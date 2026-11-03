@@ -52,8 +52,7 @@ struct StatusCluster: View {
         let waiting = shell.bell.waiting
         if running > 0 || waiting > 0 {
             HStack(spacing: Space.s1) {
-                Image(systemName: waiting > 0 ? "exclamationmark.triangle" : "waveform")
-                    .foregroundStyle(palette.tone(waiting > 0 ? .warn : .run).ink).accessibilityHidden(true)
+                StatusDot(color: palette.tone(waiting > 0 ? .warn : .run).ink)
                 Text("\(running) running").monospacedDigit()
                 if waiting > 0 { Text("· \(waiting) waiting").fontWeight(.semibold) }
             }
@@ -66,7 +65,7 @@ struct StatusCluster: View {
 
 private struct StatusButton: View {
     let title: String?
-    let symbol: String
+    let symbol: String?
     let label: String
     var on = false
     let action: () -> Void
@@ -77,7 +76,7 @@ private struct StatusButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s1) {
-                Image(systemName: symbol).accessibilityHidden(true)
+                if let symbol { Image(systemName: symbol).accessibilityHidden(true) } else { CoreMark() }
                 if let title { Text(title).lineLimit(1) }
             }
             .font(.system(size: MacTextSize.body))
@@ -94,5 +93,14 @@ private struct StatusButton: View {
         .animation(Motion.out(Motion.hover), value: hovering)
         .help(label)
         .accessibilityLabel(label)
+    }
+}
+
+/// The blue mark beside "Home Core": a rounded diamond, the connection state is the word next to it.
+private struct CoreMark: View {
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        coreShape(Space.s1).fill(palette.primary).frame(width: Space.s2 + Space.s1, height: Space.s2 + Space.s1)
+            .rotationEffect(.degrees(45)).accessibilityHidden(true)
     }
 }

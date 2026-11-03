@@ -8,7 +8,11 @@ public struct HomeSnapshot: Sendable {
         public let online: Bool
         public let slots: Int
         public let used: Int
-        public init(id: String, os: String, online: Bool, slots: Int, used: Int) {
+        /// Host load samples, 0...1, oldest first.
+        public let load: [Double]
+        public var loadPercent: Int { Int(((load.last ?? 0) * 100).rounded()) }
+        public init(id: String, os: String, online: Bool, slots: Int, used: Int, load: [Double] = []) {
+            self.load = load
             self.id = id
             self.os = os
             self.online = online
@@ -59,6 +63,8 @@ public struct HomeSnapshot: Sendable {
     public var running: [Run]
     public var events: [Event]
     public var board: Board
+    /// Seconds between host-load samples, when the app samples them.
+    public var loadSampleSeconds: Int?
     public var spendToday: Double
     public var monthTokensUsed: Double
 
@@ -66,13 +72,15 @@ public struct HomeSnapshot: Sendable {
     public var machinesOnline: Int { machines.filter(\.online).count }
 
     public static let empty = HomeSnapshot(
-        greetingName: nil, coreName: "Home Core", machines: [], running: [], events: [], board: Board(), spendToday: 0,
-        monthTokensUsed: 0)
+        greetingName: nil, coreName: "Home Core", machines: [], running: [], events: [], board: Board(),
+        loadSampleSeconds: nil,
+        spendToday: 0, monthTokensUsed: 0)
 
     public init(
         greetingName: String?, coreName: String, machines: [Machine], running: [Run], events: [Event], board: Board,
-        spendToday: Double, monthTokensUsed: Double
+        loadSampleSeconds: Int? = nil, spendToday: Double, monthTokensUsed: Double
     ) {
+        self.loadSampleSeconds = loadSampleSeconds
         self.greetingName = greetingName
         self.coreName = coreName
         self.machines = machines

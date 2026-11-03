@@ -25,7 +25,10 @@ struct LauncherView: View {
                     .font(.system(size: MacTextSize.large))
                     .focused($focused)
                     .onSubmit { run(rows) }
-                    .onExitCommand { shell.closeTopmost() }
+                    .onKeyPress(.escape) {
+                        shell.closeTopmost()
+                        return .handled
+                    }
                     .onKeyPress(.downArrow) { move(1, rows.count) }
                     .onKeyPress(.upArrow) { move(-1, rows.count) }
                     .accessibilityLabel("Launcher")
@@ -58,7 +61,11 @@ struct LauncherView: View {
         .corePanel(radius: Radius.panel, padding: 0)
         .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .background { numberShortcuts(rows) }
-        .onAppear { focused = true }
+        .task {
+            // The root holds focus while the window is calm; take it once the overlay is in place.
+            try? await Task.sleep(for: .milliseconds(80))
+            focused = true
+        }
         .onChange(of: query) { selection = 0 }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Launcher")

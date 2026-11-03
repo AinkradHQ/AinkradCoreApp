@@ -32,6 +32,8 @@ private struct PanelModifier: ViewModifier {
                     shape.fill(palette.panelStrong)
                 } else {
                     shape.fill(.regularMaterial).environment(\.colorScheme, .dark)
+                    // Day is deep blue glass (the prototype's `panelGlass`), not a grey material.
+                    if palette.isDay { shape.fill(palette.glassTint.opacity(0.5)) }
                 }
             }
     }

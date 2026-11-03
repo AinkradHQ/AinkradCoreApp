@@ -5,12 +5,19 @@ import SwiftUI
 /// Debug and preview only: the sample world the shell runs on until the networking lane lands. No fake networking, no persistence.
 /// Names follow the prototype's `data.js` (Home Core, mac-studio / linux-01 / oracle-arm, claude-code / codex).
 extension HomeSnapshot {
+    /// A steady load line ending at `last`, with a little deterministic wobble.
+    static func series(_ last: Double, _ wobble: Double, _ seed: Double) -> [Double] {
+        (0..<24).map { i in i == 23 ? last : max(0, last + wobble * sin(Double(i) * 0.9 + seed)) }
+    }
+
     public static let sample = HomeSnapshot(
         greetingName: "Ahmed", coreName: "Home Core",
         machines: [
-            Machine(id: "mac-studio", os: "macOS 27", online: true, slots: 4, used: 2),
-            Machine(id: "linux-01", os: "Ubuntu 26.04", online: true, slots: 2, used: 0),
-            Machine(id: "oracle-arm", os: "Ubuntu 26.04 (arm64)", online: true, slots: 2, used: 1),
+            Machine(id: "mac-studio", os: "macOS 27", online: true, slots: 4, used: 2, load: series(0.19, 0.04, 1)),
+            Machine(id: "linux-01", os: "Ubuntu 26.04", online: true, slots: 2, used: 0, load: series(0.15, 0.03, 2)),
+            Machine(
+                id: "oracle-arm", os: "Ubuntu 26.04 (arm64)", online: true, slots: 2, used: 1,
+                load: series(0.10, 0.03, 3)),
         ],
         running: [
             Run(id: "s1", tool: "claude-code", name: "E2-14 Citadel bootstrap", minutes: 38),
@@ -24,7 +31,8 @@ extension HomeSnapshot {
                 id: "e2", text: "cargo test passed · 412 tests", source: "mac-studio", minutesAgo: 3,
                 symbol: "checkmark"),
         ],
-        board: Board(todo: 2, doing: 2, review: 2, blocked: 1, done: 3), spendToday: 18.60, monthTokensUsed: 0.77)
+        board: Board(todo: 2, doing: 2, review: 2, blocked: 1, done: 3), loadSampleSeconds: 3, spendToday: 18.60,
+        monthTokensUsed: 0.77)
 }
 
 @MainActor

@@ -10,19 +10,29 @@ struct HomeView: View {
     private static let right: [[WidgetKind]] = [[.machines], [.board], [.events]]
 
     var body: some View {
-        ZStack(alignment: .top) {
-            HStack(alignment: .top) {
-                column(Self.left)
-                Spacer(minLength: Space.s8)
-                column(Self.right)
+        GeometryReader { geo in
+            let design = ShellMetrics.designSize
+            let u = min(geo.size.width / design.width, geo.size.height / design.height)
+            ZStack(alignment: .topLeading) {
+                HStack(alignment: .top) {
+                    column(Self.left)
+                    Spacer(minLength: 0)
+                    column(Self.right)
+                }
+                .padding(.horizontal, ShellMetrics.widgetInset)
+                .padding(.top, ShellMetrics.widgetTop)
+                greeting.frame(maxWidth: .infinity).padding(.top, Self.greetingTop)
+                controls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s4)
             }
-            .padding(.horizontal, ShellMetrics.widgetInset)
-            .padding(.top, ShellMetrics.topBar)
-            greeting.frame(maxHeight: .infinity, alignment: .center).padding(.bottom, Space.s8 * 4)
-            controls.frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s5)
+            .frame(width: design.width, height: design.height, alignment: .topLeading)
+            .scaleEffect(u, anchor: .topLeading)
+            .frame(width: design.width * u, height: design.height * u, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    /// The prototype puts the greeting in the upper third (about 28% of the height), not the middle.
+    private static let greetingTop = ShellMetrics.designSize.height * 0.24
 
     private func column(_ rows: [[WidgetKind]]) -> some View {
         VStack(alignment: .leading, spacing: ShellMetrics.widgetGap) {
@@ -52,7 +62,7 @@ struct HomeView: View {
     private var greeting: some View {
         VStack(spacing: Space.s2) {
             Text(shell.home.greetingName.map { "\(Self.dayPart), \($0)" } ?? Self.dayPart)
-                .font(.system(size: MacTextSize.large * 1.6, weight: .semibold))
+                .font(.system(size: MacTextSize.large * 1.5, weight: .semibold))
             HStack(spacing: Space.s2) {
                 Text("Press")
                 CoreKeycap("⌘K")

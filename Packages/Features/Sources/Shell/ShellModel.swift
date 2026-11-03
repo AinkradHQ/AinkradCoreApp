@@ -67,6 +67,8 @@ public enum ShellOverlay: Hashable, Sendable { case settings, shortcuts }
 public final class ShellModel {
     public var surface: ShellSurface = .home
     public private(set) var panes: [PaneSpec] = []
+    /// Each pane's share of the row; equal until a seam is dragged (`tiles.js` re-equalises on open and close).
+    public private(set) var paneFractions: [CGFloat] = []
     /// Focus mode shows this one pane full size.
     public var focusedPane: String?
     /// The pane the keyboard acts on (⌃⌥← / →, ⌘W).
@@ -96,6 +98,7 @@ public final class ShellModel {
                 if focusedPane != nil { focusedPane = spec.id }
             } else {
                 panes.append(spec)
+                equalise()
                 focusedPane = nil
             }
             activePane = spec.id
@@ -107,6 +110,7 @@ public final class ShellModel {
         guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
         animate {
             panes.remove(at: i)
+            equalise()
             if focusedPane == id { focusedPane = panes.first?.id }
             if activePane == id { activePane = panes.isEmpty ? nil : panes[min(i, panes.count - 1)].id }
             if panes.isEmpty { focusedPane = nil }
@@ -134,6 +138,18 @@ public final class ShellModel {
         let to = min(max(index, 0), panes.count - 1)
         guard to != from else { return }
         animate { panes.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to) }
+    }
+
+    /// Seam drag: moves the boundary between pane `i` and `i + 1`; `left` is the new fraction of pane `i`, the pair keeps its total.
+    public func setSeam(_ i: Int, leftFraction left: CGFloat) {
+        guard paneFractions.indices.contains(i + 1) else { return }
+        let pair = paneFractions[i] + paneFractions[i + 1]
+        paneFractions[i] = left
+        paneFractions[i + 1] = pair - left
+    }
+
+    private func equalise() {
+        paneFractions = panes.isEmpty ? [] : Array(repeating: 1 / CGFloat(panes.count), count: panes.count)
     }
 
     public func nudgeActivePane(_ step: Int) {
@@ -180,7 +196,9 @@ public final class ShellModel {
         self.overlay = overlay
     }
 
-    public func closeTopmost() {
+    /// Esc: closes the topmost thing. Returns false when there was nothing to close.
+    @discardableResult
+    public func closeTopmost() -> Bool {
         if launcherOpen {
             launcherOpen = false
         } else if bellOpen {
@@ -191,7 +209,10 @@ public final class ShellModel {
             overlay = nil
         } else if editingWidgets {
             editingWidgets = false
+        } else {
+            return false
         }
+        return true
     }
 
     /// Anything the shell shows over Home or the workspace.

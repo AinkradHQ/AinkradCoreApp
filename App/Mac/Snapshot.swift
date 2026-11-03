@@ -10,6 +10,10 @@ import SwiftUI
 enum SnapshotRunner {
     static func runIfRequested(_ shell: ShellModel) async {
         let env = ProcessInfo.processInfo.environment
+        if env["CORE_EXIT_FS_ATTEMPT"] != nil {
+            try? await Task.sleep(for: .seconds(3))
+            NSApp.windows.first { $0.title == "Ainkrad Core" }?.toggleFullScreen(nil)
+        }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
@@ -47,6 +51,10 @@ enum SnapshotRunner {
         await shot("05-ws2")
         pane("runners")
         await shot("06-ws3")
+        shell.setSeam(0, leftFraction: 0.5)
+        await shot("12-seam")
+        shell.closePane("runners")
+        pane("runners")
         pane("core")
         pane("citadel")
         await shot("07-wsstrip")

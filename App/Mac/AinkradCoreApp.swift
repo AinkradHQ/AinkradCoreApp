@@ -20,7 +20,7 @@ struct AinkradCoreApp: App {
         // Native full screen needs a resizable window; the enforcer keeps it from ever leaving full screen.
         .windowResizability(.contentMinSize)
         .commands {
-            ShellCommands(shell: shell)
+            ShellCommands(shell: shell, paneCount: shell.panes.count, focusMode: shell.focusedPane != nil)
             #if DEBUG
             DemoCommands(shell: shell)
             #endif

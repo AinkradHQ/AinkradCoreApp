@@ -53,6 +53,17 @@ struct PaneLayoutTests {
         #expect(l.frames[0].height == 560)
     }
 
+    @Test func fractionsSetWidthsButMinimumsHold() {
+        let area = CGSize(width: 1100, height: 700)
+        let l = PaneLayout.make(
+            minWidths: [340, 340, 340], fractions: [0.6, 0.2, 0.2], container: area, gap: 12, minHeight: 560)
+        #expect(l.frames[0].width > l.frames[1].width && l.frames.allSatisfy { $0.width >= 340 - 0.01 })
+        #expect(abs(l.frames[2].maxX - 1100) < 0.5)
+        let mixed = PaneLayout.make(
+            minWidths: [560, 340, 340], container: CGSize(width: 1400, height: 700), gap: 12, minHeight: 560)
+        #expect(mixed.frames[0].width >= 560 - 0.01 && abs(mixed.frames[2].maxX - 1400) < 0.5)
+    }
+
     @Test func nearestColumn() {
         let l = PaneLayout.make(
             minWidths: [340, 340, 340], container: CGSize(width: 1100, height: 700), gap: gap, minHeight: 560)

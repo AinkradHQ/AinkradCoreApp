@@ -9,10 +9,10 @@ PROJECT := AinkradCore.xcodeproj
 APP := build/Build/Products/Debug/Ainkrad Core.app
 PACKAGES := Packages/AinkradClient Packages/CoreUI Packages/CoreKit Packages/Features
 # Tokens.swift is generated (scripts/sync-tokens.sh) and not swift-format clean
-FORMAT_PATHS := App Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features -name '*.swift' -not -path '*/.build/*'))
+FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features -name '*.swift' -not -path '*/.build/*'))
 
 .DEFAULT_GOAL := generate
-.PHONY: generate open build test run lint format format-check sync-client clean
+.PHONY: generate open build test uitest run lint format format-check sync-client clean
 
 generate: ## Generate the Xcode project from project.yml
 	xcodegen generate --quiet
@@ -25,6 +25,9 @@ build: lint generate ## Debug build into ./build
 
 test: lint ## Package tests (the app target has none yet)
 	@for p in $(PACKAGES); do echo "swift test: $$p"; (cd $$p && swift test --quiet) || exit 1; done
+
+uitest: generate ## Keyboard-path UI tests (launch the app full screen; events go only to it)
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug -derivedDataPath build -quiet test
 
 run: build
 	open "$(APP)"

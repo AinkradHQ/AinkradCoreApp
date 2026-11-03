@@ -40,6 +40,10 @@ struct ShortcutsView: View {
                     if focused { coreShape(Radius.control).strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2) }
                 }
                 .focused($focused)
+                .onKeyPress(.escape) {
+                    shell.overlay = nil
+                    return .handled
+                }
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     ForEach(ShortcutCatalog.groups, id: \.name) { g in
@@ -72,7 +76,11 @@ struct ShortcutsView: View {
         .frame(width: Space.s8 * 14, height: Space.s8 * 16)
         .corePanel(radius: Radius.panel, padding: 0)
         .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .onAppear { focused = true }
+        .task {
+            // The root holds focus while the window is calm; take it once the overlay is in place.
+            try? await Task.sleep(for: .milliseconds(80))
+            focused = true
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Keyboard Shortcuts")
         .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.97)))
@@ -82,7 +90,15 @@ struct ShortcutsView: View {
 /// The app menus. Add to a scene with `.commands { ShellCommands(shell: shell) }`.
 public struct ShellCommands: Commands {
     let shell: ShellModel
-    public init(shell: ShellModel) { self.shell = shell }
+    /// Passed in from the App body: `Commands` do not observe `@Observable` models, so a value read from the model inside
+    /// them goes stale. The App body reads them, so the menus rebuild when they change.
+    let paneCount: Int
+    let focusMode: Bool
+    public init(shell: ShellModel, paneCount: Int, focusMode: Bool) {
+        self.shell = shell
+        self.paneCount = paneCount
+        self.focusMode = focusMode
+    }
 
     public var body: some Commands {
         CommandGroup(replacing: .appSettings) {
@@ -93,24 +109,24 @@ public struct ShellCommands: Commands {
         }
         CommandGroup(replacing: .saveItem) {
             Button("Close Pane") { if let id = shell.activePane { shell.closePane(id) } }
-                .keyboardShortcut("w").disabled(shell.panes.isEmpty)
+                .keyboardShortcut("w").disabled(paneCount == 0)
             Button("Close All Panes") { shell.closeAllPanes() }
-                .keyboardShortcut("w", modifiers: [.command, .option]).disabled(shell.panes.isEmpty)
+                .keyboardShortcut("w", modifiers: [.command, .option]).disabled(paneCount == 0)
         }
         CommandGroup(replacing: .sidebar) {
             Button("Home") { shell.show(.home) }.keyboardShortcut("0")
             Button("Workspace") { shell.show(.workspace) }.keyboardShortcut("0", modifiers: [.command, .shift])
-            Button(shell.focusedPane == nil ? "Focus Mode" : "Tile Panes") { shell.toggleFocusMode() }
-                .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(shell.panes.isEmpty)
+            Button(!focusMode ? "Focus Mode" : "Tile Panes") { shell.toggleFocusMode() }
+                .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(paneCount == 0)
             Button("Notifications") { shell.toggleBell() }.keyboardShortcut("b", modifiers: [.command, .shift])
             Divider()
-            Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(shell.panes.count < 2)
+            Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(paneCount < 2)
             Button("Previous Pane") { shell.cyclePane(-1) }.keyboardShortcut("`", modifiers: [.command, .shift])
-                .disabled(shell.panes.count < 2)
+                .disabled(paneCount < 2)
             Button("Move Pane Left") { shell.nudgeActivePane(-1) }
-                .keyboardShortcut(.leftArrow, modifiers: [.control, .option]).disabled(shell.panes.count < 2)
+                .keyboardShortcut(.leftArrow, modifiers: [.control, .option]).disabled(paneCount < 2)
             Button("Move Pane Right") { shell.nudgeActivePane(1) }
-                .keyboardShortcut(.rightArrow, modifiers: [.control, .option]).disabled(shell.panes.count < 2)
+                .keyboardShortcut(.rightArrow, modifiers: [.control, .option]).disabled(paneCount < 2)
         }
         CommandGroup(replacing: .toolbar) {}
         CommandGroup(replacing: .windowSize) {}

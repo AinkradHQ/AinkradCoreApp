@@ -52,6 +52,7 @@ public struct ShellView: View {
         .focusable()
         .focused($calm)
         .focusEffectDisabled()
+        .onKeyPress(.escape) { shell.closeTopmost() ? .handled : .ignored }
         .onAppear { calm = true }
         .ignoresSafeArea()
     }
@@ -66,9 +67,12 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var covers: some View {
-        if shell.coverOpen {
+        if shell.launcherOpen || shell.overlay != nil || shell.addingWidget {
             palette.bg.opacity(0.45).onTapGesture { shell.closeTopmost() }
                 .transition(.opacity).accessibilityHidden(true)
+        } else if shell.bellOpen {
+            // The bell glance does not dim Home (prototype); a click outside still closes it.
+            Color.clear.contentShape(Rectangle()).onTapGesture { shell.closeTopmost() }.accessibilityHidden(true)
         }
         if shell.launcherOpen {
             LauncherView(shell: shell).frame(maxHeight: .infinity, alignment: .center)

@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -14,7 +15,8 @@ struct WorkspaceView: View {
                 width: geo.size.width - ShellMetrics.paneInset * 2,
                 height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset)
             let layout = PaneLayout.make(
-                minWidths: shell.panes.map(\.minWidth), container: area, gap: ShellMetrics.paneGap,
+                minWidths: shell.panes.map(\.minWidth), fractions: shell.paneFractions, container: area,
+                gap: ShellMetrics.paneGap,
                 minHeight: ShellMetrics.paneMinHeight)
             ZStack(alignment: .topLeading) {
                 if shell.panes.isEmpty { empty }
@@ -22,6 +24,11 @@ struct WorkspaceView: View {
                     ZStack(alignment: .topLeading) {
                         ForEach(Array(shell.panes.enumerated()), id: \.element.id) { i, spec in
                             pane(spec, index: i, layout: layout, area: area)
+                        }
+                        if shell.focusedPane == nil && !layout.isStrip && drag == nil {
+                            ForEach(0..<max(shell.panes.count - 1, 0), id: \.self) { i in
+                                Seam(shell: shell, index: i, layout: layout, area: area)
+                            }
                         }
                     }
                     .frame(
@@ -127,5 +134,57 @@ private struct PaneHost: View {
                 )
                 .accessibilityHidden(true)
         }
+    }
+}
+
+/// The gap between two panes is a handle: drag it to trade width between them, never below either pane's minimum.
+private struct Seam: View {
+    @Bindable var shell: ShellModel
+    let index: Int
+    let layout: PaneLayout
+    let area: CGSize
+    @State private var start: (left: CGFloat, right: CGFloat)?
+    @State private var hovering = false
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        let left = layout.frames[index]
+        let right = layout.frames[index + 1]
+        let gap = ShellMetrics.paneGap
+        Color.clear
+            .frame(width: gap, height: left.height)
+            .overlay {
+                coreShape(Space.s1).fill(palette.primary.opacity(hovering || start != nil ? 0.9 : 0))
+                    .frame(width: Space.s1, height: Space.s8 * 2)
+            }
+            .contentShape(Rectangle())
+            .offset(x: left.maxX, y: 0)
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { v in
+                        let s = start ?? (left.width, right.width)
+                        start = s
+                        let minL = shell.panes[index].minWidth
+                        let minR = shell.panes[index + 1].minWidth
+                        let target = min(max(s.left + v.translation.width, minL), s.left + s.right - minR)
+                        let avail = area.width - gap * CGFloat(shell.panes.count - 1)
+                        shell.setSeam(index, leftFraction: target / avail)
+                    }
+                    .onEnded { _ in start = nil }
+            )
+            .accessibilityElement()
+            .accessibilityLabel("Resize \(shell.panes[index].title) and \(shell.panes[index + 1].title)")
+            .accessibilityAdjustableAction { dir in
+                let avail = area.width - gap * CGFloat(shell.panes.count - 1)
+                let step: CGFloat = Space.s8 * (dir == .increment ? 1 : -1)
+                let minL = shell.panes[index].minWidth
+                let minR = shell.panes[index + 1].minWidth
+                let target = min(max(left.width + step, minL), left.width + right.width - minR)
+                shell.setSeam(index, leftFraction: target / avail)
+            }
     }
 }
