@@ -4,6 +4,9 @@
 # plays the approver. Modes:
 #   scripts/app-it.sh uitest   pairs the app end to end through XCUITest (CORE_IT=1): code typed, check code compared,
 #                              approved with ainkradctl, Devices lists this Mac
+#   scripts/app-it.sh terminals  adds a runner with a pty driver to the Core, then (1) CoreKit's live terminal test (open, echo,
+#                              detach, reattach after the last byte, close) and (2) the app's XCUITest: New terminal, type
+#                              echo, see it, Detach, Attach here, End terminal. Needs ainkrad-runner and ainkrad-ptyhost built.
 #   scripts/app-it.sh shots    runs the app's self-snapshot walk (CORE_PAIR_SNAPSHOT, launched by XCUITest for its window
 #                              server) against the Core; THEME=light|dark,
 #                              OUT=<dir> for the PNGs; a second device claims the app's Add device code
@@ -16,11 +19,11 @@ MODE=${1:-uitest}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 CORE=${CORE:-$HERE/../AinkradCore}
 BIN=$CORE/target/debug
-SRV=$BIN/ainkrad-core-server CTL=$BIN/ainkradctl
+SRV=$BIN/ainkrad-core-server CTL=$BIN/ainkradctl RUN=$BIN/ainkrad-runner PTYH=$BIN/ainkrad-ptyhost
 command -v cargo >/dev/null || PATH=/opt/homebrew/opt/rustup/bin:$PATH
-if [ ! -x "$SRV" ] || [ ! -x "$CTL" ]; then
+if [ ! -x "$SRV" ] || [ ! -x "$CTL" ] || { [ "$MODE" = terminals ] && { [ ! -x "$RUN" ] || [ ! -x "$PTYH" ]; }; }; then
   (cd "$CORE" && nice -n 19 env CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=line-tables-only \
-    cargo build -q -p ainkrad-core-server -p ainkrad-ctl)
+    cargo build -q -p ainkrad-core-server -p ainkrad-ctl -p ainkrad-runner -p ainkrad-ptyhost)
 fi
 
 W=${APP_IT_DIR:-/private/tmp/claude-501/app-it}
@@ -50,7 +53,8 @@ wait_for() { local end=$((SECONDS + $1)); shift; until "$@" >/dev/null 2>&1; do 
 
 echo "== core: init + serve on $URL (state in $HOME_DIR, not the real state dir)"
 "$SRV" init "$HOME_DIR" >/dev/null 2>"$W/init.err"
-"$SRV" serve --config "$HOME_DIR/config.toml" --listen "loopback:$PORT" 2>"$W/serve.log" >/dev/null &
+PLAIN=; [ "$MODE" = terminals ] && PLAIN=--allow-plain-runner   # the runner pairs over loopback HTTP
+"$SRV" serve --config "$HOME_DIR/config.toml" --listen "loopback:$PORT" $PLAIN 2>"$W/serve.log" >/dev/null &
 PIDS+=($!)
 wait_for 30 test -S "$SOCK" && wait_for 30 curl -fsS "$URL/healthz" || { echo "the Core did not start"; tail -n5 "$W/serve.log"; exit 1; }
 
@@ -70,6 +74,36 @@ echo y >&3; exec 3>&-
 wait "$BOOT" && wait "$PAIR" || { echo "bootstrap or pair failed"; exit 1; }
 [ "$(field "$W/pair-a.out" status)" = active ] || { echo "device A not active"; exit 1; }
 echo "   admin device $(field "$W/pair-a.out" device) active, Core $CORE_FP"
+
+# A runner with a pty driver, and a second device for CoreKit's live test (terminal scope, no admin).
+if [ "$MODE" = terminals ]; then
+  echo "== runner with pty: pair, approve, connect"
+  RSTATE=$W/runner; mkdir -p "$W/tmp"
+  a device add vm --kind runner >"$W/add-r.out" || { echo "runner device add failed"; exit 1; }
+  "$RUN" pair "$URL" --code "$(field "$W/add-r.out" code)" --state "$RSTATE" >"$W/pair-r.out" 2>&1 </dev/null &
+  PIDS+=($!); PR=$!
+  runner_sas() { grep -E '^ +[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$' "$W/pair-r.out" | tr -d ' '; }
+  wait_for 20 runner_sas || { echo "the runner showed no check code"; exit 1; }
+  a device approve "$(field "$W/add-r.out" pairing_id)" "$(runner_sas)" >/dev/null || { echo "approving the runner failed"; exit 1; }
+  wait "$PR" || { echo "the runner's pairing failed"; exit 1; }
+  RID=$(sed -n 's/^Paired as \(d_[A-Za-z0-9]*\) with the Core.*/\1/p' "$W/pair-r.out")
+  env TMPDIR="$W/tmp" AINKRAD_PTYHOST="$PTYH" "$RUN" connect --state "$RSTATE" --enable-pty >/dev/null 2>"$W/runner.log" </dev/null &
+  PIDS+=($!)
+  runner_up() { a --json runner show "$RID" | grep -q '"online": *true'; }
+  wait_for 60 runner_up || { echo "the runner did not come online"; tail -n5 "$W/runner.log"; exit 1; }
+  echo "   runner $RID online with pty"
+  [ "${APP_IT_HOLD:-0}" = 1 ] && { echo "== holding for manual poking: W=$W URL=$URL RID=$RID"; sleep 3000; }
+  a device add core-it --scopes read,terminal >"$W/add-ck.out" || { echo "device add failed"; exit 1; }
+  CK_CODE=$(field "$W/add-ck.out" code) CK_PAIRING=$(field "$W/add-ck.out" pairing_id); CK_SAS=$W/ck.sas
+  (
+    wait_for 120 test -s "$CK_SAS" || exit 1
+    a device approve "$CK_PAIRING" "$(cat "$CK_SAS")" >"$W/approve-ck.out" 2>&1 || { echo "   approver: CoreKit device failed"; exit 1; }
+  ) &
+  PIDS+=($!)
+  echo "== CoreKit live terminal test (CORE_IT=1)"
+  (cd "$HERE/Packages/CoreKit" && CORE_IT=1 CORE_IT_TERMINALS=1 CORE_IT_URL="$URL" CORE_IT_CODE="${CK_CODE//-/}" CORE_IT_SAS_FILE="$CK_SAS" \
+    nice -n 19 swift test --filter LiveTerminalTests 2>&1 | grep -E "IT |✔|✘|Issue|error:|Test run" ) || { echo "CoreKit live test failed"; exit 1; }
+fi
 
 echo "== pairing for the Mac app (scopes read,approve,admin,terminal,agent)"
 a device add mac-app --scopes read,approve,admin,terminal,agent >"$W/add.out" || { echo "device add failed"; exit 1; }
@@ -119,6 +153,17 @@ if [ "$MODE" = shots ]; then
   exit 0
 fi
 
+if [ "$MODE" = terminals ]; then
+  echo "== xcodebuild test (CORE_IT=1): the app opens, uses, detaches, reattaches and ends a terminal"
+  cd "$HERE"
+  TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
+    TEST_RUNNER_CORE_IT_SHOTS="${OUT:-$W}" \
+    nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
+    -only-testing:AinkradCoreMacUITests/TerminalsLiveUITests test 2>&1 | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
+  STATUS=${PIPESTATUS[0]}
+  echo "== done: xcodebuild exit $STATUS"
+  exit "$STATUS"
+fi
 echo "== xcodebuild test (CORE_IT=1): the app pairs end to end"
 cd "$HERE"
 TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \

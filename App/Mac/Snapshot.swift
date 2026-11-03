@@ -17,6 +17,7 @@ enum SnapshotRunner {
             NSApp.windows.first { $0.title == "Ainkrad Core" }?.toggleFullScreen(nil)
         }
         if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
+        if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)

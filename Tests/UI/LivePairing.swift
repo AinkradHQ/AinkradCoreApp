@@ -1,0 +1,49 @@
+import XCTest
+
+/// Pairs the launched app with the local throwaway Core the way a person does: typed code, check code compared, approver
+/// approves (`scripts/app-it.sh` plays it from the file the app writes). Leaves the desktop open.
+@MainActor
+enum LivePairing {
+    static func pair(_ app: XCUIApplication, env: [String: String]) throws {
+        let url = try XCTUnwrap(env["CORE_IT_URL"])
+        let code = try XCTUnwrap(env["CORE_IT_CODE"])  // ABCDEFGHJK, no dash
+        let sasFile = try XCTUnwrap(env["CORE_IT_SAS_FILE"])
+        let address = app.textFields["Core address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 20), "first run shows the connect form")
+        XCTAssertFalse(app.buttons["Show workspace"].exists, "no desktop before pairing")
+        let pair = app.buttons["Pair this Mac"]
+        XCTAssertFalse(pair.isEnabled, "nothing typed: Pair is off")
+
+        address.click()
+        address.typeText(url)
+        let field = app.textFields["Pairing code"]
+        field.click()
+        field.typeText(code.lowercased())  // typed in lower case, no dash: it formats itself
+        let dashed = "\(code.prefix(5))-\(code.dropFirst(5))"
+        let formatted = NSPredicate(format: "value == %@", dashed)
+        let wait = XCTNSPredicateExpectation(predicate: formatted, object: field)
+        XCTAssertEqual(XCTWaiter().wait(for: [wait], timeout: 5), .completed, "case-insensitive, auto-dash")
+        XCTAssertTrue(pair.isEnabled)
+        pair.click()
+
+        let sas = app.descendants(matching: .any)["sas"].firstMatch
+        XCTAssertTrue(sas.waitForExistence(timeout: 30), "the claim shows the check code")
+        let shown = (sas.label).replacingOccurrences(of: "Check code ", with: "").replacingOccurrences(
+            of: " ", with: "")
+        XCTAssertEqual(shown.count, 16, "16 characters in four groups")
+        if let written = try? String(contentsOfFile: sasFile, encoding: .utf8) {
+            XCTAssertEqual(
+                written.replacingOccurrences(of: "-", with: ""), shown,
+                "the file the approver reads is what is on screen")
+        }
+        app.buttons["It matches"].click()
+
+        let open = app.buttons["Open Ainkrad Core"]
+        XCTAssertTrue(open.waitForExistence(timeout: 90), "the approver approved with the same check code")
+        open.click()
+
+        XCTAssertTrue(app.buttons["Show workspace"].waitForExistence(timeout: 30), "the desktop opens")
+        XCTAssertTrue(app.buttons["Home Core, connected"].waitForExistence(timeout: 30), "the status cluster is live")
+
+    }
+}

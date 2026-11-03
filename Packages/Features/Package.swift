@@ -21,12 +21,9 @@ let package = Package(
             name: "Shell", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
-            name: "TerminalFeed", dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
-            swiftSettings: [.swiftLanguageMode(.v5)]),
-        .target(
             name: "Terminals",
             dependencies: [
-                "Shell", "TerminalFeed", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "SwiftTerm", package: "SwiftTerm"),

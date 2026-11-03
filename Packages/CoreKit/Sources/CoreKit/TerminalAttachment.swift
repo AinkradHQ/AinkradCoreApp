@@ -234,8 +234,7 @@ extension CoreConnection {
         let socket = makeSocket(request)
         socket.start()
         do {
-            try await socket.ping()
-            let opened = try await Self.firstFrame(socket)
+            let opened = try await Self.opened(socket)
             let a = TerminalAttachment(socket: socket, clock: clock, opened: opened, after: after)
             a.start()
             return a
@@ -245,8 +244,9 @@ extension CoreConnection {
         }
     }
 
-    /// The `opened` frame, within 20 s.
-    private static func firstFrame(_ socket: any EventSocket) async throws -> TerminalOpened {
+    /// The upgrade and the runner's `opened` frame, within 20 s. (No ping: the `opened` frame is the proof, and the terminal
+    /// socket does not pong a client's ping before it has sent its first frames.)
+    private static func opened(_ socket: any EventSocket) async throws -> TerminalOpened {
         try await withThrowingTaskGroup(of: TerminalOpened.self) { group in
             group.addTask {
                 while true {
@@ -260,7 +260,9 @@ extension CoreConnection {
             }
             group.addTask {
                 try await Task.sleep(for: .seconds(20))
-                throw CoreError.offline("the terminal did not answer")
+                let status = socket.responseStatus
+                socket.cancel()  // the ping and the read do not watch for cancellation: closing the socket frees them
+                throw CoreError.offline("the terminal did not answer (HTTP \(status ?? 0))")
             }
             defer { group.cancelAll() }
             return try await group.next()!
@@ -288,7 +290,10 @@ extension CoreConnection {
         case 429?:
             return CoreError.http(
                 status: 429, code: "too_many_attaches", message: "Too many clients are attached to this terminal.")
-        default: return CoreError.offline("the terminal connection dropped")
+        default:
+            return CoreError.offline(
+                "the terminal connection dropped (HTTP \(socket.responseStatus ?? 0), close \(socket.closeCode)): \(error)"
+            )
         }
     }
 }

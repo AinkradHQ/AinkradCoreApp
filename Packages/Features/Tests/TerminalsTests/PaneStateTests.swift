@@ -26,10 +26,13 @@ import Testing
         #expect(!v.screenVisible)
     }
 
-    @Test func detachedAndOrphaned() {
-        #expect(view(item()).card?.title == "Still running")
+    @Test func detachedIsRunningNotAttachedAndOrphanedAddsTheIdleNote() {
+        let plain = view(item())
+        #expect(plain.card?.title == "Still running" && plain.card?.note == "Needs Touch ID.")
+        // The Core flags every running terminal with no client as orphaned: it is the same state, with the idle rule in words.
         let o = view(item(orphaned: true))
-        #expect(o.chip.label == "Closes when idle" && o.banner?.tone == .warn && o.card?.actions == [.attach])
+        #expect(o.chip.label == "Running, not attached" && o.card?.actions == [.attach])
+        #expect(o.card?.note?.contains("terminal.idle_secs") == true && o.info.contains("closes when idle"))
     }
 
     @Test func endedStatesAreReadOnlyOrGone() {

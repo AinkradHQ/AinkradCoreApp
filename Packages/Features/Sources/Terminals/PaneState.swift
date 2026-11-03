@@ -213,27 +213,18 @@ struct PaneView: Equatable {
                         note: "Needs Touch ID. The screen repaints from a snapshot.", actions: [.attach]),
                     info: "Not attached here · \(sizeText) · \(others)", controls: .endOnly, screenVisible: false)
             }
-            if t.orphaned {
-                return PaneView(
-                    chip: .init(label: "Closes when idle", tone: .warn, symbol: "clock"),
-                    banner: .init(
-                        tone: .warn, title: "No one is attached: it closes when idle",
-                        detail:
-                            "No client is attached. The Core closes an idle terminal after terminal.idle_secs; attaching keeps it."
-                    ),
-                    card: .init(
-                        title: "Idle terminal", body: "This terminal on \(machine) has had no client for a while.",
-                        note: "Needs Touch ID.", actions: [.attach]),
-                    info: "Not attached · idle", controls: .endOnly, screenVisible: false)
-            }
             return PaneView(
                 chip: .init(label: "Running, not attached", tone: .queue, symbol: "pause.circle"),
                 card: .init(
                     title: "Still running",
                     body:
                         "This terminal is running on \(machine) with no one attached. Detaching never stops it. Attach to see it again.",
-                    note: "Needs Touch ID.", actions: [.attach]),
-                info: "Nobody is attached", controls: .endOnly, screenVisible: false)
+                    note: t.orphaned
+                        ? "Needs Touch ID. The Core closes a terminal nobody attaches to once it has been idle past terminal.idle_secs."
+                        : "Needs Touch ID.",
+                    actions: [.attach]),
+                info: t.orphaned ? "Nobody is attached · closes when idle" : "Nobody is attached",
+                controls: .endOnly, screenVisible: false)
         }
     }
 

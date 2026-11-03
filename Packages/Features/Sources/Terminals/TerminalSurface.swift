@@ -1,16 +1,15 @@
 import AppKit
 import SwiftTerm
 import SwiftUI
-import TerminalFeed
 
-/// The SwiftTerm view for one terminal, and the only place that touches it. Output is fed through `TerminalFeeder`, a serial
-/// background queue, so the main actor does view updates and nothing else.
+/// The SwiftTerm view for one terminal, and the only place that touches it. Bytes arrive already decoded and in frames of at
+/// most 32 KiB (the runner coalesces), one frame per main-actor turn; the emulator draws into AppKit views while it parses, so
+/// it has to run on the main actor (SwiftTerm's note that `feed` may run elsewhere does not hold: it crashed on a cursor view).
 @MainActor
 final class TerminalSurface: NSObject, TerminalViewDelegate {
     /// What the pane lays out.
     let container = SurfaceContainer()
     private let term: TerminalView
-    private let feeder: TerminalFeeder
     /// Typed or pasted bytes.
     var onInput: ((Data) -> Void)?
     /// The window now fits this many columns and rows (only while the surface fills its pane).
@@ -19,7 +18,6 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
 
     override init() {
         term = TerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
-        feeder = TerminalFeeder(view: term)
         super.init()
         term.terminalDelegate = self
         term.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -41,10 +39,10 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
 
     // MARK: output
 
-    /// Draws `data`. `drawn` runs on the feed queue once SwiftTerm has taken it (credit goes back from there).
-    func feed(_ data: Data, repaint: Bool = false, drawn: @escaping @Sendable (Int) -> Void) {
-        let n = data.count
-        feeder.feed(data, reset: repaint) { drawn(n) }
+    /// Draws `data`; `repaint` clears the screen first (a snapshot).
+    func feed(_ data: Data, repaint: Bool = false) {
+        if repaint { term.feed(text: "\u{1b}c") }
+        term.feed(byteArray: [UInt8](data)[...])
     }
 
     /// The last of what is on screen and in the scrollback, as text: for VoiceOver and the live test.
@@ -123,6 +121,7 @@ final class SurfaceContainer: NSView {
     override func isAccessibilityElement() -> Bool { true }
     override func accessibilityRole() -> NSAccessibility.Role? { .textArea }
     override func accessibilityLabel() -> String? { "Terminal screen" }
+    override func accessibilityIdentifier() -> String { "Terminal screen" }
     override func accessibilityValue() -> Any? {
         let text: String? = MainActor.assumeIsolated { surface?.visibleText() }
         return text

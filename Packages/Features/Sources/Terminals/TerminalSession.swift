@@ -43,7 +43,8 @@ final class TerminalSession {
     var machine: String { runner?.name ?? item.runner }
 
     func apply(item new: TerminalItem, runner: RunnerItem?) {
-        // Attached here counts one of the Core's attachments: keep our own view of the size while we hold the socket.
+        // Only a real change is a change: a refetch that found nothing new must not redraw the pane.
+        guard item != new || self.runner != runner else { return }
         item = new
         self.runner = runner
         onChange?()
@@ -123,11 +124,13 @@ final class TerminalSession {
                 firstOutputAfterReattach = false
                 note = .resumed(from: after, to: l.opened.seq)
             }
-            surface.feed(d) { l.drawn($0) }
+            surface.feed(d)
+            l.drawn(d.count)
         case .snapshot(let d):
             if after > 0 { note = .repainted }
             firstOutputAfterReattach = false
-            surface.feed(d, repaint: true) { l.drawn($0) }
+            surface.feed(d, repaint: true)
+            l.drawn(d.count)
         case .exited(let code, let signal):
             item.status = "exited"
             item.exitCode = code
@@ -238,6 +241,15 @@ final class TerminalSession {
     func refresh() async {
         if let t = try? await service.terminal(id) { item = t }
     }
+
+    #if DEBUG
+    /// Debug only: puts the session in a state without a Core, for the demo.
+    func debugForce(link: Link, note: ResumeNote?) {
+        self.link = link
+        self.note = note
+        onChange?()
+    }
+    #endif
 
     // MARK: typing and size
 
