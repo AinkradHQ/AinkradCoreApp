@@ -92,6 +92,9 @@ extension View {
         modifier(CoreAnimationModifier(animation: animation, value: value))
     }
 
+    /// The disabled look every control shares.
+    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
+
     /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
     public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
         overlay {

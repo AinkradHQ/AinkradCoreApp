@@ -102,7 +102,7 @@ private struct RowChrome: View {
                 if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
             }
             .coreFocusRing(focused || forced == .focused, radius: Radius.row, palette: palette)
-            .opacity(enabled ? 1 : 0.45)
+            .coreDimWhenDisabled(enabled)
             .animation(Motion.out(Motion.hover), value: hover)
             .onHover { hovering = $0 }
             .focusEffectDisabled()

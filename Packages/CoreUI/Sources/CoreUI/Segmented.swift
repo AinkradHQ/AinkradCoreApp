@@ -37,7 +37,7 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
         .padding(Space.s1 / 2)
         .background(palette.uDim, in: coreShape(Radius.control))
         .coreFocusRing(focused || forced == .focused, radius: Radius.control, palette: palette)
-        .opacity(enabled ? 1 : 0.45)
+        .coreDimWhenDisabled(enabled)
         .focusable(enabled)
         .focused($focused)
         .focusEffectDisabled()

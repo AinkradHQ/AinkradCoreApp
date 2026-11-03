@@ -48,7 +48,7 @@ struct RenameDialog: View {
 
     var body: some View {
         DialogCard(title: "Rename device", width: Space.s8 * 13) {
-            FieldBox(label: "Name", placeholder: "1 to 64 characters", text: $name, autofocus: true) { go() }
+            CoreTextField("Name", placeholder: "1 to 64 characters", text: $name, autofocus: true) { go() }
             StepUpBanner(app: app)
             ErrorLine(text: app.devices.dialogError)
             DialogButtons(app: app, confirm: "Rename", busy: app.devices.busy, enabled: !name.isEmpty, run: go)

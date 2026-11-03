@@ -116,8 +116,8 @@ struct FirstRunView: View {
                 Label("A QR names its Core and its fingerprint, so no address is needed.", systemImage: "qrcode")
                     .foregroundStyle(palette.text2)
             } else {
-                FieldBox(
-                    label: "Core address", placeholder: "core.example.net", text: $model.endpointText,
+                CoreTextField(
+                    "Core address", placeholder: "core.example.net", text: $model.endpointText,
                     error: model.endpointError, suffix: addressSuffix, onSubmit: { Task { await model.submit() } })
                 Text(
                     "Always https. Add a port only if it is not 443, for example core.example.net:7443. Plain http is only for a Core on this Mac."
@@ -126,8 +126,8 @@ struct FirstRunView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             if pasteQR {
-                FieldBox(
-                    label: "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
+                CoreTextField(
+                    "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
                     mono: true, autofocus: true, onSubmit: { Task { await model.submit() } })
             } else {
                 CodeBoxes(
