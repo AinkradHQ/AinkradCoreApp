@@ -5,7 +5,10 @@ import PackageDescription
 let package = Package(
     name: "Features",
     platforms: [.macOS(.v14)],
-    products: [.library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"])],
+    products: [
+        .library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"]),
+        .library(name: "Agents", targets: ["Agents"]),
+    ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.13.3"),
@@ -15,14 +18,25 @@ let package = Package(
             name: "Shell", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
-            name: "Pairing",
+            name: "Agents",
             dependencies: [
                 "Shell", .product(name: "CoreUI", package: "CoreUI"), .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
+            name: "Pairing",
+            dependencies: [
+                "Shell", "Agents", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "ShellTests", dependencies: ["Shell"]),
+        .testTarget(
+            name: "AgentsTests", dependencies: ["Agents", "Shell", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
 )

@@ -40,6 +40,8 @@ targets:
         product: Shell
       - package: Features
         product: Pairing
+      - package: Features
+        product: Agents
     settings:
       base:
         PRODUCT_NAME: Ainkrad Core

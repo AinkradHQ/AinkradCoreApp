@@ -1,3 +1,4 @@
+import Agents
 import AinkradClient
 import CoreKit
 import Foundation
@@ -76,11 +77,18 @@ protocol CoreService: Sendable {
     func lockouts() async throws -> [LockoutInfo]
     func clearLockout(_ key: String) async throws
     func events() -> AsyncStream<ServiceEvent>
+    /// The agent routes of this Core; nil where there is no Core to ask (tests, the demo).
+    var agentsAPI: (any AgentsAPI)? { get }
+}
+
+extension CoreService {
+    var agentsAPI: (any AgentsAPI)? { nil }
 }
 
 struct LiveCoreService: CoreService {
     let connection: CoreConnection
     var deviceID: String { connection.identity.deviceID }
+    var agentsAPI: (any AgentsAPI)? { LiveAgentsAPI(connection: connection) }
     private var client: Client { connection.client }
 
     func connect() async throws { try await connection.connect() }

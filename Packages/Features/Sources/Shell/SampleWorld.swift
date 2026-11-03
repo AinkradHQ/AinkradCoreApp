@@ -40,7 +40,7 @@ public enum SampleWorld {
     public static func install(into shell: ShellModel) {
         shell.home = .sample
         for e in launcherEntries(shell) { shell.launcher.register(e) }
-        shell.launcher.recents = ["core", "agents", "terminals"]
+        shell.launcher.recents = ["core", "agents.list", "terminals"]
         approvals(shell)
         shell.bell.add(
             BellItem(
@@ -98,12 +98,8 @@ public enum SampleWorld {
         }
         return [
             pane("core", "Core", "Accounts, pools, budgets and costs", "creditcard"),
-            pane("agents", "Agents", "sessions on the Home Core", "sparkles"),
             pane("terminals", "Terminals", "Rune terminals on your runners", "terminal"),
             pane("runners", "Runners", "machines and their slots", "server.rack"),
-            action(
-                "new-session", "New agent session", "start claude-code or codex on a runner", "plus",
-                sample("New agent session")),
             action(
                 "new-terminal", "New terminal", "Open a shell on a runner · needs Touch ID", "terminal",
                 sample("New terminal")),
