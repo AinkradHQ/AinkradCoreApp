@@ -92,6 +92,42 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
         #expect(asked.last?.contains("after=77") == true)
     }
 
+    @Test func aSlowConsumerLosesNoSeqAndSeesNoRepeat() async throws {
+        let h = try Harness()
+        h.core.eventLog = (1...12).map { event(Int64($0)) }
+        let conn = try h.connection()
+        var seen: [Int64] = []
+        // A buffer of 2 against a page of 12 and a consumer that dawdles: the stream must slow down, not drop.
+        for await update in conn.events(after: 0, bufferSize: 2) {
+            if case .event(let e) = update {
+                seen.append(e.seq)
+                try await Task.sleep(for: .milliseconds(15))
+                if seen.count == 12 { break }
+            }
+        }
+        #expect(seen == Array(1...12))
+    }
+
+    @Test func aFailedResyncAfterScopeChangeRetriesBeforeAnyReplay() async throws {
+        let h = try Harness()
+        h.core.latestSeq = 77
+        let sockets = SocketFactory([.closeWith(4003), .wait])
+        let conn = try h.connection(sockets: sockets)
+        var lives = 0
+        var gaps: [Int64] = []
+        // `after` is given, so the first head lookup is the one after the 4003: it fails once.
+        h.core.fail("/api/v1/events/latest", .init(status: 500, code: "internal"))
+        for await update in conn.events(after: 3) {
+            if case .gap(let f) = update { gaps.append(f) }
+            if case .live = update { lives += 1 }
+            if lives == 2 { break }
+        }
+        #expect(gaps == [77], "the gap is still reported, once, after the retry")
+        let asked = h.core.requests(to: "/api/v1/events?").map(\.target)
+        #expect(asked.dropFirst().allSatisfy { $0.contains("after=77") }, "no replay from the old cursor: \(asked)")
+        #expect(h.core.requests(to: "/api/v1/events/latest").count >= 2)
+    }
+
     @Test func pastRetentionIsAGapNotAnError() async throws {
         let h = try Harness()
         h.core.fail("/api/v1/events", .init(status: 410, code: "past_retention", extra: ["floor": 40]))

@@ -84,6 +84,23 @@ public struct PairingClaim: Sendable, Equatable {
     public let coreFingerprint: String
 }
 
+/// Where `awaitApproval` stopped.
+public enum PairingOutcome: Sendable, Equatable {
+    /// Approved and confirmed: the identity is saved and the Core pinned.
+    case paired
+    /// The approver approved, but the user has not confirmed the SAS: call `confirmSAS()` and `awaitApproval()` again, or
+    /// `cancel()`. Nothing is pinned and nothing is forgotten.
+    case awaitingConfirmation
+}
+
+/// What `cancel()` left behind.
+public enum PairingCancel: Sendable, Equatable {
+    /// Nothing was approved yet; the local state is gone and that is all.
+    case cleared
+    /// The approver had approved this device: it is still listed there, so tell the user to revoke it.
+    case revokeDeviceOnApprover(deviceID: String)
+}
+
 /// Pairing as a new device (§7.2 steps 2 to 4 and 8): `claim`, show the SAS, `confirmSAS` when the user says it matches the
 /// approver's, `awaitApproval`. The Core is pinned (the identity saved) only when the device is active and the SAS confirmed.
 /// A pairing in flight survives a relaunch: `resume()` picks it up.
@@ -178,10 +195,19 @@ public actor DevicePairing {
         try keyStore.savePending(p)
     }
 
-    /// Gives up: forgets the pending pairing and its keys.
-    public func cancel() throws {
+    /// Gives up on a pairing in flight: clears the pending slot and its keys. Never touches a paired device (it throws).
+    @discardableResult
+    public func cancel() throws -> PairingCancel {
+        if try keyStore.loadIdentity() != nil {
+            throw CoreError.invalidInput("This device is paired; use Forget, not cancel.")
+        }
+        let pending = try keyStore.loadPending()
         sessions = nil
-        try keyStore.wipe()
+        try keyStore.deleteKey(.routine)
+        try keyStore.deleteKey(.stepup)
+        try keyStore.clearPending()
+        if let p = pending, p.approved { return .revokeDeviceOnApprover(deviceID: p.identity.deviceID) }
+        return .cleared
     }
 
     private func sendClaim(
@@ -235,10 +261,12 @@ public actor DevicePairing {
         #endif
     }
 
-    /// Polls `POST /pair/status` (signed, session `-`) with a backoff until the approver decides. `active` with the SAS
-    /// confirmed saves the identity (the pin) and returns; `active` before the confirmation keeps waiting for `confirmSAS()`.
-    /// `rejected` or `expired` (or `timeout` passing: a pairing lives 5 minutes) forgets everything and throws `notApproved`.
-    public func awaitApproval(timeout: Duration = .seconds(330)) async throws {
+    /// Polls `POST /pair/status` (signed, session `-`) with a backoff until the approver decides. `active` stops the clock and
+    /// never forgets anything: with the SAS confirmed the identity is saved (the pin) and it returns `.paired`; without, it
+    /// returns `.awaitingConfirmation` so the UI can confirm or cancel. `rejected` or `expired` (or `timeout` passing while
+    /// still pending: a pairing lives 5 minutes) forgets everything and throws `notApproved`.
+    @discardableResult
+    public func awaitApproval(timeout: Duration = .seconds(330)) async throws -> PairingOutcome {
         guard let sessions else { throw CoreError.notPaired }
         let deadline = clock.now().addingTimeInterval(Double(timeout.components.seconds))
         var delay = 0.5
@@ -251,19 +279,21 @@ public actor DevicePairing {
                 else { throw CoreError.protocolViolation("a pairing status without a status") }
                 switch status {
                 case "active":
-                    if let p = try keyStore.loadPending(), p.sasConfirmed {
-                        try keyStore.saveIdentity(p.identity)
-                        try keyStore.clearPending()
-                        self.sessions = nil
-                        return
+                    guard var p = try keyStore.loadPending() else { throw CoreError.notPaired }
+                    guard p.sasConfirmed else {
+                        p.approved = true
+                        try keyStore.savePending(p)
+                        return .awaitingConfirmation
                     }
+                    try keyStore.saveIdentity(p.identity)
+                    try keyStore.clearPending()
+                    self.sessions = nil
+                    return .paired
                 case "pending": break
                 default: throw forget(status)
                 }
             } catch CoreError.offline {
                 // The Core may be restarting: keep asking until the pairing could not be live any more.
-            } catch CoreError.coreUnproven {
-                // Same: not evidence of anything yet.
             } catch CoreError.authFailed {
                 // A claimed-then-rejected device is refused like a stranger.
                 throw forget("rejected")

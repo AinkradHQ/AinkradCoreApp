@@ -60,6 +60,8 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
     /// A refusal to answer the next call to a path with.
     var failNext: [String: Failure] = [:]
     var latestSeq: Int64 = 0
+    /// When set, `GET /api/v1/events` serves from this log by `after` and `limit`.
+    var eventLog: [[String: Any]] = []
     var eventPages: [[String: Any]] = []
     var pairStatus = "active"
     var pairSASOverride: String?
@@ -184,6 +186,12 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
         case ("GET", "/api/v1/events"):
             let (f, _, _) = authenticate(r, session: true)
             if let f { return refuse(f) }
+            if !eventLog.isEmpty {
+                let after = r.target.split(separator: "?").last.flatMap { q in
+                    q.split(separator: "&").first { $0.hasPrefix("after=") }.flatMap { Int64($0.dropFirst(6)) }
+                }
+                return respond(200, ["items": eventLog.filter { ($0["seq"] as? Int64 ?? 0) > (after ?? 0) }])
+            }
             return eventPages.isEmpty ? respond(200, ["items": []]) : respond(200, eventPages.removeFirst())
         case ("POST", "/api/v1/auth/step-up/challenge"):
             let (f, _, session) = authenticate(r, session: true)

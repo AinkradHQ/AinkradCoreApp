@@ -15,8 +15,8 @@ public struct CoreSession: Sendable, Equatable {
 }
 
 /// Signs requests and keeps one live session: opens it (identity proof, challenge, session), refreshes it at 80 % of its life
-/// with no user interaction, reopens it after `session_expired` or a Core restart, and keeps a clock offset from
-/// nothing from `clock_skew` (the user is told, never silently re-signed). One refresh at a time; concurrent callers share it.
+/// with no user interaction, and reopens it after `session_expired` or a Core restart. It learns nothing from `clock_skew`
+/// (the user is told, never silently re-signed). One refresh at a time; concurrent callers share it.
 actor SessionManager {
     /// Refresh when this fraction of the session's life is gone.
     static let refreshFraction = 0.8

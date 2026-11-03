@@ -1,4 +1,5 @@
 import AinkradClient
+import CryptoKit
 import Foundation
 import LocalAuthentication
 import OpenAPIRuntime
@@ -123,24 +124,38 @@ public actor CoreConnection {
 
     /// A cancelled prompt is the user's choice; anything else is the Keychain or Secure Enclave failing.
     static func stepUpFailure(_ error: any Error) -> CoreError {
-        let ns = error as NSError
-        if ns.domain == LAError.errorDomain,
-            [LAError.userCancel, .appCancel, .systemCancel].contains(where: { $0.rawValue == ns.code })
-        {
-            return .stepUpUnavailable("Touch ID was cancelled.")
+        isUserCancel(error)
+            ? .stepUpUnavailable("Touch ID was cancelled.")
+            : .keyStore("The Secure Enclave could not sign the step-up.")
+    }
+
+    /// `errSecUserCanceled`, `LAError.userCancel/appCancel/systemCancel`, or either wrapped by CryptoKit or as an underlying error.
+    static func isUserCancel(_ error: any Error) -> Bool {
+        let laCancels = [LAError.userCancel, .appCancel, .systemCancel].map(\.rawValue)
+        if let ck = error as? CryptoKitError, case .underlyingCoreCryptoError(let code) = ck {
+            return Int(code) == Int(errSecUserCanceled) || laCancels.contains(Int(code))
         }
-        return .keyStore("The Secure Enclave could not sign the step-up (\(ns.domain) \(ns.code)).")
+        let ns = error as NSError
+        if (ns.domain == LAError.errorDomain && laCancels.contains(ns.code))
+            || (ns.domain == NSOSStatusErrorDomain && ns.code == Int(errSecUserCanceled))
+        {
+            return true
+        }
+        if let inner = ns.userInfo[NSUnderlyingErrorKey] as? any Error { return isUserCancel(inner) }
+        return false
     }
 
     /// The events, as an `AsyncStream` (see `EventUpdate`): HTTP replay after `after` (default: from now), then the WebSocket,
     /// reconnecting with backoff and resuming from the last seq seen. It ends on revocation, on an identity mismatch, or when
-    /// the consumer stops.
+    /// the consumer stops. A consumer that reads slowly gets backpressure: when the buffer is full the stream closes the socket,
+    /// backs off and replays from the last seq it delivered, so no event is lost or repeated.
     public nonisolated func events(after: Int64? = nil) -> AsyncStream<EventUpdate> {
-        let runner = EventRunner(
-            sessions: sessions, endpoint: endpoint, clock: clock, makeSocket: makeSocket)
-        // Bounded: a consumer that stops reading loses the oldest updates instead of growing memory without end.
-        // ponytail: a drop is silent; add a resync `.gap` on `.dropped` if a consumer ever falls this far behind.
-        return AsyncStream(bufferingPolicy: .bufferingNewest(4096)) { continuation in
+        events(after: after, bufferSize: 4096)
+    }
+
+    nonisolated func events(after: Int64?, bufferSize: Int) -> AsyncStream<EventUpdate> {
+        let runner = EventRunner(sessions: sessions, endpoint: endpoint, clock: clock, makeSocket: makeSocket)
+        return AsyncStream(bufferingPolicy: .bufferingOldest(bufferSize)) { continuation in
             let task = Task { await runner.run(after: after, into: continuation) }
             continuation.onTermination = { _ in task.cancel() }
         }

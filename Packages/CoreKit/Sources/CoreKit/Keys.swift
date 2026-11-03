@@ -71,6 +71,8 @@ public struct PendingPairing: Codable, Sendable, Equatable {
     public var sas: String
     /// The Core key is trusted: from the QR's fingerprint, or because the user confirmed the SAS matches the approver's.
     public var sasConfirmed: Bool
+    /// The Core said `active`: the approver holds this device as approved, so giving up must revoke it there.
+    public var approved: Bool = false
 }
 
 public protocol KeyStore: Sendable {

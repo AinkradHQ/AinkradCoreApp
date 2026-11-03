@@ -1,5 +1,7 @@
 import CryptoKit
 import Foundation
+import LocalAuthentication
+import Security
 import Testing
 
 @testable import CoreKit
@@ -146,14 +148,49 @@ struct StepUpTestStore: KeyStore {
         #expect(try store.loadPending() == nil)
     }
 
-    @Test func activeButUnconfirmedIsNotPinned() async throws {
+    @Test func activeButUnconfirmedWaitsForTheUserAndForgetsNothing() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = makeMemoryKeyStore()
+        let p = pairing(core, store)
+        let claim = try await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        // Approved, but the user has not said the SAS matches: no pin, no wipe, and the 5-minute clock no longer applies.
+        #expect(try await p.awaitApproval(timeout: .seconds(0)) == .awaitingConfirmation)
+        #expect(try store.loadIdentity() == nil)
+        #expect(try store.loadPending()?.approved == true && (try store.key(.routine, reason: "")) != nil)
+        // The user confirms: the next call pins.
+        try await p.confirmSAS()
+        #expect(try await p.awaitApproval() == .paired)
+        #expect(try store.loadIdentity()?.deviceID == claim.deviceID)
+    }
+
+    @Test func cancellingAnApprovedPairingSaysToRevokeItOnTheApprover() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = makeMemoryKeyStore()
+        let p = pairing(core, store)
+        let claim = try await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        _ = try await p.awaitApproval()
+        #expect(try await p.cancel() == .revokeDeviceOnApprover(deviceID: claim.deviceID))
+        #expect(try store.loadPending() == nil && (try store.key(.routine, reason: "")) == nil)
+    }
+
+    @Test func cancellingBeforeApprovalOnlyClearsLocalState() async throws {
         let core = FakeCore(clock: TestClock())
         let store = makeMemoryKeyStore()
         let p = pairing(core, store)
         _ = try await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
-        // The approver approved but the user never said the SAS matched: it waits, then gives up, and pins nothing.
-        await #expect(throws: CoreError.notApproved("expired")) { try await p.awaitApproval(timeout: .seconds(10)) }
-        #expect(try store.loadIdentity() == nil && (try store.loadPending()) == nil)
+        #expect(try await p.cancel() == .cleared)
+        #expect(try store.loadPending() == nil && (try store.key(.routine, reason: "")) == nil)
+    }
+
+    @Test func cancelNeverTouchesAPairedDevice() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = makeMemoryKeyStore()
+        let p = pairing(core, store)
+        let claim = try await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        try await p.confirmSAS()
+        #expect(try await p.awaitApproval() == .paired)
+        await #expect(throws: CoreError.self) { try await p.cancel() }
+        #expect(try store.loadIdentity()?.deviceID == claim.deviceID && (try store.key(.routine, reason: "")) != nil)
     }
 
     @Test func aQRClaimIsTrustedAtOnce() async throws {
@@ -294,9 +331,26 @@ struct StepUpTestStore: KeyStore {
         #expect(core.requests(to: "/handshake/session").count == 1, "no second session was opened for it")
     }
 
+    @Test func everyKindOfCancelReadsAsUserCancel() {
+        let cancels: [any Error] = [
+            NSError(domain: LAError.errorDomain, code: LAError.userCancel.rawValue),
+            NSError(domain: LAError.errorDomain, code: LAError.appCancel.rawValue),
+            NSError(domain: LAError.errorDomain, code: LAError.systemCancel.rawValue),
+            NSError(domain: NSOSStatusErrorDomain, code: Int(errSecUserCanceled)),
+            CryptoKitError.underlyingCoreCryptoError(error: errSecUserCanceled),
+            CryptoKitError.underlyingCoreCryptoError(error: Int32(LAError.userCancel.rawValue)),
+            NSError(
+                domain: "CryptoKit", code: 9,
+                userInfo: [
+                    NSUnderlyingErrorKey: NSError(domain: LAError.errorDomain, code: LAError.userCancel.rawValue)
+                ]),
+        ]
+        for c in cancels { #expect(CoreConnection.stepUpFailure(c) == .stepUpUnavailable("Touch ID was cancelled.")) }
+        #expect(
+            !CoreConnection.isUserCancel(NSError(domain: LAError.errorDomain, code: LAError.biometryLockout.rawValue)))
+    }
+
     @Test func cancelledAndFailedPromptsReadDifferently() {
-        let cancelled = NSError(domain: "com.apple.LocalAuthentication", code: -2)
-        #expect(CoreConnection.stepUpFailure(cancelled) == .stepUpUnavailable("Touch ID was cancelled."))
         guard case .keyStore = CoreConnection.stepUpFailure(NSError(domain: "CryptoKit", code: 1)) else {
             Issue.record("a Secure Enclave failure is not a cancel")
             return

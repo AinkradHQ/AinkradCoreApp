@@ -83,6 +83,9 @@ final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
     var responseStatus: Int? { (task.response as? HTTPURLResponse)?.statusCode }
 }
 
+/// The consumer's buffer is full: the cursor stays before the event that did not fit, and the stream replays after a pause.
+struct EventBackpressure: Error {}
+
 /// How a socket ended without an error to throw.
 enum FollowEnd { case closed, scopeChanged }
 
@@ -105,21 +108,26 @@ struct EventRunner: Sendable {
             return
         }
         var backoff = 0.25
+        var needsResync = false
         while !Task.isCancelled {
             do {
-                try await replay(&last, out)
-                let end = try await follow(&last, out)
-                if end == .scopeChanged {
+                if needsResync {
                     // Cursors count in the device's scope view, which changed: the old one means nothing now. Tell the
-                    // consumer to re-sync, and carry on from the head of the new view.
+                    // consumer to re-sync and carry on from the head of the new view; a failure here retries before any replay.
                     let head = try await latest()
                     out.yield(.gap(floor: head.seq))
                     last = head.seq
+                    needsResync = false
                 }
+                try await replay(&last, out)
+                let end = try await follow(&last, out)
+                if end == .scopeChanged { needsResync = true }
                 backoff = 0.25
                 out.yield(.reconnecting(nil))
             } catch is CancellationError {
                 return
+            } catch is EventBackpressure {
+                // Nothing to tell a consumer whose buffer is full: wait for it to catch up, then replay from `last`.
             } catch let e as CoreError {
                 if EventWire.isTerminal(e) {
                     out.yield(.ended(e))
@@ -161,7 +169,7 @@ struct EventRunner: Sendable {
             let before = last
             for item in items {
                 guard let data = try? JSONSerialization.data(withJSONObject: item) else { continue }
-                deliver(data, &last, out)
+                try deliver(data, &last, out)
             }
             // The cursor moves past an event that does not decode too, so a bad one cannot hold the replay in a loop.
             if let next = page["next_after"] as? Int64, next > last { last = next }
@@ -171,10 +179,12 @@ struct EventRunner: Sendable {
 
     /// Delivers one event: each seq once and in order. A resume may repeat what was delivered; an undecodable event is skipped
     /// but still passed by the cursor.
-    private func deliver(_ data: Data, _ last: inout Int64, _ out: AsyncStream<EventUpdate>.Continuation) {
+    private func deliver(_ data: Data, _ last: inout Int64, _ out: AsyncStream<EventUpdate>.Continuation) throws {
         guard let seq = EventWire.rawSeq(data), seq > last else { return }
+        if let event = EventWire.decode(data), case .dropped = out.yield(.event(event)) {
+            throw EventBackpressure()  // the cursor stays before this event
+        }
         last = seq
-        if let event = EventWire.decode(data) { out.yield(.event(event)) }
     }
 
     /// One WebSocket, from `last`, until it closes. Throws what ends or interrupts it.
@@ -200,10 +210,11 @@ struct EventRunner: Sendable {
                 out.yield(.live)
                 while true {
                     let data = try await socket.receive()
-                    deliver(data, &last, out)
+                    try deliver(data, &last, out)
                 }
             } catch {
                 socket.cancel()
+                if error is EventBackpressure { throw error }
                 if Task.isCancelled { throw CancellationError() }
                 return try await classify(socket, session: session)
             }
