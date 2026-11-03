@@ -106,22 +106,13 @@ private struct OnlyAdminWarning: View {
     }
 }
 
-/// Column widths: the table is laid out on these so header and rows line up.
-private enum Col {
-    static let icon = MacSize.controlLg
-    static let kind = Space.s8 * 2
-    static let storage = Space.s8 * 3
-    static let access = Space.s8 * 4
-    static let seen = Space.s8 * 2 + Space.s2
-}
-
 private struct DeviceTable: View {
     let app: AppModel
     @Bindable var model: DevicesModel
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
+        VStack(alignment: .leading, spacing: Space.s3) {
             HStack {
                 CoreSegmented(
                     "Filter devices",
@@ -130,78 +121,85 @@ private struct DeviceTable: View {
                 Text("\(model.shown.count) of \(model.items.count)").foregroundStyle(palette.text2)
                     .font(.system(size: MacTextSize.body).monospacedDigit())
             }
-            header
             if model.shown.isEmpty {
                 Text("Nothing of that kind.").foregroundStyle(palette.text2).padding(Space.s3)
             }
-            ForEach(model.shown) { d in
-                Button {
-                    model.detailID = d.id
-                } label: {
-                    row(d)
-                }
-                .buttonStyle(TableRowStyle())
-                .accessibilityLabel(
-                    "\(d.name), \(app.devices.isMe(d) ? "This Mac, " : "")\(DeviceWords.kind(d.kind)), \(d.keyStorage ?? "storage not reported"), \(d.scopes.joined(separator: ", ")), last seen \(DeviceWords.seen(d.lastUsed))"
-                )
-                .accessibilityHint("Opens this device's page")
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 7), spacing: Space.s3, alignment: .top)],
+                spacing: Space.s3
+            ) {
+                ForEach(model.shown) { d in DeviceCard(app: app, device: d) { model.detailID = d.id } }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("device-table")
     }
+}
 
-    private var header: some View {
-        HStack(spacing: Space.s2) {
-            Color.clear.frame(width: Col.icon, height: 1)
-            Text("Name").frame(maxWidth: .infinity, alignment: .leading)
-            Text("Kind").frame(width: Col.kind, alignment: .leading)
-            Text("Key storage").frame(width: Col.storage, alignment: .leading)
-            Text("Access").frame(width: Col.access, alignment: .leading)
-            Text("Last seen").frame(width: Col.seen, alignment: .leading)
-        }
-        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
-        .padding(.horizontal, Space.s3)
-        .accessibilityHidden(true)
-    }
+/// One device as a card (the prototype's grid): icon tile, name with the This Mac tag, platform, kind and key storage, access,
+/// last seen. No outline at rest; the focus ring shows only on the card the keyboard is on.
+private struct DeviceCard: View {
+    let app: AppModel
+    let device: DeviceInfo
+    let open: () -> Void
+    @Environment(\.corePalette) private var palette
+    @FocusState private var focused: Bool
+    @State private var hovering = false
 
-    private func row(_ d: DeviceInfo) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: DeviceWords.symbol(d.kind, d.platform)).font(.system(size: MacTextSize.title))
-                .foregroundStyle(palette.primary).frame(width: Col.icon, height: Col.icon)
-                .background(palette.uDim, in: coreShape(Radius.control)).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: Space.s1) {
-                    Text(d.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                    if app.devices.isMe(d) { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
-                    if d.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
+    var body: some View {
+        let me = app.devices.isMe(device)
+        Button(action: open) {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                HStack(alignment: .top, spacing: Space.s2) {
+                    Image(systemName: DeviceWords.symbol(device.kind, device.platform))
+                        .font(.system(size: MacTextSize.title)).foregroundStyle(palette.primary)
+                        .frame(width: MacSize.controlLg, height: MacSize.controlLg)
+                        .background(palette.uDim, in: coreShape(Radius.control)).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: Space.s1) {
+                            Text(device.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                            if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
+                        }
+                        Text(DeviceWords.platform(device.platform)).font(.system(size: MacTextSize.meta))
+                            .foregroundStyle(palette.text2).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Text(DeviceWords.platform(d.platform)).font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(palette.text2).lineLimit(1)
+                HStack(spacing: Space.s1) {
+                    Chip(text: device.kind)
+                    Chip(text: device.keyStorage ?? "not reported", tint: device.keyStorage == "software" ? .warn : nil)
+                    if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
+                }
+                AccessChips(scopes: device.scopes)
+                Text("Last seen \(DeviceWords.seen(device.lastUsed))").font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(palette.text2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Chip(text: d.kind).frame(width: Col.kind, alignment: .leading)
-            Text(d.keyStorage ?? "not reported")
-                .font(.system(size: MacTextSize.meta, design: .monospaced))
-                .foregroundStyle(d.keyStorage == "software" ? palette.tone(.warn).ink : palette.text)
-                .frame(width: Col.storage, alignment: .leading).lineLimit(1)
-            AccessChips(scopes: d.scopes).frame(width: Col.access, alignment: .leading)
-            Text(DeviceWords.seen(d.lastUsed)).font(.system(size: MacTextSize.body))
-                .frame(width: Col.seen, alignment: .leading).lineLimit(1)
+            .padding(Space.s3)
+            .background(hovering ? palette.rowHover : palette.glassCard, in: coreShape(Radius.row))
+            .opacity(device.revoked ? 0.6 : 1)
+            .contentShape(coreShape(Radius.row))
         }
-        .padding(.horizontal, Space.s3)
-        .padding(.vertical, Space.s2)
-        .frame(minHeight: MacSize.controlLg + Space.s5)
-        .opacity(d.revoked ? 0.6 : 1)
+        .buttonStyle(.plain)
+        .focused($focused).focusEffectDisabled()
+        .coreFocusRing(focused, radius: Radius.row, palette: palette)
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .accessibilityLabel(
+            "\(device.name), \(me ? "This Mac, " : "")\(DeviceWords.kind(device.kind)), \(device.keyStorage ?? "storage not reported"), \(device.scopes.joined(separator: ", ")), last seen \(DeviceWords.seen(device.lastUsed))"
+        )
+        .accessibilityHint("Opens this device's page")
     }
 }
 
 /// A small rounded-rect tag: a kind, a scope.
 struct Chip: View {
     let text: String
+    var tint: Tone?
     @Environment(\.corePalette) private var palette
     var body: some View {
         Text(text).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1)
+            .foregroundStyle(tint.map { palette.tone($0).ink } ?? palette.text)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
             .background(palette.uDim, in: coreShape(Radius.chip))
     }
@@ -222,23 +220,6 @@ struct AccessChips: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scopes.joined(separator: ", "))
-    }
-}
-
-private struct TableRowStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isFocused) private var focused
-    @State private var hovering = false
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                hovering || configuration.isPressed ? palette.rowHover : palette.glassCard, in: coreShape(Radius.row)
-            )
-            .coreFocusRing(focused, radius: Radius.row, palette: palette)
-            .contentShape(coreShape(Radius.row))
-            .onHover { hovering = $0 }
-            .animation(Motion.out(Motion.hover), value: hovering)
-            .focusEffectDisabled()
     }
 }
 
