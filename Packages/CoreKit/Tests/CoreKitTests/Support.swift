@@ -58,8 +58,10 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
     var handshakeStatus = 200
     var supportedMinors: [Int32]? = Array(0...33)
     /// A refusal to answer the next call to a path with.
-    var failNext: [String: Failure] = [:]
+    var failNext: [String: [Failure]] = [:]
     var latestSeq: Int64 = 0
+    /// Successive retention floors: a replay from below the first is a 410 with it, and again until the client has caught up.
+    var retentionFloors: [Int64] = []
     /// When set, `GET /api/v1/events` serves from this log by `after` and `limit`.
     var eventLog: [[String: Any]] = []
     var eventPages: [[String: Any]] = []
@@ -87,7 +89,7 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
     }
     func signedRequests() -> Int { lock.withLock { log.filter { $0.headers["ainkrad-signature"] != nil }.count } }
     func requests(to path: String) -> [RawRequest] { lock.withLock { log.filter { $0.target.hasPrefix(path) } } }
-    func fail(_ path: String, _ f: Failure) { lock.withLock { failNext[path] = f } }
+    func fail(_ path: String, _ f: Failure) { lock.withLock { failNext[path, default: []].append(f) } }
 
     private var serverNow: Int64 { Int64(clock.now().timeIntervalSince1970) + serverOffset }
 
@@ -133,7 +135,11 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
     private func handle(_ r: RawRequest) -> RawResponse {
         log.append(r)
         let path = String(r.target.split(separator: "?")[0])
-        if let f = failNext.removeValue(forKey: path) { return refuse(f) }
+        if var q = failNext[path], !q.isEmpty {
+            let f = q.removeFirst()
+            failNext[path] = q
+            return refuse(f)
+        }
         let body = (try? JSONSerialization.jsonObject(with: r.body) as? [String: Any]) ?? [:]
         switch (r.method, path) {
         case ("POST", "/handshake"):
@@ -186,9 +192,15 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
         case ("GET", "/api/v1/events"):
             let (f, _, _) = authenticate(r, session: true)
             if let f { return refuse(f) }
-            if !eventLog.isEmpty {
+            if !eventLog.isEmpty || !retentionFloors.isEmpty {
                 let after = r.target.split(separator: "?").last.flatMap { q in
                     q.split(separator: "&").first { $0.hasPrefix("after=") }.flatMap { Int64($0.dropFirst(6)) }
+                }
+                while let f = retentionFloors.first {
+                    if (after ?? 0) < f {
+                        return refuse(Failure(status: 410, code: "past_retention", extra: ["floor": f]))
+                    }
+                    retentionFloors.removeFirst()
                 }
                 return respond(200, ["items": eventLog.filter { ($0["seq"] as? Int64 ?? 0) > (after ?? 0) }])
             }

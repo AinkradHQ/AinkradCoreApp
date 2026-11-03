@@ -115,7 +115,8 @@ struct EventRunner: Sendable {
                     // Cursors count in the device's scope view, which changed: the old one means nothing now. Tell the
                     // consumer to re-sync and carry on from the head of the new view; a failure here retries before any replay.
                     let head = try await latest()
-                    out.yield(.gap(floor: head.seq))
+                    // A gap the consumer never received is not reported: needsResync stays set and it is yielded again.
+                    if case .dropped = out.yield(.gap(floor: head.seq)) { throw EventBackpressure() }
                     last = head.seq
                     needsResync = false
                 }
@@ -159,7 +160,7 @@ struct EventRunner: Sendable {
                 res = try await sessions.perform(
                     method: "GET", target: "/api/v1/events?after=\(last)&limit=\(Self.page)")
             } catch CoreError.pastRetention(let floor) {
-                out.yield(.gap(floor: floor))
+                if case .dropped = out.yield(.gap(floor: floor)) { throw EventBackpressure() }  // cursor stays
                 last = max(last, floor)
                 continue
             }

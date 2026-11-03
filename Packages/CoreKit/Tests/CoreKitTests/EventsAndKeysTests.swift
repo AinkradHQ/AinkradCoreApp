@@ -128,6 +128,46 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
         #expect(h.core.requests(to: "/api/v1/events/latest").count >= 2)
     }
 
+    @Test func aReplayGapTheBufferCannotHoldIsYieldedAgainAndTheCursorStays() async throws {
+        let h = try Harness()
+        // Two trims in a row. The consumer is not reading yet, so the first gap fills the 1-slot buffer and the second is
+        // dropped: it must be reported again, not lost, and the cursor must not move past it.
+        h.core.retentionFloors = [40, 45]
+        h.core.eventLog = [event(46)]
+        let conn = try h.connection(sockets: SocketFactory([.wait]))
+        var seen: [String] = []
+        let stream = conn.events(after: 3, bufferSize: 1)
+        try await Task.sleep(for: .milliseconds(100))
+        for await update in stream {
+            switch update {
+            case .gap(let f): seen.append("gap\(f)")
+            case .event(let e): seen.append("e\(e.seq)")
+            default: break
+            }
+            try await Task.sleep(for: .milliseconds(20))
+            if seen.contains("e46") { break }
+        }
+        #expect(seen == ["gap40", "gap45", "e46"])
+    }
+
+    @Test func aDroppedResyncGapIsYieldedAgain() async throws {
+        let h = try Harness()
+        h.core.latestSeq = 77
+        let conn = try h.connection(sockets: SocketFactory([.closeWith(4003), .wait]))
+        var gaps: [Int64] = []
+        var lives = 0
+        // Buffer of 1 and a consumer that starts late: `.live` fills it, so the resync gap is dropped and retried until read.
+        let stream = conn.events(after: 3, bufferSize: 1)
+        try await Task.sleep(for: .milliseconds(100))
+        for await update in stream {
+            if case .gap(let f) = update { gaps.append(f) }
+            if case .live = update { lives += 1 }
+            try await Task.sleep(for: .milliseconds(15))
+            if !gaps.isEmpty || lives > 4 { break }
+        }
+        #expect(gaps == [77])
+    }
+
     @Test func pastRetentionIsAGapNotAnError() async throws {
         let h = try Harness()
         h.core.fail("/api/v1/events", .init(status: 410, code: "past_retention", extra: ["floor": 40]))

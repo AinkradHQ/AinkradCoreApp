@@ -298,7 +298,9 @@ public actor DevicePairing {
                 // A claimed-then-rejected device is refused like a stranger.
                 throw forget("rejected")
             }
-            if clock.now() >= deadline { throw forget("expired") }
+            // Once the approver has approved, the pairing is not ours to expire: keep asking (a relaunch while offline, say).
+            let approved = (try? keyStore.loadPending())?.approved == true
+            if !approved, clock.now() >= deadline { throw forget("expired") }
             try await clock.sleep(for: .seconds(delay))
             delay = min(delay * 1.5, 5)
         }

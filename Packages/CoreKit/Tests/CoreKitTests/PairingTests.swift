@@ -163,6 +163,22 @@ struct StepUpTestStore: KeyStore {
         #expect(try store.loadIdentity()?.deviceID == claim.deviceID)
     }
 
+    @Test func anApprovedPairingNeverExpiresWhileTheCoreIsUnreachable() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = makeMemoryKeyStore()
+        let first = pairing(core, store)
+        _ = try await first.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        #expect(try await first.awaitApproval() == .awaitingConfirmation)  // approved, unconfirmed
+        // Relaunch: the Core is unreachable for far longer than the 330 s deadline.
+        let offline = DevicePairing(keyStore: store, clock: core.clock) { _ in
+            OfflineHTTP(until: 3, then: core)
+        }
+        _ = try await offline.resume()
+        try await offline.confirmSAS()
+        #expect(try await offline.awaitApproval(timeout: .seconds(1)) == .paired)
+        #expect(try store.loadIdentity() != nil, "it kept asking past the deadline instead of forgetting")
+    }
+
     @Test func cancellingAnApprovedPairingSaysToRevokeItOnTheApprover() async throws {
         let core = FakeCore(clock: TestClock())
         let store = makeMemoryKeyStore()
@@ -362,5 +378,29 @@ struct StepUpTestStore: KeyStore {
         let conn = try h.connection()
         await #expect(throws: CoreError.self) { _ = try await conn.stepUp(reason: "test") }
         #expect(h.core.requests(to: "/api/v1/auth/step-up").isEmpty, "nothing was sent")
+    }
+}
+
+/// Fails with a network error for the first `until` requests, then forwards.
+// @unchecked Sendable: the counter is under `lock`.
+final class OfflineHTTP: CoreHTTP, @unchecked Sendable {
+    private let lock = NSLock()
+    private var left: Int
+    private let next: FakeCore
+    init(until: Int, then next: FakeCore) {
+        left = until
+        self.next = next
+    }
+    func send(_ r: RawRequest) async throws -> RawResponse {
+        let fail = lock.withLock { () -> Bool in
+            defer { left -= 1 }
+            return left > 0
+        }
+        if fail {
+            // Time passes while it is down: well past a pairing's life.
+            next.clock.advance(400)
+            throw CoreError.offline("down")
+        }
+        return try await next.send(r)
     }
 }
