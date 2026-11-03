@@ -40,6 +40,8 @@ public struct Palette: Sendable {
     public var glassCard: Color { pick("glassCard", fallback: theme["mRow"]) }
     public var glassCardEdge: Color { pick("glassCardEdge", fallback: theme["edge"]) }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
+    /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
+    public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
     public var uDim: Color { pick("uDim", fallback: theme["text"].opacity(0.08)) }
     public var uDimHover: Color { pick("uDimHover", fallback: theme["text"].opacity(0.14)) }
 
