@@ -13,7 +13,7 @@ extension View {
     }
 
     /// The neutral glass-card tint used by rows, banners and toasts. A tint, not a second material.
-    func coreCard(_ fill: Color, radius: CGFloat) -> some View {
+    public func coreCard(_ fill: Color, radius: CGFloat) -> some View {
         background(fill, in: coreShape(radius))
     }
 }
