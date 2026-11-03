@@ -1,0 +1,3 @@
+Golden vectors copied from AinkradCore crates/server/tests/vectors/ at Core commit dad06e2 (the commit Packages/AinkradClient/CORE_COMMIT records).
+The handshake spec (section 17) makes them normative: a client must reproduce them byte for byte. Never edit; re-copy when the Core changes them.
+The pkcs8 keys inside are throwaway test keys.
