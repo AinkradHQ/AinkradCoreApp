@@ -22,59 +22,6 @@ struct DialogCard<Content: View>: View {
     }
 }
 
-/// A one-line text field in a rounded-rect well, with its label above and an error below.
-struct FieldBox: View {
-    let label: String
-    let placeholder: String
-    @Binding var text: String
-    var error: String?
-    var mono = false
-    var big = false
-    var suffix: String?
-    var autofocus = false
-    var onSubmit: () -> Void = {}
-    @Environment(\.corePalette) private var palette
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text(label).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .font(
-                    mono
-                        ? .system(size: big ? MacTextSize.large : MacTextSize.title, design: .monospaced)
-                        : .system(size: MacTextSize.body)
-                )
-                .multilineTextAlignment(big ? .center : .leading)
-                .autocorrectionDisabled()
-                .focused($focused)
-                .onSubmit(onSubmit)
-                .padding(.horizontal, Space.s3)
-                .frame(minHeight: big ? MacSize.controlLg + Space.s3 : MacSize.controlLg)
-                .overlay(alignment: .trailing) {
-                    if let suffix {
-                        Text(suffix).font(.system(size: MacTextSize.meta, design: .monospaced))
-                            .foregroundStyle(palette.text2).padding(.trailing, Space.s3).allowsHitTesting(false)
-                    }
-                }
-                .background(palette.glassCard, in: coreShape(Radius.control))
-                .overlay {
-                    coreShape(Radius.control).strokeBorder(
-                        error == nil ? palette.glassCardEdge : palette.tone(.fail).ink, lineWidth: 1)
-                }
-                .coreFocusRing(focused, radius: Radius.control, palette: palette)
-                .accessibilityLabel(label)
-                .onAppear { if autofocus { focused = true } }
-            if let error {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
 /// The check code (SAS): four large keycaps of four characters across the panel, read letter by letter.
 struct SASView: View {
     let sas: String
@@ -127,25 +74,18 @@ struct FactCard<Content: View>: View {
     }
 }
 
-/// A scope as a checkbox with its plain meaning beside it.
+/// A scope as a checkbox with its plain meaning beside it (a locked scope says why instead).
 struct ScopeToggle: View {
     let scope: String
     @Binding var on: Bool
     var locked: String?
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
-        Toggle(isOn: $on) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(scope).font(.system(size: MacTextSize.body, weight: .semibold, design: .monospaced))
-                Text(locked ?? ScopeText.text(scope)).font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(palette.text2)
-            }
-        }
-        .toggleStyle(.checkbox)
-        .tint(palette.primary)
+        CoreCheckbox(
+            scope, detail: locked ?? ScopeText.text(scope), isOn: $on, mono: true,
+            spoken: "\(scope), \(ScopeText.text(scope))"
+        )
         .disabled(locked != nil)
-        .accessibilityLabel("\(scope), \(ScopeText.text(scope))")
     }
 }
 
@@ -243,7 +183,7 @@ struct DangerButtonStyle: ButtonStyle {
             .padding(.horizontal, Space.s3)
             .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.control))
             .overlay { coreShape(Radius.control).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
-            .opacity(enabled ? 1 : 0.45)
+            .coreDimWhenDisabled(enabled)
     }
 }
 
@@ -278,7 +218,7 @@ struct CodeBoxes: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Text(label).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+            CoreFieldLabel(label)
             ZStack {
                 HStack(spacing: Space.s4) {
                     group(0..<5)
@@ -302,11 +242,7 @@ struct CodeBoxes: View {
             .font(.system(size: MacTextSize.meta, design: .monospaced).monospacedDigit())
             .frame(maxWidth: .infinity, alignment: .center)
             .accessibilityHidden(true)
-            if let error {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            if let error { CoreFieldError(error) }
         }
         .onAppear { focused = true }
     }
