@@ -7,8 +7,9 @@ endif
 SCHEME := AinkradCoreMac
 PROJECT := AinkradCore.xcodeproj
 APP := build/Build/Products/Debug/Ainkrad Core.app
-PACKAGES := Packages/AinkradClient
-FORMAT_PATHS := App
+PACKAGES := Packages/AinkradClient Packages/CoreUI
+# Tokens.swift is generated (scripts/sync-tokens.sh) and not swift-format clean
+FORMAT_PATHS := App $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI -name '*.swift' -not -path '*/.build/*'))
 
 .DEFAULT_GOAL := generate
 .PHONY: generate open build test run lint format format-check sync-client clean

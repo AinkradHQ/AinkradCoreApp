@@ -20,6 +20,8 @@ settings:
 packages:
   AinkradClient:
     path: Packages/AinkradClient
+  CoreUI:
+    path: Packages/CoreUI
 
 targets:
   AinkradCoreMac:
@@ -28,6 +30,7 @@ targets:
     sources: [App/Mac]
     dependencies:
       - package: AinkradClient
+      - package: CoreUI
     settings:
       base:
         PRODUCT_NAME: Ainkrad Core
