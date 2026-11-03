@@ -7,8 +7,8 @@ endif
 SCHEME := AinkradCoreMac
 PROJECT := AinkradCore.xcodeproj
 APP := build/Build/Products/Debug/Ainkrad Core.app
-PACKAGES := Packages/AinkradClient
-FORMAT_PATHS := App
+PACKAGES := Packages/AinkradClient Packages/CoreKit
+FORMAT_PATHS := App Packages/CoreKit/Sources Packages/CoreKit/Tests
 
 .DEFAULT_GOAL := generate
 .PHONY: generate open build test run lint format format-check sync-client clean
