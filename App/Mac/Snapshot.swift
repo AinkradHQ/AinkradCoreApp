@@ -16,6 +16,7 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             NSApp.windows.first { $0.title == "Ainkrad Core" }?.toggleFullScreen(nil)
         }
+        if let dir = env["CORE_GALLERY_SNAPSHOT"] { return await GallerySnapshot.run(dir: dir, env: env) }
         if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
