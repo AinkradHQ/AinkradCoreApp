@@ -12,7 +12,8 @@ final class SnapshotWalkUITests: XCTestCase {
         app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
         app.launchEnvironment["CORE_KEYSTORE"] = "memory"
         for key in [
-            "CORE_PAIR_SNAPSHOT", "CORE_THEME", "CORE_IT_URL", "CORE_IT_CODE", "CORE_IT_SAS_FILE",
+            "CORE_PAIR_SNAPSHOT", "CORE_SNAPSHOT", "CORE_GALLERY_SNAPSHOT", "CORE_THEME", "CORE_IT_URL", "CORE_IT_CODE",
+            "CORE_IT_SAS_FILE",
             "CORE_IT_ADD_CODE_FILE",
             "CORE_IT_LOCKS_READY",
         ] {
