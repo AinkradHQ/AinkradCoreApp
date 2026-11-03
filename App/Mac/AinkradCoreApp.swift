@@ -1,19 +1,23 @@
 import AinkradClient
+import CoreKit
 import CoreUI
+import Pairing
 import Shell
 import SwiftUI
 
 @main
 struct AinkradCoreApp: App {
-    @State private var shell = AinkradCoreApp.makeShell()
+    @State private var app = AinkradCoreApp.makeApp()
+
+    private var shell: ShellModel { app.shell }
 
     var body: some Scene {
         // One window, forced full screen (plan D9). `Window` is single-instance and, being first, is the one opened at launch.
         Window("Ainkrad Core", id: "main") {
-            ShellView(shell: shell)
+            RootView(app: app)
                 .background(FullScreenEnforcer())
                 #if DEBUG
-            .task { await SnapshotRunner.runIfRequested(shell) }
+            .task { await SnapshotRunner.runIfRequested(app) }
                 #endif
         }
         .windowStyle(.hiddenTitleBar)
@@ -33,12 +37,19 @@ struct AinkradCoreApp: App {
         #endif
     }
 
-    @MainActor private static func makeShell() -> ShellModel {
-        let shell = ShellModel()
+    /// Debug switches (never in Release): `CORE_DEMO=1` shows the sample desktop with no Core, `CORE_KEYSTORE=memory` keeps keys
+    /// in memory so a test can pair without touching the Keychain, `CORE_IT_SAS_FILE` is where a script reads the check code.
+    @MainActor private static func makeApp() -> AppModel {
         #if DEBUG
-        SampleWorld.install(into: shell)
+        let env = ProcessInfo.processInfo.environment
+        let app = AppModel(
+            keyStore: env["CORE_KEYSTORE"] == "memory" ? makeDebugKeyStore() : makeKeychainKeyStore(),
+            demo: env["CORE_DEMO"] == "1", sasFile: env["CORE_IT_SAS_FILE"])
+        if env["CORE_DEMO"] == "1" { SampleWorld.install(into: app.shell) }
+        return app
+        #else
+        return AppModel()
         #endif
-        return shell
     }
 }
 

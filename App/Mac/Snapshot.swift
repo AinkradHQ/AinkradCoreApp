@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import Pairing
 import Shell
 import SwiftUI
 
@@ -8,12 +9,14 @@ import SwiftUI
 /// checks and quit. It leaves the system appearance alone: the theme is this app's own appearance.
 @MainActor
 enum SnapshotRunner {
-    static func runIfRequested(_ shell: ShellModel) async {
+    static func runIfRequested(_ app: AppModel) async {
+        let shell = app.shell
         let env = ProcessInfo.processInfo.environment
         if env["CORE_EXIT_FS_ATTEMPT"] != nil {
             try? await Task.sleep(for: .seconds(3))
             NSApp.windows.first { $0.title == "Ainkrad Core" }?.toggleFullScreen(nil)
         }
+        if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)

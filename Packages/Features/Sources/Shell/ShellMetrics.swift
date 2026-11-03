@@ -18,5 +18,5 @@ enum ShellMetrics {
     static let widgetTop: CGFloat = 50
     static let launcherWidth = Space.s8 * 20
     static let bellWidth = Space.s8 * 14
-    static let settingsSize = CGSize(width: Space.s8 * 26, height: Space.s8 * 18)
+    static let settingsSize = CGSize(width: Space.s8 * 29, height: Space.s8 * 20)
 }

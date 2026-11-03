@@ -125,7 +125,7 @@ public actor CoreConnection {
     /// A cancelled prompt is the user's choice; anything else is the Keychain or Secure Enclave failing.
     static func stepUpFailure(_ error: any Error) -> CoreError {
         isUserCancel(error)
-            ? .stepUpUnavailable("Touch ID was cancelled.")
+            ? .stepUpCancelled
             : .keyStore("The Secure Enclave could not sign the step-up.")
     }
 

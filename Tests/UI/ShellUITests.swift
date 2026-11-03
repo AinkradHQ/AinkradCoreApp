@@ -10,8 +10,10 @@ final class ShellUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
-        // Debug hook: after 3 s the app tries to leave full screen by itself, the way a stray toggle would.
-        app.launchEnvironment["CORE_EXIT_FS_ATTEMPT"] = "1"
+        // Debug hook: after 3 s the app tries to leave full screen by itself, the way a stray toggle would. Only the test that
+        // is about it asks: the toggle disables the window for a moment, and a key pressed then is lost.
+        if name.contains("testFullScreenStaysOn") { app.launchEnvironment["CORE_EXIT_FS_ATTEMPT"] = "1" }
+        app.launchEnvironment["CORE_DEMO"] = "1"
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["Show workspace"].waitForExistence(timeout: 10))
