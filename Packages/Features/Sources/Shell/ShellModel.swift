@@ -60,6 +60,29 @@ public struct ShellSheet: Identifiable {
 }
 
 public enum ShellSurface: Sendable { case home, workspace }
+
+/// How this Mac stands with its Core: what the "Home Core" button and the connection banner show.
+public enum CoreLink: Sendable, Equatable {
+    case none, connecting, live, reconnecting, offline
+}
+
+/// A dialog over everything the shell shows (add device, scopes, revoke, Touch ID). `topDialog` sits above `dialog`.
+public struct ShellDialog: Identifiable {
+    public let id: String
+    public let content: AnyView
+    /// Esc: false keeps the dialog open (a Touch ID prompt that cannot be taken back).
+    public let dismissible: Bool
+    public let onClose: @MainActor () -> Void
+    public init<V: View>(
+        id: String, dismissible: Bool = true, onClose: @escaping @MainActor () -> Void = {},
+        @ViewBuilder content: () -> V
+    ) {
+        self.id = id
+        self.dismissible = dismissible
+        self.onClose = onClose
+        self.content = AnyView(content())
+    }
+}
 public enum ShellOverlay: Hashable, Sendable { case settings, shortcuts }
 
 /// The shell's one state holder. Feature modules talk to it only through `openPane`, `launcher`, `bell`, `settings`, `toast` and `sheet`.
@@ -82,6 +105,15 @@ public final class ShellModel {
     public var hiddenWidgets: Set<WidgetKind> = []
     public var editingWidgets = false
     public var addingWidget = false
+    public var coreLink: CoreLink = .none
+    /// Retry for the connection banner and the Home Core button when the Core is unreachable.
+    public var retryConnection: (@MainActor () -> Void)?
+    /// When the session's Touch ID elevation ends; nil when locked.
+    public var elevatedUntil: Date?
+    /// The elevation chip: asks for Touch ID.
+    public var elevate: (@MainActor () -> Void)?
+    public var dialog: ShellDialog?
+    public var topDialog: ShellDialog?
 
     public let launcher = LauncherRegistry()
     public let bell = BellRegistry()
@@ -199,7 +231,11 @@ public final class ShellModel {
     /// Esc: closes the topmost thing. Returns false when there was nothing to close.
     @discardableResult
     public func closeTopmost() -> Bool {
-        if launcherOpen {
+        if let top = topDialog {
+            if top.dismissible { closeTopDialog() }
+        } else if let dialog {
+            if dialog.dismissible { closeDialog() }
+        } else if launcherOpen {
             launcherOpen = false
         } else if bellOpen {
             bellOpen = false
@@ -216,7 +252,27 @@ public final class ShellModel {
     }
 
     /// Anything the shell shows over Home or the workspace.
-    public var coverOpen: Bool { launcherOpen || bellOpen || overlay != nil }
+    public var coverOpen: Bool { launcherOpen || bellOpen || overlay != nil || dialog != nil || topDialog != nil }
+
+    public func present(_ d: ShellDialog) {
+        launcherOpen = false
+        bellOpen = false
+        dialog = d
+    }
+
+    public func closeDialog() {
+        guard let d = dialog else { return }
+        dialog = nil
+        d.onClose()
+    }
+
+    public func presentOnTop(_ d: ShellDialog) { topDialog = d }
+
+    public func closeTopDialog() {
+        guard let d = topDialog else { return }
+        topDialog = nil
+        d.onClose()
+    }
 
     public func showToast(_ message: String, undo: (@Sendable @MainActor () -> Void)? = nil) {
         toast = ToastItem(message, undo: undo)

@@ -20,17 +20,20 @@ struct StatusCluster: View {
                 ) { shell.toggleFocusMode() }
             }
             activity
-            StatusButton(title: "Locked", symbol: "lock", label: "Touch ID elevation: locked") {
-                shell.showToast("Touch ID elevation arrives with the pairing story.")
-            }
+            elevation
             StatusButton(
                 title: shell.bell.count > 0 ? "\(shell.bell.count)" : nil, symbol: "bell",
                 label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
                 on: shell.bellOpen
             ) { shell.toggleBell() }
-            StatusButton(title: shell.home.coreName, symbol: "server.rack", label: "\(shell.home.coreName), connected")
-            {
-                if let core = shell.launcher.entry("core") { core.run() } else { shell.toggleLauncher() }
+            StatusButton(title: coreTitle, symbol: coreSymbol, label: "\(shell.home.coreName), \(coreWord)") {
+                if shell.coreLink == .offline, let retry = shell.retryConnection {
+                    retry()
+                } else if let core = shell.launcher.entry("core") {
+                    core.run()
+                } else {
+                    shell.toggleLauncher()
+                }
             }
             Button {
                 shell.toggleLauncher()
@@ -45,6 +48,45 @@ struct StatusCluster: View {
         .padding(.horizontal, Space.s4)
         .frame(height: ShellMetrics.topBar, alignment: .center)
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    /// "Locked" until Touch ID, then "Elevated until 14:32". A word and a symbol, never a colour alone.
+    @ViewBuilder private var elevation: some View {
+        if let until = shell.elevatedUntil, until > Date() {
+            StatusButton(
+                title: "Elevated until \(until.formatted(date: .omitted, time: .shortened))", symbol: "lock.open",
+                label: "Touch ID elevation: elevated until \(until.formatted(date: .omitted, time: .shortened))",
+                on: true
+            ) { shell.elevate?() }
+        } else {
+            StatusButton(title: "Locked", symbol: "lock", label: "Touch ID elevation: locked") { shell.elevate?() }
+        }
+    }
+
+    private var coreWord: String {
+        switch shell.coreLink {
+        case .none: "not connected"
+        case .connecting: "connecting"
+        case .live: "connected"
+        case .reconnecting: "reconnecting"
+        case .offline: "offline"
+        }
+    }
+    private var coreTitle: String {
+        switch shell.coreLink {
+        case .live: shell.home.coreName
+        case .none: "Not connected"
+        case .connecting: "Connecting"
+        case .reconnecting: "Reconnecting"
+        case .offline: "Offline"
+        }
+    }
+    private var coreSymbol: String {
+        switch shell.coreLink {
+        case .live: "server.rack"
+        case .none, .offline: "wifi.slash"
+        case .connecting, .reconnecting: "arrow.triangle.2.circlepath"
+        }
     }
 
     @ViewBuilder private var activity: some View {

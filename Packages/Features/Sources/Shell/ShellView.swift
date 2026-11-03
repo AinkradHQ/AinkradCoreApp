@@ -23,8 +23,9 @@ public struct ShellView: View {
                 .opacity(shell.surface == .workspace ? 1 : 0)
                 .allowsHitTesting(shell.surface == .workspace)
                 .accessibilityHidden(shell.surface != .workspace)
-            VStack {
+            VStack(spacing: 0) {
                 StatusCluster(shell: shell)
+                connectionBanner
                 Spacer(minLength: 0)
             }
             covers
@@ -57,6 +58,18 @@ public struct ShellView: View {
         .ignoresSafeArea()
     }
 
+    /// Reconnecting and offline show a banner under the status cluster; the Home Core button says the same in words.
+    @ViewBuilder private var connectionBanner: some View {
+        switch shell.coreLink {
+        case .reconnecting:
+            ConnectionBanner(.reconnecting).frame(maxWidth: ShellMetrics.bellWidth * 1.5).padding(.top, Space.s1)
+        case .offline:
+            ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
+                .frame(maxWidth: ShellMetrics.bellWidth * 1.5).padding(.top, Space.s1)
+        default: EmptyView()
+        }
+    }
+
     private var sky: some View {
         Color.clear.overlay {
             Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
@@ -84,6 +97,17 @@ public struct ShellView: View {
         }
         if shell.overlay == .settings { SettingsView(shell: shell) }
         if shell.overlay == .shortcuts { ShortcutsView(shell: shell) }
+        if let d = shell.dialog { dialogLayer(d, id: "dialog") }
+        if let d = shell.topDialog { dialogLayer(d, id: "top") }
+    }
+
+    private func dialogLayer(_ d: ShellDialog, id: String) -> some View {
+        ZStack {
+            palette.bg.opacity(0.55).onTapGesture { shell.closeTopmost() }.accessibilityHidden(true)
+            d.content
+        }
+        .id("\(id)-\(d.id)")
+        .transition(.opacity)
     }
 
     /// Esc closes the topmost thing, from anywhere in the window.
