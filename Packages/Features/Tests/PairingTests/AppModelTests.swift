@@ -65,41 +65,49 @@ struct AppModelTests {
         #expect(m.shell.coreLink == .live)
     }
 
-    @Test func aCancelledTouchIDDoesNotRunTheAction() async throws {
+    @Test func aCancelledTouchIDDoesNotRunTheActionAndSaysSoInline() async throws {
         let s = FakeService()
-        s.stepUpError = CoreError.stepUpUnavailable("Touch ID was cancelled.")
+        s.stepUpError = CoreError.stepUpCancelled
         let m = try app(s)
         await m.start()
         var ran = false
-        let work = Task { @MainActor in
-            do { try await m.elevated("test") { ran = true } } catch { return error is StepUpDeclined }
-            return false
-        }
-        for _ in 0..<200 where m.stepUp.phase != .cancelled { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(m.stepUp.phase == .cancelled)
-        m.stepUp.choose(retry: false)
-        #expect(await work.value && !ran && m.shell.elevatedUntil == nil)
+        do {
+            try await m.elevated("test", done: "renamed") { ran = true }
+            Issue.record("it ran")
+        } catch { #expect(error is StepUpDeclined) }
+        #expect(!ran && m.shell.elevatedUntil == nil && m.shell.topDialog == nil, "no modal is left behind")
+        let n = try #require(m.stepUpNotice)
+        #expect(n.phase == .cancelled && n.title == "Cancelled, nothing was renamed.")
+        #expect(n.detail.contains("Your edit is still here"))
     }
 
-    @Test func tryingAgainAfterACancelElevatesAndRuns() async throws {
+    @Test func aFailedTouchIDReadsDifferentlyFromACancel() async throws {
         let s = FakeService()
-        s.stepUpError = CoreError.stepUpUnavailable("Touch ID was cancelled.")
+        s.stepUpError = CoreError.keyStore("sign")
         let m = try app(s)
         await m.start()
-        var ran = false
-        let work = Task { @MainActor in try await m.elevated("test") { ran = true } }
-        for _ in 0..<200 where m.stepUp.phase != .cancelled { try await Task.sleep(for: .milliseconds(5)) }
+        await #expect(throws: StepUpDeclined.self) { try await m.elevated("test", done: "revoked") {} }
+        let n = try #require(m.stepUpNotice)
+        #expect(n.title == "Touch ID didn't match. Nothing was revoked." && n.phase != .cancelled)
+    }
+
+    @Test func tryingAgainAfterACancelElevatesRunsAndClearsTheNotice() async throws {
+        let s = FakeService()
+        s.stepUpError = CoreError.stepUpCancelled
+        let m = try app(s)
+        await m.start()
+        await #expect(throws: StepUpDeclined.self) { try await m.elevated("test", done: "changed") {} }
         s.stepUpError = nil
-        m.stepUp.choose(retry: true)
-        try await work.value
-        #expect(ran && m.isElevated && s.stepUps == 2)
+        var ran = false
+        try await m.elevated("test", done: "changed") { ran = true }
+        #expect(ran && m.isElevated && s.stepUps == 2 && m.stepUpNotice == nil)
         // Already elevated: no second prompt.
-        try await m.elevated("again") {}
+        try await m.elevated("again", done: "changed") {}
         #expect(s.stepUps == 2)
     }
 
     @Test func stepUpFailuresAreToldApart() {
-        #expect(StepUpPhase.from(CoreError.stepUpUnavailable("Touch ID was cancelled.")) == .cancelled)
+        #expect(StepUpPhase.from(CoreError.stepUpCancelled) == .cancelled)
         #expect(
             StepUpPhase.from(CoreError.stepUpUnavailable("This device has no step-up key, so it cannot elevate."))
                 == .noKey)
@@ -108,6 +116,31 @@ struct AppModelTests {
             Issue.record("failed")
         }
         if case .refused = StepUpPhase.from(CoreError.authFailed) {} else { Issue.record("refused") }
+    }
+
+    @Test func theOnlyAdminWarningAndFilters() async throws {
+        let s = FakeService()
+        var admin = FakeService.device("d_me", "Mac", scopes: ["read", "admin"])
+        admin.stepup = true
+        var runner = FakeService.device("d_r", "linux-01", scopes: ["runner"])
+        runner.kind = "runner"
+        var odd = FakeService.device("d_x", "Odd", scopes: ["read"])
+        odd.kind = "satellite"
+        s.deviceList = [admin, runner, odd]
+        let m = try app(s)
+        await m.start()
+        #expect(m.devices.onlyAdmin?.id == "d_me")
+        m.devices.filter = .runners
+        #expect(m.devices.shown.map(\.id) == ["d_r"])
+        m.devices.filter = .devices
+        #expect(m.devices.shown.map(\.id) == ["d_me"], "an unknown kind is not a device")
+        m.devices.filter = .all
+        #expect(m.devices.shown.count == 3 && m.devices.shown.contains { $0.kind == "satellite" })
+        var second = FakeService.device("d_2", "iPhone", scopes: ["read", "admin"])
+        second.stepup = true
+        s.deviceList.append(second)
+        await m.devices.reload()
+        #expect(m.devices.onlyAdmin == nil)
     }
 
     @Test func renameGoesThroughElevationAndUpdatesTheList() async throws {

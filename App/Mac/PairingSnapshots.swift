@@ -86,11 +86,25 @@ enum PairingSnapshots {
         app.shell.coreLink = .offline
         await shot("banner-offline")
         app.shell.coreLink = .live
-        for scene in ["asking", "cancelled", "failed", "nokey"] {
-            app.debugStepUp(scene)
+        app.debugStepUp()
+        await shot("stepup-asking")
+        app.debugCloseStepUp()
+        // Touch ID outcomes are inline, in the panel that asked: here the Rename dialog of a real device.
+        app.debugOpenSettings("devices")
+        app.debugDetail(named: "iPhone")
+        await shot("device-detail")
+        app.debugOpenRename(named: "iPhone")
+        for scene in ["cancelled", "failed", "nokey"] {
+            app.debugNotice(scene, done: "renamed")
             await shot("stepup-\(scene)")
-            app.debugCloseStepUp()
         }
+        app.debugClearNotice()
+        app.debugCloseDialog()
+        app.debugDetail(named: nil)
+        // Revoke the bootstrap admin: this Mac is then the only device that can manage the Core, and the list says so.
+        app.debugOpenSettings("devices")
+        await app.debugRevoke(named: "admin")
+        await shot("devices-only-admin")
         NSApp.terminate(nil)
     }
 

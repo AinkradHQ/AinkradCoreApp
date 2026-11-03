@@ -361,7 +361,7 @@ struct StepUpTestStore: KeyStore {
                     NSUnderlyingErrorKey: NSError(domain: LAError.errorDomain, code: LAError.userCancel.rawValue)
                 ]),
         ]
-        for c in cancels { #expect(CoreConnection.stepUpFailure(c) == .stepUpUnavailable("Touch ID was cancelled.")) }
+        for c in cancels { #expect(CoreConnection.stepUpFailure(c) == .stepUpCancelled) }
         #expect(
             !CoreConnection.isUserCancel(NSError(domain: LAError.errorDomain, code: LAError.biometryLockout.rawValue)))
     }

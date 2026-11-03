@@ -50,15 +50,36 @@ extension AppModel {
         }
     }
 
-    /// The Touch ID sheet in a given phase: `asking`, `cancelled`, `failed`, `nokey`.
-    public func debugStepUp(_ scene: String) {
-        switch scene {
-        case "asking": stepUp.set(.asking("Make a pairing code for iPhone."))
-        case "cancelled": stepUp.set(.cancelled)
-        case "failed": stepUp.set(.failed("The Secure Enclave could not sign the request."))
-        default: stepUp.set(.noKey)
-        }
+    /// The Touch ID sheet while asking.
+    public func debugStepUp() {
+        stepUp.set(.asking("Make a pairing code for iPhone."))
         shell.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { StepUpSheet(model: stepUp) })
+    }
+
+    /// An inline Touch ID outcome (`cancelled`, `failed`, `nokey`) in the panel that is open.
+    public func debugNotice(_ scene: String, done: String) {
+        let phase: StepUpPhase =
+            scene == "cancelled"
+            ? .cancelled : scene == "failed" ? .failed("The Secure Enclave could not sign the request.") : .noKey
+        stepUpNotice = StepUpNotice(phase: phase, done: done)
+    }
+
+    public func debugClearNotice() { stepUpNotice = nil }
+
+    /// Opens a device's page (`name`), or the list when nil.
+    public func debugDetail(named name: String?) {
+        devices.detailID = name.flatMap { n in devices.items.first { $0.name == n }?.id }
+    }
+
+    /// Live: revokes a device by name (as the Devices screen does), so the list can show the one-admin warning.
+    public func debugRevoke(named name: String) async {
+        guard let d = devices.items.first(where: { $0.name == name }) else { return }
+        _ = await devices.revoke(d)
+    }
+
+    public func debugOpenRename(named name: String) {
+        guard let d = devices.items.first(where: { $0.name == name }) else { return }
+        shell.present(ShellDialog(id: "rename") { RenameDialog(app: self, device: d) })
     }
 
     public func debugCloseStepUp() { shell.closeTopDialog() }

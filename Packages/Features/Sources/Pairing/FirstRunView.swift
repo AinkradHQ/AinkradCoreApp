@@ -1,5 +1,6 @@
 import CoreKit
 import CoreUI
+import CryptoKit
 import SwiftUI
 
 /// The screen before the desktop: connect to a Core and pair this Mac with it.
@@ -9,6 +10,8 @@ struct FirstRunView: View {
     @Environment(\.colorScheme) private var scheme
     /// What the field shows. The model keeps the formatted code; this follows it (the usual way to rewrite text while typing).
     @State private var codeField = ""
+    @State private var pasteQR = false
+    @State private var showKeys = false
 
     var body: some View {
         ZStack {
@@ -32,6 +35,7 @@ struct FirstRunView: View {
             .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             .frame(width: Space.s8 * 17)
             .accessibilityElement(children: .contain)
+            cluster
         }
         .coreTheme()
         .onChange(of: codeField) { _, typed in
@@ -46,8 +50,7 @@ struct FirstRunView: View {
 
     private var step: (Int, String) {
         switch model.stage {
-        case .form, .claiming: (1, "Find your Core")
-        case .sas: (2, "Pair this Mac")
+        case .form, .claiming, .sas: (2, "Pair this Mac")
         case .approved: (3, "Done")
         case .failed: (0, "Connect to a Core")
         }
@@ -66,39 +69,86 @@ struct FirstRunView: View {
                 }
                 .accessibilityHidden(true)
             }
-            Text(step.0 > 0 ? "Step \(step.0) of 3 · \(step.1)" : step.1)
-                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+            Text(step.1).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+                .accessibilityLabel(step.0 > 0 ? "Step \(step.0) of 3, \(step.1)" : step.1)
         }
+    }
+
+    /// The status cluster of a Mac with no Core yet: nothing to be notified of, not connected.
+    private var cluster: some View {
+        HStack(spacing: Space.s1) {
+            clusterItem("bell", nil, label: "Notifications")
+            clusterItem("wifi.slash", "Not connected", label: "Not connected to a Core")
+            Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd - Space.s1)
+                .frame(width: MacSize.controlLg, height: MacSize.controlLg).accessibilityHidden(true)
+        }
+        .padding(.horizontal, Space.s4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.top, Space.s3)
+    }
+
+    private func clusterItem(_ symbol: String, _ title: String?, label: String) -> some View {
+        HStack(spacing: Space.s1) {
+            Image(systemName: symbol).accessibilityHidden(true)
+            if let title { Text(title) }
+        }
+        .font(.system(size: MacTextSize.body))
+        .padding(.horizontal, Space.s2).frame(minWidth: MacSize.controlMd, minHeight: MacSize.controlMd)
+        .accessibilityElement(children: .combine).accessibilityLabel(label)
     }
 
     // MARK: form
 
+    private var addressSuffix: String? {
+        guard let url = try? EndpointInput.parse(model.endpointText), url.host != nil else { return nil }
+        return "\(url.scheme ?? "https") · \(url.port ?? (url.scheme == "http" ? 80 : 443))"
+    }
+
+    private var keysHome: String { SecureEnclave.isAvailable ? "the Secure Enclave" : "this Mac's Keychain" }
+
     private var form: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Connect to a Core").font(.system(size: MacTextSize.large, weight: .semibold))
+            Text("Enter the pairing code").font(.system(size: MacTextSize.large, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            Text(
-                "Enter your Core's address and the pairing code from an admin device. Ainkrad Core checks who answers before it sends anything signed."
-            )
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            if model.usesQR {
-                Label("This QR names its Core and its fingerprint, so no address is needed.", systemImage: "qrcode")
+            Text("Ask an admin device to open **Add device**. The code is 10 characters and valid for 5 minutes.")
+                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            if pasteQR {
+                Label("A QR names its Core and its fingerprint, so no address is needed.", systemImage: "qrcode")
                     .foregroundStyle(palette.text2)
             } else {
                 FieldBox(
-                    label: "Core address", placeholder: "core.example.net or http://127.0.0.1:7700",
-                    text: $model.endpointText, error: model.endpointError, onSubmit: { Task { await model.submit() } })
+                    label: "Core address", placeholder: "core.example.net", text: $model.endpointText,
+                    error: model.endpointError, suffix: addressSuffix, onSubmit: { Task { await model.submit() } })
+                Text(
+                    "Always https. Add a port only if it is not 443, for example core.example.net:7443. Plain http is only for a Core on this Mac."
+                )
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            FieldBox(
-                label: "Pairing code or QR text", placeholder: "ABCDE-FGHJK",
-                text: $codeField, error: model.codeError,
-                mono: true, onSubmit: { Task { await model.submit() } })
-            Text(
-                "Case does not matter. I and L count as 1, O as 0. To use a QR, paste the text it holds. Plain http is only for a Core on this Mac."
-            )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-            .fixedSize(horizontal: false, vertical: true)
+            if pasteQR {
+                FieldBox(
+                    label: "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
+                    mono: true, autofocus: true, onSubmit: { Task { await model.submit() } })
+            } else {
+                CodeBoxes(
+                    label: "Pairing code", text: $codeField, error: model.codeError,
+                    onSubmit: { Task { await model.submit() } })
+                Text("Case doesn't matter. I and L count as 1, O as 0.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            }
+            VStack(alignment: .leading, spacing: Space.s2) {
+                HStack(spacing: Space.s1) {
+                    Text("This Mac keeps its keys in \(keysHome)")
+                    LinkButton(title: "Details", hint: "Shows which keys this Mac makes") { showKeys.toggle() }
+                }
+                if showKeys { keyDetails }
+            }
             HStack {
+                LinkButton(title: pasteQR ? "Type the code instead" : "Paste QR text instead") {
+                    pasteQR.toggle()
+                    model.typeCode("")
+                    codeField = ""
+                }
                 Spacer()
                 Button("Pair this Mac") { Task { await model.submit() } }
                     .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
@@ -106,18 +156,36 @@ struct FirstRunView: View {
         }
     }
 
+    private var keyDetails: some View {
+        FactCard {
+            FactRow(key: "Routine key", value: SecureEnclave.isAvailable ? "Secure Enclave" : "Software")
+            FactRow(
+                key: "Step-up key",
+                value: SecureEnclave.isAvailable
+                    ? "Secure Enclave, asks for Touch ID" : "None: it cannot unlock admin actions")
+            FactRow(
+                key: "Reported as", value: "key_storage = \(SecureEnclave.isAvailable ? "secure_enclave" : "software")",
+                mono: true)
+            Text(
+                "The keys stay on this Mac. The Core only ever sees their public halves, and records the storage as a claim."
+            )
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var claiming: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text("Checking the Core").font(.system(size: MacTextSize.large, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            HStack(spacing: Space.s3) {
-                Spin()
-                Text("The Core has to prove who it is first. Then this Mac claims the code.")
-                    .foregroundStyle(palette.text2)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.updatesFrequently)
+            Text(
+                "Nothing is signed or sent from this Mac yet. The Core has to prove who it is first, then this Mac claims the code."
+            )
+            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            IndBar().accessibilityHidden(true)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     // MARK: check code
@@ -126,17 +194,16 @@ struct FirstRunView: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text("Compare this with the approver").font(.system(size: MacTextSize.large, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            Text("It has to match the code on their screen, every character. If it doesn't, do not go on.")
+            Text("It has to match the code on their screen, every character. If it doesn't, don't go on.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             if let claim = model.claim { SASView(sas: claim.sas) }
             statusLine
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
+                Button("It doesn't match") { Task { await model.cancel() } }.buttonStyle(DangerButtonStyle())
                 if model.matched {
-                    Button("Cancel pairing") { Task { await model.cancel() } }.buttonStyle(.coreSecondary)
-                    Button("Waiting…") {}.buttonStyle(CoreButtonStyle(.prominent, busy: true)).disabled(true)
+                    Button("Waiting…") {}.buttonStyle(.coreProminent).disabled(true)
                 } else {
-                    Button("It doesn't match") { Task { await model.cancel() } }.buttonStyle(.coreSecondary)
                     Button("It matches") { Task { await model.confirmMatch() } }
                         .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
                 }
@@ -149,13 +216,14 @@ struct FirstRunView: View {
             Label("The approver approved. Say it matches to finish.", systemImage: "checkmark.seal")
                 .font(.system(size: MacTextSize.body, weight: .semibold))
         } else {
-            HStack(spacing: Space.s2) {
-                Spin()
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Waiting for approval").font(.system(size: MacTextSize.body, weight: .semibold))
-                    Text("A pairing lasts 5 minutes from when the approver made the code.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                }
+            VStack(alignment: .leading, spacing: Space.s1) {
+                IndBar().accessibilityHidden(true)
+                Text("Waiting for approval").font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(
+                    "A pairing lasts 5 minutes from when the approver made the code. This Mac isn't told the exact time."
+                )
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.updatesFrequently)

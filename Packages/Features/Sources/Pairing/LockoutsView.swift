@@ -12,6 +12,7 @@ struct LockoutsSection: View {
                 "The Core locks an address or a device for a while after repeated failed attempts. Clearing a lock needs Touch ID."
             )
             .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            StepUpBanner(app: app)
             if app.service == nil {
                 NotConnectedNote(what: "Lockouts")
             } else {
@@ -47,7 +48,7 @@ struct LockoutsSection: View {
                 }
             }
         }
-        .frame(maxWidth: Space.s8 * 20, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .task { await model.reload() }
     }
 }

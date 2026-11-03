@@ -4,10 +4,10 @@ import Foundation
 import Observation
 import SwiftUI
 
-/// The user said no to Touch ID, or closed the sheet after it failed: the action does not run.
+/// The person said no to Touch ID, or it did not elevate: the action does not run. The reason is in `AppModel.stepUpNotice`.
 struct StepUpDeclined: Error {}
 
-/// What the one Touch ID sheet shows.
+/// What the Touch ID sheet shows while asking, and what an inline notice says after.
 enum StepUpPhase: Equatable {
     case asking(String)
     case cancelled
@@ -15,11 +15,11 @@ enum StepUpPhase: Equatable {
     case noKey
     case refused(String)
 
-    /// Sorts what `stepUp` threw. CoreKit names a cancelled prompt and a missing key only in the message.
+    /// Sorts what `stepUp` threw into the person's choice (cancelled), the device (no key, failed) or the Core (refused).
     static func from(_ error: any Error) -> StepUpPhase {
         switch CoreError.unwrapping(error) {
-        case .stepUpUnavailable(let m):
-            return m.localizedCaseInsensitiveContains("cancel") ? StepUpPhase.cancelled : StepUpPhase.noKey
+        case .stepUpCancelled: return StepUpPhase.cancelled
+        case .stepUpUnavailable: return StepUpPhase.noKey
         case .keyStore: return StepUpPhase.failed("The Secure Enclave could not sign the request.")
         case .some(let e): return StepUpPhase.refused(e.localizedDescription)
         case nil: return StepUpPhase.failed(error.localizedDescription)
@@ -27,94 +27,110 @@ enum StepUpPhase: Equatable {
     }
 }
 
-/// Touch ID (`Mac.stepUp`): one sheet for every elevated action. It waits for the system prompt, and when that ends without
-/// an elevation it says why (cancelled is the person's choice, failed is not) and offers to try again.
+/// Why an elevated action did not run, in context: shown inline in the panel that asked, never as a second modal.
+struct StepUpNotice: Equatable {
+    let phase: StepUpPhase
+    /// What did not happen: "renamed", "revoked", "changed", "cleared", "approved", "made".
+    let done: String
+    /// True where the person's input is still on screen (a dialog), so the copy can say "Your edit is still here."
+    var keepsEdit = true
+
+    var title: String {
+        switch phase {
+        case .cancelled: "Cancelled, nothing was \(done)."
+        case .failed: "Touch ID didn't match. Nothing was \(done)."
+        case .noKey: "This Mac can't confirm. Nothing was \(done)."
+        case .refused: "The Core refused the proof. Nothing was \(done)."
+        case .asking: ""
+        }
+    }
+
+    var detail: String {
+        switch phase {
+        case .cancelled:
+            keepsEdit ? "Your edit is still here. Try again when you are ready." : "Try again when you are ready."
+        case .failed(let m): "\(m) Try again. After a few misses macOS asks for your password instead."
+        case .noKey: "A Mac with no step-up key can never unlock admin actions. Use another admin device for this."
+        case .refused(let m): m
+        case .asking: ""
+        }
+    }
+
+    var symbol: String {
+        switch phase {
+        case .cancelled: "hand.raised"
+        case .noKey: "lock.slash"
+        default: "exclamationmark.triangle"
+        }
+    }
+
+    var tone: Tone { phase == .cancelled ? .queue : .warn }
+}
+
+/// What the Touch ID sheet knows: the phase it is asking in.
 @MainActor @Observable
 final class StepUpModel {
     private(set) var phase: StepUpPhase?
-    private var answer: CheckedContinuation<Bool, Never>?
     func set(_ p: StepUpPhase?) { phase = p }
-    func wait() async -> Bool {
-        await withCheckedContinuation { answer = $0 }
-    }
-    func choose(retry: Bool) {
-        let a = answer
-        answer = nil
-        a?.resume(returning: retry)
+}
+
+/// The inline outcome of a Touch ID that did not elevate: a banner in the panel, with the words from the prototype.
+struct StepUpBanner: View {
+    let app: AppModel
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        if let n = app.stepUpNotice {
+            let colours = palette.tone(n.tone)
+            HStack(alignment: .top, spacing: Space.s3) {
+                Image(systemName: n.symbol).foregroundStyle(colours.ink).frame(width: Space.s4).accessibilityHidden(
+                    true)
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                    Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(n.detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s3)
+            .background(palette.glassCard, in: coreShape(Radius.cardMac))
+            .background(colours.fill, in: coreShape(Radius.cardMac))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("stepup-notice")
+        }
     }
 }
 
+/// The one Touch ID sheet. It shows only while the system prompt is up.
 struct StepUpSheet: View {
     @Bindable var model: StepUpModel
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        DialogCard(title: title, width: Space.s8 * 12) {
+        DialogCard(title: "Confirm with Touch ID", width: Space.s8 * 12) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 HStack(alignment: .top, spacing: Space.s3) {
-                    Image(systemName: symbol).font(.system(size: MacTextSize.large))
-                        .foregroundStyle(palette.tone(tone).ink)
+                    Image(systemName: "touchid").font(.system(size: MacTextSize.large))
+                        .foregroundStyle(palette.tone(.done).ink)
                         .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                        .background(palette.tone(tone).fill, in: coreShape(Radius.control))
+                        .background(palette.tone(.done).fill, in: coreShape(Radius.control))
                         .accessibilityHidden(true)
-                    Text(detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    Text(reason).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 }
-                if case .asking = model.phase {
-                    HStack(spacing: Space.s2) {
-                        Spin()
-                        Text("Waiting for Touch ID").font(.system(size: MacTextSize.body, weight: .semibold))
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.updatesFrequently)
-                } else {
-                    HStack(spacing: Space.s2) {
-                        Spacer(minLength: 0)
-                        Button(model.phase == .noKey ? "Close" : "Cancel") { model.choose(retry: false) }
-                            .buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
-                        if model.phase != .noKey {
-                            Button("Try again") { model.choose(retry: true) }
-                                .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
-                        }
-                    }
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    IndBar()
+                    Text("Waiting for Touch ID").font(.system(size: MacTextSize.body, weight: .semibold))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.updatesFrequently)
             }
             .font(.system(size: MacTextSize.body))
         }
         .accessibilityIdentifier("stepup")
     }
 
-    private var title: String {
-        switch model.phase {
-        case .asking, nil: "Confirm with Touch ID"
-        case .cancelled: "Touch ID was cancelled"
-        case .failed: "Touch ID didn't work"
-        case .noKey: "This Mac can't confirm"
-        case .refused: "The Core refused the proof"
-        }
-    }
-    private var symbol: String {
-        switch model.phase {
-        case .asking, nil: "touchid"
-        case .cancelled: "hand.raised"
-        case .noKey: "lock.slash"
-        default: "exclamationmark.triangle"
-        }
-    }
-    private var tone: Tone {
-        switch model.phase {
-        case .asking, nil: .done
-        case .cancelled: .queue
-        default: .warn
-        }
-    }
-    private var detail: String {
-        switch model.phase {
-        case .asking(let reason): reason
-        case .cancelled: "You cancelled, so nothing changed. Try again when you are ready."
-        case .failed(let m): "\(m) Try again. After a few misses macOS asks for your password instead."
-        case .noKey: "A Mac with no step-up key can never unlock admin actions. Use another admin device for this."
-        case .refused(let m): m
-        case nil: ""
-        }
+    private var reason: String {
+        if case .asking(let r)? = model.phase { return r }
+        return ""
     }
 }

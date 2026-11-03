@@ -3,6 +3,7 @@ import CoreUI
 import SwiftUI
 
 struct AddDeviceView: View {
+    let app: AppModel
     @Bindable var model: AddDeviceModel
     let close: () -> Void
     @Environment(\.corePalette) private var palette
@@ -17,6 +18,7 @@ struct AddDeviceView: View {
                 case .approved(let info): approved(info)
                 case .ended(let why): ended(why)
                 }
+                StepUpBanner(app: app)
                 if let e = model.error {
                     Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(palette.tone(.fail).ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -105,8 +107,8 @@ struct AddDeviceView: View {
                 }
                 if let qr = p.qr { QRImage(text: qr).frame(width: Space.s8 * 5, height: Space.s8 * 5) }
             }
-            HStack(spacing: Space.s2) {
-                Spin()
+            VStack(alignment: .leading, spacing: Space.s1) {
+                IndBar()
                 Text("Waiting for the new device to claim it").font(.system(size: MacTextSize.body, weight: .semibold))
             }
             .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)

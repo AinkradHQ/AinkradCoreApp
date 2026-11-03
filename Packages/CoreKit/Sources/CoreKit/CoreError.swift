@@ -43,7 +43,9 @@ public enum CoreError: Error, Equatable, Sendable {
     case keyStore(String)
     /// This device has not paired (no keys or identity).
     case notPaired
-    /// The user cancelled the Touch ID prompt, or the device has no step-up key.
+    /// The user cancelled the Touch ID prompt: their choice, not a failure.
+    case stepUpCancelled
+    /// The device has no step-up key, so it can never elevate.
     case stepUpUnavailable(String)
     /// A request body above 1 MiB (§4): the Core would count it as a forgery.
     case bodyTooLarge
@@ -76,6 +78,7 @@ extension CoreError: LocalizedError {
         case .badRequest(let m): m
         case .keyStore(let m): m
         case .notPaired: "This device is not paired."
+        case .stepUpCancelled: "Touch ID was cancelled."
         case .stepUpUnavailable(let m): m
         case .bodyTooLarge: "That is too large to send."
         case .protocolViolation(let m): m

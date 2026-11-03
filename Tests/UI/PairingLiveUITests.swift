@@ -29,7 +29,7 @@ final class PairingLiveUITests: XCTestCase {
 
         address.click()
         address.typeText(url)
-        let field = app.textFields["Pairing code or QR text"]
+        let field = app.textFields["Pairing code"]
         field.click()
         field.typeText(code.lowercased())  // typed in lower case, no dash: it formats itself
         let dashed = "\(code.prefix(5))-\(code.dropFirst(5))"
@@ -64,7 +64,11 @@ final class PairingLiveUITests: XCTestCase {
         devices.click()
         let me = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'This Mac'")).firstMatch
         XCTAssertTrue(me.waitForExistence(timeout: 20), "Devices lists this Mac from the Core")
-        XCTAssertTrue(app.descendants(matching: .any)["Rename mac-app"].exists, "the row has its actions")
-        XCTAssertTrue(app.buttons["Add device"].exists)
+        XCTAssertTrue(app.buttons["Add device…"].exists)
+        me.click()
+        XCTAssertTrue(app.buttons["Rename…"].waitForExistence(timeout: 10), "the device page has its actions")
+        XCTAssertTrue(app.buttons["Revoke…"].exists)
+        app.buttons["Back to Devices"].click()
+        XCTAssertTrue(app.buttons["Add device…"].waitForExistence(timeout: 10), "Back returns to the list")
     }
 }

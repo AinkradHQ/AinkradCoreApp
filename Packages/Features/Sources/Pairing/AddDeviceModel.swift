@@ -63,7 +63,7 @@ final class AddDeviceModel {
         let label = name.trimmingCharacters(in: .whitespaces)
         let (kind, granted) = (kind, effectiveScopes)
         do {
-            let p = try await host.elevated("Make a pairing code for \(label).") {
+            let p = try await host.elevated("Make a pairing code for \(label).", done: "made") {
                 try await service.createPairing(name: label, kind: kind, scopes: granted)
             }
             pairing = p
@@ -93,7 +93,7 @@ final class AddDeviceModel {
         busy = true
         defer { busy = false }
         do {
-            let done = try await host.elevated("Approve \(info.name ?? "the new device").") {
+            let done = try await host.elevated("Approve \(info.name ?? "the new device").", done: "approved") {
                 try await service.approve(info.id, sas: sas, scopes: nil)
             }
             apply(done)
@@ -108,7 +108,7 @@ final class AddDeviceModel {
         busy = true
         defer { busy = false }
         do {
-            _ = try await host.elevated("Reject the new device.") { try await service.reject(id) }
+            _ = try await host.elevated("Reject the new device.", done: "rejected") { try await service.reject(id) }
             stage = .ended("rejected")
             host.shell.bell.remove("pairing-\(id)")
         } catch is StepUpDeclined {

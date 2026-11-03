@@ -19,6 +19,8 @@ public final class AppModel {
     private(set) var firstRun: FirstRunModel!
     private(set) var service: (any CoreService)?
     let stepUp = StepUpModel()
+    /// Why the last elevated action did not run; shown inline by the panel that asked. Cleared by the next attempt.
+    var stepUpNotice: StepUpNotice?
     private(set) var devices: DevicesModel!
     private(set) var lockouts: LockoutsModel!
     private(set) var addDevice: AddDeviceModel?
@@ -59,7 +61,15 @@ public final class AppModel {
         lockouts = LockoutsModel(host: self)
         shell.elevate = { [weak self] in
             guard let self else { return }
-            Task { _ = await self.ensureElevated("Unlock admin actions on this Mac for 5 minutes.") }
+            Task {
+                // The chip has no panel to show a notice in, so its outcome is a toast.
+                if await !self.ensureElevated("Unlock admin actions on this Mac for 5 minutes.", done: "unlocked"),
+                    let n = self.stepUpNotice
+                {
+                    self.shell.showToast(n.title)
+                    self.stepUpNotice = nil
+                }
+            }
         }
         shell.retryConnection = { [weak self] in
             guard let self else { return }
@@ -182,11 +192,18 @@ public final class AppModel {
             shell.showToast("Connect to a Core first.")
             return
         }
+        stepUpNotice = nil
         let model = AddDeviceModel(host: self, existing: id)
         addDevice = model
         shell.present(
-            ShellDialog(id: "add-device", onClose: { [weak self] in self?.addDevice = nil }) {
-                AddDeviceView(model: model, close: { [weak self] in self?.shell.closeDialog() })
+            ShellDialog(
+                id: "add-device",
+                onClose: { [weak self] in
+                    self?.addDevice = nil
+                    self?.stepUpNotice = nil
+                }
+            ) {
+                AddDeviceView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
             })
     }
 
@@ -194,24 +211,21 @@ public final class AppModel {
 
     var isElevated: Bool { shell.elevatedUntil.map { $0 > Date() } ?? false }
 
-    /// Touch ID, through the one sheet. True when the session is elevated (it may have been already).
-    func ensureElevated(_ reason: String, force: Bool = false) async -> Bool {
+    /// Touch ID, through the one sheet, shown only while the system prompt is up. True when the session is elevated (it may have
+    /// been already). When it is not, `stepUpNotice` says why and the caller's panel shows it inline.
+    func ensureElevated(_ reason: String, done: String, keepsEdit: Bool = true, force: Bool = false) async -> Bool {
         guard let service else { return false }
         if isElevated && !force { return true }
+        stepUpNotice = nil
         stepUp.set(.asking(reason))
-        shell.presentOnTop(
-            ShellDialog(id: "step-up", dismissible: false) { StepUpSheet(model: stepUp) })
+        shell.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { StepUpSheet(model: stepUp) })
         defer { shell.closeTopDialog() }
-        while true {
-            do {
-                let until = try await service.stepUp(reason: reason)
-                setElevated(until)
-                return true
-            } catch {
-                stepUp.set(StepUpPhase.from(error))
-                if !(await stepUp.wait()) { return false }
-                stepUp.set(.asking(reason))
-            }
+        do {
+            setElevated(try await service.stepUp(reason: reason))
+            return true
+        } catch {
+            stepUpNotice = StepUpNotice(phase: StepUpPhase.from(error), done: done, keepsEdit: keepsEdit)
+            return false
         }
     }
 
@@ -226,13 +240,17 @@ public final class AppModel {
     }
 
     /// Runs an action that needs elevation: Touch ID first when the session is not elevated, and once more if the Core still
-    /// says `step_up_required` (the session may have been renewed).
-    func elevated<T>(_ reason: String, _ op: () async throws -> T) async throws -> T {
-        guard await ensureElevated(reason) else { throw StepUpDeclined() }
+    /// says `step_up_required` (the session may have been renewed). `done` names what did not happen if Touch ID does not elevate.
+    func elevated<T>(
+        _ reason: String, done: String, keepsEdit: Bool = true, _ op: () async throws -> T
+    ) async throws -> T {
+        guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit) else { throw StepUpDeclined() }
         do { return try await op() } catch {
             guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
             shell.elevatedUntil = nil
-            guard await ensureElevated(reason, force: true) else { throw StepUpDeclined() }
+            guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true) else {
+                throw StepUpDeclined()
+            }
             return try await op()
         }
     }

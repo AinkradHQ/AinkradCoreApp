@@ -14,6 +14,10 @@ struct DeviceInfo: Identifiable, Equatable, Sendable {
     var status: String
     var lastUsed: Date?
     var createdAt: Date
+    /// The device's routine key fingerprint, as the Core lists it.
+    var fingerprint: String?
+    /// Whether it has a step-up key (the Core's field; nil when the Core does not say).
+    var stepup: Bool?
     var revoked: Bool { status == "revoked" || status == "rejected" }
 }
 
@@ -221,8 +225,8 @@ struct LiveCoreService: CoreService {
     private static func device(_ d: Components.Schemas.Device) -> DeviceInfo {
         DeviceInfo(
             id: d.id, name: d.name, kind: d.kind ?? "device", platform: d.platform, keyStorage: d.keyStorage,
-            scopes: d.scopes ?? [], status: d.status ?? (d.revokedAt == nil ? "active" : "revoked"),
-            lastUsed: d.lastUsedAt, createdAt: d.createdAt)
+            scopes: d.scopes ?? [], status: d.revokedAt != nil ? "revoked" : (d.status ?? "active"),
+            lastUsed: d.lastUsedAt, createdAt: d.createdAt, fingerprint: d.fingerprint, stepup: d.stepup)
     }
 
     private static func pairing(_ p: Components.Schemas.PairingView, fallback: String) -> PairingInfo {

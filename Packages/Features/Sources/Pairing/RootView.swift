@@ -12,7 +12,7 @@ public struct RootView: View {
     public var body: some View {
         Group {
             switch app.phase {
-            case .starting: sky.overlay { ProgressView().controlSize(.regular) }
+            case .starting: sky.overlay { IndBar().frame(width: Space.s8 * 4) }
             case .firstRun: FirstRunView(model: app.firstRun)
             case .desktop: ShellView(shell: app.shell)
             case .blocked(let f): blocked(f)

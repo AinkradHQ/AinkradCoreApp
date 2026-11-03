@@ -7,6 +7,23 @@ enum LoadState: Equatable {
     case failed(String)
 }
 
+enum DeviceFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case devices = "Devices"
+    case runners = "Runners"
+    case passkeys = "Passkeys"
+    var id: String { rawValue }
+    /// By the Core's `kind` word. A kind this app does not know shows only under All, as its own word.
+    func matches(_ kind: String) -> Bool {
+        switch self {
+        case .all: true
+        case .devices: kind == "device"
+        case .runners: kind == "runner"
+        case .passkeys: kind == "passkey"
+        }
+    }
+}
+
 /// Settings, Devices: who may reach this Core. Real data from the Core, live through its events.
 @MainActor @Observable
 final class DevicesModel {
@@ -15,9 +32,21 @@ final class DevicesModel {
     /// A device whose dialog is open reports its failure here, so the dialog can say it in place.
     var dialogError: String?
     private(set) var busy = false
+    var filter: DeviceFilter = .all
+    /// The device whose page is open (nil: the list).
+    var detailID: String?
     private weak var host: AppModel?
 
     init(host: AppModel) { self.host = host }
+
+    var shown: [DeviceInfo] { items.filter { filter.matches($0.kind) } }
+    var detail: DeviceInfo? { detailID.flatMap { id in items.first { $0.id == id } } }
+
+    /// The one active device that can manage the Core, when there is exactly one: losing it means SSH to the host.
+    var onlyAdmin: DeviceInfo? {
+        let admins = active.filter { $0.scopes.contains("admin") && $0.stepup != false }
+        return admins.count == 1 ? admins[0] : nil
+    }
 
     var myID: String? { host?.service?.deviceID }
     var active: [DeviceInfo] { items.filter { !$0.revoked } }
@@ -50,7 +79,7 @@ final class DevicesModel {
             return false
         }
         return await run {
-            let updated = try await host.elevated("Rename \(d.name) to \(clean).") {
+            let updated = try await host.elevated("Rename \(d.name) to \(clean).", done: "renamed") {
                 try await service.rename(d.id, to: clean)
             }
             self.replace(updated)
@@ -68,7 +97,7 @@ final class DevicesModel {
             return false
         }
         return await run {
-            let updated = try await host.elevated("Change what \(d.name) may do.") {
+            let updated = try await host.elevated("Change what \(d.name) may do.", done: "changed") {
                 try await service.setScopes(d.id, scopes)
             }
             self.replace(updated)
@@ -83,7 +112,7 @@ final class DevicesModel {
         guard let host, let service = host.service else { return false }
         let me = isMe(d)
         return await run {
-            let updated = try await host.elevated("Revoke \(d.name). It loses access at once.") {
+            let updated = try await host.elevated("Revoke \(d.name). It loses access at once.", done: "revoked") {
                 try await service.revoke(d.id)
             }
             self.replace(updated)
@@ -143,7 +172,7 @@ final class LockoutsModel {
         clearing = l.key
         defer { clearing = nil }
         do {
-            try await host.elevated("Clear the lock on \(Self.describe(l.key)).") {
+            try await host.elevated("Clear the lock on \(Self.describe(l.key)).", done: "cleared", keepsEdit: false) {
                 try await service.clearLockout(l.key)
             }
             items.removeAll { $0.key == l.key }
