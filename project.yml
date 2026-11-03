@@ -1,0 +1,44 @@
+name: AinkradCore
+options:
+  bundleIdPrefix: com.ainkrad
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+    DEVELOPMENT_TEAM: RT9AA68C38
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  AinkradClient:
+    path: Packages/AinkradClient
+
+targets:
+  AinkradCoreMac:
+    type: application
+    platform: macOS
+    sources: [App/Mac]
+    dependencies:
+      - package: AinkradClient
+    settings:
+      base:
+        PRODUCT_NAME: Ainkrad Core
+        PRODUCT_BUNDLE_IDENTIFIER: com.ainkrad.core
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Ainkrad Core
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        ENABLE_HARDENED_RUNTIME: YES
+
+schemes:
+  AinkradCoreMac:
+    build:
+      targets:
+        AinkradCoreMac: all
