@@ -16,11 +16,10 @@ public struct CoreSession: Sendable, Equatable {
 
 /// Signs requests and keeps one live session: opens it (identity proof, challenge, session), refreshes it at 80 % of its life
 /// with no user interaction, reopens it after `session_expired` or a Core restart, and keeps a clock offset from
-/// `clock_skew`. One refresh at a time; concurrent callers share it.
+/// nothing from `clock_skew` (the user is told, never silently re-signed). One refresh at a time; concurrent callers share it.
 actor SessionManager {
     /// Refresh when this fraction of the session's life is gone.
     static let refreshFraction = 0.8
-    private static let maxSkew: Int64 = 86_400
 
     let endpoint: CoreEndpoint
     let identity: PairedIdentity
@@ -31,8 +30,9 @@ actor SessionManager {
     private(set) var negotiatedMinor: Int32?
     private(set) var lastProof: CoreProof?
     private(set) var lastRefreshError: CoreError?
-    /// Seconds added to this machine's clock when signing, learned from `clock_skew`.
-    private(set) var clockOffset: Int64 = 0
+    /// No refresh attempt before this time (Core clock, unix seconds) after one failed: honours `Retry-After`, else backs off.
+    private(set) var refreshNotBefore: Int64?
+    private var failures = 0
     private var refreshing: Task<CoreSession, any Error>?
     private var autoRefresh: Task<Void, Never>?
 
@@ -46,7 +46,7 @@ actor SessionManager {
         self.clock = clock
     }
 
-    func now() -> Int64 { Int64(clock.now().timeIntervalSince1970) + clockOffset }
+    func now() -> Int64 { Int64(clock.now().timeIntervalSince1970) }
 
     // MARK: sessions
 
@@ -55,34 +55,67 @@ actor SessionManager {
         return Double(t - s.createdAt) >= life * Self.refreshFraction
     }
 
-    /// A live session, refreshed when it is past 80 % of its life.
+    private func isLive(_ s: CoreSession) -> Bool { s.expiresAt - now() > 5 }
+
+    /// A live session, refreshed when it is past 80 % of its life. After a failed refresh nothing is tried before the backoff
+    /// deadline: a live session is kept, and with none the last error is thrown without touching the Core.
     func currentSession() async throws -> CoreSession {
-        if let s = session, !needsRefresh(s, at: now()) { return s }
+        let t = now()
+        if let s = session, !needsRefresh(s, at: t) { return s }
+        if let until = refreshNotBefore, t < until {
+            if let s = session, isLive(s) { return s }
+            if let e = lastRefreshError { throw e }
+        }
         return try await openSession()
     }
 
-    /// Runs the identity proof, challenge and session exchange (once, however many callers ask).
+    /// Runs the identity proof, challenge and session exchange (once, however many callers ask; all of them get the same
+    /// outcome, including the live old session when the refresh failed for a transient reason).
     func openSession() async throws -> CoreSession {
-        if let task = refreshing { return try await task.value }
-        let fallback = session
-        let task = Task { try await self.performOpen() }
-        refreshing = task
-        defer { refreshing = nil }
+        let task: Task<CoreSession, any Error>
+        let owner: Bool
+        if let running = refreshing {
+            task = running
+            owner = false
+        } else {
+            task = Task { try await self.performOpen() }
+            refreshing = task
+            owner = true
+        }
+        defer { if owner { refreshing = nil } }
         do {
             let s = try await task.value
-            lastRefreshError = nil
+            if owner {
+                lastRefreshError = nil
+                refreshNotBefore = nil
+                failures = 0
+            }
             return s
         } catch let e as CoreError {
-            lastRefreshError = e
+            if owner { recordFailure(e) }
             // A failed early refresh is not an outage while the old session still has time to run.
-            if let fallback, fallback.expiresAt - now() > 5 {
-                switch e {
-                case .offline, .rateLimited: return fallback
-                default: break
-                }
-            }
+            if let old = session, isLive(old), Self.isTransient(e) { return old }
             throw e
         }
+    }
+
+    static func isTransient(_ e: CoreError) -> Bool {
+        switch e {
+        case .offline, .rateLimited, .coreUnproven: true
+        default: false
+        }
+    }
+
+    private func recordFailure(_ e: CoreError) {
+        lastRefreshError = e
+        failures += 1
+        let backoff: Int64
+        if case .rateLimited(let after?) = e {
+            backoff = Int64(min(max(after, 1), 300))
+        } else {
+            backoff = min(60, Int64(5 << min(failures - 1, 3)))
+        }
+        refreshNotBefore = now() + backoff
     }
 
     /// Forget the session (it was refused), unless a newer one replaced it already.
@@ -162,28 +195,30 @@ actor SessionManager {
         return (String(target[..<i]), String(target[target.index(after: i)...]))
     }
 
-    /// What a refusal allows: at most one retry per cause.
+    /// What a refusal allows: one retry after `session_expired`. A `clock_skew` is never retried and never adopted: its
+    /// `server_time` comes from an unauthenticated answer, so it is only shown to the user (as ctl does).
     struct Retried: OptionSet {
         let rawValue: Int
-        static let skew = Retried(rawValue: 1)
         static let session = Retried(rawValue: 2)
     }
 
-    /// The retried set to continue with when the request should be sent again after `error`, else nil: a `clock_skew` (learn the
-    /// offset) or `session_expired` (forget the session; the next call reopens one), each once.
+    /// The retried set to continue with when the request should be sent again after `error`, else nil.
     func retry(after error: CoreError, sessionID: String?, retried: Retried) -> Retried? {
-        switch error {
-        case .clockSkew(let server?) where !retried.contains(.skew):
-            let offset = server - Int64(clock.now().timeIntervalSince1970)
-            guard abs(offset) <= Self.maxSkew else { return nil }
-            clockOffset = offset
-            return retried.union(.skew)
-        case .sessionExpired where !retried.contains(.session):
-            invalidate(sessionID)
-            return retried.union(.session)
-        default:
-            return nil
-        }
+        guard case .sessionExpired = error, !retried.contains(.session) else { return nil }
+        invalidate(sessionID)
+        return retried.union(.session)
+    }
+
+    /// One signed request in exactly `sessionID`, no retries: for exchanges bound to one session (step-up).
+    func perform(method: String, target: String, body: Data = Data(), inSession sessionID: String) async throws
+        -> RawResponse
+    {
+        var request = RawRequest(method: method, target: target, body: body)
+        if !body.isEmpty { request.headers["content-type"] = "application/json" }
+        request.headers.merge(try headers(method: method, target: target, body: body, sessionID: sessionID)) { $1 }
+        let res = try await http.send(request)
+        if (200..<300).contains(res.status) { return res }
+        throw CoreError.from(status: res.status, headers: res.headers, body: res.body)
     }
 
     /// One signed request through the retry rules. `signed: false` sends it bare (pre-auth routes).
@@ -227,28 +262,26 @@ actor SessionManager {
     }
 
     private func autoRefreshLoop() async {
-        var failures = 0
         while !Task.isCancelled {
-            let wait: Int64
-            if failures > 0 {
-                wait = min(60, Int64(5 << min(failures - 1, 3)))
-            } else if let s = session {
-                wait = max(1, s.createdAt + Int64(Double(s.expiresAt - s.createdAt) * Self.refreshFraction) - now())
-            } else {
+            let t = now()
+            var wait: Int64 = 15
+            if let s = session {
+                wait = max(1, s.createdAt + Int64(Double(s.expiresAt - s.createdAt) * Self.refreshFraction) - t)
+            } else if lastRefreshError == nil {
                 wait = 15
             }
+            if let until = refreshNotBefore { wait = max(wait, until - t) }
             do { try await clock.sleep(for: .seconds(wait)) } catch { return }
             if Task.isCancelled { return }
-            guard session != nil || failures > 0 else { continue }
+            guard session != nil || lastRefreshError != nil else { continue }
             do {
                 _ = try await openSession()
-                failures = 0
             } catch CoreError.coreIdentityMismatch, CoreError.authFailed, CoreError.noSharedMinor {
                 return
             } catch is CancellationError {
                 return
             } catch {
-                failures += 1
+                continue  // the failure set the backoff deadline the next wait honours
             }
         }
     }

@@ -6,6 +6,7 @@ import OpenAPIRuntime
 @testable import CoreKit
 
 /// Virtual time: `sleep` advances the clock by the asked duration and records it, so refresh scheduling runs instantly.
+// @unchecked Sendable: all state is under `lock`.
 final class TestClock: CoreClock, @unchecked Sendable {
     private let lock = NSLock()
     private var t: Double
@@ -33,6 +34,7 @@ func jsonBody(_ obj: Any) -> Data { try! JSONSerialization.data(withJSONObject: 
 
 /// A stand-in Core: it checks every signature as the real one does (§5.3, in the order that matters here), so the client's
 /// signing, sessions and error handling run against something that refuses what the spec refuses.
+// @unchecked Sendable: every request is handled under `lock`; the knobs are set by the test before or between calls.
 final class FakeCore: CoreHTTP, @unchecked Sendable {
     struct Failure {
         var status: Int
@@ -57,7 +59,7 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
     var supportedMinors: [Int32]? = Array(0...33)
     /// A refusal to answer the next call to a path with.
     var failNext: [String: Failure] = [:]
-    var events: [Int64: [Any]] = [:]  // after -> items; keyed lookups for replay
+    var latestSeq: Int64 = 0
     var eventPages: [[String: Any]] = []
     var pairStatus = "active"
     var pairSASOverride: String?
@@ -178,7 +180,7 @@ final class FakeCore: CoreHTTP, @unchecked Sendable {
         case ("GET", "/api/v1/events/latest"):
             let (f, _, _) = authenticate(r, session: true)
             if let f { return refuse(f) }
-            return respond(200, ["seq": 0])
+            return respond(200, ["seq": latestSeq])
         case ("GET", "/api/v1/events"):
             let (f, _, _) = authenticate(r, session: true)
             if let f { return refuse(f) }
@@ -284,14 +286,70 @@ struct Harness {
             endpoint: try CoreEndpoint(identity.endpoint), identity: identity, key: key, http: core, clock: clock)
     }
 
-    func connection() throws -> CoreConnection {
-        let session = URLSession(configuration: .ephemeral)
-        return CoreConnection(
+    func connection(sockets: SocketFactory = SocketFactory([.failPing])) throws -> CoreConnection {
+        CoreConnection(
             identity: identity, endpoint: try CoreEndpoint(identity.endpoint), key: key, keyStore: store, http: core,
-            transport: FakeTransport(core: core), urlSession: session, clock: clock)
+            transport: FakeTransport(core: core), makeSocket: { sockets.make($0) }, clock: clock)
     }
 }
 
 enum HTTPRequestShim {
     static func make() -> HTTPRequest { HTTPRequest(method: .post, scheme: nil, authority: nil, path: "/") }
+}
+
+/// A scripted WebSocket.
+// @unchecked Sendable: state is under `lock`.
+final class FakeSocket: EventSocket, @unchecked Sendable {
+    enum Behavior {
+        case failPing
+        case closeWith(Int)
+        case wait
+    }
+    let behavior: Behavior
+    private let lock = NSLock()
+    private var waiter: CheckedContinuation<Data, any Error>?
+    private var cancelledFlag = false
+    init(_ b: Behavior) { behavior = b }
+    var cancelled: Bool { lock.withLock { cancelledFlag } }
+    func start() {}
+    func ping() async throws { if case .failPing = behavior { throw URLError(.cannotConnectToHost) } }
+    func receive() async throws -> Data {
+        if case .closeWith = behavior { throw URLError(.networkConnectionLost) }
+        return try await withCheckedThrowingContinuation { c in
+            let done = lock.withLock { () -> Bool in
+                if cancelledFlag { return true }
+                waiter = c
+                return false
+            }
+            if done { c.resume(throwing: URLError(.cancelled)) }
+        }
+    }
+    func cancel() {
+        let w = lock.withLock { () -> CheckedContinuation<Data, any Error>? in
+            cancelledFlag = true
+            defer { waiter = nil }
+            return waiter
+        }
+        w?.resume(throwing: URLError(.cancelled))
+    }
+    var closeCode: Int { if case .closeWith(let c) = behavior { c } else { 0 } }
+    var closeReason: String { "" }
+    var responseStatus: Int? { nil }
+}
+
+/// Hands out scripted sockets in order; the last behaviour repeats.
+// @unchecked Sendable: state is under `lock`.
+final class SocketFactory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var script: [FakeSocket.Behavior]
+    private(set) var made: [FakeSocket] = []
+    init(_ script: [FakeSocket.Behavior]) { self.script = script }
+    func make(_ request: URLRequest) -> any EventSocket {
+        lock.withLock {
+            let s = FakeSocket(script.count > 1 ? script.removeFirst() : script[0])
+            made.append(s)
+            return s
+        }
+    }
+    var sockets: [FakeSocket] { lock.withLock { made } }
 }

@@ -20,12 +20,15 @@ public struct CoreEndpoint: Sendable, Equatable {
 
     public init(_ url: URL) throws {
         guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
-            let scheme = parts.scheme?.lowercased(), let name = parts.host, !name.isEmpty
+            let scheme = parts.scheme?.lowercased(), let rawHost = parts.host, !rawHost.isEmpty
         else { throw CoreError.invalidInput("the Core endpoint needs a scheme and a host") }
         guard parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
             parts.path.isEmpty || parts.path == "/"
         else { throw CoreError.invalidInput("the Core endpoint is an origin: no path, query or credentials") }
-        let loopback = ["127.0.0.1", "localhost", "::1"].contains(name.lowercased())
+        // URLComponents may or may not keep the brackets of an IPv6 literal: take them off, then put exactly one pair back.
+        var name = rawHost.lowercased()
+        if name.hasPrefix("["), name.hasSuffix("]") { name = String(name.dropFirst().dropLast()) }
+        let loopback = ["127.0.0.1", "localhost", "::1"].contains(name)
         switch scheme {
         case "https": break
         case "http" where loopback: break
@@ -34,18 +37,18 @@ public struct CoreEndpoint: Sendable, Equatable {
         }
         let defaultPort = scheme == "https" ? 443 : 80
         let shown = name.contains(":") ? "[\(name)]" : name
-        var origin = URLComponents()
-        origin.scheme = scheme
-        origin.host = name
-        origin.port = parts.port
-        guard let clean = origin.url else { throw CoreError.invalidInput("the Core endpoint is not a URL") }
+        let authority = (parts.port == nil || parts.port == defaultPort) ? shown : "\(shown):\(parts.port!)"
+        guard let clean = URL(string: "\(scheme)://\(authority)") else {
+            throw CoreError.invalidInput("the Core endpoint is not a URL")
+        }
         self.url = clean
-        self.host = (parts.port == nil || parts.port == defaultPort) ? shown : "\(shown):\(parts.port!)"
+        self.host = authority
     }
 
     /// `https://host[:port]` for a QR payload (§7.1: a QR always means HTTPS).
     public init(host: String, port: Int) throws {
-        guard let url = URL(string: "https://\(host.contains(":") ? "[\(host)]" : host):\(port)") else {
+        let bare = host.hasPrefix("[") && host.hasSuffix("]") ? String(host.dropFirst().dropLast()) : host
+        guard let url = URL(string: "https://\(bare.contains(":") ? "[\(bare)]" : bare):\(port)") else {
             throw CoreError.invalidInput("the QR names no usable host")
         }
         try self.init(url)

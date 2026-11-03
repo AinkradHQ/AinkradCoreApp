@@ -91,14 +91,48 @@ import Testing
         #expect(await m.needsRefresh(s, at: 900) == true)
     }
 
-    @Test func aFailedEarlyRefreshKeepsTheLiveSession() async throws {
+    @Test func aFailedEarlyRefreshKeepsTheLiveSessionAndBacksOff() async throws {
         let h = try Harness()
         let m = try h.sessions()
         let first = try await m.currentSession()
         h.clock.advance(800)  // past 80 %, before expiry
         h.core.fail("/handshake", .init(status: 429, code: "rate_limited", headers: ["retry-after": "30"]))
-        let again = try await m.currentSession()
-        #expect(again.id == first.id)
+        let proofs = h.core.requests(to: "/handshake").count
+        #expect(try await m.currentSession().id == first.id)
+        #expect(h.core.requests(to: "/handshake").count == proofs + 1)
+        // Inside the Retry-After window nothing is sent at all.
+        h.clock.advance(10)
+        for _ in 0..<5 { #expect(try await m.currentSession().id == first.id) }
+        #expect(h.core.requests(to: "/handshake").count == proofs + 1, "no hammering")
+        // Once it passes, the refresh is tried again (the session still has 60 s).
+        h.clock.advance(25)
+        let renewed = try await m.currentSession()
+        #expect(renewed.id != first.id)
+    }
+
+    @Test func withNoLiveSessionABackedOffRefreshThrowsTheLastErrorWithoutAsking() async throws {
+        let h = try Harness()
+        let m = try h.sessions()
+        h.core.handshakeStatus = 503
+        await #expect(throws: CoreError.self) { _ = try await m.currentSession() }
+        let n = h.core.log.count
+        await #expect(throws: CoreError.self) { _ = try await m.currentSession() }
+        #expect(h.core.log.count == n, "inside the backoff the Core is not asked again")
+    }
+
+    @Test func autoRefreshSurvivesAnUnprovenCore() async throws {
+        let h = try Harness()
+        let m = try h.sessions()
+        _ = try await m.currentSession()
+        h.core.handshakeStatus = 404
+        await m.startAutoRefresh()
+        for _ in 0..<200 where h.core.requests(to: "/handshake").count < 3 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        h.core.handshakeStatus = 200
+        for _ in 0..<300 where h.core.sessionsIssued < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        await m.stopAutoRefresh()
+        #expect(h.core.sessionsIssued >= 2, "kept trying and recovered")
     }
 
     @Test func coreRestartIsRecoveredFromSilently() async throws {
@@ -112,24 +146,19 @@ import Testing
         #expect(h.core.sessionsIssued == before + 1)
     }
 
-    @Test func clockSkewLearnsTheOffsetAndRetriesOnce() async throws {
+    @Test func clockSkewIsReportedNeverAdoptedNorRetried() async throws {
         let h = try Harness()
         h.core.serverOffset = 3600
         let conn = try h.connection()
-        _ = try await conn.client.getMe()
-        let offset = await conn.sessions.clockOffset
-        #expect(abs(offset - 3600) <= 1)
-        // One retry only: a Core that keeps refusing is an error, not a loop.
-        h.core.serverOffset = 7200
-        h.core.fail("/api/v1/me", .init(status: 401, code: "clock_skew", extra: ["server_time": 1]))
-        await #expect(throws: (any Error).self) { _ = try await conn.client.getMe() }
-    }
-
-    @Test func unreasonableSkewIsNotFollowed() async throws {
-        let h = try Harness()
-        let m = try h.sessions()
-        let retry = await m.retry(after: .clockSkew(serverTime: 5), sessionID: nil, retried: [])
-        #expect(retry == nil)
+        // The Core's clock is an hour ahead: its `clock_skew` reaches the caller with the server's time, nothing is re-signed.
+        do {
+            _ = try await conn.client.getMe()
+            Issue.record("no error")
+        } catch {
+            let expected = Int64(h.clock.now().timeIntervalSince1970) + 3600
+            #expect(CoreError.unwrapping(error) == .clockSkew(serverTime: expected))
+        }
+        #expect(h.core.requests(to: "/handshake/session").count == 1, "one attempt, no retry with an adopted clock")
     }
 
     @Test func aCoreThatIsNotThePinnedOneIsRefusedBeforeAnythingIsSigned() async throws {
@@ -146,7 +175,7 @@ import Testing
         h.core.handshakeStatus = 404
         var thrown: CoreError?
         do { _ = try await h.sessions().currentSession() } catch { thrown = error as? CoreError }
-        guard case .coreIdentityMismatch? = thrown else {
+        guard case .coreUnproven? = thrown else {
             Issue.record("\(String(describing: thrown))")
             return
         }
@@ -158,7 +187,15 @@ import Testing
         let sessions = SessionManager(
             endpoint: try CoreEndpoint(h.identity.endpoint), identity: h.identity, key: h.key, http: wrongHost,
             clock: h.clock)
-        await #expect(throws: CoreError.self) { _ = try await sessions.currentSession() }
+        do {
+            _ = try await sessions.currentSession()
+            Issue.record("no error")
+        } catch {
+            guard case CoreError.coreIdentityMismatch = error else {
+                Issue.record("\(error)")
+                return
+            }
+        }
         #expect(wrongHost.signedRequests() == 0)
     }
 

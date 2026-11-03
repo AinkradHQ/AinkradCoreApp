@@ -1,13 +1,20 @@
 import Foundation
 
 /// A scanned QR payload (§7.1): `ainkrad-pair:v1?h=<host>&p=<port>&c=<core_fp>&s=<secret>&e=<unix>`. It always means HTTPS.
-public struct PairingQR: Sendable, Equatable, CustomStringConvertible {
+public struct PairingQR: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
     public let host: String
     public let port: Int
     public let coreFingerprint: String
     let secret: Data
     public let expires: Int64
     public var description: String { "PairingQR(\(host):\(port), \(coreFingerprint))" }
+    public var debugDescription: String { description }
+    /// `dump` and the debugger show the public fields only, never the secret.
+    public var customMirror: Mirror {
+        Mirror(self, children: ["host": host, "port": port, "coreFingerprint": coreFingerprint, "expires": expires])
+    }
 
     /// Every field exactly once, nothing else; a secret that is not 16 bytes, a fingerprint that is not 43 base64url
     /// characters or a port outside 1...65535 is refused.
@@ -31,10 +38,18 @@ public struct PairingQR: Sendable, Equatable, CustomStringConvertible {
 }
 
 /// What was typed or scanned.
-public enum PairingCredential: Sendable, Equatable {
+public enum PairingCredential: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     /// The canonical 10-character code.
     case code(String)
     case qr(PairingQR)
+
+    public var description: String {
+        switch self {
+        case .code: "PairingCredential.code(…)"
+        case .qr(let q): "PairingCredential.qr(\(q))"
+        }
+    }
+    public var debugDescription: String { description }
 
     /// A QR payload (`ainkrad-pair:v1?…`) or a typed code (`ABCDE-FGHJK`, any case).
     public static func parse(_ text: String) throws -> PairingCredential {
@@ -69,15 +84,18 @@ public struct PairingClaim: Sendable, Equatable {
     public let coreFingerprint: String
 }
 
-/// Pairing as a new device (§7.2 steps 2 to 4 and 8): `claim`, show the SAS, then `awaitApproval`.
+/// Pairing as a new device (§7.2 steps 2 to 4 and 8): `claim`, show the SAS, `confirmSAS` when the user says it matches the
+/// approver's, `awaitApproval`. The Core is pinned (the identity saved) only when the device is active and the SAS confirmed.
+/// A pairing in flight survives a relaunch: `resume()` picks it up.
 public actor DevicePairing {
     private let keyStore: any KeyStore
     private let clock: any CoreClock
     private let makeHTTP: @Sendable (CoreEndpoint) -> any CoreHTTP
-    private var pending: SessionManager?
+    private var sessions: SessionManager?
+    private var claiming = false
 
-    public init(keyStore: any KeyStore, clock: any CoreClock = SystemCoreClock(), urlSession: URLSession? = nil) {
-        let session = urlSession ?? makeCoreSession()
+    public init(keyStore: any KeyStore, clock: any CoreClock = SystemCoreClock()) {
+        let session = makeCoreSession()  // always CoreKit's own: no redirects, no cookies, no cache
         self.init(keyStore: keyStore, clock: clock) { URLSessionHTTP(endpoint: $0, session: session) }
     }
 
@@ -93,8 +111,14 @@ public actor DevicePairing {
     public func claim(
         _ credential: PairingCredential, endpoint: URL? = nil, expectedCoreFingerprint: String? = nil
     ) async throws -> PairingClaim {
+        guard !claiming else { throw CoreError.invalidInput("A pairing is being claimed already.") }
+        claiming = true
+        defer { claiming = false }
         if try keyStore.loadIdentity() != nil {
             throw CoreError.invalidInput("This device is paired already. Forget the Core first.")
+        }
+        if try keyStore.loadPending() != nil {
+            throw CoreError.invalidInput("A pairing is waiting for approval. Resume it or cancel it.")
         }
         let core: CoreEndpoint
         var given = expectedCoreFingerprint
@@ -116,20 +140,52 @@ public actor DevicePairing {
         do {
             let stepup = try keyStore.generateKey(.stepup)
             let claim = try await sendClaim(
-                credential, core: core, http: http, pinned: pinned, routine: routine, stepup: stepup)
+                credential, http: http, pinned: pinned, routine: routine, stepup: stepup)
             let identity = PairedIdentity(deviceID: claim.deviceID, coreFingerprint: pinned, endpoint: core.url)
-            try keyStore.saveIdentity(identity)
-            pending = SessionManager(endpoint: core, identity: identity, key: routine, http: http, clock: clock)
+            // Pending, not paired: with a pin from the QR or the caller the Core key is trusted already; with a typed code the
+            // user's SAS confirmation decides.
+            try keyStore.savePending(
+                PendingPairing(
+                    identity: identity, pairingID: claim.pairingID, sas: claim.sas, sasConfirmed: given != nil))
+            sessions = SessionManager(endpoint: core, identity: identity, key: routine, http: http, clock: clock)
             return claim
         } catch {
             try? keyStore.deleteKey(.routine)
             try? keyStore.deleteKey(.stepup)
+            try? keyStore.clearPending()
             throw error
         }
     }
 
+    /// Picks up a pairing that was claimed before the app quit: nil when there is none. Show the claim's SAS again, then
+    /// `awaitApproval`.
+    public func resume() async throws -> PairingClaim? {
+        guard let p = try keyStore.loadPending(), let routine = try keyStore.key(.routine, reason: "") else {
+            return nil
+        }
+        let core = try CoreEndpoint(p.identity.endpoint)
+        sessions = SessionManager(
+            endpoint: core, identity: p.identity, key: routine, http: makeHTTP(core), clock: clock)
+        return PairingClaim(
+            deviceID: p.identity.deviceID, pairingID: p.pairingID, sas: p.sas,
+            coreFingerprint: p.identity.coreFingerprint)
+    }
+
+    /// The user compared the SAS with the approver's and they match: the Core key may be pinned once the device is active.
+    public func confirmSAS() throws {
+        guard var p = try keyStore.loadPending() else { throw CoreError.notPaired }
+        p.sasConfirmed = true
+        try keyStore.savePending(p)
+    }
+
+    /// Gives up: forgets the pending pairing and its keys.
+    public func cancel() throws {
+        sessions = nil
+        try keyStore.wipe()
+    }
+
     private func sendClaim(
-        _ credential: PairingCredential, core: CoreEndpoint, http: any CoreHTTP, pinned: String, routine: any DeviceKey,
+        _ credential: PairingCredential, http: any CoreHTTP, pinned: String, routine: any DeviceKey,
         stepup: (any DeviceKey)?
     ) async throws -> PairingClaim {
         let message = Wire.popMessage(
@@ -179,10 +235,11 @@ public actor DevicePairing {
         #endif
     }
 
-    /// Polls `POST /pair/status` (signed, session `-`) with a backoff until the approver decides. `active` returns; `rejected`
-    /// or `expired` (or `timeout` passing: a pairing lives 5 minutes) forgets the keys and throws `notApproved`.
+    /// Polls `POST /pair/status` (signed, session `-`) with a backoff until the approver decides. `active` with the SAS
+    /// confirmed saves the identity (the pin) and returns; `active` before the confirmation keeps waiting for `confirmSAS()`.
+    /// `rejected` or `expired` (or `timeout` passing: a pairing lives 5 minutes) forgets everything and throws `notApproved`.
     public func awaitApproval(timeout: Duration = .seconds(330)) async throws {
-        guard let sessions = pending else { throw CoreError.notPaired }
+        guard let sessions else { throw CoreError.notPaired }
         let deadline = clock.now().addingTimeInterval(Double(timeout.components.seconds))
         var delay = 0.5
         while true {
@@ -194,29 +251,32 @@ public actor DevicePairing {
                 else { throw CoreError.protocolViolation("a pairing status without a status") }
                 switch status {
                 case "active":
-                    pending = nil
-                    return
+                    if let p = try keyStore.loadPending(), p.sasConfirmed {
+                        try keyStore.saveIdentity(p.identity)
+                        try keyStore.clearPending()
+                        self.sessions = nil
+                        return
+                    }
                 case "pending": break
-                default:
-                    try? keyStore.wipe()
-                    pending = nil
-                    throw CoreError.notApproved(status)
+                default: throw forget(status)
                 }
             } catch CoreError.offline {
                 // The Core may be restarting: keep asking until the pairing could not be live any more.
+            } catch CoreError.coreUnproven {
+                // Same: not evidence of anything yet.
             } catch CoreError.authFailed {
                 // A claimed-then-rejected device is refused like a stranger.
-                try? keyStore.wipe()
-                pending = nil
-                throw CoreError.notApproved("rejected")
+                throw forget("rejected")
             }
-            if clock.now() >= deadline {
-                try? keyStore.wipe()
-                pending = nil
-                throw CoreError.notApproved("expired")
-            }
+            if clock.now() >= deadline { throw forget("expired") }
             try await clock.sleep(for: .seconds(delay))
             delay = min(delay * 1.5, 5)
         }
+    }
+
+    private func forget(_ status: String) -> CoreError {
+        try? keyStore.wipe()
+        sessions = nil
+        return .notApproved(status)
     }
 }

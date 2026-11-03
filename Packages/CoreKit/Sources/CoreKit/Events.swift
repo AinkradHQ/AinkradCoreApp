@@ -33,7 +33,12 @@ enum EventWire {
         return Int64(rest.prefix { $0.isASCII && $0.isNumber })
     }
 
-    /// Whether the end of the stream is final.
+    /// The seq of a raw event, readable even when the rest of it does not decode (so a cursor can pass it).
+    static func rawSeq(_ data: Data) -> Int64? {
+        (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["seq"] as? Int64
+    }
+
+    /// Whether the end of the stream is final. Not `.coreUnproven`: that one is retried.
     static func isTerminal(_ e: CoreError) -> Bool {
         switch e {
         case .revoked, .coreIdentityMismatch, .noSharedMinor, .authFailed, .forbiddenScope, .notPaired: true
@@ -42,20 +47,59 @@ enum EventWire {
     }
 }
 
+/// A WebSocket as the runner needs it, so tests can stand in for the network.
+protocol EventSocket: Sendable {
+    func start()
+    func ping() async throws
+    func receive() async throws -> Data
+    func cancel()
+    /// The close code the Core sent, 0 when none.
+    var closeCode: Int { get }
+    var closeReason: String { get }
+    /// The status of a refused upgrade, when there was one.
+    var responseStatus: Int? { get }
+}
+
+/// `URLSessionWebSocketTask`. It is documented thread-safe; its state is only read after the task ended.
+final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
+    private let task: URLSessionWebSocketTask
+    init(_ task: URLSessionWebSocketTask) { self.task = task }
+    func start() { task.resume() }
+    func ping() async throws {
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
+            task.sendPing { error in c.resume(with: error.map { .failure($0) } ?? .success(())) }
+        }
+    }
+    func receive() async throws -> Data {
+        switch try await task.receive() {
+        case .string(let text): Data(text.utf8)
+        case .data(let data): data
+        @unknown default: Data()
+        }
+    }
+    func cancel() { task.cancel(with: .goingAway, reason: nil) }
+    var closeCode: Int { task.closeCode.rawValue }
+    var closeReason: String { task.closeReason.flatMap { String(data: $0, encoding: .utf8) } ?? "" }
+    var responseStatus: Int? { (task.response as? HTTPURLResponse)?.statusCode }
+}
+
+/// How a socket ended without an error to throw.
+enum FollowEnd { case closed, scopeChanged }
+
 /// Replay then follow: HTTP `GET /api/v1/events?after=` to catch up, then `GET /api/v1/events/ws` (signed upgrade, session-bound,
 /// `Last-Event-ID` = the last seq seen), forever, with backoff.
 struct EventRunner: Sendable {
     let sessions: SessionManager
-    let urlSession: URLSession
     let endpoint: CoreEndpoint
     let clock: any CoreClock
+    let makeSocket: @Sendable (URLRequest) -> any EventSocket
     static let page = 1000
 
     func run(after: Int64?, into out: AsyncStream<EventUpdate>.Continuation) async {
         defer { out.finish() }
         var last: Int64
         do {
-            if let after { last = after } else { last = try await latest() }
+            if let after { last = after } else { last = try await latest().seq }
         } catch {
             if let e = error as? CoreError { out.yield(.ended(e)) }
             return
@@ -64,7 +108,14 @@ struct EventRunner: Sendable {
         while !Task.isCancelled {
             do {
                 try await replay(&last, out)
-                try await follow(&last, out)
+                let end = try await follow(&last, out)
+                if end == .scopeChanged {
+                    // Cursors count in the device's scope view, which changed: the old one means nothing now. Tell the
+                    // consumer to re-sync, and carry on from the head of the new view.
+                    let head = try await latest()
+                    out.yield(.gap(floor: head.seq))
+                    last = head.seq
+                }
                 backoff = 0.25
                 out.yield(.reconnecting(nil))
             } catch is CancellationError {
@@ -85,11 +136,11 @@ struct EventRunner: Sendable {
         }
     }
 
-    private func latest() async throws -> Int64 {
+    private func latest() async throws -> (seq: Int64, floor: Int64?) {
         let res = try await sessions.perform(method: "GET", target: "/api/v1/events/latest")
-        guard let seq = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["seq"] as? Int64
-        else { throw CoreError.protocolViolation("events/latest without a seq") }
-        return seq
+        let obj = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])
+        guard let seq = obj?["seq"] as? Int64 else { throw CoreError.protocolViolation("events/latest without a seq") }
+        return (seq, obj?["floor"] as? Int64)
     }
 
     /// Pages from `last` until the Core has no more. Past the retention floor: `gap`, then on from the floor.
@@ -107,24 +158,27 @@ struct EventRunner: Sendable {
             guard let page = try? JSONSerialization.jsonObject(with: res.body) as? [String: Any],
                 let items = page["items"] as? [Any]
             else { throw CoreError.protocolViolation("an events page that is not the contract's") }
-            if items.isEmpty { return }
+            let before = last
             for item in items {
                 guard let data = try? JSONSerialization.data(withJSONObject: item) else { continue }
-                emit(data, &last, out)
+                deliver(data, &last, out)
             }
-            if page["next_after"] as? Int64 == nil { return }
+            // The cursor moves past an event that does not decode too, so a bad one cannot hold the replay in a loop.
+            if let next = page["next_after"] as? Int64, next > last { last = next }
+            if page["next_after"] as? Int64 == nil || last == before { return }
         }
     }
 
-    private func emit(_ data: Data, _ last: inout Int64, _ out: AsyncStream<EventUpdate>.Continuation) {
-        // A resume may repeat what was already delivered; never deliver a seq twice. An undecodable event is skipped.
-        guard let event = EventWire.decode(data), event.seq > last else { return }
-        last = event.seq
-        out.yield(.event(event))
+    /// Delivers one event: each seq once and in order. A resume may repeat what was delivered; an undecodable event is skipped
+    /// but still passed by the cursor.
+    private func deliver(_ data: Data, _ last: inout Int64, _ out: AsyncStream<EventUpdate>.Continuation) {
+        guard let seq = EventWire.rawSeq(data), seq > last else { return }
+        last = seq
+        if let event = EventWire.decode(data) { out.yield(.event(event)) }
     }
 
     /// One WebSocket, from `last`, until it closes. Throws what ends or interrupts it.
-    private func follow(_ last: inout Int64, _ out: AsyncStream<EventUpdate>.Continuation) async throws {
+    private func follow(_ last: inout Int64, _ out: AsyncStream<EventUpdate>.Continuation) async throws -> FollowEnd {
         let path = "/api/v1/events/ws"
         let session = try await sessions.currentSession()
         var headers = try await sessions.headers(method: "GET", target: path, body: Data(), sessionID: session.id)
@@ -136,46 +190,44 @@ struct EventRunner: Sendable {
         }
         var request = URLRequest(url: url)
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
-        let task = urlSession.webSocketTask(with: request)
-        task.resume()
-        defer { task.cancel(with: .goingAway, reason: nil) }
-        do {
-            // A pong proves the upgrade went through: a quiet stream sends nothing else.
-            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
-                task.sendPing { error in c.resume(with: error.map { .failure($0) } ?? .success(())) }
-            }
-            out.yield(.live)
-            while true {
-                let message = try await task.receive()
-                switch message {
-                case .string(let text): emit(Data(text.utf8), &last, out)
-                case .data(let data): emit(data, &last, out)
-                @unknown default: break
+        let socket = makeSocket(request)
+        socket.start()
+        // Cancelling the consumer closes the socket at once, not when the next message happens to arrive.
+        return try await withTaskCancellationHandler {
+            do {
+                // A pong proves the upgrade went through: a quiet stream sends nothing else.
+                try await socket.ping()
+                out.yield(.live)
+                while true {
+                    let data = try await socket.receive()
+                    deliver(data, &last, out)
                 }
+            } catch {
+                socket.cancel()
+                if Task.isCancelled { throw CancellationError() }
+                return try await classify(socket, session: session)
             }
-        } catch {
-            if Task.isCancelled { throw CancellationError() }
-            try await classify(task, session: session, error: error)
+        } onCancel: {
+            socket.cancel()
         }
     }
 
     /// What a dead socket means: a close code the Core chose, or an upgrade that was refused, or the network.
-    private func classify(_ task: URLSessionWebSocketTask, session: CoreSession, error: any Error) async throws {
-        let code = task.closeCode.rawValue
-        let reason = task.closeReason.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        switch code {
+    private func classify(_ socket: any EventSocket, session: CoreSession) async throws -> FollowEnd {
+        switch socket.closeCode {
         case 4001: throw CoreError.revoked
         case 4410:
-            guard let floor = EventWire.floor(fromCloseReason: reason) else {
+            guard let floor = EventWire.floor(fromCloseReason: socket.closeReason) else {
                 throw CoreError.protocolViolation("4410 without a floor")
             }
             throw CoreError.pastRetention(floor: floor)
+        case 4003: return .scopeChanged
         case 0:
             // Never opened (the cause is in the upgrade answer) or the connection was lost.
-            switch (task.response as? HTTPURLResponse)?.statusCode {
+            switch socket.responseStatus {
             case 401:
-                // The body is not readable on a refused upgrade: drop the session, and the replay that comes next learns
-                // `clock_skew` or reopens the session with the usual retry rules.
+                // The body is not readable on a refused upgrade: drop the session, and the replay that comes next reopens it
+                // with the usual retry rules. A `clock_skew` is then reported by that replay, never adopted.
                 await sessions.invalidate(session.id)
                 throw CoreError.sessionExpired
             case 403?: throw CoreError.forbiddenScope
@@ -183,8 +235,8 @@ struct EventRunner: Sendable {
             default: throw CoreError.offline("the event stream dropped")
             }
         default:
-            // 4003 scope_changed, 1012 restarting, 1013 too slow, 1001: reconnect from the last seq.
-            return
+            // 1012 restarting, 1013 too slow, 1001: reconnect from the last seq.
+            return .closed
         }
     }
 }

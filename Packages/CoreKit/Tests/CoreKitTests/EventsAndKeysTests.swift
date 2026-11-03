@@ -43,6 +43,55 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
         #expect(seen == [1, 2, 5])
     }
 
+    @Test func theCursorPassesAnEventThatDoesNotDecode() async throws {
+        let h = try Harness()
+        let bad: [String: Any] = ["seq": 2, "at": "not a time", "kind": "k", "payload": [:]]
+        h.core.eventPages = [["items": [event(1), bad], "next_after": 2], ["items": [event(3)]]]
+        let conn = try h.connection()
+        var seen: [Int64] = []
+        for await update in conn.events(after: 0) {
+            if case .event(let e) = update { seen.append(e.seq) }
+            if case .reconnecting = update { break }
+        }
+        #expect(seen == [1, 3])
+        let asked = h.core.requests(to: "/api/v1/events?").map(\.target)
+        #expect(asked.first?.contains("after=0") == true && asked.dropFirst().first?.contains("after=2") == true)
+    }
+
+    @Test func cancellingTheConsumerClosesTheSocket() async throws {
+        let h = try Harness()
+        let sockets = SocketFactory([.wait])
+        let conn = try h.connection(sockets: sockets)
+        for await update in conn.events(after: 0) {
+            if case .live = update { break }  // the consumer stops: the stream terminates and cancels its task
+        }
+        for _ in 0..<200 where sockets.sockets.first?.cancelled != true { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(sockets.sockets.first?.cancelled == true, "the socket was closed, not left open until the next message")
+    }
+
+    @Test func scopeChangedGapsAndResetsTheCursorFromLatest() async throws {
+        let h = try Harness()
+        h.core.latestSeq = 77
+        let sockets = SocketFactory([.closeWith(4003), .wait])
+        let conn = try h.connection(sockets: sockets)
+        var seen: [String] = []
+        var lives = 0
+        for await update in conn.events(after: 3) {
+            switch update {
+            case .gap(let f): seen.append("gap\(f)")
+            case .live:
+                lives += 1
+                if lives == 2 { seen.append("live2") }
+            default: break
+            }
+            if lives == 2 { break }
+        }
+        #expect(seen == ["gap77", "live2"])
+        // Cursors are per scope view: after the change the replay starts from the new view's head, not from 3.
+        let asked = h.core.requests(to: "/api/v1/events?").map(\.target)
+        #expect(asked.last?.contains("after=77") == true)
+    }
+
     @Test func pastRetentionIsAGapNotAnError() async throws {
         let h = try Harness()
         h.core.fail("/api/v1/events", .init(status: 410, code: "past_retention", extra: ["floor": 40]))

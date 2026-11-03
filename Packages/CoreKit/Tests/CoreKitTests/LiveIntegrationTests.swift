@@ -41,6 +41,8 @@ private func within<T: Sendable>(_ seconds: Int, _ work: @escaping @Sendable () 
         let claim = try await pairing.claim(try .parse(try need("CORE_IT_CODE")), endpoint: url)
         print("IT claimed device=\(claim.deviceID) sas=\(claim.sas) core_fp=\(claim.coreFingerprint)")
         try claim.sas.write(toFile: try need("CORE_IT_SAS_FILE"), atomically: true, encoding: .utf8)
+        // The approver compares the SAS (ainkradctl is handed this one); matching, the user confirms it here.
+        try await pairing.confirmSAS()
         try await within(60) { try await pairing.awaitApproval(timeout: .seconds(55)) }
         print("IT approved")
 

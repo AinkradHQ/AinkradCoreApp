@@ -1,5 +1,6 @@
 import AinkradClient
 import Foundation
+import LocalAuthentication
 import OpenAPIRuntime
 import OpenAPIURLSession
 
@@ -15,28 +16,29 @@ public actor CoreConnection {
     let sessions: SessionManager
     let keyStore: any KeyStore
     let http: any CoreHTTP
-    let urlSession: URLSession
+    let makeSocket: @Sendable (URLRequest) -> any EventSocket
     let clock: any CoreClock
 
     /// A connection for the identity this device paired with. Throws `notPaired` before pairing.
-    public static func open(
-        keyStore: any KeyStore, clock: any CoreClock = SystemCoreClock(), urlSession: URLSession? = nil
-    ) throws -> CoreConnection {
+    public static func open(keyStore: any KeyStore, clock: any CoreClock = SystemCoreClock()) throws -> CoreConnection {
         guard let identity = try keyStore.loadIdentity(), let key = try keyStore.key(.routine, reason: "") else {
             throw CoreError.notPaired
         }
         let endpoint = try CoreEndpoint(identity.endpoint)
-        let session = urlSession ?? makeCoreSession()
+        // Always CoreKit's own session: no redirects, no cookies, no cache.
+        let session = makeCoreSession()
         let http = URLSessionHTTP(endpoint: endpoint, session: session)
         let transport = URLSessionTransport(configuration: .init(session: session))
         return CoreConnection(
             identity: identity, endpoint: endpoint, key: key, keyStore: keyStore, http: http, transport: transport,
-            urlSession: session, clock: clock)
+            makeSocket: { URLSessionEventSocket(session.webSocketTask(with: $0)) }, clock: clock)
     }
 
     init(
         identity: PairedIdentity, endpoint: CoreEndpoint, key: any DeviceKey, keyStore: any KeyStore,
-        http: any CoreHTTP, transport: any ClientTransport, urlSession: URLSession, clock: any CoreClock
+        http: any CoreHTTP, transport: any ClientTransport,
+        makeSocket: @escaping @Sendable (URLRequest) -> any EventSocket,
+        clock: any CoreClock
     ) {
         let sessions = SessionManager(endpoint: endpoint, identity: identity, key: key, http: http, clock: clock)
         self.sessions = sessions
@@ -44,7 +46,7 @@ public actor CoreConnection {
         self.endpoint = endpoint
         self.keyStore = keyStore
         self.http = http
-        self.urlSession = urlSession
+        self.makeSocket = makeSocket
         self.clock = clock
         self.client = Client(
             serverURL: endpoint.url, configuration: .init(dateTranscoder: .iso8601WithFractionalSeconds),
@@ -93,21 +95,24 @@ public actor CoreConnection {
         guard let key = try keyStore.key(.stepup, reason: reason) else {
             throw CoreError.stepUpUnavailable("This device has no step-up key, so it cannot elevate.")
         }
-        let ask = try await sessions.perform(method: "POST", target: "/api/v1/auth/step-up/challenge")
+        // One session for the whole exchange: the challenge is bound to it, and a refresh during the Touch ID prompt must not move
+        // the proof to another session (the Core would refuse it and count the failure against the step-up budget).
+        let sessionID = try await sessions.currentSession().id
+        let ask = try await sessions.perform(
+            method: "POST", target: "/api/v1/auth/step-up/challenge", inSession: sessionID)
         guard
             let challenge = (try? JSONSerialization.jsonObject(with: ask.body) as? [String: Any])?["challenge"]
                 as? String, challenge.count == 43, Wire.unb64(challenge) != nil
         else { throw CoreError.protocolViolation("a step-up challenge that is not 32 bytes") }
-        // The challenge is bound to the session that asked for it: sign for the one now live.
-        guard let sessionID = await sessions.session?.id else { throw CoreError.sessionExpired }
         let message = Wire.stepUpMessage(
             coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID, challenge: challenge)
         let signature: Data
         do { signature = try await offloaded { try key.sign(message) } } catch {
-            throw CoreError.stepUpUnavailable("Touch ID was cancelled or did not match.")
+            throw Self.stepUpFailure(error)
         }
         let body = try JSONEncoder().encode(["challenge": challenge, "stepup_sig": Wire.b64(signature)])
-        let done = try await sessions.perform(method: "POST", target: "/api/v1/auth/step-up", body: body)
+        let done = try await sessions.perform(
+            method: "POST", target: "/api/v1/auth/step-up", body: body, inSession: sessionID)
         guard
             let until = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["elevated_until"]
                 as? String, let t = Wire.parseTimestamp(until)
@@ -116,13 +121,26 @@ public actor CoreConnection {
         return Date(timeIntervalSince1970: TimeInterval(t))
     }
 
+    /// A cancelled prompt is the user's choice; anything else is the Keychain or Secure Enclave failing.
+    static func stepUpFailure(_ error: any Error) -> CoreError {
+        let ns = error as NSError
+        if ns.domain == LAError.errorDomain,
+            [LAError.userCancel, .appCancel, .systemCancel].contains(where: { $0.rawValue == ns.code })
+        {
+            return .stepUpUnavailable("Touch ID was cancelled.")
+        }
+        return .keyStore("The Secure Enclave could not sign the step-up (\(ns.domain) \(ns.code)).")
+    }
+
     /// The events, as an `AsyncStream` (see `EventUpdate`): HTTP replay after `after` (default: from now), then the WebSocket,
     /// reconnecting with backoff and resuming from the last seq seen. It ends on revocation, on an identity mismatch, or when
     /// the consumer stops.
     public nonisolated func events(after: Int64? = nil) -> AsyncStream<EventUpdate> {
         let runner = EventRunner(
-            sessions: sessions, urlSession: urlSession, endpoint: endpoint, clock: clock)
-        return AsyncStream { continuation in
+            sessions: sessions, endpoint: endpoint, clock: clock, makeSocket: makeSocket)
+        // Bounded: a consumer that stops reading loses the oldest updates instead of growing memory without end.
+        // ponytail: a drop is silent; add a resync `.gap` on `.dropped` if a consumer ever falls this far behind.
+        return AsyncStream(bufferingPolicy: .bufferingNewest(4096)) { continuation in
             let task = Task { await runner.run(after: after, into: continuation) }
             continuation.onTermination = { _ in task.cancel() }
         }

@@ -16,6 +16,23 @@ func storeWithSoftwareStepUp() -> any KeyStore {
     return StepUpTestStore(base: BlobKeyStore(blobs: blobs, useSecureEnclave: false), blobs: blobs)
 }
 
+/// A store whose step-up key is the given one.
+struct HookedStore: KeyStore {
+    let stepup: any DeviceKey
+    let base: any KeyStore
+    func key(_ role: KeyRole, reason: String) throws -> (any DeviceKey)? {
+        role == .stepup ? stepup : try base.key(role, reason: reason)
+    }
+    func generateKey(_ role: KeyRole) throws -> (any DeviceKey)? { try base.generateKey(role) }
+    func deleteKey(_ role: KeyRole) throws { try base.deleteKey(role) }
+    func loadIdentity() throws -> PairedIdentity? { try base.loadIdentity() }
+    func saveIdentity(_ i: PairedIdentity) throws { try base.saveIdentity(i) }
+    func loadPending() throws -> PendingPairing? { try base.loadPending() }
+    func savePending(_ p: PendingPairing) throws { try base.savePending(p) }
+    func clearPending() throws { try base.clearPending() }
+    func wipe() throws { try base.wipe() }
+}
+
 struct StepUpTestStore: KeyStore {
     let base: BlobKeyStore
     let blobs: MemoryBlobs
@@ -29,6 +46,9 @@ struct StepUpTestStore: KeyStore {
     func deleteKey(_ role: KeyRole) throws { try base.deleteKey(role) }
     func loadIdentity() throws -> PairedIdentity? { try base.loadIdentity() }
     func saveIdentity(_ i: PairedIdentity) throws { try base.saveIdentity(i) }
+    func loadPending() throws -> PendingPairing? { try base.loadPending() }
+    func savePending(_ p: PendingPairing) throws { try base.savePending(p) }
+    func clearPending() throws { try base.clearPending() }
     func wipe() throws { try base.wipe() }
 }
 
@@ -41,8 +61,11 @@ struct StepUpTestStore: KeyStore {
         let routine = try #require(try store.key(.routine, reason: ""))
         #expect(claim.sas == Wire.sas(coreSPKI: core.coreSPKI, deviceSPKI: routine.spki, pairingID: claim.pairingID))
         #expect(claim.coreFingerprint == core.coreFP)
-        let identity = try #require(try store.loadIdentity())
-        #expect(identity.deviceID == claim.deviceID && identity.coreFingerprint == core.coreFP)
+        // Claimed, not paired: nothing is pinned until the device is active and the SAS confirmed.
+        #expect(try store.loadIdentity() == nil)
+        let pending = try #require(try store.loadPending())
+        #expect(pending.identity.deviceID == claim.deviceID && pending.identity.coreFingerprint == core.coreFP)
+        #expect(pending.sas == claim.sas && !pending.sasConfirmed, "a typed code needs the SAS confirmation")
         // The claim carried the step-up key and both proofs; the Core verified them.
         #expect(core.stepupSPKI != nil)
         let sent = try #require(core.requests(to: "/pair/claim").first)
@@ -114,11 +137,73 @@ struct StepUpTestStore: KeyStore {
             try? await Task.sleep(for: .milliseconds(20))
             core.pairStatus = "active"
         }
+        try await p.confirmSAS()
         try await p.awaitApproval()
         let polls = core.requests(to: "/pair/status")
         #expect(polls.count >= 1)
         #expect(polls.allSatisfy { $0.headers["ainkrad-session"] == nil && $0.headers["ainkrad-signature"] != nil })
-        #expect(try store.loadIdentity() != nil, "kept")
+        #expect(try store.loadIdentity() != nil, "pinned only now")
+        #expect(try store.loadPending() == nil)
+    }
+
+    @Test func activeButUnconfirmedIsNotPinned() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = makeMemoryKeyStore()
+        let p = pairing(core, store)
+        _ = try await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        // The approver approved but the user never said the SAS matched: it waits, then gives up, and pins nothing.
+        await #expect(throws: CoreError.notApproved("expired")) { try await p.awaitApproval(timeout: .seconds(10)) }
+        #expect(try store.loadIdentity() == nil && (try store.loadPending()) == nil)
+    }
+
+    @Test func aQRClaimIsTrustedAtOnce() async throws {
+        let core = FakeCore(clock: TestClock(unix: 1000), host: "core.example:8443")
+        let store = makeMemoryKeyStore()
+        let qr =
+            "ainkrad-pair:v1?h=core.example&p=8443&c=\(core.coreFP)&s=\(Wire.b64(Data(repeating: 9, count: 16)))&e=2000"
+        let p = pairing(core, store)
+        _ = try await p.claim(try .parse(qr))
+        #expect(try store.loadPending()?.sasConfirmed == true)
+        try await p.awaitApproval()
+        #expect(try store.loadIdentity()?.coreFingerprint == core.coreFP)
+    }
+
+    @Test func aRelaunchedAppResumesPolling() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = makeMemoryKeyStore()
+        let claim = try await pairing(core, store).claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        // A new DevicePairing, as after a relaunch: same store, nothing in memory.
+        let again = pairing(core, store)
+        let resumed = try #require(try await again.resume())
+        #expect(resumed == claim)
+        try await again.confirmSAS()
+        try await again.awaitApproval()
+        #expect(try store.loadIdentity()?.deviceID == claim.deviceID)
+        #expect(try await pairing(core, makeMemoryKeyStore()).resume() == nil)
+    }
+
+    @Test func oneClaimAtATime() async throws {
+        let core = FakeCore(clock: TestClock())
+        let p = pairing(core, makeMemoryKeyStore())
+        let results = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<2 {
+                group.addTask { (try? await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)) != nil }
+            }
+            return await group.reduce(into: []) { $0.append($1) }
+        }
+        let ok = results.filter { $0 }.count
+        #expect(ok == 1 && core.requests(to: "/pair/claim").count == 1)
+    }
+
+    @Test func theQRSecretStaysOutOfDumps() throws {
+        let secret = Wire.b64(Data(repeating: 9, count: 16))
+        let qr = "ainkrad-pair:v1?h=core.example&p=8443&c=\(Wire.b64(Data(repeating: 1, count: 32)))&s=\(secret)&e=2000"
+        let cred = try PairingCredential.parse(qr)
+        var dumped = ""
+        dump(cred, to: &dumped)
+        dump(try #require(PairingQR.parse(qr)), to: &dumped)
+        #expect(!dumped.contains(secret) && !"\(cred) \(String(reflecting: cred))".contains(secret))
+        #expect(!"\(PairingCredential.code("4DTTJF9NW0"))".contains("4DTTJF9NW0"))
     }
 
     @Test func rejectedForgetsTheDevice() async throws {
@@ -126,9 +211,11 @@ struct StepUpTestStore: KeyStore {
         let store = makeMemoryKeyStore()
         let p = pairing(core, store)
         _ = try await p.claim(try .parse("4DTTJF9NW0"), endpoint: loopback)
+        try await p.confirmSAS()
         core.pairStatus = "rejected"
         await #expect(throws: CoreError.notApproved("rejected")) { try await p.awaitApproval() }
         #expect(try store.loadIdentity() == nil && (try store.key(.routine, reason: "")) == nil)
+        #expect(try store.loadPending() == nil)
     }
 
     @Test func pendingForeverExpires() async throws {
@@ -165,12 +252,55 @@ struct StepUpTestStore: KeyStore {
         core.stepupSPKI = stepup.spki
         let conn = CoreConnection(
             identity: identity, endpoint: try CoreEndpoint(loopback), key: routine, keyStore: store, http: core,
-            transport: FakeTransport(core: core), urlSession: .shared, clock: core.clock)
+            transport: FakeTransport(core: core), makeSocket: { _ in FakeSocket(.failPing) }, clock: core.clock)
         #expect(await conn.elevatedUntil == nil)
         let until = try await conn.stepUp(reason: "test")
         let expected = Int64(core.clock.now().timeIntervalSince1970) + 300
         #expect(abs(Int64(until.timeIntervalSince1970) - expected) <= 1)
         #expect(await conn.elevatedUntil != nil)
+    }
+
+    /// A step-up key that, while "Touch ID is showing", lets the Core restart: the session dies and the app would refresh.
+    struct RestartingKey: DeviceKey {
+        let inner: SoftwareKey
+        let core: FakeCore
+        var storage: KeyStorage { .software }
+        var spki: Data { inner.spki }
+        func sign(_ message: Data) throws -> Data {
+            core.restart()
+            return try inner.sign(message)
+        }
+    }
+
+    @Test func stepUpStaysInOneSession() async throws {
+        let core = FakeCore(clock: TestClock())
+        let store = storeWithSoftwareStepUp()
+        let routine = try #require(try store.generateKey(.routine))
+        let stepup = try #require(try store.generateKey(.stepup))
+        let identity = PairedIdentity(
+            deviceID: "d_stepuptest00000000000000", coreFingerprint: core.coreFP, endpoint: loopback)
+        core.register(device: identity.deviceID, spki: routine.spki)
+        core.stepupSPKI = stepup.spki
+        let hooked = HookedStore(stepup: RestartingKey(inner: stepup as! SoftwareKey, core: core), base: store)
+        let conn = CoreConnection(
+            identity: identity, endpoint: try CoreEndpoint(loopback), key: routine, keyStore: hooked, http: core,
+            transport: FakeTransport(core: core), makeSocket: { _ in FakeSocket(.failPing) }, clock: core.clock)
+        // The Core restarts while the prompt is up: the exchange fails as a whole, it is not moved to a new session.
+        await #expect(throws: CoreError.sessionExpired) { _ = try await conn.stepUp(reason: "test") }
+        let posts = core.requests(to: "/api/v1/auth/step-up").filter { $0.target == "/api/v1/auth/step-up" }
+        let challenges = core.requests(to: "/api/v1/auth/step-up/challenge")
+        #expect(challenges.count == 1 && posts.count == 1)
+        #expect(posts[0].headers["ainkrad-session"] == challenges[0].headers["ainkrad-session"])
+        #expect(core.requests(to: "/handshake/session").count == 1, "no second session was opened for it")
+    }
+
+    @Test func cancelledAndFailedPromptsReadDifferently() {
+        let cancelled = NSError(domain: "com.apple.LocalAuthentication", code: -2)
+        #expect(CoreConnection.stepUpFailure(cancelled) == .stepUpUnavailable("Touch ID was cancelled."))
+        guard case .keyStore = CoreConnection.stepUpFailure(NSError(domain: "CryptoKit", code: 1)) else {
+            Issue.record("a Secure Enclave failure is not a cancel")
+            return
+        }
     }
 
     @Test func aDeviceWithoutAStepUpKeyCannotElevate() async throws {

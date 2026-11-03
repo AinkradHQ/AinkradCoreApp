@@ -63,6 +63,16 @@ public struct PairedIdentity: Codable, Sendable, Equatable {
     }
 }
 
+/// A pairing in flight: claimed, not yet approved. Kept apart from `PairedIdentity` so nothing is pinned until the device is
+/// active and the SAS was confirmed; a relaunched app resumes from it. The keys stay in their own slots.
+public struct PendingPairing: Codable, Sendable, Equatable {
+    public var identity: PairedIdentity
+    public var pairingID: String
+    public var sas: String
+    /// The Core key is trusted: from the QR's fingerprint, or because the user confirmed the SAS matches the approver's.
+    public var sasConfirmed: Bool
+}
+
 public protocol KeyStore: Sendable {
     /// The stored key, or nil when none was made. `reason` is the OS prompt text for a key that needs the user.
     func key(_ role: KeyRole, reason: String) throws -> (any DeviceKey)?
@@ -71,7 +81,10 @@ public protocol KeyStore: Sendable {
     func deleteKey(_ role: KeyRole) throws
     func loadIdentity() throws -> PairedIdentity?
     func saveIdentity(_ identity: PairedIdentity) throws
-    /// Removes both keys and the identity.
+    func loadPending() throws -> PendingPairing?
+    func savePending(_ pending: PendingPairing) throws
+    func clearPending() throws
+    /// Removes both keys, the identity and any pending pairing; keeps going past a failure and reports the first.
     func wipe() throws
 }
 
@@ -160,8 +173,26 @@ struct BlobKeyStore: KeyStore {
         try blobs.write("identity", try JSONEncoder().encode(identity))
     }
 
+    func loadPending() throws -> PendingPairing? {
+        guard let data = try blobs.read("pending") else { return nil }
+        guard let p = try? JSONDecoder().decode(PendingPairing.self, from: data) else {
+            throw CoreError.keyStore("the pending pairing is unreadable")
+        }
+        return p
+    }
+
+    func savePending(_ pending: PendingPairing) throws {
+        try blobs.write("pending", try JSONEncoder().encode(pending))
+    }
+
+    func clearPending() throws { try blobs.remove("pending") }
+
     func wipe() throws {
-        for n in ["routine", "stepup", "identity"] { try blobs.remove(n) }
+        var first: (any Error)?
+        for n in ["routine", "stepup", "identity", "pending"] {
+            do { try blobs.remove(n) } catch { first = first ?? error }
+        }
+        if let first { throw first }
     }
 }
 
@@ -170,6 +201,7 @@ public func makeMemoryKeyStore() -> any KeyStore {
     BlobKeyStore(blobs: MemoryBlobs(), useSecureEnclave: false)
 }
 
+// @unchecked Sendable: every access to `items` is under `lock`.
 final class MemoryBlobs: BlobStore, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: Data] = [:]
@@ -224,8 +256,11 @@ struct KeychainBlobs: BlobStore {
         return data
     }
 
+    /// Update in place, add when there is nothing yet: a failure never leaves the old secret deleted.
     func write(_ name: String, _ data: Data) throws {
-        try remove(name)
+        let updated = SecItemUpdate(query(name) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if updated == errSecSuccess { return }
+        guard updated == errSecItemNotFound else { throw Self.fail("write", updated) }
         var q = query(name)
         q[kSecValueData as String] = data
         if dataProtection { q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly }

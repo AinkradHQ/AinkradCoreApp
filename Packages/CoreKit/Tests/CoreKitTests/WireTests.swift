@@ -73,8 +73,17 @@ import Testing
         #expect(try CoreEndpoint(URL(string: "https://core.example")!).host == "core.example")
         #expect(try CoreEndpoint(URL(string: "https://core.example:443/")!).host == "core.example")
         #expect(try CoreEndpoint(host: "core.example", port: 8443).host == "core.example:8443")
+        // IPv6 loopback: one pair of brackets, lower case, default ports dropped.
+        let v6 = try CoreEndpoint(URL(string: "http://[::1]:7700")!)
+        #expect(v6.host == "[::1]:7700" && v6.url.absoluteString == "http://[::1]:7700")
+        #expect(try CoreEndpoint(URL(string: "http://[::1]")!).host == "[::1]")
+        #expect(try CoreEndpoint(URL(string: "HTTPS://CORE.Example:443")!).host == "core.example")
+        #expect(try CoreEndpoint(URL(string: "http://LOCALHOST:80")!).host == "localhost")
+        #expect(try CoreEndpoint(host: "[2001:db8::1]", port: 8443).host == "[2001:db8::1]:8443")
+        #expect(try CoreEndpoint(host: "2001:db8::1", port: 8443).url.absoluteString == "https://[2001:db8::1]:8443")
         for bad in [
-            "http://core.example", "ftp://x", "https://u@x", "https://x/api", "https://x?q=1", "https://x#f", "x",
+            "http://core.example", "http://[2001:db8::1]:7700", "ftp://x", "https://u@x", "https://x/api",
+            "https://x?q=1", "https://x#f", "x",
         ] {
             #expect(throws: CoreError.self, "\(bad)") { try CoreEndpoint(URL(string: bad)!) }
         }

@@ -16,6 +16,9 @@ public enum CoreError: Error, Equatable, Sendable {
     case rateLimited(retryAfter: TimeInterval?)
     /// The Core did not prove the pinned identity (§13). Nothing signed was sent.
     case coreIdentityMismatch(pinned: String, served: String)
+    /// The Core did not answer `POST /handshake` with a usable proof (non-200, malformed): this attempt fails closed and nothing
+    /// signed is sent, but it is not evidence of a different Core, so callers retry with backoff.
+    case coreUnproven(String)
     /// The client and the Core share no API minor (§14a).
     case noSharedMinor(builtFor: Int32, serverSupported: [Int32])
     /// The Core cannot be reached: no network, refused, TLS failure, timeout.
@@ -60,6 +63,7 @@ extension CoreError: LocalizedError {
         case .forbiddenScope: "This device is not allowed to do that."
         case .rateLimited(let s): s.map { "Too many requests. Try again in \(Int($0)) s." } ?? "Too many requests."
         case .coreIdentityMismatch: "This is not the Core this device was paired with."
+        case .coreUnproven: "The Core could not prove who it is. Trying again shortly."
         case .noSharedMinor: "This app and the Core do not speak a common API version."
         case .offline(let m): "The Core cannot be reached: \(m)"
         case .pairingFailed: "The pairing code is wrong, used or expired."
