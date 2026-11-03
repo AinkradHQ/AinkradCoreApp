@@ -24,6 +24,8 @@ packages:
     path: Packages/CoreUI
   CoreKit:
     path: Packages/CoreKit
+  Features:
+    path: Packages/Features
 
 targets:
   AinkradCoreMac:
@@ -34,6 +36,8 @@ targets:
       - package: AinkradClient
       - package: CoreUI
       - package: CoreKit
+      - package: Features
+        product: Shell
     settings:
       base:
         PRODUCT_NAME: Ainkrad Core
@@ -43,8 +47,23 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_HARDENED_RUNTIME: YES
 
+  AinkradCoreMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [Tests/UI]
+    dependencies:
+      - target: AinkradCoreMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ainkrad.core.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: AinkradCoreMac
+
 schemes:
   AinkradCoreMac:
     build:
       targets:
         AinkradCoreMac: all
+    test:
+      targets:
+        - AinkradCoreMacUITests

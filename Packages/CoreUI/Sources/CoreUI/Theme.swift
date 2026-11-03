@@ -93,7 +93,7 @@ extension View {
     }
 
     /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
-    func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
+    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
         overlay {
             if show {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -115,7 +115,9 @@ private struct CoreAnimationModifier<V: Equatable>: ViewModifier {
 }
 
 /// Reduce Motion: translate and scale are dropped (opacity stays). One place so every component agrees.
-func coreMove(_ reduce: Bool, _ distance: CGFloat) -> CGFloat { reduce ? 0 : distance }
+public func coreMove(_ reduce: Bool, _ distance: CGFloat) -> CGFloat { reduce ? 0 : distance }
 
 /// A rounded rectangle at a token radius. The only shape the system draws.
-func coreShape(_ radius: CGFloat) -> RoundedRectangle { RoundedRectangle(cornerRadius: radius, style: .continuous) }
+public func coreShape(_ radius: CGFloat) -> RoundedRectangle {
+    RoundedRectangle(cornerRadius: radius, style: .continuous)
+}

@@ -1,0 +1,229 @@
+#if DEBUG
+import CoreUI
+import SwiftUI
+
+/// Debug and preview only: the sample world the shell runs on until the networking lane lands. No fake networking, no persistence.
+/// Names follow the prototype's `data.js` (Home Core, mac-studio / linux-01 / oracle-arm, claude-code / codex).
+extension HomeSnapshot {
+    /// A steady load line ending at `last`, with a little deterministic wobble.
+    static func series(_ last: Double, _ wobble: Double, _ seed: Double) -> [Double] {
+        (0..<24).map { i in i == 23 ? last : max(0, last + wobble * sin(Double(i) * 0.9 + seed)) }
+    }
+
+    public static let sample = HomeSnapshot(
+        greetingName: "Ahmed", coreName: "Home Core",
+        machines: [
+            Machine(id: "mac-studio", os: "macOS 27", online: true, slots: 4, used: 2, load: series(0.19, 0.04, 1)),
+            Machine(id: "linux-01", os: "Ubuntu 26.04", online: true, slots: 2, used: 0, load: series(0.15, 0.03, 2)),
+            Machine(
+                id: "oracle-arm", os: "Ubuntu 26.04 (arm64)", online: true, slots: 2, used: 1,
+                load: series(0.10, 0.03, 3)),
+        ],
+        running: [
+            Run(id: "s1", tool: "claude-code", name: "E2-14 Citadel bootstrap", minutes: 38),
+            Run(id: "s4", tool: "claude-code", name: "E3 plan review", minutes: 27),
+        ],
+        events: [
+            Event(
+                id: "e1", text: "claude-code wants to push feat/e2-14", source: "mac-studio", minutesAgo: 1,
+                symbol: "lock.shield"),
+            Event(
+                id: "e2", text: "cargo test passed · 412 tests", source: "mac-studio", minutesAgo: 3,
+                symbol: "checkmark"),
+        ],
+        board: Board(todo: 2, doing: 2, review: 2, blocked: 1, done: 3), loadSampleSeconds: 3, spendToday: 18.60,
+        monthTokensUsed: 0.77)
+}
+
+@MainActor
+public enum SampleWorld {
+    public static func install(into shell: ShellModel) {
+        shell.home = .sample
+        for e in launcherEntries(shell) { shell.launcher.register(e) }
+        shell.launcher.recents = ["core", "agents", "terminals"]
+        approvals(shell)
+        shell.bell.add(
+            BellItem(
+                id: "alarm-backup", kind: .alarm, title: "Backup age 31 h, limit 26 h", sub: "alarm.raised · Home Core",
+                time: "2 min",
+                actions: [BellAction("Open Ops", primary: true) { shell.showToast("Sample: Ops opens here.") }]))
+        shell.bell.add(
+            BellItem(
+                id: "runner-cooling", kind: .runner, title: "codex-plus is cooling down",
+                sub: "A session moved to codex-api and restarted", time: "now"))
+    }
+
+    static func approvals(_ shell: ShellModel) {
+        let rows = [
+            (
+                "claude-code wants to push feat/e2-14-citadel-bootstrap",
+                "mac-studio · needs Touch ID · expires in 5 min", "now"
+            ),
+            ("claude-code wants to read GH_TOKEN", "oracle-arm · needs Touch ID · expires in 5 min", "2 min"),
+            ("codex wants to run cargo add prometheus-client", "linux-01 · needs Touch ID · expires in 5 min", "4 min"),
+        ]
+        for (i, r) in rows.enumerated() { shell.bell.add(approval(shell, id: "appr-\(i)", r.0, r.1, r.2)) }
+    }
+
+    static func approval(_ shell: ShellModel, id: String, _ title: String, _ sub: String, _ time: String) -> BellItem {
+        BellItem(
+            id: id, kind: .approval, title: title, sub: sub, time: time,
+            actions: [
+                BellAction("Deny") {
+                    shell.bell.remove(id)
+                    shell.showToast("Denied.")
+                },
+                BellAction("Approve", primary: true) {
+                    shell.bell.remove(id)
+                    shell.showToast("Approved (sample).") { shell.bell.add(approval(shell, id: id, title, sub, time)) }
+                },
+            ])
+    }
+
+    static func launcherEntries(_ shell: ShellModel) -> [LauncherEntry] {
+        func pane(_ id: String, _ title: String, _ sub: String, _ symbol: String, wide: Bool = false) -> LauncherEntry {
+            LauncherEntry(id: id, title: title, sub: sub, symbol: symbol) { shell.openPane(samplePane(id, shell)) }
+        }
+        func action(
+            _ id: String, _ title: String, _ sub: String, _ symbol: String, _ run: @escaping @MainActor () -> Void
+        )
+            -> LauncherEntry
+        { LauncherEntry(id: id, title: title, sub: sub, symbol: symbol, isAction: true, run: run) }
+        func sample(_ title: String) -> @MainActor () -> Void {
+            {
+                shell.presentSheet(
+                    title: title, message: "Sample data only: this starts nothing.",
+                    actions: [ShellSheetAction("OK", primary: true)])
+            }
+        }
+        return [
+            pane("core", "Core", "Accounts, pools, budgets and costs", "creditcard"),
+            pane("agents", "Agents", "sessions on the Home Core", "sparkles"),
+            pane("terminals", "Terminals", "Rune terminals on your runners", "terminal"),
+            pane("runners", "Runners", "machines and their slots", "server.rack"),
+            action(
+                "new-session", "New agent session", "start claude-code or codex on a runner", "plus",
+                sample("New agent session")),
+            action(
+                "new-terminal", "New terminal", "Open a shell on a runner · needs Touch ID", "terminal",
+                sample("New terminal")),
+            action("add-device", "Add device", "create a one-time pairing code", "plus", sample("Add device")),
+            action("shortcuts", "Keyboard Shortcuts", "keys help commands", "keyboard") { shell.open(.shortcuts) },
+            action("add-widget", "Add Widget…", "put a widget on Home", "plus") {
+                shell.show(.home)
+                shell.addingWidget = true
+            },
+            LauncherEntry(
+                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
+                symbol: "gearshape"
+            ) {
+                shell.open(.settings)
+            },
+        ]
+    }
+
+    public static func samplePane(_ id: String, _ shell: ShellModel) -> PaneSpec {
+        switch id {
+        case "agents":
+            PaneSpec(
+                id: id, title: "Agents", sub: "Home Core", symbol: "sparkles",
+                chip: PaneChip("Waiting on you", tone: .warn, symbol: "hourglass")
+            ) {
+                SampleList(
+                    rows: [
+                        ("E2-14 Citadel bootstrap", "claude-code · mac-studio", SessionState.running),
+                        ("E3 plan review", "claude-code · oracle-arm", .running),
+                        ("Hoard test fixtures", "claude-code · mac-studio", .starting),
+                        ("E2-12 notifications", "codex · linux-01", .ended),
+                    ])
+            }
+        case "terminals":
+            PaneSpec(
+                id: id, title: "Terminals", sub: "Rune", symbol: "terminal",
+                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack")
+            ) {
+                SampleList(
+                    rows: [
+                        ("zsh", "~/AinkradCore · mac-studio", SessionState.running),
+                        ("bash", "~/ainkrad/logs · linux-01", .running),
+                        ("zsh", "~/AinkradCore · mac-studio", .ended),
+                    ])
+            }
+        case "runners":
+            PaneSpec(id: id, title: "Runners", sub: "3 machines", symbol: "server.rack") {
+                SampleList(
+                    rows: [
+                        ("mac-studio", "macOS 27 · 2 of 4 slots", SessionState.running),
+                        ("linux-01", "Ubuntu 26.04 · idle", .running),
+                        ("oracle-arm", "Ubuntu 26.04 (arm64) · 1 of 2 slots", .running),
+                    ])
+            }
+        case "citadel":
+            PaneSpec(id: id, title: "Citadel", sub: "Ainkrad", symbol: "building.columns", minWidth: 560) {
+                SampleList(
+                    rows: [
+                        ("Board", "9 issues in the sprint", SessionState.running),
+                        ("Runs", "2 running", .running),
+                    ])
+            }
+        default:
+            PaneSpec(id: id, title: "Core", sub: "Home Core", symbol: "creditcard", minWidth: 560) {
+                SampleList(
+                    rows: [
+                        ("Accounts", "3 providers, all ready", SessionState.running),
+                        ("Budgets", "77% of month tokens", .running),
+                        ("Ledger", "$18.60 today", .running),
+                    ])
+            }
+        }
+    }
+}
+
+private struct SampleList: View {
+    let rows: [(String, String, SessionState)]
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Space.s2) {
+                ForEach(rows, id: \.0) { r in
+                    CoreRow(r.0, subtitle: r.1) { StateBadge(r.2) }
+                }
+                Text("Sample data").font(.system(size: MacTextSize.meta)).padding(.top, Space.s2)
+            }
+            .padding(Space.s3)
+        }
+    }
+}
+
+/// Debug ▸ Demo: states that need a backend to change, in place of the prototype's demo strip.
+public struct DemoCommands: Commands {
+    let shell: ShellModel
+    public init(shell: ShellModel) { self.shell = shell }
+    public var body: some Commands {
+        CommandMenu("Demo") {
+            Button("Add Approval to Bell") {
+                shell.bell.add(
+                    SampleWorld.approval(
+                        shell, id: "appr-\(shell.bell.count)-\(Int.random(in: 0..<999))",
+                        "claude-code wants to push feat/demo", "mac-studio · needs Touch ID", "now"))
+            }
+            Button("Clear Bell") { shell.bell.removeAll() }
+            Button("Reset Bell") {
+                shell.bell.removeAll()
+                SampleWorld.install(into: shell)
+            }
+            Divider()
+            ForEach(["agents", "terminals", "runners", "core", "citadel"], id: \.self) { id in
+                Button("Open \(id.capitalized) Pane") { shell.openPane(SampleWorld.samplePane(id, shell)) }
+            }
+            Button("Close All Panes") { shell.closeAllPanes() }
+            Divider()
+            Button("Toast with Undo") { shell.showToast("Sample toast.") {} }
+            Button("Confirm Sheet") {
+                shell.presentSheet(
+                    title: "Remove device?", message: "Sample sheet.",
+                    actions: [ShellSheetAction("Cancel"), ShellSheetAction("Remove", primary: true)])
+            }
+        }
+    }
+}
+#endif

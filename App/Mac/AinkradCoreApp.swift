@@ -1,14 +1,29 @@
 import AinkradClient
 import CoreUI
+import Shell
 import SwiftUI
 
 @main
 struct AinkradCoreApp: App {
+    @State private var shell = AinkradCoreApp.makeShell()
+
     var body: some Scene {
-        WindowGroup("Ainkrad Core") {
-            // E5-00 skeleton: proves the app links the vendored client. The shell replaces this in E5-03.
-            Text(verbatim: "Ainkrad Core")
-                .frame(minWidth: 640, minHeight: 400)
+        // One window, forced full screen (plan D9). `Window` is single-instance and, being first, is the one opened at launch.
+        Window("Ainkrad Core", id: "main") {
+            ShellView(shell: shell)
+                .background(FullScreenEnforcer())
+                #if DEBUG
+            .task { await SnapshotRunner.runIfRequested(shell) }
+                #endif
+        }
+        .windowStyle(.hiddenTitleBar)
+        // Native full screen needs a resizable window; the enforcer keeps it from ever leaving full screen.
+        .windowResizability(.contentMinSize)
+        .commands {
+            ShellCommands(shell: shell, paneCount: shell.panes.count, focusMode: shell.focusedPane != nil)
+            #if DEBUG
+            DemoCommands(shell: shell)
+            #endif
         }
         #if DEBUG
         Window("CoreUI Gallery", id: "gallery") {
@@ -16,6 +31,14 @@ struct AinkradCoreApp: App {
         }
         .commands { DebugCommands() }
         #endif
+    }
+
+    @MainActor private static func makeShell() -> ShellModel {
+        let shell = ShellModel()
+        #if DEBUG
+        SampleWorld.install(into: shell)
+        #endif
+        return shell
     }
 }
 
