@@ -97,6 +97,7 @@ struct OpsSection: View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Text(t.title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
             Text(t.value).font(.system(size: MacTextSize.title, weight: .semibold).monospacedDigit()).lineLimit(2)
+            if let h = admin.ops?.history[t.name], h.count >= 2 { CoreSpark(h) }
             Text(t.help).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(2)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
