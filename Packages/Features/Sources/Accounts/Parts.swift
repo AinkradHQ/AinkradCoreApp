@@ -207,7 +207,7 @@ extension AccStateCard where Actions == EmptyView {
 /// A figure the Core does not report yet: a quiet card that says so, so nothing is ever estimated.
 struct NotYetCard: View {
     let title: String
-    var text = "Not available yet. Core does not report this until KAN-448 to KAN-450 land."
+    var text = "Not available yet. Core does not report this."
     @Environment(\.corePalette) private var palette
     var body: some View {
         AccPanel(spacing: Space.s1) {

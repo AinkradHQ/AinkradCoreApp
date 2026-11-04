@@ -158,6 +158,6 @@ struct NotYetPage: View {
     private var text: String {
         page == .activity
             ? "Core keeps account events in its audit log: Settings, Security, Audit lists every account, pool and binding change."
-            : "Core does not report \(page.title.lowercased()) yet. It arrives with KAN-448 to KAN-450, and nothing here is estimated until then."
+            : "Core does not report \(page.title.lowercased()) yet, and nothing here is estimated."
     }
 }

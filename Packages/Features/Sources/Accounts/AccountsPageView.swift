@@ -247,7 +247,7 @@ struct AccountDetailView: View {
             NotYetCard(
                 title: "How much is left",
                 text:
-                    "Limits and budget are not available yet. Core does not report them until KAN-448 to KAN-450 land.")
+                    "Limits and budget are not available yet. Core does not report them yet.")
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s3, alignment: .top)],
                 spacing: Space.s3
@@ -293,7 +293,7 @@ struct AccountDetailView: View {
             NotYetCard(
                 title: "Last 12 hours",
                 text:
-                    "Usage is not available yet. Core does not report tokens, messages or cost until KAN-448 to KAN-450 land."
+                    "Usage is not available yet. Core does not report tokens, messages or cost yet."
             )
             DisclosureGroup("Technical details") {
                 AccPanel(spacing: Space.s2) {
