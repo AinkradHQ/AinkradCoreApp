@@ -1,0 +1,158 @@
+import CoreUI
+import Shell
+import SwiftUI
+
+/// One terminal pane: banner, screen (or the card that stands in for it), footer. It reads the session and asks it to act.
+struct TerminalPaneView: View {
+    let model: TerminalsModel
+    let session: TerminalSession
+    @State private var signals = false
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        let v = session.view
+        VStack(spacing: Space.s2) {
+            if let b = v.banner {
+                TermBanner(
+                    tone: b.tone, title: b.title, detail: b.detail, busy: b.busy,
+                    actionTitle: b.action.map(PaneView.label)
+                ) { b.action.map(perform) }
+                .padding(.horizontal, Space.s2)
+                .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
+            ZStack {
+                if v.screenVisible {
+                    TerminalScreen(surface: session.surface).opacity(v.dim ? 0.5 : 1)
+                        .animation(reduce ? nil : Motion.out(Motion.ui), value: v.dim)
+                } else {
+                    coreShape(Radius.cardMac).fill(Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255).opacity(0.78))
+                        .accessibilityHidden(true)
+                }
+                if let c = v.card {
+                    ZStack {
+                        // The prototype's veil: deep blue at half strength, the same in night and day.
+                        coreShape(Radius.cardMac).fill(
+                            Color(red: 6 / 255, green: 12 / 255, blue: 24 / 255).opacity(0.5))
+                        TermCard(
+                            title: c.title, text: c.body, note: c.note,
+                            actions: c.actions.map { a in
+                                (
+                                    title: PaneView.label(a), primary: a != .closePane && a != .dismiss,
+                                    run: { perform(a) }
+                                )
+                            }
+                        )
+                        .padding(Space.s5)
+                    }
+                    .background(.ultraThinMaterial, in: coreShape(Radius.cardMac))
+                    .environment(\.colorScheme, .dark)
+                    .transition(.opacity)
+                }
+            }
+            .clipShape(coreShape(Radius.cardMac))
+            .padding(.horizontal, Space.s2)
+            .accessibilityElement(children: .contain)
+            footer(v)
+        }
+        .padding(.top, Space.s1)
+        .coreAnimation(Motion.out(Motion.move), value: v)
+        .onDisappear { model.paneClosed(session.id) }
+        .accessibilityIdentifier("terminal-pane-\(session.id)")
+    }
+
+    private func footer(_ v: PaneView) -> some View {
+        HStack(spacing: Space.s2) {
+            Text(v.info).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2).lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            switch v.controls {
+            case .ended:
+                Button("Close pane") { model.closePane(session.id) }.buttonStyle(CoreButtonStyle(.secondary))
+            case .running, .pending:
+                let off = v.controls == .pending
+                Button("Send signal") { signals.toggle() }
+                    .buttonStyle(CoreButtonStyle(.secondary)).disabled(off)
+                    .keyboardShortcut("s", modifiers: [.command, .option])
+                    .help("Send a signal to the terminal's process group (⌥⌘S)")
+                    .popover(isPresented: $signals, arrowEdge: .top) {
+                        SignalMenu(session: session) { signals = false }
+                    }
+                Button("Detach") { session.detach() }
+                    .buttonStyle(CoreButtonStyle(.secondary)).disabled(off)
+                    .keyboardShortcut("d", modifiers: [.command, .option])
+                    .help("Leave the terminal running and close this connection (⌥⌘D)")
+                endButton(off)
+            case .endOnly:
+                endButton(false)
+            }
+        }
+        .padding(.horizontal, Space.s4).padding(.bottom, Space.s3).frame(minHeight: MacSize.controlLg + Space.s2)
+    }
+
+    private func endButton(_ off: Bool) -> some View {
+        Button("End terminal") { confirmEnd() }
+            .buttonStyle(TermDangerStyle()).disabled(off)
+            .keyboardShortcut("e", modifiers: [.command, .option])
+            .help("Stop the terminal and everything running in it (⌥⌘E)")
+    }
+
+    private func confirmEnd() {
+        model.shell.presentSheet(
+            title: "End this terminal?",
+            message:
+                "The terminal on \(session.machine) and everything running in it will stop. Closing the pane only detaches. This needs Touch ID.",
+            actions: [
+                ShellSheetAction("Keep it"),
+                ShellSheetAction("End terminal", primary: false) { Task { _ = await session.end() } },
+            ])
+    }
+
+    private func perform(_ a: PaneAction) {
+        switch a {
+        case .attach, .verify: Task { await session.attach() }
+        case .retry:
+            Task {
+                await model.reload()
+                await session.attach()
+            }
+        case .runner: model.openRunners(session.item.runner)
+        case .dismiss: session.dismissNote()
+        case .closePane: model.closePane(session.id)
+        case .newTerminal: model.openNew(runner: session.item.runner)
+        }
+    }
+}
+
+/// The signals a terminal's process group can be sent: a grid of names, each one a button.
+struct SignalMenu: View {
+    let session: TerminalSession
+    let done: () -> Void
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Text("Signal to send").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                palette.text2)
+            LazyVGrid(columns: [GridItem(.fixed(Space.s8 * 2.5)), GridItem(.fixed(Space.s8 * 2.5))], spacing: Space.s1)
+            {
+                ForEach(TerminalSignals.all, id: \.self) { name in
+                    Button {
+                        done()
+                        Task { _ = await session.signal(name) }
+                    } label: {
+                        Text(name).font(.system(size: MacTextSize.body, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlMd)
+                            .contentShape(coreShape(Radius.chip))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Send SIG\(name)")
+                }
+            }
+            Text("Needs Touch ID. Covers this action only.").font(.system(size: MacTextSize.meta))
+                .foregroundStyle(palette.text2)
+        }
+        .padding(Space.s3)
+        .coreTheme()
+    }
+}

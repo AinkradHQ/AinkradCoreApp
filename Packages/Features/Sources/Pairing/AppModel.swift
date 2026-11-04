@@ -4,6 +4,7 @@ import Foundation
 import Observation
 import Shell
 import SwiftUI
+import Terminals
 
 /// The app's root state: first run, the desktop, or a stop that needs a person. It owns the Core connection, turns its
 /// events into the status cluster, the bell and the Devices and Lockouts screens, and runs every elevated action.
@@ -24,6 +25,8 @@ public final class AppModel {
     private(set) var devices: DevicesModel!
     private(set) var lockouts: LockoutsModel!
     private(set) var addDevice: AddDeviceModel?
+    /// Terminals and runners (E5-05); nil until a Core connection exists.
+    public private(set) var terminals: TerminalsModel?
     var confirmForget = false
 
     private let keyStore: any KeyStore
@@ -103,6 +106,11 @@ public final class AppModel {
             return
         }
         shell.home.coreName = "Home Core"
+        if let live = service as? LiveCoreService {
+            let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
+            model.install()
+            terminals = model
+        }
         phase = .desktop
         await connect()
     }
@@ -137,6 +145,7 @@ public final class AppModel {
     func refreshAll() async {
         await devices.reload()
         await lockouts.reload()
+        terminals?.resync()
     }
 
     private func startEvents(_ service: any CoreService) {
@@ -160,6 +169,7 @@ public final class AppModel {
             shell.coreLink = .none
             phase = .blocked(f)
         case .event(let kind, let pairing, _):
+            terminals?.event(kind: kind)
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
             if kind.hasPrefix("pairing."), let pairing { await pairingEvent(kind, pairing) }
@@ -269,6 +279,8 @@ public final class AppModel {
         shell.bell.removeAll()
         shell.dialog = nil
         shell.overlay = nil
+        shell.closeAllPanes()
+        terminals = nil
         firstRun.reset()
         phase = .firstRun
     }
