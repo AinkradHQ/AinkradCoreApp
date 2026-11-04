@@ -1,4 +1,5 @@
 import CoreKit
+import CoreUI
 import Foundation
 import Observation
 
@@ -23,6 +24,9 @@ final class TerminalSession {
     @ObservationIgnored private var cursor: UInt64?
     @ObservationIgnored private var lastLetterbox = false
     @ObservationIgnored private var firstOutputAfterReattach = false
+    /// When output arrived, at most one stamp a second, newest last: the "output this Mac has seen" the tile's strip is drawn from.
+    /// The Core stores no output, so this is the only history there is, and it starts when this Mac attaches.
+    @ObservationIgnored private(set) var outputTimes: [Date] = []
     @ObservationIgnored var onBell: (() -> Void)?
     @ObservationIgnored var onChange: (() -> Void)?
 
@@ -51,6 +55,15 @@ final class TerminalSession {
     }
 
     func dismissNote() { note = nil }
+
+    func noteOutput(at now: Date = Date()) {
+        if let last = outputTimes.last, now.timeIntervalSince(last) < 1 { return }
+        outputTimes.append(now)
+        if outputTimes.count > 4000 { outputTimes.removeFirst(1000) }
+    }
+
+    /// Twelve slices of five minutes, oldest first, 0...1.
+    func heat(now: Date = Date()) -> [Double] { heatBuckets(outputTimes, now: now, slice: 300, count: 12) }
 
     // MARK: attach
 
@@ -124,6 +137,7 @@ final class TerminalSession {
                 firstOutputAfterReattach = false
                 note = .resumed(from: after, to: l.opened.seq)
             }
+            noteOutput()
             surface.feed(d)
             l.drawn(d.count)
         case .snapshot(let d):

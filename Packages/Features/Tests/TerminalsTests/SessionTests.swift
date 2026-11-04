@@ -13,6 +13,16 @@ import Testing
         return (TerminalSession(item: t, runner: runner(), service: service, host: host), service, host)
     }
 
+    @Test func outputStampsAreCoalescedToOneASecondAndBucketedIntoTheStrip() {
+        let (s, _, _) = make()
+        let now = Date(timeIntervalSince1970: 100_000)
+        s.noteOutput(at: now.addingTimeInterval(-3_599))
+        for i in (0..<10).reversed() { s.noteOutput(at: now.addingTimeInterval(-Double(i) * 0.1)) }  // one burst, one stamp
+        #expect(s.outputTimes.count == 2)
+        let heat = s.heat(now: now)
+        #expect(heat.count == 12 && heat[0] == 1 && heat[11] == 1 && heat[5] == 0)
+    }
+
     @Test func attachAsksForTouchIDThenShowsTheLink() async {
         let (s, svc, host) = make()
         host.isElevated = false

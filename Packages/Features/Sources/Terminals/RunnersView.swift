@@ -82,6 +82,11 @@ private struct RunnerTile: View {
                     labelled("Host load per core", String(format: "%.2f", p)) {
                         Meter(value: p, max: 6, limit: RunnerStatus.busyPerCore, warn: p > RunnerStatus.busyPerCore)
                     }
+                    if let s = model.loadSamples[runner.id], s.count >= 2 {
+                        CoreSpark(s, tone: st == .busy ? .warn : .run, ceiling: max(6, s.max() ?? 6))
+                        Text("Load sampled on this Mac while it watched.").font(.system(size: MacTextSize.meta))
+                            .foregroundStyle(palette.text2)
+                    }
                 }
                 HStack(spacing: Space.s2) {
                     ForEach(runner.drivers, id: \.name) { d in
