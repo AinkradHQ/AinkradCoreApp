@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-private let cardColumns = [GridItem(.adaptive(minimum: Space.s8 * 10), spacing: Space.s3, alignment: .top)]
+private let cardColumns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
 
 /// What is usable, who is tried first, and what needs you.
 struct OverviewPage: View {
