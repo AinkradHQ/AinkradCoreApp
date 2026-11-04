@@ -8,6 +8,7 @@ struct FirstRunView: View {
     @Bindable var model: FirstRunModel
     @Environment(\.corePalette) private var palette
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduce
     /// What the field shows. The model keeps the formatted code; this follows it (the usual way to rewrite text while typing).
     @State private var codeField = ""
     @State private var pasteQR = false
@@ -21,13 +22,24 @@ struct FirstRunView: View {
             .clipped().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s4) {
                 header
-                switch model.stage {
-                case .form: form
-                case .claiming: claiming
-                case .sas: sas
-                case .approved: approved
-                case .failed(let f): failed(f)
+                Group {
+                    switch model.stage {
+                    case .form:
+                        switch model.step {
+                        case .name: nameStep
+                        case .address: addressStep
+                        case .bootstrap: bootstrapStep
+                        case .code: form
+                        }
+                    case .claiming: claiming
+                    case .sas: sas
+                    case .approved: approved
+                    case .failed(let f): failed(f)
+                    }
                 }
+                .id("\(model.stage == .form ? "form" : "other")-\(model.step)")
+                .transition(.opacity.combined(with: .offset(x: coreMove(reduce, 12))))
+
             }
             .foregroundStyle(palette.text)
             .font(.system(size: MacTextSize.body))
@@ -43,15 +55,25 @@ struct FirstRunView: View {
             if model.codeText != typed { codeField = model.codeText }
         }
         .onChange(of: model.codeText) { _, text in if text != codeField { codeField = text } }
-        .onAppear { codeField = model.codeText }
-        .animation(Motion.out(Motion.ui), value: model.stage)
+        .onAppear {
+            codeField = model.codeText
+            pasteQR = model.usesQR
+        }
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: model.stage)
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: model.step)
         .ignoresSafeArea()
     }
 
     private var step: (Int, String) {
         switch model.stage {
-        case .form, .claiming, .sas: (2, "Pair this Mac")
-        case .approved: (3, "Done")
+        case .form:
+            switch model.step {
+            case .name: (1, "Welcome")
+            case .address, .bootstrap: (2, "Find your Core")
+            case .code: (3, "Pair this Mac")
+            }
+        case .claiming, .sas: (3, "Pair this Mac")
+        case .approved: (4, "Done")
         case .failed: (0, "Connect to a Core")
         }
     }
@@ -62,7 +84,7 @@ struct FirstRunView: View {
                 .accessibilityHidden(true)
             if step.0 > 0 {
                 HStack(spacing: Space.s1) {
-                    ForEach(1...3, id: \.self) { i in
+                    ForEach(1...4, id: \.self) { i in
                         coreShape(Radius.chip / 3).fill(i <= step.0 ? palette.primary : palette.track)
                             .frame(width: Space.s5, height: Space.s1)
                     }
@@ -70,7 +92,7 @@ struct FirstRunView: View {
                 .accessibilityHidden(true)
             }
             Text(step.1).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
-                .accessibilityLabel(step.0 > 0 ? "Step \(step.0) of 3, \(step.1)" : step.1)
+                .accessibilityLabel(step.0 > 0 ? "Step \(step.0) of 4, \(step.1)" : step.1)
         }
     }
 
@@ -106,36 +128,115 @@ struct FirstRunView: View {
 
     private var keysHome: String { SecureEnclave.isAvailable ? "the Secure Enclave" : "this Mac's Keychain" }
 
-    private var form: some View {
+    private func title(_ t: String) -> some View {
+        Text(t).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+    }
+
+    private func note(_ t: LocalizedStringKey) -> some View {
+        Text(t).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: step 1, who you are
+
+    private var nameStep: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Enter the pairing code").font(.system(size: MacTextSize.large, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
-            Text("Ask an admin device to open **Add device**. The code is 10 characters and valid for 5 minutes.")
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            title("Welcome to Ainkrad")
+            note("What should we call you? Home greets you with it. It stays on this Mac.")
+            CoreTextField(
+                "Your name", placeholder: "Ahmed", text: $model.nameText, autofocus: true,
+                onSubmit: { model.submitName() })
+            HStack {
+                LinkButton(title: "Not now") {
+                    model.nameText = ""
+                    model.submitName()
+                }
+                Spacer()
+                Button("Continue") { model.submitName() }.buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    // MARK: step 2, where the Core is
+
+    private var addressStep: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            title("Connect to a Core")
+            note("Enter the address of your Core. Ainkrad checks who answers before it sends anything signed.")
+            CoreSegmented(
+                "How to find the Core",
+                segments: [CoreSegment(false, "Address"), CoreSegment(true, "Paste QR text")],
+                selection: Binding(get: { pasteQR }, set: { setQR($0) }))
             if pasteQR {
                 Label("A QR names its Core and its fingerprint, so no address is needed.", systemImage: "qrcode")
                     .foregroundStyle(palette.text2)
+                CoreTextField(
+                    "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
+                    mono: true, autofocus: true, onSubmit: { Task { await model.submit() } })
             } else {
                 CoreTextField(
                     "Core address", placeholder: "core.example.net", text: $model.endpointText,
-                    error: model.endpointError, suffix: addressSuffix, onSubmit: { Task { await model.submit() } })
+                    error: model.endpointError, suffix: addressSuffix, onSubmit: { model.submitAddress() })
                 Text(
                     "Always https. Add a port only if it is not 443, for example core.example.net:7443. Plain http is only for a Core on this Mac."
                 )
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            if pasteQR {
-                CoreTextField(
-                    "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
-                    mono: true, autofocus: true, onSubmit: { Task { await model.submit() } })
-            } else {
-                CodeBoxes(
-                    label: "Pairing code", text: $codeField, error: model.codeError,
-                    onSubmit: { Task { await model.submit() } })
-                Text("Case doesn't matter. I and L count as 1, O as 0.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            HStack {
+                LinkButton(title: "Setting up a new Core?") { model.goTo(.bootstrap) }
+                Spacer()
+                if pasteQR {
+                    Button("Pair this Mac") { Task { await model.submit() } }
+                        .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
+                } else {
+                    Button("Continue") { model.submitAddress() }
+                        .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                        .disabled(model.endpointText.isEmpty)
+                }
             }
+        }
+    }
+
+    private func setQR(_ on: Bool) {
+        pasteQR = on
+        model.typeCode("")
+        codeField = ""
+    }
+
+    private var bootstrapStep: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            title("Setting up a new Core")
+            note(
+                "The very first device is created on the host itself, never over the network. Open a terminal on the machine that runs the Core."
+            )
+            Text("$ ainkrad bootstrap").font(.system(size: MacTextSize.body, design: .monospaced))
+                .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                .background(palette.glassCard, in: coreShape(Radius.row))
+            VStack(alignment: .leading, spacing: Space.s2) {
+                note("1. Enter the address, then the code it printed.")
+                note("2. Compare the check code on this Mac with the one the host prints, and type y there.")
+                note("3. Add a second admin device (your iPhone) afterwards, so losing one never needs SSH.")
+            }
+            HStack {
+                Button("Back") { model.goTo(.address) }.buttonStyle(.coreSecondary)
+                Spacer()
+                Button("I have a code") { model.goTo(.address) }.buttonStyle(.coreProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    // MARK: step 3, the pairing code
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            title("Enter the pairing code")
+            note("Ask an admin device to open **Add device**. The code is 10 characters and valid for 5 minutes.")
+            CodeBoxes(
+                label: "Pairing code", text: $codeField, error: model.codeError,
+                onSubmit: { Task { await model.submit() } })
+            Text("Case doesn't matter. I and L count as 1, O as 0.")
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(spacing: Space.s1) {
                     Text("This Mac keeps its keys in \(keysHome)")
@@ -144,11 +245,7 @@ struct FirstRunView: View {
                 if showKeys { keyDetails }
             }
             HStack {
-                LinkButton(title: pasteQR ? "Type the code instead" : "Paste QR text instead") {
-                    pasteQR.toggle()
-                    model.typeCode("")
-                    codeField = ""
-                }
+                LinkButton(title: "Back") { model.goTo(.address) }
                 Spacer()
                 Button("Pair this Mac") { Task { await model.submit() } }
                     .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
@@ -200,7 +297,7 @@ struct FirstRunView: View {
             statusLine
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
-                Button("It doesn't match") { Task { await model.cancel() } }.buttonStyle(DangerButtonStyle())
+                Button("It doesn't match") { Task { await model.cancel() } }.buttonStyle(.coreDanger)
                 if model.matched {
                     Button("Waiting…") {}.buttonStyle(.coreProminent).disabled(true)
                 } else {
@@ -246,7 +343,11 @@ struct FirstRunView: View {
                 .foregroundStyle(palette.text2)
             if let claim = model.claim {
                 FactCard {
+                    if let n = model.displayName { FactRow(key: "You", value: n) }
                     if let e = model.endpoint { FactRow(key: "Core", value: e.absoluteString, mono: true) }
+                    FactRow(
+                        key: "Key storage",
+                        value: SecureEnclave.isAvailable ? "Secure Enclave, routine and step-up" : "Keychain")
                     FactRow(key: "This Mac", value: claim.deviceID, mono: true)
                     FactRow(key: "Core fingerprint", value: String(claim.coreFingerprint.prefix(24)) + "…", mono: true)
                 }

@@ -115,6 +115,10 @@ public final class ShellModel {
     static let layoutKey = "ainkrad.core.home.widgets"
     public var editingWidgets = false
     public var addingWidget = false
+    #if DEBUG
+    /// Snapshots only: draws the second Quick actions tile in its hover state.
+    public var debugForceQuickHover = false
+    #endif
     public var coreLink: CoreLink = .none {
         didSet { if oldValue == .live && coreLink != .live { lastLiveAt = Date() } }
     }
@@ -150,7 +154,8 @@ public final class ShellModel {
             })
         launcher.register(
             LauncherEntry(
-                id: "widgets.edit", title: "Edit Widgets", sub: "Rearrange, resize or remove", symbol: "slider.horizontal.3",
+                id: "widgets.edit", title: "Edit Widgets", sub: "Rearrange, resize or remove",
+                symbol: "slider.horizontal.3",
                 keywords: ["widgets", "home", "rearrange", "resize"], isAction: true
             ) { [weak self] in
                 self?.show(.home)
@@ -331,7 +336,12 @@ public final class ShellModel {
     }
 
     /// Applies a layout a drag already worked out (the drop).
-    public func setWidgets(_ items: [WidgetItem]) { _ = edit { $0.items = items; return true } }
+    public func setWidgets(_ items: [WidgetItem]) {
+        _ = edit {
+            $0.items = items
+            return true
+        }
+    }
     public func moveWidget(_ id: UUID, dx: Int, dy: Int) { _ = edit { $0.nudge(id, dx: dx, dy: dy) } }
 
     public func resizeWidget(_ id: UUID, to size: WidgetSize) {
@@ -345,13 +355,22 @@ public final class ShellModel {
             added = $0.add(kind, size)
             return added != nil
         }
-        if ok, let added { showToast("Added \(added.kind.title)") } else { showToast("No room on Home. Remove a widget first.") }
+        if ok, let added {
+            showToast("Added \(added.kind.title)")
+        } else {
+            showToast("No room on Home. Remove a widget first.")
+        }
         return ok
     }
 
     public func removeWidget(_ id: UUID) {
         var gone: WidgetItem?
-        guard edit({ gone = $0.remove(id); return gone != nil }), let gone else { return }
+        guard
+            edit({
+                gone = $0.remove(id)
+                return gone != nil
+            }), let gone
+        else { return }
         showToast("Removed \(gone.kind.title)") { [weak self] in
             guard let self else { return }
             if !self.edit({ $0.restore(gone) }) { self.showToast("No room to bring it back.") }
@@ -360,8 +379,16 @@ public final class ShellModel {
 
     public func resetWidgets() {
         let was = widgets
-        _ = edit { $0 = .standard(); return true }
-        showToast("Home is back to the default layout") { [weak self] in _ = self?.edit { $0 = was; return true } }
+        _ = edit {
+            $0 = .standard()
+            return true
+        }
+        showToast("Home is back to the default layout") { [weak self] in
+            _ = self?.edit {
+                $0 = was
+                return true
+            }
+        }
     }
 
     // MARK: -

@@ -18,6 +18,7 @@ enum SnapshotRunner {
         }
         if let dir = env["CORE_GALLERY_SNAPSHOT"] { return await GallerySnapshot.run(dir: dir, env: env) }
         if let dir = env["CORE_AGENTS_SNAPSHOT"] { return await AgentsSnapshots.run(app, dir: dir, env: env) }
+        if let dir = env["CORE_HOME_SNAPSHOT"] { return await HomeSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_ACC_SNAPSHOT"] { return await AccountsSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_ADMIN_SNAPSHOT"] { return await AdminSnapshots.run(app, dir: dir, env: env) }

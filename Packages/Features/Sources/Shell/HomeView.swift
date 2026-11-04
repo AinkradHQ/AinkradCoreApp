@@ -76,7 +76,9 @@ struct HomeView: View {
         if let d = drag, d.isNew, !base.contains(where: { $0.id == d.item.id }) { base.append(d.item) }
         return base
     }
-    private var sorted: [WidgetItem] { shown.sorted { ($0.y, $0.x, $0.id.uuidString) < ($1.y, $1.x, $1.id.uuidString) } }
+    private var sorted: [WidgetItem] {
+        shown.sorted { ($0.y, $0.x, $0.id.uuidString) < ($1.y, $1.x, $1.id.uuidString) }
+    }
 
     @ViewBuilder private func card(_ item: WidgetItem) -> some View {
         let held = drag?.item.id == item.id
@@ -92,7 +94,10 @@ struct HomeView: View {
                     .onChanged { v in
                         if drag == nil {
                             let o = DeskGrid.origin(item.x, item.y)
-                            beginDrag(item, isNew: false, grab: CGSize(width: v.startLocation.x - o.x, height: v.startLocation.y - o.y), at: v.location)
+                            beginDrag(
+                                item, isNew: false,
+                                grab: CGSize(width: v.startLocation.x - o.x, height: v.startLocation.y - o.y),
+                                at: v.location)
                         }
                         moveDrag(v.location)
                     }
@@ -105,10 +110,12 @@ struct HomeView: View {
         if let d = drag, let c = d.cell, d.preview != nil {
             let o = DeskGrid.origin(c[0], c[1])
             let s = DeskGrid.frameSize(d.item.size)
-            coreShape(20).fill(palette.glassCard).overlay { coreShape(20).strokeBorder(palette.navActiveEdge, lineWidth: 1.5) }
-                .frame(width: s.width, height: s.height).offset(x: o.x, y: o.y).allowsHitTesting(false)
-                .animation(reduce ? nil : Motion.out(0.18), value: c)
-                .accessibilityHidden(true)
+            coreShape(20).fill(palette.glassCard).overlay {
+                coreShape(20).strokeBorder(palette.navActiveEdge, lineWidth: 1.5)
+            }
+            .frame(width: s.width, height: s.height).offset(x: o.x, y: o.y).allowsHitTesting(false)
+            .animation(reduce ? nil : Motion.out(0.18), value: c)
+            .accessibilityHidden(true)
         }
     }
 
@@ -204,7 +211,10 @@ struct GreetingView: View {
             if !profile.hasName { nameAsk }
         }
         .foregroundStyle(ink)
-        .shadow(color: scheme == .dark ? Color(red: 0, green: 0.03, blue: 0.09).opacity(0.65) : .white.opacity(0.7), radius: 14, y: 1)
+        .shadow(
+            color: scheme == .dark ? Color(red: 0, green: 0.03, blue: 0.09).opacity(0.65) : .white.opacity(0.7),
+            radius: 14, y: 1
+        )
         .opacity(shown ? 1 : 0)
         .offset(y: shown ? 0 : coreMove(reduce, 10))
         .animation(reduce ? .easeOut(duration: 0.3) : Motion.out(1.0), value: shown)

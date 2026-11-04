@@ -193,7 +193,9 @@ struct MachinesBody: View {
                     HStack(spacing: Space.s2) {
                         StatusDot(color: m.online ? palette.tone(.run).ink : palette.tone(.queue).ink)
                         Text(m.id).font(.system(size: MacTextSize.headline, weight: .semibold))
-                        if size == .l { Text(m.os).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2) }
+                        if size == .l {
+                            Text(m.os).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                        }
                         Spacer(minLength: 0)
                         Text(m.online ? "\(m.used) of \(m.slots) slots" : "Offline")
                             .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
@@ -275,7 +277,8 @@ struct EventsBody: View {
                         .frame(width: 22, height: 22).background(palette.uDim, in: coreShape(7))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(e.text).font(.system(size: MacTextSize.headline, weight: .medium)).lineLimit(size == .m ? 1 : 2)
+                        Text(e.text).font(.system(size: MacTextSize.headline, weight: .medium)).lineLimit(
+                            size == .m ? 1 : 2)
                         Text("\(e.source) · \(e.minutesAgo) min").font(.system(size: MacTextSize.meta))
                             .foregroundStyle(palette.text2)
                     }
@@ -335,15 +338,19 @@ struct ClockBody: View {
                 if size == .l { WidgetHead(title: "Clock") }
                 Spacer(minLength: 0)
                 if size == .t {
-                    Text(ctx.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted))).font(.system(size: 62, weight: .semibold))
+                    Text(ctx.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted))).font(
+                        .system(size: 62, weight: .semibold))
                     Text(ctx.date, format: .dateTime.minute(.twoDigits)).font(.system(size: 62, weight: .semibold))
                 } else {
                     Text(ctx.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
                         .font(.system(size: size == .l ? 56 : size == .s ? 38 : 44, weight: .semibold)).lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
-                Text(ctx.date, format: size == .s ? .dateTime.weekday(.wide) : .dateTime.weekday(.wide).month(.wide).day())
-                    .foregroundStyle(palette.text2)
+                Text(
+                    ctx.date,
+                    format: size == .s ? .dateTime.weekday(.wide) : .dateTime.weekday(.wide).month(.wide).day()
+                )
+                .foregroundStyle(palette.text2)
                 if size == .l { Spacer(minLength: 0) }
             }
             .monospacedDigit()
@@ -361,8 +368,20 @@ struct QuickBody: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var arrived = false
 
+    private func forcedHover(_ i: Int) -> CoreInteraction? {
+        #if DEBUG
+        return shell.debugForceQuickHover && i == 1 ? .hover : nil
+        #else
+        return nil
+        #endif
+    }
+
     private func run(_ id: String, _ title: String) {
-        if let e = shell.launcher.entry(id) { e.run() } else { shell.showToast("\(title) arrives with its feature module.") }
+        if let e = shell.launcher.entry(id) {
+            e.run()
+        } else {
+            shell.showToast("\(title) arrives with its feature module.")
+        }
     }
 
     var body: some View {
@@ -376,11 +395,20 @@ struct QuickBody: View {
             let cols = wide ? [GridItem(.flexible(), spacing: 6), GridItem(.flexible())] : [GridItem(.flexible())]
             LazyVGrid(columns: cols, spacing: 6) {
                 ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
-                    Button { run(t.0, t.1) } label: { label(t.2, t.1, wide: wide) }
-                        .buttonStyle(CoreButtonStyle(.secondary)).rise(arrived, i, reduce)
+                    Button {
+                        run(t.0, t.1)
+                    } label: {
+                        label(t.2, t.1, wide: wide)
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary)).rise(arrived, i, reduce)
+                    .environment(\.coreForcedInteraction, forcedHover(i))
                 }
-                Button { shell.toggleLauncher() } label: { label("magnifyingglass", "Launcher", wide: wide, key: "⌘K") }
-                    .buttonStyle(CoreButtonStyle(.prominent)).rise(arrived, tiles.count, reduce)
+                Button {
+                    shell.toggleLauncher()
+                } label: {
+                    label("magnifyingglass", "Launcher", wide: wide, key: "⌘K")
+                }
+                .buttonStyle(CoreButtonStyle(.prominent)).rise(arrived, tiles.count, reduce)
             }
             if !wide { Spacer(minLength: 0) }
         }
@@ -412,7 +440,8 @@ extension View {
         opacity(shown ? 1 : 0)
             .offset(y: shown ? 0 : coreMove(reduce, 10))
             .animation(
-                (reduce ? Animation.easeOut(duration: 0.2) : Motion.out(Motion.move)).delay(reduce ? 0 : Double(index) * 0.04),
+                (reduce ? Animation.easeOut(duration: 0.2) : Motion.out(Motion.move)).delay(
+                    reduce ? 0 : Double(index) * 0.04),
                 value: shown)
     }
 }

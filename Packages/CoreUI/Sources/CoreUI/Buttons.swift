@@ -92,7 +92,9 @@ private struct CoreButtonBody: View {
         case .secondary: hover || pressed ? palette.uDim : .clear
         case .plain: hover || pressed ? palette.uDim : .clear
         // ui.css `.btn.danger`: solid #D92D20, #E4402F on hover, white label in both themes.
-        case .danger: hover || pressed ? Color(red: 0.894, green: 0.251, blue: 0.184) : Color(red: 0.851, green: 0.176, blue: 0.125)
+        case .danger:
+            hover || pressed
+                ? Color(red: 0.894, green: 0.251, blue: 0.184) : Color(red: 0.851, green: 0.176, blue: 0.125)
         }
     }
 }

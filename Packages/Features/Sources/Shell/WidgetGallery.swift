@@ -27,8 +27,10 @@ struct WidgetGallery: View {
                     ForEach(Self.cats, id: \.self) { cat in
                         let kinds = WidgetKind.allCases.filter { $0.category == cat }
                         if !kinds.isEmpty {
-                            Text(cat).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
-                                .padding(.horizontal, 6).padding(.top, 8)
+                            Text(cat).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                                palette.text2
+                            )
+                            .padding(.horizontal, 6).padding(.top, 8)
                             ForEach(kinds) { kind in card(kind) }
                         }
                     }
@@ -92,7 +94,10 @@ struct WidgetGallery: View {
                 .onChanged { v in
                     if v.translation == .zero { return }
                     // The first change starts the drag; the held widget starts at the pointer's start point.
-                    if !started { started = true; begin(kind, s, v.startLocation) }
+                    if !started {
+                        started = true
+                        begin(kind, s, v.startLocation)
+                    }
                     move(v.location)
                 }
                 .onEnded { _ in
@@ -117,7 +122,9 @@ private struct ChoiceStyle: ButtonStyle {
             .foregroundStyle(on ? palette.primary : palette.text)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm)
             .background(on ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.chip))
-            .overlay { coreShape(Radius.chip).strokeBorder(on ? palette.navActiveEdge : palette.glassCardEdge, lineWidth: 1) }
+            .overlay {
+                coreShape(Radius.chip).strokeBorder(on ? palette.navActiveEdge : palette.glassCardEdge, lineWidth: 1)
+            }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
             .animation(Motion.out(Motion.hover), value: hovering)

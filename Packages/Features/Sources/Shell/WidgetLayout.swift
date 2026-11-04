@@ -190,7 +190,8 @@ public struct WidgetLayout: Equatable, Sendable {
     }
 
     public func encoded() -> Data? {
-        try? JSONEncoder().encode(Stored(items: items.map { .init(t: $0.kind.rawValue, s: $0.size.rawValue, x: $0.x, y: $0.y) }))
+        try? JSONEncoder().encode(
+            Stored(items: items.map { .init(t: $0.kind.rawValue, s: $0.size.rawValue, x: $0.x, y: $0.y) }))
     }
 
     /// nil for anything unreadable; rows that name an unknown widget or size, or do not fit or overlap, are dropped.
@@ -198,7 +199,9 @@ public struct WidgetLayout: Equatable, Sendable {
         guard let s = try? JSONDecoder().decode(Stored.self, from: data), s.v == 1 else { return nil }
         var out: [WidgetItem] = []
         for r in s.items {
-            guard let k = WidgetKind(rawValue: r.t), let z = WidgetSize(rawValue: r.s), k.sizes.contains(z) else { continue }
+            guard let k = WidgetKind(rawValue: r.t), let z = WidgetSize(rawValue: r.s), k.sizes.contains(z) else {
+                continue
+            }
             let i = WidgetItem(kind: k, size: z, x: r.x, y: r.y)
             if isFree(i, out) { out.append(i) }
         }

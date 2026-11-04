@@ -3,6 +3,7 @@ import Testing
 
 @testable import CoreKit
 @testable import Pairing
+@testable import Shell
 
 @MainActor
 struct FirstRunTests {
@@ -189,5 +190,37 @@ struct FirstRunTests {
         await m.submit()
         m.reset()
         #expect(m.stage == .form && m.codeText.isEmpty && m.endpointText == "http://127.0.0.1:7700")
+    }
+
+    @Test func nameThenAddressThenCode() {
+        let name = "test.firstrun.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        let profile = UserProfile(defaults: d)
+        let m = FirstRunModel(driver: FakeDriver(), profile: profile) {}
+        #expect(m.step == .name)
+        m.nameText = "  Ahmed "
+        m.submitName()
+        #expect(profile.name == "Ahmed" && m.step == .address)
+        m.endpointText = ""
+        m.submitAddress()
+        #expect(m.step == .address && m.endpointError != nil)
+        m.endpointText = "core.example.net"
+        m.submitAddress()
+        #expect(m.step == .code && m.endpointError == nil)
+        m.editAddress()
+        #expect(m.step == .address)
+        // A Mac that already has a name goes straight to the address.
+        #expect(FirstRunModel(driver: FakeDriver(), profile: profile) {}.step == .address)
+    }
+
+    @Test func skippingTheNameKeepsItEmpty() {
+        let name = "test.firstrun.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        let profile = UserProfile(defaults: d)
+        let m = FirstRunModel(driver: FakeDriver(), profile: profile) {}
+        m.submitName()
+        #expect(!profile.hasName && m.step == .address)
     }
 }

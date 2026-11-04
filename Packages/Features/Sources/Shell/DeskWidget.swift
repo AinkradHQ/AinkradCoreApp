@@ -98,17 +98,23 @@ struct DeskWidget: View {
         HStack {
             HStack(spacing: 3) {
                 ForEach(item.kind.sizes, id: \.self) { s in
-                    Button { shell.resizeWidget(item.id, to: s) } label: { sizeMark(s) }
-                        .buttonStyle(SizeChoiceStyle(selected: s == item.size))
-                        .accessibilityLabel("\(s.title), \(s.cols) by \(s.rows)")
-                        .accessibilityAddTraits(s == item.size ? .isSelected : [])
-                        .help(s.title)
+                    Button {
+                        shell.resizeWidget(item.id, to: s)
+                    } label: {
+                        sizeMark(s)
+                    }
+                    .buttonStyle(SizeChoiceStyle(selected: s == item.size))
+                    .accessibilityLabel("\(s.title), \(s.cols) by \(s.rows)")
+                    .accessibilityAddTraits(s == item.size ? .isSelected : [])
+                    .help(s.title)
                 }
             }
             .padding(3).background(palette.panelStrong, in: coreShape(9))
             .overlay { coreShape(9).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             Spacer(minLength: 0)
-            Button { shell.removeWidget(item.id) } label: {
+            Button {
+                shell.removeWidget(item.id)
+            } label: {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(SizeChoiceStyle(selected: false, destructive: true))
@@ -126,8 +132,10 @@ struct DeskWidget: View {
     }
 
     private func sizeMark(_ s: WidgetSize) -> some View {
-        coreShape(1.5).frame(width: CGFloat(5 * s.cols + 2 * (s.cols - 1)), height: CGFloat(5 * s.rows + 2 * (s.rows - 1)))
-            .opacity(0.85)
+        coreShape(1.5).frame(
+            width: CGFloat(5 * s.cols + 2 * (s.cols - 1)), height: CGFloat(5 * s.rows + 2 * (s.rows - 1))
+        )
+        .opacity(0.85)
     }
 }
 

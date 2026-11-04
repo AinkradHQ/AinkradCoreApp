@@ -15,7 +15,9 @@ public final class UserProfile {
     }
     /// Trimmed, one line, 40 characters at most.
     public static func clean(_ raw: String) -> String {
-        String(raw.split(whereSeparator: \.isNewline).first.map { String($0) }?.trimmingCharacters(in: .whitespaces).prefix(40) ?? "")
+        String(
+            raw.split(whereSeparator: \.isNewline).first.map { String($0) }?.trimmingCharacters(in: .whitespaces)
+                .prefix(40) ?? "")
     }
     public var hasName: Bool { !name.isEmpty }
     public func set(_ raw: String) { name = Self.clean(raw) }

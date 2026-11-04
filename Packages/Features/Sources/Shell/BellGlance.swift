@@ -153,7 +153,8 @@ struct BellGlance: View {
     private var summary: some View {
         let w = shell.bell.waiting
         let running = shell.home.runningAgents
-        return (w == 0
+        return
+            (w == 0
             ? Text("Nothing waiting on you")
             : Text("\(w) waiting on you").fontWeight(.semibold).foregroundStyle(palette.text))
             + Text(" · \(running) \(running == 1 ? "agent" : "agents") running")
@@ -219,8 +220,10 @@ struct BellGlance: View {
                 }
                 .font(.system(size: MacTextSize.body))
                 Spacer(minLength: 0)
-                Text(m.slots > 0 ? "\(m.used)/\(m.slots)" : "").font(.system(size: MacTextSize.body, design: .monospaced))
-                    .foregroundStyle(palette.text2)
+                Text(m.slots > 0 ? "\(m.used)/\(m.slots)" : "").font(
+                    .system(size: MacTextSize.body, design: .monospaced)
+                )
+                .foregroundStyle(palette.text2)
             }
             .padding(Space.s2).accessibilityElement(children: .combine)
         }
