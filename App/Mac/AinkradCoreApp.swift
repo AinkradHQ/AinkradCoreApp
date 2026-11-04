@@ -13,7 +13,7 @@ struct AinkradCoreApp: App {
 
     var body: some Scene {
         // One window, forced full screen (plan D9). `Window` is single-instance and, being first, is the one opened at launch.
-        Window("Ainkrad Core", id: "main") {
+        Window("Ainkrad", id: "main") {
             RootView(app: app)
                 .background(FullScreenEnforcer())
                 #if DEBUG

@@ -38,7 +38,7 @@ enum LivePairing {
         }
         app.buttons["It matches"].click()
 
-        let open = app.buttons["Open Ainkrad Core"]
+        let open = app.buttons["Open Ainkrad"]
         XCTAssertTrue(open.waitForExistence(timeout: 90), "the approver approved with the same check code")
         open.click()
 

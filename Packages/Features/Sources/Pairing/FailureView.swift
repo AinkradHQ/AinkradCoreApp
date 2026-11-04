@@ -58,7 +58,7 @@ extension Failure {
     var text: String {
         switch kind {
         case .offline(let m):
-            "There was no answer, so nothing was sent from this Mac. \(m) Ainkrad Core does not keep retrying in the background."
+            "There was no answer, so nothing was sent from this Mac. \(m) Ainkrad does not keep retrying in the background."
         case .rateLimited: "This address asked the Core too often. Waiting is the only thing that helps."
         case .identityMismatch:
             "The Core that answered has a different identity from the one this Mac expected. It stopped before sending anything signed, so nothing left this Mac. Only pair again if the Core's identity was changed on purpose."
