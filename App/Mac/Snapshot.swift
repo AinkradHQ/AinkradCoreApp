@@ -26,6 +26,7 @@ enum SnapshotRunner {
         if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
+        // The full-screen toggle above must not undo the theme.
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
         guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else {
@@ -37,15 +38,14 @@ enum SnapshotRunner {
         window.toggleFullScreen(nil)  // try to leave: it must come back
         try? await Task.sleep(for: .seconds(4))
         log("afterExitAttempt fullscreen=\(window.styleMask.contains(.fullScreen))")
+        // The full-screen toggle above must not undo the theme.
+        NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
 
         func shot(_ name: String) async {
             try? await Task.sleep(for: .seconds(1.6))
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-            p.arguments = ["-x", "-o", "-l", String(window.windowNumber), "\(dir)/\(name)-\(theme)-app.png"]
-            try? p.run()
-            p.waitUntilExit()
-            log("shot \(name) status=\(p.terminationStatus)")
+            let ok = capture(window, to: "\(dir)/\(name)-\(theme)-app.png")
+            let status = ok ? 0 : 1
+            log("shot \(name) status=\(status)")
         }
         func pane(_ id: String) { shell.openPane(SampleWorld.samplePane(id, shell)) }
 
@@ -108,6 +108,17 @@ enum SnapshotRunner {
         shell.editingWidgets = true
         await shot("11-home-edit")
         NSApp.terminate(nil)
+    }
+
+    /// The window's own pixels through the window server: needs no screen-recording permission.
+    private static func capture(_ window: NSWindow, to path: String) -> Bool {
+        guard
+            let image = CGWindowListCreateImage(
+                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
+                [.boundsIgnoreFraming, .nominalResolution]),
+            let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        else { return false }
+        return (try? png.write(to: URL(fileURLWithPath: path))) != nil
     }
 
     private static func menuItems(_ action: Selector) -> Int {

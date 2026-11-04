@@ -237,6 +237,7 @@ struct SettingsSwitchRow: View {
     let detail: String
     @Binding var isOn: Bool
     var locked = false
+    var identifier: String?
     @Environment(\.corePalette) private var palette
     var body: some View {
         HStack(spacing: Space.s3) {
@@ -246,13 +247,15 @@ struct SettingsSwitchRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
+            // The switch keeps its own accessibility element (labelled with the title), so it can be found and pressed.
             Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).disabled(locked)
+                .accessibilityLabel(title).accessibilityIdentifier(identifier ?? "switch-\(title)")
         }
         .padding(Space.s3)
         .frame(maxWidth: Space.s8 * 16)
         .background(palette.glassCard, in: coreShape(Radius.row))
         .opacity(locked ? 0.7 : 1)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

@@ -78,7 +78,7 @@ final class ShellParityUITests: XCTestCase {
         let activity = app.buttons["Activity"]
         XCTAssertTrue(activity.waitForExistence(timeout: 5))
         activity.click()
-        let toggle = app.switches["Status bar chip"]
+        let toggle = app.descendants(matching: .any)["switch-Status bar chip"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "Settings, Activity has the chip switch")
         toggle.click()
         app.typeKey(.escape, modifierFlags: [])
