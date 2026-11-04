@@ -313,7 +313,7 @@ struct DeviceDetail: View {
                 Button {
                     app.devices.detailID = nil
                 } label: {
-                    Label("Devices", systemImage: "chevron.left")
+                    Label("All devices", systemImage: "chevron.left")
                 }
                 .buttonStyle(.coreSecondary).keyboardShortcut(.leftArrow, modifiers: .command)
                 .accessibilityLabel("Back to Devices")
@@ -325,7 +325,8 @@ struct DeviceDetail: View {
                 if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
                 if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
             }
-            section("Device") {
+            Text("\(device.kind) · \(DeviceWords.platform(device.platform))").foregroundStyle(palette.text2)
+            section("Device", "Who it is, as it told the Core.") {
                 if app.devices.renaming {
                     InlineRename(app: app, device: device)
                 } else {
@@ -343,7 +344,7 @@ struct DeviceDetail: View {
                 FactRow(key: "Last seen", value: DeviceWords.seen(device.lastUsed))
                 FactRow(key: "Status", value: device.status)
             }
-            section("Keys") {
+            section("Keys", "Generated on the device. The Core only holds the public halves.") {
                 FactRow(key: "Key storage", value: DeviceWords.storage(device.keyStorage))
                 FactRow(
                     key: "Step-up key",
@@ -353,7 +354,7 @@ struct DeviceDetail: View {
                         ?? "Not reported")
                 if let fp = device.fingerprint { FactRow(key: "Fingerprint", value: fp, mono: true) }
             }
-            section("Access") {
+            section("Access", "What it may do. You can only narrow it. To give more, pair it again.") {
                 Text(
                     device.scopes.isEmpty
                         ? "No scopes." : device.scopes.map { "\($0): \(ScopeText.text($0))" }.joined(separator: "\n")
@@ -365,7 +366,7 @@ struct DeviceDetail: View {
                 }
             }
             if !device.revoked {
-                section("Revoke") {
+                section("Revoke", "Signs it out at once. It has to pair again to come back.") {
                     Text(
                         me
                             ? "Revoking this Mac signs it out at once and returns it to Connect to a Core. It must be paired again."
@@ -381,10 +382,13 @@ struct DeviceDetail: View {
         .accessibilityIdentifier("device-detail")
     }
 
-    private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func section<C: View>(_ title: String, _ sub: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(palette.text2)
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            }
             FactCard { content() }
         }
     }
