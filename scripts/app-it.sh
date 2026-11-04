@@ -7,6 +7,9 @@
 #   scripts/app-it.sh terminals  adds a runner with a pty driver to the Core, then (1) CoreKit's live terminal test (open, echo,
 #                              detach, reattach after the last byte, close) and (2) the app's XCUITest: New terminal, type
 #                              echo, see it, Detach, Attach here, End terminal. Needs ainkrad-runner and ainkrad-ptyhost built.
+#   scripts/app-it.sh admin    (E5-07) the app's XCUITest against the Core: toggles a feature switch, stores a dummy secret named
+#                              e5-07-test, sees its metadata and the audit rows; then ainkradctl confirms the secret is there
+#                              (name and metadata only: a value never comes back)
 #   scripts/app-it.sh shots    runs the app's self-snapshot walk (CORE_PAIR_SNAPSHOT, launched by XCUITest for its window
 #                              server) against the Core; THEME=light|dark,
 #                              OUT=<dir> for the PNGs; a second device claims the app's Add device code
@@ -36,7 +39,8 @@ cleanup() {
   sleep 0.5
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -9 "$p" 2>/dev/null || true; done
   for p in $(pgrep ainkrad-ptyhost 2>/dev/null | sort | comm -13 <(echo "$PTY_BEFORE") - ); do kill "$p" 2>/dev/null || true; done
-  pkill -f "Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
+  # Only the app built from this checkout: other worktrees may be running their own tests on the same Mac.
+  pkill -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
   if [ "${APP_IT_KEEP:-0}" = 1 ]; then echo "app-it: kept $W" >&2; else rm -rf "$W"; fi
 }
 trap cleanup EXIT
@@ -161,6 +165,21 @@ if [ "$MODE" = terminals ]; then
     nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
     -only-testing:AinkradCoreMacUITests/TerminalsLiveUITests test 2>&1 | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
   STATUS=${PIPESTATUS[0]}
+  echo "== done: xcodebuild exit $STATUS"
+  exit "$STATUS"
+fi
+if [ "$MODE" = admin ]; then
+  echo "== xcodebuild test (CORE_IT=1): the app toggles a switch, stores a dummy secret and reads the audit"
+  cd "$HERE"
+  TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
+    TEST_RUNNER_CORE_IT_SHOTS="${OUT:-$W}" \
+    nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
+    -only-testing:AinkradCoreMacUITests/AdminLiveUITests test 2>&1 | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
+  STATUS=${PIPESTATUS[0]}
+  echo "== the Core's view: secrets (name and metadata only)"
+  LS=$(a secret ls 2>&1) || true
+  echo "$LS"
+  echo "$LS" | grep -q "e5-07-test" || { echo "the Core does not list e5-07-test"; STATUS=1; }
   echo "== done: xcodebuild exit $STATUS"
   exit "$STATUS"
 fi

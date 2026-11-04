@@ -58,15 +58,29 @@ public struct ShellView: View {
         .ignoresSafeArea()
     }
 
-    /// Reconnecting and offline show a banner under the status cluster; the Home Core button says the same in words.
+    /// Reconnecting and offline show a banner under the status cluster; the Home Core button says the same in words. A link notice
+    /// (slow down, session renewing, Core restarted) takes the banner's place while it lasts.
     @ViewBuilder private var connectionBanner: some View {
-        switch shell.coreLink {
-        case .reconnecting:
-            ConnectionBanner(.reconnecting).frame(maxWidth: ShellMetrics.bellWidth * 1.5).padding(.top, Space.s1)
-        case .offline:
-            ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
-                .frame(maxWidth: ShellMetrics.bellWidth * 1.5).padding(.top, Space.s1)
-        default: EmptyView()
+        let width = ShellMetrics.bellWidth * 1.5
+        if let notice = shell.linkNotice {
+            switch notice {
+            case .rateLimited(let until):
+                LinkBanner(.rateLimited(until: until)).frame(maxWidth: width).padding(.top, Space.s1)
+            case .renewing: LinkBanner(.renewing).frame(maxWidth: width).padding(.top, Space.s1)
+            case .restarted:
+                LinkBanner(.restarted, dismiss: { shell.linkNotice = nil }).frame(maxWidth: width).padding(
+                    .top, Space.s1)
+            }
+        } else {
+            switch shell.coreLink {
+            case .reconnecting:
+                LinkBanner(.resuming(since: shell.lastLiveAt), retry: shell.retryConnection.map { r in { r() } })
+                    .frame(maxWidth: width).padding(.top, Space.s1)
+            case .offline:
+                ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
+                    .frame(maxWidth: width).padding(.top, Space.s1)
+            default: EmptyView()
+            }
         }
     }
 

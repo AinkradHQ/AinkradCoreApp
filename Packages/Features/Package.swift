@@ -7,7 +7,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"]),
-        .library(name: "Terminals", targets: ["Terminals"]),
+        .library(name: "Terminals", targets: ["Terminals"]), .library(name: "Admin", targets: ["Admin"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -30,9 +30,17 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
+            name: "Admin",
+            dependencies: [
+                "Shell", .product(name: "CoreUI", package: "CoreUI"), .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Terminals", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", "Terminals", "Admin", .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
@@ -42,6 +50,7 @@ let package = Package(
         .testTarget(
             name: "TerminalsTests",
             dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(name: "AdminTests", dependencies: ["Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
 )
