@@ -46,6 +46,8 @@ targets:
         product: Admin
       - package: Features
         product: Accounts
+      - package: Features
+        product: Agents
     settings:
       base:
         PRODUCT_NAME: Ainkrad Core

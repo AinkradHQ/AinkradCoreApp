@@ -1,5 +1,6 @@
 import Accounts
 import Admin
+import Agents
 import CoreKit
 import CoreUI
 import Foundation
@@ -18,6 +19,7 @@ public final class AppModel {
     }
 
     public let shell = ShellModel()
+    public let agents: AgentsModel
     var phase: Phase = .starting
     private(set) var firstRun: FirstRunModel!
     private(set) var service: (any CoreService)?
@@ -61,6 +63,7 @@ public final class AppModel {
         makeService: @escaping @MainActor (any KeyStore) throws -> any CoreService,
         sasSink: (@MainActor (String) -> Void)? = nil
     ) {
+        self.agents = AgentsModel(shell: shell, notifier: SystemNotifier())
         self.keyStore = keyStore
         self.demo = demo
         self.makeService = makeService
@@ -88,6 +91,7 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.connect() }
         }
+        agents.setHost(self)
         Registration.install(into: self)
     }
 
@@ -98,6 +102,9 @@ public final class AppModel {
         if demo {
             phase = .desktop
             shell.coreLink = .live
+            #if DEBUG
+            agents.attach(FakeAgentsAPI.prototypeWorld())
+            #endif
             return
         }
         do {
@@ -137,6 +144,7 @@ public final class AppModel {
             shell.coreLink = .live
             shell.elevatedUntil = nil
             startEvents(service)
+            if let api = service.agentsAPI { agents.attach(api) }
             await refreshAll()
         } catch {
             let f = Failure.from(error)
@@ -327,6 +335,7 @@ public final class AppModel {
     func forgetCore() async {
         events?.cancel()
         retry?.cancel()
+        agents.detach()
         await service?.close()
         service = nil
         try? keyStore.wipe()
@@ -353,5 +362,17 @@ public final class AppModel {
     func say(_ error: any Error) {
         if error is StepUpDeclined { return }
         shell.showToast(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription)
+    }
+}
+
+extension AppModel: AgentsHost {
+    /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
+    public func elevate(reason: String, force: Bool) async -> InlineNotice? {
+        if isElevated && !force { return nil }
+        if await ensureElevated(reason, done: "done", keepsEdit: true, force: force) { return nil }
+        let n = stepUpNotice
+        stepUpNotice = nil
+        return n.map { InlineNotice(title: $0.title, detail: $0.detail, symbol: $0.symbol, tone: $0.tone) }
+            ?? InlineNotice(title: "Touch ID did not run.")
     }
 }
