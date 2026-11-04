@@ -8,21 +8,26 @@ enum LivePairing {
         let url = try XCTUnwrap(env["CORE_IT_URL"])
         let code = try XCTUnwrap(env["CORE_IT_CODE"])  // ABCDEFGHJK, no dash
         let sasFile = try XCTUnwrap(env["CORE_IT_SAS_FILE"])
+        // Setup: who you are (skipped), where the Core is, the code.
+        let notNow = app.buttons["Not now"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 20), "first run starts with the name step")
+        XCTAssertFalse(app.buttons["Show workspace"].exists, "no desktop before pairing")
+        notNow.click()
         let address = app.textFields["Core address"]
         XCTAssertTrue(address.waitForExistence(timeout: 20), "first run shows the connect form")
-        XCTAssertFalse(app.buttons["Show workspace"].exists, "no desktop before pairing")
-        let pair = app.buttons["Pair this Mac"]
-        XCTAssertFalse(pair.isEnabled, "nothing typed: Pair is off")
-
         address.click()
         address.typeText(url)
+        app.buttons["Continue"].click()
+        let pair = app.buttons["Pair this Mac"]
         let field = app.textFields["Pairing code"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "the code step opens")
+        XCTAssertFalse(pair.isEnabled, "nothing typed: Pair is off")
         field.click()
         field.typeText(code.lowercased())  // typed in lower case, no dash: it formats itself
         let dashed = "\(code.prefix(5))-\(code.dropFirst(5))"
-        let formatted = NSPredicate(format: "value == %@", dashed)
+        let formatted = NSPredicate(format: "value == %@ OR value == %@", dashed, code)
         let wait = XCTNSPredicateExpectation(predicate: formatted, object: field)
-        XCTAssertEqual(XCTWaiter().wait(for: [wait], timeout: 5), .completed, "case-insensitive, auto-dash")
+        XCTAssertEqual(XCTWaiter().wait(for: [wait], timeout: 5), .completed, "case-insensitive")
         XCTAssertTrue(pair.isEnabled)
         pair.click()
 

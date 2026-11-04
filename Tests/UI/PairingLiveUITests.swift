@@ -67,6 +67,12 @@ final class PairingLiveUITests: XCTestCase {
         let confirm = app.buttons["Forget Core"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the confirmation asks first")
         confirm.click()
-        XCTAssertTrue(app.textFields["Core address"].waitForExistence(timeout: 20), "back on the connect screen")
+        let setup = NSPredicate { _, _ in
+            app.textFields["Pairing code"].exists || app.textFields["Core address"].exists
+        }
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: setup, object: nil)], timeout: 20), .completed,
+            "back on the setup screens, no desktop")
+        XCTAssertFalse(app.buttons["Show workspace"].exists)
     }
 }
