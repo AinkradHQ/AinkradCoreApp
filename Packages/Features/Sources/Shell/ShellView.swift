@@ -94,7 +94,7 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var covers: some View {
-        if shell.launcherOpen || shell.overlay != nil || shell.addingWidget {
+        if shell.launcherOpen || shell.overlay != nil {
             palette.bg.opacity(0.45).onTapGesture { shell.closeTopmost() }
                 .transition(.opacity).accessibilityHidden(true)
         } else if shell.bellOpen {

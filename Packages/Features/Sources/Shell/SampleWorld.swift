@@ -39,6 +39,7 @@ extension HomeSnapshot {
 public enum SampleWorld {
     public static func install(into shell: ShellModel) {
         shell.home = .sample
+        if !shell.profile.hasName { shell.profile.set("Ahmed") }
         for e in launcherEntries(shell) { shell.launcher.register(e) }
         shell.launcher.recents = ["core", "agents.list", "terminals"]
         approvals(shell)
@@ -62,7 +63,7 @@ public enum SampleWorld {
             ("claude-code wants to read GH_TOKEN", "oracle-arm · needs Touch ID · expires in 5 min", "2 min"),
             ("codex wants to run cargo add prometheus-client", "linux-01 · needs Touch ID · expires in 5 min", "4 min"),
         ]
-        for (i, r) in rows.enumerated() { shell.bell.add(approval(shell, id: "appr-\(i)", r.0, r.1, r.2)) }
+        for (i, r) in rows.enumerated() { shell.bell.add(approval(shell, id: "agents.appr-\(i)", r.0, r.1, r.2)) }
     }
 
     static func approval(_ shell: ShellModel, id: String, _ title: String, _ sub: String, _ time: String) -> BellItem {
@@ -105,10 +106,6 @@ public enum SampleWorld {
                 sample("New terminal")),
             action("add-device", "Add device", "create a one-time pairing code", "plus", sample("Add device")),
             action("shortcuts", "Keyboard Shortcuts", "keys help commands", "keyboard") { shell.open(.shortcuts) },
-            action("add-widget", "Add Widget…", "put a widget on Home", "plus") {
-                shell.show(.home)
-                shell.addingWidget = true
-            },
             LauncherEntry(
                 id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
                 symbol: "gearshape"

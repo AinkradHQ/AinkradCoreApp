@@ -92,40 +92,77 @@ public struct HomeSnapshot: Sendable {
     }
 }
 
-public enum WidgetKind: String, CaseIterable, Sendable, Identifiable {
-    case today, clock, spend, quick, machines, board, events
+public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
+    case today, needs, running, spend, machines, board, events, core, quick, clock
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .today: "Today"
-        case .clock: "Clock"
+        case .needs: "Needs you"
+        case .running: "Running agents"
         case .spend: "Agent spend"
-        case .quick: "Quick actions"
         case .machines: "Machines"
         case .board: "Citadel board"
         case .events: "Recent events"
+        case .core: "Core health"
+        case .quick: "Quick actions"
+        case .clock: "Clock"
         }
     }
     public var about: String {
         switch self {
         case .today: "What needs you, what is running, how the machines are."
-        case .clock: "Time and date."
+        case .needs: "Approvals waiting on a person."
+        case .running: "Agent sessions working now, and for how long."
         case .spend: "Spend today and the month token meter."
-        case .quick: "New session, new terminal, add a device, open the launcher."
-        case .machines: "Runner slots in use."
+        case .machines: "Runner slots in use and host load, sampled on this Mac."
         case .board: "Issues by state across the board."
         case .events: "What just happened on the Core."
+        case .core: "Home Core connection and the alarms it raised."
+        case .quick: "New session, new terminal, add a device, open the launcher."
+        case .clock: "Time and date."
         }
     }
     public var symbol: String {
         switch self {
-        case .today: "sun.max"
-        case .clock: "clock"
-        case .spend: "dollarsign.square"
-        case .quick: "bolt"
+        case .today: "calendar"
+        case .needs: "lock.shield"
+        case .running: "play"
+        case .spend: "creditcard"
         case .machines: "server.rack"
         case .board: "rectangle.split.3x1"
         case .events: "list.bullet"
+        case .core: "heart.text.square"
+        case .quick: "bolt"
+        case .clock: "clock"
+        }
+    }
+    /// The sizes this widget has a composition for (`widgets-set.js`); the first is its default.
+    public var sizes: [WidgetSize] {
+        switch self {
+        case .today: [.s, .m, .t, .l, .x]
+        case .needs, .running: [.s, .m, .t, .l]
+        case .spend, .clock: [.s, .m, .t, .l]
+        case .machines, .events: [.m, .t, .l]
+        case .board, .core: [.s, .m, .l]
+        case .quick: [.m, .l]
+        }
+    }
+    public var category: String {
+        switch self {
+        case .spend, .board: "Work"
+        case .quick, .clock: "Utilities"
+        default: "Core"
+        }
+    }
+    /// The launcher entry a click on the widget opens.
+    var launch: String? {
+        switch self {
+        case .today, .running, .events: "agents.list"
+        case .needs: "agents.inbox"
+        case .machines: "runners"
+        case .core: "settings"
+        default: nil
         }
     }
 }
