@@ -104,6 +104,7 @@ enum AgentsSnapshots {
         }
         a.debugSessionNotice(id(1), title: "Sending did not go through.", detail: "Touch ID did not match.")
         await shot("session-send-failed")
+        a.debugSessionNotice(id(1), title: "", detail: "")
         // Decide: one approved, one denied, one expired.
         if let r = a.debugFirstPending(session: id(1)) { await a.decide(r, approved: true) }
         await shot("approval-approved")

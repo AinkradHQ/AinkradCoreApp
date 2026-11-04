@@ -247,6 +247,18 @@ public final class AgentsModel {
         .sorted { $0.requestedAt > $1.requestedAt }
     }
 
+    /// What a session's pane shows above its composer: what waits on you, and the latest request nobody answered in time (while the
+    /// session is still going, so you know to ask it again).
+    public func cards(for id: String) -> [ApprovalRequest] {
+        let now = Date()
+        guard let t = transcripts[id] else { return [] }
+        let over = sessions.session(id)?.over ?? false
+        let all = t.approvalList
+        let waiting = all.filter { $0.status(now: now, sessionOver: over) == .pending }
+        let lapsed = over ? nil : all.last { $0.status(now: now, sessionOver: over) == .expired }
+        return waiting + (lapsed.map { [$0] } ?? [])
+    }
+
     public func waiting(_ id: String) -> Bool { pending.contains { $0.session == id } }
 
     public func shown() -> [AgentSessionInfo] {

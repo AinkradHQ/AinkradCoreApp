@@ -9,7 +9,7 @@ struct SessionView: View {
 
     var body: some View {
         if let s = model.sessions.session(sessionID) {
-            let mine = model.pending.filter { $0.session == sessionID }
+            let mine = model.cards(for: sessionID)
             let keysHere = model.shell.activePane == AgentsModel.paneID(sessionID) && !model.shell.coverOpen
             VStack(alignment: .leading, spacing: 0) {
                 RunHeader(model: model, session: s)
@@ -61,7 +61,10 @@ struct RunHeader: View {
                             .system(size: MacTextSize.body, design: .monospaced))
                     }
                 } else if let end = session.endedAt {
-                    Text("ended \(AgentWords.ago(end))").foregroundStyle(palette.text2)
+                    Text(
+                        "ran for \(AgentWords.clock(end.timeIntervalSince(session.createdAt))) · ended \(AgentWords.ago(end))"
+                    )
+                    .foregroundStyle(palette.text2)
                 }
                 Spacer(minLength: Space.s2)
                 if session.live {

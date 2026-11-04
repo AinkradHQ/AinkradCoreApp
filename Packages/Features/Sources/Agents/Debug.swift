@@ -26,12 +26,16 @@ extension AgentsModel {
     }
 
     public func debugNotice(_ request: String, title: String, detail: String, symbol: String, tone: String = "warn") {
+        if title.isEmpty {
+            approvalNotices[request] = nil
+            return
+        }
         approvalNotices[request] = InlineNotice(
             title: title, detail: detail, symbol: symbol, tone: tone == "queue" ? .queue : .warn)
     }
 
     public func debugSessionNotice(_ id: String, title: String, detail: String) {
-        notices[id] = InlineNotice(title: title, detail: detail)
+        notices[id] = title.isEmpty ? nil : InlineNotice(title: title, detail: detail)
     }
 
     public func debugPendingIDs() -> [String] { pending.map(\.id) }

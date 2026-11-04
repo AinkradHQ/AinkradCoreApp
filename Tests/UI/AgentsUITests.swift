@@ -59,7 +59,8 @@ final class AgentsUITests: XCTestCase {
         composer.click()
         composer.typeText("hi")
         XCTAssertEqual(composer.value as? String, "hi", "typing reaches the composer and its value can be read")
-        composer.typeKey(.return, modifierFlags: [])  // Return sends; this sample has no Core, so the refusal shows in place
+        // Return sends; this sample has no Core, so the refusal shows in place.
+        composer.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(
             containing("Touch ID did not run").waitForExistence(timeout: 10), "a send that cannot go through says so")
     }
