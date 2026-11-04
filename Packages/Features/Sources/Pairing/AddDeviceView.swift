@@ -44,7 +44,8 @@ struct AddDeviceView: View {
         case .claimed: "A device wants to join"
         case .approved: "Device paired"
         case .ended(let why):
-            why == "rejected" ? "Pairing rejected" : why == "burned" ? "Pairing burned" : "Code expired"
+            why == "rejected"
+                ? "Pairing rejected" : why == "burned" ? "Every live pairing was cancelled" : "The pairing expired"
         }
     }
 
@@ -98,7 +99,17 @@ struct AddDeviceView: View {
                 .foregroundStyle(palette.text2)
             HStack(alignment: .top, spacing: Space.s5) {
                 VStack(alignment: .leading, spacing: Space.s3) {
+                    Text("Type this code on the new device").font(.system(size: MacTextSize.meta, weight: .semibold))
+                        .foregroundStyle(palette.text2)
                     CodeCells(code: Self.shown(p.code))
+                    if let fp = app.coreFingerprint {
+                        VStack(alignment: .leading, spacing: Space.s1) {
+                            Text("Core fingerprint").font(.system(size: MacTextSize.meta, weight: .semibold))
+                                .foregroundStyle(palette.text2)
+                            Text(String(fp.prefix(24)) + "…")
+                                .font(.system(size: MacTextSize.body, design: .monospaced)).textSelection(.enabled)
+                        }
+                    }
                     expiry(p)
                     HStack(spacing: Space.s2) {
                         Button("Copy code") { copy(p.code) }.buttonStyle(.coreSecondary)
@@ -141,7 +152,7 @@ struct AddDeviceView: View {
 
     private func claimed(_ info: PairingInfo) -> some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Type the check code the new device shows. Approve only once all of it matches.")
+            Text("Check the details, then compare the code with the one on the new device.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             FactCard {
                 FactRow(key: "Name", value: info.name ?? "Unnamed")
@@ -149,8 +160,12 @@ struct AddDeviceView: View {
                 FactRow(key: "Key storage", value: DeviceWords.storage(info.keyStorage))
                 FactRow(key: "May", value: info.scopes.joined(separator: ", "), mono: true)
             }
+            Text("The Core computed this code. The new device must show the same one.")
+                .foregroundStyle(palette.text2)
+            if let sas = info.sas { SASView(sas: sas) }
             CoreTextField(
-                "Check code", placeholder: "XXXX-XXXX-XXXX-XXXX", text: $model.typed, mono: true, autofocus: true
+                "Type it here to confirm they match", placeholder: "XXXX-XXXX-XXXX-XXXX", text: $model.typed,
+                mono: true, autofocus: true
             ) {
                 if model.checkMatches { Task { await model.approve() } }
             }
@@ -171,8 +186,12 @@ struct AddDeviceView: View {
         let n = model.groupsMatching
         let total = model.groupCount
         if model.checkMismatch {
-            Label("That is not the code on the new device. Look again, or Reject.", systemImage: "xmark.octagon")
-                .foregroundStyle(palette.tone(.fail).ink)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Label("That doesn't match", systemImage: "xmark.octagon").fontWeight(.semibold)
+                Text("The device stays pending. Read the new device's screen again and retype it, or reject it.")
+                    .foregroundStyle(palette.text2)
+            }
+            .foregroundStyle(palette.tone(.fail).ink)
         } else if model.checkMatches {
             Label("All \(total) groups match.", systemImage: "checkmark.circle")
                 .foregroundStyle(palette.tone(.done).ink)
@@ -210,7 +229,7 @@ struct AddDeviceView: View {
             HStack {
                 Spacer()
                 Button("Close", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
-                Button("Make a new code") { model.restart() }.buttonStyle(.coreProminent)
+                Button("Create a new pairing") { model.restart() }.buttonStyle(.coreProminent)
                     .keyboardShortcut(.defaultAction)
             }
         }

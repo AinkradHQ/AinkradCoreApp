@@ -283,6 +283,9 @@ public final class AppModel {
 
     // MARK: elevation
 
+    /// The Core's key fingerprint this Mac paired with, for the new device to compare against.
+    var coreFingerprint: String? { (try? keyStore.loadIdentity())??.coreFingerprint }
+
     var isElevated: Bool { shell.elevatedUntil.map { $0 > Date() } ?? false }
 
     /// Touch ID, through the one sheet, shown only while the system prompt is up. True when the session is elevated (it may have
