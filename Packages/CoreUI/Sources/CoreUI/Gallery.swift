@@ -12,25 +12,31 @@ public struct CoreUIGallery: View {
     @State private var fieldText = "linux-01"
     @State private var checks: Set<String> = ["read", "terminal"]
 
-    public init() {}
+    private let officialOnly: Bool
+    private let scrollToOfficial: Bool
+
+    /// `officialOnly` shows just the Official Liquid Glass section (snapshot mode).
+    public init(officialOnly: Bool = false, scrollToOfficial: Bool = false) {
+        self.officialOnly = officialOnly
+        self.scrollToOfficial = scrollToOfficial
+    }
 
     private var palette: Palette { scheme == .dark ? .night : .day }
 
     public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.s6) {
-                Text("CoreUI Gallery").font(.system(size: MacTextSize.large, weight: .semibold))
-                buttons
-                surfaces
-                rows
-                badges
-                fields
-                segmented
-                banners
-                overlays
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s6) {
+                    Text("CoreUI Gallery").font(.system(size: MacTextSize.large, weight: .semibold))
+                    if !officialOnly { ownComponents }
+                    #if os(macOS)
+                    if #available(macOS 26, *) { OfficialGlassSection().id("official") }
+                    #endif
+                }
+                .padding(Space.s6)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(Space.s6)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .task { if scrollToOfficial { proxy.scrollTo("official", anchor: .top) } }
         }
         .background(LinearGradient(colors: [palette.surface, palette.bg], startPoint: .top, endPoint: .bottom))
         .coreTheme()
@@ -46,6 +52,17 @@ public struct CoreUIGallery: View {
             confirmTitle: "Delete",
             destructive: true
         ) { toast = ToastItem("Terminal deleted", undo: {}) }
+    }
+
+    @ViewBuilder private var ownComponents: some View {
+        buttons
+        surfaces
+        rows
+        badges
+        fields
+        segmented
+        banners
+        overlays
     }
 
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
