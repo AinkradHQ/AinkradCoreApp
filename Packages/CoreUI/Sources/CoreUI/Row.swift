@@ -88,7 +88,6 @@ private struct RowChrome: View {
     let selected: Bool
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
-    @Environment(\.isFocused) private var focused
     @Environment(\.coreForcedInteraction) private var forced
     @State private var hovering = false
 
@@ -101,10 +100,12 @@ private struct RowChrome: View {
             .overlay {
                 if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
             }
-            .coreFocusRing(focused || forced == .focused, radius: Radius.row, palette: palette)
+            // Gallery only: pinned "focused" preview. Real focus is the system ring below, drawn only on the one control that
+            // has keyboard focus (isFocused here reports the container's focus, which lit every button in it).
+            .coreFocusRing(forced == .focused, radius: Radius.row, palette: palette)
             .coreDimWhenDisabled(enabled)
             .animation(Motion.out(Motion.hover), value: hover)
             .onHover { hovering = $0 }
-            .focusEffectDisabled()
+            .contentShape(.focusEffect, coreShape(Radius.row))
     }
 }
