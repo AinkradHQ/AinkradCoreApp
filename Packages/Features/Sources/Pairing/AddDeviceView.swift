@@ -158,11 +158,18 @@ struct AddDeviceView: View {
                 FactRow(key: "Name", value: info.name ?? "Unnamed")
                 FactRow(key: "Platform", value: DeviceWords.platform(info.platform))
                 FactRow(key: "Key storage", value: DeviceWords.storage(info.keyStorage))
-                FactRow(key: "May", value: info.scopes.joined(separator: ", "), mono: true)
+                FactRow(key: "Will get", value: info.scopes.joined(separator: ", "), mono: true)
+                if let until = info.expiresAt {
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
+                        FactRow(key: "Expires in", value: Countdown.text(left), mono: true)
+                    }
+                }
             }
             Text("The Core computed this code. The new device must show the same one.")
                 .foregroundStyle(palette.text2)
-            if let sas = info.sas { SASView(sas: sas) }
+            if let sas = info.sas { SASView(sas: sas, matched: model.groupsMatching) }
+            checkProgress
             CoreTextField(
                 "Type it here to confirm they match", placeholder: "XXXX-XXXX-XXXX-XXXX", text: $model.typed,
                 mono: true, autofocus: true
@@ -170,7 +177,8 @@ struct AddDeviceView: View {
                 if model.checkMatches { Task { await model.approve() } }
             }
             .accessibilityIdentifier("check-code-field")
-            checkProgress
+            Text("Typing it proves you looked at this device's own screen.")
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
                 Button("Reject") { Task { await model.reject() } }.buttonStyle(.coreSecondary).disabled(model.busy)
