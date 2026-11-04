@@ -33,5 +33,34 @@ final class PairingLiveUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Revoke…"].exists)
         app.buttons["Back to Devices"].click()
         XCTAssertTrue(app.buttons["Add device…"].waitForExistence(timeout: 10), "Back returns to the list")
+
+        // Add device with the admin scope (this Mac holds it): a code, not "This device is not allowed to do that".
+        app.buttons["Add device…"].click()
+        let name = app.textFields["Device name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "Add device opens")
+        name.click()
+        name.typeText("second-mac")
+        let admin = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'admin'")).firstMatch
+        XCTAssertTrue(admin.waitForExistence(timeout: 5), "the admin scope is offered")
+        admin.click()
+        app.buttons["Make code"].click()
+        let code = app.descendants(matching: .any)["pairing-code"].firstMatch
+        XCTAssertTrue(code.waitForExistence(timeout: 30), "the typed code is shown, not an error")
+        XCTAssertFalse(app.staticTexts["This device is not allowed to do that."].exists, "no refusal")
+        XCTAssertFalse(code.label.isEmpty, "the code is readable text: \(code.label)")
+        app.buttons["Cancel pairing"].click()
+
+        // Forget this Core: in Settings, behind a confirmation; it returns to the connect screen.
+        app.typeKey(",", modifierFlags: .command)
+        let forget = app.buttons["Forget this Core"]
+        XCTAssertTrue(forget.waitForExistence(timeout: 10), "Settings → Core has Forget this Core")
+        forget.click()
+        let open = app.buttons["Forget this Core…"]
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        open.click()
+        let confirm = app.buttons["Forget Core"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the confirmation asks first")
+        confirm.click()
+        XCTAssertTrue(app.textFields["Core address"].waitForExistence(timeout: 20), "back on the connect screen")
     }
 }
