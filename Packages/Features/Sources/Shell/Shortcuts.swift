@@ -15,7 +15,8 @@ enum ShortcutCatalog {
         (
             "View",
             [
-                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘N"), ("Reconnect to Core", "⌘R"),
+                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘N"),
+                ("Reconnect to Core", "⌘R"),
                 ("Switch Day and Night", "⌃⌘D"), ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"),
                 ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
             ]
@@ -113,7 +114,8 @@ public struct ShellCommands: Commands {
     let coreOffline: Bool
     let paneTitles: [(id: String, title: String)]
     public init(
-        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true, coreOffline: Bool = false,
+        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true,
+        coreOffline: Bool = false,
         paneTitles: [(id: String, title: String)] = []
     ) {
         self.shell = shell

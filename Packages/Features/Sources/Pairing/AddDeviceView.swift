@@ -61,7 +61,9 @@ struct AddDeviceView: View {
                 "Kind", segments: [CoreSegment("device", "Device"), CoreSegment("runner", "Runner")],
                 selection: $model.kind)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text("Access narrowed from your own. You can only give less.").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+                Text("Access narrowed from your own. You can only give less.").font(
+                    .system(size: MacTextSize.meta, weight: .semibold)
+                ).foregroundStyle(palette.text2)
                 if model.kind == "runner" {
                     Text("A runner holds exactly runner: it only redeems secret leases.").foregroundStyle(palette.text2)
                 } else {
