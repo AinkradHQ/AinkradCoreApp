@@ -310,6 +310,7 @@ public final class AppModel {
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
             guard !Task.isCancelled, let self, self.shell.elevatedUntil == until else { return }
             self.shell.elevatedUntil = nil
+            self.shell.showToast("Admin actions locked again. The next one asks for Touch ID.", kind: .warn)
         }
     }
 

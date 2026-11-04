@@ -7,16 +7,27 @@ enum ShortcutCatalog {
         ("Ainkrad", [("Settings…", "⌘,"), ("Keyboard Shortcuts", "⌘/")]),
         (
             "File",
-            [("Launcher…", "⌘K"), ("Close Pane", "⌘W"), ("Close All Panes", "⌥⌘W")]
+            [
+                ("Launcher…", "⌘K"), ("New Agent Session", "⌘N"), ("New Terminal", "⌘T"), ("Close Pane", "⌘W"),
+                ("Reopen Closed Pane", "⇧⌘T"), ("Close All Panes", "⌥⌘W"),
+            ]
         ),
         (
             "View",
             [
-                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘B"),
-                ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"), ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
+                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘N"),
+                ("Switch Day and Night", "⌃⌘D"), ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"),
+                ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
             ]
         ),
-        ("Launcher", [("Move", "↑ ↓"), ("Open", "↵"), ("Pick a result", "⌘1–9"), ("Close", "esc")]),
+        ("Panes", [("Focus mode tabs", "← →"), ("Focus or tile a pane", "double click head"), ("Tile a pane", "drag head")]),
+        (
+            "Launcher",
+            [
+                ("Move", "↑ ↓  ⌃N ⌃P"), ("Page", "⇞ ⇟"), ("First or last", "⌘↑ ⌘↓"), ("Open", "↵"),
+                ("Pick a result", "⌘1–9"), ("Close", "esc"),
+            ]
+        ),
     ]
 }
 
@@ -94,10 +105,19 @@ public struct ShellCommands: Commands {
     /// them goes stale. The App body reads them, so the menus rebuild when they change.
     let paneCount: Int
     let focusMode: Bool
-    public init(shell: ShellModel, paneCount: Int, focusMode: Bool) {
+    let closedCount: Int
+    let chipOn: Bool
+    let paneTitles: [(id: String, title: String)]
+    public init(
+        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true,
+        paneTitles: [(id: String, title: String)] = []
+    ) {
         self.shell = shell
         self.paneCount = paneCount
         self.focusMode = focusMode
+        self.closedCount = closedCount
+        self.chipOn = chipOn
+        self.paneTitles = paneTitles
     }
 
     public var body: some Commands {
@@ -106,10 +126,15 @@ public struct ShellCommands: Commands {
         }
         CommandGroup(replacing: .newItem) {
             Button("Launcher…") { shell.toggleLauncher() }.keyboardShortcut("k")
+            Divider()
+            Button("New Agent Session") { shell.launcher.entry("agents.new")?.run() }.keyboardShortcut("n")
+            Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
         }
         CommandGroup(replacing: .saveItem) {
-            Button("Close Pane") { if let id = shell.activePane { shell.closePane(id) } }
+            Button("Close Pane") { if let id = shell.activePane { shell.dismissPane(id) } }
                 .keyboardShortcut("w").disabled(paneCount == 0)
+            Button("Reopen Closed Pane") { shell.reopenClosedPane() }
+                .keyboardShortcut("t", modifiers: [.command, .shift]).disabled(closedCount == 0)
             Button("Close All Panes") { shell.closeAllPanes() }
                 .keyboardShortcut("w", modifiers: [.command, .option]).disabled(paneCount == 0)
         }
@@ -118,7 +143,13 @@ public struct ShellCommands: Commands {
             Button("Workspace") { shell.show(.workspace) }.keyboardShortcut("0", modifiers: [.command, .shift])
             Button(!focusMode ? "Focus Mode" : "Tile Panes") { shell.toggleFocusMode() }
                 .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(paneCount == 0)
-            Button("Notifications") { shell.toggleBell() }.keyboardShortcut("b", modifiers: [.command, .shift])
+            Button("Notifications") { shell.toggleBell() }.keyboardShortcut("n", modifiers: [.command, .shift])
+            Divider()
+            Button("Switch Day and Night") {
+                shell.theme = shell.theme == .night ? .day : .night
+            }
+            .keyboardShortcut("d", modifiers: [.control, .command])
+            Toggle("Show Activity in Status Bar", isOn: Binding(get: { chipOn }, set: { shell.showActivityChip = $0 }))
             Divider()
             Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(paneCount < 2)
             Button("Previous Pane") { shell.cyclePane(-1) }.keyboardShortcut("`", modifiers: [.command, .shift])
@@ -130,6 +161,14 @@ public struct ShellCommands: Commands {
         }
         CommandGroup(replacing: .toolbar) {}
         CommandGroup(replacing: .windowSize) {}
+        // Panes by name. (⌘1–9 stays with the launcher's own picks, so these have no shortcuts.)
+        CommandGroup(before: .windowList) {
+            ForEach(paneTitles, id: \.id) { p in
+                Button(p.title) {
+                    if let spec = shell.panes.first(where: { $0.id == p.id }) { shell.openPane(spec) }
+                }
+            }
+        }
         CommandGroup(replacing: .help) {
             Button("Keyboard Shortcuts") { shell.open(.shortcuts) }.keyboardShortcut("/")
         }

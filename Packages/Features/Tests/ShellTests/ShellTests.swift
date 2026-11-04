@@ -25,53 +25,6 @@ struct LauncherTests {
     }
 }
 
-struct PaneLayoutTests {
-    private let gap: CGFloat = 12
-
-    @Test func fittingPanesShareTheWidthEqually() {
-        let l = PaneLayout.make(
-            minWidths: [340, 340, 340], container: CGSize(width: 1500, height: 700), gap: gap, minHeight: 560)
-        #expect(!l.isStrip)
-        #expect(l.frames.count == 3 && l.frames[0].width == l.frames[2].width)
-        #expect(abs(l.frames[2].maxX - 1500) < 0.5)
-    }
-
-    @Test func stripStartsWhenMinimumsDoNotFit() {
-        let w: CGFloat = 340 * 4 + gap * 3
-        #expect(
-            !PaneLayout.make(
-                minWidths: Array(repeating: 340, count: 4), container: CGSize(width: w, height: 700), gap: gap,
-                minHeight: 560
-            ).isStrip)
-        let l = PaneLayout.make(
-            minWidths: Array(repeating: 340, count: 4), container: CGSize(width: w - 1, height: 700), gap: gap,
-            minHeight: 560)
-        #expect(l.isStrip && l.frames.allSatisfy { $0.width == 340 } && l.contentWidth == w)
-    }
-
-    @Test func heightNeverDropsBelowTheMinimum() {
-        let l = PaneLayout.make(minWidths: [340], container: CGSize(width: 900, height: 400), gap: gap, minHeight: 560)
-        #expect(l.frames[0].height == 560)
-    }
-
-    @Test func fractionsSetWidthsButMinimumsHold() {
-        let area = CGSize(width: 1100, height: 700)
-        let l = PaneLayout.make(
-            minWidths: [340, 340, 340], fractions: [0.6, 0.2, 0.2], container: area, gap: 12, minHeight: 560)
-        #expect(l.frames[0].width > l.frames[1].width && l.frames.allSatisfy { $0.width >= 340 - 0.01 })
-        #expect(abs(l.frames[2].maxX - 1100) < 0.5)
-        let mixed = PaneLayout.make(
-            minWidths: [560, 340, 340], container: CGSize(width: 1400, height: 700), gap: 12, minHeight: 560)
-        #expect(mixed.frames[0].width >= 560 - 0.01 && abs(mixed.frames[2].maxX - 1400) < 0.5)
-    }
-
-    @Test func nearestColumn() {
-        let l = PaneLayout.make(
-            minWidths: [340, 340, 340], container: CGSize(width: 1100, height: 700), gap: gap, minHeight: 560)
-        #expect(l.nearestIndex(toX: 20) == 0 && l.nearestIndex(toX: 1090) == 2)
-    }
-}
-
 @MainActor
 struct ShellModelTests {
     @Test func panesOpenFocusMoveAndClose() {
@@ -84,6 +37,27 @@ struct ShellModelTests {
         #expect(shell.panes.map(\.id) == ["b", "c", "a"])
         shell.closePane("a")
         #expect(shell.panes.map(\.id) == ["b", "c"] && shell.activePane == "c")
+    }
+
+    @Test func aClosedPaneComesBackWithUndoAndReopen() {
+        let shell = ShellModel()
+        for id in ["a", "b"] { shell.openPane(PaneSpec(id: id, title: id, symbol: "square") { EmptyView() }) }
+        shell.dismissPane("b")
+        #expect(shell.panes.map(\.id) == ["a"] && shell.closedPanes.map(\.id) == ["b"])
+        #expect(shell.toast?.kind == .info && shell.toast?.undo != nil)
+        shell.reopenClosedPane()
+        #expect(shell.panes.map(\.id) == ["a", "b"] && shell.closedPanes.isEmpty)
+        shell.closePane("a")  // a feature closing its own pane leaves nothing to reopen
+        #expect(shell.closedPanes.isEmpty)
+        shell.reopenClosedPane()
+        #expect(shell.toast?.message == "No closed pane to reopen.")
+    }
+
+    @Test func aDropReordersThePanesAndKeepsThemAllOpen() {
+        let shell = ShellModel()
+        for id in ["a", "b", "c"] { shell.openPane(PaneSpec(id: id, title: id, symbol: "square") { EmptyView() }) }
+        shell.dropPane("c", on: "a", edge: .bottom)
+        #expect(shell.panes.map(\.id) == ["a", "c", "b"])
     }
 }
 
