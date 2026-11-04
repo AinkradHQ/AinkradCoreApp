@@ -84,21 +84,6 @@ struct AccLink: View {
     }
 }
 
-/// A destructive button: the fail tone with an edge.
-struct AccDangerStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        let t = palette.tone(.fail)
-        configuration.label
-            .font(.system(size: MacTextSize.body, weight: .medium)).foregroundStyle(t.ink)
-            .frame(minHeight: MacSize.controlMd).padding(.horizontal, Space.s3)
-            .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
-            .coreDimWhenDisabled(enabled)
-    }
-}
-
 /// Progress with no end in sight: a rounded bar with a segment that slides. With Reduce Motion the segment rests.
 struct AccBar: View {
     @Environment(\.corePalette) private var palette
@@ -131,38 +116,6 @@ struct AccIssue: View {
             .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
-    }
-}
-
-/// A banner row: a symbol, a title and the words, tinted by tone, with an optional action.
-struct AccBanner<Action: View>: View {
-    let symbol: String
-    let title: String
-    let text: String
-    var tone: Tone = .queue
-    @ViewBuilder let action: Action
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        let c = palette.tone(tone)
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: symbol).foregroundStyle(c.ink).frame(width: Space.s4).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s3)
-            action
-        }
-        .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .background(c.fill, in: coreShape(Radius.cardMac))
-        .accessibilityElement(children: .contain)
-    }
-}
-
-extension AccBanner where Action == EmptyView {
-    init(symbol: String, title: String, text: String, tone: Tone = .queue) {
-        self.init(symbol: symbol, title: title, text: text, tone: tone) { EmptyView() }
     }
 }
 
@@ -241,7 +194,7 @@ struct AccNotice: View {
     let notice: AdminNotice?
     var body: some View {
         if let n = notice {
-            AccBanner(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
+            CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
                 .accessibilityIdentifier("stepup-notice")
         }
     }
@@ -253,7 +206,7 @@ struct GateBanner: View {
     var body: some View {
         let g = model.gate
         if g.kind != .real {
-            AccBanner(symbol: g.symbol, title: g.title, text: g.detail, tone: g.tone) {
+            CoreNotice(symbol: g.symbol, title: g.title, text: g.detail, tone: g.tone) {
                 Button("Feature switches") { model.openSwitches() }.buttonStyle(.coreSecondary)
                     .help("Open Settings, Core, Feature switches")
             }
@@ -267,33 +220,12 @@ struct ReadOnlyBanner: View {
     let model: AccountsModel
     var body: some View {
         if model.readOnly {
-            AccBanner(
+            CoreNotice(
                 symbol: "lock", title: "This device can only read",
                 text: "Changes are refused (forbidden_scope). Use a device that holds the admin scope."
             )
             .accessibilityIdentifier("read-only-banner")
         }
-    }
-}
-
-/// A dialog over the shell, the same frame the admin dialogs use.
-struct AccDialog<Content: View>: View {
-    let title: String
-    var width: CGFloat = Space.s8 * 15
-    @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            content
-        }
-        .foregroundStyle(palette.text)
-        .font(.system(size: MacTextSize.body))
-        .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .frame(width: width)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
     }
 }
 
@@ -310,7 +242,7 @@ struct AccDialogButtons: View {
             Spacer(minLength: 0)
             Button("Cancel", action: cancel).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
             if danger {
-                Button(confirm, action: run).buttonStyle(AccDangerStyle()).disabled(!enabled || busy)
+                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger)).disabled(!enabled || busy)
             } else {
                 Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
                     .keyboardShortcut(.defaultAction).disabled(!enabled || busy)

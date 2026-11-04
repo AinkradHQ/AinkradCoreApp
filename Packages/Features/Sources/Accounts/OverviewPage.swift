@@ -81,7 +81,7 @@ private struct AlertRow: View {
     let model: AccountsModel
     let account: AccountItem
     var body: some View {
-        AccBanner(
+        CoreNotice(
             symbol: account.phase.symbol, title: "\(account.label): \(account.phase.label)",
             text: AccountsWords.why(account, now: model.now()), tone: account.phase.tone
         ) {

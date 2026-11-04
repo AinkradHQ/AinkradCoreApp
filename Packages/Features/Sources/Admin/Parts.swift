@@ -142,23 +142,10 @@ struct AdminSwitch: View {
 /// The inline outcome of a Touch ID that did not elevate, in the panel that asked.
 struct AdminNoticeBanner: View {
     let notice: AdminNotice?
-    @Environment(\.corePalette) private var palette
     var body: some View {
         if let n = notice {
-            let c = palette.tone(n.warn ? .warn : .queue)
-            HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: n.symbol).foregroundStyle(c.ink).frame(width: Space.s4).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(n.detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(Space.s3)
-            .background(palette.glassCard, in: coreShape(Radius.cardMac))
-            .background(c.fill, in: coreShape(Radius.cardMac))
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("stepup-notice")
+            CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
+                .accessibilityIdentifier("stepup-notice")
         }
     }
 }
@@ -176,27 +163,6 @@ struct IssueLine: View {
         }
         .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// Panel for a dialog over the shell.
-struct AdminDialog<Content: View>: View {
-    let title: String
-    var width: CGFloat = Space.s8 * 15
-    @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            content
-        }
-        .foregroundStyle(palette.text)
-        .font(.system(size: MacTextSize.body))
-        .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .frame(width: width)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
     }
 }
 

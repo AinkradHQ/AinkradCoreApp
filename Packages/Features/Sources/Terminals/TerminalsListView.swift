@@ -135,7 +135,7 @@ struct TerminalTile: View {
                         if item.cols > 0 { Text("\(item.cols)×\(item.rows)").monospacedDigit() }
                         Text(item.isEnded ? "ended" : "open \(ago(item.createdAt))")
                         Spacer(minLength: Space.s2)
-                        Slots(used: item.attached, capacity: max(item.attached, 1))
+                        CoreSlots(used: item.attached, capacity: max(item.attached, 1))
                         Text("\(item.attached) attached").monospacedDigit()
                     }
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)

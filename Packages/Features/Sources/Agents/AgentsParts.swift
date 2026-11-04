@@ -20,24 +20,8 @@ struct AgentMark: View {
 /// An outcome in place: a symbol, the words, and the reason. Never colour alone.
 struct NoticeBanner: View {
     let notice: InlineNotice
-    @Environment(\.corePalette) private var palette
-
     var body: some View {
-        let c = palette.tone(notice.tone)
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: notice.symbol).foregroundStyle(c.ink).frame(width: Space.s4).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(notice.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                if !notice.detail.isEmpty {
-                    Text(notice.detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(Space.s3)
-        .background(c.fill, in: coreShape(Radius.control))
-        .accessibilityElement(children: .combine)
+        CoreNotice(symbol: notice.symbol, title: notice.title, text: notice.detail, tone: notice.tone)
     }
 }
 
@@ -96,6 +80,7 @@ struct AgentRowButton<Label: View>: View {
     let id: String
     var focus: FocusState<String?>.Binding
     var selected = false
+    var waiting = false
     let action: () -> Void
     @ViewBuilder let label: Label
     @Environment(\.corePalette) private var palette
@@ -110,27 +95,13 @@ struct AgentRowButton<Label: View>: View {
                 selected ? palette.navActive : hovering ? palette.rowHover : palette.glassCard,
                 in: coreShape(Radius.row)
             )
-            .overlay { if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
+            .overlay {
+                // A session that waits on you keeps the edge the selected row has, so it stands out in a long list.
+                if selected || waiting { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+            }
             .coreFocusRing(focus.wrappedValue == id, radius: Radius.row, palette: palette)
             .animation(Motion.out(Motion.hover), value: hovering)
             .onHover { hovering = $0 }
-    }
-}
-
-/// Kill: the fail tone on a quiet fill, as Pairing's revoke. Words carry it; the tone backs them up.
-struct AgentDangerButtonStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        let t = palette.tone(.fail)
-        configuration.label
-            .font(.system(size: MacTextSize.meta, weight: .medium))
-            .foregroundStyle(t.ink)
-            .frame(minHeight: MacSize.controlSm)
-            .padding(.horizontal, Space.s2)
-            .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.chip))
-            .overlay { coreShape(Radius.chip).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
-            .coreDimWhenDisabled(enabled)
     }
 }
 

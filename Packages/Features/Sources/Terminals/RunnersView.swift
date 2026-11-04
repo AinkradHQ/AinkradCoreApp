@@ -76,7 +76,7 @@ private struct RunnerTile: View {
                 labelled(
                     "Work running\(st == .off ? " · last known" : "")", "\(runner.load) of \(runner.capacity) slots"
                 ) {
-                    Slots(used: runner.load, capacity: runner.capacity)
+                    CoreSlots(used: runner.load, capacity: runner.capacity)
                 }
                 if let p = runner.perCore {
                     labelled("Host load per core", String(format: "%.2f", p)) {
@@ -167,7 +167,7 @@ private struct RunnerDetail: View {
         }
         card("Load\(off ? " · last known" : "")") {
             fact("Work running", "\(runner.load) of \(runner.capacity)")
-            Slots(used: runner.load, capacity: runner.capacity)
+            CoreSlots(used: runner.load, capacity: runner.capacity)
             if let a = runner.avg1, let c = runner.cores {
                 fact("Host load, 1 min average", "\(String(format: "%.1f", a)) on \(c) cores")
                 fact("Per core", String(format: "%.2f", runner.perCore ?? 0))

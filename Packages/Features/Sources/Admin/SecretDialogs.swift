@@ -57,26 +57,12 @@ private struct DialogButtons: View {
             Spacer(minLength: 0)
             Button("Cancel", action: cancel).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
             if danger {
-                Button(confirm, action: run).buttonStyle(AdminDangerStyle()).disabled(!enabled || busy)
+                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger)).disabled(!enabled || busy)
             } else {
                 Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
                     .keyboardShortcut(.defaultAction).disabled(!enabled || busy)
             }
         }
-    }
-}
-
-struct AdminDangerStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        let t = palette.tone(.fail)
-        configuration.label
-            .font(.system(size: MacTextSize.body, weight: .medium)).foregroundStyle(t.ink)
-            .frame(minHeight: MacSize.controlMd).padding(.horizontal, Space.s3)
-            .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
-            .coreDimWhenDisabled(enabled)
     }
 }
 
@@ -89,7 +75,7 @@ struct SecretFormDialog: View {
     var body: some View {
         let model = admin.secrets!
         let title = form.existing.map { "Replace value of \($0.name)" } ?? "New secret"
-        AdminDialog(title: title, width: Space.s8 * 15) {
+        CoreDialogPanel(title, width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if form.existing == nil {
                     CoreTextField(
@@ -149,7 +135,7 @@ struct LeaseDialog: View {
 
     var body: some View {
         let model = admin.secrets!
-        AdminDialog(title: "Lease \(form.secret.name)", width: Space.s8 * 15) {
+        CoreDialogPanel("Lease \(form.secret.name)", width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Runner")
@@ -196,7 +182,7 @@ struct DeleteDialog: View {
     @State private var busy = false
 
     var body: some View {
-        AdminDialog(title: "Delete \(secret.name)?", width: Space.s8 * 13) {
+        CoreDialogPanel("Delete \(secret.name)?", width: Space.s8 * 13) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("Runners can no longer be leased this secret. This cannot be undone.")
                 AdminNoticeBanner(notice: admin.host.elevationNotice)

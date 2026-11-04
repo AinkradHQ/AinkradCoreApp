@@ -9,7 +9,7 @@ struct NewTerminalView: View {
     @FocusState private var programFocus: Bool
 
     var body: some View {
-        TermDialog(title: "New terminal") {
+        CoreDialogPanel("New terminal", width: Space.s8 * 17) {
             Text("A shell on one of your runners. Pick where it runs.").foregroundStyle(palette.text2)
             VStack(alignment: .leading, spacing: Space.s2) {
                 Text("Runner").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
@@ -92,7 +92,7 @@ private struct PickTile: View {
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 HStack(spacing: Space.s2) {
                     Text("Work").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    Slots(used: runner.load, capacity: runner.capacity)
+                    CoreSlots(used: runner.load, capacity: runner.capacity)
                     Text("\(runner.load) of \(runner.capacity)").font(.system(size: MacTextSize.meta)).monospacedDigit()
                     Spacer()
                     if let warn {

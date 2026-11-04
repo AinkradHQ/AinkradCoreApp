@@ -1,27 +1,6 @@
 import CoreUI
 import SwiftUI
 
-/// The surface dialogs of this module share: a panel with a title, over the shell.
-struct AgentDialogCard<Content: View>: View {
-    let title: String
-    var width: CGFloat = Space.s8 * 17
-    @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            content
-        }
-        .foregroundStyle(palette.text)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .frame(width: width)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
-    }
-}
-
 /// New agent session: what the API takes (harness, policy mode, runner, model, prompt, secrets). The Core refuses a runner that
 /// cannot run it, and the refusal shows here in place.
 struct NewSessionSheet: View {
@@ -42,10 +21,11 @@ struct NewSessionSheet: View {
     private var runner: RunnerInfo? { model.runners.first { $0.id == (runnerID ?? "") } }
     private var ready: Bool {
         runner != nil && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy
+            && !PromptSize.over(prompt)
     }
 
     var body: some View {
-        AgentDialogCard(title: "New agent session") {
+        CoreDialogPanel("New agent session", width: Space.s8 * 17) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     Text("It runs on a runner of the Home Core. You can close this Mac and it keeps going.")
@@ -72,6 +52,9 @@ struct NewSessionSheet: View {
                     field("Runner") { runnerList }
                     CoreTextField("Model (optional)", placeholder: "the harness default", text: $llm, mono: true)
                     field("Prompt") { promptField }
+                    preview
+                    Text("Isolation (microVM, memory, disk, network egress): not available yet.")
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                     field("Secrets to pass  \(secrets.count) of 16") { secretsField }
                 }
                 .padding(.bottom, Space.s1)
@@ -131,7 +114,40 @@ struct NewSessionSheet: View {
         }
     }
 
+    /// What pressing Start will do, in one line, from what is chosen. No number here is invented: it is the harness, the runner
+    /// and the options picked.
+    private var preview: some View {
+        let words = runner.map { "\(harness) on \($0.name)" } ?? "Choose a runner to start on"
+        let options = [
+            mode, llm.isEmpty ? nil : llm,
+            secrets.isEmpty ? nil : "\(secrets.count) secret\(secrets.count == 1 ? "" : "s")",
+        ]
+        .compactMap { $0 }
+        return VStack(alignment: .leading, spacing: Space.s1) {
+            Text(runner == nil ? words : "This will run \(words)").font(
+                .system(size: MacTextSize.headline, weight: .semibold))
+            HStack(spacing: Space.s1) {
+                ForEach(options, id: \.self) { o in
+                    Text(o).font(.system(size: MacTextSize.meta, design: .monospaced))
+                        .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+                        .background(palette.uDim, in: coreShape(Radius.chip))
+                }
+            }
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .accessibilityElement(children: .combine)
+    }
+
     private var promptField: some View {
+        VStack(alignment: .trailing, spacing: Space.s1) {
+            promptEditor
+            Text(PromptSize.words(prompt)).font(.system(size: MacTextSize.meta, design: .monospaced))
+                .foregroundStyle(PromptSize.over(prompt) ? palette.tone(.fail).ink : palette.text2)
+        }
+    }
+
+    private var promptEditor: some View {
         TextEditor(text: $prompt).font(.system(size: MacTextSize.body)).scrollContentBackground(.hidden)
             .focused($promptFocus).frame(minHeight: Space.s8 * 3).padding(Space.s2)
             .background(palette.glassCard, in: coreShape(Radius.control))
@@ -211,6 +227,7 @@ private struct RunnerRow: View {
                 Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             }
             Spacer(minLength: 0)
+            if runner.online, let cap = runner.capacity { CoreSlots(used: runner.load, capacity: cap) }
             StateBadge(label, tone: tone, symbol: symbol)
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
@@ -226,5 +243,15 @@ private struct RunnerRow: View {
         var parts = ["\(runner.load) of \(runner.capacity.map(String.init) ?? "?") in use"]
         if !runner.drivers.isEmpty { parts.append(runner.runsAgents ? "runs agents" : "no agent driver") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The Core takes a prompt up to 64 KiB.
+enum PromptSize {
+    static let limit = 64 * 1024
+    static func bytes(_ s: String) -> Int { s.utf8.count }
+    static func over(_ s: String) -> Bool { bytes(s) > limit }
+    static func words(_ s: String) -> String {
+        over(s) ? "\(bytes(s)) of 64 KiB: too long" : String(format: "%.1f of 64 KiB", Double(bytes(s)) / 1024)
     }
 }
