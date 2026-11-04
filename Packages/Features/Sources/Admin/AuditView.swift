@@ -60,7 +60,9 @@ private struct Filters: View {
                 CoreFieldLabel("Actor")
                 CoreSegmented(
                     "Actor", segments: ActorFilter.allCases.map { CoreSegment($0, $0.rawValue.capitalized) },
-                    selection: $model.filter.actor)
+                    selection: $model.filter.actor
+                )
+                .fixedSize()
             }
             if !model.filter.isEmpty {
                 Button("Clear") { model.clearFilters() }.buttonStyle(.coreSecondary).help("Clear every filter")

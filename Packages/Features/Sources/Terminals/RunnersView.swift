@@ -83,7 +83,7 @@ private struct RunnerTile: View {
                         Meter(value: p, max: 6, limit: RunnerStatus.busyPerCore, warn: p > RunnerStatus.busyPerCore)
                     }
                     if let s = model.loadSamples[runner.id], s.count >= 2 {
-                        CoreSpark(s, tone: st == .busy ? .warn : .run, ceiling: max(6, s.max() ?? 6))
+                        CoreSpark(s, tone: st == .busy ? .warn : .run, ceiling: max(0.5, s.max() ?? 0.5))
                         Text("Load sampled on this Mac while it watched.").font(.system(size: MacTextSize.meta))
                             .foregroundStyle(palette.text2)
                     }

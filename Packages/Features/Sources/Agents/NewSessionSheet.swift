@@ -52,7 +52,6 @@ struct NewSessionSheet: View {
                     field("Runner") { runnerList }
                     CoreTextField("Model (optional)", placeholder: "the harness default", text: $llm, mono: true)
                     field("Prompt") { promptField }
-                    preview
                     Text("Isolation (microVM, memory, disk, network egress): not available yet.")
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                     field("Secrets to pass  \(secrets.count) of 16") { secretsField }
@@ -60,6 +59,7 @@ struct NewSessionSheet: View {
                 .padding(.bottom, Space.s1)
             }
             .frame(maxHeight: Space.s8 * 20)
+            preview
             HStack(spacing: Space.s2) {
                 Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
