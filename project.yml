@@ -42,6 +42,8 @@ targets:
         product: Pairing
       - package: Features
         product: Terminals
+      - package: Features
+        product: Admin
     settings:
       base:
         PRODUCT_NAME: Ainkrad Core

@@ -52,6 +52,11 @@ struct LockoutInfo: Identifiable, Equatable, Sendable {
 /// The event stream, reduced to what these screens act on.
 enum ServiceEvent: Sendable, Equatable {
     case live, reconnecting, gap
+    /// `session_expired`: the session is being reopened in the background.
+    case renewing
+    case rateLimited(retryAfter: TimeInterval?)
+    /// The socket closed cleanly and came back: the Core restarted.
+    case restarted
     case ended(CoreError)
     case event(kind: String, pairingID: String?, deviceID: String?)
 }
@@ -193,10 +198,20 @@ struct LiveCoreService: CoreService {
         let source = connection.events()
         return AsyncStream { out in
             let task = Task {
+                var closedCleanly = false
                 for await update in source {
                     switch update {
-                    case .live: out.yield(.live)
-                    case .reconnecting: out.yield(.reconnecting)
+                    case .live:
+                        out.yield(.live)
+                        if closedCleanly { out.yield(.restarted) }
+                        closedCleanly = false
+                    case .reconnecting(let cause):
+                        closedCleanly = cause == nil
+                        switch cause {
+                        case .sessionExpired?: out.yield(.renewing)
+                        case .rateLimited(let after)?: out.yield(.rateLimited(retryAfter: after))
+                        default: out.yield(.reconnecting)
+                        }
                     case .gap: out.yield(.gap)
                     case .ended(let e): out.yield(.ended(e))
                     case .event(let e):
