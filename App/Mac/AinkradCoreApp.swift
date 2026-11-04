@@ -30,10 +30,16 @@ struct AinkradCoreApp: App {
             #endif
         }
         #if DEBUG
-        Window("CoreUI Gallery", id: "gallery") {
-            CoreUIGallery().frame(minWidth: 720, minHeight: 600)
+        // Debug tool window: opened only from Debug → CoreUI Gallery (⌥⌘G), never at launch and never restored, so the app
+        // always starts on its main window (a restored gallery used to open instead of it).
+        if #available(macOS 15, *) {
+            Window("CoreUI Gallery", id: "gallery") {
+                CoreUIGallery().frame(minWidth: 720, minHeight: 600)
+            }
+            .defaultLaunchBehavior(.suppressed)
+            .restorationBehavior(.disabled)
+            .commands { DebugCommands() }
         }
-        .commands { DebugCommands() }
         #endif
     }
 
