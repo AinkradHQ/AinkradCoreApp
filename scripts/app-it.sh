@@ -21,6 +21,10 @@
 #                              a session started from outside appears over the event stream, ⌘Return approves it (step-up
 #                              included), the session ends, a second session is cancelled from the app, an offline runner
 #                              refuses a new one. `agents-core` does the Core side alone with ainkradctl.
+#   scripts/app-it.sh manual   for a person testing by hand: the Core on http://127.0.0.1:7700 with a runner (pty + a stand-in
+#                              `claude`), prints a pairing code for the app (run it with `make run`), then reads commands:
+#                              a <check code> approve the app, s session, c <code> second device, l lockouts, p pause/resume
+#                              the Core, n new code, q stop and wipe. The app keeps its real keys: Forget this Core at the end.
 # The app keeps its keys in memory (CORE_KEYSTORE=memory): the Keychain is never touched. Run `make build` first.
 #   (CORE=<AinkradCore checkout> to override; APP_IT_KEEP=1 keeps the work dir.) Stops the Core and stray ptyhosts on exit.
 # shellcheck disable=SC2015
@@ -32,7 +36,7 @@ CORE=${CORE:-$HERE/../AinkradCore}
 BIN=$CORE/target/debug
 SRV=$BIN/ainkrad-core-server CTL=$BIN/ainkradctl RUN=$BIN/ainkrad-runner PTYH=$BIN/ainkrad-ptyhost
 command -v cargo >/dev/null || PATH=/opt/homebrew/opt/rustup/bin:$PATH
-if [ ! -x "$SRV" ] || [ ! -x "$CTL" ] || { { [ "$MODE" = terminals ] || [[ $MODE == agents* ]]; } && { [ ! -x "$RUN" ] || [ ! -x "$PTYH" ]; }; }; then
+if [ ! -x "$SRV" ] || [ ! -x "$CTL" ] || { { [ "$MODE" = terminals ] || [ "$MODE" = manual ] || [[ $MODE == agents* ]]; } && { [ ! -x "$RUN" ] || [ ! -x "$PTYH" ]; }; }; then
   (cd "$CORE" && nice -n 19 env CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=line-tables-only \
     cargo build -q -p ainkrad-core-server -p ainkrad-ctl -p ainkrad-runner -p ainkrad-ptyhost)
 fi
@@ -48,11 +52,12 @@ cleanup() {
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -9 "$p" 2>/dev/null || true; done
   for p in $(pgrep ainkrad-ptyhost 2>/dev/null | sort | comm -13 <(echo "$PTY_BEFORE") - ); do kill "$p" 2>/dev/null || true; done
   # Only the app built from this checkout: other worktrees may be running their own tests on the same Mac.
-  pkill -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
+  [ "$MODE" = manual ] || pkill -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
   if [ "${APP_IT_KEEP:-0}" = 1 ]; then echo "app-it: kept $W" >&2; else rm -rf "$W"; fi
 }
 trap cleanup EXIT
 
+[ "$MODE" = manual ] && PORT=7700 && { ! nc -z 127.0.0.1 7700 2>/dev/null || { echo "port 7700 is in use"; exit 1; }; } ||
 PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
 URL=http://127.0.0.1:$PORT
 HOME_DIR=$W/home DB=$W/home/core.db SOCK=$W/home/admin.sock
@@ -65,7 +70,9 @@ wait_for() { local end=$((SECONDS + $1)); shift; until "$@" >/dev/null 2>&1; do 
 
 echo "== core: init + serve on $URL (state in $HOME_DIR, not the real state dir)"
 "$SRV" init "$HOME_DIR" >/dev/null 2>"$W/init.err"
-PLAIN=; { [ "$MODE" = terminals ] || [[ $MODE == agents* ]]; } && PLAIN=--allow-plain-runner  # a loopback runner pairs over plain http
+PLAIN=; { [ "$MODE" = terminals ] || [ "$MODE" = manual ] || [[ $MODE == agents* ]]; } && PLAIN=--allow-plain-runner  # a loopback runner pairs over plain http
+# manual: loopback is a trusted proxy, so `l` can make wrong claims from a test address (X-Forwarded-For) and lock that one out.
+[ "$MODE" = manual ] && PLAIN="$PLAIN --trusted-proxy 127.0.0.1"
 "$SRV" serve --config "$HOME_DIR/config.toml" --listen "loopback:$PORT" $PLAIN 2>"$W/serve.log" >/dev/null &
 PIDS+=($!)
 wait_for 30 test -S "$SOCK" && wait_for 30 curl -fsS "$URL/healthz" || { echo "the Core did not start"; tail -n5 "$W/serve.log"; exit 1; }
@@ -125,7 +132,7 @@ CODE_BARE=${CODE//-/}
 SAS_FILE=$W/app.sas ADD_CODE_FILE=$W/add.code LOCKS_FILE=$W/locks.ready
 
 # The approver for the app: the app writes the check code it shows; type that into ainkradctl, as a person would.
-(
+[ "$MODE" = manual ] || (
   wait_for 120 test -s "$SAS_FILE" || exit 1
   echo "   approver: check code from the app $(cat "$SAS_FILE")"
   [ "$MODE" = shots ] && sleep 6
@@ -166,13 +173,48 @@ PERL
   RSAS=$(grep -Eo "[A-Z0-9]{4}(-[A-Z0-9]{4}){3}" "$W/rpair.out" | head -n1)
   a device approve "$(field "$W/radd.out" pairing_id)" "$RSAS" >"$W/rapprove.out" 2>&1 || { echo "runner approve failed"; cat "$W/rapprove.out"; return 1; }
   wait_for 30 test -s "$W/runner/enrolment.json" || { echo "the runner was not enrolled"; cat "$W/rpair.out"; return 1; }
-  PATH="$W/bin:$PATH" "$RUN" connect --state "$W/runner" --enable-agents >"$W/runner.log" 2>&1 </dev/null &
+  RFLAGS=(--enable-agents); [ "$MODE" = manual ] && RFLAGS+=(--enable-pty) && mkdir -p "$W/tmp"
+  PATH="$W/bin:$PATH" TMPDIR="$W/tmp" AINKRAD_PTYHOST="$PTYH" "$RUN" connect --state "$W/runner" "${RFLAGS[@]}" >"$W/runner.log" 2>&1 </dev/null &
   PIDS+=($!)
   wait_for 40 bash -c "'$CTL' --url '$URL' --host '${URL#http://}' --keystore '$KS_A' --stepup-passphrase-file '$PASS_A' runner ls </dev/null | grep -q online" \
     || { echo "the runner did not come online"; a runner ls 2>&1 | head -5; sed 's/\x1b\[[0-9;]*m//g' "$W/runner.log" | grep -v untested | tail -n8 | cut -c1-240; return 1; }
   RUNNER_ID=$(a runner ls | awk '/online/ {print $1; exit}')
   echo "   runner $RUNNER_ID online with a stand-in claude"
 }
+
+if [ "$MODE" = manual ]; then
+  prep_runner || exit 1
+  CORE_PID=${PIDS[0]} PAUSED=0
+  echo
+  echo "== Core: $URL    pairing code for the app: $CODE"
+  echo "   a <check code>  approve this Mac     s  agent session     c <code>  second device claims an Add device code"
+  echo "   l  lockouts     p  pause/resume the Core     n  new pairing code     q  stop and wipe"
+  while printf '> ' && read -r CMD ARG; do
+    case $CMD in
+      a) a device approve "$PAIRING" "$ARG" 2>&1 | tail -n2 ;;
+      s) a agent run "$RUNNER_ID" claude "bootstrap the thing" 2>&1 | tail -n2 ;;
+      c) K=$W/b/k$RANDOM.json
+         "$CTL" --url "$URL" --host "${URL#http://}" --keystore "$K" pair "$ARG" --no-stepup --wait 300 >"$K.out" 2>&1 </dev/null &
+         PIDS+=($!); wait_for 20 has_field "$K.out" sas && echo "   check code: $(field "$K.out" sas) (approve it in the app)" \
+           || tail -n2 "$K.out" ;;
+      l) # 20 wrong claims from a test address (keyed by X-Forwarded-For): it locks that address, not this Mac's. They also spend the wrong-claim budget, which burns every unused code (n).
+         for _ in $(seq 1 21); do
+           curl -s -o /dev/null -H "X-Forwarded-For: 203.0.113.7" -H 'Content-Type: application/json' \
+             -d '{"code":"ZZZZZ-ZZZZZ","routine_spki":"x","pop":"x"}' "$URL/pair/claim" || true
+         done; a lockouts ls 2>&1 | head -n3; echo "   locked for 1 minute; unused pairing codes were burned (n makes a new one)" ;;
+      p) if [ "$PAUSED" = 0 ]; then kill -STOP "$CORE_PID"; PAUSED=1; echo "   Core paused (p resumes)"
+         else kill -CONT "$CORE_PID"; PAUSED=0; echo "   Core resumed"; fi ;;
+      n) a device add mac-app --scopes read,approve,admin,terminal,agent >"$W/add.out" 2>&1 || { tail -n2 "$W/add.out"; continue; }
+         PAIRING=$(field "$W/add.out" pairing_id); echo "   pairing code: $(field "$W/add.out" code)" ;;
+      q) break ;;
+      "") ;;
+      *) echo "   a <check code> | s | c <code> | l | p | n | q" ;;
+    esac
+  done
+  [ "$PAUSED" = 1 ] && kill -CONT "$CORE_PID"
+  echo "== stopping and wiping $W"
+  exit 0
+fi
 
 if [ "$MODE" = agents-core ]; then
   prep_runner || exit 1
