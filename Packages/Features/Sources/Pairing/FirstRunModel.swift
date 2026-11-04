@@ -1,6 +1,7 @@
 import CoreKit
 import Foundation
 import Observation
+import Shell
 
 /// CoreKit's `DevicePairing`, as the first-run screen uses it, so tests can stand in for it.
 protocol PairingDriver: Sendable {
@@ -94,7 +95,12 @@ final class FirstRunModel {
         case failed(Failure)
     }
 
+    /// Inside `.form`: who you are, where the Core is, the pairing code (and, off to the side, how to set up a new Core).
+    enum Step: Equatable { case name, address, bootstrap, code }
+
     private(set) var stage: Stage = .form
+    private(set) var step: Step
+    var nameText = ""
     var endpointText = ""
     /// Always in the form `ABCDE-FGHJK`: set it through `typeCode`.
     private(set) var codeText = ""
@@ -109,19 +115,44 @@ final class FirstRunModel {
     private(set) var endpoint: URL?
 
     private let driver: any PairingDriver
+    private let profile: UserProfile?
     private let onPaired: @MainActor () -> Void
     /// Debug: where a live-test script reads the check code from.
     private let sasSink: (@MainActor (String) -> Void)?
     private var waiting: Task<Void, Never>?
 
+    /// `profile`: where the name goes. Asked first, once; skipped when this Mac already has one (or has nowhere to keep it).
     init(
-        driver: any PairingDriver, sasSink: (@MainActor (String) -> Void)? = nil,
+        driver: any PairingDriver, profile: UserProfile? = nil, sasSink: (@MainActor (String) -> Void)? = nil,
         onPaired: @escaping @MainActor () -> Void
     ) {
         self.driver = driver
+        self.profile = profile
+        step = profile.map { $0.hasName ? .address : .name } ?? .address
+        nameText = profile?.name ?? ""
         self.onPaired = onPaired
         self.sasSink = sasSink
     }
+
+    /// "Continue" on the name step. An empty name is fine (the greeting then says nothing of it); the person can add one on Home.
+    func submitName() {
+        profile?.set(nameText)
+        step = .address
+    }
+
+    /// "Continue" on the address step: the address must parse before the code step.
+    func submitAddress() {
+        endpointError = nil
+        do { _ = try EndpointInput.parse(endpointText) } catch {
+            endpointError = error.localizedDescription
+            return
+        }
+        step = .code
+    }
+
+    var displayName: String? { (profile?.hasName ?? false) ? profile?.name : nil }
+
+    func goTo(_ s: Step) { step = s }
 
     func typeCode(_ typed: String) { codeText = CodeFormat.format(typed) }
 
@@ -186,6 +217,7 @@ final class FirstRunModel {
         waiting?.cancel()
         waiting = nil
         stage = .form
+        step = .code
         codeText = ""
         claim = nil
         matched = false
@@ -198,6 +230,7 @@ final class FirstRunModel {
     /// Back to the form with everything kept, for a failure that is about the address.
     func editAddress() {
         stage = .form
+        step = .address
         retryAt = nil
     }
 
@@ -234,7 +267,7 @@ extension FirstRunModel {
     /// Snapshot scenes: set the screen without a Core.
     func debugSet(
         _ stage: Stage, endpoint: String = "", code: String = "", claim: ClaimInfo? = nil, matched: Bool = false,
-        approverApproved: Bool = false, retryAt: Date? = nil
+        approverApproved: Bool = false, retryAt: Date? = nil, step: Step? = nil
     ) {
         endpointText = endpoint
         typeCode(code)
@@ -243,6 +276,11 @@ extension FirstRunModel {
         self.approverApproved = approverApproved
         self.retryAt = retryAt
         self.stage = stage
+        if let step {
+            self.step = step
+        } else if stage != .form || !endpoint.isEmpty || !code.isEmpty {
+            self.step = .code
+        }
     }
 }
 #endif

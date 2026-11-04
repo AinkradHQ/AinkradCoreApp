@@ -67,7 +67,7 @@ public final class AppModel {
         self.keyStore = keyStore
         self.demo = demo
         self.makeService = makeService
-        firstRun = FirstRunModel(driver: driver, sasSink: sasSink) { [weak self] in
+        firstRun = FirstRunModel(driver: driver, profile: shell.profile, sasSink: sasSink) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }

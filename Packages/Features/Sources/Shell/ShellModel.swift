@@ -109,9 +109,16 @@ public final class ShellModel {
     public var toast: ToastItem?
     public var sheet: ShellSheet?
     public var home = HomeSnapshot.empty
-    public var hiddenWidgets: Set<WidgetKind> = []
+    public private(set) var widgets: WidgetLayout
+    public let profile: UserProfile
+    private let defaults: UserDefaults
+    static let layoutKey = "ainkrad.core.home.widgets"
     public var editingWidgets = false
     public var addingWidget = false
+    #if DEBUG
+    /// Snapshots only: draws the second Quick actions tile in its hover state.
+    public var debugForceQuickHover = false
+    #endif
     public var coreLink: CoreLink = .none {
         didSet { if oldValue == .live && coreLink != .live { lastLiveAt = Date() } }
     }
@@ -132,7 +139,29 @@ public final class ShellModel {
     public let bell = BellRegistry()
     public let settings = SettingsRegistry()
 
-    public init() { installBuiltInSettings() }
+    public init(defaults: UserDefaults = .coreStore()) {
+        self.defaults = defaults
+        profile = UserProfile(defaults: defaults)
+        widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
+        installBuiltInSettings()
+        launcher.register(
+            LauncherEntry(
+                id: "widgets.add", title: "Add Widget…", sub: "Put a widget on Home", symbol: "plus",
+                keywords: ["widgets", "home", "gallery"], isAction: true
+            ) { [weak self] in
+                self?.show(.home)
+                self?.addingWidget = true
+            })
+        launcher.register(
+            LauncherEntry(
+                id: "widgets.edit", title: "Edit Widgets", sub: "Rearrange, resize or remove",
+                symbol: "slider.horizontal.3",
+                keywords: ["widgets", "home", "rearrange", "resize"], isAction: true
+            ) { [weak self] in
+                self?.show(.home)
+                self?.editingWidgets = true
+            })
+    }
 
     // MARK: panes (Mac.openPane / closePane / updatePane)
 
@@ -252,10 +281,10 @@ public final class ShellModel {
             launcherOpen = false
         } else if bellOpen {
             bellOpen = false
-        } else if addingWidget {
-            addingWidget = false
         } else if overlay != nil {
             overlay = nil
+        } else if addingWidget {
+            addingWidget = false
         } else if editingWidgets {
             editingWidgets = false
         } else {
@@ -297,12 +326,70 @@ public final class ShellModel {
 
     // MARK: widgets
 
-    public func removeWidget(_ kind: WidgetKind) {
-        animate { hiddenWidgets.insert(kind) }
-        showToast("\(kind.title) removed from Home") { [weak self] in self?.restoreWidget(kind) }
+    /// Every edit goes through here: it keeps the layout valid, saves it and animates the move.
+    private func edit(_ change: (inout WidgetLayout) -> Bool) -> Bool {
+        var next = widgets
+        guard change(&next) else { return false }
+        animate { widgets = next }
+        if let d = next.encoded() { defaults.set(d, forKey: Self.layoutKey) }
+        return true
     }
 
-    public func restoreWidget(_ kind: WidgetKind) { animate { hiddenWidgets.remove(kind) } }
+    /// Applies a layout a drag already worked out (the drop).
+    public func setWidgets(_ items: [WidgetItem]) {
+        _ = edit {
+            $0.items = items
+            return true
+        }
+    }
+    public func moveWidget(_ id: UUID, dx: Int, dy: Int) { _ = edit { $0.nudge(id, dx: dx, dy: dy) } }
+
+    public func resizeWidget(_ id: UUID, to size: WidgetSize) {
+        if !edit({ $0.resize(id, to: size) }) { showToast("Not enough room for that size.") }
+    }
+
+    @discardableResult
+    public func addWidget(_ kind: WidgetKind, _ size: WidgetSize? = nil) -> Bool {
+        var added: WidgetItem?
+        let ok = edit {
+            added = $0.add(kind, size)
+            return added != nil
+        }
+        if ok, let added {
+            showToast("Added \(added.kind.title)")
+        } else {
+            showToast("No room on Home. Remove a widget first.")
+        }
+        return ok
+    }
+
+    public func removeWidget(_ id: UUID) {
+        var gone: WidgetItem?
+        guard
+            edit({
+                gone = $0.remove(id)
+                return gone != nil
+            }), let gone
+        else { return }
+        showToast("Removed \(gone.kind.title)") { [weak self] in
+            guard let self else { return }
+            if !self.edit({ $0.restore(gone) }) { self.showToast("No room to bring it back.") }
+        }
+    }
+
+    public func resetWidgets() {
+        let was = widgets
+        _ = edit {
+            $0 = .standard()
+            return true
+        }
+        showToast("Home is back to the default layout") { [weak self] in
+            _ = self?.edit {
+                $0 = was
+                return true
+            }
+        }
+    }
 
     // MARK: -
 
