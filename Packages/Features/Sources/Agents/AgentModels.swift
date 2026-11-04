@@ -177,6 +177,10 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
     public let timeoutSecs: Int?
     public var decision: Bool?
 
+    /// One approval, everywhere it is keyed (bell, macOS notification, "already announced"). The request id is only unique within
+    /// its session (a stand-in agent always says `req1`), so the session is part of it.
+    public var key: String { "agents.ap.\(session).\(id)" }
+
     public var expiresAt: Date? { timeoutSecs.map { requestedAt.addingTimeInterval(TimeInterval($0)) } }
 
     /// `sessionOver`: an agent that ended is no longer waiting. Expiry follows the runner's clock, as reported.
@@ -220,3 +224,6 @@ public enum AgentWords {
         return (s.state.label, s.state.tone, s.state.symbol)
     }
 }
+
+/// What a session was asked to do that has not finished yet.
+public enum StopKind: Sendable { case cancelling, killing }

@@ -64,7 +64,7 @@ extension AgentsModel {
             actions: [
                 ShellSheetAction("Keep running"),
                 ShellSheetAction("Cancel session", primary: true) { [weak self] in
-                    self?.run(id, "Cancelling") { try await $0.cancel(id) }
+                    self?.run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
                 },
             ])
     }
@@ -78,7 +78,7 @@ extension AgentsModel {
             actions: [
                 ShellSheetAction("Keep running"),
                 ShellSheetAction("Kill session", primary: true) { [weak self] in
-                    self?.run(id, "Killing") { try await $0.kill(id) }
+                    self?.run(id, "Killing", stop: .killing) { try await $0.kill(id) }
                 },
             ])
     }
@@ -101,18 +101,24 @@ extension AgentsModel {
     }
 
     private func run(
-        _ id: String, _ doing: String, _ op: @escaping @Sendable (any AgentsAPI) async throws -> AgentSessionInfo
+        _ id: String, _ doing: String, stop: StopKind? = nil,
+        _ op: @escaping @Sendable (any AgentsAPI) async throws -> AgentSessionInfo
     ) {
         guard let api else { return }
         note(id, nil)
         let h = sessions.session(id)?.harness ?? "the agent"
+        if let stop { stopping[id] = stop }
         Task { [weak self] in
             guard let self else { return }
             do {
                 let s = try await self.elevated("\(doing) \(h).") { try await op(api) }
                 self.sessions.upsert(s)
+                if s.over { self.stopping[id] = nil }
                 self.syncDerived()
-            } catch { self.note(id, Self.notice(error, doing: doing)) }
+            } catch {
+                if stop != nil { self.stopping[id] = nil }
+                self.note(id, Self.notice(error, doing: doing))
+            }
         }
     }
 

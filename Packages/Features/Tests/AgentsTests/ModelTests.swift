@@ -108,8 +108,8 @@ struct ModelTests {
                     kind: "agent.approval_requested", session: "as_01JC4X7Q3MZ8N5V2K9R004", request: "req_new",
                     tool: "Bash")))
         #expect(m.pending.count == 4)
-        #expect(m.shell.bell.items.contains { $0.id == "agents.ap.req_new" })
-        #expect(n.posted == ["agents.ap.req_new"])
+        #expect(m.shell.bell.items.contains { $0.id == "agents.ap.as_01JC4X7Q3MZ8N5V2K9R004.req_new" })
+        #expect(n.posted == ["agents.ap.as_01JC4X7Q3MZ8N5V2K9R004.req_new"])
         m.notifyApprovals = false
         api.append(
             "as_01JC4X7Q3MZ8N5V2K9R004", [.approvalRequest(id: "req_2", tool: "Bash", input: "ls", timeoutSecs: 300)])

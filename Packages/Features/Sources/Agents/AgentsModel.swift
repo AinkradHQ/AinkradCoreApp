@@ -45,6 +45,9 @@ public final class AgentsModel {
     /// What is typed in each session's composer.
     public var drafts: [String: String] = [:]
     public internal(set) var sending: Set<String> = []
+    /// Sessions asked to stop that have not ended yet: the Core answers a cancel at once but the agent only stops after its tool
+    /// call in flight (or the runner's grace), so the session reads as still running until then. Shown as "Cancelling".
+    public internal(set) var stopping: [String: StopKind] = [:]
     /// Inline outcome of the last thing done to a session (composer, cancel, resume…), cleared by the next try.
     public internal(set) var notices: [String: InlineNotice] = [:]
     /// Approvals being decided, and why one did not go through.
