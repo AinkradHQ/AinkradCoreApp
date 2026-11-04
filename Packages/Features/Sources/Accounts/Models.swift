@@ -1,0 +1,267 @@
+import CoreUI
+import Foundation
+
+/// A model a provider lists, with its list price in millionths of a dollar per million tokens (what the API has).
+struct ModelPriceItem: Equatable, Sendable {
+    let id: String
+    let inputMicro: Int64
+    let outputMicro: Int64
+    /// `$3.00 in, $15.00 out per million tokens`; the Core's own numbers, never rounded away.
+    var words: String { "\(Self.usd(inputMicro)) in, \(Self.usd(outputMicro)) out per million tokens" }
+    static func usd(_ micro: Int64) -> String { (Double(micro) / 1_000_000).formatted(.currency(code: "USD")) }
+}
+
+/// A provider as the Core lists it (`GET /api/v1/accounts/providers`): only the fields the API has.
+struct ProviderItem: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let harness: String
+    let authVar: String
+    let baseURL: String
+    let delivery: [String]
+    let loginMethods: [String]
+    let models: [ModelPriceItem]
+    let pricedAt: String?
+    let builtin: Bool
+}
+
+/// An account as a `read` device sees it: its key's last four characters, never the key.
+struct AccountItem: Identifiable, Equatable, Sendable {
+    let id: Int64
+    let provider: String
+    let label: String
+    let maskedTail: String
+    let baseURL: String
+    var state: String
+    let stateReason: String?
+    let stateUntil: Date?
+    var cap: Int64
+    let lastUsedAt: Date?
+    let createdAt: Date
+    var phase: AccountPhase { AccountPhase(state) }
+}
+
+struct PoolItem: Identifiable, Equatable, Sendable {
+    let id: Int64
+    let name: String
+    let provider: String
+    let isDefault: Bool
+    /// Account ids, in fallback order.
+    let members: [Int64]
+}
+
+struct BindingItem: Identifiable, Equatable, Sendable {
+    var id: String { "\(agent)/\(provider)" }
+    let agent: String
+    let provider: String
+    let poolID: Int64
+}
+
+/// An account's state word. The Core says `active`, `cooling`, `limited`, `unhealthy` or `disabled`; any other word shows
+/// as itself and is never counted as a problem.
+enum AccountPhase: Equatable, Sendable {
+    case active, cooling, limited, unhealthy, disabled
+    case other(String)
+
+    init(_ raw: String) {
+        switch raw {
+        case "active": self = .active
+        case "cooling": self = .cooling
+        case "limited": self = .limited
+        case "unhealthy": self = .unhealthy
+        case "disabled": self = .disabled
+        default: self = .other(raw)
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .active: "Ready"
+        case .cooling: "Resting"
+        case .limited: "Limited"
+        case .unhealthy: "Needs a look"
+        case .disabled: "Turned off"
+        case .other(let raw): raw
+        }
+    }
+
+    var tone: Tone {
+        switch self {
+        case .active: .run
+        case .cooling, .limited: .warn
+        case .unhealthy: .fail
+        case .disabled, .other: .queue
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .active: "checkmark.circle"
+        case .cooling: "clock"
+        case .limited: "gauge.with.dots.needle.100percent"
+        case .unhealthy: "exclamationmark.triangle"
+        case .disabled: "pause.circle"
+        case .other: "questionmark.circle"
+        }
+    }
+
+    var needsLook: Bool {
+        switch self {
+        case .cooling, .limited, .unhealthy: true
+        default: false
+        }
+    }
+}
+
+/// What stands between this Core and a stored provider key: `secrets.mode` and `secrets.provider_accounts`.
+struct GateState: Equatable, Sendable {
+    var mode: Int64?
+    var providerAccounts: Int64?
+
+    enum Kind: Equatable { case unknown, off, throwaway, real, other }
+    var kind: Kind {
+        guard let mode, let providerAccounts else { return .unknown }
+        if mode == 0 { return .off }
+        if mode == 1 { return providerAccounts >= 1 ? .real : .throwaway }
+        return .other
+    }
+
+    var title: String {
+        switch kind {
+        case .unknown: "The gate for real accounts is not readable"
+        case .off: "Secrets are off"
+        case .throwaway: "Real accounts are off"
+        case .real: "Real provider keys are allowed"
+        case .other: "Secrets mode \(mode ?? 0)"
+        }
+    }
+
+    var detail: String {
+        switch kind {
+        case .unknown:
+            "This Mac could not read secrets.mode or secrets.provider_accounts, so it cannot say what Core accepts."
+        case .off: "secrets.mode is 0: Core refuses to store any account key (secrets_disabled)."
+        case .throwaway:
+            "Core accepts throwaway test values only. A key shaped like a real one is refused (real_secret_refused). Turn on secrets.provider_accounts in Feature switches to change that."
+        case .real:
+            "secrets.provider_accounts is on: a key of a provider's own shape can be stored while secrets.mode is 1."
+        case .other:
+            "secrets.mode is \(mode ?? 0) and secrets.provider_accounts is \(providerAccounts ?? 0). This app does not know that combination."
+        }
+    }
+
+    var symbol: String {
+        switch kind {
+        case .real: "checkmark.shield"
+        case .unknown, .other: "questionmark.circle"
+        default: "lock"
+        }
+    }
+
+    var tone: Tone { kind == .real ? .run : kind == .unknown || kind == .other ? .queue : .warn }
+}
+
+/// What a page shows in place of its content.
+enum AccountsLoad: Equatable {
+    case loading
+    case ready
+    case failed(code: String, message: String)
+    case forbidden
+}
+
+enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
+    case overview, accounts, pools, bindings, budgets, costs, ledger, prices, activity
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .overview: "Overview"
+        case .accounts: "Accounts"
+        case .pools: "Pools"
+        case .bindings: "Bindings"
+        case .budgets: "Budgets"
+        case .costs: "Costs and usage"
+        case .ledger: "Ledger"
+        case .prices: "Prices"
+        case .activity: "Activity"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .overview: "waveform.path.ecg"
+        case .accounts: "creditcard"
+        case .pools: "square.grid.2x2"
+        case .bindings: "link"
+        case .budgets: "dollarsign.circle"
+        case .costs: "chart.bar"
+        case .ledger: "list.bullet"
+        case .prices: "tag"
+        case .activity: "text.alignleft"
+        }
+    }
+    /// Pages the Core has nothing for yet (KAN-448 to KAN-450).
+    var notYet: Bool { [.budgets, .costs, .ledger, .prices, .activity].contains(self) }
+    static let groups: [(String?, [AccountsPage])] = [
+        (nil, [.overview]), ("Accounts", [.accounts, .pools, .bindings]),
+        ("Spend", [.budgets, .costs, .ledger, .prices]), (nil, [.activity]),
+    ]
+}
+
+enum AccountFilter: String, CaseIterable, Sendable {
+    case all = "All"
+    case need = "Needs a look"
+    case off = "Turned off"
+    func matches(_ a: AccountItem) -> Bool {
+        switch self {
+        case .all: true
+        case .need: a.phase.needsLook
+        case .off: a.phase == .disabled
+        }
+    }
+}
+
+/// Where each built-in provider keeps its keys. Only a page to open: this app never takes a key.
+enum ProviderSites {
+    static func page(_ provider: String) -> (name: String, url: URL)? {
+        switch provider {
+        case "anthropic": ("the Anthropic Console", URL(string: "https://console.anthropic.com/settings/keys")!)
+        case "openai": ("the OpenAI platform", URL(string: "https://platform.openai.com/api-keys")!)
+        case "google": ("Google AI Studio", URL(string: "https://aistudio.google.com/apikey")!)
+        default: nil
+        }
+    }
+}
+
+enum AccountsWords {
+    /// `41 min`, `2 h 10 min`, `3 d`.
+    static func duration(_ seconds: TimeInterval) -> String {
+        let m = max(1, Int((seconds / 60).rounded()))
+        if m >= 1440 { return "\(m / 1440) d" }
+        if m >= 60 { return m % 60 == 0 ? "\(m / 60) h" : "\(m / 60) h \(m % 60) min" }
+        return "\(m) min"
+    }
+
+    /// `Used 11 min ago`, `Never used`.
+    static func used(_ d: Date?, now: Date = Date()) -> String {
+        guard let d else { return "Never used" }
+        let s = now.timeIntervalSince(d)
+        return s < 60 ? "Used just now" : "Used \(duration(s)) ago"
+    }
+
+    /// What a not-ready account is doing, from the fields the API has.
+    static func why(_ a: AccountItem, now: Date = Date()) -> String {
+        var s: String
+        switch a.phase {
+        case .cooling: s = "Resting. Other accounts of this provider cover until it is back."
+        case .limited: s = "The provider limited it."
+        case .unhealthy: s = "Core marked it unhealthy, so agents do not use it."
+        case .disabled: s = "Agents will not use it until you turn it back on."
+        case .active: s = "Agents can use it now."
+        case .other(let raw): s = "Core reports it as \(raw)."
+        }
+        if let r = a.stateReason, !r.isEmpty { s += r.hasSuffix(".") ? " \(r)" : " \(r)." }
+        if let u = a.stateUntil, u > now { s += " Back in \(duration(u.timeIntervalSince(now)))." }
+        return s
+    }
+
+    static func capWords(_ cap: Int64) -> String { cap == 0 ? "No limit on sessions at once" : "Up to \(cap) at once" }
+}

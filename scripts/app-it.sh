@@ -10,6 +10,9 @@
 #   scripts/app-it.sh admin    (E5-07) the app's XCUITest against the Core: toggles a feature switch, stores a dummy secret named
 #                              e5-07-test, sees its metadata and the audit rows; then ainkradctl confirms the secret is there
 #                              (name and metadata only: a value never comes back)
+#   scripts/app-it.sh accounts (E5-08) the app's XCUITest against the Core: lists accounts (none) and pools, makes a pool, binds an
+#                              agent to it, unbinds, deletes the pool. A throwaway Core holds no provider key, so no account is
+#                              made: this app never takes a key.
 #   scripts/app-it.sh shots    runs the app's self-snapshot walk (CORE_PAIR_SNAPSHOT, launched by XCUITest for its window
 #                              server) against the Core; THEME=light|dark,
 #                              OUT=<dir> for the PNGs; a second device claims the app's Add device code
@@ -163,7 +166,7 @@ if [ "$MODE" = terminals ]; then
   TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
     TEST_RUNNER_CORE_IT_SHOTS="${OUT:-$W}" \
     nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
-    -only-testing:AinkradCoreMacUITests/TerminalsLiveUITests test 2>&1 | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
+    -only-testing:AinkradCoreMacUITests/TerminalsLiveUITests test 2>&1 | grep -E -A40 "Test Case|error:|TEST |\*\* TEST|XCTAssert"
   STATUS=${PIPESTATUS[0]}
   echo "== done: xcodebuild exit $STATUS"
   exit "$STATUS"
@@ -174,12 +177,23 @@ if [ "$MODE" = admin ]; then
   TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
     TEST_RUNNER_CORE_IT_SHOTS="${OUT:-$W}" \
     nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
-    -only-testing:AinkradCoreMacUITests/AdminLiveUITests test 2>&1 | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
+    -only-testing:AinkradCoreMacUITests/AdminLiveUITests test 2>&1 | grep -E -A40 "Test Case|error:|TEST |\*\* TEST|XCTAssert"
   STATUS=${PIPESTATUS[0]}
   echo "== the Core's view: secrets (name and metadata only)"
   LS=$(a secret ls 2>&1) || true
   echo "$LS"
   echo "$LS" | grep -q "e5-07-test" || { echo "the Core does not list e5-07-test"; STATUS=1; }
+  echo "== done: xcodebuild exit $STATUS"
+  exit "$STATUS"
+fi
+if [ "$MODE" = accounts ]; then
+  echo "== xcodebuild test (CORE_IT=1): the app makes a pool, binds an agent, unbinds and deletes the pool"
+  cd "$HERE"
+  TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
+    TEST_RUNNER_CORE_IT_SHOTS="${OUT:-$W}" \
+    nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
+    -only-testing:AinkradCoreMacUITests/AccountsLiveUITests test 2>&1 | grep -E -A40 "Test Case|error:|TEST |\*\* TEST|XCTAssert"
+  STATUS=${PIPESTATUS[0]}
   echo "== done: xcodebuild exit $STATUS"
   exit "$STATUS"
 fi
