@@ -34,7 +34,9 @@ final class DevicesModel {
     private(set) var busy = false
     var filter: DeviceFilter = .all
     /// The device whose page is open (nil: the list).
-    var detailID: String?
+    var detailID: String? { didSet { renaming = false } }
+    /// The name field on the device page is open (rename is inline, as in the prototype).
+    var renaming = false
     private weak var host: AppModel?
 
     init(host: AppModel) { self.host = host }

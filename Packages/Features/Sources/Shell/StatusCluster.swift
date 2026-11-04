@@ -180,8 +180,8 @@ private struct ElevationChip: View {
 }
 
 /// m:ss, as the prototype's `mmss`.
-enum Countdown {
-    static func text(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
+public enum Countdown {
+    public static func text(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
 }
 
 /// What the elevation chip opens: what is unlocked, the time left, and Renew / Unlock with Touch ID.

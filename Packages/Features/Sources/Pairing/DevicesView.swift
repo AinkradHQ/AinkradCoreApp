@@ -165,14 +165,13 @@ private struct DeviceCard: View {
                     }
                     Spacer(minLength: 0)
                 }
-                HStack(spacing: Space.s1) {
+                HStack(spacing: Space.s2) {
                     Chip(text: device.kind)
-                    Chip(text: device.keyStorage ?? "not reported", tint: device.keyStorage == "software" ? .warn : nil)
+                    KeyStorageLabel(storage: device.keyStorage)
                     if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
                 }
                 AccessChips(scopes: device.scopes)
-                Text("Last seen \(DeviceWords.seen(device.lastUsed))").font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(palette.text2)
+                LastSeenLine(lastUsed: device.lastUsed)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Space.s3)
@@ -189,6 +188,45 @@ private struct DeviceCard: View {
             "\(device.name), \(me ? "This Mac, " : "")\(DeviceWords.kind(device.kind)), \(device.keyStorage ?? "storage not reported"), \(device.scopes.joined(separator: ", ")), last seen \(DeviceWords.seen(device.lastUsed))"
         )
         .accessibilityHint("Opens this device's page")
+    }
+}
+
+/// Where the key lives: a shield for the Secure Enclave, an amber warning for software. What the device reported, not verified.
+struct KeyStorageLabel: View {
+    let storage: String?
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        let software = storage == "software"
+        Label {
+            Text(storage.map { $0 == "secure_enclave" ? "Secure Enclave" : $0 } ?? "not reported")
+        } icon: {
+            Image(systemName: software ? "exclamationmark.triangle" : "checkmark.shield")
+        }
+        .font(.system(size: MacTextSize.meta))
+        .foregroundStyle(software ? palette.tone(.warn).ink : palette.text2)
+        .lineLimit(1)
+    }
+}
+
+/// "Active now" with a quiet pulse while the device was seen in the last minute, else "Last seen 3 days ago".
+struct LastSeenLine: View {
+    let lastUsed: Date?
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var on = false
+    var body: some View {
+        let fresh = lastUsed.map { Date().timeIntervalSince($0) < 60 } ?? false
+        HStack(spacing: Space.s1) {
+            if fresh {
+                coreShape(2).fill(palette.tone(.done).ink).frame(width: 7, height: 7)
+                    .opacity(on && !reduce ? 0.35 : 1)
+                    .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: on)
+                    .onAppear { on = true }
+                    .accessibilityHidden(true)
+            }
+            Text(fresh ? "Active now" : "Last seen \(DeviceWords.seen(lastUsed))")
+        }
+        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
     }
 }
 
@@ -223,6 +261,45 @@ struct AccessChips: View {
     }
 }
 
+/// Rename in place: a field with Save and Cancel. A Touch ID that does not go through leaves the edit where it is.
+private struct InlineRename: View {
+    let app: AppModel
+    let device: DeviceInfo
+    @State private var name: String
+
+    init(app: AppModel, device: DeviceInfo) {
+        self.app = app
+        self.device = device
+        _name = State(initialValue: device.name)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            CoreTextField("Name", placeholder: "1 to 64 characters", text: $name, autofocus: true) { go() }
+            StepUpBanner(app: app)
+            ErrorLine(text: app.devices.dialogError)
+            HStack(spacing: Space.s2) {
+                Button("Save") { go() }.buttonStyle(CoreButtonStyle(.prominent, busy: app.devices.busy))
+                    .disabled(name.isEmpty || name == device.name).keyboardShortcut(.defaultAction)
+                Button("Cancel") { stop() }.buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+            }
+        }
+        .onAppear {
+            app.devices.dialogError = nil
+            app.stepUpNotice = nil
+        }
+    }
+
+    private func go() {
+        Task { if await app.devices.rename(device, to: name) { stop() } }
+    }
+
+    private func stop() {
+        app.stepUpNotice = nil
+        app.devices.renaming = false
+    }
+}
+
 /// One device's page: Device, Keys, Access, Revoke. Back returns to the list.
 struct DeviceDetail: View {
     let app: AppModel
@@ -249,11 +326,14 @@ struct DeviceDetail: View {
                 if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
             }
             section("Device") {
-                HStack {
-                    FactRow(key: "Name", value: device.name)
-                    if !device.revoked {
-                        Button("Rename…") { present("rename", RenameDialog(app: app, device: device)) }
-                            .buttonStyle(.coreSecondary)
+                if app.devices.renaming {
+                    InlineRename(app: app, device: device)
+                } else {
+                    HStack {
+                        FactRow(key: "Name", value: device.name)
+                        if !device.revoked {
+                            Button("Rename…") { app.devices.renaming = true }.buttonStyle(.coreSecondary)
+                        }
                     }
                 }
                 FactRow(key: "Kind", value: device.kind, mono: true)
