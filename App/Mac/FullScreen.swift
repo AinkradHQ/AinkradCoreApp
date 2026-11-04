@@ -1,4 +1,5 @@
 import AppKit
+import Shell
 import SwiftUI
 
 /// Plan D9: the main window is full screen only. It launches into native full screen (its own Space), has no way out
@@ -11,11 +12,13 @@ struct FullScreenEnforcer: NSViewRepresentable {
 
 private final class EnforcerView: NSView {
     private var tokens: [NSObjectProtocol] = []
+    @MainActor private static var settled = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard let window, tokens.isEmpty else { return }
-        window.collectionBehavior = [.fullScreenPrimary, .fullScreenDisallowsTiling]
+        Self.pin(window)
+        NSApp.appearance = ThemeChoice.stored().appearance  // the saved Day/Night choice, before anything is drawn
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.styleMask.insert(.fullSizeContentView)
@@ -30,6 +33,37 @@ private final class EnforcerView: NSView {
             center.addObserver(forName: NSApplication.didUpdateNotification, object: nil, queue: .main) { _ in
                 MainActor.assumeIsolated { Self.scrubMenus() }
             })
+        // Mission Control's Spaces bar can drag this Space onto another (Split View tiles both, so the window shrinks to half
+        // the screen) or onto a Desktop (it leaves full screen). No notification names the tiling, so every resize and every
+        // screen change re-checks that the window still fills its screen, and puts things right if not.
+        for name in [NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification] {
+            tokens.append(
+                center.addObserver(forName: name, object: window, queue: .main) { note in
+                    guard let window = note.object as? NSWindow else { return }
+                    MainActor.assumeIsolated {
+                        Self.pin(window)
+                        Self.restoreIfTiled(window)
+                    }
+                })
+        }
+        // The enter/exit animation resizes the window too; only a settled full-screen window is checked.
+        for (name, to) in [
+            (NSWindow.willEnterFullScreenNotification, false), (NSWindow.willExitFullScreenNotification, false),
+            (NSWindow.didEnterFullScreenNotification, true),
+        ] {
+            tokens.append(
+                center.addObserver(forName: name, object: window, queue: .main) { note in
+                    guard let window = note.object as? NSWindow else { return }
+                    MainActor.assumeIsolated {
+                        Self.settled = to
+                        if to {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                MainActor.assumeIsolated { Self.restoreIfTiled(window) }
+                            }
+                        }
+                    }
+                })
+        }
         // Entering needs a key window in an active app, so try again whenever either becomes true.
         for name in [NSWindow.didBecomeKeyNotification, NSApplication.didBecomeActiveNotification] {
             tokens.append(
@@ -40,6 +74,23 @@ private final class EnforcerView: NSView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak window] in
             MainActor.assumeIsolated { if let window { Self.enter(window) } }
         }
+    }
+
+    /// No tiling, and a minimum size of the whole screen: macOS does not tile (Split View, window tiling) a window that cannot
+    /// shrink to half, so this holds even if the collection behaviour is reset. Re-applied on every resize and screen change.
+    @MainActor private static func pin(_ window: NSWindow) {
+        window.collectionBehavior = [.fullScreenPrimary, .fullScreenDisallowsTiling]
+        if let size = (window.screen ?? NSScreen.main)?.frame.size, window.contentMinSize != size {
+            window.contentMinSize = size
+        }
+        window.standardWindowButton(.zoomButton)?.isEnabled = false
+    }
+
+    /// In full screen but narrower than the screen: tiled. Leaving full screen makes `didExitFullScreen` bring it straight back.
+    @MainActor private static func restoreIfTiled(_ window: NSWindow) {
+        guard settled, window.styleMask.contains(.fullScreen), let screen = window.screen else { return }
+        guard window.frame.width < screen.frame.width - 1 else { return }
+        window.toggleFullScreen(nil)
     }
 
     @MainActor private static func enter(_ window: NSWindow) {

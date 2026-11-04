@@ -152,14 +152,39 @@ struct SettingsValueRow: View {
     }
 }
 
+/// The app's own Day/Night choice. It sets the app's appearance, so it overrides System Settings; "System" follows the Mac again.
+public enum ThemeChoice: String, CaseIterable, Sendable {
+    case system, day, night
+    static let key = "core.theme"
+    var title: String { rawValue.capitalized }
+    public var appearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .day: NSAppearance(named: .aqua)
+        case .night: NSAppearance(named: .darkAqua)
+        }
+    }
+    public static func stored(_ defaults: UserDefaults = .standard) -> ThemeChoice {
+        defaults.string(forKey: key).flatMap(ThemeChoice.init) ?? .system
+    }
+}
+
 struct AppearanceSection: View {
+    @Bindable var shell: ShellModel
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
-        SettingsPage(intro: "Ainkrad Core follows your Mac. There is nothing to set here yet.") {
-            SettingsValueRow(
-                title: "Theme", detail: "Follows System Settings → Appearance.",
-                value: scheme == .dark ? "Night" : "Day")
+        SettingsPage(intro: "Pick Day or Night, or let Ainkrad Core follow your Mac. Your choice is remembered.") {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Text("Theme").font(.system(size: MacTextSize.headline, weight: .semibold))
+                CoreSegmented(
+                    "Theme", segments: ThemeChoice.allCases.map { CoreSegment($0, $0.title) },
+                    selection: $shell.theme
+                )
+                .frame(maxWidth: Space.s8 * 8)
+                Text(shell.theme == .system ? "Following System Settings → Appearance." : "Overrides System Settings.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(.secondary)
+            }
             SettingsValueRow(
                 title: "Reduce Motion",
                 detail: "Set in System Settings → Accessibility → Display. Shown here, not changed.",
@@ -205,6 +230,6 @@ extension ShellModel {
         later("notifications", .notifications, "Notifications", "bell", 0, "Notification settings")
         settings.section(
             SettingsSection(id: "appearance", group: .appearance, title: "Appearance", symbol: "circle.lefthalf.filled")
-            { AppearanceSection() })
+            { AppearanceSection(shell: self) })
     }
 }

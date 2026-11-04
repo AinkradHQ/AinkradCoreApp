@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Observation
 import SwiftUI
@@ -131,8 +132,18 @@ public final class ShellModel {
     public let launcher = LauncherRegistry()
     public let bell = BellRegistry()
     public let settings = SettingsRegistry()
+    /// Day, Night or System (Settings → Appearance). Persisted; applied to the whole app.
+    public var theme: ThemeChoice = ThemeChoice.stored() {
+        didSet {
+            UserDefaults.standard.set(theme.rawValue, forKey: ThemeChoice.key)
+            NSApp.appearance = theme.appearance
+        }
+    }
 
-    public init() { installBuiltInSettings() }
+    public init() {
+        installBuiltInSettings()
+        NSApp?.appearance = theme.appearance
+    }
 
     // MARK: panes (Mac.openPane / closePane / updatePane)
 
