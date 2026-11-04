@@ -39,7 +39,9 @@ private final class ScriptSocket: EventSocket, @unchecked Sendable {
     func start() {}
     func ping() async throws { if failPing { throw URLError(.badServerResponse) } }
     func receive() async throws -> Data {
-        try await withCheckedThrowingContinuation { c in
+        // A refused upgrade: the first read fails and the status says why (the attach does not ping).
+        if failPing { throw URLError(.badServerResponse) }
+        return try await withCheckedThrowingContinuation { c in
             let r = lock.withLock { () -> Result<Data, any Error>? in
                 if dead { return .failure(URLError(.networkConnectionLost)) }
                 if !queue.isEmpty {
