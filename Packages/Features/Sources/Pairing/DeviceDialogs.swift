@@ -93,21 +93,36 @@ struct ScopeWarnings: View {
         var out: [(Tone, String, String)] = []
         if gone.contains("admin") {
             if app.devices.onlyAdmin?.id == device.id {
-                out.append((.fail, "xmark.octagon", "\(device.name) is the last admin. The Core will refuse this (409 conflict)."))
+                out.append(
+                    (
+                        .fail, "xmark.octagon",
+                        "\(device.name) is the last admin. The Core will refuse this (409 conflict)."
+                    ))
             } else {
                 out.append((.warn, "exclamationmark.triangle", "It can no longer manage devices, secrets or settings."))
             }
         }
         if gone.contains("approve") {
-            out.append((.warn, "exclamationmark.triangle", "It can no longer decide agent approvals. Waiting ones need another device."))
+            out.append(
+                (
+                    .warn, "exclamationmark.triangle",
+                    "It can no longer decide agent approvals. Waiting ones need another device."
+                ))
         }
         if gone.contains("read") {
-            out.append((.warn, "exclamationmark.triangle", "Without read it can't load anything, not even its own session."))
+            out.append(
+                (.warn, "exclamationmark.triangle", "Without read it can't load anything, not even its own session."))
         }
         if !gone.isEmpty {
-            out.append((.queue, "clock", "Open connections from this device close right away (4003) and reconnect with the new access."))
+            out.append(
+                (
+                    .queue, "clock",
+                    "Open connections from this device close right away (4003) and reconnect with the new access."
+                ))
         }
-        if kept.isEmpty { out.append((.fail, "xmark.octagon", "A device needs at least one scope. To remove it, revoke it.")) }
+        if kept.isEmpty {
+            out.append((.fail, "xmark.octagon", "A device needs at least one scope. To remove it, revoke it."))
+        }
         return out
     }
 

@@ -71,8 +71,12 @@ struct ThemeTests {
         d.set("junk", forKey: ThemeChoice.key)
         #expect(ThemeChoice.stored(d) == .system)
         #expect(ThemeChoice.system.appearance == nil)
-        #expect(ThemeChoice.sun.appearance(hour: 6)?.name == .darkAqua && ThemeChoice.sun.appearance(hour: 7)?.name == .aqua)
-        #expect(ThemeChoice.sun.appearance(hour: 17)?.name == .aqua && ThemeChoice.sun.appearance(hour: 18)?.name == .darkAqua)
+        #expect(
+            ThemeChoice.sun.appearance(hour: 6)?.name == .darkAqua && ThemeChoice.sun.appearance(hour: 7)?.name == .aqua
+        )
+        #expect(
+            ThemeChoice.sun.appearance(hour: 17)?.name == .aqua
+                && ThemeChoice.sun.appearance(hour: 18)?.name == .darkAqua)
         #expect(ThemeChoice.day.appearance?.name == .aqua && ThemeChoice.night.appearance?.name == .darkAqua)
     }
 }

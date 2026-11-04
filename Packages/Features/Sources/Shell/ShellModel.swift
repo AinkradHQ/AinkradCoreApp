@@ -124,9 +124,16 @@ public final class ShellModel {
     static let layoutKey = "ainkrad.core.home.widgets"
     public var editingWidgets = false
     public var addingWidget = false
+    /// What the launcher starts with when it opens (a hand-off from a command that opens it with a search; cleared on use).
+    public var launcherQuery = ""
     #if DEBUG
     /// Snapshots only: draws the second Quick actions tile in its hover state.
     public var debugForceQuickHover = false
+    /// Snapshots only: drops a pane on the edge of another, as a drag would.
+    public func debugDrop(_ id: String, on target: String, edge: String) {
+        let e: TileEdge = edge == "left" ? .left : edge == "right" ? .right : edge == "top" ? .top : .bottom
+        dropPane(id, on: target, edge: e)
+    }
     #endif
     public var coreLink: CoreLink = .none {
         didSet { if oldValue == .live && coreLink != .live { lastLiveAt = Date() } }
@@ -382,7 +389,10 @@ public final class ShellModel {
     }
 
     /// Anything the shell shows over Home or the workspace.
-    public var coverOpen: Bool { sheet != nil || launcherOpen || elevationPanelOpen || bellOpen || overlay != nil || dialog != nil || topDialog != nil }
+    public var coverOpen: Bool {
+        sheet != nil || launcherOpen || elevationPanelOpen || bellOpen || overlay != nil || dialog != nil
+            || topDialog != nil
+    }
 
     public func present(_ d: ShellDialog) {
         launcherOpen = false

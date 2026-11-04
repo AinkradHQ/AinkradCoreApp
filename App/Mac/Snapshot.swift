@@ -51,6 +51,30 @@ enum SnapshotRunner {
         await shot("01-home")
         shell.toggleLauncher()
         await shot("02-launcher")
+        shell.toggleLauncher()
+        shell.launcherQuery = "dev"
+        shell.toggleLauncher()
+        await shot("02b-launcher-query")
+        shell.toggleLauncher()
+        shell.showToast("Added Today", kind: .ok)
+        await shot("02c-toast-ok")
+        shell.showToast("Admin actions locked again. The next one asks for Touch ID.", kind: .warn)
+        await shot("02d-toast-warn")
+        shell.toast = nil
+        shell.presentSheet(
+            title: "End this session?", message: "It stops now. What it already wrote stays.",
+            actions: [ShellSheetAction("Cancel"), ShellSheetAction("End session", destructive: true)])
+        await shot("02e-sheet")
+        shell.sheet = nil
+        shell.elevatedUntil = nil
+        shell.elevationPanelOpen = true
+        await shot("02f-elevation-locked")
+        shell.elevatedUntil = Date().addingTimeInterval(262)
+        await shot("02g-elevation-open")
+        shell.elevatedUntil = Date().addingTimeInterval(44)
+        await shot("02h-elevation-soon")
+        shell.elevationPanelOpen = false
+        shell.elevatedUntil = nil
         shell.toggleBell()
         await shot("03-bell")
         shell.bellOpen = false
@@ -60,8 +84,8 @@ enum SnapshotRunner {
         await shot("05-ws2")
         pane("runners")
         await shot("06-ws3")
-        shell.setSeam(0, leftFraction: 0.5)
-        await shot("12-seam")
+        shell.debugDrop("runners", on: "agents", edge: "bottom")
+        await shot("12-split")
         shell.closePane("runners")
         pane("runners")
         pane("core")
@@ -74,6 +98,9 @@ enum SnapshotRunner {
         shell.show(.home)
         shell.open(.settings)
         await shot("09-settings")
+        shell.settings.selected = "activity"
+        await shot("09b-settings-activity")
+        shell.settings.selected = "appearance"
         shell.open(.shortcuts)
         await shot("10-shortcuts")
         shell.overlay = nil

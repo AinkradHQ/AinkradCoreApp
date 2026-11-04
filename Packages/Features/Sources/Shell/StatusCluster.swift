@@ -165,7 +165,8 @@ private struct ElevationChip: View {
                 let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
                 let soon = left <= 60
                 StatusButton(
-                    title: "\(soon ? "Locks in" : "Unlocked") \(Countdown.text(left))", symbol: soon ? "lock.badge.clock" : "lock.open",
+                    title: "\(soon ? "Locks in" : "Unlocked") \(Countdown.text(left))",
+                    symbol: soon ? "lock.badge.clock" : "lock.open",
                     label: "Touch ID elevation: admin actions unlocked for \(Countdown.text(left))",
                     on: shell.elevationPanelOpen, meter: (Double(left) / shell.elevationSpan, soon)
                 ) { shell.elevationPanelOpen.toggle() }
@@ -195,11 +196,14 @@ struct ElevationPanel: View {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
                     VStack(alignment: .leading, spacing: Space.s3) {
-                        header(left <= 60 ? "Locks in \(Countdown.text(left))" : "Unlocked for \(Countdown.text(left))", "lock.open")
+                        header(
+                            left <= 60 ? "Locks in \(Countdown.text(left))" : "Unlocked for \(Countdown.text(left))",
+                            "lock.open")
                         CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Elevation time left")
                     }
                 }
-                text("Adding devices, renaming, revoking, scopes and clearing lockouts go through without asking again.")
+                text(
+                    "Adding devices, renaming, revoking, scopes and clearing lockouts go through without asking again.")
             } else {
                 header("Admin actions are locked", "lock")
                 text(

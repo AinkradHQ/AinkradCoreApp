@@ -75,6 +75,10 @@ struct LauncherView: View {
             try? await Task.sleep(for: .milliseconds(80))
             focused = true
         }
+        .onAppear {
+            query = shell.launcherQuery
+            shell.launcherQuery = ""
+        }
         .onChange(of: query) { selection = 0 }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Launcher")
@@ -214,7 +218,10 @@ private struct LauncherItem: View {
         }
         // Only a moving pointer selects: the first event on arrival (the launcher opening under a still pointer) does not.
         .onContinuousHover { phase in
-            guard case .active(let p) = phase else { return lastPoint = nil }
+            guard case .active(let p) = phase else {
+                lastPoint = nil
+                return
+            }
             if let last = lastPoint, last != p { hover() }
             lastPoint = p
         }

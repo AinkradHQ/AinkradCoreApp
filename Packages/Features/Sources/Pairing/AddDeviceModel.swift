@@ -53,7 +53,8 @@ final class AddDeviceModel {
     /// How many groups from the start of what was typed equal the real check code.
     var groupsMatching: Int {
         guard let sas = checkCode else { return 0 }
-        let real = sas.uppercased().split(separator: "-"), mine = typed.split(separator: "-")
+        let real = sas.uppercased().split(separator: "-")
+        let mine = typed.split(separator: "-")
         var n = 0
         for (a, b) in zip(real, mine) {
             guard a == b else { break }
@@ -66,7 +67,8 @@ final class AddDeviceModel {
     /// A full group that is wrong (typing the next one is not a mismatch yet).
     var checkMismatch: Bool {
         guard let sas = checkCode else { return false }
-        let real = sas.uppercased().split(separator: "-"), mine = typed.split(separator: "-")
+        let real = sas.uppercased().split(separator: "-")
+        let mine = typed.split(separator: "-")
         return zip(real, mine).contains { $0 != $1 && $1.count == 4 }
     }
 

@@ -20,7 +20,10 @@ enum ShortcutCatalog {
                 ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
             ]
         ),
-        ("Panes", [("Focus mode tabs", "← →"), ("Focus or tile a pane", "double click head"), ("Tile a pane", "drag head")]),
+        (
+            "Panes",
+            [("Focus mode tabs", "← →"), ("Focus or tile a pane", "double click head"), ("Tile a pane", "drag head")]
+        ),
         (
             "Launcher",
             [

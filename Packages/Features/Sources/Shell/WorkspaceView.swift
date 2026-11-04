@@ -90,7 +90,8 @@ struct WorkspaceView: View {
         .zIndex(dragging ? 1 : 0)
         // A pane rises 18 pt and settles from 97 %; Reduce Motion is a fade.
         .transition(
-            reduce ? .opacity : .opacity.combined(with: .offset(y: 18)).combined(with: .scale(scale: 0.97)))
+            reduce ? .opacity : .opacity.combined(with: .offset(y: 18)).combined(with: .scale(scale: 0.97))
+        )
         .onTapGesture { shell.activePane = spec.id }
     }
 
@@ -236,7 +237,11 @@ private struct SeamHandle: View {
             .offset(x: seam.frame.minX, y: seam.frame.minY)
             .onHover { inside in
                 hovering = inside
-                if inside { (horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push() } else { NSCursor.pop() }
+                if inside {
+                    (horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
+                } else {
+                    NSCursor.pop()
+                }
             }
             .gesture(
                 DragGesture(minimumDistance: 1, coordinateSpace: .named("ws"))

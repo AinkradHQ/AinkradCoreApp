@@ -108,7 +108,9 @@ struct TileTreeTests {
     }
 
     @Test func dropTargetPicksTheNearHalf() {
-        let frames = ["a": CGRect(x: 0, y: 0, width: 400, height: 600), "b": CGRect(x: 412, y: 0, width: 400, height: 600)]
+        let frames = [
+            "a": CGRect(x: 0, y: 0, width: 400, height: 600), "b": CGRect(x: 412, y: 0, width: 400, height: 600),
+        ]
         let left = TileTree.dropTarget(at: CGPoint(x: 450, y: 300), frames: frames, excluding: "a")
         #expect(left?.target == "b" && left?.edge == .left && left?.hint.width == 200)
         let bottom = TileTree.dropTarget(at: CGPoint(x: 600, y: 580), frames: frames, excluding: "a")

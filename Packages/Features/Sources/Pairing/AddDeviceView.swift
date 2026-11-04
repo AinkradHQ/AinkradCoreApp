@@ -43,7 +43,8 @@ struct AddDeviceView: View {
         case .code: "Pair a new device"
         case .claimed: "A device wants to join"
         case .approved: "Device paired"
-        case .ended(let why): why == "rejected" ? "Pairing rejected" : why == "burned" ? "Pairing burned" : "Code expired"
+        case .ended(let why):
+            why == "rejected" ? "Pairing rejected" : why == "burned" ? "Pairing burned" : "Code expired"
         }
     }
 
@@ -137,7 +138,7 @@ struct AddDeviceView: View {
     private func claimed(_ info: PairingInfo) -> some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text("Type the check code the new device shows. Approve only once all of it matches.")
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             FactCard {
                 FactRow(key: "Name", value: info.name ?? "Unnamed")
                 FactRow(key: "Platform", value: DeviceWords.platform(info.platform))

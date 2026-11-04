@@ -51,9 +51,12 @@ private struct LockRow: View {
                     Text(lock.key).font(.system(size: MacTextSize.meta, design: .monospaced))
                         .foregroundStyle(palette.text2).textSelection(.enabled)
                     HStack(spacing: Space.s2) {
-                        Text(left == 0 ? "Ended" : soon ? "Ends in \(Countdown.text(left))" : "\(Countdown.text(left)) left")
-                            .font(.system(size: MacTextSize.meta, weight: .medium).monospacedDigit())
-                            .foregroundStyle(soon ? palette.tone(.warn).ink : palette.text)
+                        Text(
+                            left == 0
+                                ? "Ended" : soon ? "Ends in \(Countdown.text(left))" : "\(Countdown.text(left)) left"
+                        )
+                        .font(.system(size: MacTextSize.meta, weight: .medium).monospacedDigit())
+                        .foregroundStyle(soon ? palette.tone(.warn).ink : palette.text)
                         CoreMeter(
                             Double(left) / LockMeter.total(left), low: soon, label: "Lock time left"
                         )
