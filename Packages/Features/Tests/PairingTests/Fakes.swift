@@ -73,8 +73,10 @@ final class FakeService: CoreService, @unchecked Sendable {
         d.status = "revoked"
         return d
     }
+    var refuseCreate = false
     func createPairing(name: String, kind: String, scopes: [String]) async throws -> NewPairing {
-        NewPairing(id: "p_9", code: "ABCDEFGHJK", qr: nil, expiresAt: Date().addingTimeInterval(300))
+        if refuseCreate { throw CoreError.forbiddenScope }
+        return NewPairing(id: "p_9", code: "ABCDEFGHJK", qr: nil, expiresAt: Date().addingTimeInterval(300))
     }
     func pairing(_ id: String) async throws -> PairingInfo {
         PairingInfo(

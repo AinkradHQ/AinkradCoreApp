@@ -49,9 +49,16 @@ final class AddDeviceModel {
             return
         }
         do {
-            mine = try await service.myScopes()
-            scopes = scopes.intersection(mine)
+            try await loadMine(service)
         } catch { fail(error) }
+    }
+
+    /// What this Mac holds now: the Core's own record of this device, else what the session was granted. The Core refuses a
+    /// pairing wider than its creator (403 `forbidden_scope`), so the form never offers more.
+    private func loadMine(_ service: any CoreService) async throws {
+        mine = try await service.myScopes()
+        if let me = try? await service.devices().first(where: { $0.id == service.deviceID }) { mine = me.scopes }
+        scopes = scopes.intersection(mine)
     }
 
     func create() async {
@@ -72,7 +79,15 @@ final class AddDeviceModel {
             stage = .form
         } catch {
             stage = .form
-            fail(error)
+            if CoreError.unwrapping(error) == .forbiddenScope {
+                // Not a bare "not allowed": say what this Mac may hand on, and take back what it may not.
+                try? await loadMine(service)
+                let held = ScopeText.all.filter(mine.contains).joined(separator: ", ")
+                self.error =
+                    "This Mac can only hand on the scopes it holds (\(held.isEmpty ? "none" : held)). Unchecked what it does not hold."
+            } else {
+                fail(error)
+            }
         }
     }
 

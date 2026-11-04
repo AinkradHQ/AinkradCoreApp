@@ -213,6 +213,22 @@ struct AppModelTests {
         if case .approved = add.stage {} else { Issue.record("not approved") }
     }
 
+    @Test func aRefusedScopeIsExplainedAndTakenBackNotShownAsABareError() async throws {
+        let s = FakeService()
+        let m = try app(s)
+        await m.start()
+        m.shell.elevatedUntil = Date().addingTimeInterval(300)
+        let add = AddDeviceModel(host: m)
+        await add.prepare()
+        add.name = "iPhone"
+        add.scopes = ["read", "admin"]
+        s.refuseCreate = true
+        await add.create()
+        #expect(add.stage == .form)
+        #expect(add.error?.contains("only hand on the scopes it holds") == true)
+        #expect(add.error?.contains("read, approve, admin") == true)
+    }
+
     @Test func aRunnerGetsExactlyRunner() {
         let add = AddDeviceModel(
             host: AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() })

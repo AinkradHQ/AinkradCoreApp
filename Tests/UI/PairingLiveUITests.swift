@@ -47,8 +47,14 @@ final class PairingLiveUITests: XCTestCase {
         let code = app.descendants(matching: .any)["pairing-code"].firstMatch
         XCTAssertTrue(code.waitForExistence(timeout: 30), "the typed code is shown, not an error")
         XCTAssertFalse(app.staticTexts["This device is not allowed to do that."].exists, "no refusal")
-        XCTAssertFalse(code.label.isEmpty, "the code is readable text: \(code.label)")
+        // The typed code is on the card as text (spoken character by character), not only in the QR.
+        XCTAssertTrue(code.label.hasPrefix("Pairing code "), "the code is readable: \(code.label)")
+        XCTAssertGreaterThanOrEqual(code.label.split(separator: " ").count, 12, "spoken one character at a time")
         app.buttons["Cancel pairing"].click()
+        let close = app.buttons["Close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 20), "the pairing ended")
+        close.click()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10))
 
         // Forget this Core: in Settings, behind a confirmation; it returns to the connect screen.
         app.typeKey(",", modifierFlags: .command)
