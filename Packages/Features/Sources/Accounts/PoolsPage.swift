@@ -31,6 +31,7 @@ struct PoolsPage: View {
                 if let p = model.selectedPool { PoolDetail(model: model, pool: p) }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pools")
     }
 
@@ -121,7 +122,7 @@ private struct PoolDetail: View {
                             }
                             .disabled(ro)
                         }
-                        .accessibilityElement(children: .combine)
+                        .accessibilityElement(children: .contain)
                     }
                     if let e = model.writeError["bind"] { AccIssue(text: e) }
                 }
@@ -248,7 +249,7 @@ struct BindingsPage: View {
                             }
                             .disabled(model.readOnly)
                         }
-                        .accessibilityElement(children: .combine)
+                        .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("binding-\(b.agent)")
                     }
                     if let e = model.writeError.first(where: { $0.key.hasPrefix("unbind-") })?.value {
@@ -257,6 +258,7 @@ struct BindingsPage: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("bindings")
     }
 }

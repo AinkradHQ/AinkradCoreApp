@@ -60,6 +60,7 @@ private struct AccountsList: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts-list")
     }
 }
@@ -305,6 +306,7 @@ struct AccountDetailView: View {
             }
             .foregroundStyle(palette.primary)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-detail")
     }
 }

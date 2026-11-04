@@ -47,16 +47,22 @@ final class AccountsLiveUITests: XCTestCase {
 
         // Overview: no accounts, and the gate says what the Core will accept.
         openFromLauncher("accounts", expect: "accounts-pane")
-        XCTAssertTrue(element("first-account").waitForExistence(timeout: 20), "an empty Core offers the first account")
-        XCTAssertTrue(element("gate-banner").exists, "the gate's state is shown")
+        let first = app.staticTexts["No accounts yet"]
+        _ = first.waitForExistence(timeout: 20)
         shot("overview")
+        XCTAssertTrue(
+            first.exists, "an empty Core offers the first account. Tree: \(String(app.debugDescription.prefix(6000)))")
+        XCTAssertTrue(element("gate-banner").exists, "the gate's state is shown")
 
         // Pools: the Core's own lists (whatever default pools it has), then a new one.
         element("nav-pools").click()
         XCTAssertTrue(element("pools").waitForExistence(timeout: 20), "the pools page opens")
-        app.buttons["New pool"].firstMatch.click()
         let name = app.textFields["Name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 10), "the New pool dialog opens")
+        for _ in 0..<3 where !name.exists {  // the first click can land while the page is still loading
+            app.buttons["New pool"].firstMatch.click()
+            _ = name.waitForExistence(timeout: 6)
+        }
+        XCTAssertTrue(name.exists, "the New pool dialog opens")
         name.click()
         name.typeText("e5-08-test")
         app.buttons["Create pool"].click()
@@ -67,9 +73,12 @@ final class AccountsLiveUITests: XCTestCase {
         // Bindings: bind an agent to it, see it, unbind it.
         element("nav-bindings").click()
         XCTAssertTrue(element("bindings").waitForExistence(timeout: 20))
-        app.buttons["Bind an agent"].firstMatch.click()
         let agent = app.textFields["Agent"]
-        XCTAssertTrue(agent.waitForExistence(timeout: 10), "the Bind dialog opens")
+        for _ in 0..<3 where !agent.exists {
+            app.buttons["Bind an agent"].firstMatch.click()
+            _ = agent.waitForExistence(timeout: 6)
+        }
+        XCTAssertTrue(agent.exists, "the Bind dialog opens")
         agent.click()
         agent.typeText("e5-08-agent")
         app.buttons["e5-08-test"].firstMatch.click()
@@ -77,7 +86,7 @@ final class AccountsLiveUITests: XCTestCase {
         let row = element("binding-e5-08-agent")
         XCTAssertTrue(row.waitForExistence(timeout: 30), "the binding is listed")
         shot("bound")
-        row.buttons["Unbind"].click()
+        app.buttons["Unbind"].firstMatch.click()
         wait({ !self.element("binding-e5-08-agent").exists }, "the binding is gone")
 
         // Delete the pool again.

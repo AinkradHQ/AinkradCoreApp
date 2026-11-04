@@ -40,6 +40,7 @@ struct OverviewPage: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("overview")
     }
 
@@ -70,6 +71,7 @@ struct FirstAccount: View {
                     .disabled(model.readOnly)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("first-account")
     }
 }
