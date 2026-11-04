@@ -79,6 +79,8 @@ private struct CoreThemeModifier: ViewModifier {
         content
             .environment(\.corePalette, scheme == .dark ? .night : .day)
             .foregroundStyle((scheme == .dark ? Palette.night : Palette.day).text)
+            // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
+            .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
             .font(.system(size: MacTextSize.body))
     }
 }
