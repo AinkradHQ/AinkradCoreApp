@@ -32,6 +32,8 @@ set -euo pipefail
 
 MODE=${1:-uitest}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
+# Modes that launch the app take over the screen: wait for the shared lock and an idle Mac (scripts/ui-lock.sh).
+case $MODE in manual|agents-core) ;; *) [ "${UI_LOCK_HELD:-}" = 1 ] || exec "$HERE/scripts/ui-lock.sh" "$0" "$@" ;; esac
 CORE=${CORE:-$HERE/../AinkradCore}
 BIN=$CORE/target/debug
 SRV=$BIN/ainkrad-core-server CTL=$BIN/ainkradctl RUN=$BIN/ainkrad-runner PTYH=$BIN/ainkrad-ptyhost

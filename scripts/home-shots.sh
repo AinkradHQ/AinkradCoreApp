@@ -5,9 +5,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${OUT:-/private/tmp/claude-501/home-shots}; mkdir -p "$OUT"
-LOCK=/private/tmp/claude-501/ainkrad-uitest.lock
-until mkdir "$LOCK" 2>/dev/null; do sleep 15; done
-trap 'rmdir "$LOCK"' EXIT
+[ "${UI_LOCK_HELD:-}" = 1 ] || exec "$HERE/scripts/ui-lock.sh" "$0" "$@"
 for THEME in $( [ "${1:-both}" = both ] && echo "dark light" || { [ "$1" = night ] && echo dark || echo light; } ); do
   echo "== $THEME -> $OUT"
   cd "$HERE"
