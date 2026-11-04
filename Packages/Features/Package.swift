@@ -7,11 +7,15 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"]),
-        .library(name: "Agents", targets: ["Agents"]),
+        .library(name: "Terminals", targets: ["Terminals"]), .library(name: "Admin", targets: ["Admin"]),
+        .library(name: "Accounts", targets: ["Accounts"]), .library(name: "Agents", targets: ["Agents"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.13.3"),
+        // The vendored fork (no reflow on resize), pinned to a commit of branch `ainkrad-no-reflow`.
+        .package(
+            url: "https://github.com/AhmedMElhalaby/SwiftTerm", revision: "e44352494333686a5de418f85f7927b81c6a9fbe"),
     ],
     targets: [
         .target(
@@ -26,15 +30,46 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
+            name: "Terminals",
+            dependencies: [
+                "Shell", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
+            name: "Admin",
+            dependencies: [
+                "Shell", .product(name: "CoreUI", package: "CoreUI"), .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
+            name: "Accounts",
+            dependencies: [
+                "Shell", "Admin", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Agents", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", "Agents", "Terminals", "Admin", "Accounts", .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "ShellTests", dependencies: ["Shell"]),
+        .testTarget(
+            name: "TerminalsTests",
+            dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(name: "AdminTests", dependencies: ["Admin", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(name: "AccountsTests", dependencies: ["Accounts", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(
             name: "AgentsTests", dependencies: ["Agents", "Shell", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),

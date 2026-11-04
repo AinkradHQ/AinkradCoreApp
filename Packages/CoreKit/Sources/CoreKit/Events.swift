@@ -52,12 +52,18 @@ protocol EventSocket: Sendable {
     func start()
     func ping() async throws
     func receive() async throws -> Data
+    /// Sends one text frame (the terminal socket; the event socket never sends).
+    func send(_ data: Data) async throws
     func cancel()
     /// The close code the Core sent, 0 when none.
     var closeCode: Int { get }
     var closeReason: String { get }
     /// The status of a refused upgrade, when there was one.
     var responseStatus: Int? { get }
+}
+
+extension EventSocket {
+    func send(_ data: Data) async throws { throw CoreError.protocolViolation("this socket cannot send") }
 }
 
 /// `URLSessionWebSocketTask`. It is documented thread-safe; its state is only read after the task ended.
@@ -77,6 +83,7 @@ final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
         @unknown default: Data()
         }
     }
+    func send(_ data: Data) async throws { try await task.send(.string(String(decoding: data, as: UTF8.self))) }
     func cancel() { task.cancel(with: .goingAway, reason: nil) }
     var closeCode: Int { task.closeCode.rawValue }
     var closeReason: String { task.closeReason.flatMap { String(data: $0, encoding: .utf8) } ?? "" }

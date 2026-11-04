@@ -147,12 +147,6 @@ private struct Seam: View {
     @State private var hovering = false
     @Environment(\.corePalette) private var palette
 
-    /// Read while panes close (the seam can render once more with fewer panes than its layout): never index past the end.
-    private var seamLabel: String {
-        let p = shell.panes
-        return p.indices.contains(index + 1) ? "Resize \(p[index].title) and \(p[index + 1].title)" : "Resize panes"
-    }
-
     var body: some View {
         let left = layout.frames[index]
         let right = layout.frames[index + 1]
@@ -183,7 +177,11 @@ private struct Seam: View {
                     .onEnded { _ in start = nil }
             )
             .accessibilityElement()
-            .accessibilityLabel(seamLabel)
+            // A seam can be drawn once more after its pane closed (both closing at once): no index past the end.
+            .accessibilityLabel(
+                shell.panes.indices.contains(index + 1)
+                    ? "Resize \(shell.panes[index].title) and \(shell.panes[index + 1].title)" : "Resize panes"
+            )
             .accessibilityAdjustableAction { dir in
                 let avail = area.width - gap * CGFloat(shell.panes.count - 1)
                 let step: CGFloat = Space.s8 * (dir == .increment ? 1 : -1)

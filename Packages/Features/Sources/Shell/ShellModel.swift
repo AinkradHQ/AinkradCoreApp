@@ -66,6 +66,13 @@ public enum CoreLink: Sendable, Equatable {
     case none, connecting, live, reconnecting, offline
 }
 
+/// What the connection banner says on top of `CoreLink`.
+public enum LinkNotice: Sendable, Equatable {
+    case rateLimited(until: Date?)
+    case renewing
+    case restarted
+}
+
 /// A dialog over everything the shell shows (add device, scopes, revoke, Touch ID). `topDialog` sits above `dialog`.
 public struct ShellDialog: Identifiable {
     public let id: String
@@ -105,7 +112,13 @@ public final class ShellModel {
     public var hiddenWidgets: Set<WidgetKind> = []
     public var editingWidgets = false
     public var addingWidget = false
-    public var coreLink: CoreLink = .none
+    public var coreLink: CoreLink = .none {
+        didSet { if oldValue == .live && coreLink != .live { lastLiveAt = Date() } }
+    }
+    /// When the Core was last reachable: what the "resuming" banner says the screen is current to.
+    public private(set) var lastLiveAt: Date?
+    /// A connection state beyond `coreLink`: the Core says slow down, the session is renewing, the Core restarted.
+    public var linkNotice: LinkNotice?
     /// Retry for the connection banner and the Home Core button when the Core is unreachable.
     public var retryConnection: (@MainActor () -> Void)?
     /// When the session's Touch ID elevation ends; nil when locked.

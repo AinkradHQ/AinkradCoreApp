@@ -1,5 +1,5 @@
 {
-  "originHash" : "8b3a47433ef3c39eb98136bd4d3aef3816596c0c7d75bec34d0d9c3b7220de77",
+  "originHash" : "9e359bc7ff003a1620686aa2ab5627a44b509049d5a45ee6af92b0b4b65fe9a1",
   "pins" : [
     {
       "identity" : "swift-collections",
@@ -35,6 +35,14 @@
       "state" : {
         "revision" : "279aa6b77be6aa842a4bf3c45fa79fa15edf3e07",
         "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swiftterm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/AhmedMElhalaby/SwiftTerm",
+      "state" : {
+        "revision" : "e44352494333686a5de418f85f7927b81c6a9fbe"
       }
     }
   ],

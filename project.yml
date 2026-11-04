@@ -41,6 +41,12 @@ targets:
       - package: Features
         product: Pairing
       - package: Features
+        product: Terminals
+      - package: Features
+        product: Admin
+      - package: Features
+        product: Accounts
+      - package: Features
         product: Agents
     settings:
       base:

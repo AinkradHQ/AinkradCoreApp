@@ -1,0 +1,381 @@
+import CoreUI
+import SwiftUI
+
+/// A titled group the way Settings groups things: a heading and a line under it, then the panel.
+struct AdminSection<Content: View>: View {
+    let title: String
+    let detail: String?
+    @ViewBuilder let content: Content
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+                if let detail {
+                    Text(detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            content
+        }
+        .font(.system(size: MacTextSize.body))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The glass card rows sit in.
+struct AdminPanel<Content: View>: View {
+    var spacing: CGFloat = Space.s3
+    @ViewBuilder let content: Content
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) { content }
+            .padding(Space.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.glassCard, in: coreShape(Radius.cardMac))
+    }
+}
+
+/// A short word in a rounded box: a delivery, a version, a runner. Neutral; never the only carrier of a state.
+struct MetaChip: View {
+    let text: String
+    var mono = false
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        Text(text).font(.system(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default))
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .background(palette.uDim, in: coreShape(Radius.chip))
+    }
+}
+
+/// "Needs Touch ID", "Weakens security": a lock or a warning, then the words.
+struct GateTag: View {
+    let text: String
+    var warn = false
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        Label(text, systemImage: warn ? "exclamationmark.triangle" : "lock")
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(warn ? palette.tone(.warn).ink : palette.text2)
+            .labelStyle(.titleAndIcon)
+    }
+}
+
+/// Progress with no end in sight: a rounded bar with a segment that slides. With Reduce Motion the segment rests in the middle.
+struct AdminBar: View {
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    var body: some View {
+        TimelineView(.animation(paused: reduce)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
+            let phase = reduce ? 0.5 : t - t.rounded(.down)
+            GeometryReader { geo in
+                let seg = geo.size.width * 0.3
+                ZStack(alignment: .leading) {
+                    coreShape(Space.s1 / 2).fill(palette.track)
+                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
+                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
+                }
+                .clipShape(coreShape(Space.s1 / 2))
+            }
+        }
+        .frame(height: Space.s1)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A text link in the primary colour with the one focus ring.
+struct AdminLink: View {
+    let title: String
+    var danger = false
+    var help: String?
+    let action: () -> Void
+    @Environment(\.corePalette) private var palette
+    @FocusState private var focused: Bool
+    var body: some View {
+        Button(action: action) { Text(title).font(.system(size: MacTextSize.body)) }
+            .buttonStyle(.plain)
+            .foregroundStyle(danger ? palette.tone(.fail).ink : palette.primary)
+            .focused($focused).focusEffectDisabled()
+            .coreFocusRing(focused, radius: Radius.chip, palette: palette)
+            .help(help ?? title)
+    }
+}
+
+/// A switch drawn as a rounded rectangle with a square-cornered thumb, with its state in words beside it.
+struct AdminSwitch: View {
+    let label: String
+    @Binding var on: Bool
+    var busy = false
+    @Environment(\.corePalette) private var palette
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        Button {
+            on.toggle()
+        } label: {
+            HStack(spacing: Space.s2) {
+                Text(on ? "On" : "Off").font(.system(size: MacTextSize.meta, weight: .semibold))
+                    .foregroundStyle(palette.text2).frame(minWidth: Space.s5, alignment: .trailing)
+                ZStack(alignment: on ? .trailing : .leading) {
+                    coreShape(Radius.control).fill(on ? palette.btnPrimary : palette.track)
+                        .frame(width: Space.s8 + Space.s2, height: Space.s5 + Space.s1)
+                    coreShape(Radius.chip).fill(on ? palette.btnInk : palette.text2)
+                        .frame(width: Space.s4, height: Space.s4).padding(Space.s1)
+                }
+                .animation(reduce ? nil : Motion.out(Motion.hover), value: on)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focused($focused).focusEffectDisabled()
+        .coreFocusRing(focused, radius: Radius.control, palette: palette)
+        .coreDimWhenDisabled(enabled)
+        .accessibilityLabel(label)
+        .accessibilityValue(on ? "On" : "Off")
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityIdentifier("switch-\(label)")
+    }
+}
+
+/// The inline outcome of a Touch ID that did not elevate, in the panel that asked.
+struct AdminNoticeBanner: View {
+    let notice: AdminNotice?
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        if let n = notice {
+            let c = palette.tone(n.warn ? .warn : .queue)
+            HStack(alignment: .top, spacing: Space.s3) {
+                Image(systemName: n.symbol).foregroundStyle(c.ink).frame(width: Space.s4).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                    Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(n.detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s3)
+            .background(palette.glassCard, in: coreShape(Radius.cardMac))
+            .background(c.fill, in: coreShape(Radius.cardMac))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("stepup-notice")
+        }
+    }
+}
+
+/// A refusal from the Core under a field or a row: the code in mono, then the words.
+struct IssueLine: View {
+    let code: String?
+    let text: String
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+            Image(systemName: "exclamationmark.triangle").accessibilityHidden(true)
+            if let code { Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)) }
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Panel for a dialog over the shell.
+struct AdminDialog<Content: View>: View {
+    let title: String
+    var width: CGFloat = Space.s8 * 15
+    @ViewBuilder let content: Content
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            content
+        }
+        .foregroundStyle(palette.text)
+        .font(.system(size: MacTextSize.body))
+        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .frame(width: width)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
+    }
+}
+
+/// A state that replaces a section: a symbol tile, a title, the words and what to do about it.
+struct StateCard<Actions: View>: View {
+    let symbol: String
+    let title: String
+    let text: String
+    var tone: Tone = .queue
+    var code: String?
+    var errorID: String?
+    @ViewBuilder let actions: Actions
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        let c = palette.tone(tone)
+        VStack(spacing: Space.s2) {
+            Image(systemName: symbol).font(.system(size: MacTextSize.large)).foregroundStyle(c.ink)
+                .frame(width: MacSize.controlLg + Space.s3, height: MacSize.controlLg + Space.s3)
+                .background(c.fill, in: coreShape(Radius.cardMac)).accessibilityHidden(true)
+            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
+            if let code {
+                Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)).padding(.horizontal, Space.s2)
+                    .frame(minHeight: MacSize.chip).background(palette.uDim, in: coreShape(Radius.chip))
+            }
+            if let errorID {
+                HStack(spacing: Space.s2) {
+                    Text("error_id").foregroundStyle(palette.text2)
+                    Text(errorID).font(.system(size: MacTextSize.meta, design: .monospaced)).textSelection(.enabled)
+                }
+                .font(.system(size: MacTextSize.meta))
+            }
+            HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
+        }
+        .padding(Space.s6)
+        .frame(maxWidth: .infinity)
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .overlay { if tone == .fail { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.5), lineWidth: 1) } }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+extension StateCard where Actions == EmptyView {
+    init(symbol: String, title: String, text: String, tone: Tone = .queue, code: String? = nil, errorID: String? = nil)
+    {
+        self.init(symbol: symbol, title: title, text: text, tone: tone, code: code, errorID: errorID) { EmptyView() }
+    }
+}
+
+/// The loading state: a bar, a word, and quiet rows where the content will be.
+struct SectionSkeleton: View {
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            AdminBar().frame(maxWidth: Space.s8 * 5)
+            Text("Loading…").foregroundStyle(palette.text2)
+            ForEach(0..<5, id: \.self) { i in
+                coreShape(Radius.cardMac).fill(palette.glassCard).frame(height: i == 0 ? Space.s8 : Space.s8 + Space.s5)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading")
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
+/// What one admin section shows: the page when the Core answered, else the one state that fits. While changes are paused
+/// (the Core is unreachable or rate limiting) the page stays but is dimmed and cannot be used.
+struct AdminScreen<Content: View>: View {
+    let admin: AdminModel
+    let what: String
+    let intro: String
+    let state: SectionState
+    var empty: (title: String, text: String, symbol: String) = ("Nothing here", "", "tray")
+    var emptyAction: (title: String, run: () -> Void)?
+    let retry: () -> Void
+    @ViewBuilder let content: Content
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s5) {
+            Text(intro).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            if !admin.isConnected {
+                StateCard(
+                    symbol: "wifi.slash", title: "Not connected",
+                    text: "\(what) come from your Core. This Mac is not connected to one right now.")
+            } else {
+                switch state {
+                case .loading: SectionSkeleton()
+                case .ready:
+                    content.opacity(admin.host.pausedReason == nil ? 1 : 0.55).disabled(admin.host.pausedReason != nil)
+                case .empty:
+                    StateCard(
+                        symbol: empty.symbol, title: empty.title,
+                        text: empty.text + " This is not a permission problem: this device holds the admin scope."
+                    ) {
+                        if let emptyAction {
+                            Button(emptyAction.title, action: emptyAction.run).buttonStyle(.coreProminent)
+                        }
+                    }
+                case .failed(let code, let message, let id):
+                    StateCard(
+                        symbol: "exclamationmark.triangle", title: "Could not load this",
+                        text: "The Core answered with an error. \(message) Nothing was changed.", tone: .fail,
+                        code: code,
+                        errorID: id
+                    ) { Button("Try again", action: retry).buttonStyle(.coreProminent) }
+                case .forbidden:
+                    StateCard(
+                        symbol: "lock", title: "This device is not allowed to do that",
+                        text:
+                            "Reading and changing this needs the admin scope (forbidden_scope). Use a device that holds it.",
+                        code: "forbidden_scope")
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+enum AdminWords {
+    /// `Nov 3, 06:27`: the form a list uses, no seconds.
+    static func when(_ d: Date) -> String {
+        d.formatted(.dateTime.month(.abbreviated).day().hour(.twoDigits(amPM: .omitted)).minute())
+    }
+    /// `Nov 3, 06:27:17`: for one row's details.
+    static func whenExact(_ d: Date) -> String {
+        d.formatted(.dateTime.month(.abbreviated).day().hour(.twoDigits(amPM: .omitted)).minute().second())
+    }
+    static func time(_ d: Date) -> String { d.formatted(date: .omitted, time: .standard) }
+    static func bytes(_ n: Int64) -> String { "\(n) B" }
+    static func number(_ n: Int64) -> String { n.formatted(.number.grouping(.never)) }
+}
+
+/// The states of a gate as nodes with what each step needs between them: met or not met, in words, a symbol and a bar.
+struct AdminFlow: View {
+    struct Node {
+        let title: String
+        let sub: String
+    }
+    struct Edge {
+        let label: String
+        let met: Bool
+    }
+    let nodes: [Node]
+    let current: Int
+    let edges: [Edge]
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Space.s2) {
+            ForEach(Array(nodes.enumerated()), id: \.offset) { i, n in
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(n.sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(1)
+                }
+                .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+                .background(i == current ? palette.navActive : palette.uDim, in: coreShape(Radius.control))
+                .overlay {
+                    if i == current { coreShape(Radius.control).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(n.title), \(n.sub)\(i == current ? ", current" : "")")
+                if i < edges.count {
+                    let e = edges[i]
+                    VStack(spacing: Space.s1) {
+                        coreShape(Space.s1 / 2).fill(e.met ? palette.primary : palette.tone(.warn).ink.opacity(0.6))
+                            .frame(height: Space.s1)
+                        Label(e.label + " · " + (e.met ? "met" : "not met"), systemImage: e.met ? "checkmark" : "lock")
+                            .font(.system(size: MacTextSize.meta)).labelStyle(.titleAndIcon)
+                            .foregroundStyle(e.met ? palette.text2 : palette.tone(.warn).ink).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+}

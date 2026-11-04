@@ -1,3 +1,5 @@
+import Accounts
+import Admin
 import Agents
 import CoreKit
 import CoreUI
@@ -5,6 +7,7 @@ import Foundation
 import Observation
 import Shell
 import SwiftUI
+import Terminals
 
 /// The app's root state: first run, the desktop, or a stop that needs a person. It owns the Core connection, turns its
 /// events into the status cluster, the bell and the Devices and Lockouts screens, and runs every elevated action.
@@ -26,6 +29,14 @@ public final class AppModel {
     private(set) var devices: DevicesModel!
     private(set) var lockouts: LockoutsModel!
     private(set) var addDevice: AddDeviceModel?
+    /// Terminals and runners (E5-05); nil until a Core connection exists.
+    public private(set) var terminals: TerminalsModel?
+    /// Core settings, Feature switches, Secrets, Audit and Ops (E5-07); its screens say "not connected" until a Core is open.
+    public private(set) var admin: AdminModel!
+    /// Provider accounts, pools and bindings (E5-08); its screens say "not connected" until a Core is open.
+    public private(set) var accounts: AccountsModel!
+    private var rateLimitEnd: Task<Void, Never>?
+    private var restartedEnd: Task<Void, Never>?
     var confirmForget = false
 
     private let keyStore: any KeyStore
@@ -62,6 +73,8 @@ public final class AppModel {
         }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
+        admin = AdminModel(host: AdminHostAdapter(app: self))
+        accounts = AccountsModel(host: AdminHostAdapter(app: self))
         shell.elevate = { [weak self] in
             guard let self else { return }
             Task {
@@ -110,6 +123,13 @@ public final class AppModel {
             return
         }
         shell.home.coreName = "Home Core"
+        if let live = service as? LiveCoreService {
+            let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
+            model.install()
+            terminals = model
+            admin.attach(connection: live.connection)
+            accounts.attach(connection: live.connection)
+        }
         phase = .desktop
         await connect()
     }
@@ -131,8 +151,13 @@ public final class AppModel {
             switch f.kind {
             case .offline, .unproven, .rateLimited:
                 shell.coreLink = .offline
+                var wait = 8.0
+                if case .rateLimited(let after)? = CoreError.unwrapping(error) {
+                    noteRateLimit(after)
+                    wait = max(wait, after ?? 0)
+                }
                 retry = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(8))
+                    try? await Task.sleep(for: .seconds(wait))
                     if !Task.isCancelled { await self?.connect() }
                 }
             default:
@@ -145,6 +170,9 @@ public final class AppModel {
     func refreshAll() async {
         await devices.reload()
         await lockouts.reload()
+        terminals?.resync()
+        admin.resync()
+        accounts.resync()
     }
 
     private func startEvents(_ service: any CoreService) {
@@ -159,8 +187,28 @@ public final class AppModel {
 
     func handle(_ e: ServiceEvent) async {
         switch e {
-        case .live: shell.coreLink = .live
+        case .live:
+            shell.coreLink = .live
+            if shell.linkNotice == .renewing {
+                shell.linkNotice = nil
+                shell.showToast("Session renewed. Nothing was lost.")
+            }
         case .reconnecting: shell.coreLink = .reconnecting
+        case .renewing:
+            shell.coreLink = .reconnecting
+            shell.linkNotice = .renewing
+        case .rateLimited(let after):
+            shell.coreLink = .reconnecting
+            noteRateLimit(after)
+        case .restarted:
+            shell.coreLink = .live
+            shell.elevatedUntil = nil
+            shell.linkNotice = .restarted
+            restartedEnd?.cancel()
+            restartedEnd = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(20))
+                if !Task.isCancelled, self?.shell.linkNotice == .restarted { self?.shell.linkNotice = nil }
+            }
         case .gap: await refreshAll()
         case .ended(let error):
             let f = Failure.from(error)
@@ -168,9 +216,27 @@ public final class AppModel {
             shell.coreLink = .none
             phase = .blocked(f)
         case .event(let kind, let pairing, _):
+            terminals?.event(kind: kind)
+            admin.event(kind: kind)
+            accounts.event(kind: kind)
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
             if kind.hasPrefix("pairing."), let pairing { await pairingEvent(kind, pairing) }
+        }
+    }
+
+    // MARK: rate limit
+
+    /// The Core said slow down: the banner counts the wait down, changes are paused until it ends.
+    func noteRateLimit(_ after: TimeInterval?) {
+        let wait = max(after ?? 30, 1)
+        shell.linkNotice = .rateLimited(until: Date().addingTimeInterval(wait))
+        rateLimitEnd?.cancel()
+        rateLimitEnd = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(wait))
+            guard !Task.isCancelled, let self, case .rateLimited? = self.shell.linkNotice else { return }
+            self.shell.linkNotice = nil
+            self.shell.showToast("Rate limit lifted. Changes are back.")
         }
     }
 
@@ -278,6 +344,11 @@ public final class AppModel {
         shell.bell.removeAll()
         shell.dialog = nil
         shell.overlay = nil
+        shell.closeAllPanes()
+        terminals = nil
+        admin.detach()
+        accounts.detach()
+        shell.linkNotice = nil
         firstRun.reset()
         phase = .firstRun
     }

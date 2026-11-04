@@ -51,9 +51,7 @@ final class AgentsLiveUITests: XCTestCase {
         app.launchEnvironment["CORE_IT_SAS_FILE"] = try XCTUnwrap(env["CORE_IT_SAS_FILE"])
         app.launch()
         defer { app.terminate() }
-        try LivePairing.pair(
-            app, url: try XCTUnwrap(env["CORE_IT_URL"]), code: try XCTUnwrap(env["CORE_IT_CODE"]),
-            sasFile: env["CORE_IT_SAS_FILE"])
+        try LivePairing.pair(app, env: env)
 
         // The list, live: nothing yet.
         run("agents")

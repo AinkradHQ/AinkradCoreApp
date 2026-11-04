@@ -1,4 +1,6 @@
 #if DEBUG
+import Accounts
+import Admin
 import CoreKit
 import CryptoKit
 import Foundation
@@ -109,6 +111,18 @@ extension AppModel {
     public func debugCreateAddDevice(name: String) async {
         addDevice?.name = name
         await addDevice?.create()
+    }
+    /// The admin states on sample data (E5-07), for screenshots and clicking through. Needs no Core.
+    public func debugAdminDemo() -> AdminDemo {
+        AdminDemo(admin: admin) { [weak self] n in
+            self?.stepUpNotice = n == nil ? nil : StepUpNotice(phase: .cancelled, done: "stored", keepsEdit: true)
+        }
+    }
+    /// The Core app's states on sample data (E5-08), for screenshots and clicking through. Needs no Core.
+    public func debugAccountsDemo() -> AccountsDemo {
+        AccountsDemo(model: accounts) { [weak self] n in
+            self?.stepUpNotice = n == nil ? nil : StepUpNotice(phase: .cancelled, done: "changed", keepsEdit: true)
+        }
     }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }
     public var debugPairingCode: String? {

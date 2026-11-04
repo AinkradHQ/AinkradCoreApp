@@ -1,3 +1,4 @@
+import Accounts
 import Shell
 import SwiftUI
 
@@ -6,6 +7,8 @@ import SwiftUI
 enum Registration {
     static func install(into app: AppModel) {
         let shell = app.shell
+        app.admin.install()
+        app.accounts.install()
         shell.settings.section(
             SettingsSection(id: "devices", group: .core, title: "Devices", symbol: "iphone", order: 1) {
                 DevicesSection(app: app)
