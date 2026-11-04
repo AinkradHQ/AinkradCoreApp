@@ -68,9 +68,9 @@ private struct CoreButtonBody: View {
             }
         }
         .coreFocusRing(focused || forced == .focused, radius: size.radius, palette: palette)
-        .opacity(enabled ? 1 : 0.45)
+        .coreDimWhenDisabled(enabled)
         .scaleEffect(pressed && !reduce ? 0.97 : 1)
-        .animation(reduce ? nil : Motion.press(Motion.press), value: pressed)
+        .coreAnimation(Motion.press(Motion.press), value: pressed)
         .animation(Motion.out(Motion.hover), value: hover)
         .onHover { hovering = $0 }
         .focusEffectDisabled()

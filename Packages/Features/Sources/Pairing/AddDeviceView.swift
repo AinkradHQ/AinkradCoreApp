@@ -52,7 +52,7 @@ struct AddDeviceView: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text("Name the device, choose what it may do, and you get a code that lasts 5 minutes.")
                 .foregroundStyle(palette.text2)
-            FieldBox(label: "Device name", placeholder: "iPhone, linux-01…", text: $model.name, autofocus: true) {
+            CoreTextField("Device name", placeholder: "iPhone, linux-01…", text: $model.name, autofocus: true) {
                 Task { await model.create() }
             }
             CoreSegmented(

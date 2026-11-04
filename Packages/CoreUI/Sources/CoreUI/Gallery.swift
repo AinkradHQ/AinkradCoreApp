@@ -9,6 +9,8 @@ public struct CoreUIGallery: View {
     @State private var toast: ToastItem?
     @State private var confirm = false
     @State private var destructive = false
+    @State private var fieldText = "linux-01"
+    @State private var checks: Set<String> = ["read", "terminal"]
 
     public init() {}
 
@@ -22,6 +24,7 @@ public struct CoreUIGallery: View {
                 surfaces
                 rows
                 badges
+                fields
                 segmented
                 banners
                 overlays
@@ -129,6 +132,35 @@ public struct CoreUIGallery: View {
                 width: Space.s8 * 2, alignment: .leading)
             HStack(spacing: Space.s2) { ForEach(items.indices, id: \.self) { items[$0] } }
         }
+    }
+
+    private var fields: some View {
+        section("Text field and checkbox") {
+            HStack(alignment: .top, spacing: Space.s4) {
+                CoreTextField("Rest", placeholder: "Device name", text: $fieldText)
+                CoreTextField("Focus", placeholder: "Device name", text: $fieldText)
+                    .environment(\.coreForcedInteraction, .focused)
+                CoreTextField("Error", placeholder: "Device name", text: $fieldText, error: "Use 1 to 64 characters.")
+                CoreTextField("Disabled", placeholder: "Device name", text: $fieldText).disabled(true)
+            }
+            HStack(alignment: .top, spacing: Space.s4) {
+                CoreTextField("Code", placeholder: "ainkrad-pair:v1?", text: $fieldText, mono: true, suffix: ":443")
+                CoreTextField("Large", placeholder: "K7QD", text: $fieldText, mono: true, big: true)
+            }
+            VStack(alignment: .leading, spacing: Space.s2) {
+                ForEach(["read", "approve", "terminal"], id: \.self) { name in
+                    CoreCheckbox(
+                        name, detail: "What this scope allows", isOn: checkBinding(name), mono: true)
+                }
+                CoreCheckbox("Disabled", detail: "Not available here", isOn: checkBinding("admin")).disabled(true)
+            }
+        }
+    }
+
+    private func checkBinding(_ name: String) -> Binding<Bool> {
+        Binding(
+            get: { checks.contains(name) },
+            set: { if $0 { checks.insert(name) } else { checks.remove(name) } })
     }
 
     private var segmented: some View {
