@@ -20,12 +20,17 @@ public struct LauncherEntry: Identifiable {
     public let symbol: String
     public let keywords: [String]
     public let isAction: Bool
+    /// The tile behind the glyph: blue for apps and actions, slate for the Mac's own places (Settings, shortcuts).
+    public let tile: Tile
     public let run: @MainActor () -> Void
+
+    public enum Tile: Sendable { case blue, slate }
 
     public init(
         id: String, title: String, sub: String? = nil, symbol: String = "square", keywords: [String] = [],
-        isAction: Bool = false, run: @escaping @MainActor () -> Void
+        isAction: Bool = false, tile: Tile = .blue, run: @escaping @MainActor () -> Void
     ) {
+        self.tile = tile
         self.id = id
         self.title = title
         self.sub = sub

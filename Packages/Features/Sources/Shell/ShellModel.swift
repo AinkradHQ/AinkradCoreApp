@@ -176,6 +176,24 @@ public final class ShellModel {
         showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
+        // Follow the sun changes sides at 07:00 and 18:00: look again every minute.
+        Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self else { return }
+                if self.theme == .sun { NSApp.appearance = self.theme.appearance }
+            }
+        }
+        launcher.register(
+            LauncherEntry(
+                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
+                symbol: "gearshape", keywords: ["preferences", "appearance", "activity"], tile: .slate
+            ) { [weak self] in self?.open(.settings) })
+        launcher.register(
+            LauncherEntry(
+                id: "shortcuts", title: "Keyboard Shortcuts", sub: "every key the app answers to",
+                symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
+            ) { [weak self] in self?.open(.shortcuts) })
         launcher.register(
             LauncherEntry(
                 id: "widgets.add", title: "Add Widget…", sub: "Put a widget on Home", symbol: "plus",
