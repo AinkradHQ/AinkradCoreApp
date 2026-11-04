@@ -136,7 +136,9 @@ private struct FocusTabs: View {
                 } label: {
                     Text(p.sub ?? p.title).font(.system(size: MacTextSize.body, weight: .medium)).lineLimit(1)
                         .truncationMode(.tail)
+                        // As wide as the label, 220 pt at most: frame first, then fixedSize so it does not stretch to fill.
                         .frame(maxWidth: Space.s8 * 7)
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
                         .background {
                             if on {
@@ -164,6 +166,7 @@ private struct FocusTabs: View {
             shell.cyclePane(1)
             return .handled
         }
+        .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, Space.s4)
         .padding(.top, Space.s2)

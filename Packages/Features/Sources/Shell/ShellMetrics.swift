@@ -19,5 +19,5 @@ enum ShellMetrics {
     static let launcherWidth = Space.s8 * 20
     static let bellWidth: CGFloat = 420
     /// The prototype's Settings overlay is 1080 wide.
-    static let settingsSize = CGSize(width: 1080, height: Space.s8 * 21)
+    static let settingsSize = CGSize(width: 1080, height: Space.s8 * 23)
 }
