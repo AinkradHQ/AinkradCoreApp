@@ -157,6 +157,8 @@ public final class TerminalsDemo {
     /// Shows one scene: panes are closed first, then what the scene needs is opened.
     public func show(_ scene: String) async {
         shell.closeAllPanes()
+        // Let the closing panes leave before the next scene opens one with the same id.
+        try? await Task.sleep(for: .milliseconds(450))
         shell.closeDialog()
         shell.closeTopDialog()
         shell.sheet = nil

@@ -31,8 +31,9 @@ struct TerminalPaneView: View {
                 }
                 if let c = v.card {
                     ZStack {
+                        // The prototype's veil: deep blue at half strength, the same in night and day.
                         coreShape(Radius.cardMac).fill(
-                            palette.isDay ? Color.white.opacity(0.35) : Color.black.opacity(0.3))
+                            Color(red: 6 / 255, green: 12 / 255, blue: 24 / 255).opacity(0.5))
                         TermCard(
                             title: c.title, text: c.body, note: c.note,
                             actions: c.actions.map { a in
@@ -45,6 +46,7 @@ struct TerminalPaneView: View {
                         .padding(Space.s5)
                     }
                     .background(.ultraThinMaterial, in: coreShape(Radius.cardMac))
+                    .environment(\.colorScheme, .dark)
                     .transition(.opacity)
                 }
             }
