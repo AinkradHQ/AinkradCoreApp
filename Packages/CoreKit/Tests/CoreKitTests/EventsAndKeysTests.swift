@@ -69,6 +69,22 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
         #expect(sockets.sockets.first?.cancelled == true, "the socket was closed, not left open until the next message")
     }
 
+    @Test func aCoreThatStopsAnsweringIsReconnectingNotLiveForEver() async throws {
+        let h = try Harness()
+        let sockets = SocketFactory([.silentAfter(1), .wait])
+        let conn = try h.connection(sockets: sockets)
+        var order: [String] = []
+        for await update in conn.events(after: 0) {
+            if case .live = update { order.append("live") }
+            if case .reconnecting = update {
+                order.append("reconnecting")
+                break
+            }
+        }
+        #expect(order == ["live", "reconnecting"], "no pong: the stream says so instead of staying live")
+        #expect(sockets.sockets.first?.cancelled == true)
+    }
+
     @Test func scopeChangedGapsAndResetsTheCursorFromLatest() async throws {
         let h = try Harness()
         h.core.latestSeq = 77

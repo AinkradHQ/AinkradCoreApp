@@ -324,6 +324,8 @@ final class FakeSocket: EventSocket, @unchecked Sendable {
         case failPing
         case closeWith(Int)
         case wait
+        /// Answers this many pings, then takes the connection and says nothing (a paused Core).
+        case silentAfter(Int)
     }
     let behavior: Behavior
     private let lock = NSLock()
@@ -332,7 +334,18 @@ final class FakeSocket: EventSocket, @unchecked Sendable {
     init(_ b: Behavior) { behavior = b }
     var cancelled: Bool { lock.withLock { cancelledFlag } }
     func start() {}
-    func ping() async throws { if case .failPing = behavior { throw URLError(.cannotConnectToHost) } }
+    private var pings = 0
+    func ping() async throws {
+        if case .failPing = behavior { throw URLError(.cannotConnectToHost) }
+        guard case .silentAfter(let n) = behavior else { return }
+        let n1 = lock.withLock { () -> Int in
+            pings += 1
+            return pings
+        }
+        if n1 <= n { return }
+        while !cancelled { try await Task.sleep(for: .milliseconds(5)) }
+        throw URLError(.cancelled)
+    }
     func receive() async throws -> Data {
         if case .closeWith = behavior { throw URLError(.networkConnectionLost) }
         return try await withCheckedThrowingContinuation { c in
