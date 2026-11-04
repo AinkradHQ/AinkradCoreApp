@@ -14,6 +14,10 @@ enum Registration {
                 DevicesSection(app: app)
             })
         shell.settings.section(
+            SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
+                ForgetSection(app: app)
+            })
+        shell.settings.section(
             SettingsSection(id: "lockouts", group: .security, title: "Lockouts", symbol: "lock", order: 0) {
                 LockoutsSection(app: app)
             })

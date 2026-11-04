@@ -87,13 +87,25 @@ private struct PoolDetail: View {
         let bound = model.bindings(of: pool)
         let first = model.firstReady(in: pool)
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(
-                "\(model.providerName(pool.provider)) pool. "
-                    + (pool.isDefault
-                        ? "The default: it also serves every agent of this provider with no binding."
-                        : "Serves the agents bound to it.")
-            )
-            .foregroundStyle(palette.text2)
+            HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
+                Text(
+                    "\(model.providerName(pool.provider)) pool. "
+                        + (pool.isDefault
+                            ? "The default: it also serves every agent of this provider with no binding. The default cannot be deleted; make another pool the default first."
+                            : "Serves the agents bound to it.")
+                )
+                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Space.s2)
+                // Always shown, so the option is findable; the Core refuses the default pool, so it is off there with the reason above.
+                Button {
+                    AccountDialogs.openDeletePool(model, pool)
+                } label: {
+                    Label("Delete pool…", systemImage: ro ? "lock" : "trash")
+                }
+                .buttonStyle(.coreDanger).disabled(ro || pool.isDefault)
+                .help(pool.isDefault ? "The default pool cannot be deleted" : "Delete \(pool.name) and its bindings")
+                .accessibilityIdentifier("pool-delete-button")
+            }
             HStack(alignment: .top, spacing: Space.s3) {
                 AccPanel(spacing: Space.s2) {
                     HStack {
@@ -151,12 +163,6 @@ private struct PoolDetail: View {
                     )
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
-                    if !pool.isDefault {
-                        AccLink(title: "Delete pool…", symbol: ro ? "lock" : nil, danger: true) {
-                            AccountDialogs.openDeletePool(model, pool)
-                        }
-                        .disabled(ro)
-                    }
                 }
             }
         }

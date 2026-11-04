@@ -130,7 +130,7 @@ extension AgentsModel {
         syncLauncher()
         let now = Date()
         let list = pending
-        let live = Set(list.map { "agents.ap.\($0.id)" })
+        let live = Set(list.map { $0.key })
         for gone in registered.subtracting(live) {
             shell.bell.remove(gone)
             notifier.clear(id: gone)
@@ -138,9 +138,9 @@ extension AgentsModel {
         registered = live
         for r in list {
             shell.bell.add(bellItem(r, now: now))
-            let id = "agents.ap.\(r.id)"
-            if primed, !announced.contains(r.id) {
-                announced.insert(r.id)
+            let id = r.key
+            if primed, !announced.contains(id) {
+                announced.insert(id)
                 if notifyApprovals {
                     let h = sessions.session(r.session)?.harness ?? "An agent"
                     notifier.post(
@@ -148,7 +148,7 @@ extension AgentsModel {
                         session: r.session)
                 }
             } else {
-                announced.insert(r.id)
+                announced.insert(id)
             }
         }
         if list.isEmpty {
@@ -170,7 +170,7 @@ extension AgentsModel {
         let s = sessions.session(r.session)
         let left = r.remaining(now: now).map { "expires in \(AgentWords.clock($0))" }
         return BellItem(
-            id: "agents.ap.\(r.id)", kind: .approval,
+            id: r.key, kind: .approval,
             title: "\(s?.harness ?? "An agent") wants to use \(r.tool)",
             sub: [s.map { runnerName($0.runner) }, r.input.isEmpty ? nil : r.input, left].compactMap { $0 }
                 .joined(separator: " · "),

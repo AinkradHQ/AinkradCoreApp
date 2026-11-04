@@ -147,4 +147,10 @@ struct ModelTests {
             m.state(for: CoreError.offline("down"))
                 == .failed(code: "offline", message: "The Core cannot be reached: down"))
     }
+
+    @Test func aPoolNameFollowsTheCoresRule() {
+        #expect(PoolName.isValid("client-work") && PoolName.isValid("e5-08.test_2"))
+        #expect(!PoolName.isValid("Client work") && !PoolName.isValid("2fast") && !PoolName.isValid(""))
+        #expect(!PoolName.isValid(String(repeating: "a", count: 65)))
+    }
 }

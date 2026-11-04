@@ -110,8 +110,18 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         return try await session(id)
     }
 
+    /// The real Core answers a cancel at once and ends the session later (after the tool call in flight); false does the same.
+    public var cancelEndsSession = true
+
     public func cancel(_ id: String) async throws -> AgentSessionInfo {
-        try await finish(id, "cancel", .cancelled, "cancelled")
+        if !cancelEndsSession {
+            calls.append("cancel")
+            guard let s = lock.withLock({ sessionsByID[id] }) else {
+                throw CoreError.http(status: 404, code: "not_found", message: "no such session")
+            }
+            return s
+        }
+        return try await finish(id, "cancel", .cancelled, "cancelled")
     }
     public func kill(_ id: String) async throws -> AgentSessionInfo { try await finish(id, "kill", .failed, "failed") }
 

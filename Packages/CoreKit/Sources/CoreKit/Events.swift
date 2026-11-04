@@ -1,6 +1,7 @@
 import AinkradClient
 import Foundation
 import OpenAPIRuntime
+import os
 
 /// What the event stream tells its consumer.
 public enum EventUpdate: Sendable {
@@ -93,6 +94,9 @@ final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
 /// The consumer's buffer is full: the cursor stays before the event that did not fit, and the stream replays after a pause.
 struct EventBackpressure: Error {}
 
+/// A ping that nobody answered.
+struct SilentCore: Error {}
+
 /// How a socket ended without an error to throw.
 enum FollowEnd { case closed, scopeChanged }
 
@@ -104,6 +108,11 @@ struct EventRunner: Sendable {
     let clock: any CoreClock
     let makeSocket: @Sendable (URLRequest) -> any EventSocket
     static let page = 1000
+    /// A Core that was paused or lost the network still takes the TCP connection and answers nothing, so a socket with no
+    /// error looks alive for ever. Ping every `pingEvery`; no pong within `pongWithin` means the Core is gone (the events socket
+    /// answers pings; the Core pings it too). Real time, not the injected clock: it is about the network, not scheduling.
+    var pingEvery: Duration = .seconds(10)
+    var pongWithin: Duration = .seconds(5)
 
     func run(after: Int64?, into out: AsyncStream<EventUpdate>.Continuation) async {
         defer { out.finish() }
@@ -210,12 +219,26 @@ struct EventRunner: Sendable {
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
         let socket = makeSocket(request)
         socket.start()
+        let silent = OSAllocatedUnfairLock(initialState: false)
         // Cancelling the consumer closes the socket at once, not when the next message happens to arrive.
         return try await withTaskCancellationHandler {
             do {
                 // A pong proves the upgrade went through: a quiet stream sends nothing else.
-                try await socket.ping()
+                try await ping(socket)
                 out.yield(.live)
+                let (every, probe) = (pingEvery, ping)
+                let watchdog = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: every)
+                        if Task.isCancelled { return }
+                        do { try await probe(socket) } catch {
+                            if error is SilentCore { silent.withLock { $0 = true } }
+                            socket.cancel()  // ends the receive below
+                            return
+                        }
+                    }
+                }
+                defer { watchdog.cancel() }
                 while true {
                     let data = try await socket.receive()
                     try deliver(data, &last, out)
@@ -224,10 +247,42 @@ struct EventRunner: Sendable {
                 socket.cancel()
                 if error is EventBackpressure { throw error }
                 if Task.isCancelled { throw CancellationError() }
+                if error is SilentCore || silent.withLock({ $0 }) {
+                    throw CoreError.offline("the Core stopped answering")
+                }
                 return try await classify(socket, session: session)
             }
         } onCancel: {
             socket.cancel()
+        }
+    }
+
+    /// A ping that must be answered within `pongWithin`; on silence the socket is cancelled so nothing stays pending.
+    func ping(_ socket: any EventSocket) async throws {
+        let wait = pongWithin
+        let answered = OSAllocatedUnfairLock(initialState: false)
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
+            // Whoever finishes first resumes `c`; the other does nothing.
+            @Sendable func finish(_ result: Result<Void, any Error>) -> Bool {
+                guard
+                    answered.withLock({ done in
+                        defer { done = true }
+                        return !done
+                    })
+                else { return false }
+                c.resume(with: result)
+                return true
+            }
+            Task {
+                do {
+                    try await socket.ping()
+                    _ = finish(.success(()))
+                } catch { _ = finish(.failure(error)) }
+            }
+            Task {
+                try? await Task.sleep(for: wait)
+                if finish(.failure(SilentCore())) { socket.cancel() }
+            }
         }
     }
 

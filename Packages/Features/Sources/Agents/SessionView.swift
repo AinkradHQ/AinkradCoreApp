@@ -51,6 +51,7 @@ struct RunHeader: View {
 
     var body: some View {
         let st = AgentWords.status(session, waiting: model.waiting(session.id))
+        let stopping = model.stopping[session.id]
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s2) {
                 StateBadge(st.label, tone: st.tone, symbol: st.symbol)
@@ -69,7 +70,8 @@ struct RunHeader: View {
                 Spacer(minLength: Space.s2)
                 if session.live {
                     Button("Cancel") { model.confirmCancel(session.id) }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small, busy: stopping != nil))
+                        .disabled(stopping != nil)
                         .help("Ask \(session.harness) to stop after its current tool call")
                     Button("Kill") { model.confirmKill(session.id) }
                         .buttonStyle(AgentDangerButtonStyle())
@@ -77,6 +79,20 @@ struct RunHeader: View {
                 }
             }
             .font(.system(size: MacTextSize.body))
+            if session.live, let stop = stopping {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    StateBadge(
+                        stop == .killing ? "Killing" : "Cancelling", tone: .warn, symbol: "hourglass")
+                    Text(
+                        stop == .killing
+                            ? "Stopping it on the runner now."
+                            : "It finishes the tool call in flight, then ends as cancelled. Kill stops it at once."
+                    )
+                    .foregroundStyle(palette.text2)
+                }
+                .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)
+                .accessibilityIdentifier("session-stopping")
+            }
             HStack(alignment: .top, spacing: Space.s5) {
                 stat("Tokens in", session.usage.map { AgentWords.tokens($0.input) } ?? "none yet")
                 stat("Tokens out", session.usage.map { AgentWords.tokens($0.output) } ?? "none yet")

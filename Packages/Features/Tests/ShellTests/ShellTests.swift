@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -83,5 +84,19 @@ struct ShellModelTests {
         #expect(shell.panes.map(\.id) == ["b", "c", "a"])
         shell.closePane("a")
         #expect(shell.panes.map(\.id) == ["b", "c"] && shell.activePane == "c")
+    }
+}
+
+@MainActor
+struct ThemeTests {
+    @Test func theChoiceIsRememberedAndSystemMeansNoOverride() {
+        let d = UserDefaults(suiteName: "theme-tests-\(UUID())")!
+        #expect(ThemeChoice.stored(d) == .system)
+        d.set("night", forKey: ThemeChoice.key)
+        #expect(ThemeChoice.stored(d) == .night)
+        d.set("junk", forKey: ThemeChoice.key)
+        #expect(ThemeChoice.stored(d) == .system)
+        #expect(ThemeChoice.system.appearance == nil)
+        #expect(ThemeChoice.day.appearance?.name == .aqua && ThemeChoice.night.appearance?.name == .darkAqua)
     }
 }

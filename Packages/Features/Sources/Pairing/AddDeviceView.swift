@@ -95,7 +95,7 @@ struct AddDeviceView: View {
                     Text(Self.shown(p.code)).font(
                         .system(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced)
                     )
-                    .textSelection(.enabled).accessibilityLabel(
+                    .textSelection(.enabled).accessibilityElement(children: .ignore).accessibilityLabel(
                         "Pairing code \(p.code.map { String($0) }.joined(separator: " "))"
                     )
                     .accessibilityIdentifier("pairing-code")

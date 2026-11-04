@@ -199,24 +199,29 @@ private struct NewPoolDialog: View {
         let chosen = provider.isEmpty ? (model.providers.first?.id ?? "") : provider
         AccDialog(title: "New pool", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                CoreTextField("Name", placeholder: "Client work", text: $name, autofocus: true) { go(chosen) }
+                CoreTextField("Name", placeholder: "client-work", text: $name, autofocus: true) { go(chosen) }
                 CoreFieldLabel("Provider")
                 CoreSegmented(
                     "Provider", segments: model.providers.map { CoreSegment($0.id, $0.name) },
                     selection: Binding(get: { chosen }, set: { provider = $0 }))
                 Text("A pool holds accounts of one provider. It starts empty.").font(.system(size: MacTextSize.meta))
+                let typed = name.trimmingCharacters(in: .whitespaces)
+                if !typed.isEmpty && !PoolName.isValid(typed) {
+                    AccIssue(text: PoolName.rule)
+                }
                 if let e = model.writeError["new-pool"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(
                     confirm: "Create pool", busy: busy,
-                    enabled: !name.trimmingCharacters(in: .whitespaces).isEmpty && !chosen.isEmpty, cancel: close
+                    enabled: PoolName.isValid(name.trimmingCharacters(in: .whitespaces)) && !chosen.isEmpty,
+                    cancel: close
                 ) { go(chosen) }
             }
         }
         .accessibilityIdentifier("pool-new")
     }
     private func go(_ p: String) {
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard PoolName.isValid(name.trimmingCharacters(in: .whitespaces)) else { return }
         busy = true
         Task {
             let ok = await model.createPool(name: name, provider: p)
@@ -393,5 +398,17 @@ struct AccountsGateSection: View {
         }
         .font(.system(size: MacTextSize.body)).frame(maxWidth: .infinity, alignment: .leading)
         .task { await model.reload() }
+    }
+}
+
+/// The Core's rule for a pool name (`[a-z][a-z0-9._-]{0,63}`), so a name it would refuse is explained before the Touch ID prompt.
+enum PoolName {
+    static let rule = "Use lowercase letters, digits, dots, dashes or underscores, starting with a letter (up to 64)."
+    static func isValid(_ name: String) -> Bool {
+        guard let first = name.unicodeScalars.first, name.unicodeScalars.count <= 64, ("a"..."z").contains(first)
+        else { return false }
+        return name.unicodeScalars.allSatisfy {
+            ("a"..."z").contains($0) || ("0"..."9").contains($0) || "._-".unicodeScalars.contains($0)
+        }
     }
 }

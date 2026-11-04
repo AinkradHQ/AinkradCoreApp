@@ -63,8 +63,8 @@ extension AgentsModel {
                 "\(s.harness) finishes the tool call in flight, then the session ends as cancelled. What it already did stays in the transcript.",
             actions: [
                 ShellSheetAction("Keep running"),
-                ShellSheetAction("Cancel session", primary: true) { [weak self] in
-                    self?.run(id, "Cancelling") { try await $0.cancel(id) }
+                ShellSheetAction("Cancel session", primary: true, destructive: true) { [weak self] in
+                    self?.run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
                 },
             ])
     }
@@ -77,8 +77,8 @@ extension AgentsModel {
                 "Cancel asks \(s.harness) to stop. Kill stops it at once on \(runnerName(s.runner)) and can leave files half-written. Use it only if Cancel did not work.",
             actions: [
                 ShellSheetAction("Keep running"),
-                ShellSheetAction("Kill session", primary: true) { [weak self] in
-                    self?.run(id, "Killing") { try await $0.kill(id) }
+                ShellSheetAction("Kill session", primary: true, destructive: true) { [weak self] in
+                    self?.run(id, "Killing", stop: .killing) { try await $0.kill(id) }
                 },
             ])
     }
@@ -101,18 +101,24 @@ extension AgentsModel {
     }
 
     private func run(
-        _ id: String, _ doing: String, _ op: @escaping @Sendable (any AgentsAPI) async throws -> AgentSessionInfo
+        _ id: String, _ doing: String, stop: StopKind? = nil,
+        _ op: @escaping @Sendable (any AgentsAPI) async throws -> AgentSessionInfo
     ) {
         guard let api else { return }
         note(id, nil)
         let h = sessions.session(id)?.harness ?? "the agent"
+        if let stop { stopping[id] = stop }
         Task { [weak self] in
             guard let self else { return }
             do {
                 let s = try await self.elevated("\(doing) \(h).") { try await op(api) }
                 self.sessions.upsert(s)
+                if s.over { self.stopping[id] = nil }
                 self.syncDerived()
-            } catch { self.note(id, Self.notice(error, doing: doing)) }
+            } catch {
+                if stop != nil { self.stopping[id] = nil }
+                self.note(id, Self.notice(error, doing: doing))
+            }
         }
     }
 

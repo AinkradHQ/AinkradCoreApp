@@ -44,7 +44,7 @@ public struct ShellView: View {
                         shell.sheet = nil
                         a.run()
                     }
-                    .buttonStyle(CoreButtonStyle(a.primary ? .prominent : .secondary))
+                    .buttonStyle(CoreButtonStyle(a.destructive ? .danger : a.primary ? .prominent : .secondary))
                     .keyboardShortcut(a.primary ? .defaultAction : .cancelAction)
                 }
             }

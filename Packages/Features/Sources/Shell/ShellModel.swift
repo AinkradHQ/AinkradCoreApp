@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Observation
 import SwiftUI
@@ -43,10 +44,15 @@ public struct ShellSheetAction: Identifiable {
     public let id = UUID()
     public let label: String
     public let primary: Bool
+    /// Drawn with the danger button: the action cannot be taken back.
+    public let destructive: Bool
     public let run: @MainActor () -> Void
-    public init(_ label: String, primary: Bool = false, run: @escaping @MainActor () -> Void = {}) {
+    public init(
+        _ label: String, primary: Bool = false, destructive: Bool = false, run: @escaping @MainActor () -> Void = {}
+    ) {
         self.label = label
         self.primary = primary
+        self.destructive = destructive
         self.run = run
     }
 }
@@ -138,12 +144,20 @@ public final class ShellModel {
     public let launcher = LauncherRegistry()
     public let bell = BellRegistry()
     public let settings = SettingsRegistry()
+    /// Day, Night or System (Settings → Appearance). Persisted; applied to the whole app.
+    public var theme: ThemeChoice = ThemeChoice.stored() {
+        didSet {
+            UserDefaults.standard.set(theme.rawValue, forKey: ThemeChoice.key)
+            NSApp.appearance = theme.appearance
+        }
+    }
 
     public init(defaults: UserDefaults = .coreStore()) {
         self.defaults = defaults
         profile = UserProfile(defaults: defaults)
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
         installBuiltInSettings()
+        NSApp?.appearance = theme.appearance
         launcher.register(
             LauncherEntry(
                 id: "widgets.add", title: "Add Widget…", sub: "Put a widget on Home", symbol: "plus",
