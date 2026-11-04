@@ -156,7 +156,7 @@ struct AppearanceSection: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
-        SettingsPage(intro: "Ainkrad Core follows your Mac. There is nothing to set here yet.") {
+        SettingsPage(intro: "Ainkrad follows your Mac. There is nothing to set here yet.") {
             SettingsValueRow(
                 title: "Theme", detail: "Follows System Settings → Appearance.",
                 value: scheme == .dark ? "Night" : "Day")
@@ -170,8 +170,7 @@ struct AppearanceSection: View {
 
 struct WindowSection: View {
     var body: some View {
-        SettingsPage(intro: "Ainkrad Core always runs full screen, in its own Space. It cannot be resized or windowed.")
-        {
+        SettingsPage(intro: "Ainkrad always runs full screen, in its own Space. It cannot be resized or windowed.") {
             SettingsValueRow(title: "Window", detail: "One window, full screen.", value: "Full screen")
         }
     }

@@ -14,7 +14,7 @@ enum SnapshotRunner {
         let env = ProcessInfo.processInfo.environment
         if env["CORE_EXIT_FS_ATTEMPT"] != nil {
             try? await Task.sleep(for: .seconds(3))
-            NSApp.windows.first { $0.title == "Ainkrad Core" }?.toggleFullScreen(nil)
+            NSApp.windows.first { $0.title == "Ainkrad" }?.toggleFullScreen(nil)
         }
         if let dir = env["CORE_GALLERY_SNAPSHOT"] { return await GallerySnapshot.run(dir: dir, env: env) }
         if let dir = env["CORE_AGENTS_SNAPSHOT"] { return await AgentsSnapshots.run(app, dir: dir, env: env) }
@@ -26,7 +26,7 @@ enum SnapshotRunner {
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
-        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad Core" }) else {
+        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else {
             return log("no main window")
         }
         log("fullscreen=\(window.styleMask.contains(.fullScreen)) size=\(window.frame.size)")

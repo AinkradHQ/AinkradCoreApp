@@ -50,10 +50,10 @@ targets:
         product: Agents
     settings:
       base:
-        PRODUCT_NAME: Ainkrad Core
+        PRODUCT_NAME: Ainkrad
         PRODUCT_BUNDLE_IDENTIFIER: com.ainkrad.core
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Ainkrad Core
+        INFOPLIST_KEY_CFBundleDisplayName: Ainkrad
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_HARDENED_RUNTIME: YES
 

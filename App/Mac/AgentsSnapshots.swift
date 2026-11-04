@@ -13,7 +13,7 @@ enum AgentsSnapshots {
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
-        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad Core" }) else {
+        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else {
             return log("no main window")
         }
         let shell = app.shell
