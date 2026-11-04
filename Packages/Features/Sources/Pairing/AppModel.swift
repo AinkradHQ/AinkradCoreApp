@@ -1,3 +1,4 @@
+import Accounts
 import Admin
 import CoreKit
 import CoreUI
@@ -30,6 +31,8 @@ public final class AppModel {
     public private(set) var terminals: TerminalsModel?
     /// Core settings, Feature switches, Secrets, Audit and Ops (E5-07); its screens say "not connected" until a Core is open.
     public private(set) var admin: AdminModel!
+    /// Provider accounts, pools and bindings (E5-08); its screens say "not connected" until a Core is open.
+    public private(set) var accounts: AccountsModel!
     private var rateLimitEnd: Task<Void, Never>?
     private var restartedEnd: Task<Void, Never>?
     var confirmForget = false
@@ -68,6 +71,7 @@ public final class AppModel {
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
+        accounts = AccountsModel(host: AdminHostAdapter(app: self))
         shell.elevate = { [weak self] in
             guard let self else { return }
             Task {
@@ -117,6 +121,7 @@ public final class AppModel {
             model.install()
             terminals = model
             admin.attach(connection: live.connection)
+            accounts.attach(connection: live.connection)
         }
         phase = .desktop
         await connect()
@@ -159,6 +164,7 @@ public final class AppModel {
         await lockouts.reload()
         terminals?.resync()
         admin.resync()
+        accounts.resync()
     }
 
     private func startEvents(_ service: any CoreService) {
@@ -204,6 +210,7 @@ public final class AppModel {
         case .event(let kind, let pairing, _):
             terminals?.event(kind: kind)
             admin.event(kind: kind)
+            accounts.event(kind: kind)
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
             if kind.hasPrefix("pairing."), let pairing { await pairingEvent(kind, pairing) }
@@ -331,6 +338,7 @@ public final class AppModel {
         shell.closeAllPanes()
         terminals = nil
         admin.detach()
+        accounts.detach()
         shell.linkNotice = nil
         firstRun.reset()
         phase = .firstRun

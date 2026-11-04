@@ -1,4 +1,5 @@
 #if DEBUG
+import Accounts
 import Admin
 import CoreKit
 import CryptoKit
@@ -115,6 +116,12 @@ extension AppModel {
     public func debugAdminDemo() -> AdminDemo {
         AdminDemo(admin: admin) { [weak self] n in
             self?.stepUpNotice = n == nil ? nil : StepUpNotice(phase: .cancelled, done: "stored", keepsEdit: true)
+        }
+    }
+    /// The Core app's states on sample data (E5-08), for screenshots and clicking through. Needs no Core.
+    public func debugAccountsDemo() -> AccountsDemo {
+        AccountsDemo(model: accounts) { [weak self] n in
+            self?.stepUpNotice = n == nil ? nil : StepUpNotice(phase: .cancelled, done: "changed", keepsEdit: true)
         }
     }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }

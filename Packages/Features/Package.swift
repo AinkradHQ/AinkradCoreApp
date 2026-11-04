@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"]),
         .library(name: "Terminals", targets: ["Terminals"]), .library(name: "Admin", targets: ["Admin"]),
+        .library(name: "Accounts", targets: ["Accounts"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -38,9 +39,18 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
+            name: "Accounts",
+            dependencies: [
+                "Shell", "Admin", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Terminals", "Admin", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", "Terminals", "Admin", "Accounts", .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
@@ -51,6 +61,7 @@ let package = Package(
             name: "TerminalsTests",
             dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "AdminTests", dependencies: ["Admin", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(name: "AccountsTests", dependencies: ["Accounts", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
 )

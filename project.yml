@@ -44,6 +44,8 @@ targets:
         product: Terminals
       - package: Features
         product: Admin
+      - package: Features
+        product: Accounts
     settings:
       base:
         PRODUCT_NAME: Ainkrad Core
