@@ -70,6 +70,20 @@ final class AccountsLiveUITests: XCTestCase {
         XCTAssertTrue(tab.waitForExistence(timeout: 30), "the new pool is listed after Touch ID (software key)")
         shot("pool-created")
 
+        // A second pool right after the first (it used to be reported as impossible).
+        let again = app.textFields["Name"]
+        for _ in 0..<3 where !again.exists {
+            app.buttons["New pool"].firstMatch.click()
+            _ = again.waitForExistence(timeout: 6)
+        }
+        XCTAssertTrue(again.exists, "the New pool dialog opens a second time")
+        again.click()
+        again.typeText("e5-08-second")
+        app.buttons["Create pool"].click()
+        XCTAssertTrue(
+            element("pool-tab-e5-08-second").waitForExistence(timeout: 30), "the second pool is listed too")
+        shot("two-pools")
+
         // Bindings: bind an agent to it, see it, unbind it.
         element("nav-bindings").click()
         XCTAssertTrue(element("bindings").waitForExistence(timeout: 20))
@@ -92,8 +106,13 @@ final class AccountsLiveUITests: XCTestCase {
         // Delete the pool again.
         element("nav-pools").click()
         element("pool-tab-e5-08-test").click()
+        XCTAssertTrue(app.buttons["Delete pool…"].firstMatch.isEnabled, "a pool that is not the default can be deleted")
         app.buttons["Delete pool…"].firstMatch.click()
         app.buttons["Delete pool"].click()
         wait({ !self.element("pool-tab-e5-08-test").exists }, "the pool is deleted")
+        element("pool-tab-e5-08-second").click()
+        app.buttons["Delete pool…"].firstMatch.click()
+        app.buttons["Delete pool"].click()
+        wait({ !self.element("pool-tab-e5-08-second").exists }, "the second pool is deleted")
     }
 }

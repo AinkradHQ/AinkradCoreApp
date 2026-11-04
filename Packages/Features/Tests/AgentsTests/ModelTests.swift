@@ -172,6 +172,37 @@ struct ModelTests {
         #expect(api.calls.contains("cancel") && m.sessions.session(id)?.over == true)
     }
 
+    @Test func aCancelTheAgentHasNotObeyedYetShowsAsCancellingAndCannotBeRepeated() async throws {
+        let api = FakeAgentsAPI.prototypeWorld()
+        api.cancelEndsSession = false
+        let (m, _, _, _) = await make(api)
+        let id = "as_01JC4X7Q3MZ8N5V2K9R001"
+        m.confirmCancel(id)
+        try #require(m.shell.sheet).actions[1].run()
+        #expect(m.stopping[id] == .cancelling, "shown at once, before the Core answers")
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(api.calls.filter { $0 == "cancel" }.count == 1)
+        #expect(
+            m.sessions.session(id)?.live == true && m.stopping[id] == .cancelling, "still running: reads as cancelling")
+        api.update(id) { $0.state = .ended }
+        await m.reloadAll()
+        #expect(m.sessions.session(id)?.over == true)
+    }
+
+    @Test func theSameRequestIdInAnotherSessionIsAnotherApprovalAndNotifiesAgain() async {
+        let (m, api, _, n) = await make()
+        let a = "as_01JC4X7Q3MZ8N5V2K9R004"
+        let b = "as_01JC4X7Q3MZ8N5V2K9R001"
+        for s in [a, b] {
+            api.append(s, [.approvalRequest(id: "req1", tool: "Bash", input: "git push", timeoutSecs: 300)])
+            api.update(s) { $0.state = .running }
+            await m.handle(
+                .event(AgentEvent(kind: "agent.approval_requested", session: s, request: "req1", tool: "Bash")))
+        }
+        #expect(n.posted.contains("agents.ap.\(a).req1") && n.posted.contains("agents.ap.\(b).req1"))
+        #expect(Set(m.shell.bell.items.map(\.id)).isSuperset(of: ["agents.ap.\(a).req1", "agents.ap.\(b).req1"]))
+    }
+
     @Test func resumeAndWakeGoThroughTouchID() async throws {
         let (m, api, host, _) = await make()
         m.resume("as_01JC4X7Q3MZ8N5V2K9R011")
