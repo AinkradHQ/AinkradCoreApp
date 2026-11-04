@@ -354,7 +354,7 @@ struct FirstRunView: View {
             }
             HStack {
                 Spacer()
-                Button("Open Ainkrad Core") { model.finish() }
+                Button("Open Ainkrad") { model.finish() }
                     .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
             }
         }

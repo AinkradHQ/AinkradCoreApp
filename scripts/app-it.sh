@@ -52,7 +52,7 @@ cleanup() {
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -9 "$p" 2>/dev/null || true; done
   for p in $(pgrep ainkrad-ptyhost 2>/dev/null | sort | comm -13 <(echo "$PTY_BEFORE") - ); do kill "$p" 2>/dev/null || true; done
   # Only the app built from this checkout: other worktrees may be running their own tests on the same Mac.
-  [ "$MODE" = manual ] || pkill -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
+  [ "$MODE" = manual ] || pkill -f "$HERE/build/Build/Products/Debug/Ainkrad.app/Contents/MacOS" 2>/dev/null || true
   if [ "${APP_IT_KEEP:-0}" = 1 ]; then echo "app-it: kept $W" >&2; else rm -rf "$W"; fi
 }
 trap cleanup EXIT
@@ -235,7 +235,7 @@ if [ "$MODE" = agents ]; then
   PIDS+=($!)
   if [ -n "${APP_IT_SAMPLE:-}" ]; then  # a stuck app: a stack sample of it, a while after the first session started
     ( wait_for 400 grep -q approved "$W/approve.out" || exit 1; sleep "$APP_IT_SAMPLE"
-      P=$(pgrep -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" | head -n1); [ -n "$P" ] && sample "$P" 3 -file "$W/sample.txt" >/dev/null 2>&1 ) &
+      P=$(pgrep -f "$HERE/build/Build/Products/Debug/Ainkrad.app/Contents/MacOS" | head -n1); [ -n "$P" ] && sample "$P" 3 -file "$W/sample.txt" >/dev/null 2>&1 ) &
     PIDS+=($!)
   fi
   echo "== xcodebuild test (CORE_IT=1): the agents screens against the Core and the runner"
@@ -253,7 +253,7 @@ if [ "$MODE" = agents ]; then
   exit "$STATUS"
 fi
 
-APP="$HERE/build/Build/Products/Debug/Ainkrad Core.app"
+APP="$HERE/build/Build/Products/Debug/Ainkrad.app"
 if [ "$MODE" = shots ]; then
   # The second device: claims the code the app's Add device shows (no step-up key); the app approves it.
   (
