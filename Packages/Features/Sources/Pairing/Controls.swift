@@ -5,12 +5,19 @@ import SwiftUI
 struct DialogCard<Content: View>: View {
     let title: String
     var width: CGFloat = Space.s8 * 15
+    /// When set, a close button sits at the top right (the prototype's dialogs have one).
+    var close: (() -> Void)?
     @ViewBuilder let content: Content
     @Environment(\.corePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            HStack(alignment: .top) {
+                Text(title).font(.system(size: MacTextSize.large, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Space.s2)
+                if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
+            }
             content
         }
         .foregroundStyle(palette.text)

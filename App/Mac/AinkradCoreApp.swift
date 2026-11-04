@@ -27,6 +27,7 @@ struct AinkradCoreApp: App {
             ShellCommands(
                 shell: shell, paneCount: shell.panes.count, focusMode: shell.focusedPane != nil,
                 closedCount: shell.closedPanes.count, chipOn: shell.showActivityChip,
+                coreOffline: shell.coreLink == .offline,
                 paneTitles: shell.panes.map { ($0.id, $0.title) })
             #if DEBUG
             DemoCommands(shell: shell)

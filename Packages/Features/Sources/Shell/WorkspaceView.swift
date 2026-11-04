@@ -153,6 +153,7 @@ private struct FocusTabs: View {
             }
         }
         .padding(Space.s1)
+        .coreGlass(radius: Radius.cardMac)
         .animation(reduce ? nil : Motion.out(Motion.move), value: shell.focusedPane)
         // ← and → move between tabs and select as they go.
         .onKeyPress(.leftArrow) {

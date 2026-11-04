@@ -296,9 +296,16 @@ public final class AppModel {
         defer { shell.closeTopDialog() }
         do {
             setElevated(try await service.stepUp(reason: reason))
+            stepUp.set(.done)
+            try? await Task.sleep(for: .milliseconds(450))  // the tick, before the sheet leaves
             return true
         } catch {
-            stepUpNotice = StepUpNotice(phase: StepUpPhase.from(error), done: done, keepsEdit: keepsEdit)
+            let phase = StepUpPhase.from(error)
+            stepUpNotice = StepUpNotice(phase: phase, done: done, keepsEdit: keepsEdit)
+            if case .failed = phase {
+                stepUp.set(phase)
+                try? await Task.sleep(for: .milliseconds(600))  // the shake
+            }
             return false
         }
     }
@@ -323,6 +330,7 @@ public final class AppModel {
         do { return try await op() } catch {
             guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
             shell.elevatedUntil = nil
+            shell.showToast("The Core answered 403 step_up_required. Asking for Touch ID, then retrying.", kind: .warn)
             guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true) else {
                 throw StepUpDeclined()
             }

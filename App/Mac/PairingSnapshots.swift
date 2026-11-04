@@ -66,6 +66,8 @@ enum PairingSnapshots {
         await shot("add-device-code")
         if await until("the second device to claim", 60, { app.debugAddStage == "claimed" }) {
             await shot("add-device-claimed")
+            app.debugTypeAddDeviceCheck(half: true)
+            await shot("add-device-typing", wait: 0.6)
             await app.debugApproveAddDevice()
             await shot("add-device-approved")
         }
@@ -81,6 +83,9 @@ enum PairingSnapshots {
         await shot("lockouts")
         app.shell.overlay = nil
         await shot("elevated-chip")
+        app.shell.elevationPanelOpen = true
+        await shot("elevated-panel", wait: 0.6)
+        app.shell.elevationPanelOpen = false
         app.shell.coreLink = .reconnecting
         await shot("banner-reconnecting")
         app.shell.coreLink = .offline
@@ -93,6 +98,14 @@ enum PairingSnapshots {
         app.debugOpenSettings("devices")
         app.debugDetail(named: "iPhone")
         await shot("device-detail")
+        app.debugOpenRename(named: "iPhone")
+        await shot("device-rename")
+        app.debugOpenDialog("scopes", named: "iPhone")
+        await shot("device-scopes")
+        app.debugCloseDialog()
+        app.debugOpenDialog("revoke", named: "iPhone")
+        await shot("device-revoke")
+        app.debugCloseDialog()
         app.debugOpenRename(named: "iPhone")
         for scene in ["cancelled", "failed", "nokey"] {
             app.debugNotice(scene, done: "renamed")

@@ -47,7 +47,7 @@ struct ScopesDialog: View {
     }
 
     var body: some View {
-        DialogCard(title: "What \(device.name) may do", width: Space.s8 * 15) {
+        DialogCard(title: "What \(device.name) may do", width: Space.s8 * 15, close: { app.shell.closeDialog() }) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("You can take scopes away here. To give more, pair the device again.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

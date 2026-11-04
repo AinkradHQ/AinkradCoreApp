@@ -90,6 +90,16 @@ extension AppModel {
         devices.renaming = true
     }
 
+    /// The Access dialog (`kind: "scopes"`) or the Revoke dialog of a device, for screenshots.
+    public func debugOpenDialog(_ kind: String, named name: String) {
+        guard let d = devices.items.first(where: { $0.name == name }) else { return }
+        devices.detailID = d.id
+        shell.present(
+            ShellDialog(id: kind) {
+                if kind == "scopes" { ScopesDialog(app: self, device: d) } else { RevokeDialog(app: self, device: d) }
+            })
+    }
+
     public func debugCloseStepUp() { shell.closeTopDialog() }
 
     /// Live: the first-run form filled and sent, as a person would.

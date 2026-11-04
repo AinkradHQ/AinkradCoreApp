@@ -15,7 +15,7 @@ enum ShortcutCatalog {
         (
             "View",
             [
-                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘N"),
+                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘N"), ("Reconnect to Core", "⌘R"),
                 ("Switch Day and Night", "⌃⌘D"), ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"),
                 ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
             ]
@@ -110,9 +110,10 @@ public struct ShellCommands: Commands {
     let focusMode: Bool
     let closedCount: Int
     let chipOn: Bool
+    let coreOffline: Bool
     let paneTitles: [(id: String, title: String)]
     public init(
-        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true,
+        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true, coreOffline: Bool = false,
         paneTitles: [(id: String, title: String)] = []
     ) {
         self.shell = shell
@@ -120,6 +121,7 @@ public struct ShellCommands: Commands {
         self.focusMode = focusMode
         self.closedCount = closedCount
         self.chipOn = chipOn
+        self.coreOffline = coreOffline
         self.paneTitles = paneTitles
     }
 
@@ -152,6 +154,7 @@ public struct ShellCommands: Commands {
                 shell.theme = shell.theme == .night ? .day : .night
             }
             .keyboardShortcut("d", modifiers: [.control, .command])
+            Button("Reconnect to Core") { shell.retryConnection?() }.keyboardShortcut("r").disabled(!coreOffline)
             Toggle("Show Activity in Status Bar", isOn: Binding(get: { chipOn }, set: { shell.showActivityChip = $0 }))
             Divider()
             Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(paneCount < 2)

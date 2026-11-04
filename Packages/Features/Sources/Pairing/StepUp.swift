@@ -10,6 +10,8 @@ struct StepUpDeclined: Error {}
 /// What the Touch ID sheet shows while asking, and what an inline notice says after.
 enum StepUpPhase: Equatable {
     case asking(String)
+    /// Touch ID went through: the sheet shows a tick for a moment before it closes.
+    case done
     case cancelled
     case failed(String)
     case noKey
@@ -41,7 +43,7 @@ struct StepUpNotice: Equatable {
         case .failed: "Touch ID didn't match. Nothing was \(done)."
         case .noKey: "This Mac can't confirm. Nothing was \(done)."
         case .refused: "The Core refused the proof. Nothing was \(done)."
-        case .asking: ""
+        case .asking, .done: ""
         }
     }
 
@@ -52,7 +54,7 @@ struct StepUpNotice: Equatable {
         case .failed(let m): "\(m) Try again. After a few misses macOS asks for your password instead."
         case .noKey: "A Mac with no step-up key can never unlock admin actions. Use another admin device for this."
         case .refused(let m): m
-        case .asking: ""
+        case .asking, .done: ""
         }
     }
 
@@ -101,36 +103,75 @@ struct StepUpBanner: View {
     }
 }
 
-/// The one Touch ID sheet. It shows only while the system prompt is up.
+/// The one Touch ID sheet. It shows only while the system prompt is up: a fingerprint that scans, a tick when it goes through, a
+/// small shake when it does not match.
 struct StepUpSheet: View {
     @Bindable var model: StepUpModel
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var scan = false
 
     var body: some View {
-        DialogCard(title: "Confirm with Touch ID", width: Space.s8 * 12) {
-            VStack(alignment: .leading, spacing: Space.s4) {
-                HStack(alignment: .top, spacing: Space.s3) {
-                    Image(systemName: "touchid").font(.system(size: MacTextSize.large))
-                        .foregroundStyle(palette.tone(.done).ink)
-                        .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                        .background(palette.tone(.done).fill, in: coreShape(Radius.control))
-                        .accessibilityHidden(true)
-                    Text(reason).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                }
-                VStack(alignment: .leading, spacing: Space.s1) {
+        // Centred, as the prototype's sheet: the tile, the title, what it is for, then the wait.
+        VStack(spacing: Space.s3) {
+            Image(systemName: done ? "checkmark" : missed ? "xmark" : "touchid")
+                .font(.system(size: MacTextSize.large * 1.5))
+                .foregroundStyle(palette.tone(missed ? .warn : .done).ink)
+                .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 2)
+                .background(palette.tone(missed ? .warn : .done).fill, in: coreShape(Radius.cardMac))
+                .opacity(scan && !done && !missed && !reduce ? 0.55 : 1)
+                .animation(
+                    reduce || done || missed ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+                    value: scan
+                )
+                .modifier(Shake(count: missed && !reduce ? 3 : 0))
+                .animation(.linear(duration: 0.45), value: missed)
+                .accessibilityHidden(true)
+            Text("Confirm with Touch ID").font(.system(size: MacTextSize.title, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+            Text(done ? "Unlocked." : missed ? "Touch ID didn't match." : reason)
+                .foregroundStyle(palette.text2).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if !done && !missed {
+                VStack(spacing: Space.s1) {
                     IndBar()
                     Text("Waiting for Touch ID").font(.system(size: MacTextSize.body, weight: .semibold))
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.updatesFrequently)
             }
-            .font(.system(size: MacTextSize.body))
         }
+        .font(.system(size: MacTextSize.body))
+        .foregroundStyle(palette.text)
+        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .frame(width: Space.s8 * 12)
+        .onAppear { scan = true }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Confirm with Touch ID")
         .accessibilityIdentifier("stepup")
+    }
+
+    private var done: Bool { model.phase == .done }
+    private var missed: Bool {
+        if case .failed? = model.phase { return true }
+        return false
     }
 
     private var reason: String {
         if case .asking(let r)? = model.phase { return r }
         return ""
+    }
+}
+
+/// A few small sideways steps: the sign that the fingerprint did not match.
+private struct Shake: GeometryEffect {
+    var count: CGFloat
+    var animatableData: CGFloat {
+        get { count }
+        set { count = newValue }
+    }
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: 5 * sin(count * .pi * 2), y: 0))
     }
 }

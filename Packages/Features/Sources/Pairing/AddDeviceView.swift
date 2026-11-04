@@ -10,7 +10,7 @@ struct AddDeviceView: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        DialogCard(title: title, width: Space.s8 * 16) {
+        DialogCard(title: title, width: Space.s8 * 16, close: close) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 switch model.stage {
                 case .form, .creating: form
@@ -39,7 +39,7 @@ struct AddDeviceView: View {
 
     private var title: String {
         switch model.stage {
-        case .form, .creating: "Add device"
+        case .form, .creating: "Add a device"
         case .code: "Pair a new device"
         case .claimed: "A device wants to join"
         case .approved: "Device paired"
@@ -52,7 +52,7 @@ struct AddDeviceView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Name the device, choose what it may do, and you get a code that lasts 5 minutes.")
+            Text("This Mac creates a one-time code. Whoever enters it still needs your approval.")
                 .foregroundStyle(palette.text2)
             CoreTextField("Device name", placeholder: "iPhone, linux-01…", text: $model.name, autofocus: true) {
                 Task { await model.create() }
@@ -61,7 +61,7 @@ struct AddDeviceView: View {
                 "Kind", segments: [CoreSegment("device", "Device"), CoreSegment("runner", "Runner")],
                 selection: $model.kind)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text("It may").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+                Text("Access narrowed from your own. You can only give less.").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
                 if model.kind == "runner" {
                     Text("A runner holds exactly runner: it only redeems secret leases.").foregroundStyle(palette.text2)
                 } else {
@@ -77,9 +77,11 @@ struct AddDeviceView: View {
                 }
             }
             HStack(spacing: Space.s2) {
+                Text("Lasts 5 minutes · single use").font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
                 Button("Cancel", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
-                Button("Make code") { Task { await model.create() } }
+                Button("Create pairing") { Task { await model.create() } }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.stage == .creating))
                     .keyboardShortcut(.defaultAction).disabled(!model.canCreate)
             }
