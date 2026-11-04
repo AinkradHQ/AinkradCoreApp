@@ -44,7 +44,6 @@ private struct CoreButtonBody: View {
     let busy: Bool
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
-    @Environment(\.isFocused) private var focused
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.coreForcedInteraction) private var forced
     @State private var hovering = false
@@ -74,13 +73,15 @@ private struct CoreButtonBody: View {
                         startPoint: .top, endPoint: .bottom), lineWidth: 1)
             }
         }
-        .coreFocusRing(focused || forced == .focused, radius: size.radius, palette: palette)
+        // Gallery only: pinned "focused" preview. Real focus is the system ring below, drawn only on the one control that
+        // has keyboard focus (isFocused here reports the container's focus, which lit every button in it).
+        .coreFocusRing(forced == .focused, radius: size.radius, palette: palette)
         .coreDimWhenDisabled(enabled)
         .scaleEffect(pressed && !reduce ? 0.97 : 1)
         .coreAnimation(Motion.press(Motion.press), value: pressed)
         .animation(Motion.out(Motion.hover), value: hover)
         .onHover { hovering = $0 }
-        .focusEffectDisabled()
+        .contentShape(.focusEffect, coreShape(size.radius))
         .allowsHitTesting(!busy)
         .accessibilityAddTraits(busy ? .updatesFrequently : [])
         .accessibilityValue(busy ? "Busy" : "")
