@@ -4,6 +4,7 @@
 # The app goes full screen on this Mac for about a minute; it sends no key events. Run `make build` first.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
+[ "${UI_LOCK_HELD:-}" = 1 ] || exec "$HERE/scripts/ui-lock.sh" "$0" "$@"
 OUT=${OUT:-/private/tmp/claude-501/agents-shots}
 mkdir -p "$OUT"
 cd "$HERE"

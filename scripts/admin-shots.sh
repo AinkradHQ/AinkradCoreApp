@@ -3,6 +3,7 @@
 #   OUT=<dir> scripts/admin-shots.sh [night|day|both]   (SCENES=a,b limits the walk). Run `make build` first.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
+[ "${UI_LOCK_HELD:-}" = 1 ] || exec "$HERE/scripts/ui-lock.sh" "$0" "$@"
 OUT=${OUT:-/private/tmp/claude-501/admin-shots}; mkdir -p "$OUT"
 for THEME in $( [ "${1:-both}" = both ] && echo "dark light" || { [ "$1" = night ] && echo dark || echo light; } ); do
   echo "== $THEME -> $OUT"

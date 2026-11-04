@@ -26,8 +26,8 @@ build: lint generate ## Debug build into ./build
 test: lint ## Package tests (the app target has none yet)
 	@for p in $(PACKAGES); do echo "swift test: $$p"; (cd $$p && swift test --quiet) || exit 1; done
 
-uitest: generate ## Keyboard-path UI tests (launch the app full screen; events go only to it)
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug -derivedDataPath build -quiet test
+uitest: generate ## Keyboard-path UI tests (take over the screen: wait for the shared lock and 5 idle minutes, UI_IDLE=0 to skip)
+	scripts/ui-lock.sh caffeinate -d xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug -derivedDataPath build -quiet test
 
 run: build
 	open "$(APP)"
