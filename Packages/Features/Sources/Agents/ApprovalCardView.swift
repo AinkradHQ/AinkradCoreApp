@@ -25,6 +25,7 @@ struct ApprovalCardView: View {
         .accessibilityElement(children: .contain)
     }
 
+    private var elevated: Bool { model.shell.elevatedUntil.map { $0 > Date() } ?? false }
     private var harness: String { model.sessions.session(request.session)?.harness ?? "An agent" }
 
     private func card(now: Date) -> some View {
@@ -42,7 +43,7 @@ struct ApprovalCardView: View {
                         .system(size: MacTextSize.headline, weight: .semibold))
                     if !request.input.isEmpty {
                         Text(request.input).font(.system(size: 12, design: .monospaced)).foregroundStyle(palette.text2)
-                            .lineLimit(4).textSelection(.enabled)
+                            .lineLimit(4).agentCopyMenu(request.input)
                     }
                 }
                 Spacer(minLength: 0)
@@ -56,14 +57,13 @@ struct ApprovalCardView: View {
                 }
                 Spacer(minLength: 0)
                 answer("Deny", keycap: "⌘⌫", prominent: false, busy: busy)
-                answer("Approve", keycap: "⌘↩", prominent: true, busy: busy)
+                answer(elevated ? "Approve" : "Approve with Touch ID", keycap: "⌘↩", prominent: true, busy: busy)
             }
         }
         .padding(Space.s4)
         .background(palette.glassCard, in: coreShape(Radius.cardMac))
         .overlay { coreShape(Radius.cardMac).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
         .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s2))))
-        .accessibilityLabel("\(harness) asks to use \(request.tool). \(request.input)")
     }
 
     private func facts(now: Date, left: TimeInterval?, tone: Tone) -> some View {
@@ -93,7 +93,7 @@ struct ApprovalCardView: View {
         } label: {
             HStack(spacing: Space.s2) {
                 Text(title)
-                CoreKeycap(keycap)
+                AgentKeyHint(keys: keycap)
             }
         }
         .buttonStyle(CoreButtonStyle(prominent ? .prominent : .secondary))

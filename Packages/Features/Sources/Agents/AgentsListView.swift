@@ -106,31 +106,34 @@ struct AgentsListView: View {
 
     private func list(_ rows: [AgentSessionInfo], _ waitingIDs: Set<String>) -> some View {
         ScrollView {
-            LazyVStack(spacing: Space.s1) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s2, alignment: .top)],
+                spacing: Space.s2
+            ) {
                 ForEach(rows) { s in
-                    Button {
+                    AgentRowButton(id: s.id, focus: $focusedRow, selected: model.selected == s.id) {
                         model.openSession(s.id)
                     } label: {
                         SessionRow(session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id))
                     }
-                    .buttonStyle(AgentRowStyle(selected: model.selected == s.id))
-                    .focused($focusedRow, equals: s.id)
                     .accessibilityLabel(label(s, waiting: waitingIDs.contains(s.id)))
                     .accessibilityHint("Opens the session")
                     .onAppear { if s.id == rows.last?.id && model.filter == .all { model.loadMore() } }
                 }
-                Text(
-                    model.sessions.hasMore
-                        ? "Showing \(model.sessions.items.count) sessions. Older ones load as you scroll."
-                        : "Showing all \(model.sessions.items.count) sessions."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, Space.s2).padding(.bottom, Space.s2)
+            .padding(.horizontal, Space.s3)
+            Text(
+                model.sessions.hasMore
+                    ? "Showing \(model.sessions.items.count) sessions. Older ones load as you scroll."
+                    : "Showing all \(model.sessions.items.count) sessions."
+            )
+            .font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+            .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
         }
         .onKeyPress(.downArrow) { move(rows, 1) }
         .onKeyPress(.upArrow) { move(rows, -1) }
+        .onKeyPress(.rightArrow) { move(rows, 1) }
+        .onKeyPress(.leftArrow) { move(rows, -1) }
     }
 
     private func move(_ rows: [AgentSessionInfo], _ step: Int) -> KeyPress.Result {

@@ -37,6 +37,7 @@ struct NewSessionSheet: View {
     @State private var busy = false
     @Environment(\.corePalette) private var palette
     @FocusState private var promptFocus: Bool
+    @FocusState private var runnerFocus: String?
 
     private var runner: RunnerInfo? { model.runners.first { $0.id == (runnerID ?? "") } }
     private var ready: Bool {
@@ -50,7 +51,7 @@ struct NewSessionSheet: View {
                     Text("It runs on a runner of the Home Core. You can close this Mac and it keeps going.")
                         .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                     if let notice { NoticeBanner(notice: notice) }
-                    HStack(alignment: .top, spacing: Space.s4) {
+                    VStack(alignment: .leading, spacing: Space.s3) {
                         field("Harness") {
                             CoreSegmented(
                                 "Harness",
@@ -75,7 +76,7 @@ struct NewSessionSheet: View {
                 }
                 .padding(.bottom, Space.s1)
             }
-            .frame(maxHeight: Space.s8 * 17)
+            .frame(maxHeight: Space.s8 * 20)
             HStack(spacing: Space.s2) {
                 Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
@@ -86,7 +87,14 @@ struct NewSessionSheet: View {
                     .help("Start the session (⌘Return)")
             }
         }
-        .onAppear { pickRunner() }
+        .onAppear {
+            pickRunner()
+        }
+        .task {
+            // The prompt is the one thing to type here; focus it once the sheet is on screen.
+            try? await Task.sleep(for: .milliseconds(250))
+            promptFocus = true
+        }
         .onChange(of: model.runners) { _, _ in pickRunner() }
     }
 
@@ -110,39 +118,17 @@ struct NewSessionSheet: View {
         } else {
             VStack(spacing: Space.s1) {
                 ForEach(model.runners) { r in
-                    Button {
+                    AgentRowButton(id: r.id, focus: $runnerFocus, selected: runnerID == r.id) {
                         runnerID = r.id
                         notice = nil
                     } label: {
-                        HStack(spacing: Space.s3) {
-                            Image(systemName: runnerID == r.id ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(runnerID == r.id ? palette.primary : palette.text2)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold))
-                                Text(detail(r)).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                            }
-                            Spacer(minLength: 0)
-                            StateBadge(
-                                r.online ? (r.degraded ? "Degraded" : "Online") : "Offline",
-                                tone: r.online ? (r.degraded ? .warn : .run) : .queue,
-                                symbol: r.online ? "checkmark.circle" : "wifi.slash")
-                        }
-                        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(coreShape(Radius.control))
+                        RunnerRow(runner: r, chosen: runnerID == r.id)
                     }
-                    .buttonStyle(AgentRowStyle(selected: runnerID == r.id))
                     .accessibilityLabel("\(r.name), \(r.online ? "online" : "offline")")
                     .accessibilityAddTraits(runnerID == r.id ? .isSelected : [])
                 }
             }
         }
-    }
-
-    private func detail(_ r: RunnerInfo) -> String {
-        var parts = ["\(r.load) of \(r.capacity.map(String.init) ?? "?") in use"]
-        if !r.drivers.isEmpty { parts.append(r.runsAgents ? "runs agents" : "no agent driver") }
-        return parts.joined(separator: " · ")
     }
 
     private var promptField: some View {
@@ -207,5 +193,38 @@ struct NewSessionSheet: View {
             busy = false
             if let n { notice = n } else { model.shell.closeDialog() }
         }
+    }
+}
+
+/// A runner to pick: its name, how busy it is, and whether it is there.
+private struct RunnerRow: View {
+    let runner: RunnerInfo
+    let chosen: Bool
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: chosen ? "checkmark.square.fill" : "square")
+                .foregroundStyle(chosen ? palette.primary : palette.text2).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(runner.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: 0)
+            StateBadge(label, tone: tone, symbol: symbol)
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(coreShape(Radius.control))
+    }
+
+    private var label: String { runner.online ? (runner.degraded ? "Degraded" : "Online") : "Offline" }
+    private var tone: Tone { runner.online ? (runner.degraded ? .warn : .run) : .queue }
+    private var symbol: String { runner.online ? "checkmark.circle" : "wifi.slash" }
+
+    private var detail: String {
+        var parts = ["\(runner.load) of \(runner.capacity.map(String.init) ?? "?") in use"]
+        if !runner.drivers.isEmpty { parts.append(runner.runsAgents ? "runs agents" : "no agent driver") }
+        return parts.joined(separator: " · ")
     }
 }

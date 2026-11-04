@@ -37,7 +37,9 @@ struct EntryParserTests {
     }
 
     @Test func bookkeepingIsHiddenAndUnknownKeepsItsWord() {
-        for t in ["session_started", "usage", "turn_ended"] { #expect(EntryParser.kind(["type": t]) == .hidden) }
+        for t in ["session_started", "usage", "turn_ended", "approval_requested"] {
+            #expect(EntryParser.kind(["type": t]) == .hidden)
+        }
         #expect(
             EntryParser.kind(["type": "brand_new_thing", "reason": "why"])
                 == .note(type: "brand_new_thing", detail: "why"))
@@ -65,6 +67,18 @@ struct TranscriptStoreTests {
         let t = TranscriptStore(sessionID: "as_1")
         t.append([entry(1, .hidden), entry(2, .assistant("x"))])
         #expect(t.entries.map(\.seq) == [2] && t.lastSeq == 2)
+    }
+
+    @Test func aToolResultJoinsItsCallsRowInPlace() {
+        let t = TranscriptStore(sessionID: "as_1")
+        t.append([entry(1, .toolUse(id: "t", name: "Bash", summary: "ls")), entry(2, .assistant("x"))])
+        t.append([entry(3, .toolResult(id: "t", name: nil, ok: true, exitCode: 0, output: "a", durationMs: 5))])
+        #expect(t.entries.map(\.seq) == [1, 2] && t.lastSeq == 3)
+        if case .toolDone(_, let name, let summary, let ok, _, _, _) = t.entries[0].kind {
+            #expect(name == "Bash" && summary == "ls" && ok)
+        } else {
+            Issue.record("expected the call and its result as one row")
+        }
     }
 
     @Test func aHoleIsShownNotFilled() {

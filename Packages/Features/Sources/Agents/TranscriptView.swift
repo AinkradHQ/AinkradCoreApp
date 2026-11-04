@@ -110,13 +110,19 @@ struct EntryRow: View, Equatable {
             Text(text).font(.system(size: MacTextSize.body)).foregroundStyle(palette.btnInk)
                 .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                 .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
-                .frame(maxWidth: .infinity, alignment: .trailing).textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .agentCopyMenu(text)
                 .accessibilityLabel("You: \(text)")
         case .assistant(let text):
-            Text(text).font(.system(size: MacTextSize.body)).lineSpacing(3).textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(text).font(.system(size: MacTextSize.body)).lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: .leading).agentCopyMenu(text)
         case .toolUse(_, let name, let summary):
-            tool(name, summary, trailing: nil)
+            tool(name, summary, trailing: "running")
+        case .toolDone(_, let name, let summary, let ok, let code, let output, let ms):
+            VStack(alignment: .leading, spacing: Space.s1) {
+                tool(name, summary, trailing: toolFacts(ok, code, ms))
+                if !output.isEmpty { outputBlock(output) }
+            }
         case .toolResult(_, let name, let ok, let code, let output, let ms):
             result(name, ok, code, output, ms)
         case .approvalRequest(_, let tool, let input, _):
@@ -145,11 +151,36 @@ struct EntryRow: View, Equatable {
                 width: 64, alignment: .leading)
             Text(summary).font(.system(size: 12, design: .monospaced)).lineLimit(2).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailing {
+                Text(trailing).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+                    .lineLimit(1)
+            }
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .background(palette.glassCard, in: coreShape(Radius.control))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
+    }
+
+    private func toolFacts(_ ok: Bool, _ code: Int?, _ ms: Int?) -> String {
+        [ok ? "ok" : "failed", code.map { "exit \($0)" }, ms.map { String(format: "%.1f s", Double($0) / 1000) }]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// A result's output, six lines and a way to the rest.
+    private func outputBlock(_ output: String) -> some View {
+        let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
+        let long = lines.count > 6
+        return VStack(alignment: .leading, spacing: Space.s1) {
+            Text(long && !expanded ? lines.prefix(6).joined(separator: "\n") + "\n…" : output)
+                .font(.system(size: 12, design: .monospaced)).foregroundStyle(palette.text2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Space.s3).background(palette.glassCard, in: coreShape(Radius.control)).agentCopyMenu(output)
+            if long {
+                Button(expanded ? "Show less" : "Show all \(lines.count) lines") { expanded.toggle() }
+                    .buttonStyle(CoreButtonStyle(.plain, size: .small))
+            }
+        }
     }
 
     private func result(_ name: String?, _ ok: Bool, _ code: Int?, _ output: String, _ ms: Int?) -> some View {
@@ -173,7 +204,7 @@ struct EntryRow: View, Equatable {
             if !output.isEmpty {
                 Text(long && !expanded ? lines.prefix(6).joined(separator: "\n") + "\n…" : output)
                     .font(.system(size: 12, design: .monospaced)).foregroundStyle(palette.text2)
-                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(Space.s3).background(palette.glassCard, in: coreShape(Radius.control))
                 if long {
                     Button(expanded ? "Show less" : "Show all \(lines.count) lines") { expanded.toggle() }

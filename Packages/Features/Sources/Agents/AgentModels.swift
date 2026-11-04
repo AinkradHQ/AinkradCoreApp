@@ -130,6 +130,9 @@ public enum EntryKind: Equatable, Sendable {
     case toolUse(id: String, name: String, summary: String)
     case toolResult(
         id: String, name: String?, ok: Bool, exitCode: Int?, output: String, durationMs: Int?)
+    /// A tool call and its result as one row: the store folds a `toolResult` into the `toolUse` it answers.
+    case toolDone(
+        id: String, name: String, summary: String, ok: Bool, exitCode: Int?, output: String, durationMs: Int?)
     case approvalRequest(id: String, tool: String, input: String, timeoutSecs: Int?)
     case approvalDecided(id: String, approved: Bool)
     case interrupted(reason: String)

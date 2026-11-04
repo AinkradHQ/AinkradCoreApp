@@ -99,7 +99,7 @@ extension AgentsModel {
             ) { [weak self] in self?.openInbox() })
         shell.settings.section(
             SettingsSection(
-                id: "agents-notifications", group: .notifications, title: "Notifications", symbol: "bell", order: 10
+                id: "notifications", group: .notifications, title: "Notifications", symbol: "bell", order: 0
             ) {
                 NotificationsSection(model: self)
             })

@@ -76,7 +76,8 @@ enum EntryParser {
         case "ended":
             let o = b["outcome"] as? [String: Any]
             return .ended(kind: o?["kind"] as? String ?? "ended", reason: o?["reason"] as? String)
-        case "session_started", "usage", "usage_so_far", "turn_ended", "exited": return .hidden
+        // `approval_requested` is the harness asking; the Core's own `approval_request` entry that follows is the one shown.
+        case "session_started", "usage", "usage_so_far", "turn_ended", "exited", "approval_requested": return .hidden
         default: return .note(type: type.isEmpty ? "unknown" : type, detail: str("reason") ?? str("text") ?? "")
         }
     }

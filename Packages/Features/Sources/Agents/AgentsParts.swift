@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -89,36 +90,75 @@ struct SkeletonRows: View {
     }
 }
 
-/// A button that is a row: the card tint at rest, lighter on hover, the nav colour when selected, the one focus ring.
-struct AgentRowStyle: ButtonStyle {
+/// A row that is a button: the card tint at rest, lighter on hover, the nav colour when selected, and the one focus ring, drawn
+/// from this row's own focus (a row never shows the ring because another control has it).
+struct AgentRowButton<Label: View>: View {
+    let id: String
+    var focus: FocusState<String?>.Binding
     var selected = false
-    func makeBody(configuration: Configuration) -> some View {
-        Chrome(configuration: configuration, selected: selected)
+    let action: () -> Void
+    @ViewBuilder let label: Label
+    @Environment(\.corePalette) private var palette
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) { label }
+            .buttonStyle(.plain)
+            .focused(focus, equals: id)
+            .focusEffectDisabled()
+            .background(
+                selected ? palette.navActive : hovering ? palette.rowHover : palette.glassCard,
+                in: coreShape(Radius.row)
+            )
+            .overlay { if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
+            .coreFocusRing(focus.wrappedValue == id, radius: Radius.row, palette: palette)
+            .animation(Motion.out(Motion.hover), value: hovering)
+            .onHover { hovering = $0 }
     }
-    private struct Chrome: View {
-        let configuration: ButtonStyleConfiguration
-        let selected: Bool
-        @Environment(\.corePalette) private var palette
-        @Environment(\.isFocused) private var focused
-        @State private var hovering = false
-        var body: some View {
-            configuration.label
-                .background(
-                    selected
-                        ? palette.navActive
-                        : hovering || configuration.isPressed ? palette.rowHover : palette.glassCard,
-                    in: coreShape(Radius.row)
-                )
-                .overlay { if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
-                .coreFocusRing(focused, radius: Radius.row, palette: palette)
-                .animation(Motion.out(Motion.hover), value: hovering)
-                .onHover { hovering = $0 }
-                .focusEffectDisabled()
-        }
+}
+
+/// Kill: the fail tone on a quiet fill, as Pairing's revoke. Words carry it; the tone backs them up.
+struct AgentDangerButtonStyle: ButtonStyle {
+    @Environment(\.corePalette) private var palette
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        let t = palette.tone(.fail)
+        configuration.label
+            .font(.system(size: MacTextSize.meta, weight: .medium))
+            .foregroundStyle(t.ink)
+            .frame(minHeight: MacSize.controlSm)
+            .padding(.horizontal, Space.s2)
+            .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.chip))
+            .overlay { coreShape(Radius.chip).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
+            .coreDimWhenDisabled(enabled)
     }
 }
 
 extension View {
     /// The head of a pane section: a label that screen readers announce as a heading.
     func agentHeading() -> some View { accessibilityAddTraits(.isHeader) }
+}
+
+/// A shortcut beside a button's words, on one line (the shared keycap wraps a two-key shortcut in a narrow button).
+struct AgentKeyHint: View {
+    let keys: String
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        Text(keys).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+            .fixedSize().padding(.horizontal, Space.s1).background(palette.uDim, in: coreShape(Radius.chip / 2))
+            .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Copy in the context menu. (Not `.textSelection`: with it on many rows, VoiceOver and the accessibility tree recurse until the
+    /// app overflows its stack, seen on macOS 27 with two session panes open.)
+    func agentCopyMenu(_ text: String) -> some View {
+        contextMenu {
+            Button("Copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        }
+    }
 }

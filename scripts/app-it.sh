@@ -7,6 +7,11 @@
 #   scripts/app-it.sh shots    runs the app's self-snapshot walk (CORE_PAIR_SNAPSHOT, launched by XCUITest for its window
 #                              server) against the Core; THEME=light|dark,
 #                              OUT=<dir> for the PNGs; a second device claims the app's Add device code
+#   scripts/app-it.sh agents   (E5-06) pairs the app, starts a runner with a stand-in `claude` (no provider, no credentials: it
+#                              prints a few events and asks for one approval), then the app is driven by XCUITest: the list,
+#                              a session started from outside appears over the event stream, ⌘Return approves it (step-up
+#                              included), the session ends, a second session is cancelled from the app, an offline runner
+#                              refuses a new one. `agents-core` does the Core side alone with ainkradctl.
 # The app keeps its keys in memory (CORE_KEYSTORE=memory): the Keychain is never touched. Run `make build` first.
 #   (CORE=<AinkradCore checkout> to override; APP_IT_KEEP=1 keeps the work dir.) Stops the Core and stray ptyhosts on exit.
 # shellcheck disable=SC2015
@@ -16,14 +21,14 @@ MODE=${1:-uitest}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 CORE=${CORE:-$HERE/../AinkradCore}
 BIN=$CORE/target/debug
-SRV=$BIN/ainkrad-core-server CTL=$BIN/ainkradctl
+SRV=$BIN/ainkrad-core-server CTL=$BIN/ainkradctl RUNNER=$BIN/ainkrad-runner
 command -v cargo >/dev/null || PATH=/opt/homebrew/opt/rustup/bin:$PATH
-if [ ! -x "$SRV" ] || [ ! -x "$CTL" ]; then
+if [ ! -x "$SRV" ] || [ ! -x "$CTL" ] || { [[ $MODE == agents* ]] && [ ! -x "$RUNNER" ]; }; then
   (cd "$CORE" && nice -n 19 env CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=line-tables-only \
-    cargo build -q -p ainkrad-core-server -p ainkrad-ctl)
+    cargo build -q -p ainkrad-core-server -p ainkrad-ctl -p ainkrad-runner)
 fi
 
-W=${APP_IT_DIR:-/private/tmp/claude-501/app-it}
+W=${APP_IT_DIR:-/private/tmp/claude-501/app-it-$(basename "$HERE")}
 rm -rf "$W"; mkdir -p "$W"; chmod 700 "$W"
 PIDS=()
 PTY_BEFORE=$(pgrep ainkrad-ptyhost 2>/dev/null | sort || true)
@@ -33,7 +38,7 @@ cleanup() {
   sleep 0.5
   for p in ${PIDS[@]+"${PIDS[@]}"}; do kill -9 "$p" 2>/dev/null || true; done
   for p in $(pgrep ainkrad-ptyhost 2>/dev/null | sort | comm -13 <(echo "$PTY_BEFORE") - ); do kill "$p" 2>/dev/null || true; done
-  pkill -f "Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
+  pkill -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" 2>/dev/null || true
   if [ "${APP_IT_KEEP:-0}" = 1 ]; then echo "app-it: kept $W" >&2; else rm -rf "$W"; fi
 }
 trap cleanup EXIT
@@ -50,7 +55,8 @@ wait_for() { local end=$((SECONDS + $1)); shift; until "$@" >/dev/null 2>&1; do 
 
 echo "== core: init + serve on $URL (state in $HOME_DIR, not the real state dir)"
 "$SRV" init "$HOME_DIR" >/dev/null 2>"$W/init.err"
-"$SRV" serve --config "$HOME_DIR/config.toml" --listen "loopback:$PORT" 2>"$W/serve.log" >/dev/null &
+EXTRA=(); [[ $MODE == agents* ]] && EXTRA=(--allow-plain-runner)  # a loopback test runner speaks plain http
+"$SRV" serve --config "$HOME_DIR/config.toml" --listen "loopback:$PORT" ${EXTRA[@]+"${EXTRA[@]}"} 2>"$W/serve.log" >/dev/null &
 PIDS+=($!)
 wait_for 30 test -S "$SOCK" && wait_for 30 curl -fsS "$URL/healthz" || { echo "the Core did not start"; tail -n5 "$W/serve.log"; exit 1; }
 
@@ -87,6 +93,83 @@ SAS_FILE=$W/app.sas ADD_CODE_FILE=$W/add.code LOCKS_FILE=$W/locks.ready
   echo "   approver: approved the app"
 ) &
 PIDS+=($!)
+
+# A runner with a stand-in `claude`: no provider, no credentials. It prints an assistant message, one tool call and its result,
+# asks the Core for one approval (a push), says what it was told, and ends the turn.
+prep_runner() {
+  mkdir -p "$W/runner" "$W/bin"; chmod 700 "$W/runner"
+  cat >"$W/bin/claude" <<'PERL'
+#!/usr/bin/perl
+$| = 1;
+exit 0 if $ENV{AINKRAD_EXEC_PROBE};
+if (grep { $_ eq "--version" } @ARGV) { print "2.1.400 (Claude Code)\n"; exit 0 }
+<STDIN>; <STDIN>;
+print qq({"type":"system","subtype":"init","session_id":"S1"}\n);
+print qq({"type":"assistant","message":{"id":"m1","content":[{"type":"text","text":"Reading the repo before I change anything."}],"usage":{"input_tokens":120,"output_tokens":30}}}\n);
+print qq({"type":"assistant","message":{"id":"m2","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"cargo test -p citadel"}}],"usage":{"input_tokens":150,"output_tokens":60}}}\n);
+select(undef, undef, undef, 0.6);
+print qq({"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"test result: ok. 12 passed"}]}}\n);
+print qq({"type":"control_request","request_id":"req1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"git push -u origin feat/agents"}}}\n);
+my $ok = 0;
+while (my $l = <STDIN>) { if ($l =~ /control_response/) { $ok = ($l =~ /"allow"/) ? 1 : 0; last } }
+my $say = $ok ? "Pushed the branch." : "Not allowed to push, stopping.";
+print qq({"type":"assistant","message":{"id":"m3","content":[{"type":"text","text":"$say"}],"usage":{"input_tokens":300,"output_tokens":100}}}\n);
+print qq({"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":300,"output_tokens":100}}\n);
+select(undef, undef, undef, 0.4);
+exit 0;
+PERL
+  chmod 755 "$W/bin/claude"
+  a device add runner-1 --kind runner >"$W/radd.out" || { echo "runner add failed"; return 1; }
+  "$RUNNER" pair "$URL" --code "$(field "$W/radd.out" code)" --state "$W/runner" >"$W/rpair.out" 2>&1 </dev/null &
+  PIDS+=($!)
+  wait_for 30 grep -Eq "[A-Z0-9]{4}(-[A-Z0-9]{4}){3}" "$W/rpair.out" || { echo "the runner printed no check code"; cat "$W/rpair.out"; return 1; }
+  RSAS=$(grep -Eo "[A-Z0-9]{4}(-[A-Z0-9]{4}){3}" "$W/rpair.out" | head -n1)
+  a device approve "$(field "$W/radd.out" pairing_id)" "$RSAS" >"$W/rapprove.out" 2>&1 || { echo "runner approve failed"; cat "$W/rapprove.out"; return 1; }
+  wait_for 30 test -s "$W/runner/enrolment.json" || { echo "the runner was not enrolled"; cat "$W/rpair.out"; return 1; }
+  PATH="$W/bin:$PATH" "$RUNNER" connect --state "$W/runner" --enable-agents >"$W/runner.log" 2>&1 </dev/null &
+  PIDS+=($!)
+  wait_for 40 bash -c "'$CTL' --url '$URL' --host '${URL#http://}' --keystore '$KS_A' --stepup-passphrase-file '$PASS_A' runner ls </dev/null | grep -q online" \
+    || { echo "the runner did not come online"; a runner ls 2>&1 | head -5; sed 's/\x1b\[[0-9;]*m//g' "$W/runner.log" | grep -v untested | tail -n8 | cut -c1-240; return 1; }
+  RUNNER_ID=$(a runner ls | awk '/online/ {print $1; exit}')
+  echo "   runner $RUNNER_ID online with a stand-in claude"
+}
+
+if [ "$MODE" = agents-core ]; then
+  prep_runner || exit 1
+  echo "== agent session through ainkradctl (the Core side of E5-06)"
+  a agent run "$RUNNER_ID" claude "bootstrap the thing" >"$W/run.out" 2>&1 || { echo "agent run failed"; cat "$W/run.out"; exit 1; }
+  cat "$W/run.out"
+  SID=$(grep -o 'as_[A-Za-z0-9]*' "$W/run.out" | head -n1)
+  sleep 4
+  a agent show "$SID"
+  a agent tail "$SID" --no-follow | head -30
+  exit 0
+fi
+
+if [ "$MODE" = agents ]; then
+  prep_runner || exit 1
+  # The first session comes from outside, a while after the app paired and showed the empty list: it must arrive over the event stream.
+  ( wait_for 400 grep -q approved "$W/approve.out" || exit 1; sleep 30; for _ in $(seq 1 30); do a agent run "$RUNNER_ID" claude "bootstrap the thing" >"$W/run1.out" 2>&1 && break; sleep 4; done; echo "   session 1 started: $(head -c 60 "$W/run1.out")" ) &
+  PIDS+=($!)
+  if [ -n "${APP_IT_SAMPLE:-}" ]; then  # a stuck app: a stack sample of it, a while after the first session started
+    ( wait_for 400 grep -q approved "$W/approve.out" || exit 1; sleep "$APP_IT_SAMPLE"
+      P=$(pgrep -f "$HERE/build/Build/Products/Debug/Ainkrad Core.app/Contents/MacOS" | head -n1); [ -n "$P" ] && sample "$P" 3 -file "$W/sample.txt" >/dev/null 2>&1 ) &
+    PIDS+=($!)
+  fi
+  echo "== xcodebuild test (CORE_IT=1): the agents screens against the Core and the runner"
+  cd "$HERE"
+  TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
+    nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
+    -resultBundlePath "$W/agents.xcresult" -only-testing:AinkradCoreMacUITests/AgentsLiveUITests test 2>&1 \
+    | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
+  STATUS=${PIPESTATUS[0]}
+  # The window shots the test kept, out of the result bundle (OUT=<dir> to keep them).
+  if [ -n "${OUT:-}" ]; then
+    xcrun xcresulttool export attachments --path "$W/agents.xcresult" --output-path "$OUT" >/dev/null 2>&1 || true
+  fi
+  echo "== done: xcodebuild exit $STATUS"
+  exit "$STATUS"
+fi
 
 APP="$HERE/build/Build/Products/Debug/Ainkrad Core.app"
 if [ "$MODE" = shots ]; then

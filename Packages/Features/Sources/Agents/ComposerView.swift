@@ -29,19 +29,18 @@ struct ComposerView: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: Space.s2) {
-            TextField(placeholder, text: draft)
+            TextField("Reply to the agent", text: draft, prompt: Text(placeholder))
+                .accessibilityIdentifier("agent-composer")
                 .textFieldStyle(.plain)
                 .focused($focused)
                 .disabled(!enabled)
                 .onSubmit { Task { await model.send(session.id) } }
-                .accessibilityLabel("Reply to the agent")
             Text("\(String(format: bytes < 1024 ? "%.2f" : "%.1f", Double(bytes) / 1024)) / 16 KiB")
                 .font(.system(size: MacTextSize.meta, design: .monospaced))
                 .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
                 .overlay(alignment: .leading) {
                     if over { Image(systemName: "exclamationmark.triangle").offset(x: -Space.s4) }
                 }
-                .accessibilityLabel(over ? "Too long for the Core" : "Message size")
             if session.over {
                 Button("Resume") { model.resume(session.id) }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
                     .help("Start this session again from where it stopped")

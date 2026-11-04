@@ -69,7 +69,7 @@ struct RunHeader: View {
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .help("Ask \(session.harness) to stop after its current tool call")
                     Button("Kill") { model.confirmKill(session.id) }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .buttonStyle(AgentDangerButtonStyle())
                         .help("Stop it at once; can leave files half-written")
                 }
             }
@@ -83,7 +83,9 @@ struct RunHeader: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(.horizontal, Space.s3).padding(.bottom, Space.s3)
+        .padding(Space.s3)
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .padding([.horizontal, .bottom], Space.s3)
         .accessibilityElement(children: .contain)
     }
 

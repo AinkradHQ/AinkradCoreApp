@@ -21,6 +21,8 @@ public final class TranscriptStore {
     public private(set) var approvals: [String: ApprovalRequest] = [:]
     /// Decisions seen before their request was (an earlier page loads later).
     private var earlyDecisions: [String: Bool] = [:]
+    /// Tool calls still waiting for their result, by tool id.
+    private var toolSeq: [String: Int64] = [:]
     @ObservationIgnored private var inflight: Task<Void, Never>?
     @ObservationIgnored private var dirty = false
     static let tail: Int64 = 200
@@ -40,15 +42,28 @@ public final class TranscriptStore {
     @discardableResult
     func append(_ page: [TranscriptEntry]) -> Int {
         var added = 0
-        var fresh: [TranscriptEntry] = []
         for e in page.sorted(by: { $0.seq < $1.seq }) where e.seq > lastSeq {
             lastSeq = e.seq
             added += 1
             absorb(e)
-            if e.visible { fresh.append(e) }
+            if foldResult(e) { continue }
+            if case .toolUse(let id, _, _) = e.kind { toolSeq[id] = e.seq }
+            if e.visible { entries.append(e) }
         }
-        if !fresh.isEmpty { entries.append(contentsOf: fresh) }
         return added
+    }
+
+    /// A tool's result joins its call's row (one row for the pair, the way the prototype shows it).
+    private func foldResult(_ e: TranscriptEntry) -> Bool {
+        guard case .toolResult(let id, let name, let ok, let code, let out, let ms) = e.kind, let seq = toolSeq[id],
+            let i = entries.lastIndex(where: { $0.seq == seq }), case .toolUse(_, let n, let summary) = entries[i].kind
+        else { return false }
+        entries[i] = TranscriptEntry(
+            seq: seq, at: entries[i].at,
+            kind: .toolDone(
+                id: id, name: name ?? n, summary: summary, ok: ok, exitCode: code, output: out, durationMs: ms))
+        toolSeq[id] = nil
+        return true
     }
 
     /// Entries from before the first one held.
@@ -154,6 +169,13 @@ public final class SessionsStore {
             items.insert(s, at: at)
         }
     }
+
+    #if DEBUG
+    func debugSet(load: AgentsLoad, items: [AgentSessionInfo]? = nil) {
+        self.load = load
+        if let items { self.items = items }
+    }
+    #endif
 
     func reload(_ api: any AgentsAPI) async {
         if items.isEmpty { load = .loading }

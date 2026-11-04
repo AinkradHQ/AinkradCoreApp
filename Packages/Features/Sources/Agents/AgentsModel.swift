@@ -50,7 +50,7 @@ public final class AgentsModel {
     /// Approvals being decided, and why one did not go through.
     public internal(set) var deciding: Set<String> = []
     public internal(set) var approvalNotices: [String: InlineNotice] = [:]
-    public private(set) var notifierPermission: NotificationPermission = .notAsked
+    public internal(set) var notifierPermission: NotificationPermission = .notAsked
     public var selected: String?
 
     var api: (any AgentsAPI)?
@@ -63,6 +63,9 @@ public final class AgentsModel {
     @ObservationIgnored var announced: Set<String> = []
     @ObservationIgnored var registered: Set<String> = []
     @ObservationIgnored var launcherIDs: Set<String> = []
+    #if DEBUG
+    @ObservationIgnored var held: [AgentSessionInfo] = []
+    #endif
 
     public init(
         shell: ShellModel, notifier: any ApprovalNotifier, defaults: UserDefaults = .standard,
