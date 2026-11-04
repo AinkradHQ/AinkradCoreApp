@@ -5,6 +5,7 @@
 #   scripts/ui-lock.sh <command...>
 set -euo pipefail
 LOCK=/private/tmp/claude-501/ainkrad-uitest.lock
+LAST=/private/tmp/claude-501/ainkrad-uitest.last  # when the last run released the lock
 IDLE=${UI_IDLE:-300}
 idle() { ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF / 1000000000); exit}'; }
 if [ "${UI_LOCK_HELD:-}" != 1 ]; then
@@ -17,7 +18,10 @@ if [ "${UI_LOCK_HELD:-}" != 1 ]; then
     sleep 15
   done
   echo $$ >"$LOCK/pid"
-  trap 'rm -rf "$LOCK"' EXIT; trap 'exit 130' INT TERM
+  trap 'date +%s >"$LAST"; rm -rf "$LOCK"' EXIT; trap 'exit 130' INT TERM
+  # The tests' own synthetic input resets the idle clock: if nothing has happened since the last run ended, chain on.
+  since=$(($(date +%s) - $(cat "$LAST" 2>/dev/null || echo 0)))
+  [ "$since" -lt 600 ] && [ "$(idle)" -ge $((since - 5)) ] && IDLE=0
   said=
   while [ "$(idle)" -lt "$IDLE" ]; do
     [ -n "$said" ] || { echo "ui-lock: waiting until this Mac has been idle for ${IDLE}s (UI_IDLE=0 to skip)"; said=1; }
