@@ -417,16 +417,23 @@ struct QuickBody: View {
     }
 
     @ViewBuilder private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
-        let content = Group {
-            Image(systemName: symbol).font(.system(size: wide ? 14 : 13)).accessibilityHidden(true)
-            Text(title).font(.system(size: wide ? MacTextSize.meta : MacTextSize.body, weight: .medium)).lineLimit(1)
-            if let key { CoreKeycap(key) }
-        }
+        let icon = Image(systemName: symbol).font(.system(size: wide ? 14 : 13)).accessibilityHidden(true)
+        let text = Text(title).font(.system(size: wide ? MacTextSize.meta : MacTextSize.body, weight: .medium))
+            .lineLimit(1)
         if wide {
-            VStack(spacing: 2) { content }.frame(maxWidth: .infinity, minHeight: 40)
+            VStack(spacing: 2) {
+                icon
+                HStack(spacing: Space.s1) {
+                    text
+                    if let key { Text(key).font(.system(size: MacTextSize.meta)).opacity(0.8) }
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 40)
         } else {
             HStack(spacing: Space.s2) {
-                content
+                icon
+                text
+                if let key { CoreKeycap(key) }
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, minHeight: 26)
