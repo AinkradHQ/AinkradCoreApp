@@ -174,7 +174,7 @@ struct AppearanceSection: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
-        SettingsPage(intro: "Pick Day or Night, or let Ainkrad Core follow your Mac. Your choice is remembered.") {
+        SettingsPage(intro: "Pick Day or Night, or let Ainkrad follow your Mac. Your choice is remembered.") {
             VStack(alignment: .leading, spacing: Space.s2) {
                 Text("Theme").font(.system(size: MacTextSize.headline, weight: .semibold))
                 CoreSegmented(
@@ -195,8 +195,7 @@ struct AppearanceSection: View {
 
 struct WindowSection: View {
     var body: some View {
-        SettingsPage(intro: "Ainkrad Core always runs full screen, in its own Space. It cannot be resized or windowed.")
-        {
+        SettingsPage(intro: "Ainkrad always runs full screen, in its own Space. It cannot be resized or windowed.") {
             SettingsValueRow(title: "Window", detail: "One window, full screen.", value: "Full screen")
         }
     }

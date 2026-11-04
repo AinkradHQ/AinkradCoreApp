@@ -4,7 +4,7 @@ import SwiftUI
 /// Every shortcut the shell owns. The ⌘/ sheet reads this; `ShellCommands` binds the same keys.
 enum ShortcutCatalog {
     static let groups: [(name: String, items: [(title: String, keys: String)])] = [
-        ("Ainkrad Core", [("Settings…", "⌘,"), ("Keyboard Shortcuts", "⌘/")]),
+        ("Ainkrad", [("Settings…", "⌘,"), ("Keyboard Shortcuts", "⌘/")]),
         (
             "File",
             [("Launcher…", "⌘K"), ("Close Pane", "⌘W"), ("Close All Panes", "⌥⌘W")]

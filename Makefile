@@ -1,4 +1,4 @@
-# Ainkrad Core for Mac. The Xcode project is generated from project.yml by XcodeGen and is not committed.
+# Ainkrad for Mac. The Xcode project is generated from project.yml by XcodeGen and is not committed.
 ifneq ($(wildcard /Applications/Xcode.app),)
 DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 export DEVELOPER_DIR
@@ -6,7 +6,7 @@ endif
 
 SCHEME := AinkradCoreMac
 PROJECT := AinkradCore.xcodeproj
-APP := build/Build/Products/Debug/Ainkrad Core.app
+APP := build/Build/Products/Debug/Ainkrad.app
 PACKAGES := Packages/AinkradClient Packages/CoreUI Packages/CoreKit Packages/Features
 # Tokens.swift is generated (scripts/sync-tokens.sh) and not swift-format clean
 FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features -name '*.swift' -not -path '*/.build/*'))

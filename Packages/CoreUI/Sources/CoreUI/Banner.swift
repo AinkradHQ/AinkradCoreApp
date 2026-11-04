@@ -22,8 +22,8 @@ public enum ConnectionState: Sendable, Hashable {
     var detail: String {
         switch self {
         case .offline: "Changes wait here until the connection is back."
-        case .reconnecting: "Trying to reach Ainkrad Core again."
-        case .loading: "Getting the latest from Ainkrad Core."
+        case .reconnecting: "Trying to reach your Core again."
+        case .loading: "Getting the latest from your Core."
         case .error(let message): message
         }
     }
