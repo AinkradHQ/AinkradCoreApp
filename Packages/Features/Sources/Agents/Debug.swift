@@ -5,6 +5,22 @@ import Foundation
 extension AgentsModel {
     public func debugDropHost() { host = nil }
 
+    /// A believable climb to each session's token total, so the burn charts have samples in the demo.
+    public func debugSeedBurn() {
+        for (i, s) in sessions.items.enumerated() {
+            guard let total = s.usage?.tokens, total > 0 else { continue }
+            var v = 0.0
+            let steps = (0..<24).map { k in Double(((k * 7 + i * 5) % 9) + 1) }
+            let sum = steps.reduce(0, +)
+            sessions.debugSeedBurn(
+                s.id,
+                steps.map { step in
+                    v += step / sum * Double(total)
+                    return v
+                })
+        }
+    }
+
     public func debugList(_ mode: String) {
         switch mode {
         case "loading": sessions.debugSet(load: .loading)

@@ -47,3 +47,15 @@ struct TokenTests {
             { $0 > 0 })
     }
 }
+
+struct HeatTests {
+    @Test func bucketsCountPerSliceAndScaleToTheBusiest() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let cells = heatBuckets(
+            [now, now.addingTimeInterval(-10), now.addingTimeInterval(-70), now.addingTimeInterval(-9_999)],
+            now: now, slice: 60, count: 4)
+        #expect(cells == [0, 0, 0.5, 1])
+        #expect(heatBuckets([], now: now, slice: 60, count: 3) == [0, 0, 0])
+        #expect(heatBuckets([now], now: now, slice: 0, count: 3).isEmpty)
+    }
+}

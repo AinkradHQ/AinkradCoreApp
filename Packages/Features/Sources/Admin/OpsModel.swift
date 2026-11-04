@@ -86,6 +86,13 @@ final class OpsModel {
     private(set) var raw = ""
     var state: SectionState = .loading
     private(set) var readAt: Date?
+    /// Each count-like tile's value as this Mac read it, oldest first. The Core reports the present value only, so a chart is what
+    /// was sampled while this screen was open.
+    private(set) var history: [String: [Double]] = [:]
+    static let charted: Set<String> = [
+        "ainkrad_devices_active", "ainkrad_runners", "ainkrad_terminals", "ainkrad_agent_sessions",
+        "ainkrad_disk_free_percent",
+    ]
     var showRaw = false
     @ObservationIgnored private weak var hub: AdminModel?
 
@@ -113,9 +120,26 @@ final class OpsModel {
             raw = try await service.metrics()
             (samples, help) = PrometheusText.parse(raw)
             readAt = Date()
+            for name in Self.charted {
+                let rows = samples.filter { $0.name == name && $0.labels.isEmpty }
+                guard rows.count == 1 else { continue }
+                var list = history[name] ?? []
+                list.append(rows[0].value)
+                if list.count > 60 { list.removeFirst(list.count - 60) }
+                history[name] = list
+            }
             state = samples.isEmpty ? .empty : .ready
         } catch { state = hub.state(for: error) }
     }
+
+    #if DEBUG
+    /// The demo has one read; a few more so the charts have a line to draw.
+    func debugSeedHistory() {
+        for s in samples where Self.charted.contains(s.name) && s.labels.isEmpty {
+            history[s.name] = (0..<20).map { s.value + Double(($0 * 3) % 5) - 2 }
+        }
+    }
+    #endif
 
     var alarms: [AlarmState] {
         samples.filter { $0.name == "ainkrad_alarm_active" }.compactMap { s in

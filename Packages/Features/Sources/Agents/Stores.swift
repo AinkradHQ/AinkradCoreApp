@@ -154,7 +154,11 @@ public final class SessionsStore {
     public private(set) var load: AgentsLoad = .idle
     public private(set) var hasMore = true
     public private(set) var loadingMore = false
+    /// Tokens used per session as this Mac has seen them change, oldest first. The Core reports a total, not a history, so the
+    /// burn chart is what this app sampled: it starts empty and fills while the app watches.
+    public private(set) var burn: [String: [Double]] = [:]
     static let page = 50
+    static let burnKeep = 48
 
     public init() {}
 
@@ -162,6 +166,7 @@ public final class SessionsStore {
 
     /// A newer view of a session replaces it in place; a new one goes where its creation time puts it.
     public func upsert(_ s: AgentSessionInfo) {
+        sample(s)
         if let i = items.firstIndex(where: { $0.id == s.id }) {
             if items[i] != s { items[i] = s }
         } else {
@@ -170,7 +175,22 @@ public final class SessionsStore {
         }
     }
 
+    /// Notes a session's token total when it changed since the last sample.
+    func sample(_ s: AgentSessionInfo) {
+        guard let t = s.usage?.tokens else { return }
+        var list = burn[s.id] ?? []
+        guard list.last != Double(t) else { return }
+        list.append(Double(t))
+        if list.count > Self.burnKeep { list.removeFirst(list.count - Self.burnKeep) }
+        burn[s.id] = list
+    }
+
+    /// The cost of every loaded session that reported one, and how many did not.
+    public var totalCostMicros: Int64 { items.reduce(0) { $0 + ($1.usage?.costMicros ?? 0) } }
+
     #if DEBUG
+    func debugSeedBurn(_ id: String, _ values: [Double]) { burn[id] = values }
+
     func debugSet(load: AgentsLoad, items: [AgentSessionInfo]? = nil) {
         self.load = load
         if let items { self.items = items }
@@ -185,6 +205,7 @@ public final class SessionsStore {
             let ids = Set(page.map(\.id))
             let newer = items.filter { !ids.contains($0.id) && $0.createdAt > (page.first?.createdAt ?? .distantPast) }
             items = newer + page
+            for s in items { sample(s) }
             hasMore = page.count >= Self.page
             load = .ready
         } catch {

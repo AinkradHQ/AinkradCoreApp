@@ -74,7 +74,7 @@ struct RunHeader: View {
                         .disabled(stopping != nil)
                         .help("Ask \(session.harness) to stop after its current tool call")
                     Button("Kill") { model.confirmKill(session.id) }
-                        .buttonStyle(AgentDangerButtonStyle())
+                        .buttonStyle(CoreButtonStyle(.danger, size: .small))
                         .help("Stop it at once; can leave files half-written")
                 }
             }
@@ -101,6 +101,16 @@ struct RunHeader: View {
                 if let r = session.resumes, r > 0 { stat("Resumed", "\(r) \(r == 1 ? "time" : "times")") }
                 Spacer(minLength: 0)
             }
+            let burn = model.sessions.burn[session.id] ?? []
+            if burn.count >= 2 {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    CoreSpark(burn, tone: st.tone == .fail ? .fail : .run)
+                    Text("Tokens used, as this Mac saw them change").font(.system(size: MacTextSize.meta))
+                        .foregroundStyle(palette.text2)
+                }
+            }
+            Text("Token cap and budget: not available yet.").font(.system(size: MacTextSize.meta))
+                .foregroundStyle(palette.text2)
         }
         .padding(Space.s3)
         .background(palette.glassCard, in: coreShape(Radius.cardMac))
@@ -174,19 +184,6 @@ struct StateBanner: View {
         _ symbol: String, _ tone: Tone, _ title: String, _ detail: String,
         @ViewBuilder buttons: () -> Buttons = { EmptyView() }
     ) -> some View {
-        let c = palette.tone(tone)
-        return HStack(spacing: Space.s3) {
-            Image(systemName: symbol).foregroundStyle(c.ink).frame(width: Space.s5).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s2)
-            buttons()
-        }
-        .padding(Space.s3)
-        .background(c.fill, in: coreShape(Radius.control))
-        .accessibilityElement(children: .contain)
+        CoreNotice(symbol: symbol, title: title, text: detail, tone: tone) { HStack(spacing: Space.s2) { buttons() } }
     }
 }

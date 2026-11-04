@@ -118,7 +118,9 @@ public final class AdminDemo {
                 admin.audit.filter.kind = "terminal."
                 try? await Task.sleep(for: .milliseconds(900))
             }
-        case "ops": await open("ops")
+        case "ops":
+            await open("ops")
+            admin.ops.debugSeedHistory()
         case "state-loading":
             await open("core")
             admin.registry.state = .loading

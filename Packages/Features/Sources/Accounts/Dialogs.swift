@@ -59,7 +59,7 @@ private struct ConnectDialog: View {
 
     var body: some View {
         let site = ProviderSites.page(provider)
-        AccDialog(title: replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
+        CoreDialogPanel(replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if replacing == nil {
                     CoreFieldLabel("Provider")
@@ -118,7 +118,7 @@ private struct DeleteAccountDialog: View {
     @State private var busy = false
     var body: some View {
         let pools = model.pools(of: account)
-        AccDialog(title: "Delete \(account.label)?", width: Space.s8 * 14) {
+        CoreDialogPanel("Delete \(account.label)?", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
                     "Its key is deleted from Core and cannot be recovered. Its leases are dropped.\(pools.isEmpty ? "" : " It leaves \(pools.map(\.name).joined(separator: ", ")).")"
@@ -165,7 +165,7 @@ private struct CapDialog: View {
         return nil
     }
     var body: some View {
-        AccDialog(title: "Sessions at once: \(account.label)", width: Space.s8 * 13) {
+        CoreDialogPanel("Sessions at once: \(account.label)", width: Space.s8 * 13) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField(
                     "Limit", placeholder: "No limit", text: $text, error: text.isEmpty ? nil : issue, autofocus: true
@@ -197,7 +197,7 @@ private struct NewPoolDialog: View {
     @State private var busy = false
     var body: some View {
         let chosen = provider.isEmpty ? (model.providers.first?.id ?? "") : provider
-        AccDialog(title: "New pool", width: Space.s8 * 14) {
+        CoreDialogPanel("New pool", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField("Name", placeholder: "client-work", text: $name, autofocus: true) { go(chosen) }
                 CoreFieldLabel("Provider")
@@ -238,7 +238,7 @@ private struct DeletePoolDialog: View {
     @State private var busy = false
     var body: some View {
         let n = model.bindings(of: pool).count
-        AccDialog(title: "Delete \(pool.name)?", width: Space.s8 * 14) {
+        CoreDialogPanel("Delete \(pool.name)?", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
                     "The pool goes, and so do its \(n) binding\(n == 1 ? "" : "s"). Those agents fall back to the default pool. The accounts stay."
@@ -268,7 +268,7 @@ private struct AddMemberDialog: View {
     @State private var busy = false
     var body: some View {
         let rest = model.candidates(for: pool)
-        AccDialog(title: "Add to \(pool.name)", width: Space.s8 * 14) {
+        CoreDialogPanel("Add to \(pool.name)", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if rest.isEmpty {
                     Text("Every \(model.providerName(pool.provider)) account is already in this pool.")
@@ -319,7 +319,7 @@ private struct BindDialog: View {
         let pools = model.pools(for: chosen)
         let target = pools.first { $0.id == poolID } ?? model.defaultPool(chosen) ?? pools.first
         let t = agent.trimmingCharacters(in: .whitespaces)
-        AccDialog(title: "Bind an agent", width: Space.s8 * 15) {
+        CoreDialogPanel("Bind an agent", width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField(
                     "Agent", placeholder: "agent id", text: $agent,
@@ -390,7 +390,7 @@ struct AccountsGateSection: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             Text("This gate is only for provider keys. Other secrets stay throwaway until the external review ends.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            AccBanner(
+            CoreNotice(
                 symbol: model.gate.symbol, title: model.gate.title, text: model.gate.detail, tone: model.gate.tone
             ) {
                 Button("Feature switches") { model.openSwitches() }.buttonStyle(.coreSecondary)

@@ -167,6 +167,31 @@ struct SessionsStoreTests {
         #expect(st.items.map(\.id) == ["c", "b", "a"] && st.session("b")?.over == true)
     }
 
+    @Test func burnSamplesOnlyWhenTheTotalChangesAndKeepsAWindow() {
+        let st = SessionsStore()
+        func with(_ t: Int64, cost: Int64? = nil) -> AgentSessionInfo {
+            var x = s("a", 10, index: 1)
+            x.usage = AgentUsageInfo(input: t, output: 0, costMicros: cost)
+            return x
+        }
+        st.upsert(with(100))
+        st.upsert(with(100))
+        st.upsert(with(250, cost: 2_000_000))
+        #expect(st.burn["a"] == [100, 250])
+        for i in 0..<100 { st.upsert(with(Int64(300 + i))) }
+        #expect(st.burn["a"]?.count == SessionsStore.burnKeep && st.burn["a"]?.last == 399)
+        #expect(st.totalCostMicros == 0)  // the last update reported no cost
+        st.upsert(with(400, cost: 1_500_000))
+        #expect(st.totalCostMicros == 1_500_000)
+    }
+
+    @Test func promptSizeCountsBytesAgainstSixtyFourKiB() {
+        #expect(!PromptSize.over(String(repeating: "a", count: 65_536)))
+        #expect(PromptSize.over(String(repeating: "a", count: 65_537)))
+        #expect(PromptSize.over(String(repeating: "é", count: 40_000)))  // two bytes each
+        #expect(PromptSize.words("") == "0.0 of 64 KiB")
+    }
+
     @Test func unknownStatesKeepTheirWord() {
         var x = s("x", 1, index: 1)
         x.state = SessionState(rawValue: "hibernating")

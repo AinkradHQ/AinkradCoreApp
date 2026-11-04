@@ -21,6 +21,7 @@ enum AgentsSnapshots {
         a.debugDropHost()
         for item in shell.bell.items where !item.id.hasPrefix("agents.") { shell.bell.remove(item.id) }
         for _ in 0..<100 where a.sessions.items.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+        a.debugSeedBurn()
         func id(_ n: Int) -> String { String(format: "as_01JC4X7Q3MZ8N5V2K9R%03d", n) }
         var n = 0
         func shot(_ name: String, wait: Double = 1.2) async {

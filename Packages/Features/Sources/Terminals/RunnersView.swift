@@ -76,11 +76,16 @@ private struct RunnerTile: View {
                 labelled(
                     "Work running\(st == .off ? " · last known" : "")", "\(runner.load) of \(runner.capacity) slots"
                 ) {
-                    Slots(used: runner.load, capacity: runner.capacity)
+                    CoreSlots(used: runner.load, capacity: runner.capacity)
                 }
                 if let p = runner.perCore {
                     labelled("Host load per core", String(format: "%.2f", p)) {
                         Meter(value: p, max: 6, limit: RunnerStatus.busyPerCore, warn: p > RunnerStatus.busyPerCore)
+                    }
+                    if let s = model.loadSamples[runner.id], s.count >= 2 {
+                        CoreSpark(s, tone: st == .busy ? .warn : .run, ceiling: max(0.5, s.max() ?? 0.5))
+                        Text("Load sampled on this Mac while it watched.").font(.system(size: MacTextSize.meta))
+                            .foregroundStyle(palette.text2)
                     }
                 }
                 HStack(spacing: Space.s2) {
@@ -167,7 +172,7 @@ private struct RunnerDetail: View {
         }
         card("Load\(off ? " · last known" : "")") {
             fact("Work running", "\(runner.load) of \(runner.capacity)")
-            Slots(used: runner.load, capacity: runner.capacity)
+            CoreSlots(used: runner.load, capacity: runner.capacity)
             if let a = runner.avg1, let c = runner.cores {
                 fact("Host load, 1 min average", "\(String(format: "%.1f", a)) on \(c) cores")
                 fact("Per core", String(format: "%.2f", runner.perCore ?? 0))

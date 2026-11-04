@@ -9,7 +9,7 @@ struct NewTerminalView: View {
     @FocusState private var programFocus: Bool
 
     var body: some View {
-        TermDialog(title: "New terminal") {
+        CoreDialogPanel("New terminal", width: Space.s8 * 17) {
             Text("A shell on one of your runners. Pick where it runs.").foregroundStyle(palette.text2)
             VStack(alignment: .leading, spacing: Space.s2) {
                 Text("Runner").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
@@ -21,6 +21,30 @@ struct NewTerminalView: View {
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text("Starts with").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
                     palette.text2)
+                // The shells this runner's pty driver says it offers; the Core refuses any other with `unsupported_command`.
+                let offered = model.runner(form.runner ?? "")?.drivers.first { $0.name == "pty" }?.commands ?? []
+                if !offered.isEmpty {
+                    HStack(spacing: Space.s2) {
+                        ForEach(offered, id: \.self) { c in
+                            let on = form.program == c
+                            Button {
+                                form.program = on ? "" : c
+                            } label: {
+                                Text(c).font(.system(size: MacTextSize.meta, weight: .medium, design: .monospaced))
+                                    .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm)
+                                    .background(on ? palette.navActive : palette.uDim, in: coreShape(Radius.chip))
+                                    .overlay {
+                                        if on {
+                                            coreShape(Radius.chip).strokeBorder(palette.navActiveEdge, lineWidth: 1)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+                            .accessibilityLabel("Start with \(c)")
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
                 TextField("Login shell", text: $form.program)
                     .textFieldStyle(.plain).font(.system(size: MacTextSize.body, design: .monospaced))
                     .autocorrectionDisabled().focused($programFocus)
@@ -92,7 +116,7 @@ private struct PickTile: View {
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 HStack(spacing: Space.s2) {
                     Text("Work").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    Slots(used: runner.load, capacity: runner.capacity)
+                    CoreSlots(used: runner.load, capacity: runner.capacity)
                     Text("\(runner.load) of \(runner.capacity)").font(.system(size: MacTextSize.meta)).monospacedDigit()
                     Spacer()
                     if let warn {
