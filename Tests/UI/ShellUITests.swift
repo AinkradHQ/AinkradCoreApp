@@ -101,4 +101,22 @@ final class ShellUITests: XCTestCase {
         let wait = XCTNSPredicateExpectation(predicate: enabled, object: close)
         XCTAssertEqual(XCTWaiter().wait(for: [wait], timeout: 5), .completed, "a pane is open: Close Pane is enabled")
     }
+
+    func testEditWidgetsResizeAndRemoveByKeyboardPath() {
+        openLauncher()
+        launcher.typeText("edit widgets")
+        launcher.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5), "Edit Widgets turns into Done")
+        let remove = app.buttons["Remove Clock"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), "edit mode shows a remove button on each widget")
+        let large = app.buttons["Wide, 2 by 1"]
+        XCTAssertTrue(large.firstMatch.exists, "edit mode shows size choices")
+        remove.click()
+        XCTAssertTrue(
+            app.staticTexts["Removed Clock"].waitForExistence(timeout: 5),
+            "toast says Removed Clock; tree: \(app.buttons.allElementsBoundByIndex.map(\.label))")
+        XCTAssertTrue(remove.waitForNonExistence(timeout: 5), "Remove takes the widget off Home")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.buttons["Edit Widgets"].waitForExistence(timeout: 5), "Esc leaves edit mode")
+    }
 }

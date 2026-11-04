@@ -1,6 +1,6 @@
 import SwiftUI
 
-public enum CoreButtonKind: Sendable { case prominent, secondary, plain }
+public enum CoreButtonKind: Sendable { case prominent, secondary, plain, danger }
 public enum CoreButtonSize: Sendable {
     case small, medium, large
     var height: CGFloat {
@@ -34,6 +34,7 @@ extension ButtonStyle where Self == CoreButtonStyle {
     public static var coreProminent: CoreButtonStyle { CoreButtonStyle(.prominent) }
     public static var coreSecondary: CoreButtonStyle { CoreButtonStyle(.secondary) }
     public static var corePlain: CoreButtonStyle { CoreButtonStyle(.plain) }
+    public static var coreDanger: CoreButtonStyle { CoreButtonStyle(.danger) }
 }
 
 private struct CoreButtonBody: View {
@@ -52,7 +53,7 @@ private struct CoreButtonBody: View {
     private var hover: Bool { hovering || forced == .hover }
 
     var body: some View {
-        let ink = kind == .prominent ? palette.btnInk : palette.text
+        let ink = kind == .prominent || kind == .danger ? palette.btnInk : palette.text
         ZStack {
             configuration.label.opacity(busy ? 0 : 1)
             if busy { ProgressView().controlSize(.small).tint(ink) }
@@ -65,6 +66,12 @@ private struct CoreButtonBody: View {
         .overlay {
             if kind == .secondary {
                 coreShape(size.radius).strokeBorder(palette.glassCardEdge, lineWidth: 1)
+            } else if kind == .prominent {
+                // ui.css `.btn.primary`: a 1 px light top edge (inset 0 1px 0 rgba(255,255,255,.22)).
+                coreShape(size.radius).strokeBorder(
+                    LinearGradient(
+                        stops: [.init(color: .white.opacity(0.22), location: 0), .init(color: .clear, location: 0.25)],
+                        startPoint: .top, endPoint: .bottom), lineWidth: 1)
             }
         }
         .coreFocusRing(focused || forced == .focused, radius: size.radius, palette: palette)
@@ -84,6 +91,10 @@ private struct CoreButtonBody: View {
         case .prominent: pressed ? palette.btnPrimaryPress : hover ? palette.btnPrimaryHover : palette.btnPrimary
         case .secondary: hover || pressed ? palette.uDim : .clear
         case .plain: hover || pressed ? palette.uDim : .clear
+        // ui.css `.btn.danger`: solid #D92D20, #E4402F on hover, white label in both themes.
+        case .danger:
+            hover || pressed
+                ? Color(red: 0.894, green: 0.251, blue: 0.184) : Color(red: 0.851, green: 0.176, blue: 0.125)
         }
     }
 }

@@ -44,7 +44,7 @@ public struct ShellView: View {
                         shell.sheet = nil
                         a.run()
                     }
-                    .buttonStyle(CoreButtonStyle(a.primary ? .prominent : .secondary))
+                    .buttonStyle(CoreButtonStyle(a.destructive ? .danger : a.primary ? .prominent : .secondary))
                     .keyboardShortcut(a.primary ? .defaultAction : .cancelAction)
                 }
             }
@@ -94,7 +94,7 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var covers: some View {
-        if shell.launcherOpen || shell.overlay != nil || shell.addingWidget {
+        if shell.launcherOpen || shell.overlay != nil {
             palette.bg.opacity(0.45).onTapGesture { shell.closeTopmost() }
                 .transition(.opacity).accessibilityHidden(true)
         } else if shell.bellOpen {

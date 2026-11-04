@@ -9,7 +9,8 @@ import Shell
 /// Debug only: puts the app in a named state for the self-snapshot runner (no keys sent, nothing leaves the app).
 extension AppModel {
     public static let firstRunScenes = [
-        "empty", "typed", "qr", "claiming", "sas", "sas-approved", "waiting", "approved", "offline", "ratelimit",
+        "empty", "address", "bootstrap", "typed", "qr", "claiming", "sas", "sas-approved", "waiting", "approved",
+        "offline", "ratelimit",
         "mismatch",
         "unproven", "clock", "rejected", "expired", "badcode", "sasmismatch", "oldapp", "revoked", "cancelled",
     ]
@@ -24,8 +25,12 @@ extension AppModel {
             firstRun.debugSet(.failed(Failure(kind: k)), endpoint: addr, code: "ABCDEFGHJK")
         }
         switch scene {
-        case "empty": firstRun.debugSet(.form)
-        case "typed": firstRun.debugSet(.form, endpoint: addr, code: "abcdefghjk")
+        case "empty":
+            firstRun.nameText = ""
+            firstRun.debugSet(.form, step: .name)
+        case "address": firstRun.debugSet(.form, endpoint: addr, step: .address)
+        case "bootstrap": firstRun.debugSet(.form, step: .bootstrap)
+        case "typed": firstRun.debugSet(.form, endpoint: addr, code: "abcdefghjk", step: .code)
         case "qr": firstRun.debugSet(.form, code: "ainkrad-pair:v1?h=core.example.net&p=443&c=…")
         case "claiming": firstRun.debugSet(.claiming, endpoint: addr, code: "ABCDEFGHJK")
         case "sas": firstRun.debugSet(.sas, endpoint: addr, code: "ABCDEFGHJK", claim: sas)
@@ -140,6 +145,8 @@ extension AppModel {
     }
     public func debugApproveAddDevice() async { await addDevice?.approve() }
     public func debugCloseDialog() { shell.closeDialog() }
+    /// Snapshots: leave a first-run scene for the (sample) desktop.
+    public func debugShowDesktop() { phase = .desktop }
     public func debugOpenSettings(_ id: String) {
         shell.settings.selected = id
         shell.open(.settings)

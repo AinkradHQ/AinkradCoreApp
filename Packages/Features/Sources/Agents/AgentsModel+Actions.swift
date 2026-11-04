@@ -63,7 +63,7 @@ extension AgentsModel {
                 "\(s.harness) finishes the tool call in flight, then the session ends as cancelled. What it already did stays in the transcript.",
             actions: [
                 ShellSheetAction("Keep running"),
-                ShellSheetAction("Cancel session", primary: true) { [weak self] in
+                ShellSheetAction("Cancel session", primary: true, destructive: true) { [weak self] in
                     self?.run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
                 },
             ])
@@ -77,7 +77,7 @@ extension AgentsModel {
                 "Cancel asks \(s.harness) to stop. Kill stops it at once on \(runnerName(s.runner)) and can leave files half-written. Use it only if Cancel did not work.",
             actions: [
                 ShellSheetAction("Keep running"),
-                ShellSheetAction("Kill session", primary: true) { [weak self] in
+                ShellSheetAction("Kill session", primary: true, destructive: true) { [weak self] in
                     self?.run(id, "Killing", stop: .killing) { try await $0.kill(id) }
                 },
             ])

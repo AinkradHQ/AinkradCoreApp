@@ -60,7 +60,7 @@ public struct CoreUIGallery: View {
             let states: [(String, CoreInteraction?)] = [
                 ("Rest", nil), ("Hover", .hover), ("Pressed", .pressed), ("Focus", .focused),
             ]
-            ForEach([CoreButtonKind.prominent, .secondary, .plain], id: \.self) { kind in
+            ForEach([CoreButtonKind.prominent, .secondary, .plain, .danger], id: \.self) { kind in
                 HStack(spacing: Space.s3) {
                     ForEach(states, id: \.0) { state in
                         Button(state.0) {}.buttonStyle(CoreButtonStyle(kind)).environment(

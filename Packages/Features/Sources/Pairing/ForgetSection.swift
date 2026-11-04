@@ -14,7 +14,7 @@ struct ForgetSection: View {
             .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button("Forget this Core…") { app.confirmForget = true }
-                    .buttonStyle(CoreButtonStyle(.secondary))
+                    .buttonStyle(CoreButtonStyle(.danger))
                     .accessibilityIdentifier("forget-core")
                 Spacer(minLength: 0)
             }

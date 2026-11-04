@@ -102,7 +102,7 @@ private struct PoolDetail: View {
                 } label: {
                     Label("Delete pool…", systemImage: ro ? "lock" : "trash")
                 }
-                .buttonStyle(.coreSecondary).disabled(ro || pool.isDefault)
+                .buttonStyle(.coreDanger).disabled(ro || pool.isDefault)
                 .help(pool.isDefault ? "The default pool cannot be deleted" : "Delete \(pool.name) and its bindings")
                 .accessibilityIdentifier("pool-delete-button")
             }
