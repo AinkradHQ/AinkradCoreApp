@@ -56,6 +56,7 @@ private final class EnforcerView: NSView {
                     guard let window = note.object as? NSWindow else { return }
                     MainActor.assumeIsolated {
                         Self.settled = to
+                        if to { Self.hideChrome(window) }
                         if to {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 MainActor.assumeIsolated { Self.restoreIfTiled(window) }
@@ -68,7 +69,12 @@ private final class EnforcerView: NSView {
         for name in [NSWindow.didBecomeKeyNotification, NSApplication.didBecomeActiveNotification] {
             tokens.append(
                 center.addObserver(forName: name, object: nil, queue: .main) { [weak window] _ in
-                    MainActor.assumeIsolated { if let window { Self.enter(window) } }
+                    MainActor.assumeIsolated {
+                        if let window {
+                            Self.enter(window)
+                            Self.hideChrome(window)
+                        }
+                    }
                 })
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak window] in
@@ -97,6 +103,17 @@ private final class EnforcerView: NSView {
         guard window.isVisible, !window.styleMask.contains(.fullScreen) else { return }
         window.makeKeyAndOrderFront(nil)
         window.toggleFullScreen(nil)
+    }
+
+    /// No title bar strip (traffic lights) and no menu bar sliding down when the pointer reaches the top edge (Ahmed,
+    /// 2026-11-05). Menu commands stay on their shortcuts and in the launcher. Re-applied on every activation, because the
+    /// options only hold while the app is frontmost.
+    @MainActor static func hideChrome(_ window: NSWindow) {
+        guard window.styleMask.contains(.fullScreen) else { return }
+        NSApp.presentationOptions = [.fullScreen, .hideDock, .hideMenuBar]
+        for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            window.standardWindowButton(b)?.isHidden = true
+        }
     }
 
     /// Removes the system's way out: Enter/Exit Full Screen (and its ⌃⌘F), Zoom.
