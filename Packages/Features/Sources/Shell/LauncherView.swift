@@ -14,19 +14,26 @@ struct LauncherView: View {
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
+    /// The active pane's actions (⇧⌘A) instead of the launcher's entries.
+    var actionsOnly = false
+
     private var rows: [LauncherRow] {
-        Fuzzy.rank(shell.launcher.entries, query: query, recents: shell.launcher.recents)
+        actionsOnly
+            ? Fuzzy.rank(shell.paneActionEntries(), query: query, recents: [])
+            : Fuzzy.rank(shell.launcher.entries, query: query, recents: shell.launcher.recents)
     }
 
     var body: some View {
         let rows = rows
         VStack(spacing: 0) {
+            if actionsOnly { PaneActionsHeader(shell: shell) }
             HStack(spacing: Space.s3) {
                 Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
                     .accessibilityHidden(true)
                 TextField(
                     "Launcher", text: $query,
-                    prompt: Text("Open an app or run a command…").foregroundStyle(WidgetInk.secondary)
+                    prompt: Text(actionsOnly ? "Do something with this pane…" : "Open an app or run a command…")
+                        .foregroundStyle(WidgetInk.secondary)
                 )
                 .textFieldStyle(.plain)
                 .foregroundStyle(WidgetInk.primary)
@@ -185,6 +192,7 @@ struct LauncherView: View {
         let entry = rows[selection].entry
         shell.launcher.remember(entry.id)
         shell.launcherOpen = false
+        shell.actionsOpen = false
         entry.run()
     }
 }
@@ -278,6 +286,8 @@ private struct LauncherItem: View {
     /// Each group has its colour, so the list reads at a glance; slate entries stay quiet.
     private var hue: Color {
         if row.entry.tile == .slate { return .white.opacity(0.35) }
+        if row.entry.tile == .danger { return Color(red: 1, green: 0.38, blue: 0.4) }
+        if row.entry.tile == .view { return Color(red: 0.62, green: 0.45, blue: 1) }
         switch row.group {
         case .recent, .topHit: return WidgetInk.blue
         case .actions: return WidgetInk.green
@@ -294,5 +304,43 @@ private struct LauncherItem: View {
             out[r].foregroundColor = hue == .white.opacity(0.35) ? WidgetInk.blue : hue
         }
         return Text(out).font(.system(size: MacTextSize.headline, weight: .semibold))
+    }
+}
+
+/// ⇧⌘A's header: the pane the actions are for, its picture, title and live state, arriving with a bounce.
+private struct PaneActionsHeader: View {
+    let shell: ShellModel
+    @State private var shown = false
+    var body: some View {
+        if let id = shell.activePane ?? shell.panes.first?.id, let spec = shell.panes.first(where: { $0.id == id }) {
+            HStack(spacing: Space.s3) {
+                IconTile(spec.symbol, hue: GlassInk.blue, size: 44, bounce: shown)
+                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Actions").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                        WidgetInk.secondary)
+                    HStack(spacing: Space.s2) {
+                        Text(spec.title).font(.system(size: MacTextSize.title, weight: .bold))
+                        if let sub = spec.sub { Text(sub).foregroundStyle(WidgetInk.secondary) }
+                    }
+                }
+                Spacer(minLength: 0)
+                if let chip = spec.chip {
+                    HStack(spacing: Space.s1) {
+                        StatusDot(
+                            color: chip.tone == .fail
+                                ? GlassInk.red : chip.tone == .warn ? GlassInk.orange : GlassInk.green,
+                            live: chip.tone == .run || chip.tone == .done)
+                        Text(chip.label).font(.system(size: MacTextSize.meta, weight: .medium))
+                    }
+                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
+                    .background(GlassInk.well, in: coreShape(Radius.chip))
+                }
+            }
+            .foregroundStyle(WidgetInk.primary)
+            .padding([.horizontal, .top], Space.s4)
+            .coreRise(shown, 0)
+            .onAppear { shown = true }
+        }
     }
 }

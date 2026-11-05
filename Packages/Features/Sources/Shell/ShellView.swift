@@ -32,8 +32,8 @@ public struct ShellView: View {
 
     /// One scrim for the launcher, Settings, dialogs and sheets (prototype MV-05): the desktop behind blurs 6 pt and dims.
     private var scrimmed: Bool {
-        shell.launcherOpen || shell.overlay != nil || shell.dialog != nil || shell.topDialog != nil
-            || shell.sheet != nil
+        shell.launcherOpen || shell.actionsOpen || shell.overlay != nil || shell.dialog != nil
+            || shell.topDialog != nil || shell.sheet != nil
     }
 
     private var base: some View {
@@ -109,7 +109,7 @@ public struct ShellView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .transition(.opacity)
         }
-        if shell.launcherOpen || shell.overlay != nil {
+        if shell.launcherOpen || shell.actionsOpen || shell.overlay != nil {
             Self.scrim.onTapGesture { shell.closeTopmost() }
                 .transition(.opacity).accessibilityHidden(true)
         } else if shell.bellOpen {
@@ -118,6 +118,9 @@ public struct ShellView: View {
         }
         if shell.launcherOpen {
             LauncherView(shell: shell).frame(maxHeight: .infinity, alignment: .center)
+        }
+        if shell.actionsOpen {
+            LauncherView(shell: shell, actionsOnly: true).frame(maxHeight: .infinity, alignment: .center)
         }
         if shell.bellOpen {
             BellGlance(shell: shell)

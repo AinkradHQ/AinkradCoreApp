@@ -24,7 +24,7 @@ public struct LauncherEntry: Identifiable {
     public let tile: Tile
     public let run: @MainActor () -> Void
 
-    public enum Tile: Sendable { case blue, slate }
+    public enum Tile: Sendable { case blue, slate, danger, view }
 
     public init(
         id: String, title: String, sub: String? = nil, symbol: String = "square", keywords: [String] = [],

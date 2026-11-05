@@ -136,6 +136,8 @@ public final class ShellModel {
     /// The pane the keyboard acts on (⌃⌥← / →, ⌘W).
     public var activePane: String?
     public var launcherOpen = false
+    /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
+    public var actionsOpen = false
     public var bellOpen = false
     public var overlay: ShellOverlay?
     public var toast: ToastItem?
@@ -401,6 +403,8 @@ public final class ShellModel {
             elevationPanelOpen = false
         } else if launcherOpen {
             launcherOpen = false
+        } else if actionsOpen {
+            actionsOpen = false
         } else if bellOpen {
             bellOpen = false
         } else if overlay != nil {
