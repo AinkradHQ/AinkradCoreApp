@@ -240,12 +240,12 @@ struct AccDialogButtons: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             Spacer(minLength: 0)
-            Button("Cancel", action: cancel).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+            Button("Cancel", action: cancel).buttonStyle(.coreSecondary).coreShortcut(.cancel)
             if danger {
                 Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger)).disabled(!enabled || busy)
             } else {
                 Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
-                    .keyboardShortcut(.defaultAction).disabled(!enabled || busy)
+                    .coreShortcut(.primary).disabled(!enabled || busy)
             }
         }
     }

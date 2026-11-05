@@ -190,15 +190,21 @@ public struct ModalCard: View {
                 Text(note).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     .multilineTextAlignment(.center)
             }
+            // The lead choice (the primary, else the first) answers Return; the others ⌘1, ⌘2… Every key is on its tile.
+            let lead = choices.firstIndex { $0.primary } ?? 0
             HStack(spacing: Space.s2) {
                 ForEach(Array(choices.enumerated()), id: \.element.choice.id) { i, c in
+                    let n = i < lead ? i + 1 : i
                     ChoiceTile(
-                        choice: c.choice, on: hovered == nil ? c.primary : hovered == i, keys: c.primary ? "↩" : nil
+                        choice: c.choice, on: hovered == nil ? i == lead : hovered == i,
+                        keys: i == lead ? "↩" : "⌘\(n)"
                     ) {
                         c.choice.run()
                     }
                     .keyboardShortcut(
-                        c.primary || (!choices.contains { $0.primary } && i == 0) ? .defaultAction : nil
+                        i == lead
+                            ? KeyboardShortcut.defaultAction
+                            : KeyboardShortcut(KeyEquivalent(Character("\(min(n, 9))")), modifiers: .command)
                     )
                     .onHover { hovered = $0 ? i : nil }
                 }

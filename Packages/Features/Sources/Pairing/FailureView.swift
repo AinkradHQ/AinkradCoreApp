@@ -149,12 +149,12 @@ struct FailureView: View {
             }
             // Secondary actions sit at the left edge, the primary one at the right.
             HStack(spacing: Space.s2) {
-                ForEach(actions.filter { $0.style != .primary }) { a in
-                    Button(a.label, action: a.run).coreGlassButton().disabled(a.disabled)
+                ForEach(Array(actions.filter { $0.style != .primary }.enumerated()), id: \.element.id) { i, a in
+                    Button(a.label, action: a.run).coreGlassButton().coreShortcut(.number(i + 1)).disabled(a.disabled)
                 }
                 Spacer(minLength: 0)
                 ForEach(actions.filter { $0.style == .primary }) { a in
-                    Button(a.label, action: a.run).coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
+                    Button(a.label, action: a.run).coreGlassButton(prominent: true).coreShortcut(.primary)
                         .disabled(a.disabled || wait > 0)
                 }
             }

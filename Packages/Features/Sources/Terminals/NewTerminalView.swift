@@ -34,15 +34,19 @@ struct NewTerminalView: View {
                 LazyVGrid(
                     columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
                 ) {
-                    ForEach(model.runners) { r in RunnerTile(model: model, form: form, runner: r, lens: pick) }
+                    ForEach(Array(model.runners.enumerated()), id: \.element.id) { i, r in
+                        RunnerTile(model: model, form: form, runner: r, lens: pick)
+                            .coreTileKey("⌘\(i + 1)", key: Character("\(min(i + 1, 9))"))
+                    }
                 }
             }
             step("What", "chevron.left.forwardslash.chevron.right", index: 2) {
                 HStack(spacing: Space.s2) {
-                    ForEach(Self.shells, id: \.id) { sh in
+                    ForEach(Array(Self.shells.enumerated()), id: \.element.id) { i, sh in
                         ShellTile(title: sh.title, symbol: sh.symbol, on: form.program == sh.id) {
                             form.program = sh.id
                         }
+                        .coreTileKey("⌃\(i + 1)", key: Character("\(i + 1)"), modifiers: .control)
                     }
                 }
                 TextField("Or any command, for example htop", text: $form.program)
@@ -71,14 +75,14 @@ struct NewTerminalView: View {
             }
             HStack(spacing: Space.s2) {
                 Button("Cancel") { model.shell.closeDialog() }
-                    .buttonStyle(CoreButtonStyle(.secondary)).keyboardShortcut(.cancelAction)
+                    .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
                 Spacer(minLength: Space.s2)
                 Button {
                     Task { await form.submit() }
                 } label: {
                     Label(form.error?.code == "runner_busy" ? "Try again" : "Open terminal", systemImage: "touchid")
                 }
-                .buttonStyle(CoreButtonStyle(.prominent, busy: form.busy)).keyboardShortcut(.defaultAction)
+                .buttonStyle(CoreButtonStyle(.prominent, busy: form.busy)).coreShortcut(.primary)
                 .disabled(!form.canOpen)
             }
         }

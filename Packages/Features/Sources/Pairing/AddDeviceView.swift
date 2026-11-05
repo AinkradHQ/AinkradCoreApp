@@ -76,14 +76,14 @@ struct AddDeviceView: View {
                     LazyVGrid(
                         columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
                     ) {
-                        ForEach(ScopeText.all, id: \.self) { s in
+                        ForEach(Array(ScopeText.all.enumerated()), id: \.element) { i, s in
                             ScopeToggle(
                                 scope: s,
                                 on: Binding(
                                     get: { model.scopes.contains(s) },
                                     set: { if $0 { model.scopes.insert(s) } else { model.scopes.remove(s) } }),
                                 locked: model.mine.contains(s)
-                                    ? nil : "This Mac does not hold it, so it cannot hand it on.")
+                                    ? nil : "This Mac does not hold it, so it cannot hand it on.", index: i)
                         }
                     }
                 }
@@ -92,10 +92,10 @@ struct AddDeviceView: View {
                 Text("Lasts 5 minutes · single use").font(.system(size: MacTextSize.meta))
                     .foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
-                Button("Cancel", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+                Button("Cancel", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
                 Button("Create pairing") { Task { await model.create() } }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.stage == .creating))
-                    .keyboardShortcut(.defaultAction).disabled(!model.canCreate)
+                    .coreShortcut(.primary).disabled(!model.canCreate)
             }
         }
     }
@@ -135,7 +135,7 @@ struct AddDeviceView: View {
             HStack {
                 Spacer()
                 Button("Cancel pairing") { Task { await model.reject() } }.buttonStyle(.coreSecondary)
-                Button("Close", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+                Button("Close", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
             }
         }
     }
@@ -192,7 +192,7 @@ struct AddDeviceView: View {
                 Spacer(minLength: 0)
                 Button("Reject") { Task { await model.reject() } }.buttonStyle(.coreSecondary).disabled(model.busy)
                 Button("Approve") { Task { await model.approve() } }
-                    .buttonStyle(CoreButtonStyle(.prominent, busy: model.busy)).keyboardShortcut(.defaultAction)
+                    .buttonStyle(CoreButtonStyle(.prominent, busy: model.busy)).coreShortcut(.primary)
                     .disabled(!model.checkMatches)
             }
         }
@@ -228,7 +228,7 @@ struct AddDeviceView: View {
             Text("It finishes on the new device once it confirms the check code there.").foregroundStyle(palette.text2)
             HStack {
                 Spacer()
-                Button("Done", action: close).buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                Button("Done", action: close).buttonStyle(.coreProminent).coreShortcut(.primary)
             }
         }
     }
@@ -245,9 +245,9 @@ struct AddDeviceView: View {
             .foregroundStyle(palette.text2)
             HStack {
                 Spacer()
-                Button("Close", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+                Button("Close", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
                 Button("Create a new pairing") { model.restart() }.buttonStyle(.coreProminent)
-                    .keyboardShortcut(.defaultAction)
+                    .coreShortcut(.primary)
             }
         }
     }

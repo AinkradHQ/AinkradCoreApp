@@ -33,24 +33,11 @@ public struct CoreButtonStyle: ButtonStyle {
 extension View {
     /// Apple's own Liquid Glass button (`.glass` / `.glassProminent`) on macOS 26 / iOS 26, as an 8 pt rounded rect,
     /// tinted with the theme blue; the CoreUI button below that.
+    /// The large glass button of first run and the failure cards: the CoreUI button (Liquid Glass on macOS 26), so it
+    /// shows its key like every other; `tint` colours a prominent one (red for a destructive choice).
     @ViewBuilder
     public func coreGlassButton(prominent: Bool = false, tint: Color? = nil) -> some View {
-        if #available(macOS 26, iOS 26, *) {
-            Group {
-                // The theme's blue tint would flood the clear glass, so the secondary button drops it.
-                if prominent, let tint {
-                    buttonStyle(.glassProminent).tint(tint)
-                } else if prominent {
-                    buttonStyle(.glassProminent)
-                } else {
-                    buttonStyle(.glass).tint(nil)
-                }
-            }
-            .buttonBorderShape(.roundedRectangle(radius: Radius.control))
-            .controlSize(.large)
-        } else {
-            buttonStyle(prominent ? .coreProminent : .coreSecondary)
-        }
+        buttonStyle(CoreButtonStyle(tint != nil ? .danger : prominent ? .prominent : .secondary, size: .large))
     }
 }
 
@@ -70,6 +57,7 @@ private struct CoreButtonBody: View {
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.coreForcedInteraction) private var forced
+    @Environment(\.coreKeycap) private var keycap
     @State private var hovering = false
 
     private var pressed: Bool { configuration.isPressed || forced == .pressed }
@@ -77,9 +65,18 @@ private struct CoreButtonBody: View {
 
     var body: some View {
         let ink = kind == .prominent || kind == .danger ? palette.btnInk : palette.text
-        ZStack {
-            configuration.label.opacity(busy ? 0 : 1)
-            if busy { ProgressView().controlSize(.small).tint(ink) }
+        HStack(spacing: Space.s2) {
+            ZStack {
+                configuration.label.opacity(busy ? 0 : 1)
+                if busy { ProgressView().controlSize(.small).tint(ink) }
+            }
+            // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
+            if let keycap {
+                Text(keycap).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
+                    .padding(.horizontal, 5).frame(minHeight: 18)
+                    .background(.white.opacity(0.16), in: coreShape(5))
+                    .accessibilityHidden(true)
+            }
         }
         .font(.system(size: size.text, weight: .medium))
         .foregroundStyle(ink)
@@ -149,5 +146,60 @@ private struct ButtonSurface: ViewModifier {
                     }
                 }
         }
+    }
+}
+
+private struct KeycapKey: EnvironmentKey { static let defaultValue: String? = nil }
+
+extension EnvironmentValues {
+    /// The key a CoreUI button shows on itself (set with `coreShortcut`).
+    public var coreKeycap: String? {
+        get { self[KeycapKey.self] }
+        set { self[KeycapKey.self] = newValue }
+    }
+}
+
+/// The shortcuts every modal uses: Esc for the way back, Return for the main action, ⌘1… for the rest, in order.
+public enum ModalKey {
+    case cancel
+    case primary
+    case number(Int)
+
+    var label: String {
+        switch self {
+        case .cancel: "esc"
+        case .primary: "↩"
+        case .number(let n): "⌘\(n)"
+        }
+    }
+}
+
+extension View {
+    /// Runs this button with `key` and shows the key on it.
+    @ViewBuilder
+    public func coreShortcut(_ key: ModalKey) -> some View {
+        switch key {
+        case .cancel: keyboardShortcut(.cancelAction).environment(\.coreKeycap, key.label)
+        case .primary: keyboardShortcut(.defaultAction).environment(\.coreKeycap, key.label)
+        case .number(let n):
+            keyboardShortcut(KeyEquivalent(Character("\(n % 10)")), modifiers: .command)
+                .environment(\.coreKeycap, key.label)
+        }
+    }
+}
+
+extension View {
+    /// A choice tile's key: runs it with `key` (+ `modifiers`) and shows `label` in its top-right corner.
+    public func coreTileKey(_ label: String, key: Character, modifiers: EventModifiers = .command) -> some View {
+        keyboardShortcut(KeyEquivalent(key), modifiers: modifiers)
+            .overlay(alignment: .topTrailing) {
+                Text(label).font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 5).frame(minHeight: 16)
+                    .background(.black.opacity(0.35), in: coreShape(4))
+                    .padding(6)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
     }
 }

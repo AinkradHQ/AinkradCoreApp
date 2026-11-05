@@ -308,8 +308,8 @@ private struct InlineRename: View {
             ErrorLine(text: app.devices.dialogError)
             HStack(spacing: Space.s2) {
                 Button("Save") { go() }.buttonStyle(CoreButtonStyle(.prominent, busy: app.devices.busy))
-                    .disabled(name.isEmpty || name == device.name).keyboardShortcut(.defaultAction)
-                Button("Cancel") { stop() }.buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+                    .disabled(name.isEmpty || name == device.name).coreShortcut(.primary)
+                Button("Cancel") { stop() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
             }
         }
         .onAppear {

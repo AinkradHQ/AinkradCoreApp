@@ -43,7 +43,7 @@ struct InboxView: View {
             .frame(maxHeight: Space.s8 * 18)
             HStack {
                 Spacer(minLength: 0)
-                Button("Done") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+                Button("Done") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
             }
         }
     }

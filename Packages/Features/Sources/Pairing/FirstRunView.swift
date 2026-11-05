@@ -169,9 +169,9 @@ struct FirstRunView: View {
                     model.submitName()
                 }
                 .coreGlassButton()
+                .coreShortcut(.cancel)
                 Spacer()
-                Button("Continue") { model.submitName() }.coreGlassButton(prominent: true).keyboardShortcut(
-                    .defaultAction)
+                Button("Continue") { model.submitName() }.coreGlassButton(prominent: true).coreShortcut(.primary)
             }
         }
     }
@@ -211,10 +211,10 @@ struct FirstRunView: View {
                 Spacer()
                 if pasteQR {
                     Button("Pair this Mac") { Task { await model.submit() } }
-                        .coreGlassButton(prominent: true).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
+                        .coreGlassButton(prominent: true).coreShortcut(.primary).disabled(!model.canSubmit)
                 } else {
                     Button("Continue") { model.submitAddress() }
-                        .coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
+                        .coreGlassButton(prominent: true).coreShortcut(.primary)
                         .disabled(model.endpointText.isEmpty)
                 }
             }
@@ -263,10 +263,10 @@ struct FirstRunView: View {
                 note("3. Add a second admin device (your iPhone) afterwards, so losing one never needs SSH.")
             }
             HStack {
-                Button("Back") { model.goTo(.address) }.coreGlassButton()
+                Button("Back") { model.goTo(.address) }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
                 Button("I have a code") { model.goTo(.address) }.coreGlassButton(prominent: true)
-                    .keyboardShortcut(.defaultAction)
+                    .coreShortcut(.primary)
             }
         }
     }
@@ -290,10 +290,10 @@ struct FirstRunView: View {
                 if showKeys { keyDetails }
             }
             HStack {
-                Button("Back") { model.goTo(.address) }.coreGlassButton()
+                Button("Back") { model.goTo(.address) }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
                 Button("Pair this Mac") { Task { await model.submit() } }
-                    .coreGlassButton(prominent: true).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
+                    .coreGlassButton(prominent: true).coreShortcut(.primary).disabled(!model.canSubmit)
             }
         }
     }
@@ -343,12 +343,13 @@ struct FirstRunView: View {
             HStack(spacing: Space.s2) {
                 Button("It doesn't match") { Task { await model.cancel() } }
                     .coreGlassButton(prominent: true, tint: palette.tone(.fail).ink)
+                    .coreShortcut(.number(1))
                 Spacer(minLength: 0)
                 if model.matched {
                     Button("Waiting…") {}.coreGlassButton(prominent: true).disabled(true)
                 } else {
                     Button("It matches") { Task { await model.confirmMatch() } }
-                        .coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
+                        .coreGlassButton(prominent: true).coreShortcut(.primary)
                 }
             }
         }
@@ -401,7 +402,7 @@ struct FirstRunView: View {
             HStack {
                 Spacer()
                 Button("Open Ainkrad") { model.finish() }
-                    .coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
+                    .coreGlassButton(prominent: true).coreShortcut(.primary)
             }
         }
     }

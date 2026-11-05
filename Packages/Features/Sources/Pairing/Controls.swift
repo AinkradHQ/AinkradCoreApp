@@ -100,6 +100,8 @@ struct ScopeToggle: View {
     let scope: String
     @Binding var on: Bool
     var locked: String?
+    /// Its number in the list: ⌘1… switches it.
+    var index: Int?
 
     var body: some View {
         Button {
@@ -110,6 +112,7 @@ struct ScopeToggle: View {
                 hue: ScopeText.hue(scope), on: on)
         }
         .buttonStyle(.plain)
+        .modifier(TileKey(index: index))
         .disabled(locked != nil)
         .accessibilityLabel("\(scope), \(ScopeText.text(scope))")
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -314,5 +317,17 @@ struct CodeBoxes: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// ⌘ + a tile's number, shown on the tile; none when it has no number.
+struct TileKey: ViewModifier {
+    let index: Int?
+    func body(content: Content) -> some View {
+        if let index, index < 9 {
+            content.coreTileKey("⌘\(index + 1)", key: Character("\(index + 1)"))
+        } else {
+            content
+        }
     }
 }
