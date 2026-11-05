@@ -9,6 +9,9 @@ struct WorkspaceView: View {
     @State private var drag: (id: String, origin: CGPoint, translation: CGSize)?
     @State private var drop: TileDrop?
     @State private var resizing = false
+    /// How far the workspace strip is scrolled, so a drag measured on screen lands on the right pane.
+    @State private var scrollX: CGFloat = 0
+    @State private var scrolling = false
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -48,6 +51,7 @@ struct WorkspaceView: View {
                         height: max(area.height, layout.frames.values.map(\.maxY).max() ?? 0), alignment: .topLeading)
                 }
                 .scrollDisabled(focus != nil || !layout.isStrip)
+                .modifier(StripScroll(x: $scrollX, scrolling: $scrolling))
                 .frame(width: area.width, height: area.height)
                 .padding(.leading, ShellMetrics.paneInset)
                 .padding(.top, ShellMetrics.topBar)
@@ -67,7 +71,7 @@ struct WorkspaceView: View {
         guard shell.focusedPane == nil, let slot = layout.frames[id] else { return }
         if drag?.id != id { shell.activePane = id }
         drag = (id, drag?.id == id ? drag!.origin : slot.origin, translation)
-        let p = CGPoint(x: location.x - ShellMetrics.paneInset, y: location.y - ShellMetrics.topBar)
+        let p = CGPoint(x: location.x - ShellMetrics.paneInset + scrollX, y: location.y - ShellMetrics.topBar)
         drop = TileTree.dropTarget(at: p, frames: layout.frames, excluding: id)
     }
 
@@ -88,7 +92,7 @@ struct WorkspaceView: View {
         let dragging = drag?.id == spec.id
         PaneHost(
             spec: spec, active: shell.activePane == spec.id && (focus != nil || shell.panes.count > 1),
-            canDrag: focus == nil && shell.panes.count > 1,
+            canDrag: focus == nil && shell.panes.count > 1, scrolling: scrolling,
             onDrag: { dragTo(spec.id, $0, $1, layout) }, onDragEnd: { dropIt(spec.id) }
         )
         .frame(width: slot.width, height: slot.height)
@@ -312,10 +316,13 @@ private struct PaneHost: View {
     let spec: PaneSpec
     let active: Bool
     let canDrag: Bool
+    let scrolling: Bool
     let onDrag: (CGPoint, CGSize) -> Void
     let onDragEnd: () -> Void
     @State private var hovering = false
     @State private var gripHover = false
+    /// The grip stays while it is held: the pane moves under the pointer, and losing hover must not end the drag.
+    @State private var dragging = false
 
     var body: some View {
         CorePaneChrome(
@@ -325,19 +332,23 @@ private struct PaneHost: View {
             spec.content
         }
         .overlay(alignment: .top) {
-            if canDrag && hovering {
+            if canDrag && (dragging || (hovering && !scrolling)) {
                 Capsule().fill(.white.opacity(gripHover ? 0.75 : 0.4))
                     .frame(width: gripHover ? 64 : 44, height: 5)
                     .padding(.vertical, 6).padding(.horizontal, 24)
                     .contentShape(Rectangle())
-                    .onHover { inside in
-                        gripHover = inside
-                        if inside { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
-                    }
+                    .onHover { gripHover = $0 }
+                    .modifier(GrabPointer(active: dragging))
                     .gesture(
                         DragGesture(minimumDistance: 2, coordinateSpace: .named("wsroot"))
-                            .onChanged { onDrag($0.location, $0.translation) }
-                            .onEnded { _ in onDragEnd() }
+                            .onChanged {
+                                dragging = true
+                                onDrag($0.location, $0.translation)
+                            }
+                            .onEnded { _ in
+                                dragging = false
+                                onDragEnd()
+                            }
                     )
                     .help("Drag to move this app")
                     .transition(.opacity)
@@ -393,5 +404,36 @@ private struct SeamHandle: View {
 
     private func move(to pointer: CGFloat) {
         shell.resizeSeam(seam, gap: ShellMetrics.paneGap, position: pointer - seam.origin)
+    }
+}
+
+/// The strip's scroll offset and whether it is moving (macOS 15; below that, no offset and no pause).
+private struct StripScroll: ViewModifier {
+    @Binding var x: CGFloat
+    @Binding var scrolling: Bool
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content
+                .onScrollGeometryChange(for: CGFloat.self) {
+                    $0.contentOffset.x
+                } action: { _, new in
+                    x = new
+                }
+                .onScrollPhaseChange { _, phase in scrolling = phase != .idle }
+        } else {
+            content
+        }
+    }
+}
+
+/// The grab hand on the grip, open at rest and closed while dragging.
+private struct GrabPointer: ViewModifier {
+    let active: Bool
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content.pointerStyle(active ? .grabActive : .grabIdle)
+        } else {
+            content
+        }
     }
 }
