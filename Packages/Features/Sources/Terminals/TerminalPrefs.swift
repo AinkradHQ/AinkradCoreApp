@@ -18,6 +18,18 @@ final class TerminalPrefs {
     /// Frosts what shows through a see-through terminal, so text stays readable over a busy sky.
     var blur: Bool { didSet { save() } }
 
+    /// The Terminals app's own surface (the list): glass clear or frosted, the theme's colour, or a solid dark.
+    enum Surface: String, CaseIterable { case clear, frosted, theme, solid }
+    var surface: Surface { didSet { save() } }
+    /// How solid that surface is, 0 (see-through) to 1.
+    var surfaceOpacity: Double { didSet { save() } }
+
+    /// Defaults for the quick New terminal and for what opening one does.
+    var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
+    var defaultShell: String { didSet { save() } }  // "" = the runner's login shell
+    var openFullPane: Bool { didSet { save() } }
+    var confirmEnd: Bool { didSet { save() } }
+
     enum CursorShape: String, CaseIterable { case block, underline, bar }
 
     private let defaults = UserDefaults.standard
@@ -29,6 +41,12 @@ final class TerminalPrefs {
         blink = defaults.object(forKey: "terminal.blink") as? Bool ?? true
         opacity = defaults.object(forKey: "terminal.opacity") as? Double ?? 0.78
         blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
+        surface = Surface(rawValue: defaults.string(forKey: "terminal.surface") ?? "") ?? .frosted
+        surfaceOpacity = defaults.object(forKey: "terminal.surfaceOpacity") as? Double ?? 0.35
+        defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
+        defaultShell = defaults.string(forKey: "terminal.defaultShell") ?? ""
+        openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
+        confirmEnd = defaults.object(forKey: "terminal.confirmEnd") as? Bool ?? true
     }
 
     static let systemMono = "SF Mono"
@@ -68,6 +86,12 @@ final class TerminalPrefs {
         defaults.set(blink, forKey: "terminal.blink")
         defaults.set(opacity, forKey: "terminal.opacity")
         defaults.set(blur, forKey: "terminal.blur")
+        defaults.set(surface.rawValue, forKey: "terminal.surface")
+        defaults.set(surfaceOpacity, forKey: "terminal.surfaceOpacity")
+        defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
+        defaults.set(defaultShell, forKey: "terminal.defaultShell")
+        defaults.set(openFullPane, forKey: "terminal.openFull")
+        defaults.set(confirmEnd, forKey: "terminal.confirmEnd")
         NotificationCenter.default.post(name: Self.changed, object: nil)
     }
 }

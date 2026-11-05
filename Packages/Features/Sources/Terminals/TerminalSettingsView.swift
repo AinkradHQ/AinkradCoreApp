@@ -5,6 +5,8 @@ import SwiftUI
 /// terminal at once.
 struct TerminalSettingsView: View {
     @Bindable var prefs = TerminalPrefs.shared
+    /// Read live: the section is built once, before the runners arrive.
+    weak var model: TerminalsModel?
     @Namespace private var pick
 
     var body: some View {
@@ -67,6 +69,42 @@ struct TerminalSettingsView: View {
                     .monospacedDigit().contentTransition(.numericText()).frame(width: 44, alignment: .trailing)
                 }
                 Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
+            }
+            GlassSection(
+                "App surface", sub: "The Terminals app's own background.", symbol: "square.on.square",
+                hue: GlassInk.blue, index: 5
+            ) {
+                Picker("Surface", selection: $prefs.surface) {
+                    Text("Clear glass").tag(TerminalPrefs.Surface.clear)
+                    Text("Frosted glass").tag(TerminalPrefs.Surface.frosted)
+                    Text("Theme colour").tag(TerminalPrefs.Surface.theme)
+                    Text("Solid").tag(TerminalPrefs.Surface.solid)
+                }
+                .pickerStyle(.segmented).labelsHidden()
+                HStack(spacing: Space.s3) {
+                    Text("Clear").foregroundStyle(GlassInk.secondary)
+                    Slider(value: $prefs.surfaceOpacity, in: 0...1)
+                    Text("Solid").foregroundStyle(GlassInk.secondary)
+                    Text("\(Int((prefs.surfaceOpacity * 100).rounded()))%").monospacedDigit().frame(
+                        width: 44, alignment: .trailing)
+                }
+            }
+            GlassSection(
+                "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
+                hue: GlassInk.green, index: 6
+            ) {
+                Picker("Runner", selection: $prefs.defaultRunner) {
+                    Text("Best ready runner").tag("")
+                    ForEach(model?.runners ?? []) { r in Text(r.name).tag(r.id) }
+                }
+                Picker("Shell", selection: $prefs.defaultShell) {
+                    Text("Login shell").tag("")
+                    Text("zsh").tag("zsh")
+                    Text("bash").tag("bash")
+                    Text("sh").tag("sh")
+                }
+                Toggle("Open new terminals full pane", isOn: $prefs.openFullPane).toggleStyle(.switch)
+                Toggle("Ask before ending a terminal", isOn: $prefs.confirmEnd).toggleStyle(.switch)
             }
         }
         .foregroundStyle(GlassInk.primary)

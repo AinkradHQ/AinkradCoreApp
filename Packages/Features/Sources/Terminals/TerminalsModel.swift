@@ -147,7 +147,7 @@ public final class TerminalsModel {
             SettingsSection(
                 id: "terminal", group: .mac, title: "Terminal", sub: "Font, colours, cursor and background",
                 symbol: "terminal", order: 10
-            ) { TerminalSettingsView() })
+            ) { TerminalSettingsView(model: self) })
         let l = shell.launcher
         l.register(
             LauncherEntry(
@@ -292,7 +292,17 @@ public final class TerminalsModel {
         return items
     }
 
+    /// Acts on a terminal from the list: its session if this Mac has one, else one made without attaching.
+    func session(for id: String) -> TerminalSession? {
+        if sessions[id] == nil { openTerminal(id, attach: false) }
+        return sessions[id]
+    }
+
     func confirmEnd(_ session: TerminalSession) {
+        guard TerminalPrefs.shared.confirmEnd else {
+            Task { _ = await session.end() }
+            return
+        }
         shell.presentSheet(
             title: "End this terminal?",
             message:
@@ -346,7 +356,9 @@ public final class TerminalsModel {
     func quickNew() {
         Task {
             if runners.isEmpty { await reload() }
-            let m = NewTerminalModel(model: self, runner: nil)
+            let prefs = TerminalPrefs.shared
+            let m = NewTerminalModel(model: self, runner: prefs.defaultRunner.isEmpty ? nil : prefs.defaultRunner)
+            m.program = prefs.defaultShell
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }
@@ -373,6 +385,10 @@ public final class TerminalsModel {
         items.insert(t, at: 0)
         openTerminal(t.id)
         await reload()
+        if TerminalPrefs.shared.openFullPane {
+            shell.activePane = "terminal-\(t.id)"
+            shell.focusedPane = "terminal-\(t.id)"
+        }
         shell.showToast("A terminal opened on \(name(of: t.runner))")
     }
 
