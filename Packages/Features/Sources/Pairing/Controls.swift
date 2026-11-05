@@ -254,7 +254,7 @@ struct CodeBoxes: View {
                 Text(i < chars.count ? String(chars[i]) : "")
                     .font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(palette.glassCard, in: coreShape(Radius.control))
+                    .coreGlassField(fallback: palette.glassCard)
                     .overlay {
                         coreShape(Radius.control).strokeBorder(
                             active ? palette.primary : error != nil ? palette.tone(.fail).ink : palette.glassCardEdge,
