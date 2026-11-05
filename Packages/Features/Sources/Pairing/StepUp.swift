@@ -95,8 +95,7 @@ struct StepUpBanner: View {
         if let n = app.stepUpNotice {
             let colours = palette.tone(n.tone)
             HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: n.symbol).foregroundStyle(colours.ink).frame(width: Space.s4).accessibilityHidden(
-                    true)
+                IconTile(n.symbol, hue: colours.ink, size: 32, bounce: n.title)
                 VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                     Text(n.detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
@@ -105,8 +104,9 @@ struct StepUpBanner: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3)
-            .background(palette.glassCard, in: coreShape(Radius.cardMac))
-            .background(colours.fill, in: coreShape(Radius.cardMac))
+            .background(colours.ink.opacity(0.14), in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(colours.ink.opacity(0.35), lineWidth: 1) }
+            .transition(.opacity.combined(with: .move(edge: .top)))
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("stepup-notice")
         }
@@ -117,50 +117,104 @@ struct StepUpBanner: View {
 /// small shake when it does not match.
 struct StepUpSheet: View {
     @Bindable var model: StepUpModel
-    @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var scan = false
+    @State private var ripple = false
+    @State private var sweep = false
+    @State private var drawn: CGFloat = 0
+
+    private var hue: Color { done ? GlassInk.green : missed ? GlassInk.red : GlassInk.blue }
 
     var body: some View {
-        // Centred, as the prototype's sheet: the tile, the title, what it is for, then the wait.
-        VStack(spacing: Space.s3) {
+        VStack(spacing: Space.s4) {
             ZStack {
-                if done || missed {
-                    Image(systemName: done ? "checkmark" : "xmark")
-                        .font(.system(size: MacTextSize.large * 1.5))
-                        .foregroundStyle(palette.tone(missed ? .warn : .done).ink)
-                        .transition(.scale.combined(with: .opacity))
-                } else {
-                    // Apple's own Touch ID view, inside this sheet: macOS asks here instead of a second system panel.
-                    LocalAuthenticationView("Touch ID", context: model.context)
+                // Halos rippling out while it waits (rounded rectangles, like every shape in the app).
+                if !done && !missed && !reduce {
+                    ForEach(0..<3, id: \.self) { i in
+                        coreShape(Radius.cardMac + 10).stroke(hue.opacity(0.5), lineWidth: 1.5)
+                            .frame(width: 112, height: 112)
+                            .scaleEffect(ripple ? 1.55 : 1)
+                            .opacity(ripple ? 0 : 0.8)
+                            .animation(
+                                .easeOut(duration: 2.1).repeatForever(autoreverses: false).delay(Double(i) * 0.7),
+                                value: ripple)
+                    }
+                }
+                coreShape(Radius.cardMac + 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [hue.opacity(0.55), hue.opacity(0.22)], startPoint: .top, endPoint: .bottom)
+                    )
+                    .overlay { coreShape(Radius.cardMac + 6).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                    .frame(width: 112, height: 112)
+                    .shadow(color: hue.opacity(0.6), radius: done ? 30 : 18)
+                Group {
+                    if done {
+                        CheckMark().trim(from: 0, to: drawn)
+                            .stroke(.white, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
+                            .frame(width: 46, height: 46)
+                            .transition(.scale.combined(with: .opacity))
+                    } else if missed {
+                        Image(systemName: "xmark").font(.system(size: 40, weight: .bold)).foregroundStyle(.white)
+                            .transition(.scale.combined(with: .opacity))
+                    } else {
+                        // Apple's own Touch ID view, inside this sheet: macOS asks here instead of a second panel.
+                        LocalAuthenticationView("Touch ID", context: model.context).frame(width: 72, height: 72)
+                    }
+                }
+                // A light sweep across the tile while it waits.
+                if !done && !missed && !reduce {
+                    LinearGradient(colors: [.clear, .white.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(width: 112, height: 26)
+                        .offset(y: sweep ? 46 : -46)
+                        .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: sweep)
+                        .clipShape(coreShape(Radius.cardMac + 6))
+                        .frame(width: 112, height: 112)
+                        .allowsHitTesting(false)
                 }
             }
-            .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 2)
-            .background(palette.tone(missed ? .warn : .done).fill, in: coreShape(Radius.cardMac))
+            .frame(width: 170, height: 170)
             .modifier(Shake(count: missed && !reduce ? 3 : 0))
             .animation(.linear(duration: 0.45), value: missed)
-            .animation(.spring(duration: 0.3, bounce: 0.3), value: done)
+            .animation(.spring(duration: 0.4, bounce: 0.35), value: done)
             .accessibilityHidden(true)
-            Text("Confirm with Touch ID").font(.system(size: MacTextSize.title, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
-            Text(done ? "Unlocked." : missed ? "Touch ID didn't match." : reason)
-                .foregroundStyle(palette.text2).multilineTextAlignment(.center)
+            VStack(spacing: Space.s2) {
+                Text(done ? "Unlocked" : missed ? "Didn't match" : "Touch the sensor")
+                    .font(.system(size: MacTextSize.large + 6, weight: .bold))
+                    .contentTransition(.opacity)
+                    .accessibilityAddTraits(.isHeader)
+                Text(
+                    done
+                        ? "Admin actions are open for a short while."
+                        : missed ? "Touch it again. After a few misses macOS asks for your password." : reason
+                )
+                .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+            }
             if !done && !missed {
-                VStack(spacing: Space.s1) {
-                    IndBar()
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "touchid").symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                     Text("Waiting for Touch ID").font(.system(size: MacTextSize.body, weight: .semibold))
                 }
+                .foregroundStyle(GlassInk.secondary)
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.updatesFrequently)
             }
         }
-        .font(.system(size: MacTextSize.body))
-        .foregroundStyle(palette.text)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .frame(width: Space.s8 * 12)
-        .onAppear { scan = true }
+        .foregroundStyle(GlassInk.primary)
+        .padding(Space.s6)
+        .frame(width: Space.s8 * 13)
+        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
+        .coreModalEntrance()
+        .animation(.spring(duration: 0.35), value: model.phase)
+        .onAppear {
+            ripple = true
+            sweep = true
+        }
+        .onChange(of: done) { _, now in
+            if now { withAnimation(.easeOut(duration: reduce ? 0.01 : 0.4).delay(0.1)) { drawn = 1 } }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Confirm with Touch ID")
         .accessibilityIdentifier("stepup")
@@ -175,6 +229,17 @@ struct StepUpSheet: View {
     private var reason: String {
         if case .asking(let r)? = model.phase { return r }
         return ""
+    }
+}
+
+/// A tick drawn as one path, so it can draw itself in.
+private struct CheckMark: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX + r.width * 0.12, y: r.midY + r.height * 0.02))
+        p.addLine(to: CGPoint(x: r.minX + r.width * 0.4, y: r.maxY - r.height * 0.18))
+        p.addLine(to: CGPoint(x: r.maxX - r.width * 0.1, y: r.minY + r.height * 0.18))
+        return p
     }
 }
 
