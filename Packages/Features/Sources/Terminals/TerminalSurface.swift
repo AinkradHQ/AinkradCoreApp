@@ -75,7 +75,9 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         let bytes = Data(data)
         MainActor.assumeIsolated { onInput?(bytes) }
     }
-    nonisolated func scrolled(source: TerminalView, position: Double) {}
+    nonisolated func scrolled(source: TerminalView, position: Double) {
+        MainActor.assumeIsolated { container.showThumb() }
+    }
     nonisolated func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
         if let url = URL(string: link), ["http", "https"].contains(url.scheme?.lowercased()) {
             NSWorkspace.shared.open(url)
@@ -103,19 +105,57 @@ final class SurfaceContainer: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
+    /// The terminal's own grey scroller is hidden and its reserved strip pushed past the right edge, so the screen has
+    /// the same margin on every side; a thin glass thumb stands in for it, fading in while the output scrolls
+    /// (Ahmed, 2026-11-05).
+    private let thumb = CALayer()
+    private var fade: DispatchWorkItem?
+
     override func layout() {
         super.layout()
         guard let term else { return }
+        let strip = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+        for case let s as NSScroller in term.subviews { s.isHidden = true }
         switch mode {
         case .fill:
             layer?.backgroundColor = nil
-            term.frame = bounds
+            term.frame = CGRect(x: 0, y: 0, width: bounds.width + strip, height: bounds.height)
         case .letterbox:
             layer?.backgroundColor = NSColor(red: 2 / 255, green: 6 / 255, blue: 12 / 255, alpha: 0.92).cgColor
             let want = term.getOptimalFrameSize().size
             term.frame = CGRect(
-                x: 0, y: 0, width: min(want.width, bounds.width), height: min(want.height, bounds.height))
+                x: 0, y: 0, width: min(want.width, bounds.width + strip), height: min(want.height, bounds.height))
         }
+        placeThumb()
+    }
+
+    private func placeThumb() {
+        guard let term, let layer else { return }
+        if thumb.superlayer == nil {
+            thumb.backgroundColor = NSColor.white.withAlphaComponent(0.42).cgColor
+            thumb.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
+            thumb.borderWidth = 0.5
+            thumb.cornerRadius = 2.5
+            thumb.opacity = 0
+            layer.addSublayer(thumb)
+        }
+        let size = max(0.05, min(1, term.scrollThumbsize))
+        let height = max(28, bounds.height * size)
+        let y = (bounds.height - height) * CGFloat(term.scrollPosition)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        thumb.frame = CGRect(x: bounds.width - 8, y: y, width: 5, height: height)
+        CATransaction.commit()
+        thumb.isHidden = !term.canScroll
+    }
+
+    func showThumb() {
+        placeThumb()
+        thumb.opacity = 1
+        fade?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.thumb.opacity = 0 }
+        fade = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
     }
 
     override func isAccessibilityElement() -> Bool { true }

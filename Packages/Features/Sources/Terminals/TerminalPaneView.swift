@@ -19,7 +19,6 @@ struct TerminalPaneView: View {
                     tone: b.tone, title: b.title, detail: b.detail, busy: b.busy,
                     actionTitle: b.action.map(PaneView.label)
                 ) { b.action.map(perform) }
-                .padding(.horizontal, Space.s2)
                 .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
             ZStack {
@@ -52,10 +51,9 @@ struct TerminalPaneView: View {
                 }
             }
             .clipShape(coreShape(Radius.cardMac))
-            .padding(.horizontal, Space.s2)
             .accessibilityElement(children: .contain)
         }
-        .padding(.top, Space.s1)
+        // No margin of its own: the pane frame gives the same space on every side.
         .coreAnimation(Motion.out(Motion.move), value: v)
         .onDisappear { model.paneClosed(session.id) }
         .accessibilityIdentifier("terminal-pane-\(session.id)")
