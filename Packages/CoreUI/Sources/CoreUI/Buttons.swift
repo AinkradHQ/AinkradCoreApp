@@ -64,7 +64,7 @@ private struct CoreButtonBody: View {
     private var hover: Bool { hovering || forced == .hover }
 
     var body: some View {
-        let ink = kind == .prominent || kind == .danger ? palette.btnInk : palette.text
+        let ink: Color = .white
         HStack(spacing: Space.s2) {
             ZStack {
                 configuration.label.opacity(busy ? 0 : 1)
@@ -72,13 +72,13 @@ private struct CoreButtonBody: View {
             }
             // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
             if let keycap {
-                Text(keycap).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
-                    .padding(.horizontal, 5).frame(minHeight: 18)
+                Text(keycap).font(.system(size: 10, weight: .medium, design: .rounded))
+                    .padding(.horizontal, 5).frame(minHeight: 16)
                     .background(.white.opacity(0.16), in: coreShape(5))
                     .accessibilityHidden(true)
             }
         }
-        .font(.system(size: size.text, weight: .medium))
+        .font(.system(size: size.text, weight: .semibold))
         .foregroundStyle(ink)
         .frame(minHeight: size.height)
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
@@ -110,42 +110,35 @@ private struct CoreButtonBody: View {
     }
 }
 
-/// Every CoreUI button is Liquid Glass on macOS 26 / iOS 26 (Ahmed, 2026-11-05: "everything shall be liquid glass"):
-/// prominent and danger are glass tinted with their colour, secondary is clear glass, plain gets glass only on hover.
-/// Below 26 the flat fills and edges of the prototype stay.
+/// Every CoreUI button is the app-header tile (Ahmed, 2026-11-05: "apply this style of buttons everywhere"): prominent is
+/// a soft blue tile, danger a soft red one, secondary a dark glass well; a light edge, a glow and a small lift on hover.
+/// Plain buttons stay quiet until hovered.
 private struct ButtonSurface: ViewModifier {
     let kind: CoreButtonKind
     let radius: CGFloat
     let fill: Color
     let hover: Bool
-    @Environment(\.corePalette) private var palette
 
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
-        if #available(macOS 26, iOS 26, *) {
-            switch kind {
-            case .prominent, .danger: content.glassEffect(.regular.tint(fill).interactive(), in: shape)
-            case .secondary:
-                content.glassEffect(.regular.tint(palette.glassTint.opacity(0.25)).interactive(), in: shape)
-            case .plain:
-                if hover { content.glassEffect(.regular.interactive(), in: shape) } else { content }
-            }
-        } else {
-            content.background(fill, in: shape)
-                .overlay {
-                    if kind == .secondary {
-                        shape.strokeBorder(palette.glassCardEdge, lineWidth: 1)
-                    } else if kind == .prominent {
-                        // ui.css `.btn.primary`: a 1 px light top edge (inset 0 1px 0 rgba(255,255,255,.22)).
-                        shape.strokeBorder(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .white.opacity(0.22), location: 0),
-                                    .init(color: .clear, location: 0.25),
-                                ], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-                    }
+        let hue: Color =
+            kind == .danger ? GlassInk.red : kind == .prominent ? GlassInk.blue : GlassInk.slate
+        content
+            .background {
+                switch kind {
+                case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.95 : 0.8))
+                case .secondary: shape.fill(hover ? hue.opacity(0.28) : GlassInk.well)
+                case .plain: shape.fill(hover ? GlassInk.wellHover : .clear)
                 }
-        }
+            }
+            .overlay {
+                if kind != .plain {
+                    shape.strokeBorder(.white.opacity(kind == .secondary ? 0.15 : 0.3), lineWidth: 1)
+                }
+            }
+            .shadow(color: (kind == .plain ? Color.clear : hue).opacity(hover ? 0.45 : 0), radius: 10)
+            .scaleEffect(hover && kind != .plain ? 1.04 : 1)
+            .animation(.spring(duration: 0.25, bounce: 0.3), value: hover)
     }
 }
 
