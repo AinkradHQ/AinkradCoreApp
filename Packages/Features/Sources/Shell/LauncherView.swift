@@ -9,6 +9,9 @@ struct LauncherView: View {
     @State private var selection = 0
     /// The pointer only moves the selection while the keyboard has not moved it just now (a list scrolling under a still pointer is not a hover).
     @State private var keyAt = Date.distantPast
+    /// The text field's own editor takes ↑ ↓ (it moves the text cursor), so the list never saw them: while the launcher
+    /// is open, these keys are caught first and move the selection.
+    @State private var arrowMonitor: Any?
     @Namespace private var glide
     @FocusState private var focused: Bool
     @Environment(\.corePalette) private var palette
@@ -45,6 +48,11 @@ struct LauncherView: View {
                     return .handled
                 }
                 .onKeyPress(phases: [.down, .repeat]) { press in key(press, rows.count) }
+                .onAppear { catchArrows() }
+                .onDisappear {
+                    if let arrowMonitor { NSEvent.removeMonitor(arrowMonitor) }
+                    arrowMonitor = nil
+                }
                 .accessibilityLabel("Launcher")
             }
             .padding(Space.s4)
@@ -167,6 +175,33 @@ struct LauncherView: View {
         keyAt = Date()
         glide((selection + step + count) % count)
         return .handled
+    }
+
+    private func catchArrows() {
+        guard arrowMonitor == nil else { return }
+        arrowMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            let count = rows.count
+            guard count > 0 else { return e }
+            let command = e.modifierFlags.contains(.command)
+            let control = e.modifierFlags.contains(.control)
+            switch e.keyCode {
+            case 125 where command: _ = jump(count - 1)  // ⌘↓
+            case 126 where command: _ = jump(0)  // ⌘↑
+            case 125: step(1, count)  // ↓
+            case 126: step(-1, count)  // ↑
+            case 121: _ = jump(min(selection + 8, count - 1))  // page down
+            case 116: _ = jump(max(selection - 8, 0))  // page up
+            case 45 where control: step(1, count)  // ⌃N
+            case 35 where control: step(-1, count)  // ⌃P
+            default: return e
+            }
+            return nil
+        }
+    }
+
+    private func step(_ by: Int, _ count: Int) {
+        keyAt = Date()
+        glide((selection + by + count) % count)
     }
 
     private func jump(_ to: Int) -> KeyPress.Result {
