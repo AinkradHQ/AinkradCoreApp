@@ -34,11 +34,17 @@ extension View {
     /// Apple's own Liquid Glass button (`.glass` / `.glassProminent`) on macOS 26 / iOS 26, as an 8 pt rounded rect,
     /// tinted with the theme blue; the CoreUI button below that.
     @ViewBuilder
-    public func coreGlassButton(prominent: Bool = false) -> some View {
+    public func coreGlassButton(prominent: Bool = false, tint: Color? = nil) -> some View {
         if #available(macOS 26, iOS 26, *) {
             Group {
                 // The theme's blue tint would flood the clear glass, so the secondary button drops it.
-                if prominent { buttonStyle(.glassProminent) } else { buttonStyle(.glass).tint(nil) }
+                if prominent, let tint {
+                    buttonStyle(.glassProminent).tint(tint)
+                } else if prominent {
+                    buttonStyle(.glassProminent)
+                } else {
+                    buttonStyle(.glass).tint(nil)
+                }
             }
             .buttonBorderShape(.roundedRectangle(radius: Radius.control))
             .controlSize(.large)

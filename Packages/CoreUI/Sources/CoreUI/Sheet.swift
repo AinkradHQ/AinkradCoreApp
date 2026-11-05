@@ -17,14 +17,13 @@ public struct CoreSheet<Content: View, Footer: View>: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
             content.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
-            HStack(spacing: Space.s2) {
-                Spacer(minLength: 0)
-                footer
-            }
+            // Right-aligned by default; a footer that holds a Spacer spreads its buttons to both edges.
+            HStack(spacing: Space.s2) { footer }.frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(Space.s5)
         .frame(width: Space.s8 * 11)
-        .background(palette.panelStrong)
+        .coreGlass(radius: Radius.panel, interactive: false)
+        .presentationBackground(.clear)
         .coreTheme()
         .accessibilityElement(children: .contain)
     }
@@ -38,6 +37,7 @@ public struct CoreConfirmDialog: View {
     let destructive: Bool
     let onConfirm: () -> Void
     let onCancel: () -> Void
+    @Environment(\.corePalette) private var palette
 
     public init(
         _ title: String, message: String, confirmTitle: String, destructive: Bool = false,
@@ -55,11 +55,12 @@ public struct CoreConfirmDialog: View {
         CoreSheet(title) {
             Text(message).fixedSize(horizontal: false, vertical: true)
         } footer: {
-            Button("Cancel", action: onCancel)
-                .buttonStyle(CoreButtonStyle(destructive ? .prominent : .secondary))
-                .keyboardShortcut(.cancelAction)
+            // Cancel at the left edge, the confirm at the right. A destructive confirm is red glass and never the
+            // Return key, so Return is not a trap.
+            Button("Cancel", action: onCancel).coreGlassButton().keyboardShortcut(.cancelAction)
+            Spacer(minLength: 0)
             Button(confirmTitle, action: onConfirm)
-                .buttonStyle(CoreButtonStyle(destructive ? .secondary : .prominent))
+                .coreGlassButton(prominent: true, tint: destructive ? palette.tone(.fail).ink : nil)
                 .keyboardShortcut(destructive ? nil : .defaultAction)
         }
     }
