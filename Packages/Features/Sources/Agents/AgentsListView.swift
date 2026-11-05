@@ -119,9 +119,11 @@ struct AgentsListView: View {
                     ) {
                         model.openSession(s.id)
                     } label: {
-                        SessionRow(
+                        SessionTile(
                             session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id),
-                            burn: model.sessions.burn[s.id] ?? [])
+                            selected: model.selected == s.id || focusedRow == s.id,
+                            burn: model.sessions.burn[s.id] ?? []
+                        ) { key in act(key, s.id) }
                     }
                     .accessibilityLabel(label(s, waiting: waitingIDs.contains(s.id)))
                     .accessibilityHint("Opens the session")
@@ -130,13 +132,11 @@ struct AgentsListView: View {
                 }
             }
             .padding(.horizontal, Space.s3)
-            Text(
-                model.sessions.hasMore
-                    ? "Showing \(model.sessions.items.count) sessions. Older ones load as you scroll."
-                    : "Showing all \(model.sessions.items.count) sessions."
-            )
-            .font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
-            .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
+            if model.sessions.hasMore {
+                Label("Older sessions load as you scroll", systemImage: "arrow.down")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .padding(Space.s4).frame(maxWidth: .infinity)
+            }
         }
         .onKeyPress(.downArrow) { move(rows, 1) }
         .onKeyPress(.upArrow) { move(rows, -1) }
@@ -144,21 +144,24 @@ struct AgentsListView: View {
         .onKeyPress(.leftArrow) { move(rows, -1) }
         .onKeyPress(characters: .letters) { press in
             let id = focusedRow ?? model.selected ?? rows.first?.id
-            switch press.characters.lowercased() {
-            case "a":
+            let key = press.characters.lowercased()
+            if key == "a" {
                 model.openInbox()
-            case "c":
-                guard let id else { return .ignored }
-                model.confirmCancel(id)
-            case "k":
-                guard let id else { return .ignored }
-                model.confirmKill(id)
-            case "r":
-                guard let id else { return .ignored }
-                model.resume(id)
-            default: return .ignored
+                return .handled
             }
+            guard let id, "ckr".contains(key) else { return .ignored }
+            act(Character(key), id)
             return .handled
+        }
+    }
+
+    /// A tile's action, from its hover buttons or the keyboard: ↩ open, R resume, C cancel, K kill.
+    private func act(_ key: Character, _ id: String) {
+        switch key {
+        case "c": model.confirmCancel(id)
+        case "k": model.confirmKill(id)
+        case "r": model.resume(id)
+        default: model.openSession(id)
         }
     }
 
@@ -221,74 +224,6 @@ struct NotificationAsk: View {
         .background(palette.glassCard, in: coreShape(Radius.row))
         .overlay { coreShape(Radius.row).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
-    }
-}
-
-struct SessionRow: View {
-    let session: AgentSessionInfo
-    let runner: String
-    let waiting: Bool
-    var burn: [Double] = []
-
-    var body: some View {
-        let st = AgentWords.status(session, waiting: waiting)
-        let hue: Color =
-            waiting ? GlassInk.orange : st.tone == .fail ? GlassInk.red : session.live ? GlassInk.green : GlassInk.slate
-        VStack(alignment: .leading, spacing: Space.s2) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                IconTile(AgentsModel.harnessSymbol(session.harness), hue: GlassInk.violet, size: 40, bounce: waiting)
-                    .overlay(alignment: .bottomTrailing) {
-                        Circle().fill(hue).frame(width: 9, height: 9)
-                            .overlay { Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1.5) }
-                            .offset(x: 3, y: 3)
-                    }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(session.harness.capitalized).font(.system(size: MacTextSize.headline + 1, weight: .semibold))
-                        .lineLimit(1)
-                    Text("\(runner) · \(session.shortID)").font(.system(size: MacTextSize.meta))
-                        .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.middle)
-                }
-                Spacer(minLength: Space.s2)
-                HStack(spacing: 5) {
-                    if waiting {
-                        Image(systemName: "hand.raised.fill").symbolEffect(.pulse, options: .repeating)
-                    } else if session.live {
-                        Image(systemName: "waveform").symbolEffect(.variableColor.iterative, options: .repeating)
-                    }
-                    Text(st.label)
-                }
-                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
-                .padding(.horizontal, Space.s2).frame(height: 22)
-                .background(hue.opacity(0.16), in: coreShape(6))
-            }
-            if burn.count >= 2 {
-                CoreSpark(burn, tone: st.tone == .fail ? .fail : .run).frame(height: 22)
-            }
-            HStack(spacing: Space.s2) {
-                if let u = session.usage {
-                    if let c = AgentWords.cost(u.costMicros) {
-                        Label(c, systemImage: "dollarsign.circle").fontWeight(.semibold)
-                    }
-                    Label("\(AgentWords.tokens(u.tokens))", systemImage: "number")
-                }
-                Spacer(minLength: 0)
-                Label {
-                    if session.live {
-                        Text(session.createdAt, style: .timer)
-                    } else {
-                        Text(AgentWords.ago(session.endedAt ?? session.updatedAt))
-                    }
-                } icon: {
-                    Image(systemName: "clock")
-                }
-            }
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).monospacedDigit()
-        }
-        .foregroundStyle(GlassInk.primary)
-        .padding(Space.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(coreShape(Radius.cardMac))
-        .accessibilityElement(children: .combine)
     }
 }
 
