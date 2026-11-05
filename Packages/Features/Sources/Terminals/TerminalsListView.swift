@@ -2,13 +2,12 @@ import CoreUI
 import SwiftUI
 
 /// The Terminals app: its own surface (Settings, Terminal, App surface), the filter, a mini-terminal tile per terminal,
-/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S signal, R rename, ⌥⌘N new,
-/// ⌥⌘P appearance. The Core keeps no output, so a tile shows the shell, not its screen.
+/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S signal, R rename, ⌥⌘N new.
+/// The Core keeps no output, so a tile shows the shell, not its screen.
 struct TerminalsListView: View {
     let model: TerminalsModel
     @Bindable private var prefs = TerminalPrefs.shared
     @FocusState private var listFocus: Bool
-    @State private var appearance = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,11 +35,6 @@ struct TerminalsListView: View {
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
         } actions: {
-            AppActionTile(title: "Appearance", symbol: "paintpalette", key: "⌥⌘P", hue: GlassInk.violet) {
-                appearance.toggle()
-            }
-            .keyboardShortcut("p", modifiers: [.command, .option])
-            .popover(isPresented: $appearance, arrowEdge: .bottom) { AppearancePopover(prefs: prefs) }
             AppActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.blue, prominent: true) {
                 model.quickNew()
             }

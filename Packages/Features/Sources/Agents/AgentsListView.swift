@@ -6,7 +6,6 @@ struct AgentsListView: View {
     @Bindable var model: AgentsModel
     @Environment(\.corePalette) private var palette
     @FocusState private var focusedRow: String?
-    @State private var appearance = false
 
     var body: some View {
         let waitingIDs = Set(model.pending.map(\.session))
@@ -56,7 +55,7 @@ struct AgentsListView: View {
                 AppStatChip("dollarsign", c, GlassInk.blue)
             }
             Spacer(minLength: 0)
-            Text("↩ open · A approvals · C cancel · K kill · R resume · P look").font(.system(size: MacTextSize.meta))
+            Text("↩ open · A approvals · C cancel · K kill · R resume").font(.system(size: MacTextSize.meta))
                 .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
@@ -72,12 +71,6 @@ struct AgentsListView: View {
 
     @ViewBuilder
     private func buttons(_ waiting: Int) -> some View {
-        AppActionTile(title: "Appearance", symbol: "paintpalette", key: "P", hue: GlassInk.violet) {
-            appearance.toggle()
-        }
-        .popover(isPresented: $appearance, arrowEdge: .bottom) {
-            AgentSettingsView(model: model, compact: true).padding(Space.s4).frame(width: 420)
-        }
         AppActionTile(
             title: waiting > 0 ? "Approvals \(waiting)" : "Approvals", symbol: "lock.shield", key: "A",
             hue: waiting > 0 ? GlassInk.orange : GlassInk.slate, pulse: waiting > 0
@@ -154,8 +147,6 @@ struct AgentsListView: View {
             switch press.characters.lowercased() {
             case "a":
                 model.openInbox()
-            case "p":
-                appearance.toggle()
             case "c":
                 guard let id else { return .ignored }
                 model.confirmCancel(id)
