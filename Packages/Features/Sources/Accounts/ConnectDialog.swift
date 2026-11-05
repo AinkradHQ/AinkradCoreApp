@@ -23,9 +23,9 @@ struct ConnectDialog: View {
         let hue = ProviderLook.hue(provider)
         CoreDialogPanel(replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
             VStack(alignment: .leading, spacing: Space.s4) {
-                if replacing == nil {
+                if replacing == nil && model.signIn == nil {
                     HStack(spacing: Space.s2) {
-                        ForEach(model.providers) { p in
+                        ForEach(ProviderLook.ordered(model.providers)) { p in
                             ProviderChoice(provider: p, on: p.id == provider, lens: lens) {
                                 withAnimation(.spring(duration: 0.35, bounce: 0.25)) { provider = p.id }
                             }
@@ -38,32 +38,36 @@ struct ConnectDialog: View {
                     .onKeyPress(.rightArrow) { move(1) }
                     .onAppear { keys = true }
                 }
-                VStack(alignment: .leading, spacing: 0) {
-                    step(
-                        1, "Get a key", hue: hue, on: true,
-                        detail: site.map { "Create an API key in \($0.name). Ainkrad never sees your password." }
-                            ?? "Open this provider's own site and create a key there."
-                    ) {
-                        if let site {
-                            AppActionTile(
-                                title: "Open \(site.name)", symbol: "arrow.up.right.square", key: "⌘O", hue: hue,
-                                prominent: true
-                            ) {
-                                model.opener(site.url)
+                if let p = model.provider(provider), p.loginMethods.contains("browser_code") {
+                    SubscriptionSignIn(model: model, provider: p, close: close).id(provider)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        step(
+                            1, "Get a key", hue: hue, on: true,
+                            detail: site.map { "Create an API key in \($0.name). Ainkrad never sees your password." }
+                                ?? "Open this provider's own site and create a key there."
+                        ) {
+                            if let site {
+                                AppActionTile(
+                                    title: "Open \(site.name)", symbol: "arrow.up.right.square", key: "⌘O", hue: hue,
+                                    prominent: true
+                                ) {
+                                    model.opener(site.url)
+                                }
+                                .keyboardShortcut("o", modifiers: .command)
+                                .help(site.url.absoluteString)
                             }
-                            .keyboardShortcut("o", modifiers: .command)
-                            .help(site.url.absoluteString)
                         }
+                        step(
+                            2, "Add it to your Core", hue: hue, on: false, last: true,
+                            detail:
+                                "Keys are added from an admin computer, not from this app: there is no place here to type one, so a key can't leak from this Mac."
+                        ) { EmptyView() }
                     }
-                    step(
-                        2, "Add it to your Core", hue: hue, on: false, last: true,
-                        detail:
-                            "Keys are added from an admin computer, not from this app: there is no place here to type one, so a key can't leak from this Mac."
-                    ) { EmptyView() }
+                    .id(provider)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    AccDialogButtons(confirm: "Done", cancel: close, run: close)
                 }
-                .id(provider)
-                .transition(.opacity.combined(with: .move(edge: .trailing)))
-                AccDialogButtons(confirm: "Done", cancel: close, run: close)
             }
         }
         .accessibilityIdentifier("account-connect")
@@ -73,7 +77,7 @@ struct ConnectDialog: View {
     @FocusState private var keys: Bool
 
     private func move(_ step: Int) -> KeyPress.Result {
-        let ids = model.providers.map(\.id)
+        let ids = ProviderLook.ordered(model.providers).map(\.id)
         guard let i = ids.firstIndex(of: provider) else { return .ignored }
         withAnimation(.spring(duration: 0.35, bounce: 0.25)) { provider = ids[min(max(i + step, 0), ids.count - 1)] }
         return .handled
@@ -126,8 +130,11 @@ private struct ProviderChoice: View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
                 AccTile(large: true, provider: provider.id).symbolEffect(.bounce, value: on)
-                Text(provider.name).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
-                Text("API key").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(ProviderLook.short(provider.id, provider.name)).font(
+                    .system(size: MacTextSize.body, weight: .semibold)
+                ).lineLimit(1)
+                Text(provider.loginMethods.contains("browser_code") ? "Subscription" : "API key")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
             }
             .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity).padding(.vertical, Space.s3)

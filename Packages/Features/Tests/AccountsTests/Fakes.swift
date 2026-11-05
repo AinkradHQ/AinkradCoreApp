@@ -113,6 +113,19 @@ final class FakeService: AccountsService, @unchecked Sendable {
         }
         return accountList.first { $0.id == id }!
     }
+    var loginItem = LoginItem(
+        id: "lg_1", provider: "claude-sub", label: "claude-plan", runner: "r_1", state: "open_url",
+        url: "https://claude.ai/oauth/authorize?test", reason: nil, accountID: nil)
+    func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
+        try note("startLogin \(provider) \(label)")
+        return loginItem
+    }
+    func login(_ id: String) async throws -> LoginItem { loginItem }
+    func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
+        try note("sendLoginCode \(id)")
+        return loginItem
+    }
+    func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
     func deleteAccount(_ id: Int64) async throws {
         try note("deleteAccount \(id)")
         accountList.removeAll { $0.id == id }

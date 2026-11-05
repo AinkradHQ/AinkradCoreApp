@@ -22,6 +22,11 @@ protocol AccountsService: Sendable {
     func setState(account: Int64, state: String) async throws -> AccountItem
     func setCap(account: Int64, cap: Int64) async throws -> AccountItem
     func deleteAccount(_ id: Int64) async throws
+    /// Subscription sign-in (KAN-441): start one on a runner, read where it is, hand it the approval code, stop it.
+    func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem
+    func login(_ id: String) async throws -> LoginItem
+    func sendLoginCode(_ id: String, code: String) async throws -> LoginItem
+    func cancelLogin(_ id: String) async throws
 }
 
 /// The Core's transport already turns every non-2xx answer into a `CoreError`, so only `.ok` is read here.
@@ -98,7 +103,34 @@ struct LiveAccountsService: AccountsService {
         try await run { _ = try await client.deleteAccount(path: .init(id: String(id))).ok }
     }
 
+    func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
+        try await run {
+            Self.login(
+                try await client.startAccountLogin(
+                    body: .json(.init(label: label, provider: provider, runner: runner))
+                ).ok.body.json)
+        }
+    }
+    func login(_ id: String) async throws -> LoginItem {
+        try await run { Self.login(try await client.getAccountLogin(path: .init(id: id)).ok.body.json) }
+    }
+    func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
+        try await run {
+            Self.login(
+                try await client.sendAccountLoginCode(path: .init(id: id), body: .json(.init(code: code))).ok.body.json)
+        }
+    }
+    func cancelLogin(_ id: String) async throws {
+        try await run { _ = try await client.cancelAccountLogin(path: .init(id: id)).ok }
+    }
+
     // MARK: mapping
+
+    static func login(_ l: Components.Schemas.AccountLogin) -> LoginItem {
+        LoginItem(
+            id: l.id, provider: l.provider, label: l.label, runner: l.runner, state: l.state, url: l.url,
+            reason: l.reason, accountID: l.accountId)
+    }
 
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
 

@@ -279,6 +279,7 @@ struct ReadOnlyBanner: View {
 /// right (↩, or ⌘↩ when it removes something, so Return alone never destroys).
 struct AccDialogButtons: View {
     let confirm: String
+    var cancelTitle = "Cancel"
     var danger = false
     var busy = false
     var enabled = true
@@ -288,7 +289,8 @@ struct AccDialogButtons: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             ChoiceTile(
-                choice: ConfirmChoice("Cancel", symbol: "arrow.uturn.backward"), on: hovered == 0, keys: "esc",
+                choice: ConfirmChoice(cancelTitle, symbol: cancelTitle == "Cancel" ? "arrow.uturn.backward" : "xmark"),
+                on: hovered == 0, keys: "esc",
                 run: cancel
             )
             .keyboardShortcut(.cancelAction)

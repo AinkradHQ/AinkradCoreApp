@@ -31,6 +31,11 @@ public final class AccountsDemo {
                 p(
                     "google", "Gemini API", "agy", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com",
                     [("gemini-pro", 1_250_000, 10_000_000)]),
+                ProviderItem(
+                    id: "claude-sub", name: "Claude subscription", harness: "claude",
+                    authVar: "CLAUDE_CODE_OAUTH_TOKEN",
+                    baseURL: "https://api.anthropic.com", delivery: ["env"], loginMethods: ["browser_code"], models: [],
+                    pricedAt: nil, builtin: true),
             ]
         }
         lazy var accountList: [AccountItem] = [
@@ -126,6 +131,43 @@ public final class AccountsDemo {
             accountList = accountList.map { $0.id == id ? new : $0 }
             return new
         }
+        // A stand-in sign-in: the URL comes after a beat, the code takes another, then a new account appears.
+        var loginStart: Date?
+        var codeAt: Date?
+        var loginLabel = "claude-plan"
+        var loginFails = false
+        func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
+            if loginFails { throw CoreError.http(status: 409, code: "no_runner", message: "no runner can sign in") }
+            loginStart = Date()
+            codeAt = nil
+            loginLabel = label
+            return try await login("lg_demo")
+        }
+        func login(_ id: String) async throws -> LoginItem {
+            let t = Date()
+            var state = "starting"
+            var account: Int64?
+            if let c = codeAt {
+                state = t.timeIntervalSince(c) > 1.5 ? "done" : "storing"
+                if state == "done" {
+                    if !accountList.contains(where: { $0.label == loginLabel }) {
+                        accountList.append(a(7, loginLabel, "claude-sub", "active", "oat1", 1, used: 0))
+                    }
+                    account = 7
+                }
+            } else if let s = loginStart, t.timeIntervalSince(s) > 1.2 {
+                state = "open_url"
+            }
+            return LoginItem(
+                id: id, provider: "claude-sub", label: loginLabel, runner: "linux-01", state: state,
+                url: state == "open_url" ? "https://claude.ai/oauth/authorize?demo" : nil, reason: nil,
+                accountID: account)
+        }
+        func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
+            codeAt = Date()
+            return try await login(id)
+        }
+        func cancelLogin(_ id: String) async throws { loginStart = nil }
         func deleteAccount(_ id: Int64) async throws {
             accountList.removeAll { $0.id == id }
             poolList = poolList.map {
@@ -143,7 +185,8 @@ public final class AccountsDemo {
         "bindings-empty",
         "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
         "add-member",
-        "delete-pool", "touchid-cancelled", "read-only", "state-loading", "state-error", "state-scope", "launcher",
+        "delete-pool", "signin-intro", "signin-url", "signin-working", "signin-done", "signin-failed",
+        "touchid-cancelled", "read-only", "state-loading", "state-error", "state-scope", "launcher",
         "settings-gate",
     ]
 
@@ -167,6 +210,7 @@ public final class AccountsDemo {
         model.filter = .all
         model.poolSelection = nil
         model.opener = { _ in }
+        model.signIn = nil
         switch scene {
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
@@ -183,7 +227,8 @@ public final class AccountsDemo {
         let page: AccountsPage =
             switch scene {
             case "accounts", "accounts-need", "account-ready", "account-cooling", "account-unhealthy",
-                "account-disabled", "connect", "delete-account", "cap":
+                "account-disabled", "connect", "delete-account", "cap", "signin-intro", "signin-url", "signin-working",
+                "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
             case "bindings", "bindings-empty", "bind": .bindings
@@ -203,6 +248,19 @@ public final class AccountsDemo {
         if scene == "accounts-need" { model.filter = .need }
         switch scene {
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
+        case "signin-intro": AccountDialogs.openConnect(model, provider: "claude-sub")
+        case "signin-url", "signin-working", "signin-done", "signin-failed":
+            AccountDialogs.openConnect(model, provider: "claude-sub")
+            model.signIn = SignInFlow(
+                stage: scene == "signin-url"
+                    ? .open(URL(string: "https://claude.ai/oauth/authorize?demo")!)
+                    : scene == "signin-working"
+                        ? .working
+                        : scene == "signin-done"
+                            ? .done(account: 1)
+                            : .failed(
+                                "No runner can sign in yet. A runner needs the newest ainkrad-runner, with Claude's own app installed."
+                            ), login: "lg_demo", runner: "linux-01", label: "claude-plan", opened: true)
         case "delete-account": AccountDialogs.openDelete(model, model.account(1)!)
         case "cap": AccountDialogs.openCap(model, model.account(1)!)
         case "new-pool": AccountDialogs.openNewPool(model)

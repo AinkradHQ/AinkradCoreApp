@@ -26,6 +26,8 @@ public final class AccountsModel {
     /// The account whose page is open in Accounts (nil: the list).
     var detail: Int64?
     var poolSelection: Int64?
+    /// A subscription sign-in in the Connect sheet, while it runs (`SignIn.swift`).
+    var signIn: SignInFlow?
     /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
     var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
@@ -56,6 +58,7 @@ public final class AccountsModel {
         load = .loading
         readOnly = false
         detail = nil
+        signIn = nil
     }
 
     public var isConnected: Bool { service != nil }
