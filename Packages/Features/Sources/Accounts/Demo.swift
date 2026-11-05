@@ -1,5 +1,6 @@
 #if DEBUG
 import Admin
+import AppKit
 import CoreKit
 import Foundation
 import Shell
@@ -160,7 +161,7 @@ public final class AccountsDemo {
             }
             return LoginItem(
                 id: id, provider: "claude-sub", label: loginLabel, runner: "linux-01", state: state,
-                url: state == "open_url" ? "https://claude.ai/oauth/authorize?demo" : nil, reason: nil,
+                url: state == "open_url" ? "https://claude.ai/login" : nil, reason: nil,
                 accountID: account)
         }
         func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
@@ -197,12 +198,10 @@ public final class AccountsDemo {
         self.setNotice = setNotice
     }
 
-    /// For clicking through by hand: links say where they would go instead of doing nothing (the demo never opens a
-    /// browser).
+    /// For clicking through by hand: links really open in the browser (the snapshot runs never do).
     public func showInteractive(_ scene: String) async {
         await show(scene)
-        let shell = model.host.shell
-        model.opener = { url in shell.showToast("Demo: this opens \(url.host ?? "the page") in your browser") }
+        model.opener = { NSWorkspace.shared.open($0) }
     }
 
     public func show(_ scene: String) async {
@@ -261,7 +260,7 @@ public final class AccountsDemo {
             AccountDialogs.openConnect(model, provider: "claude-sub")
             model.signIn = SignInFlow(
                 stage: scene == "signin-url"
-                    ? .open(URL(string: "https://claude.ai/oauth/authorize?demo")!)
+                    ? .open(URL(string: "https://claude.ai/login")!)
                     : scene == "signin-working"
                         ? .working
                         : scene == "signin-done"
