@@ -89,6 +89,8 @@ struct AgentRowButton<Label: View>: View {
     var body: some View {
         Button(action: action) { label }
             .buttonStyle(.plain)
+            // Focusable even with the system's keyboard navigation off, so the arrows always reach the tiles.
+            .focusable()
             .focused(focus, equals: id)
             .focusEffectDisabled()
             .background(

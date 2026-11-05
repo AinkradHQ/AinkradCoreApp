@@ -32,7 +32,8 @@ struct SessionTile: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             stage(hue: hue, state: state, label: st.label)
                 .overlay(alignment: .bottomTrailing) {
-                    if hovering { actions.transition(.opacity.combined(with: .move(edge: .trailing))) }
+                    // The keyboard's tile shows its actions too, so every key is visible where it acts.
+                    if hovering || selected { actions.transition(.opacity.combined(with: .move(edge: .trailing))) }
                 }
             HStack(spacing: Space.s2) {
                 coreShape(2).fill(hue).frame(width: 3, height: 26)
