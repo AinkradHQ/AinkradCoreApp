@@ -22,21 +22,20 @@ public struct AppSurfaceFill: View {
     }
     public var body: some View {
         let shape = coreShape(Radius.cardMac)
-        Group {
+        // Blur is its own choice: any style can sit on frosted glass (Blurred) or over the sky as it is (Sharp).
+        ZStack {
+            if blur { shape.fill(.ultraThinMaterial) }
             switch style {
             case .clear: shape.fill(.black.opacity(opacity * 0.6))
-            case .frosted: shape.fill(.ultraThinMaterial).overlay { shape.fill(.black.opacity(opacity * 0.6)) }
-            case .tinted:
-                ZStack {
-                    if blur { shape.fill(.ultraThinMaterial) }
-                    shape.fill(tint.opacity(opacity))
-                }
+            case .frosted: shape.fill(.white.opacity(0.06)).overlay { shape.fill(.black.opacity(opacity * 0.5)) }
+            case .tinted: shape.fill(tint.opacity(opacity))
             case .solid: shape.fill(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.5 + opacity * 0.5))
             }
         }
         .environment(\.colorScheme, .dark)
         .animation(.easeOut(duration: 0.25), value: style)
         .animation(.easeOut(duration: 0.25), value: opacity)
+        .animation(.easeOut(duration: 0.25), value: blur)
     }
 }
 
@@ -260,5 +259,50 @@ public struct GlassSlider: View {
         let next = ((value / step).rounded() + steps) * step
         value = min(max(next, range.lowerBound), range.upperBound)
         return .handled
+    }
+}
+
+/// The full set of surface options, the same in every app and for the terminal screen: style tabs at the section's top
+/// right, then Blurred / Sharp and the 5 % slider.
+public struct SurfaceStyleTabs: View {
+    @Binding var style: AppSurfaceStyle
+    let tintTitle: String
+    public init(style: Binding<AppSurfaceStyle>, tintTitle: String = "Theme") {
+        self._style = style
+        self.tintTitle = tintTitle
+    }
+    public var body: some View {
+        CoreSegmented(
+            "Style",
+            segments: [
+                CoreSegment(AppSurfaceStyle.clear, "Clear", symbol: "square.dashed"),
+                CoreSegment(.frosted, "Frosted", symbol: "snowflake"),
+                CoreSegment(.tinted, tintTitle, symbol: "paintpalette"),
+                CoreSegment(.solid, "Solid", symbol: "square.fill"),
+            ], selection: $style)
+    }
+}
+
+public struct SurfaceControls: View {
+    @Binding var blur: Bool
+    @Binding var opacity: Double
+    let range: ClosedRange<Double>
+    public init(blur: Binding<Bool>, opacity: Binding<Double>, in range: ClosedRange<Double> = 0...1) {
+        self._blur = blur
+        self._opacity = opacity
+        self.range = range
+    }
+    public var body: some View {
+        HStack(spacing: Space.s4) {
+            CoreSegmented(
+                "Behind",
+                segments: [
+                    CoreSegment(true, "Blurred", symbol: "drop.halffull"), CoreSegment(false, "Sharp", symbol: "drop"),
+                ],
+                selection: $blur
+            )
+            .fixedSize()
+            GlassSlider(value: $opacity, in: range, low: "See-through", high: "Solid")
+        }
     }
 }

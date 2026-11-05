@@ -173,7 +173,7 @@ private struct TileScreen: View {
         .background {
             ZStack {
                 if prefs.blur { coreShape(Radius.row).fill(.ultraThinMaterial).environment(\.colorScheme, .dark) }
-                coreShape(Radius.row).fill(Color(nsColor: t.background).opacity(prefs.opacity))
+                coreShape(Radius.row).fill(Color(nsColor: prefs.screenColor))
             }
         }
         .overlay { coreShape(Radius.row).strokeBorder(.white.opacity(0.12), lineWidth: 1) }
@@ -215,25 +215,22 @@ struct AppearancePopover: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text("App surface").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            CoreSegmented(
-                "Surface",
-                segments: [
-                    CoreSegment(TerminalPrefs.Surface.clear, "Clear"), CoreSegment(.frosted, "Frosted"),
-                    CoreSegment(.theme, "Theme"), CoreSegment(.solid, "Solid"),
-                ], selection: $prefs.surface, fill: true)
-            GlassSlider(value: $prefs.surfaceOpacity, low: "Clear", high: "Solid")
             Text("Terminal screen").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            GlassSlider(
-                value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6, low: "Solid",
-                high: "See-through")
-            Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
+            SurfaceStyleTabs(
+                style: Binding(get: { TerminalPrefs.app(prefs.screen) }, set: { prefs.screen = TerminalPrefs.term($0) })
+            )
+            SurfaceControls(blur: $prefs.blur, opacity: $prefs.opacity, in: 0.4...1)
+            Text("App surface").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
+            SurfaceStyleTabs(
+                style: Binding(
+                    get: { TerminalPrefs.app(prefs.surface) }, set: { prefs.surface = TerminalPrefs.term($0) }))
+            SurfaceControls(blur: $prefs.surfaceBlur, opacity: $prefs.surfaceOpacity)
             Text("Font size").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
             GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) { _ in
                 Int(prefs.fontSize.rounded())
             }
         }
         .padding(Space.s4)
-        .frame(width: 380)
+        .frame(width: 560)
     }
 }

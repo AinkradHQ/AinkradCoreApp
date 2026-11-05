@@ -1,4 +1,5 @@
 import AppKit
+import CoreUI
 import Observation
 import SwiftTerm
 
@@ -21,6 +22,9 @@ final class TerminalPrefs {
     /// The Terminals app's own surface (the list): glass clear or frosted, the theme's colour, or a solid dark.
     enum Surface: String, CaseIterable { case clear, frosted, theme, solid }
     var surface: Surface { didSet { save() } }
+    var surfaceBlur: Bool { didSet { save() } }
+    /// The terminal screen's own style (the same four as the surface).
+    var screen: Surface { didSet { save() } }
     /// How solid that surface is, 0 (see-through) to 1.
     var surfaceOpacity: Double { didSet { save() } }
 
@@ -43,6 +47,8 @@ final class TerminalPrefs {
         blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
         surface = Surface(rawValue: defaults.string(forKey: "terminal.surface") ?? "") ?? .theme
         surfaceOpacity = defaults.object(forKey: "terminal.surfaceOpacity") as? Double ?? 0.78
+        surfaceBlur = defaults.object(forKey: "terminal.surfaceBlur") as? Bool ?? true
+        screen = Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "") ?? .theme
         defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
         defaultShell = defaults.string(forKey: "terminal.defaultShell") ?? ""
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
@@ -53,6 +59,25 @@ final class TerminalPrefs {
     static let changed = Notification.Name("ainkrad.terminal.prefs")
 
     var theme: TermTheme { TermTheme.all.first { $0.id == themeID } ?? TermTheme.all[0] }
+
+    /// The style as the shared surface type (theme ↔ tinted).
+    static func app(_ s: Surface) -> AppSurfaceStyle {
+        s == .theme ? .tinted : AppSurfaceStyle(rawValue: s.rawValue) ?? .frosted
+    }
+    static func term(_ s: AppSurfaceStyle) -> Surface {
+        s == .tinted ? .theme : Surface(rawValue: s.rawValue) ?? .theme
+    }
+
+    /// The terminal screen's background colour for its style, at its transparency.
+    var screenColor: NSColor {
+        let a = CGFloat(opacity)
+        switch screen {
+        case .clear: return NSColor.black.withAlphaComponent(a * 0.6)
+        case .frosted: return NSColor(white: 0.06, alpha: a * 0.6)
+        case .theme: return theme.background.withAlphaComponent(a)
+        case .solid: return NSColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.5 + a * 0.5)
+        }
+    }
 
     var font: NSFont {
         let size = CGFloat(fontSize)
@@ -88,6 +113,8 @@ final class TerminalPrefs {
         defaults.set(blur, forKey: "terminal.blur")
         defaults.set(surface.rawValue, forKey: "terminal.surface")
         defaults.set(surfaceOpacity, forKey: "terminal.surfaceOpacity")
+        defaults.set(surfaceBlur, forKey: "terminal.surfaceBlur")
+        defaults.set(screen.rawValue, forKey: "terminal.screen")
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
         defaults.set(defaultShell, forKey: "terminal.defaultShell")
         defaults.set(openFullPane, forKey: "terminal.openFull")

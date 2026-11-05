@@ -52,32 +52,21 @@ struct TerminalSettingsView: View {
                 symbol: "circle.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
-                CoreSegmented(
-                    "Behind the terminal",
-                    segments: [
-                        CoreSegment(true, "Blurred", symbol: "drop.halffull"),
-                        CoreSegment(false, "Sharp", symbol: "drop"),
-                    ],
-                    selection: $prefs.blur)
+                SurfaceStyleTabs(
+                    style: Binding(
+                        get: { TerminalPrefs.app(prefs.screen) }, set: { prefs.screen = TerminalPrefs.term($0) }))
             } content: {
-                GlassSlider(
-                    value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6,
-                    low: "Solid", high: "See-through")
+                SurfaceControls(blur: $prefs.blur, opacity: $prefs.opacity, in: 0.4...1)
             }
             GlassSection(
                 "App surface", sub: "The Terminals app's own background.", symbol: "square.on.square",
                 hue: GlassInk.blue, index: 5
             ) {
-                CoreSegmented(
-                    "Surface",
-                    segments: [
-                        CoreSegment(TerminalPrefs.Surface.clear, "Clear", symbol: "square.dashed"),
-                        CoreSegment(.frosted, "Frosted", symbol: "drop.halffull"),
-                        CoreSegment(.theme, "Theme", symbol: "paintpalette"),
-                        CoreSegment(.solid, "Solid", symbol: "square.fill"),
-                    ], selection: $prefs.surface)
+                SurfaceStyleTabs(
+                    style: Binding(
+                        get: { TerminalPrefs.app(prefs.surface) }, set: { prefs.surface = TerminalPrefs.term($0) }))
             } content: {
-                GlassSlider(value: $prefs.surfaceOpacity, low: "Clear", high: "Solid")
+                SurfaceControls(blur: $prefs.surfaceBlur, opacity: $prefs.surfaceOpacity)
             }
             GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
@@ -121,7 +110,7 @@ private struct TerminalPreview: View {
         .font(font)
         .padding(Space.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: t.background).opacity(prefs.opacity), in: coreShape(Radius.cardMac))
+        .background(Color(nsColor: prefs.screenColor), in: coreShape(Radius.cardMac))
         .background {
             if prefs.blur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
         }

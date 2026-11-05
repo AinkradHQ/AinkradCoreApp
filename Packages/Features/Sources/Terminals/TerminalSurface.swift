@@ -40,7 +40,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         let p = TerminalPrefs.shared
         let t = p.theme
         term.font = p.font
-        term.nativeBackgroundColor = t.background.withAlphaComponent(CGFloat(p.opacity))
+        term.nativeBackgroundColor = p.screenColor
         // SwiftTerm paints its own layer opaque when it is made (and again on every resize); keep it clear so only the
         // themed background, at the chosen transparency, is drawn (SurfaceContainer.layout re-applies after a resize).
         term.layer?.backgroundColor = NSColor.clear.cgColor

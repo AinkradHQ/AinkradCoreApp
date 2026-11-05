@@ -11,6 +11,7 @@ final class AgentPrefs {
     var surface: Surface { didSet { save() } }
     /// How solid the surface is, 0 (see-through) to 1.
     var opacity: Double { didSet { save() } }
+    var blur: Bool { didSet { save() } }
     var harness: String { didSet { save() } }
     var mode: String { didSet { save() } }
     var runner: String { didSet { save() } }  // "" = the best ready runner
@@ -20,6 +21,7 @@ final class AgentPrefs {
     private init() {
         surface = Surface(rawValue: d.string(forKey: "agents.surface") ?? "") ?? .frosted
         opacity = d.object(forKey: "agents.opacity") as? Double ?? 0.55
+        blur = d.object(forKey: "agents.blur") as? Bool ?? true
         harness = d.string(forKey: "agents.harness") ?? "claude"
         mode = d.string(forKey: "agents.mode") ?? "ask"
         runner = d.string(forKey: "agents.runner") ?? ""
@@ -29,6 +31,7 @@ final class AgentPrefs {
     private func save() {
         d.set(surface.rawValue, forKey: "agents.surface")
         d.set(opacity, forKey: "agents.opacity")
+        d.set(blur, forKey: "agents.blur")
         d.set(harness, forKey: "agents.harness")
         d.set(mode, forKey: "agents.mode")
         d.set(runner, forKey: "agents.runner")
@@ -42,7 +45,7 @@ struct AgentSurface: View {
     var body: some View {
         AppSurfaceFill(
             style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted, opacity: prefs.opacity,
-            tint: Color(red: 0.1, green: 0.06, blue: 0.22))
+            tint: Color(red: 0.1, green: 0.06, blue: 0.22), blur: prefs.blur)
     }
 }
 
@@ -57,16 +60,13 @@ struct AgentSettingsView: View {
             GlassSection(
                 "App surface", sub: "The Agents app's background.", symbol: "square.on.square", hue: GlassInk.violet
             ) {
-                CoreSegmented(
-                    "Surface",
-                    segments: [
-                        CoreSegment(AgentPrefs.Surface.clear, "Clear", symbol: "square.dashed"),
-                        CoreSegment(.frosted, "Frosted", symbol: "drop.halffull"),
-                        CoreSegment(.tinted, "Tinted", symbol: "paintpalette"),
-                        CoreSegment(.solid, "Solid", symbol: "square.fill"),
-                    ], selection: $prefs.surface)
+                SurfaceStyleTabs(
+                    style: Binding(
+                        get: { AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted },
+                        set: { prefs.surface = AgentPrefs.Surface(rawValue: $0.rawValue) ?? .frosted }),
+                    tintTitle: "Tinted")
             } content: {
-                GlassSlider(value: $prefs.opacity, low: "Clear", high: "Solid")
+                SurfaceControls(blur: $prefs.blur, opacity: $prefs.opacity)
             }
             GlassSection(
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,
