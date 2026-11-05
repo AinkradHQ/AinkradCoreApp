@@ -170,47 +170,85 @@ private struct PaneTab: View {
     let onDragEnd: () -> Void
     @State private var hovering = false
 
+    /// Each kind of pane has its colour, so tabs read at a glance.
+    private var hue: Color {
+        switch spec.symbol {
+        case "terminal": GlassInk.slate
+        case "sparkles", "play": GlassInk.violet
+        case "server.rack": GlassInk.green
+        case "creditcard", "person.crop.circle": GlassInk.orange
+        default: GlassInk.blue
+        }
+    }
+
+    private var stateColor: Color? {
+        guard let chip = spec.chip else { return nil }
+        switch chip.tone {
+        case .run, .done: return GlassInk.green
+        case .fail: return GlassInk.red
+        default: return GlassInk.orange
+        }
+    }
+
     var body: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: spec.symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                .symbolEffect(.bounce, value: on)
-                .accessibilityHidden(true)
-            Text(spec.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
-            if let sub = spec.sub {
-                Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(WidgetInk.secondary).lineLimit(1)
-                    .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
-            }
-            if let chip = spec.chip {
-                StatusDot(
-                    color: chip.tone == .run || chip.tone == .done
-                        ? WidgetInk.green
-                        : chip.tone == .fail
-                            ? Color(red: 1, green: 0.38, blue: 0.4) : WidgetInk.orange, live: chip.tone == .run
-                )
-                .help(chip.label)
+            IconTile(spec.symbol, hue: on ? hue : hue.opacity(0.55), size: 26, bounce: on)
+                .overlay(alignment: .bottomTrailing) {
+                    if let c = stateColor {
+                        StatusDot(color: c, live: spec.chip?.tone == .run)
+                            .padding(2).background(.black.opacity(0.55), in: coreShape(3))
+                            .offset(x: 4, y: 4)
+                            .help(spec.chip?.label ?? "")
+                    }
+                }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(spec.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                if let sub = spec.sub {
+                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary).lineLimit(1)
+                        .frame(maxWidth: Space.s8 * 5, alignment: .leading).fixedSize(horizontal: true, vertical: false)
+                }
             }
             Menu {
                 menu
             } label: {
-                Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
-                    .frame(width: 18, height: 18)
-                    .background(.white.opacity(hovering ? 0.16 : 0.08), in: coreShape(5))
+                Image(systemName: "ellipsis").font(.system(size: 11, weight: .bold))
+                    .frame(width: 22, height: 22)
+                    .background(.white.opacity(hovering ? 0.18 : 0.08), in: coreShape(6))
             }
             .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .opacity(on || hovering ? 1 : 0)
             .accessibilityLabel("\(spec.title) actions")
+            Button {
+                shell.dismissPane(spec.id)
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 18, height: 18)
+                    .background(.white.opacity(0.1), in: coreShape(5))
+            }
+            .buttonStyle(.plain).opacity(hovering ? 1 : 0)
+            .accessibilityLabel("Close \(spec.title)")
         }
         .foregroundStyle(WidgetInk.primary)
-        .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
+        .padding(.leading, Space.s1).padding(.trailing, Space.s2).frame(height: MacSize.controlMd + 12)
         .background {
             if on {
-                coreShape(Radius.control).fill(.white.opacity(0.18))
-                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
+                coreShape(Radius.control + 2)
+                    .fill(
+                        LinearGradient(
+                            colors: [hue.opacity(0.35), hue.opacity(0.12)], startPoint: .top, endPoint: .bottom)
+                    )
+                    .overlay { coreShape(Radius.control + 2).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
+                    .overlay(alignment: .bottom) {
+                        Capsule().fill(hue).frame(width: 22, height: 3).offset(y: -2)
+                    }
+                    .shadow(color: hue.opacity(0.4), radius: 10)
                     .matchedGeometryEffect(id: "on", in: indicator)
             } else if hovering {
-                coreShape(Radius.control).fill(.white.opacity(0.08))
+                coreShape(Radius.control + 2).fill(.white.opacity(0.08))
             }
         }
-        .contentShape(coreShape(Radius.control))
+        .scaleEffect(hovering && !on ? 1.03 : 1)
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+        .contentShape(coreShape(Radius.control + 2))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { toggleFocus() }
         .onTapGesture { pick() }
