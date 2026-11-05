@@ -369,14 +369,14 @@ struct DeviceDetail: View {
             GlassSection(
                 "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.blue, index: 1
             ) {
+                if !device.revoked && !app.devices.renaming {
+                    SectionAction("Rename", symbol: "pencil") { app.devices.renaming = true }
+                }
+            } content: {
                 if app.devices.renaming {
                     InlineRename(app: app, device: device)
                 } else {
-                    InfoRow("textformat", "Name", device.name) {
-                        if !device.revoked {
-                            Button("Rename…") { app.devices.renaming = true }.buttonStyle(.coreSecondary)
-                        }
-                    }
+                    InfoRow("textformat", "Name", device.name)
                 }
                 InfoRow("square.stack.3d.up", "Kind", DeviceWords.kind(device.kind))
                 InfoRow("laptopcomputer", "Platform", DeviceWords.platform(device.platform))
@@ -406,6 +406,12 @@ struct DeviceDetail: View {
                 "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
                 symbol: "lock.shield", hue: GlassInk.violet, index: 3
             ) {
+                if !device.revoked {
+                    SectionAction("Edit access", symbol: "slider.horizontal.3") {
+                        present("scopes", ScopesDialog(app: app, device: device))
+                    }
+                }
+            } content: {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: Space.s2)], spacing: Space.s2) {
                     ForEach(ScopeText.all, id: \.self) { s in
                         ScopeTile(
@@ -413,24 +419,22 @@ struct DeviceDetail: View {
                             on: device.scopes.contains(s))
                     }
                 }
-                if !device.revoked {
-                    Button("Change access…") { present("scopes", ScopesDialog(app: app, device: device)) }
-                        .buttonStyle(.coreSecondary)
-                }
             }
             if !device.revoked {
                 GlassSection(
                     "Revoke", sub: "Signs it out at once. It has to pair again to come back.", symbol: "xmark.shield",
                     hue: GlassInk.red, index: 4
                 ) {
+                    SectionAction("Revoke device", symbol: "xmark.shield", danger: true) {
+                        present("revoke", RevokeDialog(app: app, device: device))
+                    }
+                } content: {
                     Text(
                         me
                             ? "Revoking this Mac signs it out at once and returns it to Connect to a Core. It must be paired again."
                             : "Revoking signs \(device.name) out at once and closes its open connections. It must be paired again."
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                    Button("Revoke…") { present("revoke", RevokeDialog(app: app, device: device)) }
-                        .buttonStyle(.coreDanger)
                 }
             }
         }

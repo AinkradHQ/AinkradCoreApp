@@ -49,25 +49,27 @@ extension IconTile where Trigger == Int {
     public init(_ symbol: String, hue: Color, size: CGFloat = 32) { self.init(symbol, hue: hue, size: size, bounce: 0) }
 }
 
-/// A titled glass card: icon tile, title and one line, then the content in a soft white well. Rises in when shown.
-public struct GlassSection<Content: View>: View {
+/// A titled glass card: icon tile, title and one line, an optional action at the top right, then the content in a soft
+/// white well. Rises in when shown.
+public struct GlassSection<Content: View, Accessory: View>: View {
     let title: String
     let sub: String?
     let symbol: String
     let hue: Color
     let index: Int
+    let accessory: Accessory
     let content: Content
-    @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var shown = false
     public init(
         _ title: String, sub: String? = nil, symbol: String, hue: Color, index: Int = 0,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.sub = sub
         self.symbol = symbol
         self.hue = hue
         self.index = index
+        self.accessory = accessory()
         self.content = content()
     }
     public var body: some View {
@@ -79,6 +81,8 @@ public struct GlassSection<Content: View>: View {
                         .accessibilityAddTraits(.isHeader)
                     if let sub { Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary) }
                 }
+                Spacer(minLength: Space.s3)
+                accessory
             }
             content
         }
@@ -89,6 +93,41 @@ public struct GlassSection<Content: View>: View {
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .coreRise(shown, index)
         .onAppear { shown = true }
+    }
+}
+
+extension GlassSection where Accessory == EmptyView {
+    public init(
+        _ title: String, sub: String? = nil, symbol: String, hue: Color, index: Int = 0,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(title, sub: sub, symbol: symbol, hue: hue, index: index, accessory: { EmptyView() }, content: content)
+    }
+}
+
+/// A section's action: an icon and a word, the icon bouncing when the pointer arrives.
+public struct SectionAction: View {
+    let title: String
+    let symbol: String
+    let danger: Bool
+    let action: () -> Void
+    @State private var hovering = false
+    public init(_ title: String, symbol: String, danger: Bool = false, action: @escaping () -> Void) {
+        self.title = title
+        self.symbol = symbol
+        self.danger = danger
+        self.action = action
+    }
+    public var body: some View {
+        Button(action: action) {
+            Label {
+                Text(title)
+            } icon: {
+                Image(systemName: symbol).symbolEffect(.bounce, value: hovering)
+            }
+        }
+        .buttonStyle(CoreButtonStyle(danger ? .danger : .secondary))
+        .onHover { hovering = $0 }
     }
 }
 
