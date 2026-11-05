@@ -375,43 +375,34 @@ struct CoreBody: View {
 struct ClockBody: View {
     let size: WidgetSize
     @Environment(\.corePalette) private var palette
+    /// The macOS clock widget: the dial is the widget. Wider sizes put the day and date beside or under it.
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            VStack(alignment: .leading, spacing: Space.s1) {
-                if size == .l { WidgetHead(title: "Clock", symbol: "clock") }
-                Spacer(minLength: 0)
-                if size == .t {
-                    Text(ctx.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted))).font(
-                        .system(size: 62, weight: .semibold))
-                    Text(ctx.date, format: .dateTime.minute(.twoDigits)).font(.system(size: 62, weight: .semibold))
-                } else {
-                    Text(ctx.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
-                        .font(.system(size: size == .l ? 56 : size == .s ? 38 : 44, weight: .semibold)).lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-                Text(
-                    ctx.date,
-                    format: size == .s ? .dateTime.weekday(.wide) : .dateTime.weekday(.wide).month(.wide).day()
-                )
-                .foregroundStyle(palette.text2)
-                // The minute filling up, second by second.
-                let sec = Calendar.current.component(.second, from: ctx.date)
-                coreShape(2).fill(palette.track).frame(height: 4)
-                    .overlay(alignment: .leading) {
-                        GeometryReader { g in
-                            coreShape(2).fill(palette.primary).frame(width: g.size.width * CGFloat(sec) / 59)
-                                .animation(sec == 0 ? nil : .linear(duration: 1), value: sec)
-                        }
-                    }
-                    .padding(.top, Space.s1)
-                    .accessibilityHidden(true)
-                if size == .l { Spacer(minLength: 0) }
+        switch size {
+        case .s:
+            AnalogClock().frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .m:
+            HStack(spacing: Space.s4) {
+                AnalogClock()
+                dateText(big: true)
             }
-            .contentTransition(.numericText())
-            .animation(.spring(duration: 0.4), value: Calendar.current.component(.minute, from: ctx.date))
-            .monospacedDigit()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        default:
+            VStack(spacing: Space.s3) {
+                AnalogClock().frame(maxWidth: .infinity)
+                dateText(big: false)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func dateText(big: Bool) -> some View {
+        TimelineView(.periodic(from: .now, by: 60)) { ctx in
+            VStack(alignment: big ? .leading : .center, spacing: 2) {
+                Text(ctx.date, format: .dateTime.weekday(.wide)).font(.system(size: big ? 20 : 15, weight: .semibold))
+                Text(ctx.date, format: .dateTime.month(.wide).day())
+                    .font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
