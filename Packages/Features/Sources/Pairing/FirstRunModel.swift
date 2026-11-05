@@ -10,6 +10,17 @@ protocol PairingDriver: Sendable {
     func confirmSAS() async throws
     func awaitApproval() async throws -> PairingOutcome
     func cancel() async throws -> PairingCancel
+    /// Whether something answers `GET /handshake` at this address (unsigned, nothing about this Mac is sent).
+    func coreAnswers(at url: URL) async -> Bool
+}
+
+extension PairingDriver {
+    func coreAnswers(at url: URL) async -> Bool {
+        var req = URLRequest(url: url.appending(path: "handshake"), timeoutInterval: 1.5)
+        req.httpMethod = "GET"
+        guard let (_, res) = try? await URLSession.shared.data(for: req) else { return false }
+        return (res as? HTTPURLResponse)?.statusCode == 200
+    }
 }
 
 struct LivePairing: PairingDriver {
@@ -132,6 +143,20 @@ final class FirstRunModel {
         nameText = profile?.name ?? ""
         self.onPaired = onPaired
         self.sasSink = sasSink
+    }
+
+    /// The address of a Core found running on this Mac, offered as a one-click choice on the address step.
+    private(set) var localCore: String?
+    static let localAddress = "127.0.0.1:7700"
+
+    func lookForLocalCore() async {
+        guard let url = URL(string: "http://\(Self.localAddress)") else { return }
+        localCore = await driver.coreAnswers(at: url) ? Self.localAddress : nil
+    }
+
+    func useLocalCore() {
+        endpointText = Self.localAddress
+        submitAddress()
     }
 
     /// "Continue" on the name step. An empty name is fine (the greeting then says nothing of it); the person can add one on Home.

@@ -25,6 +25,7 @@ extension Failure {
         case .oldApp: "This app and the Core do not speak the same version"
         case .revokedHere: "This Mac was revoked"
         case .cancelledAfterApproval: "Pairing cancelled"
+        case .keychain(let m) where m.contains("-25244"): "macOS won't let Ainkrad delete its old keys"
         case .keychain: "The keychain refused"
         case .other: "Something went wrong"
         }
@@ -79,6 +80,8 @@ extension Failure {
             "Another admin device removed this Mac from the Core. Its keys are gone from here. Pair again to come back."
         case .cancelledAfterApproval(let id):
             "The approver had already approved this Mac, so it is still listed on their side. Ask them to revoke device \(id) in Settings, Devices."
+        case .keychain(let m) where m.contains("-25244"):
+            "An earlier build of Ainkrad saved them, and macOS only lets that build delete them. Open Keychain Access, search for com.ainkrad.core.corekit, delete what it finds, then choose Forget again."
         case .keychain(let m): m
         case .other(let m): m
         }

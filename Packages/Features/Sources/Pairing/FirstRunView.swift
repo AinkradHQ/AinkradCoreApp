@@ -180,30 +180,34 @@ struct FirstRunView: View {
 
     private var addressStep: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            title("Connect to a Core")
-            note("Enter the address of your Core. Ainkrad checks who answers before it sends anything signed.")
+            title("Where is your Core?")
+            note(
+                "Your Core is the server that runs your agents and terminals. This Mac connects to it to show you everything."
+            )
+            if let local = model.localCore, !pasteQR {
+                foundLocalCore(local)
+            }
             CoreSegmented(
-                "How to find the Core",
-                segments: [CoreSegment(false, "Address"), CoreSegment(true, "Paste QR text")],
+                "How to connect",
+                segments: [CoreSegment(false, "Type its address"), CoreSegment(true, "Paste a pairing link")],
                 selection: Binding(get: { pasteQR }, set: { setQR($0) }))
             if pasteQR {
-                Label("A QR names its Core and its fingerprint, so no address is needed.", systemImage: "qrcode")
-                    .foregroundStyle(palette.text2)
+                note(
+                    "Copy the pairing link from the device that added this Mac. It already holds the address and the code."
+                )
                 CoreTextField(
-                    "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
+                    "Pairing link", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
                     mono: true, autofocus: true, onSubmit: { Task { await model.submit() } })
             } else {
                 CoreTextField(
-                    "Core address", placeholder: "core.example.net", text: $model.endpointText,
+                    "Core address", placeholder: "core.myhome.net", text: $model.endpointText,
                     error: model.endpointError, suffix: addressSuffix, onSubmit: { model.submitAddress() })
-                Text(
-                    "Always https. Add a port only if it is not 443, for example core.example.net:7443. Plain http is only for a Core on this Mac."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("The address you gave your Core when you set it up. Add :port only if it uses one.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                LinkButton(title: "Setting up a new Core?") { model.goTo(.bootstrap) }
+                LinkButton(title: "I don't have a Core yet") { model.goTo(.bootstrap) }
                 Spacer()
                 if pasteQR {
                     Button("Pair this Mac") { Task { await model.submit() } }
@@ -215,6 +219,27 @@ struct FirstRunView: View {
                 }
             }
         }
+        .animation(.spring(duration: 0.4, bounce: 0.2), value: model.localCore)
+        .task { await model.lookForLocalCore() }
+    }
+
+    /// A Core answered on this Mac: the easiest way in is one click.
+    private func foundLocalCore(_ address: String) -> some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: MacTextSize.large))
+                .foregroundStyle(palette.tone(.run).ink).symbolEffect(.bounce, value: address)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Found a Core on this Mac").font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(address).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: 0)
+            Button("Use it") { model.useLocalCore() }.coreGlassButton(prominent: true)
+        }
+        .padding(Space.s3)
+        .coreGlass(radius: Radius.control, interactive: false)
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        .accessibilityElement(children: .combine)
     }
 
     private func setQR(_ on: Bool) {

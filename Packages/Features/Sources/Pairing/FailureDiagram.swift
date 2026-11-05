@@ -11,12 +11,13 @@ struct FailureDiagram: View {
 
     var body: some View {
         let tone = palette.tone(failure.tone)
-        HStack(spacing: Space.s3) {
+        // Top-aligned with the link as tall as a tile, so the line runs through the middle of the icons.
+        HStack(alignment: .top, spacing: Space.s3) {
             node("laptopcomputer", "This Mac", ink: palette.text, fill: palette.glassCard)
             TimelineView(.animation(paused: reduceMotion)) { context in
                 link(t: context.date.timeIntervalSinceReferenceDate, ink: tone.ink)
             }
-            .frame(height: MacSize.controlLg)
+            .frame(height: MacSize.controlLg * 1.6)
             node(failure.diagramEnd, failure.diagramLabel, ink: tone.ink, fill: tone.fill)
                 .symbolEffect(.pulse, options: .repeating)
         }

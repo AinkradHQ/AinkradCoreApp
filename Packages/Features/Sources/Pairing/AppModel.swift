@@ -338,7 +338,11 @@ public final class AppModel {
         agents.detach()
         await service?.close()
         service = nil
-        try? keyStore.wipe()
+        // A key that stays behind would pin the old Core again on the next launch, so a refused delete stops here.
+        do { try keyStore.wipe() } catch {
+            phase = .blocked(Failure.from(error))
+            return
+        }
         shell.elevatedUntil = nil
         shell.coreLink = .none
         shell.bell.removeAll()

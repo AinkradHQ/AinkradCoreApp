@@ -13,12 +13,13 @@ struct FirstRunHero: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: Space.s3) {
+        // Top-aligned with the link as tall as a tile, so the line runs through the middle of the icons.
+        HStack(alignment: .top, spacing: Space.s3) {
             tile(left.symbol, left.label, ink: palette.text)
             TimelineView(.animation(paused: reduceMotion || scene == .you)) { context in
                 link(t: context.date.timeIntervalSinceReferenceDate)
             }
-            .frame(height: MacSize.controlLg)
+            .frame(height: MacSize.controlLg * 1.6)
             .opacity(scene == .you ? 0.35 : 1)
             tile(right.symbol, right.label, ink: scene == .paired ? palette.tone(.run).ink : palette.primary)
                 .symbolEffect(.pulse, options: .repeating, isActive: scene == .find || scene == .checking)
