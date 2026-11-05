@@ -341,9 +341,9 @@ struct FirstRunView: View {
             if let claim = model.claim { SASView(sas: claim.sas) }
             statusLine
             HStack(spacing: Space.s2) {
+                Button("It doesn't match") { Task { await model.cancel() } }
+                    .coreGlassButton(prominent: true, tint: palette.tone(.fail).ink)
                 Spacer(minLength: 0)
-                Button("It doesn't match") { Task { await model.cancel() } }.coreGlassButton(
-                    prominent: true, tint: palette.tone(.fail).ink)
                 if model.matched {
                     Button("Waiting…") {}.coreGlassButton(prominent: true).disabled(true)
                 } else {
