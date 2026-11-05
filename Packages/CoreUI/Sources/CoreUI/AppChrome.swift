@@ -58,10 +58,12 @@ public struct AppFilterTile: View {
         Button(action: pick) {
             HStack(spacing: Space.s2) {
                 Text(title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
-                Text("\(count)").font(.system(size: MacTextSize.meta, weight: .semibold)).monospacedDigit()
-                    .padding(.horizontal, 6).frame(minHeight: 18)
-                    .background(.white.opacity(on ? 0.22 : 0.1), in: coreShape(5))
-                    .contentTransition(.numericText())
+                if count >= 0 {  // a negative count hides the badge (a page with nothing to count)
+                    Text("\(count)").font(.system(size: MacTextSize.meta, weight: .semibold)).monospacedDigit()
+                        .padding(.horizontal, 6).frame(minHeight: 18)
+                        .background(.white.opacity(on ? 0.22 : 0.1), in: coreShape(5))
+                        .contentTransition(.numericText())
+                }
                 if hovering || on {
                     Text(key).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(
                         GlassInk.secondary)
@@ -113,8 +115,10 @@ public struct AppActionTile: View {
                     .symbolEffect(.bounce, value: hovering)
                     .symbolEffect(.pulse, options: .repeating, isActive: pulse)
                 Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
-                Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
-                    .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
+                if !key.isEmpty {
+                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
+                        .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
+                }
             }
             .foregroundStyle(.white)
             .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)

@@ -26,6 +26,8 @@ public final class AccountsModel {
     /// The account whose page is open in Accounts (nil: the list).
     var detail: Int64?
     var poolSelection: Int64?
+    /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
+    var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
     private(set) var writeError: [String: String] = [:]
     private(set) var busy: String?
@@ -370,7 +372,7 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .apps, title: "Accounts and budgets", symbol: "creditcard", order: 4
+                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
             ) {
                 AccountsLinkSection(model: self)
             })

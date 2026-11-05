@@ -217,6 +217,13 @@ enum AccountFilter: String, CaseIterable, Sendable {
         case .off: a.phase == .disabled
         }
     }
+    var symbol: String {
+        switch self {
+        case .all: "square.grid.2x2"
+        case .need: "exclamationmark.triangle"
+        case .off: "pause"
+        }
+    }
 }
 
 /// Where each built-in provider keeps its keys. Only a page to open: this app never takes a key.

@@ -3,51 +3,62 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// The glass card content sits in.
+/// The glass card content sits in: a quiet well that lifts a touch on hover.
 struct AccPanel<Content: View>: View {
     var spacing: CGFloat = Space.s3
     @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
+    @State private var hovering = false
     var body: some View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.glassCard, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.2), value: hovering)
     }
 }
 
-/// A page heading with its line and an optional action on the right.
+/// A page heading: its icon tile bouncing in, the title and its line, and an optional action on the right.
 struct AccHeader<Action: View>: View {
     let title: String
     let detail: String
+    var symbol = "creditcard"
+    var hue = GlassInk.blue
     @ViewBuilder let action: Action
-    @Environment(\.corePalette) private var palette
+    @State private var shown = false
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s4) {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
-                Text(detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .center, spacing: Space.s3) {
+            IconTile(symbol, hue: hue, size: 48, bounce: shown).shadow(color: hue.opacity(0.45), radius: 12)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
+                    .contentTransition(.numericText())
+                Text(detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
             action
         }
+        .onAppear { shown = true }
     }
 }
 
-/// The small rounded square that marks an account: every API account holds one key.
+/// The mark of an account: a rounded tile in its provider's colour and symbol.
 struct AccTile: View {
-    var symbol = "key"
+    var symbol: String?
     var large = false
-    @Environment(\.corePalette) private var palette
+    var provider: String?
     var body: some View {
-        Image(systemName: symbol).font(.system(size: large ? MacTextSize.large : MacTextSize.title))
-            .foregroundStyle(palette.primary)
-            .frame(
-                width: large ? MacSize.controlLg + Space.s2 : MacSize.controlLg,
-                height: large ? MacSize.controlLg + Space.s2 : MacSize.controlLg
+        let hue = provider.map(ProviderLook.hue) ?? GlassInk.slate
+        let size = large ? 56.0 : 36.0
+        Image(systemName: symbol ?? provider.map(ProviderLook.symbol) ?? "key.fill")
+            .font(.system(size: large ? 24 : 15, weight: .semibold)).foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(
+                LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
+                in: coreShape(large ? 13 : 9)
             )
-            .background(palette.uDim, in: coreShape(Radius.control))
+            .overlay { coreShape(large ? 13 : 9).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+            .shadow(color: hue.opacity(0.4), radius: large ? 14 : 6)
             .accessibilityHidden(true)
     }
 }
@@ -58,27 +69,35 @@ struct PhaseBadge: View {
     var body: some View { StateBadge(phase.label, tone: phase.tone, symbol: phase.symbol) }
 }
 
-/// A text link in the primary colour with the one focus ring; a lock and a dim when a write is not possible.
+/// A small glass action: icon and words, lifting and lighting in its colour on hover (red when it removes something).
 struct AccLink: View {
     let title: String
     var symbol: String?
     var danger = false
     var help: String?
     let action: () -> Void
-    @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
-    @FocusState private var focused: Bool
+    @State private var hovering = false
     var body: some View {
+        let hue = danger ? GlassInk.red : GlassInk.blue
         Button(action: action) {
             HStack(spacing: Space.s1) {
-                if let symbol { Image(systemName: symbol).accessibilityHidden(true) }
-                Text(title).font(.system(size: MacTextSize.body))
+                if let symbol {
+                    Image(systemName: symbol).symbolEffect(.bounce, value: hovering).accessibilityHidden(true)
+                }
+                Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).lineLimit(1)
             }
+            .foregroundStyle(hovering ? .white : hue)
+            .padding(.horizontal, Space.s2).frame(minHeight: 26)
+            .background(hovering ? hue.opacity(0.7) : hue.opacity(0.12), in: coreShape(7))
+            .overlay { coreShape(7).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
+            .contentShape(coreShape(7))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(danger ? palette.tone(.fail).ink : palette.primary)
-        .focused($focused).focusEffectDisabled()
-        .coreFocusRing(focused, radius: Radius.chip, palette: palette)
+        .focusable(false)
+        .scaleEffect(hovering ? 1.04 : 1)
+        .onHover { hovering = $0 && enabled }
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
         .coreDimWhenDisabled(enabled)
         .help(help ?? title)
     }
@@ -119,7 +138,7 @@ struct AccIssue: View {
     }
 }
 
-/// A state that replaces a page: a symbol tile, a title, the words and what to do about it.
+/// A state that replaces a page: a bouncing icon tile in its tone, a title, the words and what to do about it.
 struct AccStateCard<Actions: View>: View {
     let symbol: String
     let title: String
@@ -127,26 +146,27 @@ struct AccStateCard<Actions: View>: View {
     var tone: Tone = .queue
     var code: String?
     @ViewBuilder let actions: Actions
-    @Environment(\.corePalette) private var palette
+    @State private var shown = false
     var body: some View {
-        let c = palette.tone(tone)
-        VStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.large)).foregroundStyle(c.ink)
-                .frame(width: MacSize.controlLg + Space.s3, height: MacSize.controlLg + Space.s3)
-                .background(c.fill, in: coreShape(Radius.cardMac)).accessibilityHidden(true)
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
+        let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.orange : GlassInk.blue
+        VStack(spacing: Space.s3) {
+            IconTile(symbol, hue: hue, size: 64, bounce: shown).shadow(color: hue.opacity(0.5), radius: 18)
+                .scaleEffect(shown ? 1 : 0.6)
+            Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
             if let code {
                 Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)).padding(.horizontal, Space.s2)
-                    .frame(minHeight: MacSize.chip).background(palette.uDim, in: coreShape(Radius.chip))
+                    .frame(minHeight: 22).background(GlassInk.well, in: coreShape(6))
             }
             HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .overlay { if tone == .fail { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.5), lineWidth: 1) } }
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(tone == .queue ? 0.15 : 0.45), lineWidth: 1) }
+        .animation(.spring(duration: 0.45, bounce: 0.3), value: shown)
+        .onAppear { shown = true }
         .accessibilityElement(children: .contain)
     }
 }
@@ -157,16 +177,19 @@ extension AccStateCard where Actions == EmptyView {
     }
 }
 
-/// A figure the Core does not report yet: a quiet card that says so, so nothing is ever estimated.
+/// A figure the Core does not report yet: a quiet card with an hourglass that turns, so nothing is ever estimated.
 struct NotYetCard: View {
     let title: String
     var text = "Not available yet. Core does not report this."
-    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
-        AccPanel(spacing: Space.s1) {
-            Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-            Label(text, systemImage: "hourglass").foregroundStyle(palette.text2).labelStyle(.titleAndIcon)
-                .fixedSize(horizontal: false, vertical: true)
+        AccPanel(spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
+                    .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+            }
+            Text(text).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
@@ -229,7 +252,8 @@ struct ReadOnlyBanner: View {
     }
 }
 
-/// Cancel and the one action of a dialog: Escape cancels, Return confirms.
+/// Cancel and the one action of a dialog, as glass tiles with their keys: Cancel at the left (esc), the action at the
+/// right (↩, or ⌘↩ when it removes something, so Return alone never destroys).
 struct AccDialogButtons: View {
     let confirm: String
     var danger = false
@@ -237,29 +261,41 @@ struct AccDialogButtons: View {
     var enabled = true
     let cancel: () -> Void
     let run: () -> Void
+    @State private var hovered: Int?
     var body: some View {
         HStack(spacing: Space.s2) {
-            Spacer(minLength: 0)
-            Button("Cancel", action: cancel).buttonStyle(.coreSecondary).coreShortcut(.cancel)
-            if danger {
-                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger)).disabled(!enabled || busy)
-            } else {
-                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
-                    .coreShortcut(.primary).disabled(!enabled || busy)
-            }
+            ChoiceTile(
+                choice: ConfirmChoice("Cancel", symbol: "arrow.uturn.backward"), on: hovered == 0, keys: "esc",
+                run: cancel
+            )
+            .keyboardShortcut(.cancelAction)
+            .onHover { hovered = $0 ? 0 : nil }
+            .frame(maxWidth: Space.s8 * 5)
+            Spacer(minLength: Space.s2)
+            ChoiceTile(
+                choice: ConfirmChoice(
+                    busy ? "\(confirm)…" : confirm, symbol: danger ? "trash" : "checkmark", destructive: danger),
+                on: hovered != 0 && enabled && !busy, keys: danger ? "⌘↩" : "↩", run: run
+            )
+            .keyboardShortcut(.return, modifiers: danger ? .command : [])
+            .disabled(!enabled || busy)
+            .opacity(enabled ? 1 : 0.5)
+            .onHover { hovered = $0 ? 1 : nil }
+            .frame(maxWidth: Space.s8 * 7)
         }
+        .animation(.spring(duration: 0.25), value: hovered)
     }
 }
 
-/// A short word in a rounded box: a model, a runner, a delivery. Neutral.
+/// A short word in a rounded glass box: a model, a runner, a delivery.
 struct AccChip: View {
     let text: String
     var mono = false
-    @Environment(\.corePalette) private var palette
     var body: some View {
         Text(text).font(.system(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default))
-            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(palette.uDim, in: coreShape(Radius.chip))
+            .padding(.horizontal, Space.s2).frame(minHeight: 22)
+            .background(GlassInk.well, in: coreShape(6))
+            .overlay { coreShape(6).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }
 
