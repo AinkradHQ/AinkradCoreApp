@@ -60,12 +60,12 @@ private struct GlassModifier: ViewModifier {
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if #available(macOS 26, iOS 26, *) {
-            // Untinted is Apple's plain glass, taking the colour of what is behind it (the widget look); on the bright day
-            // sky a faint dark breath keeps white text readable.
+            // Untinted is Apple's widget glass: clear, so the sky shows through sharp and only the edges bend the light
+            // (Ahmed's macOS widget screenshots, 2026-11-05). Night darkens it a touch, like macOS does on a dark desktop.
             let glass =
                 tinted
                 ? Glass.regular.tint(palette.glassTint)
-                : palette.isDay ? Glass.regular.tint(.black.opacity(0.12)) : Glass.regular
+                : palette.isDay ? Glass.clear : Glass.clear.tint(.black.opacity(0.18))
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
         } else {

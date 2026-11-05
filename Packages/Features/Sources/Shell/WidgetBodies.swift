@@ -308,7 +308,8 @@ struct ClockBody: View {
     var body: some View {
         switch size {
         case .s:
-            AnalogClock().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The dial nearly fills the widget, a thin glass rim around it (macOS).
+            AnalogClock().padding(-Space.s2).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .m:
             HStack(spacing: Space.s4) {
                 AnalogClock()
