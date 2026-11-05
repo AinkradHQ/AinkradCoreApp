@@ -60,7 +60,10 @@ private struct GlassModifier: ViewModifier {
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if #available(macOS 26, iOS 26, *) {
-            let glass = Glass.regular.tint(tinted ? palette.glassTint : palette.glassTint.opacity(0.25))
+            // Untinted keeps a breath of blue at night; the day sky is bright, so day glass stays deep blue (the
+            // prototype's day theme) or white text on it washes out.
+            let glass = Glass.regular.tint(
+                tinted || palette.isDay ? palette.glassTint : palette.glassTint.opacity(0.25))
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
         } else {
