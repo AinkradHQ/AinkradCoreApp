@@ -20,6 +20,8 @@ struct DeskWidget: View {
         let size = DeskGrid.frameSize(item.size)
         ZStack(alignment: .topLeading) {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
+                // White ink on clear glass: a soft shadow keeps it readable over bright clouds (stronger by day).
+                .shadow(color: .black.opacity(palette.isDay ? 0.35 : 0.25), radius: 3, y: 1)
                 .padding(18).padding(.top, editing ? 30 : 0)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .opacity(editing ? 0.5 : 1)

@@ -40,7 +40,7 @@ struct QuickBody: View {
                     } label: {
                         label(t.2, t.1, wide: wide)
                     }
-                    .buttonStyle(CoreButtonStyle(.secondary)).rise(arrived, i, reduce)
+                    .buttonStyle(QuickTileStyle(prominent: false)).rise(arrived, i, reduce)
                     .environment(\.coreForcedInteraction, forcedHover(i))
                 }
                 Button {
@@ -48,7 +48,7 @@ struct QuickBody: View {
                 } label: {
                     label("magnifyingglass", "Launcher", wide: wide, key: "⌘K")
                 }
-                .buttonStyle(CoreButtonStyle(.prominent)).rise(arrived, tiles.count, reduce)
+                .buttonStyle(QuickTileStyle(prominent: true)).rise(arrived, tiles.count, reduce)
             }
             if !wide { Spacer(minLength: 0) }
         }
@@ -76,5 +76,23 @@ extension View {
                 (reduce ? Animation.easeOut(duration: 0.2) : Motion.out(Motion.move)).delay(
                     reduce ? 0 : Double(index) * 0.04),
                 value: shown)
+    }
+}
+
+/// A quick-action tile on clear glass: a white well (no second glass inside the widget), the launcher one blue.
+struct QuickTileStyle: ButtonStyle {
+    let prominent: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(WidgetInk.primary)
+            .background(
+                prominent
+                    ? WidgetInk.blue.opacity(configuration.isPressed ? 0.75 : 0.9)
+                    : configuration.isPressed ? WidgetInk.wellEdge : WidgetInk.well,
+                in: coreShape(Radius.control + 4)
+            )
+            .scaleEffect(configuration.isPressed && !reduce ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

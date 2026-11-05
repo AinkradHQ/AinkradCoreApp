@@ -49,12 +49,12 @@ struct RunRows: View {
     var body: some View {
         ForEach(runs) { r in
             HStack(spacing: Space.s2) {
-                StatusDot(color: palette.tone(.run).ink, live: true)
+                StatusDot(color: WidgetInk.green, live: true)
                 Text(r.tool).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                Text(r.name).foregroundStyle(palette.text2).lineLimit(1)
+                Text(r.name).foregroundStyle(WidgetInk.secondary).lineLimit(1)
                 Spacer(minLength: 0)
                 Text("\(r.minutes) min").font(.system(size: MacTextSize.meta, design: .monospaced))
-                    .foregroundStyle(palette.text2)
+                    .foregroundStyle(WidgetInk.secondary)
             }
             .font(.system(size: MacTextSize.body)).padding(.vertical, 3)
             .accessibilityElement(children: .combine)
@@ -71,14 +71,14 @@ struct TodayBody: View {
         let h = shell.home
         let waiting = shell.bell.waiting
         let needs = RingGauge(
-            value: min(Double(waiting), 5) / 5, symbol: "hand.raised", tint: palette.tone(.warn).ink,
+            value: min(Double(waiting), 5) / 5, symbol: "hand.raised", tint: WidgetInk.orange,
             caption: "\(waiting)", sub: "waiting")
         let running = RingGauge(
-            value: Double(h.runningAgents) / Double(max(h.totalSlots, 1)), symbol: "sparkles", tint: palette.primary,
+            value: Double(h.runningAgents) / Double(max(h.totalSlots, 1)), symbol: "sparkles", tint: WidgetInk.blue,
             caption: "\(h.runningAgents)", sub: "running")
         let online = RingGauge(
             value: h.machines.isEmpty ? 0 : Double(h.machinesOnline) / Double(h.machines.count), symbol: "server.rack",
-            tint: palette.tone(.run).ink, caption: "\(h.machinesOnline)/\(h.machines.count)", sub: "online")
+            tint: WidgetInk.green, caption: "\(h.machinesOnline)/\(h.machines.count)", sub: "online")
         VStack(spacing: Space.s4) {
             switch size {
             case .s: needs
@@ -111,7 +111,7 @@ struct NeedsBody: View {
     var body: some View {
         let need = shell.bell.items.filter(\.needsPerson)
         let ring = RingGauge(
-            value: min(Double(need.count), 5) / 5, symbol: "hand.raised", tint: palette.tone(.warn).ink,
+            value: min(Double(need.count), 5) / 5, symbol: "hand.raised", tint: WidgetInk.orange,
             caption: "\(need.count)", sub: need.isEmpty ? "all clear" : "waiting")
         VStack(alignment: .leading, spacing: Space.s3) {
             if size == .s || size == .t {
@@ -139,7 +139,7 @@ struct RunningBody: View {
     var body: some View {
         let ring = RingGauge(
             value: Double(home.runningAgents) / Double(max(home.totalSlots, 1)), symbol: "sparkles",
-            tint: palette.primary, caption: "\(home.runningAgents)", sub: "of \(home.totalSlots) slots")
+            tint: WidgetInk.blue, caption: "\(home.runningAgents)", sub: "of \(home.totalSlots) slots")
         VStack(alignment: .leading, spacing: Space.s3) {
             if size == .s || size == .t {
                 ring
@@ -161,7 +161,7 @@ struct SpendBody: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         let ring = RingGauge(
-            value: home.monthTokensUsed, symbol: "dollarsign", tint: palette.primary,
+            value: home.monthTokensUsed, symbol: "dollarsign", tint: WidgetInk.blue,
             caption: home.spendToday.formatted(.currency(code: "USD")), sub: "today")
         if size == .s || size == .t {
             VStack {
@@ -173,7 +173,8 @@ struct SpendBody: View {
                 ring.frame(width: 96)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     RollingNumber(value: home.monthTokensUsed * 100, format: { "\(Int($0))%" }, size: 30)
-                    Text("of this month's tokens").font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                    Text("of this month's tokens").font(.system(size: MacTextSize.body)).foregroundStyle(
+                        WidgetInk.secondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -193,7 +194,7 @@ struct MachinesBody: View {
         VStack(spacing: Space.s4) {
             if shown.isEmpty {
                 RingGauge(
-                    value: 0, symbol: "server.rack", tint: palette.primary, caption: "No machines", sub: "pair a runner"
+                    value: 0, symbol: "server.rack", tint: WidgetInk.blue, caption: "No machines", sub: "pair a runner"
                 )
                 .frame(maxWidth: size == .s ? .infinity : 110)
             } else {
@@ -206,7 +207,7 @@ struct MachinesBody: View {
                             RingGauge(
                                 value: m.online ? (m.load.last ?? 0) : 0,
                                 symbol: m.os.hasPrefix("macOS") ? "laptopcomputer" : "server.rack",
-                                tint: m.online ? palette.tone(.run).ink : palette.text2,
+                                tint: m.online ? WidgetInk.green : WidgetInk.secondary,
                                 caption: m.online ? "\(m.loadPercent)%" : "Off",
                                 sub: m.id)
                         }
@@ -224,16 +225,16 @@ struct BoardBody: View {
     var body: some View {
         let total = Double(max(board.todo + board.doing + board.review + board.blocked + board.done, 1))
         let cols: [(String, Int, String, Color)] = [
-            ("Todo", board.todo, "tray", palette.text2), ("Doing", board.doing, "hammer", palette.primary),
-            ("Review", board.review, "eye", palette.primary),
-            ("Blocked", board.blocked, "exclamationmark.octagon", palette.tone(.warn).ink),
-            ("Done", board.done, "checkmark", palette.tone(.run).ink),
+            ("Todo", board.todo, "tray", WidgetInk.secondary), ("Doing", board.doing, "hammer", WidgetInk.blue),
+            ("Review", board.review, "eye", WidgetInk.blue),
+            ("Blocked", board.blocked, "exclamationmark.octagon", WidgetInk.orange),
+            ("Done", board.done, "checkmark", WidgetInk.green),
         ]
         VStack(spacing: Space.s4) {
             if size == .s {
                 RingGauge(
                     value: Double(board.blocked) / total, symbol: "exclamationmark.octagon",
-                    tint: palette.tone(.warn).ink,
+                    tint: WidgetInk.orange,
                     caption: "\(board.blocked)", sub: "blocked")
             } else {
                 RingRow {
@@ -256,20 +257,20 @@ struct EventsBody: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             if home.events.isEmpty {
                 RingGauge(
-                    value: 0, symbol: "clock.arrow.circlepath", tint: palette.primary, caption: "No events", sub: "yet"
+                    value: 0, symbol: "clock.arrow.circlepath", tint: WidgetInk.blue, caption: "No events", sub: "yet"
                 )
                 .frame(maxWidth: 110).frame(maxWidth: .infinity)
             }
             ForEach(Array(home.events.prefix(size == .m ? 2 : 8).enumerated()), id: \.element.id) { i, e in
                 HStack(spacing: Space.s3) {
                     Image(systemName: e.symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                        .foregroundStyle(palette.primary)
-                        .frame(width: 34, height: 34).coreGlass(radius: Radius.control, interactive: false)
+                        .foregroundStyle(WidgetInk.primary)
+                        .frame(width: 34, height: 34).background(WidgetInk.well, in: coreShape(Radius.control))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(e.text).font(.system(size: MacTextSize.headline, weight: .medium)).lineLimit(1)
                         Text("\(e.source) · \(e.minutesAgo) min").font(.system(size: MacTextSize.meta))
-                            .foregroundStyle(palette.text2)
+                            .foregroundStyle(WidgetInk.secondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -295,7 +296,8 @@ struct CoreBody: View {
         let alarms = shell.bell.items.filter { $0.kind == .alarm }
         VStack {
             RingGauge(
-                value: shell.coreLink == .live ? 1 : 0.25, symbol: "heart.text.square", tint: palette.tone(tone).ink,
+                value: shell.coreLink == .live ? 1 : 0.25, symbol: "heart.text.square",
+                tint: tone == .run ? WidgetInk.green : tone == .warn ? WidgetInk.orange : palette.tone(tone).ink,
                 caption: word, sub: alarms.isEmpty ? "no alarms" : "\(alarms.count) alarm")
         }
     }
@@ -330,7 +332,7 @@ struct ClockBody: View {
             VStack(alignment: big ? .leading : .center, spacing: 2) {
                 Text(ctx.date, format: .dateTime.weekday(.wide)).font(.system(size: big ? 20 : 15, weight: .semibold))
                 Text(ctx.date, format: .dateTime.month(.wide).day())
-                    .font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                    .font(.system(size: MacTextSize.body)).foregroundStyle(WidgetInk.secondary)
             }
         }
         .accessibilityElement(children: .combine)

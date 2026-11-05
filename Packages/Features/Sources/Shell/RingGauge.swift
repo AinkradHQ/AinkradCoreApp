@@ -20,12 +20,12 @@ struct RingGauge: View {
                 let side = min(g.size.width, g.size.height)
                 let line = max(5, side * 0.1)
                 ZStack {
-                    Circle().stroke(palette.text.opacity(0.14), lineWidth: line)
+                    Circle().stroke(WidgetInk.track, lineWidth: line)
                     Circle().trim(from: 0, to: min(max(shown, 0), 1))
                         .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Image(systemName: symbol).font(.system(size: side * 0.3, weight: .medium))
-                        .foregroundStyle(palette.text.opacity(0.9))
+                        .foregroundStyle(WidgetInk.primary)
                         .symbolEffect(.bounce, value: shown > 0)
                 }
                 .padding(line / 2)
@@ -35,10 +35,14 @@ struct RingGauge: View {
             .aspectRatio(1, contentMode: .fit)
             if let caption {
                 VStack(spacing: 0) {
-                    Text(caption).font(.system(size: MacTextSize.headline + 2, weight: .medium)).monospacedDigit()
+                    Text(caption).font(.system(size: MacTextSize.headline + 2, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(WidgetInk.primary)
                         .contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.7)
                     if let sub {
-                        Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(1)
+                        Text(sub).font(.system(size: MacTextSize.meta, weight: .medium)).foregroundStyle(
+                            WidgetInk.secondary
+                        )
+                        .lineLimit(1)
                     }
                 }
             }

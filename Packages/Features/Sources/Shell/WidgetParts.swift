@@ -1,6 +1,20 @@
 import CoreUI
 import SwiftUI
 
+/// Widget ink on clear glass (Apple's widgets): pure white text, a softer white for the second line, a white well for
+/// tiles, and vivid gauge colours. The glass is clear, so the sky decides the background; white with a soft shadow
+/// (DeskWidget) reads on both skies.
+enum WidgetInk {
+    static let primary = Color.white
+    static let secondary = Color.white.opacity(0.78)
+    static let track = Color.white.opacity(0.24)
+    static let well = Color.white.opacity(0.16)
+    static let wellEdge = Color.white.opacity(0.3)
+    static let blue = Color(red: 0.25, green: 0.6, blue: 1)
+    static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
+    static let orange = Color(red: 1, green: 0.62, blue: 0.1)
+}
+
 /// Pieces the widgets share (`widgets.css`: header, section label, status square, meters, slot squares, load line).
 /// Everything arrives with motion (counts roll up, bars grow, lines draw in); Reduce Motion keeps fades and colour only.
 struct WidgetHead: View {
@@ -246,8 +260,7 @@ struct WidgetCard: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? palette.uDim : palette.glassCard, in: coreShape(Radius.row))
-            .overlay { coreShape(Radius.row).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .background(hovering ? WidgetInk.wellEdge : WidgetInk.well, in: coreShape(Radius.row))
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)
