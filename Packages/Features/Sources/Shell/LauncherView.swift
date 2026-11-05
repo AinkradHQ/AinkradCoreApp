@@ -69,6 +69,8 @@ struct LauncherView: View {
         .frame(maxHeight: Space.s8 * 18)
         .fixedSize(horizontal: false, vertical: true)
         // The widgets' clear glass: the sky shows through, white ink on top (Ahmed, 2026-11-05).
+        // Darker than a widget: it is an input, so the text sits on a calmer surface.
+        .background(Color.black.opacity(palette.isDay ? 0.3 : 0.32), in: coreShape(Radius.panel + Space.s1))
         .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false)
         .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
         .background { numberShortcuts(rows) }
