@@ -144,15 +144,15 @@ struct FailureView: View {
                 Label("Stopped. There is no way to continue from here.", systemImage: "hand.raised")
                     .font(.system(size: MacTextSize.body, weight: .semibold))
             }
+            // Secondary actions sit at the left edge, the primary one at the right.
             HStack(spacing: Space.s2) {
+                ForEach(actions.filter { $0.style != .primary }) { a in
+                    Button(a.label, action: a.run).coreGlassButton().disabled(a.disabled)
+                }
                 Spacer(minLength: 0)
-                ForEach(actions) { a in
-                    if a.style == .primary {
-                        Button(a.label, action: a.run).coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
-                            .disabled(a.disabled || wait > 0)
-                    } else {
-                        Button(a.label, action: a.run).coreGlassButton().disabled(a.disabled)
-                    }
+                ForEach(actions.filter { $0.style == .primary }) { a in
+                    Button(a.label, action: a.run).coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
+                        .disabled(a.disabled || wait > 0)
                 }
             }
         }
