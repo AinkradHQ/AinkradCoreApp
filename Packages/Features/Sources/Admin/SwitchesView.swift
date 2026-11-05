@@ -56,6 +56,7 @@ struct SwitchesSection: View {
                             let pty = r.drivers.contains("pty")
                             HStack(spacing: Space.s3) {
                                 IconTile("server.rack", hue: pty ? GlassInk.green : GlassInk.slate, size: 32)
+                                    .overlay(alignment: .topTrailing) { if pty { LiveDot().offset(x: 3, y: -3) } }
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold))
                                     Text(
@@ -117,12 +118,12 @@ private struct SecretsModeCard: View {
                 .disabled(model.busy == setting.key)
             }
         } content: {
-            HStack(spacing: Space.s3) {
-                Image(systemName: mode == 0 ? "lock.fill" : "testtube.2").foregroundStyle(hue)
-                    .contentTransition(.symbolEffect(.replace))
-                Text(Self.lines.indices.contains(mode) ? Self.lines[mode] : "A setting this app doesn't know yet.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: Space.s3)
+            StatePanel(
+                symbol: mode == 0 ? "lock.fill" : "testtube.2", hue: hue,
+                title: mode == 0 ? "Off" : "Test keys",
+                line: Self.lines.indices.contains(mode) ? Self.lines[mode] : "A setting this app doesn't know yet.",
+                trigger: mode
+            ) {
                 StepTrack(["Off", "Test keys", "Real keys"], at: min(mode, 2), hue: hue, locked: [2])
                     .help("Real keys open after the external security review (G-SEC).")
             }
@@ -157,6 +158,8 @@ private struct FlagCard: View {
     let offLine: String
     let onLine: String
     let needs: String?
+    var offSymbol = "checkmark.shield.fill"
+    var onSymbol = "exclamationmark.shield.fill"
     let reason: (Bool) -> String
 
     var body: some View {
@@ -177,13 +180,10 @@ private struct FlagCard: View {
                 .accessibilityIdentifier("switch-\(setting.key)")
             }
         } content: {
-            HStack(spacing: Space.s2) {
-                Image(systemName: isOn ? "checkmark.circle.fill" : "minus.circle")
-                    .foregroundStyle(isOn ? GlassInk.orange : GlassInk.secondary)
-                    .contentTransition(.symbolEffect(.replace))
-                Text(isOn ? onLine : offLine).foregroundStyle(GlassInk.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            StatePanel(
+                symbol: isOn ? onSymbol : offSymbol, hue: isOn ? GlassInk.orange : GlassInk.green,
+                title: isOn ? "On · less safe" : "Off · safer", line: isOn ? onLine : offLine, trigger: isOn
+            ) { EmptyView() }
             if let needs {
                 Label(needs, systemImage: "arrow.turn.right.up").font(
                     .system(size: MacTextSize.meta, weight: .semibold)
@@ -194,5 +194,86 @@ private struct FlagCard: View {
         }
         .help(setting.key)
         .animation(.spring(duration: 0.35), value: isOn)
+    }
+}
+
+/// What a switch means now, as a picture: a large glyph tile in the state's colour that swaps and bounces when the state
+/// changes, the state's name and its line, and a light that sweeps across the panel once on every change.
+private struct StatePanel<Trailing: View>: View {
+    let symbol: String
+    let hue: Color
+    let title: String
+    let line: String
+    let trigger: AnyHashable
+    @ViewBuilder let trailing: Trailing
+    @State private var sweep = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    init(
+        symbol: String, hue: Color, title: String, line: String, trigger: some Hashable,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.symbol = symbol
+        self.hue = hue
+        self.title = title
+        self.line = line
+        self.trigger = AnyHashable(trigger)
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: symbol).font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(
+                    LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
+                    in: coreShape(12)
+                )
+                .overlay { coreShape(12).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                .shadow(color: hue.opacity(0.5), radius: 12)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.bounce, value: trigger)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(hue)
+                    .contentTransition(.opacity)
+                Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Space.s3)
+            trailing
+        }
+        .padding(Space.s3)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
+        .overlay {
+            GeometryReader { g in
+                LinearGradient(
+                    colors: [.clear, .white.opacity(0.14), .clear], startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: g.size.width * 0.35)
+                .offset(x: sweep ? g.size.width : -g.size.width * 0.35)
+            }
+            .clipShape(coreShape(Radius.cardMac))
+            .allowsHitTesting(false)
+        }
+        .animation(.spring(duration: 0.4, bounce: 0.25), value: hue)
+        .onChange(of: trigger) { _, _ in
+            guard !reduce else { return }
+            sweep = false
+            withAnimation(.easeInOut(duration: 0.9)) { sweep = true }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A small green light that breathes: this runner's terminals are live.
+private struct LiveDot: View {
+    @State private var on = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    var body: some View {
+        coreShape(3).fill(GlassInk.green).frame(width: 9, height: 9)
+            .overlay { coreShape(3).strokeBorder(.black.opacity(0.4), lineWidth: 1) }
+            .shadow(color: GlassInk.green.opacity(on ? 0.9 : 0.3), radius: on ? 6 : 2)
+            .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(), value: on)
+            .onAppear { on = true }
     }
 }
