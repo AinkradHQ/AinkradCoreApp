@@ -288,3 +288,22 @@ public struct SurfaceModeTabs: View {
             ], selection: $mode)
     }
 }
+
+/// A settings row: icon and name at the left, the choices filling the rest (Terminals and Agents Defaults).
+public struct SettingRow<Content: View>: View {
+    let title: String
+    let symbol: String
+    let content: Content
+    public init(_ title: String, symbol: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.symbol = symbol
+        self.content = content()
+    }
+    public var body: some View {
+        HStack(spacing: Space.s3) {
+            Label(title, systemImage: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                .frame(width: 96, alignment: .leading)
+            content
+        }
+    }
+}

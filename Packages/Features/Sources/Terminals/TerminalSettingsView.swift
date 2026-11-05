@@ -61,14 +61,14 @@ struct TerminalSettingsView: View {
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
                 hue: GlassInk.green, index: 5
             ) {
-                field("Runner", "server.rack") {
+                SettingRow("Runner", symbol: "server.rack") {
                     CoreSegmented(
                         "Runner",
                         segments: [CoreSegment("", "Best ready", symbol: "sparkles")]
                             + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
                         selection: $prefs.defaultRunner, fill: true)
                 }
-                field("Shell", "apple.terminal") {
+                SettingRow("Shell", symbol: "apple.terminal") {
                     CoreSegmented(
                         "Shell",
                         segments: [
@@ -91,15 +91,6 @@ struct TerminalSettingsView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .animation(.spring(duration: 0.3, bounce: 0.2), value: prefs.themeID)
-    }
-
-    /// A labelled row: icon and name at the left, the choices filling the rest.
-    private func field(_ title: String, _ symbol: String, @ViewBuilder _ content: () -> some View) -> some View {
-        HStack(spacing: Space.s3) {
-            Label(title, systemImage: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                .frame(width: 96, alignment: .leading)
-            content()
-        }
     }
 }
 

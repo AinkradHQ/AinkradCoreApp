@@ -79,25 +79,72 @@ struct AgentSettingsView: View {
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,
                 index: 1
             ) {
-                CoreSegmented(
-                    "Harness", segments: ["claude", "codex", "opencode", "agy"].map { CoreSegment($0, $0) },
-                    selection: $prefs.harness, fill: true)
-                CoreSegmented(
-                    "Mode",
-                    segments: [
-                        CoreSegment("ask", "Asks first"), CoreSegment("accept_edits", "Accepts edits"),
-                        CoreSegment("sandboxed", "Sandboxed"),
-                    ], selection: $prefs.mode, fill: true)
-                Picker("Runner", selection: $prefs.runner) {
-                    Text("Best ready runner").tag("")
-                    ForEach(model?.runners ?? []) { r in Text(r.name).tag(r.id) }
+                SettingRow("Harness", symbol: "cpu") {
+                    CoreSegmented(
+                        "Harness",
+                        segments: [
+                            CoreSegment("claude", "claude", symbol: "sparkles"),
+                            CoreSegment("codex", "codex", symbol: "chevron.left.forwardslash.chevron.right"),
+                            CoreSegment("opencode", "opencode", symbol: "curlybraces"),
+                            CoreSegment("agy", "agy", symbol: "atom"),
+                        ], selection: $prefs.harness, fill: true)
                 }
-                LabeledContent("Model") {
-                    TextField("the harness default", text: $prefs.model).textFieldStyle(.roundedBorder).frame(
-                        width: 220)
+                SettingRow("Mode", symbol: "hand.raised") {
+                    CoreSegmented(
+                        "Mode",
+                        segments: [
+                            CoreSegment("ask", "Asks first", symbol: "questionmark.bubble"),
+                            CoreSegment("accept_edits", "Accepts edits", symbol: "pencil.and.list.clipboard"),
+                            CoreSegment("sandboxed", "Sandboxed", symbol: "shippingbox"),
+                        ], selection: $prefs.mode, fill: true)
+                }
+                SettingRow("Runner", symbol: "server.rack") {
+                    CoreSegmented(
+                        "Runner",
+                        segments: [CoreSegment("", "Best ready", symbol: "wand.and.stars")]
+                            + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
+                        selection: $prefs.runner, fill: true)
+                }
+                SettingRow("Model", symbol: "brain") {
+                    ModelField(text: $prefs.model)
                 }
             }
         }
         .foregroundStyle(GlassInk.primary)
+    }
+}
+
+/// The model name as a glass field: a sparkle that bounces while typing, a clear tile once something is set.
+private struct ModelField: View {
+    @Binding var text: String
+    @FocusState private var focused: Bool
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: text.isEmpty ? "sparkles" : "brain.head.profile")
+                .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.violet)
+                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: text.count)
+            TextField("The harness default", text: $text).textFieldStyle(.plain).focused($focused)
+                .autocorrectionDisabled()
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).frame(width: 22, height: 22)
+                        .background(GlassInk.well, in: coreShape(6))
+                }
+                .buttonStyle(.plain).help("Use the harness default").transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, Space.s3)
+        .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + 4)
+        .background(focused ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+        .overlay {
+            coreShape(Radius.control).strokeBorder(
+                focused ? GlassInk.violet.opacity(0.6) : .white.opacity(0.15), lineWidth: 1)
+        }
+        .shadow(color: GlassInk.violet.opacity(focused ? 0.35 : 0), radius: 10)
+        .focusEffectDisabled()
+        .animation(.spring(duration: 0.3, bounce: 0.25), value: focused)
+        .animation(.spring(duration: 0.3, bounce: 0.25), value: text.isEmpty)
     }
 }
