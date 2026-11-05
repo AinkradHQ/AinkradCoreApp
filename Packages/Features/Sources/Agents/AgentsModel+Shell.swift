@@ -108,9 +108,17 @@ extension AgentsModel {
                 id: "agents.inbox", title: "Approvals", sub: "what agents are waiting on you for",
                 symbol: "lock.shield", keywords: ["inbox", "approve", "touch id", "deny"]
             ) { [weak self] in self?.openInbox() })
+        shell.launcher.register(
+            LauncherEntry(
+                id: "settings.agents", title: "Agents settings", sub: "Surface and the defaults for new sessions",
+                symbol: "gearshape", keywords: ["appearance", "defaults", "harness", "agent"]
+            ) { [weak self] in
+                self?.shell.settings.selected = "agents"
+                self?.shell.open(.settings)
+            })
         shell.settings.section(
             SettingsSection(
-                id: "agents", group: .core, title: "Agents", sub: "Surface and the defaults for new sessions",
+                id: "agents", group: .apps, title: "Agents", sub: "Surface and the defaults for new sessions",
                 symbol: "sparkles", order: 30
             ) { AgentSettingsView(model: self) })
         shell.settings.section(

@@ -145,10 +145,18 @@ public final class TerminalsModel {
         followElevation()
         shell.settings.section(
             SettingsSection(
-                id: "terminal", group: .mac, title: "Terminal", sub: "Font, colours, cursor and background",
+                id: "terminal", group: .apps, title: "Terminals", sub: "Look, screen, surface and defaults",
                 symbol: "terminal", order: 10
             ) { TerminalSettingsView(model: self) })
         let l = shell.launcher
+        l.register(
+            LauncherEntry(
+                id: "settings.terminal", title: "Terminals settings", sub: "Look, screen, surface and defaults",
+                symbol: "gearshape", keywords: ["appearance", "theme", "font", "transparency", "terminal"]
+            ) { [weak self] in
+                self?.shell.settings.selected = "terminal"
+                self?.shell.open(.settings)
+            })
         l.register(
             LauncherEntry(
                 id: "terminals", title: "Terminals", sub: "Rune terminals on your runners", symbol: "terminal",

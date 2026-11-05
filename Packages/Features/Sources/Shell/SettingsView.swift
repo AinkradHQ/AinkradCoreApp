@@ -4,6 +4,8 @@ import SwiftUI
 
 public enum SettingsGroup: String, CaseIterable, Sendable {
     case mac = "Mac"
+    /// One page per app (Ahmed, 2026-11-05): its look and its defaults.
+    case apps = "Apps"
     case core = "Core"
     case security = "Security"
     case notifications = "Notifications"
@@ -13,6 +15,7 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
     var hue: Color {
         switch self {
         case .mac: Color(red: 0.55, green: 0.6, blue: 0.7)
+        case .apps: Color(red: 0.3, green: 0.82, blue: 0.9)
         case .core: WidgetInk.blue
         case .security: WidgetInk.orange
         case .notifications: Color(red: 1, green: 0.38, blue: 0.4)

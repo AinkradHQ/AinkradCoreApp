@@ -370,7 +370,7 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .core, title: "Accounts and budgets", symbol: "creditcard", order: 4
+                id: "accounts-link", group: .apps, title: "Accounts and budgets", symbol: "creditcard", order: 4
             ) {
                 AccountsLinkSection(model: self)
             })
