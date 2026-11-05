@@ -211,9 +211,11 @@ public struct WidgetLayout: Equatable, Sendable {
 
 /// Stage geometry (`widgets.js`: 150 pt cells, 14 pt gaps, origin 71 / 50), in the 1440 x 900 design stage.
 public enum DeskGrid {
-    public static let cell: CGFloat = 150
+    /// Side margin on the 1440 stage (Ahmed, 2026-11-05: less empty space at the screen edges; the prototype had 71).
+    public static let originX: CGFloat = 40
     public static let gap: CGFloat = 14
-    public static let originX: CGFloat = 71
+    /// The eight columns fill the stage between the side margins.
+    public static let cell: CGFloat = (1440 - 2 * originX - 7 * gap) / 8
     public static let originY: CGFloat = 50
     public static var step: CGFloat { cell + gap }
 

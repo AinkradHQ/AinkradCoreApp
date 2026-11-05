@@ -28,12 +28,10 @@ struct DeskWidget: View {
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipShape(coreShape(radius))
-        .coreGlass(radius: radius, interactive: false)
-        .overlay { coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)) }
-        .overlay { coreShape(radius).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        // Apple's Liquid Glass draws its own edge and light; no extra stroke or ring on top.
+        .coreGlass(radius: radius, interactive: false, tinted: false)
         .overlay {
-            coreShape(radius).inset(by: -Space.s1 / 2).strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2)
-                .opacity(focus.wrappedValue == item.id ? 1 : 0).allowsHitTesting(false)
+            coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)).allowsHitTesting(false)
         }
         .shadow(color: .black.opacity(lifting ? 0.42 : 0.28), radius: lifting ? 35 : 22, y: lifting ? 17 : 9)
         .scaleEffect(lifting && !reduce ? 1.025 : 1)

@@ -3,8 +3,10 @@ import SwiftUI
 extension View {
     /// Clear glass control: system Liquid Glass on macOS 26 / iOS 26, regular material below, both tinted with the
     /// theme's deep-blue glass (the prototype's day theme is deep glass, not pale). Never put it on a `corePanel`.
-    public func coreGlass(radius: CGFloat = Radius.control, interactive: Bool = true) -> some View {
-        modifier(GlassModifier(radius: radius, interactive: interactive))
+    /// `tinted: false` is Apple's own regular glass with only a breath of the theme blue: the sky shows through (widgets).
+    public func coreGlass(radius: CGFloat = Radius.control, interactive: Bool = true, tinted: Bool = true) -> some View
+    {
+        modifier(GlassModifier(radius: radius, interactive: interactive, tinted: tinted))
     }
 
     /// Regular material panel: the content surface. Material only, never glass.
@@ -54,10 +56,11 @@ private struct GlassModifier: ViewModifier {
     @Environment(\.corePalette) private var palette
     let radius: CGFloat
     let interactive: Bool
+    let tinted: Bool
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if #available(macOS 26, iOS 26, *) {
-            let glass = Glass.regular.tint(palette.glassTint)
+            let glass = Glass.regular.tint(tinted ? palette.glassTint : palette.glassTint.opacity(0.25))
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
         } else {
