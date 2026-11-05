@@ -147,6 +147,17 @@ struct StepUpSheet: View {
                     .overlay { coreShape(Radius.cardMac + 6).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                     .frame(width: 112, height: 112)
                     .shadow(color: hue.opacity(0.6), radius: done ? 30 : 18)
+                // A light sweep across the tile while it waits, under the Touch ID view: Apple's view cancels when anything
+                // covers it.
+                if !done && !missed && !reduce {
+                    LinearGradient(colors: [.clear, .white.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(width: 112, height: 26)
+                        .offset(y: sweep ? 46 : -46)
+                        .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: sweep)
+                        .clipShape(coreShape(Radius.cardMac + 6))
+                        .frame(width: 112, height: 112)
+                        .allowsHitTesting(false)
+                }
                 Group {
                     if done {
                         CheckMark().trim(from: 0, to: drawn)
@@ -160,16 +171,6 @@ struct StepUpSheet: View {
                         // Apple's own Touch ID view, inside this sheet: macOS asks here instead of a second panel.
                         LocalAuthenticationView("Touch ID", context: model.context).frame(width: 72, height: 72)
                     }
-                }
-                // A light sweep across the tile while it waits.
-                if !done && !missed && !reduce {
-                    LinearGradient(colors: [.clear, .white.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(width: 112, height: 26)
-                        .offset(y: sweep ? 46 : -46)
-                        .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: sweep)
-                        .clipShape(coreShape(Radius.cardMac + 6))
-                        .frame(width: 112, height: 112)
-                        .allowsHitTesting(false)
                 }
             }
             .frame(width: 170, height: 170)
@@ -206,7 +207,7 @@ struct StepUpSheet: View {
         .frame(width: Space.s8 * 13)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
-        .coreModalEntrance()
+        // No fade or scale on the way in: Apple's Touch ID view cancels while it is see-through or still sizing.
         .animation(.spring(duration: 0.35), value: model.phase)
         .onAppear {
             ripple = true

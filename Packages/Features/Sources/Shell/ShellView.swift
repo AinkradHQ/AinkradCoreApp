@@ -140,7 +140,8 @@ public struct ShellView: View {
             d.content
         }
         .id("\(id)-\(d.id)")
-        .transition(.opacity)
+        // The Touch ID sheet arrives at once: Apple's embedded Touch ID view cancels while it is see-through.
+        .transition(d.id == "step-up" ? .identity : .opacity)
     }
 
     static let scrim = Color(red: 3 / 255, green: 8 / 255, blue: 20 / 255).opacity(0.52)
