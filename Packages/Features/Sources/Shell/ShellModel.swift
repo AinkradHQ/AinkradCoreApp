@@ -102,9 +102,12 @@ public enum ShellOverlay: Hashable, Sendable { case settings, shortcuts }
 @MainActor @Observable
 public final class ShellModel {
     public var surface: ShellSurface = .home
+    /// The open panes, in reading order of the tiling tree.
     public private(set) var panes: [PaneSpec] = []
-    /// Each pane's share of the row; equal until a seam is dragged (`tiles.js` re-equalises on open and close).
-    public private(set) var paneFractions: [CGFloat] = []
+    /// How the open panes are tiled (`tiles.js`): an N-ary split tree, equal columns until a seam is dragged or a pane is dropped.
+    private(set) var tree = TileTree()
+    /// Panes closed from the head, the menu or the keyboard, newest last (⇧⌘T brings the last one back). They keep running.
+    public private(set) var closedPanes: [PaneSpec] = []
     /// Focus mode shows this one pane full size.
     public var focusedPane: String?
     /// The pane the keyboard acts on (⌃⌥← / →, ⌘W).
@@ -121,9 +124,16 @@ public final class ShellModel {
     static let layoutKey = "ainkrad.core.home.widgets"
     public var editingWidgets = false
     public var addingWidget = false
+    /// What the launcher starts with when it opens (a hand-off from a command that opens it with a search; cleared on use).
+    public var launcherQuery = ""
     #if DEBUG
     /// Snapshots only: draws the second Quick actions tile in its hover state.
     public var debugForceQuickHover = false
+    /// Snapshots only: drops a pane on the edge of another, as a drag would.
+    public func debugDrop(_ id: String, on target: String, edge: String) {
+        let e: TileEdge = edge == "left" ? .left : edge == "right" ? .right : edge == "top" ? .top : .bottom
+        dropPane(id, on: target, edge: e)
+    }
     #endif
     public var coreLink: CoreLink = .none {
         didSet { if oldValue == .live && coreLink != .live { lastLiveAt = Date() } }
@@ -135,7 +145,21 @@ public final class ShellModel {
     /// Retry for the connection banner and the Home Core button when the Core is unreachable.
     public var retryConnection: (@MainActor () -> Void)?
     /// When the session's Touch ID elevation ends; nil when locked.
-    public var elevatedUntil: Date?
+    public var elevatedUntil: Date? {
+        didSet {
+            // The meter shrinks over whatever the Core granted this time (it is 5 minutes today).
+            if let u = elevatedUntil, u != oldValue { elevationSpan = max(u.timeIntervalSinceNow, 1) }
+            if elevatedUntil == nil { elevationPanelOpen = false }
+        }
+    }
+    public private(set) var elevationSpan: TimeInterval = 300
+    /// The panel under the elevation chip (what is unlocked, time left, Renew with Touch ID).
+    public var elevationPanelOpen = false
+    /// Settings → Activity: the "N running · M waiting" chip in the status cluster. The bell is always there.
+    public var showActivityChip = true {
+        didSet { defaults.set(showActivityChip, forKey: Self.activityChipKey) }
+    }
+    static let activityChipKey = "ainkrad.core.activity.statusChip"
     /// The elevation chip: asks for Touch ID.
     public var elevate: (@MainActor () -> Void)?
     public var dialog: ShellDialog?
@@ -156,8 +180,27 @@ public final class ShellModel {
         self.defaults = defaults
         profile = UserProfile(defaults: defaults)
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
+        showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
+        // Follow the sun changes sides at 07:00 and 18:00: look again every minute.
+        Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self else { return }
+                if self.theme == .sun { NSApp.appearance = self.theme.appearance }
+            }
+        }
+        launcher.register(
+            LauncherEntry(
+                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
+                symbol: "gearshape", keywords: ["preferences", "appearance", "activity"], tile: .slate
+            ) { [weak self] in self?.open(.settings) })
+        launcher.register(
+            LauncherEntry(
+                id: "shortcuts", title: "Keyboard Shortcuts", sub: "every key the app answers to",
+                symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
+            ) { [weak self] in self?.open(.shortcuts) })
         launcher.register(
             LauncherEntry(
                 id: "widgets.add", title: "Add Widget…", sub: "Put a widget on Home", symbol: "plus",
@@ -186,7 +229,7 @@ public final class ShellModel {
                 if focusedPane != nil { focusedPane = spec.id }
             } else {
                 panes.append(spec)
-                equalise()
+                tree.open(spec.id)
                 focusedPane = nil
             }
             activePane = spec.id
@@ -194,20 +237,40 @@ public final class ShellModel {
         }
     }
 
+    /// Closes a pane without a trace (a feature closing its own pane). People closing a pane use `dismissPane`.
     public func closePane(_ id: String) {
         guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
         animate {
             panes.remove(at: i)
-            equalise()
+            tree.remove(id)
             if focusedPane == id { focusedPane = panes.first?.id }
             if activePane == id { activePane = panes.isEmpty ? nil : panes[min(i, panes.count - 1)].id }
             if panes.isEmpty { focusedPane = nil }
         }
     }
 
+    /// A person closing a pane: it keeps running, a toast offers Undo and ⇧⌘T reopens it (ten deep).
+    public func dismissPane(_ id: String) {
+        guard let spec = panes.first(where: { $0.id == id }) else { return }
+        closePane(id)
+        closedPanes.append(spec)
+        if closedPanes.count > 10 { closedPanes.removeFirst() }
+        showToast("Closed \(spec.title). It keeps running.", kind: .info) { [weak self] in self?.reopenClosedPane() }
+    }
+
+    public func reopenClosedPane() {
+        guard let spec = closedPanes.popLast() else { return showToast("No closed pane to reopen.", kind: .info) }
+        openPane(spec)
+    }
+
+    public func closeOtherPanes(except id: String) {
+        for other in panes.map(\.id) where other != id { closePane(other) }
+    }
+
     public func closeAllPanes() {
         animate {
             panes = []
+            tree = TileTree()
             focusedPane = nil
             activePane = nil
         }
@@ -220,29 +283,41 @@ public final class ShellModel {
         if let chip { panes[i].chip = chip }
     }
 
-    /// Moves a pane to a column index (drag to reorder, ⌃⌥← / →).
+    /// Moves a pane to a place in reading order (drag to reorder, ⌃⌥← / →).
     public func movePane(_ id: String, to index: Int) {
-        guard let from = panes.firstIndex(where: { $0.id == id }) else { return }
+        guard let from = tree.leaves.firstIndex(of: id) else { return }
         let to = min(max(index, 0), panes.count - 1)
-        guard to != from else { return }
-        animate { panes.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to) }
+        animate {
+            var step = to - from
+            while step != 0, tree.move(id, step: step > 0 ? 1 : -1) { step += step > 0 ? -1 : 1 }
+            syncOrder()
+        }
     }
 
-    /// Seam drag: moves the boundary between pane `i` and `i + 1`; `left` is the new fraction of pane `i`, the pair keeps its total.
-    public func setSeam(_ i: Int, leftFraction left: CGFloat) {
-        guard paneFractions.indices.contains(i + 1) else { return }
-        let pair = paneFractions[i] + paneFractions[i + 1]
-        paneFractions[i] = left
-        paneFractions[i + 1] = pair - left
+    /// A pane dropped on the near half of another: it joins that row or column, or wraps the target in a 50/50 split.
+    func dropPane(_ id: String, on target: String, edge: TileEdge) {
+        animate {
+            tree.drop(id, on: target, edge: edge)
+            syncOrder()
+        }
     }
 
-    private func equalise() {
-        paneFractions = panes.isEmpty ? [] : Array(repeating: 1 / CGFloat(panes.count), count: panes.count)
+    /// Seam drag (`position` along the split's axis from its origin). Not animated: it follows the pointer.
+    func resizeSeam(_ seam: TileSeam, gap: CGFloat, position: CGFloat) {
+        tree.resize(seam, gap: gap, position: position)
+    }
+
+    private func syncOrder() {
+        let order = tree.leaves
+        panes.sort { (order.firstIndex(of: $0.id) ?? 0) < (order.firstIndex(of: $1.id) ?? 0) }
     }
 
     public func nudgeActivePane(_ step: Int) {
-        guard let id = activePane, let i = panes.firstIndex(where: { $0.id == id }) else { return }
-        movePane(id, to: i + step)
+        guard let id = activePane else { return }
+        animate {
+            tree.move(id, step: step)
+            syncOrder()
+        }
     }
 
     public func cyclePane(_ step: Int) {
@@ -270,11 +345,13 @@ public final class ShellModel {
 
     public func toggleLauncher() {
         bellOpen = false
+        elevationPanelOpen = false
         launcherOpen.toggle()
     }
 
     public func toggleBell() {
         launcherOpen = false
+        elevationPanelOpen = false
         bellOpen.toggle()
     }
 
@@ -287,10 +364,14 @@ public final class ShellModel {
     /// Esc: closes the topmost thing. Returns false when there was nothing to close.
     @discardableResult
     public func closeTopmost() -> Bool {
-        if let top = topDialog {
+        if sheet != nil {
+            sheet = nil
+        } else if let top = topDialog {
             if top.dismissible { closeTopDialog() }
         } else if let dialog {
             if dialog.dismissible { closeDialog() }
+        } else if elevationPanelOpen {
+            elevationPanelOpen = false
         } else if launcherOpen {
             launcherOpen = false
         } else if bellOpen {
@@ -308,7 +389,10 @@ public final class ShellModel {
     }
 
     /// Anything the shell shows over Home or the workspace.
-    public var coverOpen: Bool { launcherOpen || bellOpen || overlay != nil || dialog != nil || topDialog != nil }
+    public var coverOpen: Bool {
+        sheet != nil || launcherOpen || elevationPanelOpen || bellOpen || overlay != nil || dialog != nil
+            || topDialog != nil
+    }
 
     public func present(_ d: ShellDialog) {
         launcherOpen = false
@@ -330,8 +414,10 @@ public final class ShellModel {
         d.onClose()
     }
 
-    public func showToast(_ message: String, undo: (@Sendable @MainActor () -> Void)? = nil) {
-        toast = ToastItem(message, undo: undo)
+    public func showToast(
+        _ message: String, kind: ToastKind = .ok, undo: (@Sendable @MainActor () -> Void)? = nil
+    ) {
+        toast = ToastItem(message, kind: kind, undo: undo)
     }
 
     public func presentSheet(title: String, message: String, actions: [ShellSheetAction]) {

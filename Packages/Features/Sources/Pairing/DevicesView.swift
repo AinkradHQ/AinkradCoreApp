@@ -165,14 +165,13 @@ private struct DeviceCard: View {
                     }
                     Spacer(minLength: 0)
                 }
-                HStack(spacing: Space.s1) {
+                HStack(spacing: Space.s2) {
                     Chip(text: device.kind)
-                    Chip(text: device.keyStorage ?? "not reported", tint: device.keyStorage == "software" ? .warn : nil)
+                    KeyStorageLabel(storage: device.keyStorage)
                     if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
                 }
                 AccessChips(scopes: device.scopes)
-                Text("Last seen \(DeviceWords.seen(device.lastUsed))").font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(palette.text2)
+                LastSeenLine(lastUsed: device.lastUsed)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Space.s3)
@@ -189,6 +188,45 @@ private struct DeviceCard: View {
             "\(device.name), \(me ? "This Mac, " : "")\(DeviceWords.kind(device.kind)), \(device.keyStorage ?? "storage not reported"), \(device.scopes.joined(separator: ", ")), last seen \(DeviceWords.seen(device.lastUsed))"
         )
         .accessibilityHint("Opens this device's page")
+    }
+}
+
+/// Where the key lives: a shield for the Secure Enclave, an amber warning for software. What the device reported, not verified.
+struct KeyStorageLabel: View {
+    let storage: String?
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        let software = storage == "software"
+        Label {
+            Text(storage.map { $0 == "secure_enclave" ? "Secure Enclave" : $0 } ?? "not reported")
+        } icon: {
+            Image(systemName: software ? "exclamationmark.triangle" : "checkmark.shield")
+        }
+        .font(.system(size: MacTextSize.meta))
+        .foregroundStyle(software ? palette.tone(.warn).ink : palette.text2)
+        .lineLimit(1)
+    }
+}
+
+/// "Active now" with a quiet pulse while the device was seen in the last minute, else "Last seen 3 days ago".
+struct LastSeenLine: View {
+    let lastUsed: Date?
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var on = false
+    var body: some View {
+        let fresh = lastUsed.map { Date().timeIntervalSince($0) < 60 } ?? false
+        HStack(spacing: Space.s1) {
+            if fresh {
+                coreShape(2).fill(palette.tone(.done).ink).frame(width: 7, height: 7)
+                    .opacity(on && !reduce ? 0.35 : 1)
+                    .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: on)
+                    .onAppear { on = true }
+                    .accessibilityHidden(true)
+            }
+            Text(fresh ? "Active now" : "Last seen \(DeviceWords.seen(lastUsed))")
+        }
+        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
     }
 }
 
@@ -223,6 +261,45 @@ struct AccessChips: View {
     }
 }
 
+/// Rename in place: a field with Save and Cancel. A Touch ID that does not go through leaves the edit where it is.
+private struct InlineRename: View {
+    let app: AppModel
+    let device: DeviceInfo
+    @State private var name: String
+
+    init(app: AppModel, device: DeviceInfo) {
+        self.app = app
+        self.device = device
+        _name = State(initialValue: device.name)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            CoreTextField("Name", placeholder: "1 to 64 characters", text: $name, autofocus: true) { go() }
+            StepUpBanner(app: app)
+            ErrorLine(text: app.devices.dialogError)
+            HStack(spacing: Space.s2) {
+                Button("Save") { go() }.buttonStyle(CoreButtonStyle(.prominent, busy: app.devices.busy))
+                    .disabled(name.isEmpty || name == device.name).keyboardShortcut(.defaultAction)
+                Button("Cancel") { stop() }.buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+            }
+        }
+        .onAppear {
+            app.devices.dialogError = nil
+            app.stepUpNotice = nil
+        }
+    }
+
+    private func go() {
+        Task { if await app.devices.rename(device, to: name) { stop() } }
+    }
+
+    private func stop() {
+        app.stepUpNotice = nil
+        app.devices.renaming = false
+    }
+}
+
 /// One device's page: Device, Keys, Access, Revoke. Back returns to the list.
 struct DeviceDetail: View {
     let app: AppModel
@@ -236,7 +313,7 @@ struct DeviceDetail: View {
                 Button {
                     app.devices.detailID = nil
                 } label: {
-                    Label("Devices", systemImage: "chevron.left")
+                    Label("All devices", systemImage: "chevron.left")
                 }
                 .buttonStyle(.coreSecondary).keyboardShortcut(.leftArrow, modifiers: .command)
                 .accessibilityLabel("Back to Devices")
@@ -248,12 +325,16 @@ struct DeviceDetail: View {
                 if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
                 if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
             }
-            section("Device") {
-                HStack {
-                    FactRow(key: "Name", value: device.name)
-                    if !device.revoked {
-                        Button("Rename…") { present("rename", RenameDialog(app: app, device: device)) }
-                            .buttonStyle(.coreSecondary)
+            Text("\(device.kind) · \(DeviceWords.platform(device.platform))").foregroundStyle(palette.text2)
+            section("Device", "Who it is, as it told the Core.") {
+                if app.devices.renaming {
+                    InlineRename(app: app, device: device)
+                } else {
+                    HStack {
+                        FactRow(key: "Name", value: device.name)
+                        if !device.revoked {
+                            Button("Rename…") { app.devices.renaming = true }.buttonStyle(.coreSecondary)
+                        }
                     }
                 }
                 FactRow(key: "Kind", value: device.kind, mono: true)
@@ -263,7 +344,7 @@ struct DeviceDetail: View {
                 FactRow(key: "Last seen", value: DeviceWords.seen(device.lastUsed))
                 FactRow(key: "Status", value: device.status)
             }
-            section("Keys") {
+            section("Keys", "Generated on the device. The Core only holds the public halves.") {
                 FactRow(key: "Key storage", value: DeviceWords.storage(device.keyStorage))
                 FactRow(
                     key: "Step-up key",
@@ -273,7 +354,7 @@ struct DeviceDetail: View {
                         ?? "Not reported")
                 if let fp = device.fingerprint { FactRow(key: "Fingerprint", value: fp, mono: true) }
             }
-            section("Access") {
+            section("Access", "What it may do. You can only narrow it. To give more, pair it again.") {
                 Text(
                     device.scopes.isEmpty
                         ? "No scopes." : device.scopes.map { "\($0): \(ScopeText.text($0))" }.joined(separator: "\n")
@@ -285,7 +366,7 @@ struct DeviceDetail: View {
                 }
             }
             if !device.revoked {
-                section("Revoke") {
+                section("Revoke", "Signs it out at once. It has to pair again to come back.") {
                     Text(
                         me
                             ? "Revoking this Mac signs it out at once and returns it to Connect to a Core. It must be paired again."
@@ -301,10 +382,13 @@ struct DeviceDetail: View {
         .accessibilityIdentifier("device-detail")
     }
 
-    private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func section<C: View>(_ title: String, _ sub: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(palette.text2)
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            }
             FactCard { content() }
         }
     }

@@ -86,8 +86,21 @@ extension AppModel {
 
     public func debugOpenRename(named name: String) {
         guard let d = devices.items.first(where: { $0.name == name }) else { return }
-        shell.present(ShellDialog(id: "rename") { RenameDialog(app: self, device: d) })
+        devices.detailID = d.id
+        devices.renaming = true
     }
+
+    /// The Access dialog (`kind: "scopes"`) or the Revoke dialog of a device, for screenshots.
+    public func debugOpenDialog(_ kind: String, named name: String) {
+        guard let d = devices.items.first(where: { $0.name == name }) else { return }
+        devices.detailID = d.id
+        shell.present(
+            ShellDialog(id: kind) {
+                if kind == "scopes" { ScopesDialog(app: self, device: d) } else { RevokeDialog(app: self, device: d) }
+            })
+    }
+
+    public func debugSampleLockouts() { lockouts.debugSample() }
 
     public func debugCloseStepUp() { shell.closeTopDialog() }
 
@@ -143,7 +156,15 @@ extension AppModel {
         case .ended?: "ended"
         }
     }
-    public func debugApproveAddDevice() async { await addDevice?.approve() }
+    /// Types the check code the second device shows, as the approver does, then approves. `half` types the first two groups only.
+    public func debugTypeAddDeviceCheck(half: Bool = false) {
+        guard let sas = addDevice?.checkCode else { return }
+        addDevice?.typed = half ? sas.split(separator: "-").prefix(2).joined(separator: "-") : sas
+    }
+    public func debugApproveAddDevice() async {
+        debugTypeAddDeviceCheck()
+        await addDevice?.approve()
+    }
     public func debugCloseDialog() { shell.closeDialog() }
     /// Snapshots: leave a first-run scene for the (sample) desktop.
     public func debugShowDesktop() { phase = .desktop }

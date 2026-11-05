@@ -209,8 +209,23 @@ struct AppModelTests {
             return
         }
         #expect(info.sas == "AAAA-BBBB-CCCC-DDDD")
+        // Approving needs the check code typed from the new device's screen, every group of it.
+        await add.approve()
+        if case .claimed = add.stage {} else { Issue.record("approved without the typed check code") }
+        add.typed = "aaaa bbbb"
+        #expect(add.typed == "AAAA-BBBB" && add.groupsMatching == 2 && !add.checkMatches && !add.checkMismatch)
+        add.typed = "aaaa-bbbx-"
+        #expect(add.groupsMatching == 1 && add.checkMismatch)
+        add.typed = "AAAA-BBBB-CCCC-DDDD-EEEE"
+        #expect(add.typed == "AAAA-BBBB-CCCC-DDDD" && add.checkMatches)
         await add.approve()
         if case .approved = add.stage {} else { Issue.record("not approved") }
+    }
+
+    @Test func lockMeterMeasuresAgainstTheNextLengthUp() {
+        #expect(LockMeter.total(40) == 60 && LockMeter.total(61) == 120 && LockMeter.total(3000) == 3600)
+        #expect(LockMeter.total(5000) == 5000 && LockMeter.total(0) == 60)
+        #expect(Countdown.text(272) == "4:32" && Countdown.text(8) == "0:08")
     }
 
     @Test func aRefusedScopeIsExplainedAndTakenBackNotShownAsABareError() async throws {

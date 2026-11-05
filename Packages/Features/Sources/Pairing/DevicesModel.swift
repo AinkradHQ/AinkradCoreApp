@@ -34,7 +34,9 @@ final class DevicesModel {
     private(set) var busy = false
     var filter: DeviceFilter = .all
     /// The device whose page is open (nil: the list).
-    var detailID: String?
+    var detailID: String? { didSet { renaming = false } }
+    /// The name field on the device page is open (rename is inline, as in the prototype).
+    var renaming = false
     private weak var host: AppModel?
 
     init(host: AppModel) { self.host = host }
@@ -149,6 +151,18 @@ final class DevicesModel {
 @MainActor @Observable
 final class LockoutsModel {
     private(set) var items: [LockoutInfo] = []
+    private var sampled = false
+    #if DEBUG
+    /// Snapshots only: two locks with time left, when the throwaway Core did not lock anything.
+    func debugSample() {
+        sampled = true
+        items = [
+            LockoutInfo(key: "ip:203.0.113.77", lockedUntil: Date().addingTimeInterval(252), strikes: 2),
+            LockoutInfo(key: "ipdev:198.51.100.4:dev_9c41", lockedUntil: Date().addingTimeInterval(41), strikes: 1),
+        ]
+        load = .ready
+    }
+    #endif
     private(set) var load: LoadState = .idle
     private(set) var clearing: String?
     private weak var host: AppModel?
@@ -156,6 +170,7 @@ final class LockoutsModel {
     init(host: AppModel) { self.host = host }
 
     func reload() async {
+        guard !sampled else { return }
         guard let service = host?.service else {
             load = .idle
             return

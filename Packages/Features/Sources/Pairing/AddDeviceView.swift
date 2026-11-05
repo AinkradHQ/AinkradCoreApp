@@ -1,5 +1,6 @@
 import AppKit
 import CoreUI
+import Shell
 import SwiftUI
 
 struct AddDeviceView: View {
@@ -9,7 +10,7 @@ struct AddDeviceView: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        DialogCard(title: title, width: Space.s8 * 16) {
+        DialogCard(title: title, width: Space.s8 * 16, close: close) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 switch model.stage {
                 case .form, .creating: form
@@ -38,11 +39,13 @@ struct AddDeviceView: View {
 
     private var title: String {
         switch model.stage {
-        case .form, .creating: "Add device"
+        case .form, .creating: "Add a device"
         case .code: "Pair a new device"
         case .claimed: "A device wants to join"
         case .approved: "Device paired"
-        case .ended: "Pairing ended"
+        case .ended(let why):
+            why == "rejected"
+                ? "Pairing rejected" : why == "burned" ? "Every live pairing was cancelled" : "The pairing expired"
         }
     }
 
@@ -50,7 +53,7 @@ struct AddDeviceView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Name the device, choose what it may do, and you get a code that lasts 5 minutes.")
+            Text("This Mac creates a one-time code. Whoever enters it still needs your approval.")
                 .foregroundStyle(palette.text2)
             CoreTextField("Device name", placeholder: "iPhone, linux-01…", text: $model.name, autofocus: true) {
                 Task { await model.create() }
@@ -59,7 +62,9 @@ struct AddDeviceView: View {
                 "Kind", segments: [CoreSegment("device", "Device"), CoreSegment("runner", "Runner")],
                 selection: $model.kind)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text("It may").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+                Text("Access narrowed from your own. You can only give less.").font(
+                    .system(size: MacTextSize.meta, weight: .semibold)
+                ).foregroundStyle(palette.text2)
                 if model.kind == "runner" {
                     Text("A runner holds exactly runner: it only redeems secret leases.").foregroundStyle(palette.text2)
                 } else {
@@ -75,9 +80,11 @@ struct AddDeviceView: View {
                 }
             }
             HStack(spacing: Space.s2) {
+                Text("Lasts 5 minutes · single use").font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
                 Button("Cancel", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
-                Button("Make code") { Task { await model.create() } }
+                Button("Create pairing") { Task { await model.create() } }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.stage == .creating))
                     .keyboardShortcut(.defaultAction).disabled(!model.canCreate)
             }
@@ -92,13 +99,17 @@ struct AddDeviceView: View {
                 .foregroundStyle(palette.text2)
             HStack(alignment: .top, spacing: Space.s5) {
                 VStack(alignment: .leading, spacing: Space.s3) {
-                    Text(Self.shown(p.code)).font(
-                        .system(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced)
-                    )
-                    .textSelection(.enabled).accessibilityElement(children: .ignore).accessibilityLabel(
-                        "Pairing code \(p.code.map { String($0) }.joined(separator: " "))"
-                    )
-                    .accessibilityIdentifier("pairing-code")
+                    Text("Type this code on the new device").font(.system(size: MacTextSize.meta, weight: .semibold))
+                        .foregroundStyle(palette.text2)
+                    CodeCells(code: Self.shown(p.code))
+                    if let fp = app.coreFingerprint {
+                        VStack(alignment: .leading, spacing: Space.s1) {
+                            Text("Core fingerprint").font(.system(size: MacTextSize.meta, weight: .semibold))
+                                .foregroundStyle(palette.text2)
+                            Text(String(fp.prefix(24)) + "…")
+                                .font(.system(size: MacTextSize.body, design: .monospaced)).textSelection(.enabled)
+                        }
+                    }
                     expiry(p)
                     HStack(spacing: Space.s2) {
                         Button("Copy code") { copy(p.code) }.buttonStyle(.coreSecondary)
@@ -120,15 +131,20 @@ struct AddDeviceView: View {
         }
     }
 
+    /// Time left as words and a bar that shrinks; amber in the last minute.
     private func expiry(_ p: NewPairing) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let left = max(0, Int((p.expiresAt ?? ctx.date).timeIntervalSince(ctx.date).rounded(.up)))
-            HStack(spacing: Space.s2) {
-                Image(systemName: "clock").accessibilityHidden(true)
-                Text(left > 0 ? "Expires in \(left / 60):\(String(format: "%02d", left % 60))" : "Expired")
-                    .font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
+            let soon = left <= 60
+            VStack(alignment: .leading, spacing: Space.s1) {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: soon ? "exclamationmark.triangle" : "clock").accessibilityHidden(true)
+                    Text(left > 0 ? "Expires in \(Countdown.text(left))" : "Expired")
+                        .font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
+                }
+                .foregroundStyle(soon ? palette.tone(.warn).ink : palette.text2)
+                CoreMeter(Double(left) / 300, low: soon, label: "Code time left")
             }
-            .foregroundStyle(left > 0 ? palette.text2 : palette.tone(.warn).ink)
         }
     }
 
@@ -136,23 +152,63 @@ struct AddDeviceView: View {
 
     private func claimed(_ info: PairingInfo) -> some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(
-                "Compare this with the check code on the new device's screen. Approve only if every character matches."
-            )
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            Text("Check the details, then compare the code with the one on the new device.")
+                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             FactCard {
                 FactRow(key: "Name", value: info.name ?? "Unnamed")
                 FactRow(key: "Platform", value: DeviceWords.platform(info.platform))
                 FactRow(key: "Key storage", value: DeviceWords.storage(info.keyStorage))
-                FactRow(key: "May", value: info.scopes.joined(separator: ", "), mono: true)
+                FactRow(key: "Will get", value: info.scopes.joined(separator: ", "), mono: true)
+                if let until = info.expiresAt {
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
+                        FactRow(key: "Expires in", value: Countdown.text(left), mono: true)
+                    }
+                }
             }
-            if let sas = info.sas { SASView(sas: sas) }
+            Text("The Core computed this code. The new device must show the same one.")
+                .foregroundStyle(palette.text2)
+            if let sas = info.sas { SASView(sas: sas, matched: model.groupsMatching) }
+            checkProgress
+            CoreTextField(
+                "Type it here to confirm they match", placeholder: "XXXX-XXXX-XXXX-XXXX", text: $model.typed,
+                mono: true, autofocus: true
+            ) {
+                if model.checkMatches { Task { await model.approve() } }
+            }
+            .accessibilityIdentifier("check-code-field")
+            Text("Typing it proves you looked at this device's own screen.")
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
                 Button("Reject") { Task { await model.reject() } }.buttonStyle(.coreSecondary).disabled(model.busy)
-                Button("It matches, approve") { Task { await model.approve() } }
+                Button("Approve") { Task { await model.approve() } }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.busy)).keyboardShortcut(.defaultAction)
+                    .disabled(!model.checkMatches)
             }
+        }
+    }
+
+    /// What the typing says so far, in words and a symbol: groups matched, the next one, or a mismatch.
+    @ViewBuilder private var checkProgress: some View {
+        let n = model.groupsMatching
+        let total = model.groupCount
+        if model.checkMismatch {
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Label("That doesn't match", systemImage: "xmark.octagon").fontWeight(.semibold)
+                Text("The device stays pending. Read the new device's screen again and retype it, or reject it.")
+                    .foregroundStyle(palette.text2)
+            }
+            .foregroundStyle(palette.tone(.fail).ink)
+        } else if model.checkMatches {
+            Label("All \(total) groups match.", systemImage: "checkmark.circle")
+                .foregroundStyle(palette.tone(.done).ink)
+        } else {
+            Label(
+                n == 0 ? "Type group 1 of \(total)." : "\(n) of \(total) groups match, now group \(n + 1).",
+                systemImage: "keyboard"
+            )
+            .foregroundStyle(palette.text2)
         }
     }
 
@@ -180,7 +236,9 @@ struct AddDeviceView: View {
             .foregroundStyle(palette.text2)
             HStack {
                 Spacer()
-                Button("Close", action: close).buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                Button("Close", action: close).buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+                Button("Create a new pairing") { model.restart() }.buttonStyle(.coreProminent)
+                    .keyboardShortcut(.defaultAction)
             }
         }
     }
@@ -192,5 +250,37 @@ struct AddDeviceView: View {
     private func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+/// The pairing code as ten cells in two groups. Each settles in 50 ms after the one before; Reduce Motion shows them at once.
+private struct CodeCells: View {
+    let code: String
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var settled = false
+
+    var body: some View {
+        HStack(spacing: Space.s1) {
+            ForEach(Array(code.enumerated()), id: \.offset) { i, ch in
+                if ch == "-" {
+                    Spacer().frame(width: Space.s2)
+                } else {
+                    Text(String(ch))
+                        .font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
+                        .frame(width: MacSize.controlLg, height: MacSize.controlLg + Space.s3)
+                        .background(palette.glassCard, in: coreShape(Radius.control))
+                        .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+                        .opacity(settled || reduce ? 1 : 0)
+                        .offset(y: settled || reduce ? 0 : 6)
+                        .animation(Motion.out(Motion.ui).delay(Double(i) * 0.05), value: settled)
+                }
+            }
+        }
+        .onAppear { settled = true }
+        .textSelection(.enabled)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pairing code \(code.filter { $0 != "-" }.map { String($0) }.joined(separator: " "))")
+        .accessibilityIdentifier("pairing-code")
     }
 }

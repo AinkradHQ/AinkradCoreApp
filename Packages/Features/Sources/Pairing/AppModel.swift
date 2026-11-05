@@ -283,6 +283,9 @@ public final class AppModel {
 
     // MARK: elevation
 
+    /// The Core's key fingerprint this Mac paired with, for the new device to compare against.
+    var coreFingerprint: String? { (try? keyStore.loadIdentity())??.coreFingerprint }
+
     var isElevated: Bool { shell.elevatedUntil.map { $0 > Date() } ?? false }
 
     /// Touch ID, through the one sheet, shown only while the system prompt is up. True when the session is elevated (it may have
@@ -296,9 +299,16 @@ public final class AppModel {
         defer { shell.closeTopDialog() }
         do {
             setElevated(try await service.stepUp(reason: reason))
+            stepUp.set(.done)
+            try? await Task.sleep(for: .milliseconds(450))  // the tick, before the sheet leaves
             return true
         } catch {
-            stepUpNotice = StepUpNotice(phase: StepUpPhase.from(error), done: done, keepsEdit: keepsEdit)
+            let phase = StepUpPhase.from(error)
+            stepUpNotice = StepUpNotice(phase: phase, done: done, keepsEdit: keepsEdit)
+            if case .failed = phase {
+                stepUp.set(phase)
+                try? await Task.sleep(for: .milliseconds(600))  // the shake
+            }
             return false
         }
     }
@@ -310,6 +320,7 @@ public final class AppModel {
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
             guard !Task.isCancelled, let self, self.shell.elevatedUntil == until else { return }
             self.shell.elevatedUntil = nil
+            self.shell.showToast("Admin actions locked again. The next one asks for Touch ID.", kind: .warn)
         }
     }
 
@@ -322,6 +333,7 @@ public final class AppModel {
         do { return try await op() } catch {
             guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
             shell.elevatedUntil = nil
+            shell.showToast("The Core answered 403 step_up_required. Asking for Touch ID, then retrying.", kind: .warn)
             guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true) else {
                 throw StepUpDeclined()
             }

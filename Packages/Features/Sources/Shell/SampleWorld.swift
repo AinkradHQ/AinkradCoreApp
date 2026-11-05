@@ -105,13 +105,6 @@ public enum SampleWorld {
                 "new-terminal", "New terminal", "Open a shell on a runner · needs Touch ID", "terminal",
                 sample("New terminal")),
             action("add-device", "Add device", "create a one-time pairing code", "plus", sample("Add device")),
-            action("shortcuts", "Keyboard Shortcuts", "keys help commands", "keyboard") { shell.open(.shortcuts) },
-            LauncherEntry(
-                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
-                symbol: "gearshape"
-            ) {
-                shell.open(.settings)
-            },
         ]
     }
 
