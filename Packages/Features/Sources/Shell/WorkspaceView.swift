@@ -12,6 +12,8 @@ struct WorkspaceView: View {
     /// How far the workspace strip is scrolled, so a drag measured on screen lands on the right pane.
     @State private var scrollX: CGFloat = 0
     @State private var scrolling = false
+    /// The pane on top of the stack when the active pane is elsewhere.
+    @State private var stackFront: String?
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -21,10 +23,15 @@ struct WorkspaceView: View {
                 width: geo.size.width - ShellMetrics.paneInset * 2,
                 height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset)
             let mins = Dictionary(uniqueKeysWithValues: shell.panes.map { ($0.id, $0.minWidth) })
-            let layout = shell.tree.layout(
+            let tiled = shell.tree.layout(
                 minWidth: { mins[$0] ?? ShellMetrics.paneMinWidth }, container: area, gap: ShellMetrics.paneGap,
                 minHeight: ShellMetrics.paneMinHeight)
             let focus = shell.focusedPane
+            let stack = Stack.make(
+                order: shell.tree.leaves, tiled: tiled, area: area,
+                minWidth: mins.values.max() ?? ShellMetrics.paneMinWidth,
+                active: shell.activePane, front: stackFront, focused: focus != nil)
+            let layout = stack.layout
             ZStack(alignment: .topLeading) {
                 if shell.panes.isEmpty { empty }
                 // The strip scrolls by its own offset, not a ScrollView: a terminal pane takes every scroll event, so
@@ -32,8 +39,17 @@ struct WorkspaceView: View {
                 let maxX = focus == nil && layout.isStrip ? max(0, layout.contentWidth - area.width) : 0
                 ZStack(alignment: .topLeading) {
                     ZStack(alignment: .topLeading) {
+                        if let slot = stack.slot, stack.hidden.count > 0 {
+                            StackBehind(slot: slot, count: stack.hidden.count)
+                        }
                         ForEach(shell.panes) { spec in
-                            pane(spec, layout: layout, area: area)
+                            pane(spec, layout: layout, area: area, hidden: stack.hidden.contains(spec.id))
+                        }
+                        if let slot = stack.slot, let front = stack.front {
+                            StackBadge(
+                                index: (stack.members.firstIndex(of: front) ?? 0) + 1, count: stack.members.count,
+                                slot: slot
+                            )
                         }
                         if focus == nil {
                             if let drop {
@@ -71,6 +87,7 @@ struct WorkspaceView: View {
                     }
                 }
                 .onChange(of: shell.activePane) { _, id in
+                    if let id, stack.members.contains(id) { stackFront = id }
                     guard maxX > 0, let id, let f = layout.frames[id] else { return }
                     let target =
                         f.minX < scrollX ? f.minX : f.maxX > scrollX + area.width ? f.maxX - area.width : scrollX
@@ -107,9 +124,9 @@ struct WorkspaceView: View {
     }
 
     @ViewBuilder
-    private func pane(_ spec: PaneSpec, layout: TileLayout, area: CGSize) -> some View {
+    private func pane(_ spec: PaneSpec, layout: TileLayout, area: CGSize, hidden: Bool) -> some View {
         let focus = shell.focusedPane
-        let folded = focus != nil && focus != spec.id
+        let folded = (focus != nil && focus != spec.id) || hidden
         let tiled = layout.frames[spec.id] ?? CGRect(origin: .zero, size: area)
         let slot = focus == spec.id ? CGRect(origin: .zero, size: area) : tiled
         let dragging = drag?.id == spec.id
@@ -427,77 +444,6 @@ private struct SeamHandle: View {
 
     private func move(to pointer: CGFloat) {
         shell.resizeSeam(seam, gap: ShellMetrics.paneGap, position: pointer - seam.origin)
-    }
-}
-
-/// Sideways swipes anywhere over the workspace move the strip (the terminal panes eat scroll events, so the window's
-/// events are watched while the strip can scroll). Vertical scrolling is left to the panes.
-private struct StripSwipe: NSViewRepresentable {
-    let enabled: Bool
-    let moved: (CGFloat) -> Void
-    let ended: () -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let v = NSView()
-        context.coordinator.view = v
-        return v
-    }
-
-    func updateNSView(_ v: NSView, context: Context) {
-        context.coordinator.enabled = enabled
-        context.coordinator.moved = moved
-        context.coordinator.ended = ended
-        context.coordinator.listen()
-    }
-
-    static func dismantleNSView(_ v: NSView, coordinator: Coordinator) { coordinator.stop() }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    @MainActor final class Coordinator {
-        weak var view: NSView?
-        var enabled = false
-        var moved: (CGFloat) -> Void = { _ in }
-        var ended: () -> Void = {}
-        private var monitor: Any?
-
-        func listen() {
-            guard monitor == nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] e in
-                guard let self, self.enabled, let v = self.view, e.window === v.window else { return e }
-                let p = v.convert(e.locationInWindow, from: nil)
-                guard v.bounds.contains(p), abs(e.scrollingDeltaX) > abs(e.scrollingDeltaY) else {
-                    if e.phase == .ended || e.momentumPhase == .ended { self.ended() }
-                    return e
-                }
-                self.moved(e.hasPreciseScrollingDeltas ? e.scrollingDeltaX : e.scrollingDeltaX * 12)
-                if e.phase == .ended || e.momentumPhase == .ended { self.ended() }
-                return nil
-            }
-        }
-
-        func stop() {
-            if let monitor { NSEvent.removeMonitor(monitor) }
-            monitor = nil
-        }
-    }
-}
-
-/// Where the strip is: a thin glass bar along the bottom edge.
-private struct StripBar: View {
-    let offset: CGFloat
-    let visible: CGFloat
-    let total: CGFloat
-    var body: some View {
-        GeometryReader { g in
-            let w = max(48, g.size.width * visible / max(total, 1))
-            let x = (g.size.width - w) * offset / max(total - visible, 1)
-            Capsule().fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
-        }
-        .frame(height: 4)
-        .padding(.horizontal, Space.s4).padding(.bottom, 2)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 

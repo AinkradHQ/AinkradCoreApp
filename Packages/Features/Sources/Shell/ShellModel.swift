@@ -139,6 +139,8 @@ public final class ShellModel {
     public var launcherOpen = false
     /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
     public var actionsOpen = false
+    /// ⇧⌘O: every open app as a card to pick from.
+    public var overviewOpen = false
     /// Names the person gave tabs, by pane id; the tab being renamed in place.
     /// Kept on this Mac across launches (pane ids are stable: terminal-<id>, agents, runners…).
     public var tabNames: [String: String] = [:] {
@@ -414,6 +416,8 @@ public final class ShellModel {
             launcherOpen = false
         } else if actionsOpen {
             actionsOpen = false
+        } else if overviewOpen {
+            overviewOpen = false
         } else if bellOpen {
             bellOpen = false
         } else if overlay != nil {
