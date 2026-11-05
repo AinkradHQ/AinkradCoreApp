@@ -33,7 +33,7 @@ struct RunRows: View {
     var body: some View {
         ForEach(runs) { r in
             HStack(spacing: Space.s2) {
-                StatusDot(color: palette.tone(.run).ink)
+                StatusDot(color: palette.tone(.run).ink, live: true)
                 Text(r.tool).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                 Text(r.name).foregroundStyle(palette.text2).lineLimit(1)
                 Spacer(minLength: 0)
@@ -57,27 +57,38 @@ struct TodayBody: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             switch size {
             case .s:
-                WidgetHead(title: "Today")
+                WidgetHead(title: "Today", symbol: "sun.max")
                 WidgetBig(value: "\(waiting)", caption: "waiting", small: true)
                 Spacer(minLength: 0)
                 Text("\(h.runningAgents) running").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             case .m:
-                WidgetHead(title: "Today", sub: "\(h.coreName) · \(h.machinesOnline) of \(h.machines.count) online")
+                WidgetHead(
+                    title: "Today", sub: "\(h.coreName) · \(h.machinesOnline) of \(h.machines.count) online",
+                    symbol: "sun.max")
                 needsCard
                 Spacer(minLength: 0)
             case .t:
-                WidgetHead(title: "Today")
+                WidgetHead(title: "Today", symbol: "sun.max")
                 WidgetLabel("Needs you")
                 WidgetBig(value: "\(waiting)", caption: "waiting", small: true)
                 WidgetLabel("Running")
-                if h.running.isEmpty { WidgetCalm("None.") } else { RunRows(runs: Array(h.running.prefix(3))) }
+                if h.running.isEmpty {
+                    WidgetCalm("None.", symbol: "moon.zzz")
+                } else {
+                    RunRows(runs: Array(h.running.prefix(3)))
+                }
                 Spacer(minLength: 0)
             case .l, .x:
                 WidgetHead(
-                    title: "Today", sub: "\(h.coreName) · \(h.machinesOnline) of \(h.machines.count) machines online")
+                    title: "Today", sub: "\(h.coreName) · \(h.machinesOnline) of \(h.machines.count) machines online",
+                    symbol: "sun.max")
                 needsSection
                 WidgetLabel("Running")
-                if h.running.isEmpty { WidgetCalm("No agents running.") } else { RunRows(runs: h.running) }
+                if h.running.isEmpty {
+                    WidgetCalm("No agents running.", symbol: "moon.zzz")
+                } else {
+                    RunRows(runs: h.running)
+                }
                 if size == .x {
                     WidgetLabel("Machines")
                     ForEach(h.machines) { m in
@@ -103,7 +114,7 @@ struct TodayBody: View {
                 shell.bellOpen = true
             }
         } else {
-            WidgetCalm("Nothing is waiting on you.")
+            WidgetCalm("Nothing is waiting on you.", symbol: "checkmark.seal")
         }
     }
 
@@ -114,7 +125,7 @@ struct TodayBody: View {
                 shell.bellOpen = true
             }
         } else {
-            WidgetCalm("Nothing is waiting on you.")
+            WidgetCalm("Nothing is waiting on you.", symbol: "checkmark.seal")
         }
     }
 }
@@ -127,12 +138,13 @@ struct NeedsBody: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             switch size {
             case .s:
-                WidgetHead(title: "Needs you")
+                WidgetHead(title: "Needs you", symbol: "hand.raised")
                 WidgetBig(value: "\(need.count)", caption: "waiting")
                 Spacer(minLength: 0)
             default:
-                WidgetHead(title: "Needs you", sub: need.isEmpty ? nil : "\(need.count) waiting on you")
-                if need.isEmpty { WidgetCalm("Nothing is waiting on you.") }
+                WidgetHead(
+                    title: "Needs you", sub: need.isEmpty ? nil : "\(need.count) waiting on you", symbol: "hand.raised")
+                if need.isEmpty { WidgetCalm("Nothing is waiting on you.", symbol: "checkmark.seal") }
                 ForEach(Array(need.prefix(size == .m ? 1 : size == .t ? 3 : 4))) { n in
                     WidgetCard(title: n.title, sub: n.sub ?? "Review", compact: size == .m) { shell.bellOpen = true }
                 }
@@ -148,11 +160,11 @@ struct RunningBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             if size == .s {
-                WidgetHead(title: "Running")
+                WidgetHead(title: "Running", symbol: "sparkles")
                 WidgetBig(value: "\(home.runningAgents)", caption: "agents")
             } else {
-                WidgetHead(title: "Running agents", sub: "\(home.runningAgents) working now")
-                if home.running.isEmpty { WidgetCalm("No agents running.") }
+                WidgetHead(title: "Running agents", sub: "\(home.runningAgents) working now", symbol: "sparkles")
+                if home.running.isEmpty { WidgetCalm("No agents running.", symbol: "moon.zzz") }
                 RunRows(runs: Array(home.running.prefix(size == .m ? 2 : 8)))
             }
             Spacer(minLength: 0)
@@ -167,11 +179,11 @@ struct SpendBody: View {
     var body: some View {
         let pct = Int(home.monthTokensUsed * 100)
         VStack(alignment: .leading, spacing: Space.s1) {
-            if size != .s { WidgetHead(title: "Agent spend") }
+            if size != .s { WidgetHead(title: "Agent spend", symbol: "dollarsign.circle") }
             Spacer(minLength: 0)
-            Text(home.spendToday, format: .currency(code: "USD"))
-                .font(.system(size: size == .s ? 28 : 38, weight: .semibold, design: .monospaced)).lineLimit(1)
-                .minimumScaleFactor(0.6)
+            RollingNumber(
+                value: home.spendToday, format: { $0.formatted(.currency(code: "USD")) }, size: size == .s ? 28 : 38,
+                design: .monospaced)
             Text("today").foregroundStyle(palette.text2)
             Meter(value: home.monthTokensUsed).padding(.vertical, Space.s1)
             Text("\(pct)% of month tokens").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
@@ -187,11 +199,16 @@ struct MachinesBody: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            WidgetHead(title: "Machines", sub: "\(home.machinesOnline) of \(home.machines.count) online")
+            WidgetHead(
+                title: "Machines", sub: "\(home.machinesOnline) of \(home.machines.count) online", symbol: "server.rack"
+            )
+            if home.machines.isEmpty {
+                WidgetCalm("No machines yet. A runner shows up here once it pairs.", symbol: "server.rack")
+            }
             ForEach(size == .m ? Array(home.machines.prefix(2)) : home.machines) { m in
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s2) {
-                        StatusDot(color: m.online ? palette.tone(.run).ink : palette.tone(.queue).ink)
+                        StatusDot(color: m.online ? palette.tone(.run).ink : palette.tone(.queue).ink, live: m.online)
                         Text(m.id).font(.system(size: MacTextSize.headline, weight: .semibold))
                         if size == .l {
                             Text(m.os).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
@@ -226,6 +243,9 @@ struct BoardBody: View {
     let board: HomeSnapshot.Board
     let size: WidgetSize
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    /// The bars grow from the floor one after another when the widget arrives.
+    @State private var grown = false
     var body: some View {
         let cols: [(String, Int, Tone?)] = [
             ("Todo", board.todo, nil), ("Doing", board.doing, nil), ("Review", board.review, nil),
@@ -233,23 +253,39 @@ struct BoardBody: View {
         ]
         let top = max(cols.map(\.1).max() ?? 1, 1)
         VStack(alignment: .leading, spacing: Space.s2) {
-            WidgetHead(title: "Citadel board")
+            WidgetHead(title: "Citadel board", symbol: "square.grid.3x3.topleft.filled")
             if size == .s {
                 WidgetBig(value: "\(board.blocked)", caption: "blocked", small: true)
                 Spacer(minLength: 0)
             } else {
                 HStack(alignment: .bottom, spacing: Space.s2) {
-                    ForEach(cols, id: \.0) { name, n, tone in
+                    ForEach(Array(cols.enumerated()), id: \.element.0) { idx, col in
+                        let (name, n, tone) = col
                         VStack(spacing: Space.s1) {
-                            Text("\(n)").font(.system(size: MacTextSize.title, weight: .semibold))
-                                .foregroundStyle(tone.map { palette.tone($0).ink } ?? palette.text)
+                            RollingNumber(
+                                value: Double(n), size: MacTextSize.title,
+                                ink: tone.map { palette.tone($0).ink } ?? palette.text)
                             coreShape(5).fill(palette.track)
                                 .frame(height: (size == .l ? 150 : 34))
                                 .overlay(alignment: .bottom) {
                                     GeometryReader { g in
-                                        coreShape(5).fill(tone.map { palette.tone($0).ink } ?? palette.primary)
-                                            .frame(height: max(6, g.size.height * CGFloat(n) / CGFloat(top)))
+                                        let ink = tone.map { palette.tone($0).ink } ?? palette.primary
+                                        coreShape(5)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [ink, ink.opacity(0.55)], startPoint: .top,
+                                                    endPoint: .bottom)
+                                            )
+                                            .shadow(color: ink.opacity(0.5), radius: 4)
+                                            .frame(
+                                                height: grown ? max(6, g.size.height * CGFloat(n) / CGFloat(top)) : 0
+                                            )
                                             .frame(maxHeight: .infinity, alignment: .bottom)
+                                            .animation(
+                                                reduce
+                                                    ? .easeOut(duration: 0.2)
+                                                    : .spring(duration: 0.7, bounce: 0.3).delay(Double(idx) * 0.08),
+                                                value: grown)
                                     }
                                 }
                             Text(name).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
@@ -261,6 +297,7 @@ struct BoardBody: View {
                 Spacer(minLength: 0)
             }
         }
+        .onAppear { grown = true }
     }
 }
 
@@ -268,13 +305,17 @@ struct EventsBody: View {
     let home: HomeSnapshot
     let size: WidgetSize
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var arrived = false
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            WidgetHead(title: "Recent events")
-            ForEach(Array(home.events.prefix(size == .m ? 2 : 8))) { e in
+            WidgetHead(title: "Recent events", symbol: "clock.arrow.circlepath")
+            if home.events.isEmpty { WidgetCalm("Nothing has happened yet.", symbol: "sparkles") }
+            ForEach(Array(home.events.prefix(size == .m ? 2 : 8).enumerated()), id: \.element.id) { i, e in
                 HStack(alignment: .top, spacing: Space.s2) {
-                    Image(systemName: e.symbol).font(.system(size: MacTextSize.meta))
-                        .frame(width: 22, height: 22).background(palette.uDim, in: coreShape(7))
+                    Image(systemName: e.symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
+                        .foregroundStyle(palette.primary)
+                        .frame(width: 26, height: 26).coreGlass(radius: Radius.control, interactive: false)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(e.text).font(.system(size: MacTextSize.headline, weight: .medium)).lineLimit(
@@ -285,9 +326,11 @@ struct EventsBody: View {
                 }
                 .padding(.vertical, 3)
                 .accessibilityElement(children: .combine)
+                .rise(arrived, i, reduce)
             }
             Spacer(minLength: 0)
         }
+        .onAppear { arrived = true }
     }
 }
 
@@ -306,9 +349,9 @@ struct CoreBody: View {
     var body: some View {
         let alarms = shell.bell.items.filter { $0.kind == .alarm }
         VStack(alignment: .leading, spacing: Space.s2) {
-            WidgetHead(title: "Core health", sub: size == .s ? nil : shell.home.coreName)
+            WidgetHead(title: "Core health", sub: size == .s ? nil : shell.home.coreName, symbol: "heart.text.square")
             HStack(spacing: Space.s2) {
-                StatusDot(color: palette.tone(state.1).ink)
+                StatusDot(color: palette.tone(state.1).ink, live: shell.coreLink == .live)
                 Text(state.0).font(.system(size: size == .s ? 15 : 20, weight: .semibold))
             }
             .padding(.top, Space.s1)
@@ -333,9 +376,9 @@ struct ClockBody: View {
     let size: WidgetSize
     @Environment(\.corePalette) private var palette
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 15)) { ctx in
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
             VStack(alignment: .leading, spacing: Space.s1) {
-                if size == .l { WidgetHead(title: "Clock") }
+                if size == .l { WidgetHead(title: "Clock", symbol: "clock") }
                 Spacer(minLength: 0)
                 if size == .t {
                     Text(ctx.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted))).font(
@@ -351,104 +394,24 @@ struct ClockBody: View {
                     format: size == .s ? .dateTime.weekday(.wide) : .dateTime.weekday(.wide).month(.wide).day()
                 )
                 .foregroundStyle(palette.text2)
+                // The minute filling up, second by second.
+                let sec = Calendar.current.component(.second, from: ctx.date)
+                coreShape(2).fill(palette.track).frame(height: 4)
+                    .overlay(alignment: .leading) {
+                        GeometryReader { g in
+                            coreShape(2).fill(palette.primary).frame(width: g.size.width * CGFloat(sec) / 59)
+                                .animation(sec == 0 ? nil : .linear(duration: 1), value: sec)
+                        }
+                    }
+                    .padding(.top, Space.s1)
+                    .accessibilityHidden(true)
                 if size == .l { Spacer(minLength: 0) }
             }
+            .contentTransition(.numericText())
+            .animation(.spring(duration: 0.4), value: Calendar.current.component(.minute, from: ctx.date))
             .monospacedDigit()
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
         }
-    }
-}
-
-/// Quick actions. Buttons use the one CoreUI button (ghost: glass edge, `u-dim` on hover, 0.97 press), tiles stack the icon over
-/// the label in the wide size and list in the large one; they rise in one after another when the widget arrives.
-struct QuickBody: View {
-    @Bindable var shell: ShellModel
-    let size: WidgetSize
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var arrived = false
-
-    private func forcedHover(_ i: Int) -> CoreInteraction? {
-        #if DEBUG
-        return shell.debugForceQuickHover && i == 1 ? .hover : nil
-        #else
-        return nil
-        #endif
-    }
-
-    private func run(_ id: String, _ title: String) {
-        if let e = shell.launcher.entry(id) {
-            e.run()
-        } else {
-            shell.showToast("\(title) arrives with its feature module.")
-        }
-    }
-
-    var body: some View {
-        let tiles: [(String, String, String)] = [
-            ("agents.new", "New agent session", "play"), ("new-terminal", "New terminal", "terminal"),
-            ("add-device", "Add device", "plus"),
-        ]
-        let wide = size == .m
-        VStack(alignment: .leading, spacing: Space.s2) {
-            if !wide { WidgetHead(title: "Quick actions") }
-            let cols = wide ? [GridItem(.flexible(), spacing: 6), GridItem(.flexible())] : [GridItem(.flexible())]
-            LazyVGrid(columns: cols, spacing: 6) {
-                ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
-                    Button {
-                        run(t.0, t.1)
-                    } label: {
-                        label(t.2, t.1, wide: wide)
-                    }
-                    .buttonStyle(CoreButtonStyle(.secondary)).rise(arrived, i, reduce)
-                    .environment(\.coreForcedInteraction, forcedHover(i))
-                }
-                Button {
-                    shell.toggleLauncher()
-                } label: {
-                    label("magnifyingglass", "Launcher", wide: wide, key: "⌘K")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent)).rise(arrived, tiles.count, reduce)
-            }
-            if !wide { Spacer(minLength: 0) }
-        }
-        .frame(maxHeight: .infinity, alignment: wide ? .center : .top)
-        .onAppear { arrived = true }
-    }
-
-    @ViewBuilder private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
-        let icon = Image(systemName: symbol).font(.system(size: wide ? 14 : 13)).accessibilityHidden(true)
-        let text = Text(title).font(.system(size: wide ? MacTextSize.meta : MacTextSize.body, weight: .medium))
-            .lineLimit(1)
-        if wide {
-            VStack(spacing: 2) {
-                icon
-                HStack(spacing: Space.s1) {
-                    text
-                    if let key { Text(key).font(.system(size: MacTextSize.meta)).opacity(0.8) }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 40)
-        } else {
-            HStack(spacing: Space.s2) {
-                icon
-                text
-                if let key { CoreKeycap(key) }
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, minHeight: 26)
-        }
-    }
-}
-
-extension View {
-    /// `fx.stagger({ from: 'rise', gap: 40 })`: rises 10 pt and fades in, one after another. Reduce Motion: a 200 ms fade, no travel.
-    func rise(_ shown: Bool, _ index: Int, _ reduce: Bool) -> some View {
-        opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : coreMove(reduce, 10))
-            .animation(
-                (reduce ? Animation.easeOut(duration: 0.2) : Motion.out(Motion.move)).delay(
-                    reduce ? 0 : Double(index) * 0.04),
-                value: shown)
     }
 }
