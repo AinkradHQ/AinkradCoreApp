@@ -199,9 +199,14 @@ struct AccountCard: View {
                 }
             }
             .frame(height: 4)
-            Text(a.phase == .active ? "Ready for your agents." : AccountsWords.why(a, now: model.now()))
-                .foregroundStyle(GlassInk.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+            Text(
+                model.usable(a)
+                    ? "Ready for your agents."
+                    : a.phase == .active
+                        ? "Not in a pool yet, so agents can't use it." : AccountsWords.why(a, now: model.now())
+            )
+            .foregroundStyle(GlassInk.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             HStack {
                 Label(AccountsWords.used(a.lastUsedAt, now: model.now()), systemImage: "clock")
                 Spacer()

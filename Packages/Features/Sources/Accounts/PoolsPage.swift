@@ -18,7 +18,7 @@ struct PoolsPage: View {
                 AccStateCard(
                     symbol: "square.grid.2x2", title: "No pools yet",
                     text:
-                        "Core makes a default pool for a provider when its first account arrives. You can also make one yourself."
+                        "Agents only use accounts that are in a pool. Make one for a provider with New pool (⌘N), then add its accounts."
                 )
             } else {
                 tabs
