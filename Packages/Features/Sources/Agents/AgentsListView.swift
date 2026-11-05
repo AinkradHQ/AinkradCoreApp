@@ -25,19 +25,39 @@ struct AgentsListView: View {
                 NoticeBanner(notice: InlineNotice(title: "Live updates stopped", detail: why, tone: .fail))
                     .padding([.horizontal, .bottom], Space.s3)
             }
-            CoreSegmented(
-                "Filter sessions",
-                segments: [
-                    CoreSegment(AgentFilter.all, "All \(model.count(.all))"),
-                    CoreSegment(.needsYou, "Needs you \(waitingIDs.count)"),
-                    CoreSegment(.active, "Active \(model.count(.active))"),
-                    CoreSegment(.ended, "Ended \(model.count(.ended))"),
-                ], selection: $model.filter
-            )
-            .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
+            HStack(spacing: Space.s2) {
+                ForEach(Array(filters(waitingIDs.count).enumerated()), id: \.offset) { i, f in
+                    AgentFilterTile(title: f.1, count: f.2, hue: f.3, on: model.filter == f.0, key: "⌘\(i + 1)") {
+                        withAnimation(.spring(duration: 0.3)) { model.filter = f.0 }
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.s3).padding(.bottom, Space.s3)
             content(waitingIDs)
+            Text("↑↓ move · ↩ open · A approvals · C cancel · K kill · R resume · ⌘N new · ⌥⌘N advanced")
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
         }
+        .foregroundStyle(GlassInk.primary)
+        // Like the Terminals app: the pane's glass is a rim, the app's surface sits inside it, rounded.
+        .padding(.top, Space.s3)
+        .background {
+            coreShape(Radius.cardMac).fill(.ultraThinMaterial)
+                .overlay { coreShape(Radius.cardMac).fill(Color(red: 0.04, green: 0.05, blue: 0.11).opacity(0.55)) }
+                .environment(\.colorScheme, .dark)
+        }
+        .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
+    }
+
+    private func filters(_ waiting: Int) -> [(AgentFilter, String, Int, Color)] {
+        [
+            (.all, "All", model.count(.all), GlassInk.blue), (.needsYou, "Needs you", waiting, GlassInk.orange),
+            (.active, "Active", model.count(.active), GlassInk.green),
+            (.ended, "Ended", model.count(.ended), GlassInk.slate),
+        ]
     }
 
     /// The cost of what is loaded. Older sessions load as you scroll, so until all are in, the words say what the sum covers.
@@ -73,19 +93,14 @@ struct AgentsListView: View {
 
     @ViewBuilder
     private func buttons(_ waiting: Int) -> some View {
-        Button {
-            model.openInbox()
-        } label: {
-            Text(waiting > 0 ? "Approvals \(waiting)" : "Approvals")
-        }
-        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("See what agents wait on you for")
+        AgentAction(
+            title: waiting > 0 ? "Approvals \(waiting)" : "Approvals", symbol: "lock.shield", key: "A",
+            hue: waiting > 0 ? GlassInk.orange : GlassInk.slate, pulse: waiting > 0
+        ) { model.openInbox() }
         .accessibilityLabel(waiting > 0 ? "Approvals, \(waiting) waiting" : "Approvals")
-        Button {
+        AgentAction(title: "New", symbol: "plus", key: "⌘N", hue: GlassInk.violet, prominent: true) {
             model.openNewSession()
-        } label: {
-            Text("New session")
         }
-        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).help("Start an agent on a runner")
     }
 
     @ViewBuilder
@@ -116,10 +131,10 @@ struct AgentsListView: View {
     private func list(_ rows: [AgentSessionInfo], _ waitingIDs: Set<String>) -> some View {
         ScrollView {
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s2, alignment: .top)],
-                spacing: Space.s2
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)],
+                spacing: Space.s3
             ) {
-                ForEach(rows) { s in
+                ForEach(Array(rows.enumerated()), id: \.element.id) { i, s in
                     AgentRowButton(
                         id: s.id, focus: $focusedRow, selected: model.selected == s.id,
                         waiting: waitingIDs.contains(s.id)
@@ -132,6 +147,7 @@ struct AgentsListView: View {
                     }
                     .accessibilityLabel(label(s, waiting: waitingIDs.contains(s.id)))
                     .accessibilityHint("Opens the session")
+                    .modifier(RiseIn(index: i))
                     .onAppear { if s.id == rows.last?.id && model.filter == .all { model.loadMore() } }
                 }
             }
@@ -148,6 +164,24 @@ struct AgentsListView: View {
         .onKeyPress(.upArrow) { move(rows, -1) }
         .onKeyPress(.rightArrow) { move(rows, 1) }
         .onKeyPress(.leftArrow) { move(rows, -1) }
+        .onKeyPress(characters: .letters) { press in
+            let id = focusedRow ?? model.selected ?? rows.first?.id
+            switch press.characters.lowercased() {
+            case "a":
+                model.openInbox()
+            case "c":
+                guard let id else { return .ignored }
+                model.confirmCancel(id)
+            case "k":
+                guard let id else { return .ignored }
+                model.confirmKill(id)
+            case "r":
+                guard let id else { return .ignored }
+                model.resume(id)
+            default: return .ignored
+            }
+            return .handled
+        }
     }
 
     private func move(_ rows: [AgentSessionInfo], _ step: Int) -> KeyPress.Result {
@@ -217,46 +251,147 @@ struct SessionRow: View {
     let runner: String
     let waiting: Bool
     var burn: [Double] = []
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let st = AgentWords.status(session, waiting: waiting)
-        HStack(alignment: .top, spacing: Space.s3) {
-            AgentMark(harness: session.harness)
-            VStack(alignment: .leading, spacing: Space.s1) {
-                HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                    Text(session.harness).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                    Spacer(minLength: Space.s2)
-                    StateBadge(st.label, tone: st.tone, symbol: st.symbol)
-                }
-                Text("\(runner) · \(session.shortID)").font(.system(size: MacTextSize.body)).foregroundStyle(
-                    palette.text2
-                )
-                .lineLimit(1).truncationMode(.middle)
-                // Only what this Mac saw the total do: a line needs two samples, and none is drawn before that.
-                if burn.count >= 2 {
-                    CoreSpark(burn, tone: st.tone == .fail ? .fail : .run).padding(.vertical, Space.s1)
-                }
-                HStack(spacing: Space.s2) {
-                    if let u = session.usage {
-                        if let c = AgentWords.cost(u.costMicros) {
-                            Text(c).fontWeight(.semibold).foregroundStyle(palette.text)
-                        }
-                        Text("\(AgentWords.tokens(u.tokens)) tokens")
+        let hue: Color =
+            waiting ? GlassInk.orange : st.tone == .fail ? GlassInk.red : session.live ? GlassInk.green : GlassInk.slate
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(alignment: .top, spacing: Space.s3) {
+                IconTile(AgentsModel.harnessSymbol(session.harness), hue: GlassInk.violet, size: 40, bounce: waiting)
+                    .overlay(alignment: .bottomTrailing) {
+                        Circle().fill(hue).frame(width: 9, height: 9)
+                            .overlay { Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1.5) }
+                            .offset(x: 3, y: 3)
                     }
-                    Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.harness.capitalized).font(.system(size: MacTextSize.headline + 1, weight: .semibold))
+                        .lineLimit(1)
+                    Text("\(runner) · \(session.shortID)").font(.system(size: MacTextSize.meta))
+                        .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: Space.s2)
+                HStack(spacing: 5) {
+                    if waiting {
+                        Image(systemName: "hand.raised.fill").symbolEffect(.pulse, options: .repeating)
+                    } else if session.live {
+                        Image(systemName: "waveform").symbolEffect(.variableColor.iterative, options: .repeating)
+                    }
+                    Text(st.label)
+                }
+                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                .padding(.horizontal, Space.s2).frame(height: 22)
+                .background(hue.opacity(0.16), in: coreShape(6))
+            }
+            if burn.count >= 2 {
+                CoreSpark(burn, tone: st.tone == .fail ? .fail : .run).frame(height: 22)
+            }
+            HStack(spacing: Space.s2) {
+                if let u = session.usage {
+                    if let c = AgentWords.cost(u.costMicros) {
+                        Label(c, systemImage: "dollarsign.circle").fontWeight(.semibold)
+                    }
+                    Label("\(AgentWords.tokens(u.tokens))", systemImage: "number")
+                }
+                Spacer(minLength: 0)
+                Label {
                     if session.live {
                         Text(session.createdAt, style: .timer)
                     } else {
                         Text(AgentWords.ago(session.endedAt ?? session.updatedAt))
                     }
+                } icon: {
+                    Image(systemName: "clock")
                 }
-                .font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
             }
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).monospacedDigit()
         }
+        .foregroundStyle(GlassInk.primary)
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(coreShape(Radius.row))
+        .contentShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A filter as a glass tile with its count and key, lit in its colour.
+struct AgentFilterTile: View {
+    let title: String
+    let count: Int
+    let hue: Color
+    let on: Bool
+    let key: String
+    let pick: () -> Void
+    @State private var hovering = false
+    var body: some View {
+        Button(action: pick) {
+            HStack(spacing: Space.s2) {
+                Text(title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
+                Text("\(count)").font(.system(size: MacTextSize.meta, weight: .bold)).monospacedDigit()
+                    .padding(.horizontal, 6).frame(minHeight: 18)
+                    .background(on ? hue.opacity(0.5) : .white.opacity(0.1), in: coreShape(5))
+                    .contentTransition(.numericText())
+                if on || hovering {
+                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(
+                        GlassInk.secondary)
+                }
+            }
+            .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
+            .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
+            .background(on ? hue.opacity(0.2) : hovering ? .white.opacity(0.07) : .clear, in: coreShape(Radius.control))
+            .overlay { if on { coreShape(Radius.control).strokeBorder(hue.opacity(0.5), lineWidth: 1) } }
+            .contentShape(coreShape(Radius.control))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .accessibilityLabel("\(title), \(count)")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// A header action: an icon that bounces on hover (or pulses while something waits), a word and its key.
+struct AgentAction: View {
+    let title: String
+    let symbol: String
+    let key: String
+    let hue: Color
+    var prominent = false
+    var pulse = false
+    let run: () -> Void
+    @State private var hovering = false
+    var body: some View {
+        Button(action: run) {
+            HStack(spacing: Space.s2) {
+                Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                    .symbolEffect(.bounce, value: hovering)
+                    .symbolEffect(.pulse, options: .repeating, isActive: pulse)
+                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
+                    .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
+            .background(
+                prominent || pulse ? hue.opacity(hovering ? 0.95 : 0.8) : hovering ? hue.opacity(0.28) : GlassInk.well,
+                in: coreShape(Radius.control)
+            )
+            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
+            .shadow(color: hue.opacity(hovering || pulse ? 0.45 : 0), radius: 10)
+            .contentShape(coreShape(Radius.control))
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(hovering ? 1.04 : 1)
+        .onHover { hovering = $0 }
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+    }
+}
+
+/// Rows rise in one after another the first time they show.
+struct RiseIn: ViewModifier {
+    let index: Int
+    @State private var shown = false
+    func body(content: Content) -> some View {
+        content.coreRise(shown, index).onAppear { shown = true }
     }
 }

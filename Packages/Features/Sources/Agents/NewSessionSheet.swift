@@ -73,6 +73,10 @@ struct NewSessionSheet: View {
         }
         .onAppear {
             pickRunner()
+            if prompt.isEmpty, !model.draftPrompt.isEmpty {
+                prompt = model.draftPrompt
+                model.draftPrompt = ""
+            }
         }
         .task {
             // The prompt is the one thing to type here; focus it once the sheet is on screen.

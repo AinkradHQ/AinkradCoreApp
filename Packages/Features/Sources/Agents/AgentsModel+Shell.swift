@@ -70,9 +70,14 @@ extension AgentsModel {
 
     // MARK: dialogs
 
-    public func openNewSession() {
+    /// Quick by default (one prompt, the defaults); `advanced` opens the full sheet (Ahmed, 2026-11-05).
+    public func openNewSession(advanced: Bool = false) {
         Task { await loadRunners() }
-        shell.present(ShellDialog(id: "agents.new") { NewSessionSheet(model: self) })
+        if advanced {
+            shell.present(ShellDialog(id: "agents.new") { NewSessionSheet(model: self) })
+        } else {
+            shell.present(ShellDialog(id: "agents.quick") { QuickSessionView(model: self) })
+        }
     }
 
     public func openInbox() {
@@ -89,9 +94,15 @@ extension AgentsModel {
             ) { [weak self] in self?.openList() })
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.new", title: "New agent session", sub: "start an agent on a runner · needs Touch ID",
+                id: "agents.new", title: "New agent session", sub: "One prompt, the defaults · needs Touch ID",
                 symbol: "plus", keywords: ["start", "create", "agent", "claude", "codex"], isAction: true
             ) { [weak self] in self?.openNewSession() })
+        shell.launcher.register(
+            LauncherEntry(
+                id: "agents.new-advanced", title: "New agent session (advanced)…",
+                sub: "Choose the harness, runner, model, mode and secrets", symbol: "slider.horizontal.3",
+                keywords: ["start", "agent", "harness", "codex", "model"], isAction: true
+            ) { [weak self] in self?.openNewSession(advanced: true) })
         shell.launcher.register(
             LauncherEntry(
                 id: "agents.inbox", title: "Approvals", sub: "what agents are waiting on you for",

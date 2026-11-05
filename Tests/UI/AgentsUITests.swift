@@ -48,7 +48,7 @@ final class AgentsUITests: XCTestCase {
     func testTheListOpensASessionWithItsComposer() {
         run("agents")
         XCTAssertTrue(element("Agents, Home Core").waitForExistence(timeout: 10), "the list pane opens")
-        XCTAssertTrue(app.buttons["New session"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New"].waitForExistence(timeout: 10))
         let row = containing("on mac-studio").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "sessions are listed")
         row.click()
