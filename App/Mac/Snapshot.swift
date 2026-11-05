@@ -22,6 +22,11 @@ enum SnapshotRunner {
         if let dir = env["CORE_HOME_SNAPSHOT"] { return await HomeSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_ACC_SNAPSHOT"] { return await AccountsSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_ACC_DEMO=<scene>`: Accounts on the stand-in data, left open to click through (no Core is reached).
+        if let scene = env["CORE_ACC_DEMO"] {
+            try? await Task.sleep(for: .seconds(3))
+            return await app.debugAccountsDemo().show(scene)
+        }
         if let dir = env["CORE_ADMIN_SNAPSHOT"] { return await AdminSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
