@@ -267,8 +267,11 @@ public struct GlassSlider: View {
 public struct SurfaceStyleTabs: View {
     @Binding var style: AppSurfaceStyle
     let tintTitle: String
+    /// Three styles (Ahmed, 2026-11-05): Clear, Theme (or Tinted), Solid. Frosted reads as Clear, since Blurred / Sharp
+    /// is its own choice now.
     public init(style: Binding<AppSurfaceStyle>, tintTitle: String = "Theme") {
-        self._style = style
+        self._style = Binding(
+            get: { style.wrappedValue == .frosted ? .clear : style.wrappedValue }, set: { style.wrappedValue = $0 })
         self.tintTitle = tintTitle
     }
     public var body: some View {
@@ -276,7 +279,6 @@ public struct SurfaceStyleTabs: View {
             "Style",
             segments: [
                 CoreSegment(AppSurfaceStyle.clear, "Clear", symbol: "square.dashed"),
-                CoreSegment(.frosted, "Frosted", symbol: "snowflake"),
                 CoreSegment(.tinted, tintTitle, symbol: "paintpalette"),
                 CoreSegment(.solid, "Solid", symbol: "square.fill"),
             ], selection: $style)

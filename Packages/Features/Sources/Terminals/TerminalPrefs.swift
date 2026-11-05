@@ -45,10 +45,14 @@ final class TerminalPrefs {
         blink = defaults.object(forKey: "terminal.blink") as? Bool ?? true
         opacity = defaults.object(forKey: "terminal.opacity") as? Double ?? 0.78
         blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
-        surface = Surface(rawValue: defaults.string(forKey: "terminal.surface") ?? "") ?? .theme
+        surface =
+            Surface(rawValue: defaults.string(forKey: "terminal.surface") ?? "").map { $0 == .frosted ? .clear : $0 }
+            ?? .theme
         surfaceOpacity = defaults.object(forKey: "terminal.surfaceOpacity") as? Double ?? 0.78
         surfaceBlur = defaults.object(forKey: "terminal.surfaceBlur") as? Bool ?? true
-        screen = Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "") ?? .theme
+        screen =
+            Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "").map { $0 == .frosted ? .clear : $0 }
+            ?? .theme
         defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
         defaultShell = defaults.string(forKey: "terminal.defaultShell") ?? ""
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false

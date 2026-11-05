@@ -19,7 +19,8 @@ final class AgentPrefs {
 
     private let d = UserDefaults.standard
     private init() {
-        surface = Surface(rawValue: d.string(forKey: "agents.surface") ?? "") ?? .frosted
+        surface =
+            Surface(rawValue: d.string(forKey: "agents.surface") ?? "").map { $0 == .frosted ? .clear : $0 } ?? .clear
         opacity = d.object(forKey: "agents.opacity") as? Double ?? 0.55
         blur = d.object(forKey: "agents.blur") as? Bool ?? true
         harness = d.string(forKey: "agents.harness") ?? "claude"
