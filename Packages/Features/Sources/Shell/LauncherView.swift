@@ -50,7 +50,7 @@ struct LauncherView: View {
                             LauncherItem(
                                 row: row, index: i, number: i < 9 ? i + 1 : nil, selected: i == selection, glide: glide,
                                 hover: {
-                                    if Date().timeIntervalSince(keyAt) > 0.3 { selection = i }
+                                    if Date().timeIntervalSince(keyAt) > 0.3 { point(i) }
                                 }
                             ) {
                                 selection = i
@@ -61,12 +61,12 @@ struct LauncherView: View {
                         if rows.isEmpty { empty }
                     }
                     .padding(.horizontal, Space.s3)
-                    .animation(reduce ? nil : Motion.out(0.22), value: selection)
                 }
                 .onChange(of: selection) { _, new in
                     // The list scrolls on the same curve the highlight glides on, so the two move together.
-                    guard rows.indices.contains(new) else { return }
-                    withAnimation(reduce ? nil : Motion.out(0.22)) { proxy.scrollTo(rows[new].id) }
+                    // Only the keyboard scrolls the list; a row under the pointer is already in view.
+                    guard rows.indices.contains(new), Date().timeIntervalSince(keyAt) < 0.3 else { return }
+                    withAnimation(reduce ? nil : Motion.out(0.18)) { proxy.scrollTo(rows[new].id) }
                 }
             }
             footer
@@ -158,14 +158,27 @@ struct LauncherView: View {
         default: return .ignored
         }
         keyAt = Date()
-        selection = (selection + step + count) % count
+        glide((selection + step + count) % count)
         return .handled
     }
 
     private func jump(_ to: Int) -> KeyPress.Result {
         keyAt = Date()
-        selection = to
+        glide(to)
         return .handled
+    }
+
+    /// The keyboard moves the highlight with a glide and scrolls along on the same curve. The pointer moves it at once
+    /// (`point`), like Spotlight: a glide per row the pointer crossed lagged behind it.
+    private func glide(_ to: Int) {
+        withAnimation(reduce ? nil : Motion.out(0.18)) { selection = to }
+    }
+
+    private func point(_ to: Int) {
+        guard to != selection else { return }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) { selection = to }
     }
 
     private func run(_ rows: [LauncherRow]) {
@@ -202,10 +215,6 @@ private struct LauncherItem: View {
                         in: coreShape(Radius.control)
                     )
                     .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    // Glow on the selected tile only: a shadow on every row cost an off-screen pass each frame.
-                    .background {
-                        if selected { coreShape(Radius.control).fill(hue).blur(radius: 8).opacity(0.6) }
-                    }
                     .accessibilityHidden(true)
                 title
                 Spacer(minLength: Space.s2)
