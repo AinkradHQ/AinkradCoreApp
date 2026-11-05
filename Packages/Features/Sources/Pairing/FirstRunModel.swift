@@ -227,6 +227,14 @@ final class FirstRunModel {
         endpointError = nil
     }
 
+    /// Forget this Core: first run from its very first step, with nothing typed (name and address included).
+    func resetAll() {
+        reset()
+        endpointText = ""
+        nameText = ""
+        step = .name
+    }
+
     /// Back to the form with everything kept, for a failure that is about the address.
     func editAddress() {
         stage = .form

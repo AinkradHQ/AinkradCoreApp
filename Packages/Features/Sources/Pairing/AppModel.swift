@@ -349,7 +349,8 @@ public final class AppModel {
         admin.detach()
         accounts.detach()
         shell.linkNotice = nil
-        firstRun.reset()
+        shell.resetToFresh()
+        firstRun.resetAll()
         phase = .firstRun
     }
 

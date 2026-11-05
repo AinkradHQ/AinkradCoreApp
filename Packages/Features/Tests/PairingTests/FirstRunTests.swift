@@ -192,6 +192,16 @@ struct FirstRunTests {
         #expect(m.stage == .form && m.codeText.isEmpty && m.endpointText == "http://127.0.0.1:7700")
     }
 
+    @Test func forgettingStartsFromTheFirstStepWithNothingTyped() async {
+        let d = FakeDriver()
+        d.claimResult = .failure(CoreError.pairingFailed)
+        let m = model(d)
+        fill(m)
+        await m.submit()
+        m.resetAll()
+        #expect(m.step == .name && m.stage == .form && m.codeText.isEmpty && m.endpointText.isEmpty)
+    }
+
     @Test func nameThenAddressThenCode() {
         let name = "test.firstrun.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: name)!

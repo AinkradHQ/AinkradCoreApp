@@ -148,7 +148,7 @@ public final class ShellModel {
     public var theme: ThemeChoice = ThemeChoice.stored() {
         didSet {
             UserDefaults.standard.set(theme.rawValue, forKey: ThemeChoice.key)
-            NSApp.appearance = theme.appearance
+            NSApp?.appearance = theme.appearance
         }
     }
 
@@ -336,6 +336,14 @@ public final class ShellModel {
 
     public func presentSheet(title: String, message: String, actions: [ShellSheetAction]) {
         sheet = ShellSheet(title: title, message: message, actions: actions)
+    }
+
+    /// Forget this Core: every preference this Mac kept goes back to a fresh install (name, Home widgets, theme).
+    public func resetToFresh() {
+        profile.set("")
+        widgets = .standard()
+        defaults.removeObject(forKey: Self.layoutKey)
+        theme = .system
     }
 
     // MARK: widgets
