@@ -24,6 +24,10 @@ struct TerminalPaneView: View {
             ZStack {
                 if v.screenVisible {
                     TerminalScreen(surface: session.surface).opacity(v.dim ? 0.5 : 1)
+                        // Settings, Terminal, Transparency: frost what shows through a see-through terminal.
+                        .background {
+                            if TerminalPrefs.shared.blur { Rectangle().fill(.ultraThinMaterial) }
+                        }
                         .animation(reduce ? nil : Motion.out(Motion.ui), value: v.dim)
                 } else {
                     coreShape(Radius.cardMac).fill(Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255).opacity(0.78))

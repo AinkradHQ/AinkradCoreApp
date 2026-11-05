@@ -47,14 +47,26 @@ struct TerminalSettingsView: View {
                 Toggle("Blink", isOn: $prefs.blink).toggleStyle(.switch)
             }
             GlassSection(
-                "Background", sub: "How much of the glass shows through.", symbol: "circle.lefthalf.filled",
+                "Transparency", sub: "How much of the sky shows through the terminal.",
+                symbol: "circle.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
-                HStack(spacing: Space.s3) {
-                    Text("Clear").foregroundStyle(GlassInk.secondary)
-                    Slider(value: $prefs.opacity, in: 0.4...1)
-                    Text("Solid").foregroundStyle(GlassInk.secondary)
+                SectionAction(prefs.blur ? "Blurred" : "Sharp", symbol: prefs.blur ? "drop.halffull" : "drop") {
+                    prefs.blur.toggle()
                 }
+            } content: {
+                HStack(spacing: Space.s3) {
+                    Image(systemName: "square.fill").foregroundStyle(GlassInk.secondary)
+                    Slider(
+                        value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6,
+                        step: 0.05)
+                    Image(systemName: "square.dashed").foregroundStyle(GlassInk.secondary)
+                    Text("\(Int(((1 - prefs.opacity) * 100).rounded()))%").font(
+                        .system(size: MacTextSize.body, weight: .semibold)
+                    )
+                    .monospacedDigit().contentTransition(.numericText()).frame(width: 44, alignment: .trailing)
+                }
+                Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
             }
         }
         .foregroundStyle(GlassInk.primary)
@@ -82,8 +94,12 @@ private struct TerminalPreview: View {
         .padding(Space.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: t.background).opacity(prefs.opacity), in: coreShape(Radius.cardMac))
+        .background {
+            if prefs.blur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
+        }
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .animation(.easeOut(duration: 0.2), value: prefs.fontSize)
+        .animation(.easeOut(duration: 0.2), value: prefs.opacity)
         .accessibilityLabel("Preview of the terminal")
     }
 }

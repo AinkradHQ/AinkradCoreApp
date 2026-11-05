@@ -15,6 +15,8 @@ final class TerminalPrefs {
     var blink: Bool { didSet { save() } }
     /// How solid the terminal's background is, 0.4 (see-through glass) to 1 (opaque).
     var opacity: Double { didSet { save() } }
+    /// Frosts what shows through a see-through terminal, so text stays readable over a busy sky.
+    var blur: Bool { didSet { save() } }
 
     enum CursorShape: String, CaseIterable { case block, underline, bar }
 
@@ -26,6 +28,7 @@ final class TerminalPrefs {
         cursor = CursorShape(rawValue: defaults.string(forKey: "terminal.cursor") ?? "") ?? .block
         blink = defaults.object(forKey: "terminal.blink") as? Bool ?? true
         opacity = defaults.object(forKey: "terminal.opacity") as? Double ?? 0.78
+        blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
     }
 
     static let systemMono = "SF Mono"
@@ -64,6 +67,7 @@ final class TerminalPrefs {
         defaults.set(cursor.rawValue, forKey: "terminal.cursor")
         defaults.set(blink, forKey: "terminal.blink")
         defaults.set(opacity, forKey: "terminal.opacity")
+        defaults.set(blur, forKey: "terminal.blur")
         NotificationCenter.default.post(name: Self.changed, object: nil)
     }
 }
