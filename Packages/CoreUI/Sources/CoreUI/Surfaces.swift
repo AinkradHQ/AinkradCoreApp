@@ -65,7 +65,7 @@ private struct GlassModifier: ViewModifier {
             let glass =
                 tinted
                 ? Glass.regular.tint(palette.glassTint)
-                : palette.isDay ? Glass.clear : Glass.clear.tint(.black.opacity(0.18))
+                : palette.isDay ? Glass.clear : Glass.clear.tint(.black.opacity(0.32))
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
         } else {
