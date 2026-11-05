@@ -125,11 +125,15 @@ struct WidgetBig: View {
 
 /// The prototype's status mark: a small rounded square (never a circle). The word beside it says the same thing.
 /// A live one breathes (opacity, so it stays under Reduce Motion too).
-struct StatusDot: View {
+public struct StatusDot: View {
     let color: Color
     var live = false
     @State private var dim = false
-    var body: some View {
+    public init(color: Color, live: Bool = false) {
+        self.color = color
+        self.live = live
+    }
+    public var body: some View {
         coreShape(2).fill(color).frame(width: Space.s2, height: Space.s2)
             .opacity(live && dim ? 0.45 : 1)
             .animation(live ? .easeInOut(duration: 1.1).repeatForever() : nil, value: dim)

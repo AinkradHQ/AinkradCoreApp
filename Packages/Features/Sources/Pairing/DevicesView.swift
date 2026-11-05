@@ -125,10 +125,12 @@ private struct DeviceTable: View {
                 Text("Nothing of that kind.").foregroundStyle(palette.text2).padding(Space.s3)
             }
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 7), spacing: Space.s3, alignment: .top)],
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s4, alignment: .top)],
                 spacing: Space.s3
             ) {
-                ForEach(model.shown) { d in DeviceCard(app: app, device: d) { model.detailID = d.id } }
+                ForEach(Array(model.shown.enumerated()), id: \.element.id) { i, d in
+                    DeviceCard(app: app, device: d, index: i) { model.detailID = d.id }
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -136,58 +138,84 @@ private struct DeviceTable: View {
     }
 }
 
-/// One device as a card (the prototype's grid): icon tile, name with the This Mac tag, platform, kind and key storage, access,
-/// last seen. No outline at rest; the focus ring shows only on the card the keyboard is on.
+/// One device as a tile: a large device picture with a live mark for this Mac, the name, platform, where its keys live,
+/// its access as five scope icons, and when it was last seen. Lifts on hover; tiles rise in one after another.
 private struct DeviceCard: View {
     let app: AppModel
     let device: DeviceInfo
+    var index = 0
     let open: () -> Void
     @Environment(\.corePalette) private var palette
-    @FocusState private var focused: Bool
     @State private var hovering = false
+    @State private var shown = false
+
+    private var hue: Color {
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.violet : GlassInk.blue
+    }
 
     var body: some View {
         let me = app.devices.isMe(device)
         Button(action: open) {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                HStack(alignment: .top, spacing: Space.s2) {
-                    Image(systemName: DeviceWords.symbol(device.kind, device.platform))
-                        .font(.system(size: MacTextSize.title)).foregroundStyle(palette.primary)
-                        .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                        .background(palette.uDim, in: coreShape(Radius.control)).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: Space.s1) {
-                            Text(device.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                            if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
+            VStack(alignment: .leading, spacing: Space.s3) {
+                HStack(alignment: .top, spacing: Space.s3) {
+                    IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 52, bounce: hovering)
+                        .overlay(alignment: .bottomTrailing) {
+                            if me {
+                                StatusDot(color: GlassInk.green, live: true).offset(x: 4, y: 4)
+                            }
                         }
-                        Text(DeviceWords.platform(device.platform)).font(.system(size: MacTextSize.meta))
-                            .foregroundStyle(palette.text2).lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: Space.s1) {
+                            Text(device.name).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(1)
+                            if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
+                            if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
+                        }
+                        Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
+                            .font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 0)
                 }
-                HStack(spacing: Space.s2) {
-                    Chip(text: device.kind)
-                    KeyStorageLabel(storage: device.keyStorage)
-                    if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
-                }
-                AccessChips(scopes: device.scopes)
+                KeyStorageLabel(storage: device.keyStorage)
+                ScopeIcons(scopes: device.scopes)
                 LastSeenLine(lastUsed: device.lastUsed)
             }
+            .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Space.s3)
-            .background(hovering ? palette.rowHover : palette.glassCard, in: coreShape(Radius.row))
+            .padding(Space.s4)
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             .opacity(device.revoked ? 0.6 : 1)
-            .contentShape(coreShape(Radius.row))
+            .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
-        .focused($focused).focusEffectDisabled()
-        .coreFocusRing(focused, radius: Radius.row, palette: palette)
+        .scaleEffect(hovering ? 1.02 : 1)
+        .shadow(color: .black.opacity(hovering ? 0.25 : 0), radius: 16, y: 8)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
+        .coreRise(shown, index)
+        .onAppear { shown = true }
         .accessibilityLabel(
             "\(device.name), \(me ? "This Mac, " : "")\(DeviceWords.kind(device.kind)), \(device.keyStorage ?? "storage not reported"), \(device.scopes.joined(separator: ", ")), last seen \(DeviceWords.seen(device.lastUsed))"
         )
         .accessibilityHint("Opens this device's page")
+    }
+}
+
+/// The five scopes as small icon tiles, lit when held: access at a glance instead of "all five".
+struct ScopeIcons: View {
+    let scopes: [String]
+    var body: some View {
+        HStack(spacing: Space.s1 + 2) {
+            ForEach(ScopeText.all, id: \.self) { s in
+                let on = scopes.contains(s)
+                IconTile(ScopeText.symbol(s), hue: on ? ScopeText.hue(s) : GlassInk.slate.opacity(0.35), size: 24)
+                    .opacity(on ? 1 : 0.5)
+                    .help(on ? "\(s.capitalized): \(ScopeText.text(s))" : "No \(s)")
+            }
+            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.violet, size: 24) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(scopes.joined(separator: ", "))
     }
 }
 
@@ -226,7 +254,7 @@ struct LastSeenLine: View {
             }
             Text(fresh ? "Active now" : "Last seen \(DeviceWords.seen(lastUsed))")
         }
-        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
     }
 }
 
@@ -305,97 +333,158 @@ struct DeviceDetail: View {
     let app: AppModel
     let device: DeviceInfo
     @Environment(\.corePalette) private var palette
+    @State private var shown = false
+
+    private var hue: Color {
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.violet : GlassInk.blue
+    }
 
     var body: some View {
         let me = app.devices.isMe(device)
         VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(spacing: Space.s2) {
-                Button {
-                    app.devices.detailID = nil
-                } label: {
-                    Label("All devices", systemImage: "chevron.left")
+            Button {
+                app.devices.detailID = nil
+            } label: {
+                Label("All devices", systemImage: "chevron.left")
+            }
+            .buttonStyle(.coreSecondary).keyboardShortcut(.leftArrow, modifiers: .command)
+            .accessibilityLabel("Back to Devices")
+            // Hero: the device's picture, its name and what it is.
+            HStack(spacing: Space.s4) {
+                IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 72, bounce: shown)
+                    .shadow(color: hue.opacity(0.45), radius: 16)
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    HStack(spacing: Space.s2) {
+                        Text(device.name).font(.system(size: MacTextSize.large + 6, weight: .bold))
+                            .accessibilityAddTraits(.isHeader)
+                        if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
+                        if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
+                    }
+                    Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
+                        .foregroundStyle(GlassInk.secondary)
+                    LastSeenLine(lastUsed: device.lastUsed)
                 }
-                .buttonStyle(.coreSecondary).keyboardShortcut(.leftArrow, modifiers: .command)
-                .accessibilityLabel("Back to Devices")
-                Spacer()
             }
-            HStack(spacing: Space.s2) {
-                Text(device.name).font(.system(size: MacTextSize.large, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
-                if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
-            }
-            Text("\(device.kind) · \(DeviceWords.platform(device.platform))").foregroundStyle(palette.text2)
-            section("Device", "Who it is, as it told the Core.") {
+            .coreRise(shown, 0)
+            GlassSection(
+                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.blue, index: 1
+            ) {
                 if app.devices.renaming {
                     InlineRename(app: app, device: device)
                 } else {
-                    HStack {
-                        FactRow(key: "Name", value: device.name)
+                    InfoRow("textformat", "Name", device.name) {
                         if !device.revoked {
                             Button("Rename…") { app.devices.renaming = true }.buttonStyle(.coreSecondary)
                         }
                     }
                 }
-                FactRow(key: "Kind", value: device.kind, mono: true)
-                FactRow(key: "Platform", value: DeviceWords.platform(device.platform))
-                FactRow(key: "Device ID", value: device.id, mono: true)
-                FactRow(key: "Paired", value: device.createdAt.formatted(date: .abbreviated, time: .shortened))
-                FactRow(key: "Last seen", value: DeviceWords.seen(device.lastUsed))
-                FactRow(key: "Status", value: device.status)
+                InfoRow("square.stack.3d.up", "Kind", DeviceWords.kind(device.kind))
+                InfoRow("laptopcomputer", "Platform", DeviceWords.platform(device.platform))
+                InfoRow("number", "Device ID", device.id, mono: true)
+                InfoRow("calendar", "Paired", device.createdAt.formatted(date: .abbreviated, time: .shortened))
+                InfoRow("waveform.path.ecg", "Status", device.status.capitalized)
             }
-            section("Keys", "Generated on the device. The Core only holds the public halves.") {
-                FactRow(key: "Key storage", value: DeviceWords.storage(device.keyStorage))
-                FactRow(
-                    key: "Step-up key",
-                    value: device.stepup.map {
-                        $0 ? "Yes: it asks for the user" : "None: it can never unlock admin actions"
+            GlassSection(
+                "Keys", sub: "Made on the device. The Core only holds the public halves.", symbol: "key.horizontal",
+                hue: GlassInk.green, index: 2
+            ) {
+                HStack(spacing: Space.s3) {
+                    KeyFact(
+                        symbol: device.keyStorage == "software" ? "exclamationmark.triangle" : "cpu",
+                        title: DeviceWords.storage(device.keyStorage),
+                        detail: device.keyStorage == "software" ? "Kept in software" : "In the Secure Enclave",
+                        hue: device.keyStorage == "software" ? GlassInk.orange : GlassInk.green)
+                    KeyFact(
+                        symbol: device.stepup == true ? "touchid" : "touchid",
+                        title: device.stepup.map { $0 ? "Step-up key" : "No step-up key" } ?? "Not reported",
+                        detail: device.stepup == true ? "Asks for the person" : "Can never unlock admin actions",
+                        hue: device.stepup == true ? GlassInk.green : GlassInk.slate)
+                }
+                if let fp = device.fingerprint { FingerprintView(fingerprint: fp) }
+            }
+            GlassSection(
+                "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
+                symbol: "lock.shield", hue: GlassInk.violet, index: 3
+            ) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: Space.s2)], spacing: Space.s2) {
+                    ForEach(ScopeText.all, id: \.self) { s in
+                        ScopeTile(
+                            symbol: ScopeText.symbol(s), name: s, detail: ScopeText.text(s), hue: ScopeText.hue(s),
+                            on: device.scopes.contains(s))
                     }
-                        ?? "Not reported")
-                if let fp = device.fingerprint { FactRow(key: "Fingerprint", value: fp, mono: true) }
-            }
-            section("Access", "What it may do. You can only narrow it. To give more, pair it again.") {
-                Text(
-                    device.scopes.isEmpty
-                        ? "No scopes." : device.scopes.map { "\($0): \(ScopeText.text($0))" }.joined(separator: "\n")
-                )
-                .font(.system(size: MacTextSize.body)).fixedSize(horizontal: false, vertical: true)
+                }
                 if !device.revoked {
                     Button("Change access…") { present("scopes", ScopesDialog(app: app, device: device)) }
                         .buttonStyle(.coreSecondary)
                 }
             }
             if !device.revoked {
-                section("Revoke", "Signs it out at once. It has to pair again to come back.") {
+                GlassSection(
+                    "Revoke", sub: "Signs it out at once. It has to pair again to come back.", symbol: "xmark.shield",
+                    hue: GlassInk.red, index: 4
+                ) {
                     Text(
                         me
                             ? "Revoking this Mac signs it out at once and returns it to Connect to a Core. It must be paired again."
                             : "Revoking signs \(device.name) out at once and closes its open connections. It must be paired again."
                     )
-                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                     Button("Revoke…") { present("revoke", RevokeDialog(app: app, device: device)) }
-                        .buttonStyle(DangerButtonStyle())
+                        .buttonStyle(.coreDanger)
                 }
             }
         }
+        .foregroundStyle(GlassInk.primary)
+        .onAppear { shown = true }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("device-detail")
-    }
-
-    private func section<C: View>(_ title: String, _ sub: String, @ViewBuilder _ content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-            }
-            FactCard { content() }
-        }
     }
 
     private func present(_ id: String, _ view: some View) {
         app.devices.dialogError = nil
         app.stepUpNotice = nil
         app.shell.present(ShellDialog(id: id, onClose: { app.stepUpNotice = nil }) { view })
+    }
+}
+
+/// A key fact as a small tile: icon, what it is, one line.
+private struct KeyFact: View {
+    let symbol: String
+    let title: String
+    let detail: String
+    let hue: Color
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            IconTile(symbol, hue: hue, size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity)
+        .background(GlassInk.well, in: coreShape(Radius.row))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The key fingerprint in groups of four, so it can be read out and compared.
+private struct FingerprintView: View {
+    let fingerprint: String
+    var body: some View {
+        let groups = stride(from: 0, to: fingerprint.count, by: 4).map { i -> String in
+            let a = fingerprint.index(fingerprint.startIndex, offsetBy: i)
+            return String(
+                fingerprint[
+                    a..<(fingerprint.index(a, offsetBy: 4, limitedBy: fingerprint.endIndex) ?? fingerprint.endIndex)])
+        }
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Label("Fingerprint", systemImage: "touchid").font(.system(size: MacTextSize.meta, weight: .semibold))
+                .foregroundStyle(GlassInk.secondary)
+            Text(groups.joined(separator: " ")).font(.system(size: MacTextSize.body, design: .monospaced))
+                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

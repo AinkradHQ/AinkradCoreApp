@@ -114,6 +114,28 @@ struct ScopeToggle: View {
 
 enum ScopeText {
     static let all = ["read", "approve", "terminal", "agent", "admin"]
+    /// Each scope's picture and colour, the same on every screen.
+    static func symbol(_ s: String) -> String {
+        switch s {
+        case "read": "eye"
+        case "approve": "checkmark.seal"
+        case "terminal": "terminal"
+        case "agent": "sparkles"
+        case "admin": "key"
+        case "runner": "server.rack"
+        default: "questionmark"
+        }
+    }
+    static func hue(_ s: String) -> Color {
+        switch s {
+        case "read": GlassInk.blue
+        case "approve": GlassInk.green
+        case "terminal": GlassInk.slate
+        case "agent": GlassInk.violet
+        case "admin": GlassInk.orange
+        default: GlassInk.slate
+        }
+    }
     static func text(_ s: String) -> String {
         switch s {
         case "read": "See sessions, runners, events and settings"

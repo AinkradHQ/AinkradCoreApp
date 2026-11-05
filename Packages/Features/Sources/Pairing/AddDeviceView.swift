@@ -59,8 +59,12 @@ struct AddDeviceView: View {
                 Task { await model.create() }
             }
             CoreSegmented(
-                "Kind", segments: [CoreSegment("device", "Device"), CoreSegment("runner", "Runner")],
-                selection: $model.kind)
+                "Kind",
+                segments: [
+                    CoreSegment("device", "Device", symbol: "laptopcomputer"),
+                    CoreSegment("runner", "Runner", symbol: "server.rack"),
+                ],
+                selection: $model.kind, fill: true)
             VStack(alignment: .leading, spacing: Space.s2) {
                 Text("Access narrowed from your own. You can only give less.").font(
                     .system(size: MacTextSize.meta, weight: .semibold)
@@ -68,14 +72,24 @@ struct AddDeviceView: View {
                 if model.kind == "runner" {
                     Text("A runner holds exactly runner: it only redeems secret leases.").foregroundStyle(palette.text2)
                 } else {
-                    ForEach(ScopeText.all, id: \.self) { s in
-                        ScopeToggle(
-                            scope: s,
-                            on: Binding(
-                                get: { model.scopes.contains(s) },
-                                set: { if $0 { model.scopes.insert(s) } else { model.scopes.remove(s) } }),
-                            locked: model.mine.contains(s) ? nil : "This Mac does not hold it, so it cannot hand it on."
-                        )
+                    // Each scope a tile that lights up when chosen; a scope this Mac does not hold stays dim and says why.
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
+                    ) {
+                        ForEach(ScopeText.all, id: \.self) { s in
+                            let held = model.mine.contains(s)
+                            Button {
+                                if model.scopes.contains(s) { model.scopes.remove(s) } else { model.scopes.insert(s) }
+                            } label: {
+                                ScopeTile(
+                                    symbol: ScopeText.symbol(s), name: s,
+                                    detail: held
+                                        ? ScopeText.text(s) : "This Mac does not hold it, so it cannot hand it on.",
+                                    hue: ScopeText.hue(s), on: model.scopes.contains(s))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!held)
+                        }
                     }
                 }
             }

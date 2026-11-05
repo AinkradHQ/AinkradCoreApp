@@ -11,7 +11,7 @@ extension View {
         modifier(GlassModifier(radius: radius, interactive: interactive, tinted: tinted, frosted: frosted))
     }
 
-    /// Regular material panel: the content surface. Material only, never glass.
+    /// The content surface: the shared overlay glass (see PanelModifier).
     public func corePanel(radius: CGFloat = Radius.pane, padding: CGFloat = Space.s4) -> some View {
         modifier(PanelModifier(radius: radius, padding: padding))
     }
@@ -38,19 +38,18 @@ private struct PanelModifier: ViewModifier {
     @Environment(\.corePalette) private var palette
     let radius: CGFloat
     let padding: CGFloat
+    /// Every panel, dialog and sheet is the launcher's glass (Ahmed, 2026-11-05: consistent, everything Liquid Glass): a
+    /// dark layer on Apple's glass, frosted at night, clear by day, white ink. Reduce Transparency keeps a solid panel.
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
-        content
-            .padding(padding)
-            .background {
-                if solid {
-                    shape.fill(palette.panelStrong)
-                } else {
-                    shape.fill(.regularMaterial).environment(\.colorScheme, .dark)
-                    // Day is deep blue glass (the prototype's `panelGlass`), not a grey material.
-                    if palette.isDay { shape.fill(palette.glassTint.opacity(0.5)) }
-                }
-            }
+        if solid {
+            content.padding(padding).background(palette.panelStrong, in: shape)
+        } else {
+            content.padding(padding)
+                .foregroundStyle(GlassInk.primary)
+                .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: shape)
+                .coreGlass(radius: radius, interactive: false, tinted: false, frosted: !palette.isDay)
+        }
     }
 }
 
