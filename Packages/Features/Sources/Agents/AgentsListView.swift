@@ -11,7 +11,18 @@ struct AgentsListView: View {
     var body: some View {
         let waitingIDs = Set(model.pending.map(\.session))
         VStack(alignment: .leading, spacing: 0) {
-            bar(waiting: waitingIDs.count)
+            // The Terminals header: filters at the left, actions at the right, one row.
+            HStack(spacing: Space.s2) {
+                ForEach(Array(filters(waitingIDs.count).enumerated()), id: \.offset) { i, f in
+                    AppFilterTile(title: f.1, count: f.2, on: model.filter == f.0, key: "⌘\(i + 1)") {
+                        withAnimation(.spring(duration: 0.3)) { model.filter = f.0 }
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                }
+                Spacer(minLength: Space.s2)
+                buttons(waitingIDs.count)
+            }
+            .padding(.horizontal, Space.s4).padding(.top, Space.s2).padding(.bottom, Space.s3)
             if model.shouldAskAboutNotifications {
                 NotificationAsk(model: model).padding([.horizontal, .bottom], Space.s3)
             }
@@ -26,27 +37,31 @@ struct AgentsListView: View {
                 NoticeBanner(notice: InlineNotice(title: "Live updates stopped", detail: why, tone: .fail))
                     .padding([.horizontal, .bottom], Space.s3)
             }
-            HStack(spacing: Space.s2) {
-                ForEach(Array(filters(waitingIDs.count).enumerated()), id: \.offset) { i, f in
-                    AgentFilterTile(title: f.1, count: f.2, hue: f.3, on: model.filter == f.0, key: "⌘\(i + 1)") {
-                        withAnimation(.spring(duration: 0.3)) { model.filter = f.0 }
-                    }
-                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, Space.s3).padding(.bottom, Space.s3)
             content(waitingIDs)
-            Text("↑↓ move · ↩ open · A approvals · C cancel · K kill · R resume · P appearance · ⌘N new · ⌥⌘N advanced")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+            footer(waitingIDs.count)
         }
         .foregroundStyle(GlassInk.primary)
-        // Like the Terminals app: the pane's glass is a rim, the app's surface sits inside it, rounded.
-        .padding(.top, Space.s3)
+        // The Terminals app's frame: the pane's glass is a rim, the app's surface sits inside it, rounded.
         .background { AgentSurface() }
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
+    }
+
+    /// The Terminals footer: status chips at the left, the keys at the right.
+    private func footer(_ waiting: Int) -> some View {
+        HStack(spacing: Space.s2) {
+            if waiting > 0 { AppStatChip("hand.raised.fill", "\(waiting) waiting on you", GlassInk.orange) }
+            AppStatChip("play.fill", "\(model.count(.active)) active", GlassInk.green)
+            if let c = AgentWords.cost(model.sessions.totalCostMicros),
+                model.sessions.items.contains(where: { $0.usage?.costMicros != nil })
+            {
+                AppStatChip("dollarsign", c, GlassInk.blue)
+            }
+            Spacer(minLength: 0)
+            Text("↩ open · A approvals · C cancel · K kill · R resume · P look").font(.system(size: MacTextSize.meta))
+                .foregroundStyle(GlassInk.secondary).lineLimit(1)
+        }
+        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
     }
 
     private func filters(_ waiting: Int) -> [(AgentFilter, String, Int, Color)] {
@@ -57,49 +72,20 @@ struct AgentsListView: View {
         ]
     }
 
-    /// The cost of what is loaded. Older sessions load as you scroll, so until all are in, the words say what the sum covers.
-    private var totalWords: String {
-        guard model.sessions.items.contains(where: { $0.usage?.costMicros != nil }),
-            let c = AgentWords.cost(model.sessions.totalCostMicros)
-        else { return "" }
-        return model.sessions.hasMore ? " · \(c) in \(model.sessions.items.count) loaded" : " · \(c) total"
-    }
-
-    private func bar(waiting: Int) -> some View {
-        let active = model.count(.active)
-        let summary =
-            Text(waiting > 0 ? "\(waiting) waiting on you" : "Nothing waiting on you")
-            .fontWeight(waiting > 0 ? .semibold : .regular)
-            .foregroundStyle(waiting > 0 ? palette.navActiveInk : palette.text)
-            + Text(" · \(active) active").foregroundStyle(palette.text2)
-            + Text(totalWords).foregroundStyle(palette.text2)
-        return ViewThatFits(in: .horizontal) {
-            HStack(spacing: Space.s2) {
-                summary.lineLimit(1)
-                Spacer(minLength: Space.s2)
-                buttons(waiting)
-            }
-            VStack(alignment: .leading, spacing: Space.s2) {
-                summary
-                HStack(spacing: Space.s2) { buttons(waiting) }
-            }
-        }
-        .font(.system(size: MacTextSize.body))
-        .padding(.horizontal, Space.s3).padding(.bottom, Space.s3)
-    }
-
     @ViewBuilder
     private func buttons(_ waiting: Int) -> some View {
-        AgentAction(title: "Appearance", symbol: "paintpalette", key: "P", hue: GlassInk.violet) { appearance.toggle() }
-            .popover(isPresented: $appearance, arrowEdge: .bottom) {
-                AgentSettingsView(model: model, compact: true).padding(Space.s4).frame(width: 420)
-            }
-        AgentAction(
+        AppActionTile(title: "Appearance", symbol: "paintpalette", key: "P", hue: GlassInk.violet) {
+            appearance.toggle()
+        }
+        .popover(isPresented: $appearance, arrowEdge: .bottom) {
+            AgentSettingsView(model: model, compact: true).padding(Space.s4).frame(width: 420)
+        }
+        AppActionTile(
             title: waiting > 0 ? "Approvals \(waiting)" : "Approvals", symbol: "lock.shield", key: "A",
             hue: waiting > 0 ? GlassInk.orange : GlassInk.slate, pulse: waiting > 0
         ) { model.openInbox() }
         .accessibilityLabel(waiting > 0 ? "Approvals, \(waiting) waiting" : "Approvals")
-        AgentAction(title: "New", symbol: "plus", key: "⌘N", hue: GlassInk.violet, prominent: true) {
+        AppActionTile(title: "New", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
             model.openNewSession()
         }
     }
@@ -314,79 +300,6 @@ struct SessionRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// A filter as a glass tile with its count and key, lit in its colour.
-struct AgentFilterTile: View {
-    let title: String
-    let count: Int
-    let hue: Color
-    let on: Bool
-    let key: String
-    let pick: () -> Void
-    @State private var hovering = false
-    var body: some View {
-        Button(action: pick) {
-            HStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
-                Text("\(count)").font(.system(size: MacTextSize.meta, weight: .bold)).monospacedDigit()
-                    .padding(.horizontal, 6).frame(minHeight: 18)
-                    .background(on ? hue.opacity(0.5) : .white.opacity(0.1), in: coreShape(5))
-                    .contentTransition(.numericText())
-                if on || hovering {
-                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(
-                        GlassInk.secondary)
-                }
-            }
-            .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
-            .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
-            .background(on ? hue.opacity(0.2) : hovering ? .white.opacity(0.07) : .clear, in: coreShape(Radius.control))
-            .overlay { if on { coreShape(Radius.control).strokeBorder(hue.opacity(0.5), lineWidth: 1) } }
-            .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
-        .accessibilityLabel("\(title), \(count)")
-        .accessibilityAddTraits(on ? .isSelected : [])
-    }
-}
-
-/// A header action: an icon that bounces on hover (or pulses while something waits), a word and its key.
-struct AgentAction: View {
-    let title: String
-    let symbol: String
-    let key: String
-    let hue: Color
-    var prominent = false
-    var pulse = false
-    let run: () -> Void
-    @State private var hovering = false
-    var body: some View {
-        Button(action: run) {
-            HStack(spacing: Space.s2) {
-                Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                    .symbolEffect(.bounce, value: hovering)
-                    .symbolEffect(.pulse, options: .repeating, isActive: pulse)
-                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
-                    .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
-            .background(
-                prominent || pulse ? hue.opacity(hovering ? 0.95 : 0.8) : hovering ? hue.opacity(0.28) : GlassInk.well,
-                in: coreShape(Radius.control)
-            )
-            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
-            .shadow(color: hue.opacity(hovering || pulse ? 0.45 : 0), radius: 10)
-            .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(hovering ? 1.04 : 1)
-        .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
     }
 }
 

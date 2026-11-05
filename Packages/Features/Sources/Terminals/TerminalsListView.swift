@@ -17,7 +17,12 @@ struct TerminalsListView: View {
             footer
         }
         // Like a terminal pane: the pane's glass is a rim, and the app's chosen background sits inside it, rounded.
-        .background { AppSurface(prefs: prefs) }
+        .background {
+            AppSurfaceFill(
+                style: AppSurfaceStyle(rawValue: prefs.surface == .theme ? "tinted" : prefs.surface.rawValue)
+                    ?? .frosted,
+                opacity: prefs.surfaceOpacity, tint: Color(nsColor: prefs.theme.background), blur: prefs.blur)
+        }
         .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }
     }
@@ -25,18 +30,18 @@ struct TerminalsListView: View {
     private var header: some View {
         HStack(spacing: Space.s2) {
             ForEach(Array(TerminalFilter.allCases.enumerated()), id: \.element) { i, f in
-                FilterTile(title: f.rawValue, count: count(f), on: model.filter == f, key: "⌘\(i + 1)") {
+                AppFilterTile(title: f.rawValue, count: count(f), on: model.filter == f, key: "⌘\(i + 1)") {
                     model.filter = f
                 }
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
             Spacer(minLength: Space.s2)
-            ActionTile(title: "Appearance", symbol: "paintpalette", key: "⌥⌘P", hue: GlassInk.violet) {
+            AppActionTile(title: "Appearance", symbol: "paintpalette", key: "⌥⌘P", hue: GlassInk.violet) {
                 appearance.toggle()
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
             .popover(isPresented: $appearance, arrowEdge: .bottom) { AppearancePopover(prefs: prefs) }
-            ActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.blue, prominent: true) {
                 model.quickNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
@@ -141,15 +146,7 @@ struct TerminalsListView: View {
         .help("Terminals this device opened. The Core keeps no output, so a tile shows the shell, not its screen.")
     }
 
-    private func stat(_ symbol: String, _ text: String, _ hue: Color) -> some View {
-        HStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(hue)
-            Text(text).monospacedDigit()
-        }
-        .font(.system(size: MacTextSize.meta, weight: .medium))
-        .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
-        .background(GlassInk.well, in: coreShape(Radius.chip))
-    }
+    private func stat(_ symbol: String, _ text: String, _ hue: Color) -> some View { AppStatChip(symbol, text, hue) }
 }
 
 /// What a tile can do, from its hover buttons or the keyboard.
@@ -178,102 +175,5 @@ enum RunnerHue {
             GlassInk.blue, GlassInk.violet, GlassInk.green, GlassInk.orange, Color(red: 0.3, green: 0.82, blue: 0.9),
         ]
         return hues[abs(name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }) % hues.count]
-    }
-}
-
-/// The Terminals app's surface, from Settings: glass clear or frosted, the theme's colour, or solid.
-private struct AppSurface: View {
-    let prefs: TerminalPrefs
-    var body: some View {
-        let shape = coreShape(Radius.cardMac)
-        Group {
-            switch prefs.surface {
-            case .clear: shape.fill(.black.opacity(prefs.surfaceOpacity * 0.6))
-            case .frosted:
-                shape.fill(.ultraThinMaterial).overlay { shape.fill(.black.opacity(prefs.surfaceOpacity * 0.6)) }
-            case .theme:
-                ZStack {
-                    if prefs.blur { shape.fill(.ultraThinMaterial) }
-                    shape.fill(Color(nsColor: prefs.theme.background).opacity(prefs.surfaceOpacity))
-                }
-            case .solid: shape.fill(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.5 + prefs.surfaceOpacity * 0.5))
-            }
-        }
-        .environment(\.colorScheme, .dark)
-        .animation(.easeOut(duration: 0.25), value: prefs.surface)
-        .animation(.easeOut(duration: 0.25), value: prefs.surfaceOpacity)
-    }
-}
-
-/// A filter as a glass tile with its count and key; the lit one glides.
-private struct FilterTile: View {
-    let title: String
-    let count: Int
-    let on: Bool
-    let key: String
-    let pick: () -> Void
-    @State private var hovering = false
-    var body: some View {
-        Button(action: pick) {
-            HStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
-                Text("\(count)").font(.system(size: MacTextSize.meta, weight: .semibold)).monospacedDigit()
-                    .padding(.horizontal, 6).frame(minHeight: 18)
-                    .background(.white.opacity(on ? 0.22 : 0.1), in: coreShape(5))
-                    .contentTransition(.numericText())
-                if hovering || on {
-                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(
-                        GlassInk.secondary)
-                }
-            }
-            .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
-            .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
-            .background(
-                on ? .white.opacity(0.16) : hovering ? .white.opacity(0.07) : .clear, in: coreShape(Radius.control)
-            )
-            .overlay { if on { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) } }
-            .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25), value: on)
-        .animation(.easeOut(duration: 0.15), value: hovering)
-        .accessibilityLabel("\(title), \(count)")
-        .accessibilityAddTraits(on ? .isSelected : [])
-    }
-}
-
-/// A header action: an icon that bounces on hover, a word, and its key.
-private struct ActionTile: View {
-    let title: String
-    let symbol: String
-    let key: String
-    let hue: Color
-    var prominent = false
-    let run: () -> Void
-    @State private var hovering = false
-    var body: some View {
-        Button(action: run) {
-            HStack(spacing: Space.s2) {
-                Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                    .symbolEffect(.bounce, value: hovering)
-                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
-                    .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
-            .background(
-                prominent ? hue.opacity(hovering ? 0.95 : 0.8) : hovering ? hue.opacity(0.28) : GlassInk.well,
-                in: coreShape(Radius.control)
-            )
-            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(prominent ? 0.3 : 0.15), lineWidth: 1) }
-            .shadow(color: hue.opacity(hovering ? 0.5 : 0), radius: 10)
-            .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(hovering ? 1.04 : 1)
-        .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
     }
 }

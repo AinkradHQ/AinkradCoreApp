@@ -36,26 +36,13 @@ final class AgentPrefs {
     }
 }
 
-/// The Agents app's surface inside the pane's glass rim.
+/// The Agents app's surface inside the pane's glass rim: the same fill as the Terminals app (tinted uses violet).
 struct AgentSurface: View {
     @Bindable var prefs = AgentPrefs.shared
     var body: some View {
-        let shape = coreShape(Radius.cardMac)
-        let deep = Color(red: 0.04, green: 0.05, blue: 0.11)
-        Group {
-            switch prefs.surface {
-            case .clear: shape.fill(deep.opacity(prefs.opacity * 0.6))
-            case .frosted: shape.fill(.ultraThinMaterial).overlay { shape.fill(deep.opacity(prefs.opacity)) }
-            case .tinted:
-                shape.fill(.ultraThinMaterial)
-                    .overlay { shape.fill(GlassInk.violet.opacity(0.12 + prefs.opacity * 0.25)) }
-                    .overlay { shape.fill(deep.opacity(prefs.opacity * 0.6)) }
-            case .solid: shape.fill(deep.opacity(0.6 + prefs.opacity * 0.4))
-            }
-        }
-        .environment(\.colorScheme, .dark)
-        .animation(.easeOut(duration: 0.25), value: prefs.surface)
-        .animation(.easeOut(duration: 0.25), value: prefs.opacity)
+        AppSurfaceFill(
+            style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted, opacity: prefs.opacity,
+            tint: Color(red: 0.1, green: 0.06, blue: 0.22))
     }
 }
 
