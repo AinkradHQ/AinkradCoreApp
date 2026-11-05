@@ -38,8 +38,10 @@ public struct Palette: Sendable {
     /// No blue focus rings anywhere (Ahmed, 2026-11-05): views that still outline the focused control get the quiet edge.
     public var focusRing: Color { glassCardEdge }
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
-    public var glassCard: Color { pick("glassCard", fallback: theme["mRow"]) }
-    public var glassCardEdge: Color { pick("glassCardEdge", fallback: theme["edge"]) }
+    /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
+    /// soft white well with a light edge, not a dark slab, in both themes.
+    public var glassCard: Color { .white.opacity(0.08) }
+    public var glassCardEdge: Color { .white.opacity(0.14) }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }

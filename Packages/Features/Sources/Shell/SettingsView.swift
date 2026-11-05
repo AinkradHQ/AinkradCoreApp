@@ -8,6 +8,17 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
     case security = "Security"
     case notifications = "Notifications"
     case appearance = "Appearance"
+
+    /// Each group has its colour on the nav tiles, so the list reads at a glance.
+    var hue: Color {
+        switch self {
+        case .mac: Color(red: 0.55, green: 0.6, blue: 0.7)
+        case .core: WidgetInk.blue
+        case .security: WidgetInk.orange
+        case .notifications: Color(red: 1, green: 0.38, blue: 0.4)
+        case .appearance: Color(red: 0.62, green: 0.45, blue: 1)
+        }
+    }
 }
 
 /// `Mac.settings.section({ id, group, title, icon, order, mount })`.
@@ -86,7 +97,8 @@ struct SettingsView: View {
                     .padding(.bottom, Space.s3)
                     ForEach(shell.settings.grouped(), id: \.0) { group, list in
                         Text(group.rawValue).font(.system(size: MacTextSize.body, weight: .semibold))
-                            .foregroundStyle(palette.text2).padding(.top, Space.s3).accessibilityAddTraits(.isHeader)
+                            .foregroundStyle(WidgetInk.secondary).padding(.top, Space.s3).accessibilityAddTraits(
+                                .isHeader)
                         ForEach(list) { s in
                             Button {
                                 shell.settings.selected = s.id
@@ -102,13 +114,31 @@ struct SettingsView: View {
                 .animation(reduce ? nil : Motion.out(0.26), value: shell.settings.selected)
             }
             .frame(width: Space.s8 * 8)
+            .background(Color.black.opacity(0.12))
             VStack(alignment: .leading, spacing: Space.s2) {
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: Space.s4) {
+                    if let current {
+                        // The section's own icon, large, bouncing in each time the section changes.
+                        Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .symbolEffect(.bounce, value: current.id)
+                            .contentTransition(.symbolEffect(.replace))
+                            .frame(width: 56, height: 56)
+                            .background(
+                                LinearGradient(
+                                    colors: [current.group.hue, current.group.hue.opacity(0.6)], startPoint: .top,
+                                    endPoint: .bottom),
+                                in: coreShape(Radius.control + 4)
+                            )
+                            .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                            .shadow(color: current.group.hue.opacity(0.5), radius: 12)
+                            .accessibilityHidden(true)
+                    }
                     VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                        Text(current?.title ?? "").font(.system(size: MacTextSize.large, weight: .semibold))
+                        Text(current?.title ?? "").font(.system(size: MacTextSize.large + 6, weight: .bold))
                             .accessibilityAddTraits(.isHeader)
                         if let sub = current?.sub {
-                            Text(sub).foregroundStyle(palette.text2)
+                            Text(sub).foregroundStyle(WidgetInk.secondary)
                         }
                     }
                     .id("title-\(current?.id ?? "")")
@@ -116,7 +146,7 @@ struct SettingsView: View {
                     Spacer()
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")
-                            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                            .font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary)
                             .transition(.opacity).accessibilityLabel("Saved")
                     }
                     // The close button turns a quarter on hover (Reduce Motion: no turn).
@@ -136,9 +166,14 @@ struct SettingsView: View {
             .animation(Motion.out(reduce ? 0.16 : 0.34), value: current?.id)
             .clipped()
         }
-        .frame(width: ShellMetrics.settingsSize.width, height: ShellMetrics.settingsSize.height)
-        .corePanel(radius: Radius.panel, padding: 0)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        // Most of the screen (Ahmed, 2026-11-05: larger), on the launcher's glass: darker than a widget, frosted at
+        // night, clear by day, with white ink.
+        .foregroundStyle(WidgetInk.primary)
+        .containerRelativeFrame([.horizontal, .vertical]) { length, _ in length * 0.86 }
+        .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: coreShape(Radius.panel + Space.s1))
+        .clipShape(coreShape(Radius.panel + Space.s1))
+        .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false, frosted: !palette.isDay)
+        .shadow(color: .black.opacity(0.3), radius: 40, y: 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")
         .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.95)))
@@ -151,18 +186,27 @@ struct SettingsView: View {
     }
 
     private func navRow(_ s: SettingsSection, selected: Bool) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: s.symbol).frame(width: MacSize.controlMd).accessibilityHidden(true)
-            Text(s.title).font(.system(size: MacTextSize.headline))
+        HStack(spacing: Space.s3) {
+            Image(systemName: s.symbol).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(.white)
+                .symbolEffect(.bounce, value: selected)
+                .frame(width: MacSize.controlMd + 2, height: MacSize.controlMd + 2)
+                .background(
+                    LinearGradient(
+                        colors: [s.group.hue, s.group.hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
+                    in: coreShape(Radius.control)
+                )
+                .accessibilityHidden(true)
+            Text(s.title).font(.system(size: MacTextSize.headline, weight: selected ? .semibold : .regular))
             Spacer(minLength: 0)
         }
+        .foregroundStyle(WidgetInk.primary)
         .padding(.horizontal, Space.s2)
-        .frame(height: MacSize.controlLg)
+        .frame(height: MacSize.controlLg + Space.s1)
         // One selection that glides between rows (`s-glide`), not a background swapped per row.
         .background {
             if selected {
-                coreShape(Radius.control).fill(palette.navActive)
-                    .overlay { coreShape(Radius.control).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+                coreShape(Radius.control).fill(.white.opacity(0.18))
+                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
                     .matchedGeometryEffect(id: "nav", in: glide)
             }
         }
