@@ -127,14 +127,15 @@ struct AccountDetailView: View {
             }
         }
         .padding(Space.s4)
+        // The glow is an overlay of the fill, so it can never change the banner's size.
         .background {
-            ZStack(alignment: .leading) {
-                tone.opacity(0.1)
-                coreShape(60).fill(tone.opacity(0.35)).frame(width: 200, height: 120).blur(radius: 50)
-                    .offset(x: shown && !reduce ? 40 : -60)
-                    .animation(reduce ? nil : .easeInOut(duration: 4).repeatForever(), value: shown)
-            }
-            .clipShape(coreShape(Radius.cardMac))
+            tone.opacity(0.1)
+                .overlay(alignment: .leading) {
+                    coreShape(60).fill(tone.opacity(0.35)).frame(width: 200, height: 80).blur(radius: 50)
+                        .offset(x: shown && !reduce ? 40 : -60)
+                        .animation(reduce ? nil : .easeInOut(duration: 4).repeatForever(), value: shown)
+                }
+                .clipShape(coreShape(Radius.cardMac))
         }
         .overlay { coreShape(Radius.cardMac).strokeBorder(tone.opacity(0.45), lineWidth: 1) }
         .animation(.spring(duration: 0.4, bounce: 0.25), value: usable)

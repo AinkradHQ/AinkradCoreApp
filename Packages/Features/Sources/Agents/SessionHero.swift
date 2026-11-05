@@ -77,14 +77,13 @@ struct SessionHero: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
         .background {
-            ZStack {
-                Color(red: 0.05, green: 0.06, blue: 0.1).opacity(0.55)
-                coreShape(60).fill(hue.opacity(0.4)).frame(width: 220, height: 160).blur(radius: 60)
-                    .offset(x: alive && shown ? -120 : -220, y: alive && shown ? 10 : -30)
-                    .animation(alive ? .easeInOut(duration: 3.6).repeatForever() : .default, value: shown)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .clipShape(coreShape(Radius.cardMac))
+            Color(red: 0.05, green: 0.06, blue: 0.1).opacity(0.55)
+                .overlay(alignment: .leading) {
+                    coreShape(60).fill(hue.opacity(0.4)).frame(width: 220, height: 120).blur(radius: 60)
+                        .offset(x: alive && shown ? 100 : 0, y: alive && shown ? 10 : -20)
+                        .animation(alive ? .easeInOut(duration: 3.6).repeatForever() : .default, value: shown)
+                }
+                .clipShape(coreShape(Radius.cardMac))
         }
         .overlay {
             coreShape(Radius.cardMac).strokeBorder(
