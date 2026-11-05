@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Top right: Home/Workspace, layout, what is running, the Touch ID elevation chip (placeholder), the bell, Home Core and the emblem.
+/// Top right: Home/Workspace, layout, what is running, the Touch ID elevation chip (placeholder), the bell, the Core's state when it is not connected, and the emblem.
 struct StatusCluster: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
@@ -26,13 +26,10 @@ struct StatusCluster: View {
                 label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
                 on: shell.bellOpen
             ) { shell.toggleBell() }
-            StatusButton(title: coreTitle, symbol: coreSymbol, label: "\(shell.home.coreName), \(coreWord)") {
-                if shell.coreLink == .offline, let retry = shell.retryConnection {
-                    retry()
-                } else if let core = shell.launcher.entry("core") {
-                    core.run()
-                } else {
-                    shell.toggleLauncher()
+            // The Core is reached from the launcher; the bar names it only when the link is not live.
+            if shell.coreLink != .live {
+                StatusButton(title: coreTitle, symbol: coreSymbol, label: "\(shell.home.coreName), \(coreWord)") {
+                    if shell.coreLink == .offline, let retry = shell.retryConnection { retry() }
                 }
             }
             Button {
