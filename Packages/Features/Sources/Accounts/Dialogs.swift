@@ -331,21 +331,125 @@ struct AccountsLinkSection: View {
 }
 
 /// Settings, Security: where the real-accounts gate stands.
+/// Settings, Security, Real accounts: the way from no keys to real provider keys, as three steps in plain words. The next
+/// step to take glows and has the tile that opens it.
 struct AccountsGateSection: View {
     let model: AccountsModel
-    @Environment(\.corePalette) private var palette
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text("This gate is only for provider keys. Other secrets stay throwaway until the external review ends.")
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            CoreNotice(
-                symbol: model.gate.symbol, title: model.gate.title, text: model.gate.detail, tone: model.gate.tone
-            ) {
-                Button("Feature switches") { model.openSwitches() }.buttonStyle(.coreSecondary)
+        let g = model.gate
+        let done = [(g.mode ?? 0) >= 1, (g.providerAccounts ?? 0) >= 1 && g.kind == .real]
+        let next = done.firstIndex(of: false)
+        VStack(alignment: .leading, spacing: Space.s4) {
+            Text(
+                "Real accounts hold a real API key from Anthropic, OpenAI or Google. Two switches stand in the way, on purpose."
+            )
+            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            verdict(g)
+            VStack(spacing: Space.s3) {
+                step(
+                    1, "Keys and secrets", "Your Core may keep keys and secrets.",
+                    off: "Your Core keeps no keys at all yet.", symbol: "testtube.2", done: done[0], next: next == 0)
+                step(
+                    2, "Real provider keys", "Accounts may hold a real key. Agents can use it.",
+                    off: "Only test keys are accepted for accounts.", symbol: "key.fill", done: done[1],
+                    next: next == 1)
+                step(
+                    3, "Add a real account", "Connect Claude, OpenAI or Gemini in Accounts.",
+                    off: next == nil
+                        ? "Connect Claude, OpenAI or Gemini in Accounts." : "Opens once the two steps above are done.",
+                    symbol: "person.crop.circle.badge.plus",
+                    done: false, next: next == nil,
+                    open: (
+                        "Open Accounts",
+                        {
+                            model.host.shell.overlay = nil
+                            model.show(.accounts)
+                        }
+                    ))
+            }
+            HStack(spacing: Space.s3) {
+                fact("eye.slash.fill", "Never shown again", "A key goes in and can't be read back.")
+                fact("server.rack", "Only runners use it", "Your Mac never holds it.")
+                fact("doc.text.fill", "Every use is logged", "See it in Audit.")
             }
         }
-        .font(.system(size: MacTextSize.body)).frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(GlassInk.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(g.technical)
+        .animation(.smooth(duration: 0.35), value: g)
         .task { await model.reload() }
+    }
+
+    private func verdict(_ g: GateState) -> some View {
+        let hue = g.kind == .real ? GlassInk.green : g.kind == .off ? GlassInk.orange : GlassInk.blue
+        return HStack(spacing: Space.s4) {
+            IconTile(
+                g.kind == .real ? "checkmark.shield.fill" : g.kind == .off ? "lock.fill" : "testtube.2", hue: hue,
+                size: 56, bounce: g.step ?? -1
+            )
+            .shadow(color: hue.opacity(0.5), radius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(g.title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Space.s3)
+            if let s = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: s, hue: hue) }
+        }
+        .padding(Space.s4)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+    }
+
+    private func step(
+        _ n: Int, _ title: String, _ on: String, off: String, symbol: String, done: Bool, next: Bool,
+        open: (String, () -> Void)? = nil
+    ) -> some View {
+        let hue = done ? GlassInk.green : next ? GlassInk.blue : GlassInk.slate
+        return HStack(spacing: Space.s3) {
+            IconTile(done ? "checkmark" : symbol, hue: hue, size: 40, bounce: done)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(n). \(title)").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(done ? on : off).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: Space.s3)
+            if done {
+                Label("Done", systemImage: "checkmark.circle.fill").font(
+                    .system(size: MacTextSize.meta, weight: .semibold)
+                )
+                .foregroundStyle(GlassInk.green)
+            } else if next {
+                let o = open ?? ("Open Feature switches", { model.openSwitches() })
+                AppActionTile(
+                    title: o.0, symbol: "arrow.right", key: "↩", hue: GlassInk.blue, prominent: true, run: o.1
+                )
+                .keyboardShortcut(.defaultAction)
+            } else {
+                Label("Waiting", systemImage: "lock.fill").font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(GlassInk.secondary)
+            }
+        }
+        .padding(Space.s3)
+        .background(next ? GlassInk.blue.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                next ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: next ? 1.5 : 1)
+        }
+        .shadow(color: GlassInk.blue.opacity(next ? 0.25 : 0), radius: 12)
+        .opacity(done || next ? 1 : 0.7)
+    }
+
+    private func fact(_ symbol: String, _ title: String, _ line: String) -> some View {
+        HStack(spacing: Space.s2) {
+            IconTile(symbol, hue: GlassInk.slate, size: 28)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(line).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
     }
 }
 

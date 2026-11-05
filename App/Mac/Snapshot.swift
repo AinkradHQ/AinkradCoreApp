@@ -29,15 +29,17 @@ enum SnapshotRunner {
         }
         if let dir = env["CORE_ADMIN_SNAPSHOT"] { return await AdminSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
-        // `CORE_LOCK_SNAPSHOT=<dir>`: Settings, Lockouts with two sample locks (needs a paired Core).
+        // `CORE_LOCK_SNAPSHOT=<dir> [CORE_SETTINGS_PAGE=<id>]`: one Settings page on the paired Core (Lockouts, the default,
+        // gets two sample locks).
         if let dir = env["CORE_LOCK_SNAPSHOT"] {
+            let page = env["CORE_SETTINGS_PAGE"] ?? "lockouts"
             try? await Task.sleep(for: .seconds(4))
-            app.debugOpenSettings("lockouts")
+            app.debugOpenSettings(page)
             try? await Task.sleep(for: .seconds(1))
-            app.debugSampleLockouts()
+            if page == "lockouts" { app.debugSampleLockouts() }
             try? await Task.sleep(for: .seconds(2))
             if let w = NSApp.windows.first(where: { $0.title == "Ainkrad" }) {
-                log("shot lockouts \(capture(w, to: "\(dir)/lockouts.png"))")
+                log("shot \(page) \(capture(w, to: "\(dir)/\(page).png"))")
             }
             NSApp.terminate(nil)
             return
