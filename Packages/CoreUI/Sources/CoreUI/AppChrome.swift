@@ -155,3 +155,31 @@ public struct AppStatChip: View {
         .background(GlassInk.well, in: coreShape(Radius.chip))
     }
 }
+
+/// An app's header: filters at the left and actions at the right on one row when they fit, else the filters on one row
+/// and the actions under them, right-aligned. Nothing is squeezed or spills out of the pane.
+public struct AppHeader<Filters: View, Actions: View>: View {
+    let filters: Filters
+    let actions: Actions
+    public init(@ViewBuilder filters: () -> Filters, @ViewBuilder actions: () -> Actions) {
+        self.filters = filters()
+        self.actions = actions()
+    }
+    public var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Space.s2) {
+                HStack(spacing: Space.s2) { filters }.fixedSize()
+                Spacer(minLength: Space.s3)
+                HStack(spacing: Space.s2) { actions }.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: Space.s2) {
+                ScrollView(.horizontal) { HStack(spacing: Space.s2) { filters }.fixedSize() }.scrollIndicators(.never)
+                HStack(spacing: Space.s2) {
+                    Spacer(minLength: 0)
+                    actions
+                }
+            }
+        }
+        .padding(.horizontal, Space.s4).padding(.top, Space.s2).padding(.bottom, Space.s3)
+    }
+}

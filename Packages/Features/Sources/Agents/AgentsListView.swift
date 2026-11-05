@@ -11,18 +11,16 @@ struct AgentsListView: View {
     var body: some View {
         let waitingIDs = Set(model.pending.map(\.session))
         VStack(alignment: .leading, spacing: 0) {
-            // The Terminals header: filters at the left, actions at the right, one row.
-            HStack(spacing: Space.s2) {
+            AppHeader {
                 ForEach(Array(filters(waitingIDs.count).enumerated()), id: \.offset) { i, f in
                     AppFilterTile(title: f.1, count: f.2, on: model.filter == f.0, key: "⌘\(i + 1)") {
                         withAnimation(.spring(duration: 0.3)) { model.filter = f.0 }
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
                 }
-                Spacer(minLength: Space.s2)
+            } actions: {
                 buttons(waitingIDs.count)
             }
-            .padding(.horizontal, Space.s4).padding(.top, Space.s2).padding(.bottom, Space.s3)
             if model.shouldAskAboutNotifications {
                 NotificationAsk(model: model).padding([.horizontal, .bottom], Space.s3)
             }
@@ -59,7 +57,7 @@ struct AgentsListView: View {
             }
             Spacer(minLength: 0)
             Text("↩ open · A approvals · C cancel · K kill · R resume · P look").font(.system(size: MacTextSize.meta))
-                .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
     }

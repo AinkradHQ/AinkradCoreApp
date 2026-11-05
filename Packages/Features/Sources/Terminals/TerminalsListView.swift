@@ -28,14 +28,14 @@ struct TerminalsListView: View {
     }
 
     private var header: some View {
-        HStack(spacing: Space.s2) {
+        AppHeader {
             ForEach(Array(TerminalFilter.allCases.enumerated()), id: \.element) { i, f in
                 AppFilterTile(title: f.rawValue, count: count(f), on: model.filter == f, key: "⌘\(i + 1)") {
                     model.filter = f
                 }
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
-            Spacer(minLength: Space.s2)
+        } actions: {
             AppActionTile(title: "Appearance", symbol: "paintpalette", key: "⌥⌘P", hue: GlassInk.violet) {
                 appearance.toggle()
             }
@@ -46,7 +46,6 @@ struct TerminalsListView: View {
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
         }
-        .padding(.horizontal, Space.s4).padding(.top, Space.s2).padding(.bottom, Space.s3)
     }
 
     private func count(_ f: TerminalFilter) -> Int {
@@ -140,7 +139,7 @@ struct TerminalsListView: View {
             }
             Spacer(minLength: 0)
             Text("↩ open · D detach · E end · S signal · R rename").font(.system(size: MacTextSize.meta))
-                .foregroundStyle(GlassInk.secondary)
+                .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
         .help("Terminals this device opened. The Core keeps no output, so a tile shows the shell, not its screen.")

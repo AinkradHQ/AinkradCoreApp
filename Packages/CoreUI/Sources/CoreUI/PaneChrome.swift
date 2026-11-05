@@ -27,9 +27,12 @@ public struct CorePaneChrome<Content: View>: View {
     /// No head and no footer (Ahmed, 2026-11-05): the pane is clear glass holding its content; its title and actions
     /// live in its tab in the top bar. The active pane's edge is a touch brighter.
     public var body: some View {
-        content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Content takes exactly the pane's frame and never spills over a neighbour.
+        content.frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
             .padding(Space.s2)
             .coreGlass(radius: Radius.pane, interactive: false, tinted: false)
+            .clipShape(coreShape(Radius.pane))
             .overlay {
                 coreShape(Radius.pane).strokeBorder(.white.opacity(active ? 0.3 : 0.12), lineWidth: 1)
             }
