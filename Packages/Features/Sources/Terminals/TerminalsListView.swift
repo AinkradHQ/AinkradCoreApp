@@ -16,7 +16,9 @@ struct TerminalsListView: View {
             content
             footer
         }
+        // Like a terminal pane: the pane's glass is a rim, and the app's chosen background sits inside it, rounded.
         .background { AppSurface(prefs: prefs) }
+        .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }
     }
 
@@ -183,18 +185,21 @@ enum RunnerHue {
 private struct AppSurface: View {
     let prefs: TerminalPrefs
     var body: some View {
-        let shape = coreShape(Radius.pane)
+        let shape = coreShape(Radius.cardMac)
         Group {
             switch prefs.surface {
             case .clear: shape.fill(.black.opacity(prefs.surfaceOpacity * 0.6))
             case .frosted:
                 shape.fill(.ultraThinMaterial).overlay { shape.fill(.black.opacity(prefs.surfaceOpacity * 0.6)) }
-            case .theme: shape.fill(Color(nsColor: prefs.theme.background).opacity(0.4 + prefs.surfaceOpacity * 0.6))
+            case .theme:
+                ZStack {
+                    if prefs.blur { shape.fill(.ultraThinMaterial) }
+                    shape.fill(Color(nsColor: prefs.theme.background).opacity(prefs.surfaceOpacity))
+                }
             case .solid: shape.fill(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.5 + prefs.surfaceOpacity * 0.5))
             }
         }
         .environment(\.colorScheme, .dark)
-        .padding(-Space.s2)
         .animation(.easeOut(duration: 0.25), value: prefs.surface)
         .animation(.easeOut(duration: 0.25), value: prefs.surfaceOpacity)
     }
