@@ -168,13 +168,13 @@ struct AccountCard: View {
         let a = account
         let hue = ProviderLook.hue(a.provider)
         let on = model.cursor == "a-\(a.id)"
+        let usable = model.usable(a)
+        // The bar says whether agents can use it: full green only when ready and in a pool, two thirds orange when it
+        // only lacks a pool, part-filled in its tone otherwise.
         let state =
-            a.phase.tone == .run
+            usable
             ? GlassInk.green
-            : a.phase.tone == .fail
-                ? GlassInk.red
-                : a.phase.tone == .warn
-                    ? GlassInk.orange : GlassInk.slate
+            : a.phase.tone == .fail ? GlassInk.red : a.phase == .disabled ? GlassInk.slate : GlassInk.orange
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
                 AccTile(provider: a.provider).symbolEffect(.bounce, value: hovering)
@@ -186,14 +186,16 @@ struct AccountCard: View {
                 Spacer(minLength: Space.s2)
                 PhaseBadge(phase: a.phase)
             }
-            // The state as a bar: full and green when ready, part-filled in its tone otherwise.
+            // Readiness as a bar (see `state`).
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     coreShape(2).fill(GlassInk.track)
                     coreShape(2).fill(state)
                         .frame(
                             width: shown
-                                ? g.size.width * (a.phase == .active ? 1 : a.phase == .disabled ? 0.08 : 0.45) : 0
+                                ? g.size.width
+                                    * (usable ? 1 : a.phase == .active ? 0.66 : a.phase == .disabled ? 0.08 : 0.45)
+                                : 0
                         )
                         .shadow(color: state.opacity(0.6), radius: 4)
                 }
@@ -226,8 +228,7 @@ struct AccountCard: View {
         .opacity(a.phase == .disabled ? 0.7 : 1)
         .scaleEffect(hovering ? 1.02 : on ? 1.01 : 1)
         .contentShape(coreShape(Radius.cardMac))
-        .onTapGesture(count: 2) { openIt() }
-        .onTapGesture { withAnimation(.spring(duration: 0.25)) { model.cursor = "a-\(a.id)" } }
+        .onTapGesture { openIt() }
         .onHover { hovering = $0 }
         .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
         .animation(.spring(duration: 0.3), value: on)
