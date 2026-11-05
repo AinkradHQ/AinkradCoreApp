@@ -60,10 +60,12 @@ private struct GlassModifier: ViewModifier {
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if #available(macOS 26, iOS 26, *) {
-            // Untinted keeps a breath of blue at night; the day sky is bright, so day glass stays deep blue (the
-            // prototype's day theme) or white text on it washes out.
-            let glass = Glass.regular.tint(
-                tinted || palette.isDay ? palette.glassTint : palette.glassTint.opacity(0.25))
+            // Untinted is Apple's plain glass, taking the colour of what is behind it (the widget look); on the bright day
+            // sky a faint dark breath keeps white text readable.
+            let glass =
+                tinted
+                ? Glass.regular.tint(palette.glassTint)
+                : palette.isDay ? Glass.regular.tint(.black.opacity(0.12)) : Glass.regular
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
         } else {

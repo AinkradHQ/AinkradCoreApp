@@ -32,9 +32,8 @@ struct QuickBody: View {
         ]
         let wide = size == .m
         VStack(alignment: .leading, spacing: Space.s2) {
-            if !wide { WidgetHead(title: "Quick actions", symbol: "bolt") }
-            let cols = wide ? [GridItem(.flexible(), spacing: 6), GridItem(.flexible())] : [GridItem(.flexible())]
-            LazyVGrid(columns: cols, spacing: 6) {
+            let cols = [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())]
+            LazyVGrid(columns: cols, spacing: Space.s2) {
                 ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
                     Button {
                         run(t.0, t.1)
@@ -57,28 +56,14 @@ struct QuickBody: View {
         .onAppear { arrived = true }
     }
 
-    @ViewBuilder private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
-        let icon = Image(systemName: symbol).font(.system(size: wide ? 14 : 13)).accessibilityHidden(true)
-        let text = Text(title).font(.system(size: wide ? MacTextSize.meta : MacTextSize.body, weight: .medium))
-            .lineLimit(1)
-        if wide {
-            VStack(spacing: 2) {
-                icon
-                HStack(spacing: Space.s1) {
-                    text
-                    if let key { Text(key).font(.system(size: MacTextSize.meta)).opacity(0.8) }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 40)
-        } else {
-            HStack(spacing: Space.s2) {
-                icon
-                text
-                if let key { CoreKeycap(key) }
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, minHeight: 26)
+    /// A big icon over a short label, Apple style; the launcher tile adds its key.
+    private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
+        VStack(spacing: Space.s1) {
+            Image(systemName: symbol).font(.system(size: 22, weight: .medium)).accessibilityHidden(true)
+            Text(key.map { "\(title) \($0)" } ?? title).font(.system(size: MacTextSize.meta, weight: .medium))
+                .lineLimit(1).minimumScaleFactor(0.8)
         }
+        .frame(maxWidth: .infinity, minHeight: wide ? 52 : 64)
     }
 }
 

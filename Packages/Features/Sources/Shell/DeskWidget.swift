@@ -13,13 +13,14 @@ struct DeskWidget: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var hovering = false
 
-    private var radius: CGFloat { 20 }
+    /// Apple widget corners: large and soft.
+    private var radius: CGFloat { 26 }
 
     var body: some View {
         let size = DeskGrid.frameSize(item.size)
         ZStack(alignment: .topLeading) {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
-                .padding(14).padding(.top, editing ? 30 : 0)
+                .padding(18).padding(.top, editing ? 30 : 0)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
@@ -33,7 +34,7 @@ struct DeskWidget: View {
         .overlay {
             coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)).allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(lifting ? 0.42 : 0.28), radius: lifting ? 35 : 22, y: lifting ? 17 : 9)
+        .shadow(color: .black.opacity(lifting ? 0.35 : 0.12), radius: lifting ? 30 : 14, y: lifting ? 14 : 4)
         .scaleEffect(lifting && !reduce ? 1.025 : 1)
         .animation(.easeOut(duration: 0.2), value: lifting)
         .animation(.easeOut(duration: 0.24), value: hovering)
