@@ -31,10 +31,8 @@ struct TerminalSettingsView: View {
                     Text("\(Int(prefs.fontSize)) pt").font(.system(size: MacTextSize.body, weight: .semibold))
                         .monospacedDigit().contentTransition(.numericText())
                 }
-                HStack(spacing: Space.s3) {
-                    Image(systemName: "textformat.size.smaller").foregroundStyle(GlassInk.secondary)
-                    Slider(value: $prefs.fontSize, in: 9...24, step: 1)
-                    Image(systemName: "textformat.size.larger").foregroundStyle(GlassInk.secondary)
+                GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt") { _ in
+                    Int(prefs.fontSize.rounded())
                 }
             }
             GlassSection(
@@ -57,37 +55,23 @@ struct TerminalSettingsView: View {
                     prefs.blur.toggle()
                 }
             } content: {
-                HStack(spacing: Space.s3) {
-                    Image(systemName: "square.fill").foregroundStyle(GlassInk.secondary)
-                    Slider(
-                        value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6,
-                        step: 0.05)
-                    Image(systemName: "square.dashed").foregroundStyle(GlassInk.secondary)
-                    Text("\(Int(((1 - prefs.opacity) * 100).rounded()))%").font(
-                        .system(size: MacTextSize.body, weight: .semibold)
-                    )
-                    .monospacedDigit().contentTransition(.numericText()).frame(width: 44, alignment: .trailing)
-                }
+                GlassSlider(
+                    value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6,
+                    low: "Solid",
+                    high: "See-through")
                 Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
             }
             GlassSection(
                 "App surface", sub: "The Terminals app's own background.", symbol: "square.on.square",
                 hue: GlassInk.blue, index: 5
             ) {
-                Picker("Surface", selection: $prefs.surface) {
-                    Text("Clear glass").tag(TerminalPrefs.Surface.clear)
-                    Text("Frosted glass").tag(TerminalPrefs.Surface.frosted)
-                    Text("Theme colour").tag(TerminalPrefs.Surface.theme)
-                    Text("Solid").tag(TerminalPrefs.Surface.solid)
-                }
-                .pickerStyle(.segmented).labelsHidden()
-                HStack(spacing: Space.s3) {
-                    Text("Clear").foregroundStyle(GlassInk.secondary)
-                    Slider(value: $prefs.surfaceOpacity, in: 0...1)
-                    Text("Solid").foregroundStyle(GlassInk.secondary)
-                    Text("\(Int((prefs.surfaceOpacity * 100).rounded()))%").monospacedDigit().frame(
-                        width: 44, alignment: .trailing)
-                }
+                CoreSegmented(
+                    "Surface",
+                    segments: [
+                        CoreSegment(TerminalPrefs.Surface.clear, "Clear glass"), CoreSegment(.frosted, "Frosted glass"),
+                        CoreSegment(.theme, "Theme colour"), CoreSegment(.solid, "Solid"),
+                    ], selection: $prefs.surface, fill: true)
+                GlassSlider(value: $prefs.surfaceOpacity, low: "Clear", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",

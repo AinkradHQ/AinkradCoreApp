@@ -216,35 +216,24 @@ struct AppearancePopover: View {
                 }
             }
             Text("App surface").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            Picker("Surface", selection: $prefs.surface) {
-                Text("Clear").tag(TerminalPrefs.Surface.clear)
-                Text("Frosted").tag(TerminalPrefs.Surface.frosted)
-                Text("Theme").tag(TerminalPrefs.Surface.theme)
-                Text("Solid").tag(TerminalPrefs.Surface.solid)
-            }
-            .pickerStyle(.segmented).labelsHidden()
-            slider("Surface", value: $prefs.surfaceOpacity, range: 0...1, solid: true)
+            CoreSegmented(
+                "Surface",
+                segments: [
+                    CoreSegment(TerminalPrefs.Surface.clear, "Clear"), CoreSegment(.frosted, "Frosted"),
+                    CoreSegment(.theme, "Theme"), CoreSegment(.solid, "Solid"),
+                ], selection: $prefs.surface, fill: true)
+            GlassSlider(value: $prefs.surfaceOpacity, low: "Clear", high: "Solid")
             Text("Terminal screen").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            slider(
-                "Transparency", value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }),
-                range: 0...0.6,
-                solid: false)
+            GlassSlider(
+                value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6, low: "Solid",
+                high: "See-through")
             Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
-            LabeledContent("Font size") { Stepper("\(Int(prefs.fontSize)) pt", value: $prefs.fontSize, in: 9...24) }
+            Text("Font size").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
+            GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt") { _ in
+                Int(prefs.fontSize.rounded())
+            }
         }
         .padding(Space.s4)
         .frame(width: 380)
-    }
-
-    private func slider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, solid: Bool) -> some View {
-        HStack {
-            Text(title).frame(width: 92, alignment: .leading)
-            Slider(value: value, in: range)
-            Text(
-                solid
-                    ? "\(Int((value.wrappedValue * 100).rounded()))%" : "\(Int((value.wrappedValue * 100).rounded()))%"
-            )
-            .monospacedDigit().frame(width: 38, alignment: .trailing)
-        }
     }
 }

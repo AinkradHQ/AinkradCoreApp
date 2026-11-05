@@ -183,3 +183,77 @@ public struct AppHeader<Filters: View, Actions: View>: View {
         .padding(.horizontal, Space.s4).padding(.top, Space.s2).padding(.bottom, Space.s3)
     }
 }
+
+/// The one slider (Ahmed, 2026-11-05: unify): a glass track with a blue fill and a white knob, the two ends named,
+/// the value as a percentage at the right. Drag or click anywhere on the track; ← → step by 5 %.
+public struct GlassSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let low: String
+    let high: String
+    let percent: (Double) -> Int
+    let unit: String
+    @State private var dragging = false
+    @FocusState private var focused: Bool
+
+    public init(
+        value: Binding<Double>, in range: ClosedRange<Double> = 0...1, low: String, high: String, unit: String = "%",
+        percent: @escaping (Double) -> Int = { Int(($0 * 100).rounded()) }
+    ) {
+        self.unit = unit
+        self._value = value
+        self.range = range
+        self.low = low
+        self.high = high
+        self.percent = percent
+    }
+
+    public var body: some View {
+        HStack(spacing: Space.s3) {
+            Text(low).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            GeometryReader { g in
+                let f = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
+                let x = g.size.width * CGFloat(min(max(f, 0), 1))
+                ZStack(alignment: .leading) {
+                    coreShape(3).fill(.white.opacity(0.14)).frame(height: 6)
+                    coreShape(3).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
+                        .shadow(color: GlassInk.blue.opacity(0.5), radius: 4)
+                    coreShape(6).fill(.white).frame(width: dragging ? 22 : 18, height: dragging ? 22 : 18)
+                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        .offset(x: x - (dragging ? 11 : 9))
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { d in
+                            dragging = true
+                            let t = min(max(d.location.x / max(g.size.width, 1), 0), 1)
+                            value = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
+                        }
+                        .onEnded { _ in dragging = false })
+            }
+            .frame(height: 24)
+            Text(high).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            Text("\(percent(value))\(unit)").font(.system(size: MacTextSize.body, weight: .semibold)).monospacedDigit()
+                .contentTransition(.numericText()).frame(width: 46, alignment: .trailing)
+        }
+        .animation(.spring(duration: 0.2), value: dragging)
+        .focusable().focused($focused).focusEffectDisabled()
+        .onKeyPress(.leftArrow) { step(-0.05) }
+        .onKeyPress(.rightArrow) { step(0.05) }
+        .accessibilityElement()
+        .accessibilityLabel("\(low) to \(high)")
+        .accessibilityValue("\(percent(value))\(unit == "%" ? " percent" : unit)")
+        .accessibilityAdjustableAction { direction in
+            let by = direction == .increment ? 0.05 : -0.05
+            _ = step(by)
+        }
+    }
+
+    private func step(_ by: Double) -> KeyPress.Result {
+        let span = range.upperBound - range.lowerBound
+        value = min(max(value + by * span, range.lowerBound), range.upperBound)
+        return .handled
+    }
+}

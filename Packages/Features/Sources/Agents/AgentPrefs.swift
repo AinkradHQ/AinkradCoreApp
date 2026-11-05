@@ -57,33 +57,27 @@ struct AgentSettingsView: View {
             GlassSection(
                 "App surface", sub: "The Agents app's background.", symbol: "square.on.square", hue: GlassInk.violet
             ) {
-                Picker("Surface", selection: $prefs.surface) {
-                    Text("Clear").tag(AgentPrefs.Surface.clear)
-                    Text("Frosted").tag(AgentPrefs.Surface.frosted)
-                    Text("Tinted").tag(AgentPrefs.Surface.tinted)
-                    Text("Solid").tag(AgentPrefs.Surface.solid)
-                }
-                .pickerStyle(.segmented).labelsHidden()
-                HStack(spacing: Space.s3) {
-                    Text("Clear").foregroundStyle(GlassInk.secondary)
-                    Slider(value: $prefs.opacity, in: 0...1)
-                    Text("Solid").foregroundStyle(GlassInk.secondary)
-                    Text("\(Int((prefs.opacity * 100).rounded()))%").monospacedDigit().frame(
-                        width: 44, alignment: .trailing)
-                }
+                CoreSegmented(
+                    "Surface",
+                    segments: [
+                        CoreSegment(AgentPrefs.Surface.clear, "Clear glass"), CoreSegment(.frosted, "Frosted glass"),
+                        CoreSegment(.tinted, "Tinted"), CoreSegment(.solid, "Solid"),
+                    ], selection: $prefs.surface, fill: true)
+                GlassSlider(value: $prefs.opacity, low: "Clear", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,
                 index: 1
             ) {
-                Picker("Harness", selection: $prefs.harness) {
-                    ForEach(["claude", "codex", "opencode", "agy"], id: \.self) { Text($0).tag($0) }
-                }
-                Picker("Mode", selection: $prefs.mode) {
-                    Text("Asks first").tag("ask")
-                    Text("Accepts edits").tag("accept_edits")
-                    Text("Sandboxed").tag("sandboxed")
-                }
+                CoreSegmented(
+                    "Harness", segments: ["claude", "codex", "opencode", "agy"].map { CoreSegment($0, $0) },
+                    selection: $prefs.harness, fill: true)
+                CoreSegmented(
+                    "Mode",
+                    segments: [
+                        CoreSegment("ask", "Asks first"), CoreSegment("accept_edits", "Accepts edits"),
+                        CoreSegment("sandboxed", "Sandboxed"),
+                    ], selection: $prefs.mode, fill: true)
                 Picker("Runner", selection: $prefs.runner) {
                     Text("Best ready runner").tag("")
                     ForEach(model?.runners ?? []) { r in Text(r.name).tag(r.id) }
