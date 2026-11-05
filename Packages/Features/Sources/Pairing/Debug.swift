@@ -178,6 +178,8 @@ extension AppModel {
 }
 #endif
 
+#if DEBUG
+
 /// Debug only: keys in memory, with a software step-up key so a test can elevate with no Touch ID. Release never has one: a
 /// step-up key with no user verification proves nothing beyond the routine key (CoreKit refuses to make one).
 public func makeDebugKeyStore() -> any KeyStore { DebugKeyStore(base: makeMemoryKeyStore()) }
@@ -217,3 +219,4 @@ private final class DebugKeyStore: KeyStore, @unchecked Sendable {
         try base.wipe()
     }
 }
+#endif

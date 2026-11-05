@@ -202,7 +202,10 @@ private struct LauncherItem: View {
                         in: coreShape(Radius.control)
                     )
                     .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .shadow(color: hue.opacity(selected ? 0.6 : 0), radius: 8)
+                    // Glow on the selected tile only: a shadow on every row cost an off-screen pass each frame.
+                    .background {
+                        if selected { coreShape(Radius.control).fill(hue).blur(radius: 8).opacity(0.6) }
+                    }
                     .accessibilityHidden(true)
                 title
                 Spacer(minLength: Space.s2)
