@@ -119,7 +119,7 @@ enum SnapshotRunner {
         shell.show(.home)
         shell.open(.settings)
         await shot("09-settings")
-        shell.settings.selected = "activity"
+        shell.settings.selected = "notifications"
         await shot("09b-settings-activity")
         shell.settings.selected = "appearance"
         shell.open(.shortcuts)

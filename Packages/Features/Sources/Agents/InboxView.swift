@@ -68,66 +68,111 @@ struct InboxView: View {
     }
 }
 
-/// Settings, Notifications: what macOS allows, and which approvals show a banner. Saved on this Mac.
+/// Settings, Notifications: whether macOS lets Ainkrad show banners, what it tells you about, and where activity shows
+/// inside Ainkrad. Saved on this Mac.
 struct NotificationsSection: View {
     @Bindable var model: AgentsModel
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s5) {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                Text("macOS permission").font(.system(size: MacTextSize.title, weight: .semibold)).agentHeading()
-                Text("macOS decides whether Ainkrad may show banners. Ainkrad asks once.").foregroundStyle(
-                    palette.text2)
-                permission
-            }
-            VStack(alignment: .leading, spacing: Space.s2) {
-                Text("Notify me when").font(.system(size: MacTextSize.title, weight: .semibold)).agentHeading()
-                CoreCheckbox(
-                    "An approval is waiting", detail: "An agent asks to use a tool and waits for you.",
-                    isOn: $model.notifyApprovals
-                ).disabled(model.notifierPermission != .allowed)
-                Text(
-                    "Banners show while Ainkrad is open. Telling this Mac when Ainkrad is closed needs push, which the Core does not offer to this Mac yet."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
-                // Failures, finished sessions and stalls have no push channel on the Core yet: shown, never pretended.
-                ForEach(["A session fails", "A session finishes", "A session stalls"], id: \.self) { kind in
-                    CoreCheckbox(kind, detail: "Not available yet.", isOn: .constant(false)).disabled(true)
+        let allowed = model.notifierPermission == .allowed
+        VStack(alignment: .leading, spacing: Space.s4) {
+            permission
+            GlassSection(
+                "Tell me when", sub: "Banners show while Ainkrad is open.", symbol: "bell.badge.fill",
+                hue: GlassInk.red, index: 1
+            ) {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: Space.s3), GridItem(.flexible())], spacing: Space.s3
+                ) {
+                    GlassToggleTile(
+                        "An approval is waiting",
+                        sub: allowed ? "An agent asks to use a tool and waits for you." : "Allow banners above first.",
+                        symbol: "hand.raised", onSymbol: "hand.raised.fill", isOn: $model.notifyApprovals, fill: true
+                    )
+                    .disabled(!allowed)
+                    ForEach(
+                        [
+                            ("A session fails", "xmark.octagon"), ("A session finishes", "checkmark.circle"),
+                            ("A session stalls", "pause.circle"),
+                        ],
+                        id: \.0
+                    ) { title, symbol in
+                        GlassToggleTile(
+                            title, sub: "Coming: your Core can't send this yet.", symbol: symbol,
+                            isOn: .constant(false), fill: true
+                        )
+                        .disabled(true).opacity(0.55)
+                    }
                 }
-            }
-            VStack(alignment: .leading, spacing: Space.s2) {
-                Text("What a banner looks like").font(.system(size: MacTextSize.title, weight: .semibold))
-                    .agentHeading()
                 BannerPreview()
             }
+            GlassSection(
+                "Inside Ainkrad", sub: "What is running and what needs you.", symbol: "waveform.path.ecg",
+                hue: GlassInk.blue, index: 2
+            ) {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: Space.s3), GridItem(.flexible())], spacing: Space.s3
+                ) {
+                    GlassToggleTile(
+                        "The bell", sub: "Always on: what waits on you, runners and recent events.", symbol: "bell",
+                        onSymbol: "bell.fill", isOn: .constant(true), fill: true
+                    )
+                    .disabled(true)
+                    GlassToggleTile(
+                        "Status bar chip", sub: "“2 running · 1 waiting” next to the bell.", symbol: "capsule",
+                        onSymbol: "capsule.fill",
+                        isOn: Binding(
+                            get: { model.shell.showActivityChip },
+                            set: {
+                                model.shell.showActivityChip = $0
+                                model.shell.settings.saved()
+                            }), fill: true)
+                }
+            }
         }
+        .foregroundStyle(GlassInk.primary)
         .task { await model.refreshPermission() }
     }
 
-    @ViewBuilder
     private var permission: some View {
-        switch model.notifierPermission {
-        case .allowed:
-            NoticeBanner(
-                notice: InlineNotice(
-                    title: "Notifications are allowed", detail: "macOS shows Ainkrad banners.", symbol: "bell",
-                    tone: .run))
-        case .notAsked:
-            NoticeBanner(
-                notice: InlineNotice(
-                    title: "macOS has not been asked yet", detail: "Ainkrad cannot show banners until you allow them.",
-                    symbol: "bell.slash", tone: .queue))
-            Button("Ask macOS") { Task { await model.turnOnNotifications() } }.buttonStyle(.coreProminent)
-        case .denied:
-            NoticeBanner(
-                notice: InlineNotice(
-                    title: "Notifications are turned off in macOS",
-                    detail:
-                        "Turn them on in System Settings, Notifications, Ainkrad. Ainkrad cannot change this itself.",
-                    symbol: "bell.slash"))
+        let p = model.notifierPermission
+        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.blue : GlassInk.orange
+        return HStack(spacing: Space.s4) {
+            IconTile(p == .allowed ? "bell.fill" : "bell.slash.fill", hue: hue, size: 56, bounce: p == .allowed)
+                .shadow(color: hue.opacity(0.5), radius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(
+                    p == .allowed
+                        ? "Banners are on" : p == .notAsked ? "Banners aren't set up yet" : "macOS has banners off"
+                )
+                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(
+                    p == .allowed
+                        ? "macOS shows Ainkrad's banners."
+                        : p == .notAsked
+                            ? "macOS asks you once. Until then Ainkrad can't show banners."
+                            : "Turn them on in System Settings → Notifications → Ainkrad. Ainkrad can't change this itself."
+                )
+                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Space.s3)
+            if p == .notAsked {
+                AppActionTile(title: "Turn on", symbol: "bell.badge", key: "↩", hue: GlassInk.blue, prominent: true) {
+                    Task { await model.turnOnNotifications() }
+                }
+                .keyboardShortcut(.defaultAction)
+            } else if p == .denied {
+                AppActionTile(title: "Open System Settings", symbol: "gearshape", key: "", hue: GlassInk.slate) {
+                    NSWorkspace.shared.open(
+                        URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                }
+            }
         }
+        .padding(Space.s4)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .animation(.smooth(duration: 0.35), value: p)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -145,8 +190,9 @@ private struct BannerPreview: View {
             Text("now").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
         }
         .padding(Space.s3).frame(maxWidth: Space.s8 * 12, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .background(.black.opacity(0.25), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .help("What an approval banner looks like")
         .accessibilityElement(children: .combine).accessibilityLabel("Preview: claude is waiting on you")
     }
 }

@@ -421,29 +421,6 @@ private struct ThemeCard: View {
     }
 }
 
-/// Where activity shows. The bell is always there; the status bar chip is optional.
-struct ActivitySection: View {
-    @Bindable var shell: ShellModel
-    var body: some View {
-        SettingsBlock(
-            title: "Where activity shows",
-            detail: "What is running and what needs you. The bell is always there; turn on the rest as you like."
-        ) {
-            SettingsSwitchRow(
-                title: "Bell", detail: "Summary, what waits on you, runners and recent events",
-                isOn: .constant(true), locked: true)
-            SettingsSwitchRow(
-                title: "Status bar chip", detail: "“2 running · 1 waiting” next to the bell",
-                isOn: Binding(
-                    get: { shell.showActivityChip },
-                    set: {
-                        shell.showActivityChip = $0
-                        shell.settings.saved()
-                    }))
-        }
-    }
-}
-
 struct WindowSection: View {
     var body: some View {
         SettingsPage(intro: "Ainkrad always runs full screen, in its own Space. It cannot be resized or windowed.") {
@@ -478,11 +455,6 @@ extension ShellModel {
         later("secrets", .security, "Secrets", "key", 1, "Secrets")
         later("audit", .security, "Audit", "doc.text", 2, "The audit log")
         later("notifications", .notifications, "Notifications", "bell", 0, "Notification settings")
-        settings.section(
-            SettingsSection(
-                id: "activity", group: .notifications, title: "Activity",
-                sub: "The bell always shows it · other places are optional", symbol: "waveform.path.ecg", order: 90
-            ) { ActivitySection(shell: self) })
         settings.section(
             SettingsSection(
                 id: "appearance", group: .appearance, title: "Appearance", sub: "Theme and motion",
