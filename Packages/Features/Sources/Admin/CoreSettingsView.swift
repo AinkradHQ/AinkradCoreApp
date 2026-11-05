@@ -113,7 +113,7 @@ private struct LimitRow: View {
 
     private var editing: Bool { model.editing == setting.key }
     private var selected: Bool { model.cursor == setting.key }
-    private var showsActions: Bool { selected || hovering || editing }
+    private var showsActions: Bool { (selected || hovering) && !editing }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -133,6 +133,8 @@ private struct LimitRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Space.s3)
+                // Always laid out, only faded: showing them never changes the row's size under the pointer.
+                actions.opacity(showsActions ? 1 : 0).allowsHitTesting(showsActions)
                 Text(SettingWords.value(setting, setting.value))
                     .font(.system(size: MacTextSize.large, weight: .bold, design: .rounded))
                     .foregroundStyle(selected ? hue : GlassInk.primary)
@@ -142,8 +144,6 @@ private struct LimitRow: View {
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
             if editing {
                 LimitEditor(model: model, setting: setting, hue: hue).transition(.opacity)
-            } else if showsActions {
-                actions.transition(.opacity)
             }
             if model.openHistory == setting.key {
                 HistoryTimeline(setting: setting, hue: hue, load: model.history[setting.key]).transition(.opacity)
@@ -186,7 +186,6 @@ private struct LimitRow: View {
                 title: model.openHistory == setting.key ? "Hide history" : "History", symbol: "clock.arrow.circlepath",
                 key: selected ? "H" : "", hue: GlassInk.slate
             ) { Task { await model.toggleHistory(setting.key) } }
-            Spacer()
             if setting.isOverride {
                 AppActionTile(
                     title: "Back to \(SettingWords.value(setting, setting.defaultValue))",
