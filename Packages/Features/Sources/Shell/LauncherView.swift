@@ -43,7 +43,8 @@ struct LauncherView: View {
             .padding(Space.s4)
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: Space.s1) {
+                    // Not lazy: a lazy stack builds rows as they scroll in, and each one replayed its arrival.
+                    VStack(alignment: .leading, spacing: Space.s1) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
                             if i == 0 || rows[i - 1].group != row.group { groupTitle(row.group) }
                             LauncherItem(
@@ -63,7 +64,9 @@ struct LauncherView: View {
                     .animation(reduce ? nil : Motion.out(0.22), value: selection)
                 }
                 .onChange(of: selection) { _, new in
-                    if rows.indices.contains(new) { proxy.scrollTo(rows[new].id) }
+                    // The list scrolls on the same curve the highlight glides on, so the two move together.
+                    guard rows.indices.contains(new) else { return }
+                    withAnimation(reduce ? nil : Motion.out(0.22)) { proxy.scrollTo(rows[new].id) }
                 }
             }
             footer
@@ -74,7 +77,6 @@ struct LauncherView: View {
         // The widgets' glass, darker since it is an input; frosted at night, clear by day (Ahmed, 2026-11-05).
         .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: coreShape(Radius.panel + Space.s1))
         .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false, frosted: !palette.isDay)
-        .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
         .background { numberShortcuts(rows) }
         .task {
             // The root holds focus while the window is calm; take it once the overlay is in place.
@@ -193,7 +195,6 @@ private struct LauncherItem: View {
             HStack(spacing: Space.s3) {
                 Image(systemName: row.entry.symbol).font(.system(size: MacTextSize.body + 1, weight: .semibold))
                     .foregroundStyle(.white)
-                    .symbolEffect(.bounce, value: selected)
                     .frame(width: MacSize.controlLg, height: MacSize.controlLg)
                     .background(
                         LinearGradient(
@@ -231,11 +232,14 @@ private struct LauncherItem: View {
             withAnimation(Motion.out(0.3).delay(Double(min(index, 8)) * 0.022)) { arrived = true }
         }
         // Only a moving pointer selects: the first event on arrival (the launcher opening under a still pointer) does not.
+        // Only a pointer that really moves selects. Rows scrolling under a still pointer change the row-local point, so
+        // the screen position is what is compared (that loop made scrolling jitter).
         .onContinuousHover { phase in
-            guard case .active(let p) = phase else {
+            guard case .active = phase else {
                 lastPoint = nil
                 return
             }
+            let p = NSEvent.mouseLocation
             if let last = lastPoint, last != p { hover() }
             lastPoint = p
         }
