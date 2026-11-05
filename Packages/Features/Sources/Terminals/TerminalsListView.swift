@@ -15,9 +15,15 @@ struct TerminalsListView: View {
                     "Filter terminals", segments: TerminalFilter.allCases.map { CoreSegment($0, $0.rawValue) },
                     selection: Binding(get: { model.filter }, set: { model.filter = $0 }))
                 Spacer(minLength: Space.s2)
-                Button("New terminal") { model.openNew() }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                    .keyboardShortcut("n", modifiers: [.command, .option])
-                    .help("Open a shell on a runner (⌥⌘N)")
+                AppearanceButton()
+                Button {
+                    model.quickNew()
+                } label: {
+                    Label("New", systemImage: "plus")
+                }
+                .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .help("New terminal with the defaults (⌥⌘N); ⌥⌘T for the advanced sheet")
             }
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             content
@@ -35,10 +41,12 @@ struct TerminalsListView: View {
             Spacer(minLength: 0)
         default:
             if model.shown.isEmpty {
-                VStack(spacing: Space.s2) {
+                VStack(spacing: Space.s3) {
+                    IconTile("terminal", hue: GlassInk.slate, size: 64)
                     Text("No terminals here").font(.system(size: MacTextSize.title, weight: .semibold))
-                    Text("Open a shell on one of your runners.").foregroundStyle(palette.text2)
-                    Button("New terminal") { model.openNew() }.buttonStyle(CoreButtonStyle(.prominent))
+                    Text("Open a shell on one of your runners.").foregroundStyle(GlassInk.secondary)
+                    Button("New terminal") { model.quickNew() }.buttonStyle(CoreButtonStyle(.prominent))
+                        .coreShortcut(.primary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityElement(children: .contain)
@@ -46,11 +54,11 @@ struct TerminalsListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s2, alignment: .top)],
-                            spacing: Space.s2
+                            columns: [GridItem(.adaptive(minimum: Space.s8 * 10), spacing: Space.s3, alignment: .top)],
+                            spacing: Space.s3
                         ) {
-                            ForEach(model.shown) { t in
-                                TerminalTile(model: model, item: t).id(t.id)
+                            ForEach(Array(model.shown.enumerated()), id: \.element.id) { i, t in
+                                TerminalTile(model: model, item: t, index: i).id(t.id)
                             }
                         }
                         .padding(.horizontal, Space.s3)
@@ -84,30 +92,39 @@ struct TerminalsListView: View {
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text("\(model.openCount) open").font(.system(size: MacTextSize.body, weight: .medium))
-            let per = model.runners.filter { model.onRunner($0.id) > 0 }.map { "\($0.name) \(model.onRunner($0.id))" }
-            Text(
-                (per.isEmpty ? [] : [per.joined(separator: " · ") + "."]).joined()
-                    + " Lists the terminals this device opened."
-            )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-            .fixedSize(horizontal: false, vertical: true)
-            Text("No preview: the Core never stores terminal output, so a tile cannot show what is on screen.")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
+        let running = model.items.filter { !$0.isEnded }.count
+        let ended = model.items.count - running
+        return HStack(spacing: Space.s2) {
+            stat("play.circle.fill", "\(running) running", GlassInk.green)
+            if ended > 0 { stat("stop.circle", "\(ended) ended", GlassInk.slate) }
+            ForEach(model.runners.filter { model.onRunner($0.id) > 0 }) { r in
+                stat("server.rack", "\(r.name) \(model.onRunner(r.id))", GlassInk.blue)
+            }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .help("Terminals this device opened. The Core keeps no output, so a tile shows the shell, not its screen.")
+    }
+
+    private func stat(_ symbol: String, _ text: String, _ hue: Color) -> some View {
+        HStack(spacing: Space.s1) {
+            Image(systemName: symbol).foregroundStyle(hue)
+            Text(text).monospacedDigit()
+        }
+        .font(.system(size: MacTextSize.meta, weight: .medium))
+        .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
+        .background(GlassInk.well, in: coreShape(Radius.chip))
     }
 }
 
-/// One terminal: its runner, id, size, how long, who is attached, and the state as a badge.
+/// One terminal as a little terminal: a screen in your terminal theme and transparency with its prompt and a blinking
+/// cursor, a live state glow, then its facts. Lifts on hover, rises in one after another.
 struct TerminalTile: View {
     let model: TerminalsModel
     let item: TerminalItem
-    @Environment(\.corePalette) private var palette
+    var index = 0
     @State private var hovering = false
+    @State private var shown = false
 
     var body: some View {
         let session = model.sessions[item.id]
@@ -115,76 +132,69 @@ struct TerminalTile: View {
             session?.view.chip
             ?? PaneView.make(item: item, runner: model.runner(item.runner), link: .none, note: nil).chip
         let selected = model.selected == item.id
+        let rang = model.rang.contains(item.id)
+        let hue: Color =
+            rang
+            ? GlassInk.orange
+            : item.isEnded
+                ? GlassInk.slate
+                : chip.tone == .fail
+                    ? GlassInk.red
+                    : chip.tone == .warn ? GlassInk.orange : GlassInk.green
         Button {
             model.openTerminal(item.id)
         } label: {
-            HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: "terminal").font(.system(size: MacTextSize.title))
-                    .foregroundStyle(selected ? palette.navActiveInk : palette.primary)
-                    .frame(width: MacSize.controlMd, height: MacSize.controlMd)
-                    .background(palette.uDim, in: coreShape(Radius.control))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    HStack(spacing: Space.s2) {
-                        Text(model.name(of: item.runner)).font(.system(size: MacTextSize.headline, weight: .semibold))
-                            .lineLimit(1)
-                        if model.rang.contains(item.id) {
-                            StateBadge("Bell", tone: .warn, symbol: "bell")
-                        }
-                        Spacer(minLength: Space.s2)
-                        StateBadge(chip.label, tone: chip.tone, symbol: chip.symbol)
-                    }
-                    Text(item.id).font(.system(size: MacTextSize.meta, design: .monospaced))
-                        .foregroundStyle(palette.text2).lineLimit(1).truncationMode(.middle)
-                    HStack(spacing: Space.s2) {
-                        if item.cols > 0 {
-                            // The screen's shape, drawn to scale: wide terminals read wide.
-                            coreShape(Radius.chip / 2).strokeBorder(palette.text2.opacity(0.6), lineWidth: 1)
-                                .frame(
-                                    width: Space.s5,
-                                    height: Space.s5 * CGFloat(item.rows) / CGFloat(max(item.cols, 1)) * 1.6
-                                )
-                                .accessibilityHidden(true)
-                            Text("\(item.cols)×\(item.rows)").monospacedDigit()
-                        }
-                        Text(item.isEnded ? "ended" : "open \(ago(item.createdAt))")
-                    }
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    HStack(spacing: Space.s2) {
-                        CoreSlots(used: item.attached, capacity: max(item.attached, 1))
-                        Text("\(item.attached) attached").monospacedDigit()
-                        Spacer(minLength: Space.s2)
-                        if let session {
-                            // Only terminals this Mac attached to have a strip: it is output this Mac saw.
-                            TimelineView(.periodic(from: .now, by: 60)) { ctx in
-                                CoreHeat(session.heat(now: ctx.date))
-                                    .help("Output this Mac saw in the last hour, five minutes a cell")
+            VStack(alignment: .leading, spacing: 0) {
+                TileScreen(
+                    runner: model.name(of: item.runner), label: chip.label, hue: hue, ended: item.isEnded,
+                    lit: selected || hovering, blink: shown)
+                // The facts.
+                HStack(spacing: Space.s2) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: Space.s1) {
+                            Text(model.name(of: item.runner)).font(
+                                .system(size: MacTextSize.headline, weight: .semibold))
+                            if rang {
+                                Image(systemName: "bell.fill").foregroundStyle(GlassInk.orange).symbolEffect(
+                                    .bounce, value: rang)
                             }
                         }
+                        Text(
+                            [
+                                item.cols > 0 ? "\(item.cols)×\(item.rows)" : nil,
+                                item.isEnded ? "ended" : "open \(ago(item.createdAt))",
+                                "\(item.attached) attached",
+                            ].compactMap { $0 }.joined(separator: " · ")
+                        )
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).monospacedDigit()
                     }
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    Spacer(minLength: 0)
+                    if let session {
+                        TimelineView(.periodic(from: .now, by: 60)) { ctx in
+                            CoreHeat(session.heat(now: ctx.date))
+                                .help("Output this Mac saw in the last hour, five minutes a cell")
+                        }
+                    }
                 }
+                .padding(.horizontal, Space.s1).padding(.top, Space.s2)
             }
-            .padding(Space.s3)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(GlassInk.primary)
+            .padding(Space.s2)
             .background(
-                selected ? palette.navActive : hovering ? palette.rowHover : palette.glassCard,
-                in: coreShape(Radius.row)
+                selected ? .white.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                in: coreShape(Radius.cardMac)
             )
-            .overlay {
-                if model.rang.contains(item.id) {
-                    coreShape(Radius.row).strokeBorder(palette.tone(.warn).ink, lineWidth: 1)
-                } else if selected {
-                    coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1)
-                }
-            }
-            .contentShape(coreShape(Radius.row))
-            .opacity(item.isEnded ? 0.75 : 1)
+            .overlay { if selected { coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.3), lineWidth: 1) } }
+            .contentShape(coreShape(Radius.cardMac))
+            .opacity(item.isEnded ? 0.7 : 1)
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .scaleEffect(hovering ? 1.02 : 1)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
+        .coreRise(shown, index)
+        .onAppear { shown = true }
         .accessibilityLabel(
             "Terminal on \(model.name(of: item.runner)), \(chip.label), \(item.cols) by \(item.rows), \(item.attached) attached"
         )
@@ -192,5 +202,119 @@ struct TerminalTile: View {
         .contextMenu {
             Button("Open") { model.openTerminal(item.id) }
         }
+    }
+}
+
+/// The terminals' look from the Terminals screen: theme swatches, transparency, blur and font size, live on every open
+/// terminal (the full set is in Settings, Terminal).
+private struct AppearanceButton: View {
+    @Bindable private var prefs = TerminalPrefs.shared
+    @State private var open = false
+    var body: some View {
+        Button {
+            open.toggle()
+        } label: {
+            Label("Appearance", systemImage: "paintpalette")
+        }
+        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        .help("Theme, transparency and font of every terminal")
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                Text("Terminal appearance").font(.system(size: MacTextSize.headline, weight: .semibold))
+                HStack(spacing: Space.s2) {
+                    ForEach(TermTheme.all) { t in
+                        Button {
+                            prefs.themeID = t.id
+                        } label: {
+                            VStack(spacing: 4) {
+                                coreShape(6).fill(Color(nsColor: t.background))
+                                    .overlay(alignment: .bottomLeading) {
+                                        HStack(spacing: 2) {
+                                            ForEach(1..<5, id: \.self) { i in
+                                                coreShape(1).fill(Color(nsColor: t.ansi[i])).frame(width: 6, height: 4)
+                                            }
+                                        }
+                                        .padding(5)
+                                    }
+                                    .overlay {
+                                        coreShape(6).strokeBorder(
+                                            prefs.themeID == t.id ? GlassInk.blue : .white.opacity(0.2),
+                                            lineWidth: prefs.themeID == t.id ? 2 : 1)
+                                    }
+                                    .frame(width: 54, height: 36)
+                                Text(t.title).font(.system(size: 10))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                LabeledContent("Transparency") {
+                    HStack {
+                        Slider(
+                            value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6,
+                            step: 0.05
+                        )
+                        .frame(width: 160)
+                        Text("\(Int(((1 - prefs.opacity) * 100).rounded()))%").monospacedDigit().frame(
+                            width: 36, alignment: .trailing)
+                    }
+                }
+                Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
+                LabeledContent("Font size") {
+                    Stepper("\(Int(prefs.fontSize)) pt", value: $prefs.fontSize, in: 9...24)
+                }
+            }
+            .padding(Space.s4)
+            .frame(width: 360)
+        }
+    }
+}
+
+/// The tile's little screen: window dots, the state, and the prompt with a blinking cursor, in the terminal theme.
+private struct TileScreen: View {
+    let runner: String
+    let label: String
+    let hue: Color
+    let ended: Bool
+    let lit: Bool
+    let blink: Bool
+    @Bindable private var prefs = TerminalPrefs.shared
+
+    var body: some View {
+        let t = prefs.theme
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { _ in Circle().fill(.white.opacity(0.18)).frame(width: 7, height: 7) }
+                Spacer()
+                HStack(spacing: 4) {
+                    Circle().fill(hue).frame(width: 7, height: 7).opacity(!ended && blink ? 0.45 : 1)
+                        .animation(ended ? nil : .easeInOut(duration: 1.1).repeatForever(), value: blink)
+                    Text(label).font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(hue)
+            }
+            Spacer(minLength: 2)
+            prompt(t)
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+        .background(Color(nsColor: t.background).opacity(prefs.opacity), in: coreShape(Radius.row))
+        .overlay { coreShape(Radius.row).strokeBorder(hue.opacity(lit ? 0.6 : 0.25), lineWidth: 1) }
+        .shadow(color: hue.opacity(lit ? 0.35 : 0.12), radius: lit ? 14 : 6)
+    }
+
+    private func prompt(_ t: TermTheme) -> some View {
+        HStack(spacing: 0) {
+            Text("\(runner) ").foregroundStyle(Color(nsColor: t.ansi[2]))
+            Text("~ $ ").foregroundStyle(Color(nsColor: t.ansi[4]))
+            if ended {
+                Text("[exited]").foregroundStyle(Color(nsColor: t.foreground).opacity(0.6))
+            } else {
+                Rectangle().fill(Color(nsColor: t.caret)).frame(width: 7, height: 13)
+                    .opacity(blink ? 0.15 : 1)
+                    .animation(.easeInOut(duration: 0.6).repeatForever(), value: blink)
+            }
+        }
+        .font(.system(size: 12, design: .monospaced))
     }
 }
