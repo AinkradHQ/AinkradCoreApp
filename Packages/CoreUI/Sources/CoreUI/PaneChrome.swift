@@ -27,8 +27,9 @@ public struct CorePaneChrome<Content: View>: View {
     public var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: Space.s2) {
-                Image(systemName: symbol).foregroundStyle(palette.primary).accessibilityHidden(true)
-                Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(1)
+                // Neutral icon and a 13 pt title, as the prototype's pane head (`shell.css` .pane-head).
+                Image(systemName: symbol).foregroundStyle(palette.text2).accessibilityHidden(true)
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                 if let sub {
                     Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2).lineLimit(1)
                 }

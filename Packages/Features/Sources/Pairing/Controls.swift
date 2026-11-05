@@ -5,12 +5,19 @@ import SwiftUI
 struct DialogCard<Content: View>: View {
     let title: String
     var width: CGFloat = Space.s8 * 15
+    /// When set, a close button sits at the top right (the prototype's dialogs have one).
+    var close: (() -> Void)?
     @ViewBuilder let content: Content
     @Environment(\.corePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            HStack(alignment: .top) {
+                Text(title).font(.system(size: MacTextSize.large, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Space.s2)
+                if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
+            }
             content
         }
         .foregroundStyle(palette.text)
@@ -25,24 +32,40 @@ struct DialogCard<Content: View>: View {
 /// The check code (SAS): four large keycaps of four characters across the panel, read letter by letter.
 struct SASView: View {
     let sas: String
+    /// Groups the approver has typed correctly so far: each shows a tick, the next one a ring.
+    var matched: Int?
     @Environment(\.corePalette) private var palette
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            ForEach(Array(sas.split(separator: "-").enumerated()), id: \.offset) { _, group in
+            ForEach(Array(sas.split(separator: "-").enumerated()), id: \.offset) { i, group in
                 Text(String(group))
                     .font(.system(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, minHeight: MacSize.controlLg * 2)
                     .background(palette.glassCard, in: coreShape(Radius.cardMac))
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+                    .overlay {
+                        coreShape(Radius.cardMac).strokeBorder(
+                            ring(i) ? palette.primary : palette.glassCardEdge, lineWidth: ring(i) ? 2 : 1)
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if let matched, i < matched {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.tone(.done).ink)
+                                .padding(Space.s1)
+                        }
+                    }
             }
         }
+        .animation(Motion.out(Motion.hover), value: matched)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "Check code \(sas.replacingOccurrences(of: "-", with: " ").map { String($0) }.joined(separator: " "))"
         )
         .accessibilityIdentifier("sas")
     }
+}
+
+extension SASView {
+    fileprivate func ring(_ i: Int) -> Bool { matched == i }
 }
 
 /// Label and value, one per line, for facts the Core told us.

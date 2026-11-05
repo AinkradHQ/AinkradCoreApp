@@ -43,7 +43,7 @@ final class PairingLiveUITests: XCTestCase {
         let admin = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'admin'")).firstMatch
         XCTAssertTrue(admin.waitForExistence(timeout: 5), "the admin scope is offered")
         admin.click()
-        app.buttons["Make code"].click()
+        app.buttons["Create pairing"].click()
         let code = app.descendants(matching: .any)["pairing-code"].firstMatch
         XCTAssertTrue(code.waitForExistence(timeout: 30), "the typed code is shown, not an error")
         XCTAssertFalse(app.staticTexts["This device is not allowed to do that."].exists, "no refusal")

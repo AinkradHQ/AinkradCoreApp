@@ -21,6 +21,8 @@ final class AddDeviceModel {
     private(set) var mine: [String] = []
     private(set) var error: String?
     private(set) var busy = false
+    /// What the approver typed from the new device's screen, as `XXXX-XXXX-XXXX-XXXX`: approving needs all four groups to match.
+    var typed = "" { didSet { if typed != Self.format(typed) { typed = Self.format(typed) } } }
     private(set) var pairing: NewPairing?
     private weak var host: AppModel?
     private let existing: String?
@@ -35,6 +37,39 @@ final class AddDeviceModel {
     var effectiveScopes: [String] { kind == "runner" ? ["runner"] : ScopeText.all.filter(scopes.contains) }
     var canCreate: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && !effectiveScopes.isEmpty && !busy
+    }
+
+    /// Upper case letters and digits, four to a group, at most four groups.
+    static func format(_ text: String) -> String {
+        let chars = text.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(16)
+        return stride(from: 0, to: chars.count, by: 4).map { i in
+            String(chars.dropFirst(i).prefix(4))
+        }.joined(separator: "-")
+    }
+
+    /// The check code the Core gave for the claimed device, if any.
+    var checkCode: String? { if case .claimed(let i) = stage { i.sas } else { nil } }
+
+    /// How many groups from the start of what was typed equal the real check code.
+    var groupsMatching: Int {
+        guard let sas = checkCode else { return 0 }
+        let real = sas.uppercased().split(separator: "-")
+        let mine = typed.split(separator: "-")
+        var n = 0
+        for (a, b) in zip(real, mine) {
+            guard a == b else { break }
+            n += 1
+        }
+        return n
+    }
+    var groupCount: Int { max(checkCode?.split(separator: "-").count ?? 4, 1) }
+    var checkMatches: Bool { checkCode != nil && groupsMatching == groupCount }
+    /// A full group that is wrong (typing the next one is not a mismatch yet).
+    var checkMismatch: Bool {
+        guard let sas = checkCode else { return false }
+        let real = sas.uppercased().split(separator: "-")
+        let mine = typed.split(separator: "-")
+        return zip(real, mine).contains { $0 != $1 && $1.count == 4 }
     }
 
     /// What the approver may hand out: their own scopes, no more.
@@ -100,10 +135,19 @@ final class AddDeviceModel {
         }
     }
 
+    /// After a pairing ended: back to the form (same name and scopes) for a new code.
+    func restart() {
+        pairing = nil
+        error = nil
+        typed = ""
+        stage = .form
+    }
+
     func refreshIfCurrent(_ id: String) async { if id == pairingID { await refresh() } }
 
     func approve() async {
-        guard case .claimed(let info) = stage, let sas = info.sas, let host, let service = host.service else { return }
+        guard case .claimed(let info) = stage, let sas = info.sas, checkMatches, let host, let service = host.service
+        else { return }
         error = nil
         busy = true
         defer { busy = false }

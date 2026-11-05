@@ -10,7 +10,10 @@ enum Registration {
         app.admin.install()
         app.accounts.install()
         shell.settings.section(
-            SettingsSection(id: "devices", group: .core, title: "Devices", symbol: "iphone", order: 1) {
+            SettingsSection(
+                id: "devices", group: .core, title: "Devices", sub: "Paired Macs, phones, runners and passkeys",
+                symbol: "iphone", order: 1
+            ) {
                 DevicesSection(app: app)
             })
         shell.settings.section(
@@ -18,7 +21,10 @@ enum Registration {
                 ForgetSection(app: app)
             })
         shell.settings.section(
-            SettingsSection(id: "lockouts", group: .security, title: "Lockouts", symbol: "lock", order: 0) {
+            SettingsSection(
+                id: "lockouts", group: .security, title: "Lockouts", sub: "Addresses the Core has locked out",
+                symbol: "lock", order: 0
+            ) {
                 LockoutsSection(app: app)
             })
         shell.launcher.register(
