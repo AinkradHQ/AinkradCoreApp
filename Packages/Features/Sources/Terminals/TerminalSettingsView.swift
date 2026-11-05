@@ -40,12 +40,13 @@ struct TerminalSettingsView: View {
                 "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.green,
                 index: 3
             ) {
+                GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
+            } content: {
                 HStack(spacing: Space.s2) {
                     ForEach(TerminalPrefs.CursorShape.allCases, id: \.self) { c in
                         CursorTile(shape: c, on: prefs.cursor == c, blink: prefs.blink) { prefs.cursor = c }
                     }
                 }
-                Toggle("Blink", isOn: $prefs.blink).toggleStyle(.switch)
             }
             GlassSection(
                 "Look", sub: "The terminals and the Terminals app, as one.",
@@ -60,22 +61,45 @@ struct TerminalSettingsView: View {
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
                 hue: GlassInk.green, index: 5
             ) {
-                Picker("Runner", selection: $prefs.defaultRunner) {
-                    Text("Best ready runner").tag("")
-                    ForEach(model?.runners ?? []) { r in Text(r.name).tag(r.id) }
+                field("Runner", "server.rack") {
+                    CoreSegmented(
+                        "Runner",
+                        segments: [CoreSegment("", "Best ready", symbol: "sparkles")]
+                            + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
+                        selection: $prefs.defaultRunner, fill: true)
                 }
-                Picker("Shell", selection: $prefs.defaultShell) {
-                    Text("Login shell").tag("")
-                    Text("zsh").tag("zsh")
-                    Text("bash").tag("bash")
-                    Text("sh").tag("sh")
+                field("Shell", "apple.terminal") {
+                    CoreSegmented(
+                        "Shell",
+                        segments: [
+                            CoreSegment("", "Login shell", symbol: "person.crop.square"),
+                            CoreSegment("zsh", "zsh", symbol: "z.square"),
+                            CoreSegment("bash", "bash", symbol: "b.square"),
+                            CoreSegment("sh", "sh", symbol: "s.square"),
+                        ], selection: $prefs.defaultShell, fill: true)
                 }
-                Toggle("Open new terminals full pane", isOn: $prefs.openFullPane).toggleStyle(.switch)
-                Toggle("Ask before ending a terminal", isOn: $prefs.confirmEnd).toggleStyle(.switch)
+                HStack(spacing: Space.s2) {
+                    GlassToggleTile(
+                        "Open full pane", sub: "A new terminal fills its pane.",
+                        symbol: "rectangle.split.2x1", onSymbol: "rectangle.inset.filled", isOn: $prefs.openFullPane,
+                        fill: true)
+                    GlassToggleTile(
+                        "Ask before ending", sub: "Confirm before a terminal is ended.",
+                        symbol: "bolt", onSymbol: "exclamationmark.shield", isOn: $prefs.confirmEnd, fill: true)
+                }
             }
         }
         .foregroundStyle(GlassInk.primary)
         .animation(.spring(duration: 0.3, bounce: 0.2), value: prefs.themeID)
+    }
+
+    /// A labelled row: icon and name at the left, the choices filling the rest.
+    private func field(_ title: String, _ symbol: String, @ViewBuilder _ content: () -> some View) -> some View {
+        HStack(spacing: Space.s3) {
+            Label(title, systemImage: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                .frame(width: 96, alignment: .leading)
+            content()
+        }
     }
 }
 
