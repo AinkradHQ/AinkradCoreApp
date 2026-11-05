@@ -315,3 +315,42 @@ public struct SettingRow<Content: View>: View {
         }
     }
 }
+
+/// Where something stands on a short way, as steps (e.g. Off → Test keys → Real keys): the steps passed join in the
+/// colour, the current one is lit and breathes, a closed one shows a lock.
+public struct StepTrack: View {
+    let steps: [String]
+    let at: Int
+    let hue: Color
+    let locked: Set<Int>
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    public init(_ steps: [String], at: Int, hue: Color, locked: Set<Int> = []) {
+        self.steps = steps
+        self.at = at
+        self.hue = hue
+        self.locked = locked
+    }
+    public var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { i, name in
+                if i > 0 { coreShape(1).fill(i <= at ? hue : GlassInk.track).frame(width: 14, height: 2) }
+                HStack(spacing: 4) {
+                    if locked.contains(i) { Image(systemName: "lock.fill").font(.system(size: 9)) }
+                    Text(name)
+                }
+                .font(.system(size: MacTextSize.meta, weight: i == at ? .semibold : .regular))
+                .foregroundStyle(i == at ? .white : GlassInk.secondary)
+                .padding(.horizontal, 8).frame(height: 24)
+                .background(i == at ? hue.opacity(0.75) : GlassInk.well, in: coreShape(6))
+                .shadow(color: hue.opacity(i == at ? 0.5 : 0), radius: 8)
+                .scaleEffect(i == at && shown && !reduce ? 1.04 : 1)
+                .animation(i == at && !reduce ? .easeInOut(duration: 1.4).repeatForever() : .default, value: shown)
+            }
+        }
+        .fixedSize()
+        .onAppear { shown = true }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(steps.indices.contains(at) ? steps[at] : "Unknown"), step \(at + 1) of \(steps.count)")
+    }
+}

@@ -228,7 +228,6 @@ struct AccNotice: View {
 struct GateBanner: View {
     let model: AccountsModel
     @State private var shown = false
-    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         let g = model.gate
@@ -245,7 +244,7 @@ struct GateBanner: View {
                     Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Space.s3)
-                if let step = g.step { steps(step, hue) }
+                if let step = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: step, hue: hue) }
                 AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "", hue: hue) {
                     model.openSwitches()
                 }
@@ -259,26 +258,6 @@ struct GateBanner: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("gate-banner")
         }
-    }
-
-    /// Off → Test keys → Real keys: the steps passed fill in, the current one glows and breathes.
-    private func steps(_ at: Int, _ hue: Color) -> some View {
-        HStack(spacing: 6) {
-            ForEach(Array(["Off", "Test keys", "Real keys"].enumerated()), id: \.offset) { i, name in
-                if i > 0 {
-                    coreShape(1).fill(i <= at ? hue : GlassInk.track).frame(width: 14, height: 2)
-                }
-                Text(name).font(.system(size: MacTextSize.meta, weight: i == at ? .semibold : .regular))
-                    .foregroundStyle(i == at ? .white : GlassInk.secondary)
-                    .padding(.horizontal, 8).frame(height: 24)
-                    .background(i == at ? hue.opacity(0.75) : GlassInk.well, in: coreShape(6))
-                    .shadow(color: hue.opacity(i == at ? 0.5 : 0), radius: 8)
-                    .scaleEffect(i == at && shown && !reduce ? 1.04 : 1)
-                    .animation(i == at && !reduce ? .easeInOut(duration: 1.4).repeatForever() : .default, value: shown)
-            }
-        }
-        .fixedSize()
-        .accessibilityHidden(true)
     }
 }
 

@@ -56,17 +56,17 @@ final class AdminLiveUITests: XCTestCase {
 
         // Feature switches: the passkey switch goes on, then the broker moves to Throwaway (secrets need it).
         openSection("feature switches", expect: "Feature switches")
-        let passkey = element("switch-Let a passkey hold admin")
+        let passkey = element("switch-auth.passkey_admin")
         XCTAssertTrue(passkey.waitForExistence(timeout: 20), "the passkey switch is listed")
         XCTAssertEqual(passkey.value as? String, "Off", "off by default")
         passkey.click()
         wait({ (passkey.value as? String) == "On" }, "the switch is on after Touch ID (software key)")
-        XCTAssertTrue(app.buttons["Throwaway"].waitForExistence(timeout: 10), "the broker modes are listed")
-        app.buttons["Throwaway"].click()
-        wait({ self.app.buttons["Throwaway"].isSelected }, "the broker is on Throwaway")
+        XCTAssertTrue(app.buttons["Test keys"].waitForExistence(timeout: 10), "the broker modes are listed")
+        app.buttons["Test keys"].click()
+        wait({ self.app.buttons["Test keys"].isSelected }, "the broker is on Test keys")
         XCTAssertTrue(
-            app.descendants(matching: .any).matching(NSPredicate(format: "value CONTAINS 'Throwaway, mode 1, current'"))
-                .firstMatch.waitForExistence(timeout: 10), "the state diagram follows")
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Test keys, step 2 of 3'"))
+                .firstMatch.waitForExistence(timeout: 10), "the step track follows")
 
         // Secrets: store a dummy value and see only its metadata.
         openSection("secrets", expect: "Secrets")

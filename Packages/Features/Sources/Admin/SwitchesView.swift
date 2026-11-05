@@ -11,148 +11,125 @@ struct SwitchesSection: View {
         AdminScreen(
             admin: admin, what: "Feature switches",
             intro:
-                "The Core's gates for secrets and for who may hold admin. Each change needs Touch ID and is audited.",
+                "Turn Core features on or off. Each change asks for Touch ID and is written to the audit log.",
             state: model.state,
             empty: ("No switches reported", "The registry returned no feature switches.", "switch.2"),
             retry: { Task { await model.reload() } }
         ) {
-            VStack(alignment: .leading, spacing: Space.s5) {
+            VStack(alignment: .leading, spacing: Space.s4) {
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
                 if let mode = model.item("secrets.mode") { SecretsModeCard(model: model, setting: mode) }
-                if let p = model.item("auth.passkey_admin") {
-                    AdminSection(
-                        title: "Passkey admin",
-                        detail: "auth.passkey_admin. Whether web sign-in can hold the admin scope."
-                    ) {
-                        AdminPanel {
-                            FlagRow(
-                                model: model, setting: p, title: "Let a passkey hold admin",
-                                detail:
-                                    "Off by default. While off, pairing or approving a web device with admin is refused (forbidden_scope). Devices that hold it already keep it.",
-                                off: "Passkeys read and approve", on: "Passkeys may hold admin",
-                                gate: "Weakens security",
-                                warn: true,
-                                reason: {
-                                    $0
-                                        ? "Turn on auth.passkey_admin. A stolen passkey session could then hold admin."
-                                        : "Turn off auth.passkey_admin."
-                                })
-                        }
-                    }
-                }
                 if let a = model.item("secrets.provider_accounts") {
-                    AdminSection(
-                        title: "Provider accounts",
-                        detail: "secrets.provider_accounts. The narrow gate for AI provider accounts."
-                    ) {
-                        AdminPanel {
-                            FlagRow(
-                                model: model, setting: a, title: "Let provider accounts hold one real key",
-                                detail:
-                                    "Lets a secret named acct.<provider>.<label> be a real key of that provider's own shape while secrets.mode is 1. It never turns the broker on.",
-                                off: "Throwaway values only", on: "Provider keys allowed", gate: "Weakens security",
-                                warn: true,
-                                reason: {
-                                    $0 ? "Turn on secrets.provider_accounts." : "Turn off secrets.provider_accounts."
-                                })
-                        }
-                    }
+                    FlagCard(
+                        model: model, setting: a, index: 1, title: "Real provider keys", symbol: "key.fill",
+                        hue: GlassInk.orange,
+                        sub: "Let accounts hold a real API key from Anthropic, OpenAI or Google.",
+                        offLine: "Only test keys are accepted for accounts.",
+                        onLine: "Accounts can hold real provider keys. Your agents can use them.",
+                        needs: model.secretsMode < 1 ? "Set Keys and secrets to Test keys first." : nil,
+                        reason: {
+                            $0 ? "Turn on secrets.provider_accounts." : "Turn off secrets.provider_accounts."
+                        })
+                }
+                if let p = model.item("auth.passkey_admin") {
+                    FlagCard(
+                        model: model, setting: p, index: 2, title: "Admin from a browser", symbol: "globe",
+                        hue: GlassInk.violet,
+                        sub: "Let a device that signs in with a passkey in a web browser become an admin.",
+                        offLine: "Browser devices can read and approve, but not change your Core. Safer.",
+                        onLine:
+                            "Browser devices can become admin. Someone who steals that browser could change your Core.",
+                        needs: nil,
+                        reason: {
+                            $0
+                                ? "Turn on auth.passkey_admin. A stolen passkey session could then hold admin."
+                                : "Turn off auth.passkey_admin."
+                        })
                 }
                 if !model.runners.isEmpty {
-                    AdminSection(
-                        title: "Terminal drivers",
-                        detail:
-                            "Set when a runner starts, not by the Core. This screen can show them but not change them."
+                    GlassSection(
+                        "Terminals on your runners",
+                        sub: "Set on each runner when it starts. Shown here, changed there.",
+                        symbol: "terminal.fill", hue: GlassInk.green, index: 3
                     ) {
-                        AdminPanel {
-                            ForEach(model.runners) { r in
-                                HStack(alignment: .firstTextBaseline) {
-                                    VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                                        Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold))
-                                        Text(
-                                            r.drivers.isEmpty
-                                                ? "No drivers reported" : r.drivers.joined(separator: ", ")
-                                        )
-                                        .foregroundStyle(palette.text2)
-                                    }
-                                    Spacer()
-                                    if r.drivers.contains("pty") {
-                                        StateBadge("pty on", tone: .run, symbol: "checkmark")
-                                    } else {
-                                        GateTag(text: "Needs the runner flag on the host")
-                                    }
+                        ForEach(model.runners) { r in
+                            let pty = r.drivers.contains("pty")
+                            HStack(spacing: Space.s3) {
+                                IconTile("server.rack", hue: pty ? GlassInk.green : GlassInk.slate, size: 32)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                                    Text(
+                                        pty
+                                            ? "Terminals work on this runner."
+                                            : "Terminals are off: this runner was started without terminal support."
+                                    )
+                                    .foregroundStyle(GlassInk.secondary)
                                 }
-                                .accessibilityElement(children: .combine)
-                                AdminFlow(
-                                    nodes: [
-                                        .init(title: "pty off", sub: "unsupported_command"),
-                                        .init(title: "pty on", sub: "terminals open"),
-                                    ], current: r.drivers.contains("pty") ? 1 : 0,
-                                    edges: [
-                                        .init(label: "runner started with the pty flag", met: r.drivers.contains("pty"))
-                                    ])
+                                Spacer()
+                                Label(pty ? "On" : "Off", systemImage: pty ? "checkmark.circle.fill" : "minus.circle")
+                                    .font(.system(size: MacTextSize.meta, weight: .semibold))
+                                    .foregroundStyle(pty ? GlassInk.green : GlassInk.secondary)
+                                    .padding(.horizontal, 8).frame(height: 24)
+                                    .background((pty ? GlassInk.green : GlassInk.slate).opacity(0.16), in: coreShape(6))
                             }
+                            .help("Drivers: \(r.drivers.isEmpty ? "none reported" : r.drivers.joined(separator: ", "))")
+                            .accessibilityElement(children: .combine)
                         }
                     }
                 }
             }
+            .foregroundStyle(GlassInk.primary)
         }
         .task { await model.reload() }
         .accessibilityIdentifier("feature-switches")
     }
 }
 
-/// secrets.mode: Off, Throwaway, Real, and what stands between the steps.
+/// secrets.mode in plain words: whether the Core keeps keys and secrets at all. Off and Test keys are the choices at the
+/// top right; Real keys stays locked until the external security review. The track shows where it stands.
 private struct SecretsModeCard: View {
     @Bindable var model: RegistryModel
     let setting: SettingItem
-    @Environment(\.corePalette) private var palette
-    @State private var choice = 0
 
-    private static let names = ["Off", "Throwaway", "Real"]
-    private static let notes = [
-        "Off. Every store, rotation, lease and redemption is refused (secrets_disabled). Listing and deleting still work.",
-        "Throwaway values only. Values shaped like real keys are refused (real_secret_refused).",
-        "Real credentials.",
+    private static let lines = [
+        "Your Core keeps no keys or secrets. Nothing can be added until you choose Test keys.",
+        "Your Core keeps test keys only. Anything shaped like a real key is refused, to keep you safe while testing.",
+        "Your Core keeps real keys.",
     ]
 
     var body: some View {
         let mode = Int(setting.value)
-        AdminSection(title: "Secrets mode", detail: "secrets.mode. The broker gate for every secret store and lease.") {
-            AdminPanel {
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    Text("Broker mode").font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(
-                        Self.notes.indices.contains(mode) ? Self.notes[mode] : "Mode \(mode) is not one this app knows."
-                    )
-                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: Space.s3) {
-                        CoreSegmented(
-                            "Broker mode",
-                            segments: [CoreSegment(0, "Off"), CoreSegment(1, "Throwaway")],
-                            selection: Binding(get: { min(mode, 1) }, set: { pick($0) })
-                        )
-                        .frame(maxWidth: Space.s8 * 8)
-                        .disabled(model.busy == setting.key)
-                        if model.busy == setting.key { AdminBar().frame(width: Space.s8 * 3) }
-                    }
-                    if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
-                }
-                AdminFlow(
-                    nodes: Self.names.enumerated().map { .init(title: $1, sub: "mode \($0)") }, current: mode,
-                    edges: [.init(label: "admin + Touch ID", met: true), .init(label: "G-SEC review", met: false)])
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                        Text("Mode 2 is closed").font(.system(size: MacTextSize.headline, weight: .semibold))
-                        Text("No real credential goes on the host before the external security review (G-SEC).")
-                            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                    GateTag(text: "Closed until G-SEC")
-                }
-                .accessibilityElement(children: .combine)
+        let hue = mode == 0 ? GlassInk.orange : GlassInk.blue
+        GlassSection(
+            "Keys and secrets", sub: "Whether your Core may keep keys and secrets at all.", symbol: "lock.shield.fill",
+            hue: GlassInk.blue
+        ) {
+            HStack(spacing: Space.s2) {
+                if model.busy == setting.key { ProgressView().controlSize(.small) }
+                CoreSegmented(
+                    "Keys and secrets",
+                    segments: [
+                        CoreSegment(0, "Off", symbol: "lock.fill"), CoreSegment(1, "Test keys", symbol: "testtube.2"),
+                    ],
+                    selection: Binding(get: { min(mode, 1) }, set: { pick($0) })
+                )
+                .fixedSize()
+                .disabled(model.busy == setting.key)
             }
+        } content: {
+            HStack(spacing: Space.s3) {
+                Image(systemName: mode == 0 ? "lock.fill" : "testtube.2").foregroundStyle(hue)
+                    .contentTransition(.symbolEffect(.replace))
+                Text(Self.lines.indices.contains(mode) ? Self.lines[mode] : "A setting this app doesn't know yet.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Space.s3)
+                StepTrack(["Off", "Test keys", "Real keys"], at: min(mode, 2), hue: hue, locked: [2])
+                    .help("Real keys open after the external security review (G-SEC).")
+            }
+            if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }
+        .help("secrets.mode = \(mode)")
+        .animation(.spring(duration: 0.35), value: mode)
     }
 
     private func pick(_ m: Int) {
@@ -167,44 +144,55 @@ private struct SecretsModeCard: View {
     }
 }
 
-/// One on/off setting: a switch, what it does, the gate it carries, and its two states with the one that holds.
-private struct FlagRow: View {
+/// One on/off feature in plain words: an animated switch tile at the top right (with a "Less safe" mark when turning it
+/// on weakens security), and one line saying what it means now.
+private struct FlagCard: View {
     @Bindable var model: RegistryModel
     let setting: SettingItem
+    let index: Int
     let title: String
-    let detail: String
-    let off: String
-    let on: String
-    let gate: String
-    var warn = false
+    let symbol: String
+    let hue: Color
+    let sub: String
+    let offLine: String
+    let onLine: String
+    let needs: String?
     let reason: (Bool) -> String
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let isOn = setting.value >= 1
-        VStack(alignment: .leading, spacing: Space.s2) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: Space.s3)
-                GateTag(text: gate, warn: warn)
-                AdminSwitch(
-                    label: title,
-                    on: Binding(
+        GlassSection(title, sub: sub, symbol: symbol, hue: hue, index: index) {
+            HStack(spacing: Space.s2) {
+                Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orange)
+                if model.busy == setting.key { ProgressView().controlSize(.small) }
+                GlassToggleTile(
+                    isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
+                    isOn: Binding(
                         get: { isOn }, set: { v in Task { await model.set(setting, to: v ? 1 : 0, reason: reason(v)) } }
-                    ),
-                    busy: model.busy == setting.key
+                    )
                 )
-                .disabled(model.busy == setting.key)
+                .disabled(model.busy == setting.key || needs != nil)
+                .accessibilityLabel(title)
+                .accessibilityIdentifier("switch-\(setting.key)")
             }
-            AdminFlow(
-                nodes: [.init(title: "Off", sub: off), .init(title: "On", sub: on)], current: isOn ? 1 : 0,
-                edges: [.init(label: "admin + Touch ID", met: true)])
-            if model.busy == setting.key { AdminBar().frame(maxWidth: Space.s8 * 5) }
+        } content: {
+            HStack(spacing: Space.s2) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "minus.circle")
+                    .foregroundStyle(isOn ? GlassInk.orange : GlassInk.secondary)
+                    .contentTransition(.symbolEffect(.replace))
+                Text(isOn ? onLine : offLine).foregroundStyle(GlassInk.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let needs {
+                Label(needs, systemImage: "arrow.turn.right.up").font(
+                    .system(size: MacTextSize.meta, weight: .semibold)
+                )
+                .foregroundStyle(GlassInk.blue)
+            }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }
-        .accessibilityElement(children: .contain)
+        .help(setting.key)
+        .animation(.spring(duration: 0.35), value: isOn)
     }
 }
