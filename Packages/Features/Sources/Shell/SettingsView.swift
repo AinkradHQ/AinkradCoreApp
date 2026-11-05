@@ -45,6 +45,15 @@ public struct SettingsSection: Identifiable {
     }
 }
 
+public struct SettingsBack {
+    public let title: String
+    public let run: @MainActor () -> Void
+    public init(title: String, run: @escaping @MainActor () -> Void) {
+        self.title = title
+        self.run = run
+    }
+}
+
 @MainActor @Observable
 public final class SettingsRegistry {
     public private(set) var sections: [SettingsSection] = []
@@ -58,6 +67,8 @@ public final class SettingsRegistry {
     private(set) var direction: CGFloat = 1
     /// When a setting last changed: the header says "Saved 14:32" for a moment.
     public private(set) var savedAt: Date?
+    /// A page inside a section (one device) puts its way back here: the title bar shows it beside the section's icon.
+    public var back: SettingsBack?
     public init() {}
     public func saved() { savedAt = Date() }
     public func section(_ s: SettingsSection) {
@@ -117,6 +128,9 @@ struct SettingsView: View {
             .background(Color.black.opacity(0.12))
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(alignment: .top, spacing: Space.s4) {
+                    if let back = shell.settings.back {
+                        SettingsBackTile(back: back).transition(.opacity.combined(with: .move(edge: .leading)))
+                    }
                     if let current {
                         // The section's own icon, large, bouncing in each time the section changes.
                         Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
@@ -468,5 +482,35 @@ extension ShellModel {
                 id: "appearance", group: .appearance, title: "Appearance", sub: "Theme and motion",
                 symbol: "circle.lefthalf.filled"
             ) { AppearanceSection(shell: self) })
+    }
+}
+
+/// Back from a page to its list, in the title bar beside the section's icon: a glass tile whose arrow slides left and
+/// bounces on hover. ⌘← does the same.
+private struct SettingsBackTile: View {
+    let back: SettingsBack
+    @State private var hovering = false
+    var body: some View {
+        Button {
+            back.run()
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold))
+                    .offset(x: hovering ? -3 : 0)
+                    .symbolEffect(.bounce, value: hovering)
+                Text(back.title).font(.system(size: 10, weight: .medium)).lineLimit(1)
+            }
+            .foregroundStyle(WidgetInk.primary)
+            .frame(width: 72, height: 56)
+            .background(.white.opacity(hovering ? 0.16 : 0.1), in: coreShape(Radius.control + 4))
+            .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.18), lineWidth: 1) }
+            .contentShape(coreShape(Radius.control + 4))
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut(.leftArrow, modifiers: .command)
+        .scaleEffect(hovering ? 1.04 : 1)
+        .onHover { hovering = $0 }
+        .animation(.spring(duration: 0.3, bounce: 0.3), value: hovering)
+        .accessibilityLabel("Back to \(back.title)")
     }
 }

@@ -42,32 +42,3 @@ struct FingerprintView: View {
         .accessibilityElement(children: .combine)
     }
 }
-
-/// Back to the list, beside the device's picture: a glass tile with an arrow that slides left on hover and a word that
-/// shows what is behind it. ⌘← does the same.
-struct BackTile: View {
-    let title: String
-    let action: () -> Void
-    @State private var hovering = false
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: "chevron.left").font(.system(size: 22, weight: .semibold))
-                    .offset(x: hovering ? -4 : 0)
-                    .symbolEffect(.bounce, value: hovering)
-                Text(title).font(.system(size: MacTextSize.meta, weight: .medium)).lineLimit(1)
-            }
-            .foregroundStyle(GlassInk.primary)
-            .frame(width: 84, height: 72)
-            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 4))
-            .overlay { coreShape(Radius.control + 4).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-            .contentShape(coreShape(Radius.control + 4))
-        }
-        .buttonStyle(.plain)
-        .keyboardShortcut(.leftArrow, modifiers: .command)
-        .scaleEffect(hovering ? 1.04 : 1)
-        .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.3, bounce: 0.3), value: hovering)
-        .accessibilityLabel("Back to Devices")
-    }
-}

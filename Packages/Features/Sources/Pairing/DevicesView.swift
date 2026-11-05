@@ -344,7 +344,6 @@ struct DeviceDetail: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             // Hero: back, the device's picture, its name and what it is.
             HStack(spacing: Space.s4) {
-                BackTile(title: "All devices") { app.devices.detailID = nil }
                 IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 72, bounce: shown)
                     .shadow(color: hue.opacity(0.45), radius: 16)
                 VStack(alignment: .leading, spacing: Space.s1) {
@@ -433,7 +432,12 @@ struct DeviceDetail: View {
             }
         }
         .foregroundStyle(GlassInk.primary)
-        .onAppear { shown = true }
+        .onAppear {
+            shown = true
+            // The way back sits in the Settings title bar, beside the Devices icon.
+            app.shell.settings.back = SettingsBack(title: "Devices") { app.devices.detailID = nil }
+        }
+        .onDisappear { app.shell.settings.back = nil }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("device-detail")
     }
