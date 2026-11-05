@@ -36,6 +36,9 @@ struct SessionView: View {
                 }
                 ComposerView(model: model, session: s)
             }
+            // The same look as the Agents app: its surface inside the pane's glass rim.
+            .background { AgentSurface() }
+            .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {
             Text("This session is not in the list anymore.").foregroundStyle(palette.text2).padding(Space.s4)

@@ -215,12 +215,9 @@ struct AppearancePopover: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text("Terminal screen").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
+            Text("Look").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
             SurfaceModeTabs(mode: prefs.screenMode)
             GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
-            Text("App surface").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            SurfaceModeTabs(mode: prefs.surfaceMode)
-            GlassSlider(value: $prefs.surfaceOpacity, low: "See-through", high: "Solid")
             Text("Font size").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
             GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) { _ in
                 Int(prefs.fontSize.rounded())

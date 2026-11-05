@@ -48,7 +48,7 @@ struct TerminalSettingsView: View {
                 Toggle("Blink", isOn: $prefs.blink).toggleStyle(.switch)
             }
             GlassSection(
-                "Transparency", sub: "How much of the sky shows through the terminal.",
+                "Look", sub: "The terminals and the Terminals app, as one.",
                 symbol: "circle.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
@@ -57,16 +57,8 @@ struct TerminalSettingsView: View {
                 GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             GlassSection(
-                "App surface", sub: "The Terminals app's own background.", symbol: "square.on.square",
-                hue: GlassInk.blue, index: 5
-            ) {
-                SurfaceModeTabs(mode: prefs.surfaceMode)
-            } content: {
-                GlassSlider(value: $prefs.surfaceOpacity, low: "See-through", high: "Solid")
-            }
-            GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
-                hue: GlassInk.green, index: 6
+                hue: GlassInk.green, index: 5
             ) {
                 Picker("Runner", selection: $prefs.defaultRunner) {
                     Text("Best ready runner").tag("")

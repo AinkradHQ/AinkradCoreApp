@@ -59,7 +59,8 @@ struct AgentSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? Space.s3 : Space.s4) {
             GlassSection(
-                "App surface", sub: "The Agents app's background.", symbol: "square.on.square", hue: GlassInk.violet
+                "Look", sub: "The Agents app and its sessions, as one.", symbol: "square.on.square",
+                hue: GlassInk.violet
             ) {
                 SurfaceModeTabs(
                     mode: Binding(

@@ -22,12 +22,11 @@ final class TerminalPrefs {
 
     /// The Terminals app's own surface (the list): glass clear or frosted, the theme's colour, or a solid dark.
     enum Surface: String, CaseIterable { case clear, frosted, theme, solid }
-    var surface: Surface { didSet { save() } }
-    var surfaceBlur: Bool { didSet { save() } }
-    /// The terminal screen's own style (the same four as the surface).
+    /// The terminal screen's style. The app surface shares it, its blur and its opacity: one look for both (Ahmed, 2026-11-05).
     var screen: Surface { didSet { save() } }
-    /// How solid that surface is, 0 (see-through) to 1.
-    var surfaceOpacity: Double { didSet { save() } }
+    var surface: Surface { screen }
+    var surfaceBlur: Bool { blur }
+    var surfaceOpacity: Double { opacity }
 
     /// Defaults for the quick New terminal and for what opening one does.
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
@@ -46,11 +45,6 @@ final class TerminalPrefs {
         blink = defaults.object(forKey: "terminal.blink") as? Bool ?? true
         opacity = defaults.object(forKey: "terminal.opacity") as? Double ?? 0.78
         blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
-        surface =
-            Surface(rawValue: defaults.string(forKey: "terminal.surface") ?? "").map { $0 == .frosted ? .clear : $0 }
-            ?? .theme
-        surfaceOpacity = defaults.object(forKey: "terminal.surfaceOpacity") as? Double ?? 0.78
-        surfaceBlur = defaults.object(forKey: "terminal.surfaceBlur") as? Bool ?? true
         screen =
             Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "").map { $0 == .frosted ? .clear : $0 }
             ?? .theme
@@ -65,21 +59,13 @@ final class TerminalPrefs {
 
     var theme: TermTheme { TermTheme.all.first { $0.id == themeID } ?? TermTheme.all[0] }
 
-    /// The three-choice look of the screen and of the app surface.
+    /// The three-choice look of the terminals and the app.
     var screenMode: Binding<SurfaceMode> {
         Binding(
             get: { SurfaceMode(style: Self.app(self.screen), blur: self.blur) },
             set: {
                 self.screen = Self.term($0.style)
                 self.blur = $0.blur
-            })
-    }
-    var surfaceMode: Binding<SurfaceMode> {
-        Binding(
-            get: { SurfaceMode(style: Self.app(self.surface), blur: self.surfaceBlur) },
-            set: {
-                self.surface = Self.term($0.style)
-                self.surfaceBlur = $0.blur
             })
     }
 
@@ -134,9 +120,6 @@ final class TerminalPrefs {
         defaults.set(blink, forKey: "terminal.blink")
         defaults.set(opacity, forKey: "terminal.opacity")
         defaults.set(blur, forKey: "terminal.blur")
-        defaults.set(surface.rawValue, forKey: "terminal.surface")
-        defaults.set(surfaceOpacity, forKey: "terminal.surfaceOpacity")
-        defaults.set(surfaceBlur, forKey: "terminal.surfaceBlur")
         defaults.set(screen.rawValue, forKey: "terminal.screen")
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
         defaults.set(defaultShell, forKey: "terminal.defaultShell")
