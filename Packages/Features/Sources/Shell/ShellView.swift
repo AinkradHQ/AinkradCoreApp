@@ -145,35 +145,29 @@ public struct ShellView: View {
 
     static let scrim = Color(red: 3 / 255, green: 8 / 255, blue: 20 / 255).opacity(0.52)
 
-    /// `Mac.sheet`: a confirm on the same glass layer as the other dialogs, over the scrim.
+    /// `Mac.sheet`: every confirmation is the one ConfirmCard (visual, animated, keyboard driven), over the scrim. The safe
+    /// choice comes first and starts highlighted.
     private func sheetLayer(_ sheet: ShellSheet) -> some View {
-        ZStack {
+        let ordered =
+            sheet.actions.filter { !$0.primary && !$0.destructive }
+            + sheet.actions.filter { $0.primary || $0.destructive }
+        return ZStack {
             Self.scrim.onTapGesture { shell.sheet = nil }.accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s4) {
-                Text(sheet.title).font(.system(size: MacTextSize.title, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Text(sheet.message).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: Space.s2) {
-                    Spacer(minLength: 0)
-                    ForEach(sheet.actions) { a in
-                        Button(a.label) {
-                            shell.sheet = nil
-                            a.run()
-                        }
-                        .buttonStyle(CoreButtonStyle(a.destructive ? .danger : a.primary ? .prominent : .secondary))
-                        .keyboardShortcut(a.primary ? .defaultAction : .cancelAction)
+            ConfirmCard(
+                title: sheet.title, message: sheet.message, symbol: sheet.symbol,
+                choices: ordered.enumerated().map { i, a in
+                    ConfirmChoice(
+                        a.label, symbol: i == 0 ? "arrow.uturn.backward" : a.destructive ? "trash" : "checkmark",
+                        destructive: a.destructive
+                    ) {
+                        shell.sheet = nil
+                        a.run()
                     }
-                }
-            }
-            .padding(Space.s5)
-            .frame(width: Space.s8 * 11)
-            .corePanel(radius: Radius.panel, padding: 0)
-            .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(sheet.title)
+                },
+                cancel: { shell.sheet = nil })
         }
         .id("sheet-\(sheet.id)")
-        .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.97)))
+        .transition(.opacity)
     }
 
     /// Esc closes the topmost thing, from anywhere in the window.

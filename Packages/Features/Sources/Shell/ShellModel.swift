@@ -86,6 +86,7 @@ public struct ShellSheet: Identifiable {
     public let title: String
     public let message: String
     public let actions: [ShellSheetAction]
+    public var symbol: String?
 }
 
 public enum ShellSurface: Sendable { case home, workspace }
@@ -451,8 +452,8 @@ public final class ShellModel {
         toast = ToastItem(message, kind: kind, undo: undo)
     }
 
-    public func presentSheet(title: String, message: String, actions: [ShellSheetAction]) {
-        sheet = ShellSheet(title: title, message: message, actions: actions)
+    public func presentSheet(title: String, message: String, actions: [ShellSheetAction], symbol: String? = nil) {
+        sheet = ShellSheet(title: title, message: message, actions: actions, symbol: symbol)
     }
 
     /// Forget this Core: every preference this Mac kept goes back to a fresh install (name, Home widgets, theme).

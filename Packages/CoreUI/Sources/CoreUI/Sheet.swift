@@ -52,17 +52,16 @@ public struct CoreConfirmDialog: View {
     }
 
     public var body: some View {
-        CoreSheet(title) {
-            Text(message).fixedSize(horizontal: false, vertical: true)
-        } footer: {
-            // Cancel at the left edge, the confirm at the right. A destructive confirm is red glass and never the
-            // Return key, so Return is not a trap.
-            Button("Cancel", action: onCancel).coreGlassButton().keyboardShortcut(.cancelAction)
-            Spacer(minLength: 0)
-            Button(confirmTitle, action: onConfirm)
-                .coreGlassButton(prominent: true, tint: destructive ? palette.tone(.fail).ink : nil)
-                .keyboardShortcut(destructive ? nil : .defaultAction)
-        }
+        ConfirmCard(
+            title: title, message: message,
+            choices: [
+                ConfirmChoice("Cancel", symbol: "arrow.uturn.backward") { onCancel() },
+                ConfirmChoice(confirmTitle, symbol: destructive ? "trash" : "checkmark", destructive: destructive) {
+                    onConfirm()
+                },
+            ], cancel: onCancel
+        )
+        .presentationBackground(.clear)
     }
 }
 

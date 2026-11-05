@@ -282,8 +282,8 @@ public final class TerminalsModel {
                 "The terminal on \(session.machine) and everything running in it will stop. Closing the pane only detaches. This needs Touch ID.",
             actions: [
                 ShellSheetAction("Keep it"),
-                ShellSheetAction("End terminal", primary: false) { Task { _ = await session.end() } },
-            ])
+                ShellSheetAction("End terminal", destructive: true) { Task { _ = await session.end() } },
+            ], symbol: "stop.circle")
     }
 
     func paneChanged(_ id: String) {
