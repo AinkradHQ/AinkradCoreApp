@@ -52,7 +52,12 @@ struct HomeView: View {
                 .allowsHitTesting(true)
             ghost
             ForEach(sorted) { item in card(item) }
-            controls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s2)
+            // Hidden at rest: Add Widget and Edit Widgets live in the right-click menu on the sky. The bar shows only
+            // while editing or adding, so there is a Done to press.
+            if shell.editingWidgets || shell.addingWidget {
+                controls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s2)
+                    .transition(.opacity.combined(with: .offset(y: coreMove(reduce, 12))))
+            }
             if shell.addingWidget {
                 WidgetGallery(shell: shell, begin: beginFromGallery, move: moveDrag, end: endDrag)
                     .frame(width: 340).frame(maxHeight: .infinity)

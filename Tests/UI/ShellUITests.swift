@@ -117,6 +117,7 @@ final class ShellUITests: XCTestCase {
             "toast says Removed Clock; tree: \(app.buttons.allElementsBoundByIndex.map(\.label))")
         XCTAssertTrue(remove.waitForNonExistence(timeout: 5), "Remove takes the widget off Home")
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(app.buttons["Edit Widgets"].waitForExistence(timeout: 5), "Esc leaves edit mode")
+        // At rest the bar is hidden (right-click the sky for Add / Edit Widgets): leaving edit mode takes Done away.
+        XCTAssertTrue(app.buttons["Done"].waitForNonExistence(timeout: 5), "Esc leaves edit mode")
     }
 }
