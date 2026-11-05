@@ -97,7 +97,7 @@ struct AccLink: View {
         .focusable(false)
         .scaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 && enabled }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+        .animation(.smooth(duration: 0.25), value: hovering)
         .coreDimWhenDisabled(enabled)
         .help(help ?? title)
     }
@@ -165,7 +165,7 @@ struct AccStateCard<Actions: View>: View {
         .frame(maxWidth: .infinity)
         .background(GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(tone == .queue ? 0.15 : 0.45), lineWidth: 1) }
-        .animation(.spring(duration: 0.45, bounce: 0.3), value: shown)
+        .animation(.smooth(duration: 0.45), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
     }
@@ -308,7 +308,7 @@ struct AccDialogButtons: View {
             .onHover { hovered = $0 ? 1 : nil }
             .frame(maxWidth: Space.s8 * 7)
         }
-        .animation(.spring(duration: 0.25), value: hovered)
+        .animation(.smooth(duration: 0.25), value: hovered)
     }
 }
 

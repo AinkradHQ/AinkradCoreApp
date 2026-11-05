@@ -32,7 +32,7 @@ struct SubscriptionSignIn: View {
             }
             .transition(.opacity.combined(with: .move(edge: .trailing)))
         }
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: model.signIn)
+        .animation(.smooth(duration: 0.4), value: model.signIn)
         .accessibilityIdentifier("subscription-sign-in")
     }
 
@@ -105,7 +105,7 @@ struct SubscriptionSignIn: View {
                 }, run: send)
         }
         .onAppear { codeFocus = true }
-        .animation(.spring(duration: 0.3), value: codeFocus)
+        .animation(.smooth(duration: 0.3), value: codeFocus)
     }
 
     private func send() { Task { await model.sendSignInCode(code) } }

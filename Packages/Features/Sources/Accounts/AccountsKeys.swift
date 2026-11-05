@@ -25,8 +25,8 @@ enum AccountsKeys {
         guard !list.isEmpty else { return .ignored }
         let i = list.firstIndex { $0 == m.cursor } ?? (step > 0 ? -1 : list.count)
         let next = list[min(max(i + step, 0), list.count - 1)]
-        withAnimation(.spring(duration: 0.25)) { m.cursor = next }
-        withAnimation(.spring(duration: 0.3)) { proxy.scrollTo(next, anchor: .center) }
+        withAnimation(.smooth(duration: 0.25)) { m.cursor = next }
+        withAnimation(.smooth(duration: 0.3)) { proxy.scrollTo(next, anchor: .center) }
         return .handled
     }
 
@@ -34,7 +34,7 @@ enum AccountsKeys {
     static func side(_ m: AccountsModel, _ step: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
         guard m.page == .pools, !m.pools.isEmpty else { return move(m, step, proxy) }
         let i = m.pools.firstIndex { $0.id == m.selectedPool?.id } ?? 0
-        withAnimation(.spring(duration: 0.3)) {
+        withAnimation(.smooth(duration: 0.3)) {
             m.poolSelection = m.pools[min(max(i + step, 0), m.pools.count - 1)].id
             m.cursor = nil
         }
@@ -46,7 +46,7 @@ enum AccountsKeys {
             return .ignored
         }
         if c.hasPrefix("a-") || c.hasPrefix("m-") {
-            withAnimation(.spring(duration: 0.35)) {
+            withAnimation(.smooth(duration: 0.35)) {
                 m.page = .accounts
                 m.detail = id
                 m.cursor = nil
@@ -57,7 +57,7 @@ enum AccountsKeys {
 
     static func back(_ m: AccountsModel) -> KeyPress.Result {
         guard m.detail != nil else { return .ignored }
-        withAnimation(.spring(duration: 0.35)) {
+        withAnimation(.smooth(duration: 0.35)) {
             m.cursor = m.detail.map { "a-\($0)" }
             m.detail = nil
         }
@@ -84,7 +84,7 @@ enum AccountsKeys {
         }
         if m.page == .accounts, key == "f" {
             let all = AccountFilter.allCases
-            withAnimation(.spring(duration: 0.3)) {
+            withAnimation(.smooth(duration: 0.3)) {
                 m.filter = all[((all.firstIndex(of: m.filter) ?? 0) + 1) % all.count]
             }
             return .handled

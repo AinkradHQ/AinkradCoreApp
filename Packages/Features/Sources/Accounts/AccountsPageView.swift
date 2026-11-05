@@ -83,7 +83,7 @@ private struct SummaryBar: View {
             }
             .frame(height: 8).accessibilityHidden(true)
         }
-        .animation(.spring(duration: 0.8, bounce: 0.2), value: shown)
+        .animation(.smooth(duration: 0.8), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(ready) ready, \(need) need a look, \(off + other) turned off or other")
@@ -119,7 +119,7 @@ private struct ProviderSection: View {
                 }
                 Spacer(minLength: Space.s3)
                 AccLink(title: open ? "Hide details" : "About", symbol: open ? "chevron.up" : "info.circle") {
-                    withAnimation(.spring(duration: 0.35)) { open.toggle() }
+                    withAnimation(.smooth(duration: 0.35)) { open.toggle() }
                 }
                 AccLink(title: "Connect another", symbol: "plus") {
                     AccountDialogs.openConnect(model, provider: provider.id)
@@ -213,7 +213,7 @@ struct BackTile: View {
         .focusable(false)
         .keyboardShortcut(.leftArrow, modifiers: .command)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.4), value: hovering)
+        .animation(.smooth(duration: 0.25), value: hovering)
         .help("All accounts (esc)")
         .accessibilityLabel("All accounts")
     }

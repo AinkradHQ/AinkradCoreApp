@@ -35,8 +35,6 @@ struct AccountsView: View {
                     .foregroundStyle(GlassInk.primary)
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .animation(.spring(duration: 0.35, bounce: 0.2), value: model.page)
-                    .animation(.spring(duration: 0.35, bounce: 0.2), value: model.detail)
                 }
                 .scrollIndicators(.never)
                 .focusable()
@@ -81,7 +79,7 @@ struct AccountsView: View {
     }
 
     private func go(_ page: AccountsPage) {
-        withAnimation(.spring(duration: 0.3)) {
+        withAnimation(.smooth(duration: 0.3)) {
             model.page = page
             model.detail = nil
             model.cursor = nil
@@ -145,7 +143,7 @@ struct AccountsView: View {
                     default: BindingsPage(model: model)
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .transition(.opacity)
                 .opacity(model.host.pausedReason == nil ? 1 : 0.55)
                 .disabled(model.host.pausedReason != nil)
             case .failed(let code, let message):

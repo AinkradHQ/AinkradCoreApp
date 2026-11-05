@@ -67,7 +67,7 @@ struct AccountDetailView: View {
                 AccLink(
                     title: tech ? "Hide details" : "Technical details", symbol: tech ? "chevron.up" : "chevron.down"
                 ) {
-                    withAnimation(.spring(duration: 0.35)) { tech.toggle() }
+                    withAnimation(.smooth(duration: 0.35)) { tech.toggle() }
                 }
             }
             .font(.system(size: MacTextSize.meta))
@@ -138,7 +138,7 @@ struct AccountDetailView: View {
                 .clipShape(coreShape(Radius.cardMac))
         }
         .overlay { coreShape(Radius.cardMac).strokeBorder(tone.opacity(0.45), lineWidth: 1) }
-        .animation(.spring(duration: 0.4, bounce: 0.25), value: usable)
+        .animation(.smooth(duration: 0.4), value: usable)
     }
 
     /// Key saved → Turned on → In a pool: each step lit once it holds.
@@ -181,7 +181,7 @@ struct AccountDetailView: View {
             HStack(spacing: 6) {
                 ForEach(0..<4, id: \.self) { i in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
-                        .opacity(shown ? 1 : 0).animation(.spring(duration: 0.3).delay(Double(i) * 0.06), value: shown)
+                        .opacity(shown ? 1 : 0).animation(.smooth(duration: 0.3).delay(Double(i) * 0.06), value: shown)
                 }
                 Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).font(
                     .system(size: MacTextSize.title, weight: .semibold, design: .monospaced))
@@ -207,7 +207,7 @@ struct AccountDetailView: View {
                 ForEach(0..<Int(min(max(a.cap, 1), 12)), id: \.self) { i in
                     coreShape(3).fill(a.cap == 0 ? hue.opacity(0.35) : hue.opacity(0.8)).frame(height: 8)
                         .scaleEffect(x: 1, y: shown ? 1 : 0.2, anchor: .bottom)
-                        .animation(.spring(duration: 0.4, bounce: 0.3).delay(Double(i) * 0.05), value: shown)
+                        .animation(.smooth(duration: 0.4).delay(Double(i) * 0.05), value: shown)
                 }
             }
             Text(AccountsWords.used(a.lastUsedAt, now: model.now())).font(.system(size: MacTextSize.meta))
@@ -224,7 +224,7 @@ struct AccountDetailView: View {
             }
             ForEach(pools) { p in
                 Button {
-                    withAnimation(.spring(duration: 0.3)) {
+                    withAnimation(.smooth(duration: 0.3)) {
                         model.poolSelection = p.id
                         model.page = .pools
                         model.detail = nil

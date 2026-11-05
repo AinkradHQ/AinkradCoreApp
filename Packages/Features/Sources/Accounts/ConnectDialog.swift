@@ -27,7 +27,7 @@ struct ConnectDialog: View {
                     HStack(spacing: Space.s2) {
                         ForEach(ProviderLook.ordered(model.providers)) { p in
                             ProviderChoice(provider: p, on: p.id == provider, lens: lens) {
-                                withAnimation(.spring(duration: 0.35, bounce: 0.25)) { provider = p.id }
+                                withAnimation(.smooth(duration: 0.35)) { provider = p.id }
                             }
                         }
                     }
@@ -79,7 +79,7 @@ struct ConnectDialog: View {
     private func move(_ step: Int) -> KeyPress.Result {
         let ids = ProviderLook.ordered(model.providers).map(\.id)
         guard let i = ids.firstIndex(of: provider) else { return .ignored }
-        withAnimation(.spring(duration: 0.35, bounce: 0.25)) { provider = ids[min(max(i + step, 0), ids.count - 1)] }
+        withAnimation(.smooth(duration: 0.35)) { provider = ids[min(max(i + step, 0), ids.count - 1)] }
         return .handled
     }
 
@@ -157,7 +157,7 @@ private struct ProviderChoice: View {
         .focusable(false)
         .scaleEffect(on ? 1.03 : hovering ? 1.02 : 1)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.3, bounce: 0.3), value: hovering)
+        .animation(.smooth(duration: 0.3), value: hovering)
         .accessibilityLabel(provider.name)
         .accessibilityAddTraits(on ? .isSelected : [])
     }

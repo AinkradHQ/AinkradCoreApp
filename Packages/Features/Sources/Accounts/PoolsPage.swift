@@ -57,7 +57,7 @@ private struct PoolTab: View {
     var body: some View {
         let hue = ProviderLook.hue(pool.provider)
         Button {
-            withAnimation(.spring(duration: 0.3)) {
+            withAnimation(.smooth(duration: 0.3)) {
                 model.poolSelection = pool.id
                 model.cursor = nil
             }
@@ -66,7 +66,9 @@ private struct PoolTab: View {
                 AccTile(provider: pool.provider).scaleEffect(0.8)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 4) {
-                        Text(pool.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                        Text("\(ProviderLook.short(pool.provider, pool.provider)) · \(pool.name)").font(
+                            .system(size: MacTextSize.headline, weight: .semibold)
+                        ).lineLimit(1)
                         if pool.isDefault {
                             Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orange)
                         }
@@ -95,7 +97,7 @@ private struct PoolTab: View {
         .focusable(false)
         .scaleEffect(hovering ? 1.03 : 1)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+        .animation(.smooth(duration: 0.25), value: hovering)
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("pool-tab-\(pool.name)")
     }
@@ -110,31 +112,59 @@ private struct PoolDetail: View {
         let bound = model.bindings(of: pool)
         let first = model.firstReady(in: pool)
         VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-                Text(
-                    "\(model.providerName(pool.provider)) pool. "
-                        + (pool.isDefault
-                            ? "The default: it also serves every agent of this provider with no binding. The default cannot be deleted; make another pool the default first."
-                            : "Serves the agents bound to it.")
-                )
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .center, spacing: Space.s3) {
+                AccTile(large: true, provider: pool.provider)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(ProviderLook.short(pool.provider, model.providerName(pool.provider))) · \(pool.name)")
+                        .font(.system(size: MacTextSize.large, weight: .bold))
+                    HStack(spacing: Space.s2) {
+                        if pool.isDefault {
+                            Label("Default: also serves agents with no binding", systemImage: "star.fill")
+                                .foregroundStyle(GlassInk.orange)
+                        } else {
+                            Label("Serves the agents bound to it", systemImage: "link").foregroundStyle(
+                                GlassInk.secondary)
+                        }
+                    }
+                    .font(.system(size: MacTextSize.meta, weight: .semibold))
+                }
                 Spacer(minLength: Space.s2)
-                // Always shown, so the option is findable; the Core refuses the default pool, so it is off there with the reason above.
                 if !pool.isDefault {
                     AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.orange) {
                         Task { await model.makeDefault(pool) }
                     }
                     .disabled(ro || model.busy != nil)
+                    AppActionTile(title: "Delete pool", symbol: ro ? "lock" : "trash", key: "", hue: GlassInk.red) {
+                        AccountDialogs.openDeletePool(model, pool)
+                    }
+                    .disabled(ro)
+                    .help("Delete \(pool.name) and its bindings")
+                    .accessibilityIdentifier("pool-delete-button")
                 }
-                AppActionTile(title: "Delete pool", symbol: ro ? "lock" : "trash", key: "", hue: GlassInk.red) {
-                    AccountDialogs.openDeletePool(model, pool)
-                }
-                .disabled(ro || pool.isDefault)
-                .opacity(pool.isDefault ? 0.5 : 1)
-                .help(pool.isDefault ? "The default pool cannot be deleted" : "Delete \(pool.name) and its bindings")
-                .accessibilityIdentifier("pool-delete-button")
             }
             HStack(alignment: .top, spacing: Space.s3) {
+                AccPanel(spacing: Space.s2) {
+                    HStack {
+                        Label("Accounts, in the order they're tried", systemImage: "list.number").font(
+                            .system(size: MacTextSize.title, weight: .semibold))
+                        Spacer()
+                        AccLink(title: "Add · A", symbol: "plus") { AccountDialogs.openAddMember(model, pool: pool) }
+                            .disabled(ro)
+                    }
+                    if pool.members.isEmpty {
+                        Text("Add an account to get this pool working.").foregroundStyle(GlassInk.orange)
+                    }
+                    ForEach(Array(pool.members.enumerated()), id: \.offset) { i, id in
+                        MemberRow(model: model, pool: pool, index: i, id: id, first: first?.id == id)
+                    }
+                    if let e = model.writeError["member-\(pool.id)"] ?? model.writeError["default-\(pool.id)"] {
+                        AccIssue(text: e)
+                    }
+                    Text("Tried top to bottom. If one stops, the next ready one takes over.")
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
                 AccPanel(spacing: Space.s2) {
                     HStack {
                         Label("Agents", systemImage: "sparkles").font(
@@ -167,29 +197,7 @@ private struct PoolDetail: View {
                     }
                     if let e = model.writeError["bind"] { AccIssue(text: e) }
                 }
-                AccPanel(spacing: Space.s2) {
-                    HStack {
-                        Label("Accounts", systemImage: "list.number").font(
-                            .system(size: MacTextSize.title, weight: .semibold))
-                        Spacer()
-                        AccLink(title: "Add · A", symbol: "plus") { AccountDialogs.openAddMember(model, pool: pool) }
-                            .disabled(ro)
-                    }
-                    if pool.members.isEmpty {
-                        Text("Add an account to get this pool working.").foregroundStyle(GlassInk.orange)
-                    }
-                    ForEach(Array(pool.members.enumerated()), id: \.offset) { i, id in
-                        MemberRow(model: model, pool: pool, index: i, id: id, first: first?.id == id)
-                    }
-                    if let e = model.writeError["member-\(pool.id)"] ?? model.writeError["default-\(pool.id)"] {
-                        AccIssue(text: e)
-                    }
-                    Text(
-                        "Accounts are tried in this order. If one stops, the next ready account of this provider takes over and the task restarts without its earlier conversation. Core only adds to the end of the order."
-                    )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+                .frame(width: Space.s8 * 12)
             }
         }
     }
@@ -239,10 +247,10 @@ private struct MemberRow: View {
         .overlay { coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.7) : .clear, lineWidth: 1.5) }
         .shadow(color: hue.opacity(on ? 0.4 : 0), radius: 10)
         .contentShape(coreShape(Radius.control + 2))
-        .onTapGesture { withAnimation(.spring(duration: 0.25)) { model.cursor = "m-\(id)" } }
+        .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "m-\(id)" } }
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25), value: hovering)
-        .animation(.spring(duration: 0.25), value: on)
+        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(.smooth(duration: 0.25), value: on)
         .id("m-\(id)")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("member-\(a?.label ?? String(id))")
@@ -307,7 +315,7 @@ private struct BindingRow: View {
                     GlassInk.secondary)
                 if let p = model.pool(b.poolID) {
                     Button {
-                        withAnimation(.spring(duration: 0.3)) {
+                        withAnimation(.smooth(duration: 0.3)) {
                             model.poolSelection = p.id
                             model.page = .pools
                         }
@@ -344,10 +352,10 @@ private struct BindingRow: View {
         .shadow(color: hue.opacity(on ? 0.4 : 0), radius: 12)
         .scaleEffect(hovering ? 1.01 : 1)
         .contentShape(coreShape(Radius.cardMac))
-        .onTapGesture { withAnimation(.spring(duration: 0.25)) { model.cursor = "b-\(b.id)" } }
+        .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "b-\(b.id)" } }
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25), value: hovering)
-        .animation(.spring(duration: 0.25), value: on)
+        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(.smooth(duration: 0.25), value: on)
         .coreRise(shown, index)
         .onAppear { shown = true }
         .id("b-\(b.id)")

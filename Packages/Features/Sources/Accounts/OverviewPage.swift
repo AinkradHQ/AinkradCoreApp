@@ -19,14 +19,29 @@ struct OverviewPage: View {
             if model.accounts.isEmpty {
                 FirstAccount(model: model)
             } else {
-                ForEach(need) { a in AlertRow(model: model, account: a).id("a-\(a.id)") }
-                HStack(alignment: .top, spacing: Space.s3) {
-                    TriedFirst(model: model)
-                    NotYetCard(title: "Spent today")
+                // How it's going, at a glance: four figures that fill in as they appear.
+                HStack(spacing: Space.s3) {
+                    let total = max(model.accounts.count, 1)
+                    let pooled = model.accounts.filter { !model.pools(of: $0).isEmpty }.count
+                    StatTile(
+                        "Ready", value: model.readyCount, of: total, symbol: "checkmark.seal.fill", hue: GlassInk.green)
+                    StatTile(
+                        "Need a look", value: need.count, of: total, symbol: "exclamationmark.triangle.fill",
+                        hue: need.isEmpty ? GlassInk.slate : GlassInk.orange)
+                    StatTile("In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue)
+                    StatTile(
+                        "Agents bound", value: model.bindings.count, of: max(model.bindings.count, 1),
+                        symbol: "link", hue: GlassInk.violet)
                 }
+                if !need.isEmpty {
+                    section("Needs you", "hand.raised.fill", GlassInk.orange)
+                    LazyVGrid(columns: cardColumns, spacing: Space.s3) {
+                        ForEach(need) { a in AlertRow(model: model, account: a).id("a-\(a.id)") }
+                    }
+                }
+                TriedFirst(model: model)
                 HStack {
-                    Text("Your accounts").font(.system(size: MacTextSize.title, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
+                    section("Your accounts", "creditcard.fill", GlassInk.blue)
                     Spacer()
                     AccLink(title: "See all", symbol: "arrow.right") { model.page = .accounts }
                 }
@@ -43,6 +58,15 @@ struct OverviewPage: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("overview")
+    }
+
+    private func section(_ title: String, _ symbol: String, _ hue: Color) -> some View {
+        Label {
+            Text(title).font(.system(size: MacTextSize.title, weight: .semibold))
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(hue)
+        }
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func headline(_ need: Int) -> String {
@@ -79,78 +103,131 @@ struct FirstAccount: View {
     }
 }
 
-/// One not-ready account as a tinted card: its provider tile, what it is doing, and a way to its page.
+/// One not-ready account as a tinted tile: its provider tile and state, why in two lines, and Open.
 private struct AlertRow: View {
     let model: AccountsModel
     let account: AccountItem
+    @State private var hovering = false
     var body: some View {
         let on = model.cursor == "a-\(account.id)"
         let hue = account.phase.tone == .fail ? GlassInk.red : GlassInk.orange
-        HStack(spacing: Space.s3) {
-            AccTile(provider: account.provider)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: Space.s2) {
-                    Text(account.label).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    PhaseBadge(phase: account.phase)
-                }
-                Text(AccountsWords.why(account, now: model.now())).foregroundStyle(GlassInk.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s3) {
+                AccTile(provider: account.provider)
+                Text(account.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: Space.s2)
+                PhaseBadge(phase: account.phase)
             }
-            Spacer(minLength: Space.s2)
-            AccLink(title: "Open", symbol: "arrow.up.forward.app") {
+            Text(AccountsWords.why(account, now: model.now())).foregroundStyle(GlassInk.secondary)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 34, alignment: .topLeading)
+        }
+        .padding(Space.s3)
+        .background(hue.opacity(on || hovering ? 0.2 : 0.12), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(on ? 0.8 : 0.4), lineWidth: on ? 1.5 : 1) }
+        .contentShape(coreShape(Radius.cardMac))
+        .onTapGesture {
+            withAnimation(.smooth(duration: 0.3)) {
                 model.page = .accounts
                 model.detail = account.id
             }
-            .help("Open \(account.label)")
         }
-        .padding(Space.s3)
-        .background(hue.opacity(on ? 0.22 : 0.12), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(on ? 0.8 : 0.4), lineWidth: on ? 1.5 : 1) }
-        .shadow(color: hue.opacity(on ? 0.4 : 0), radius: 12)
-        .animation(.spring(duration: 0.3), value: on)
-        .accessibilityElement(children: .contain)
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(.smooth(duration: 0.2), value: on)
+        .help("Open \(account.label)")
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
-/// For each provider: the account its default pool tries first.
+/// A figure with its share as a bar that fills in: Ready 3 of 6.
+private struct StatTile: View {
+    let title: String
+    let value: Int
+    let of: Int
+    let symbol: String
+    let hue: Color
+    @State private var shown = false
+    init(_ title: String, value: Int, of: Int, symbol: String, hue: Color) {
+        self.title = title
+        self.value = value
+        self.of = of
+        self.symbol = symbol
+        self.hue = hue
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack {
+                Image(systemName: symbol).foregroundStyle(hue)
+                Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                Spacer(minLength: 0)
+            }
+            Text("\(value)").font(.system(size: 30, weight: .bold, design: .rounded)).contentTransition(.numericText())
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    coreShape(3).fill(GlassInk.track)
+                    coreShape(3).fill(hue.gradient)
+                        .frame(width: shown ? g.size.width * CGFloat(value) / CGFloat(max(of, 1)) : 0)
+                }
+            }
+            .frame(height: 6)
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .animation(.smooth(duration: 0.8), value: shown)
+        .animation(.smooth(duration: 0.4), value: value)
+        .onAppear { shown = true }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title): \(value) of \(of)")
+    }
+}
+
+/// For each provider, the account its default pool tries first, as chips you can open.
 private struct TriedFirst: View {
     let model: AccountsModel
-    @Environment(\.corePalette) private var palette
     var body: some View {
-        AccPanel(spacing: Space.s2) {
-            Label("Tried first in each default pool", systemImage: "arrow.right.to.line").font(
-                .system(size: MacTextSize.headline, weight: .semibold))
-            ForEach(model.providers) { p in
-                HStack(spacing: Space.s3) {
-                    AccTile(provider: p.id)
-                    Text(p.name).foregroundStyle(GlassInk.secondary).frame(width: Space.s8 * 4, alignment: .leading)
-                    if let pool = model.defaultPool(p.id), let a = model.firstReady(in: pool) {
-                        Button {
-                            model.page = .accounts
-                            model.detail = a.id
-                        } label: {
-                            HStack(spacing: Space.s2) {
-                                Image(systemName: "1.square.fill").foregroundStyle(ProviderLook.hue(p.id))
-                                Text(a.label).font(.system(size: MacTextSize.headline, weight: .semibold))
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
-                            }
-                            .padding(.horizontal, Space.s2).frame(minHeight: 32)
-                            .background(GlassInk.well, in: coreShape(Radius.control))
-                        }
-                        .buttonStyle(.plain).help("Open \(a.label)")
-                    } else {
-                        Label(
-                            model.defaultPool(p.id) == nil ? "No default pool" : "No ready account in the default pool",
-                            systemImage: "exclamationmark.circle"
-                        )
-                        .foregroundStyle(GlassInk.orange)
-                    }
-                    Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Label {
+                Text("Tried first").font(.system(size: MacTextSize.title, weight: .semibold))
+            } icon: {
+                Image(systemName: "arrow.right.to.line").foregroundStyle(GlassInk.violet)
+            }
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s2, alignment: .leading)],
+                spacing: Space.s2
+            ) {
+                ForEach(model.providers) { p in chip(p) }
+            }
+        }
+    }
+
+    private func chip(_ p: ProviderItem) -> some View {
+        let first = model.defaultPool(p.id).flatMap { model.firstReady(in: $0) }
+        return HStack(spacing: Space.s2) {
+            AccTile(provider: p.id).scaleEffect(0.8)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(ProviderLook.short(p.id, p.name) + (p.loginMethods.contains("browser_code") ? " · plan" : ""))
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(first?.label ?? (model.defaultPool(p.id) == nil ? "No default pool" : "None ready"))
+                    .font(.system(size: MacTextSize.body, weight: .semibold))
+                    .foregroundStyle(first == nil ? GlassInk.orange : GlassInk.primary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Space.s2).frame(minHeight: 44)
+        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .contentShape(coreShape(Radius.control + 2))
+        .onTapGesture {
+            if let first {
+                withAnimation(.smooth(duration: 0.3)) {
+                    model.page = .accounts
+                    model.detail = first.id
                 }
             }
         }
-        .frame(maxWidth: .infinity)
     }
 }
 
@@ -230,9 +307,9 @@ struct AccountCard: View {
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
-        .animation(.spring(duration: 0.3), value: on)
-        .animation(.spring(duration: 0.7).delay(0.1 + Double(index) * 0.05), value: shown)
+        .animation(.smooth(duration: 0.3), value: hovering)
+        .animation(.smooth(duration: 0.3), value: on)
+        .animation(.smooth(duration: 0.7).delay(0.1 + Double(index) * 0.05), value: shown)
         .coreRise(shown, index)
         .onAppear { shown = true }
         .accessibilityElement(children: .combine)
@@ -244,7 +321,7 @@ struct AccountCard: View {
     }
 
     private func openIt() {
-        withAnimation(.spring(duration: 0.35)) {
+        withAnimation(.smooth(duration: 0.35)) {
             model.page = .accounts
             model.detail = account.id
             model.cursor = nil
