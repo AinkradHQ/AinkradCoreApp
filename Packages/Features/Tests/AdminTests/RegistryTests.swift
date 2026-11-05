@@ -48,7 +48,7 @@ struct RegistryTests {
         let r = admin.registry!
         let s = r.item("auth.step_up_secs")!
         #expect(RegistryModel.check(s, "59")?.code == "out_of_bounds")
-        #expect(RegistryModel.check(s, "901")?.message.contains("maximum 900") == true)
+        #expect(RegistryModel.check(s, "901")?.message.contains("highest allowed, 15 min") == true)
         #expect(RegistryModel.check(s, "abc")?.code == "not_integer")
         #expect(RegistryModel.check(s, "") != nil)
         #expect(RegistryModel.check(s, " 600 ") == nil)
@@ -70,7 +70,7 @@ struct RegistryTests {
         r.draft = "600"
         await r.saveEdit(s)
         #expect(service.log.contains("set auth.step_up_secs 600"))
-        #expect(host.reasons.last?.contains("auth.step_up_secs to 600") == true)
+        #expect(host.reasons.last?.contains("Touch ID unlocks for to 10 min") == true)
         #expect(r.editing == nil)
         #expect(r.item("auth.step_up_secs")?.value == 600)
         #expect(r.item("auth.step_up_secs")?.isOverride == true)
@@ -126,7 +126,7 @@ struct RegistryTests {
         await r.reset(r.item("api.requests_per_min")!)
         #expect(service.log.contains("reset api.requests_per_min"))
         #expect(r.item("api.requests_per_min")?.value == 1200)
-        #expect(host.reasons.last?.contains("default (1200)") == true)
+        #expect(host.reasons.last?.contains("default, 1,200 a minute") == true)
     }
 
     @Test("a switch changes through Touch ID and an Undo puts it back")
