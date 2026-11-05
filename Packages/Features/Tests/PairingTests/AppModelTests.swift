@@ -15,7 +15,9 @@ struct AppModelTests {
                     deviceID: "d_me", coreFingerprint: String(repeating: "A", count: 43),
                     endpoint: URL(string: "http://127.0.0.1:7700")!))
         }
-        return AppModel(keyStore: store, driver: FakeDriver()) { _ in service }
+        let m = AppModel(keyStore: store, driver: FakeDriver()) { _ in service }
+        m.stepUp.check = { _, _ in }  // never the Mac's real Touch ID
+        return m
     }
 
     @Test func notPairedStartsFirstRun() async throws {

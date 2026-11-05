@@ -86,6 +86,11 @@ final class StepUpModel {
         phase = p
     }
 
+    /// The local Touch ID check. Tests put a stand-in here so they never reach the Mac's real Touch ID.
+    var check: (LAContext, String) async throws -> Void = { context, reason in
+        try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
+    }
+
     private var choice: CheckedContinuation<Bool, Never>?
 
     /// Asks for Touch ID in the sheet's embedded view and waits. True once it went through. A miss shows in the sheet and
@@ -96,7 +101,7 @@ final class StepUpModel {
         try? await Task.sleep(for: .milliseconds(300))
         while true {
             do {
-                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
+                try await check(context, reason)
                 return true
             } catch let e as LAError where e.code == .userCancel || e.code == .appCancel || e.code == .systemCancel {
                 if cancelled { return false }
