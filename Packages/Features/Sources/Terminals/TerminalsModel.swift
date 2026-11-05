@@ -132,10 +132,18 @@ public final class TerminalsModel {
                 id: "terminals", title: "Terminals", sub: "Rune terminals on your runners", symbol: "terminal",
                 keywords: ["rune", "shell", "zsh", "bash"]
             ) { [weak self] in self?.openList() })
+        // Quick by default, advanced on request (Ahmed, 2026-11-05): New terminal opens one at once with the defaults;
+        // the advanced sheet picks the runner and the shell.
         l.register(
             LauncherEntry(
-                id: "new-terminal", title: "New terminal", sub: "Open a shell on a runner · needs Touch ID",
+                id: "new-terminal", title: "New terminal", sub: "Opens at once on the best runner · needs Touch ID",
                 symbol: "terminal", keywords: ["shell", "rune"], isAction: true
+            ) { [weak self] in self?.quickNew() })
+        l.register(
+            LauncherEntry(
+                id: "new-terminal-advanced", title: "New terminal (advanced)…",
+                sub: "Choose the runner and the shell", symbol: "slider.horizontal.3",
+                keywords: ["shell", "rune", "runner", "zsh", "bash"], isAction: true
             ) { [weak self] in self?.openNew() })
         l.register(
             LauncherEntry(
@@ -272,8 +280,20 @@ public final class TerminalsModel {
 
     // MARK: new terminal
 
-    func openNew(runner: String? = nil) {
-        let m = NewTerminalModel(model: self, runner: runner)
+    /// New terminal with the defaults: the first ready runner, its login shell, opened after Touch ID with no sheet. When
+    /// nothing is ready or the Core refuses, the advanced sheet opens with the reason.
+    func quickNew() {
+        Task {
+            if runners.isEmpty { await reload() }
+            let m = NewTerminalModel(model: self, runner: nil)
+            guard m.canOpen else { return openNew(form: m) }
+            await m.submit()
+            if m.error != nil { openNew(form: m) }
+        }
+    }
+
+    func openNew(runner: String? = nil, form: NewTerminalModel? = nil) {
+        let m = form ?? NewTerminalModel(model: self, runner: runner)
         newTerminal = m
         host.clearElevationNotice()
         shell.present(

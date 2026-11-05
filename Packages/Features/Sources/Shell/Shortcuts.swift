@@ -136,6 +136,8 @@ public struct ShellCommands: Commands {
             Divider()
             Button("New Agent Session") { shell.launcher.entry("agents.new")?.run() }.keyboardShortcut("n")
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
+            Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
+                .keyboardShortcut("t", modifiers: [.command, .option])
         }
         CommandGroup(replacing: .saveItem) {
             Button("Close Pane") { if let id = shell.activePane { shell.dismissPane(id) } }

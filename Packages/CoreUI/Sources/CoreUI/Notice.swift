@@ -64,7 +64,10 @@ public struct CoreDialogPanel<Content: View>: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            // An empty title leaves the header to the content (a sheet with its own hero).
+            if !title.isEmpty {
+                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            }
             content
         }
         .foregroundStyle(palette.text)

@@ -36,11 +36,12 @@ final class TerminalsLiveUITests: XCTestCase {
         defer { app.terminate() }
         try LivePairing.pair(app, env: env)
 
-        // ⌘K, "new terminal", Return: the sheet lists the runner; Open terminal.
+        // ⌘K, "new terminal advanced", Return: the advanced sheet lists the runner; Open terminal. (Plain New terminal
+        // opens one at once with the defaults.)
         app.typeKey("k", modifierFlags: .command)
         let launcher = app.textFields["Launcher"]
         XCTAssertTrue(launcher.waitForExistence(timeout: 10))
-        launcher.typeText("new terminal")
+        launcher.typeText("new terminal advanced")
         launcher.typeKey(.return, modifierFlags: [])
         let open = app.buttons["Open terminal"]
         XCTAssertTrue(open.waitForExistence(timeout: 10), "the New terminal sheet opens")
