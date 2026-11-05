@@ -60,8 +60,9 @@ final class TerminalsLiveUITests: XCTestCase {
         waitForScreen(containing: "live-42-ok", "the echo came back")
 
         // Detach from the pane's tab menu: the terminal keeps running and says so.
-        app.menuButtons["Rune actions"].click()
-        app.menuItems["Detach"].click()
+        // ⇧⌘A lists the pane's actions; type and Return.
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        app.textFields["Launcher"].typeText("detach\n")
         XCTAssertTrue(element("Still running").waitForExistence(timeout: 10), "detached: still running, not attached")
         XCTAssertTrue(app.buttons["Attach here"].exists || app.buttons["Attach"].exists)
 
@@ -74,8 +75,8 @@ final class TerminalsLiveUITests: XCTestCase {
         waitForScreen(containing: "again-55-ok", "typing works after reattach")
 
         // End it from the tab menu: confirm, then the pane says it ended.
-        app.menuButtons["Rune actions"].click()
-        app.menuItems["End Terminal…"].click()
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        app.textFields["Launcher"].typeText("end terminal\n")
         let confirm = app.buttons["End terminal"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10), "the confirm sheet asks")
         confirm.click()

@@ -169,6 +169,8 @@ private struct PaneTab: View {
     let onDrag: (CGPoint, CGSize) -> Void
     let onDragEnd: () -> Void
     @State private var hovering = false
+    @State private var draft = ""
+    @FocusState private var editing: Bool
 
     private var stateColor: Color? {
         guard let chip = spec.chip else { return nil }
@@ -186,20 +188,26 @@ private struct PaneTab: View {
             Image(systemName: spec.symbol).font(.system(size: MacTextSize.body, weight: .medium))
                 .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary)
                 .accessibilityHidden(true)
-            Text(spec.sub ?? spec.title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
-                .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary).lineLimit(1)
-                .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
+            if shell.renamingTab == spec.id {
+                TextField("Tab name", text: $draft)
+                    .textFieldStyle(.plain).font(.system(size: MacTextSize.body, weight: .semibold))
+                    .foregroundStyle(WidgetInk.primary).frame(width: Space.s8 * 4)
+                    .focused($editing)
+                    .onSubmit { shell.renameTab(spec.id, to: draft) }
+                    .onExitCommand { shell.renamingTab = nil }
+                    .onAppear {
+                        draft = shell.tabName(spec)
+                        editing = true
+                    }
+            } else {
+                Text(shell.tabName(spec)).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
+                    .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary).lineLimit(1)
+                    .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
+            }
             if let c = stateColor {
                 Circle().fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
             }
             if hovering {
-                Menu {
-                    menu
-                } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 10, weight: .bold)).frame(width: 16, height: 16)
-                }
-                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-                .accessibilityLabel("\(spec.title) actions")
                 Button {
                     shell.dismissPane(spec.id)
                 } label: {
@@ -227,9 +235,9 @@ private struct PaneTab: View {
                 .onEnded { _ in onDragEnd() }
         )
         .contextMenu { menu }
-        .help(spec.sub.map { "\(spec.title) · \($0)" } ?? spec.title)
+        .help("\(spec.title) · right-click for actions, ⌃Tab next tab, ⇧⌘R rename")
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(spec.sub.map { "\(spec.title), \($0)" } ?? spec.title)
+        .accessibilityLabel(shell.tabName(spec))
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
@@ -251,6 +259,11 @@ private struct PaneTab: View {
             }
         }
         if shell.paneMenus[spec.id] != nil { Divider() }
+        Button {
+            shell.renamingTab = spec.id
+        } label: {
+            Label("Rename Tab…", systemImage: "pencil")
+        }
         Button {
             toggleFocus()
         } label: {

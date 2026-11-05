@@ -139,6 +139,9 @@ public final class ShellModel {
     public var launcherOpen = false
     /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
     public var actionsOpen = false
+    /// Names the person gave tabs, by pane id; the tab being renamed in place.
+    public var tabNames: [String: String] = [:]
+    public var renamingTab: String?
     public var bellOpen = false
     public var overlay: ShellOverlay?
     public var toast: ToastItem?
