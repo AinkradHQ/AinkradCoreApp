@@ -177,8 +177,7 @@ struct HomeView: View {
             }
             .buttonStyle(CoreButtonStyle(shell.editingWidgets ? .prominent : .secondary, size: .small))
         }
-        .padding(Space.s1)
-        .coreGlass(radius: Radius.cardMac, interactive: false)
+        // The two buttons are glass themselves; no second glass behind them.
     }
 }
 

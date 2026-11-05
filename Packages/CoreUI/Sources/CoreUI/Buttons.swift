@@ -85,18 +85,7 @@ private struct CoreButtonBody: View {
         .foregroundStyle(ink)
         .frame(minHeight: size.height)
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
-        .background(fill, in: coreShape(size.radius))
-        .overlay {
-            if kind == .secondary {
-                coreShape(size.radius).strokeBorder(palette.glassCardEdge, lineWidth: 1)
-            } else if kind == .prominent {
-                // ui.css `.btn.primary`: a 1 px light top edge (inset 0 1px 0 rgba(255,255,255,.22)).
-                coreShape(size.radius).strokeBorder(
-                    LinearGradient(
-                        stops: [.init(color: .white.opacity(0.22), location: 0), .init(color: .clear, location: 0.25)],
-                        startPoint: .top, endPoint: .bottom), lineWidth: 1)
-            }
-        }
+        .modifier(ButtonSurface(kind: kind, radius: size.radius, fill: fill, hover: hover))
         // Gallery only: pinned "focused" preview. Real focus is the system ring below, drawn only on the one control that
         // has keyboard focus (isFocused here reports the container's focus, which lit every button in it).
         .coreFocusRing(forced == .focused, radius: size.radius, palette: palette)
@@ -120,6 +109,45 @@ private struct CoreButtonBody: View {
         case .danger:
             hover || pressed
                 ? Color(red: 0.894, green: 0.251, blue: 0.184) : Color(red: 0.851, green: 0.176, blue: 0.125)
+        }
+    }
+}
+
+/// Every CoreUI button is Liquid Glass on macOS 26 / iOS 26 (Ahmed, 2026-11-05: "everything shall be liquid glass"):
+/// prominent and danger are glass tinted with their colour, secondary is clear glass, plain gets glass only on hover.
+/// Below 26 the flat fills and edges of the prototype stay.
+private struct ButtonSurface: ViewModifier {
+    let kind: CoreButtonKind
+    let radius: CGFloat
+    let fill: Color
+    let hover: Bool
+    @Environment(\.corePalette) private var palette
+
+    func body(content: Content) -> some View {
+        let shape = coreShape(radius)
+        if #available(macOS 26, iOS 26, *) {
+            switch kind {
+            case .prominent, .danger: content.glassEffect(.regular.tint(fill).interactive(), in: shape)
+            case .secondary:
+                content.glassEffect(.regular.tint(palette.glassTint.opacity(0.25)).interactive(), in: shape)
+            case .plain:
+                if hover { content.glassEffect(.regular.interactive(), in: shape) } else { content }
+            }
+        } else {
+            content.background(fill, in: shape)
+                .overlay {
+                    if kind == .secondary {
+                        shape.strokeBorder(palette.glassCardEdge, lineWidth: 1)
+                    } else if kind == .prominent {
+                        // ui.css `.btn.primary`: a 1 px light top edge (inset 0 1px 0 rgba(255,255,255,.22)).
+                        shape.strokeBorder(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .white.opacity(0.22), location: 0),
+                                    .init(color: .clear, location: 0.25),
+                                ], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    }
+                }
         }
     }
 }
