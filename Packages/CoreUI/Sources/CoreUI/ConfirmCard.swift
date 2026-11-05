@@ -230,6 +230,7 @@ public enum ModalLook {
     public static func of(_ title: String) -> (symbol: String, hue: Color) {
         let t = title.lowercased()
         func has(_ words: String...) -> Bool { words.contains { t.contains($0) } }
+        if t.hasPrefix("lend ") { return ("key.horizontal", GlassInk.orange) }  // not "end "
         if has("revoke", "remove", "delete", "forget", "kill", "end ", "end this", "stop") {
             return ("trash", GlassInk.red)
         }

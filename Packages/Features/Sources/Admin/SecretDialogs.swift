@@ -54,8 +54,8 @@ private struct DialogButtons: View {
 
     var body: some View {
         HStack(spacing: Space.s2) {
-            Spacer(minLength: 0)
             Button("Cancel", action: cancel).buttonStyle(.coreSecondary).coreShortcut(.cancel)
+            Spacer(minLength: 0)
             if danger {
                 Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger)).disabled(!enabled || busy)
             } else {
@@ -74,44 +74,54 @@ struct SecretFormDialog: View {
 
     var body: some View {
         let model = admin.secrets!
-        let title = form.existing.map { "Replace value of \($0.name)" } ?? "New secret"
+        let title = form.existing.map { "New value for \($0.name)" } ?? "New secret"
         CoreDialogPanel(title, width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if form.existing == nil {
                     CoreTextField(
-                        "Name", placeholder: "e.g. e5-07-test", text: $form.name, mono: false, autofocus: true)
+                        "Name", placeholder: "e.g. github-token-test", text: $form.name, mono: false, autofocus: true)
                 }
                 CoreSecureField(
-                    "Value (write-only)", placeholder: "Paste a throwaway value",
+                    "Value", placeholder: "Paste a test value",
                     text: Binding(get: { form.value }, set: { form.setValue($0) }), autofocus: form.existing != nil
                 ) { go(model) }
                 if form.existing == nil {
                     VStack(alignment: .leading, spacing: Space.s1) {
-                        CoreFieldLabel("Delivery")
+                        CoreFieldLabel("How a runner gets it")
                         CoreSegmented(
-                            "Delivery", segments: ["env", "file", "askpass"].map { CoreSegment($0, $0) },
-                            selection: $form.delivery)
+                            "Delivery",
+                            segments: Delivery.all.map {
+                                CoreSegment($0, Delivery.look($0).title, symbol: Delivery.look($0).symbol)
+                            },
+                            selection: $form.delivery, fill: true)
+                        Text(Delivery.look(form.delivery).line).font(.system(size: MacTextSize.meta))
+                            .foregroundStyle(GlassInk.secondary)
                     }
                     VStack(alignment: .leading, spacing: Space.s1) {
-                        CoreFieldLabel("Runners allowed")
+                        CoreFieldLabel("Runners that may borrow it")
                         if model.runners.isEmpty {
-                            Text("No runners yet. A secret with no runners cannot be leased.").foregroundStyle(
+                            Text("No runners yet. A secret no runner may borrow can't be lent.").foregroundStyle(
                                 palette.text2)
                         }
                         ForEach(model.runners) { r in
-                            CoreCheckbox(
-                                r.name, detail: "\(r.id)\(r.online ? "" : " · offline")",
+                            GlassToggleTile(
+                                r.name, sub: r.online ? "Online" : "Offline right now", symbol: "server.rack",
+                                onSymbol: "checkmark.circle.fill",
                                 isOn: Binding(
                                     get: { form.runners.contains(r.id) },
-                                    set: { if $0 { form.runners.insert(r.id) } else { form.runners.remove(r.id) } }))
+                                    set: { if $0 { form.runners.insert(r.id) } else { form.runners.remove(r.id) } }),
+                                fill: true
+                            )
+                            .help(r.id)
                         }
                     }
                 }
-                Text("The value is stored and never shown again. There is no way to read or copy it back.")
+                Label("Once stored, nobody can show or copy it again. Asks for Touch ID.", systemImage: "lock.fill")
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                if let i = form.issue { IssueLine(code: i.code, text: i.message) }
+                if let i = form.issue { IssueLine(code: nil, text: i.message) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
-                DialogButtons(confirm: form.existing == nil ? "Store" : "Replace", busy: form.busy, cancel: close) {
+                DialogButtons(confirm: form.existing == nil ? "Store" : "Replace value", busy: form.busy, cancel: close)
+                {
                     go(model)
                 }
             }
@@ -135,36 +145,34 @@ struct LeaseDialog: View {
 
     var body: some View {
         let model = admin.secrets!
-        CoreDialogPanel("Lease \(form.secret.name)", width: Space.s8 * 15) {
+        CoreDialogPanel("Lend \(form.secret.name)", width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    CoreFieldLabel("Runner")
+                    CoreFieldLabel("To which runner")
                     if form.secret.runners.isEmpty {
-                        Text("This secret has no runners. Replace its scope before leasing it.").foregroundStyle(
+                        Text("No runner may borrow this secret yet.").foregroundStyle(
                             palette.text2)
                     } else {
                         CoreSegmented(
                             "Runner", segments: form.secret.runners.map { CoreSegment($0, model.runnerName($0)) },
-                            selection: $form.runner)
+                            selection: $form.runner, fill: true)
                     }
                 }
                 CoreTextField(
-                    "Lease length", placeholder: "Default \(model.leaseLimit)", text: $form.ttl, suffix: "s",
+                    "For how long", placeholder: "\(model.leaseLimit)", text: $form.ttl, suffix: "seconds",
                     autofocus: true
                 ) { go(model) }
-                HStack(alignment: .top, spacing: Space.s3) {
-                    Image(systemName: "exclamationmark.triangle").foregroundStyle(palette.tone(.warn).ink)
-                        .accessibilityHidden(true)
-                    Text(
-                        "Any secret leased to a session can be read by that session's agent. An agent on that runner would be able to read the value."
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Space.s3).background(palette.tone(.warn).fill, in: coreShape(Radius.cardMac))
-                CoreCheckbox("I understand an agent on that runner can read it", isOn: $form.understood)
-                if let i = form.issue { IssueLine(code: i.code, text: i.message) }
+                Text(
+                    "Up to \(SettingWords.duration(model.leaseLimit)). It comes back by itself when the time runs out."
+                )
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                GlassToggleTile(
+                    "An agent on that runner can read it", sub: "Lend it only to a runner whose agents you trust.",
+                    symbol: "exclamationmark.triangle", onSymbol: "checkmark.shield.fill", isOn: $form.understood,
+                    fill: true)
+                if let i = form.issue { IssueLine(code: nil, text: i.message) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
-                DialogButtons(confirm: "Lease", busy: form.busy, cancel: close) { go(model) }
+                DialogButtons(confirm: "Lend", busy: form.busy, cancel: close) { go(model) }
             }
         }
         .accessibilityIdentifier("secret-lease")
@@ -184,7 +192,7 @@ struct DeleteDialog: View {
     var body: some View {
         CoreDialogPanel("Delete \(secret.name)?", width: Space.s8 * 13) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("Runners can no longer be leased this secret. This cannot be undone.")
+                Text("Runners can no longer borrow it. This can't be undone.")
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
                 DialogButtons(confirm: "Delete", danger: true, busy: busy, cancel: close) {
                     busy = true
