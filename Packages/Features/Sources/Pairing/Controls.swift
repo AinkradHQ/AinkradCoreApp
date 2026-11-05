@@ -257,7 +257,9 @@ struct CodeBoxes: View {
                     .coreGlassField(fallback: palette.glassCard)
                     .overlay {
                         coreShape(Radius.control).strokeBorder(
-                            active ? palette.primary : error != nil ? palette.tone(.fail).ink : palette.glassCardEdge,
+                            active
+                                ? palette.text.opacity(0.55)
+                                : error != nil ? palette.tone(.fail).ink : palette.glassCardEdge,
                             lineWidth: active ? 2 : 1)
                     }
             }

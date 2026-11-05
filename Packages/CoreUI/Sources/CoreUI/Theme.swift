@@ -35,7 +35,8 @@ public struct Palette: Sendable {
     public var surface: Color { theme["surface"] }
 
     /// The one focus ring: blue at night, white over the deep day glass.
-    public var focusRing: Color { pick("focusRing", fallback: theme["primary"]) }
+    /// No blue focus rings anywhere (Ahmed, 2026-11-05): views that still outline the focused control get the quiet edge.
+    public var focusRing: Color { glassCardEdge }
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
     public var glassCard: Color { pick("glassCard", fallback: theme["mRow"]) }
     public var glassCardEdge: Color { pick("glassCardEdge", fallback: theme["edge"]) }
@@ -82,6 +83,9 @@ private struct CoreThemeModifier: ViewModifier {
             // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
             .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
             .font(.system(size: MacTextSize.body))
+            // No focus rings anywhere (Ahmed, 2026-11-05): the system ring and our own both stay off. Keyboard focus
+            // still moves; the focused control is the one that answers Space and Return.
+            .focusEffectDisabled()
     }
 }
 
@@ -98,16 +102,8 @@ extension View {
     public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
 
     /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
-    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
-        overlay {
-            if show {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .inset(by: -Space.s1 / 2)
-                    .strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
+    /// Draws nothing in the app: focus rings are off everywhere (Ahmed, 2026-11-05). Kept so callers need no change.
+    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View { self }
 }
 
 private struct CoreAnimationModifier<V: Equatable>: ViewModifier {
