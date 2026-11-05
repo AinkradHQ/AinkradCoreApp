@@ -110,6 +110,11 @@ extension AgentsModel {
             ) { [weak self] in self?.openInbox() })
         shell.settings.section(
             SettingsSection(
+                id: "agents", group: .core, title: "Agents", sub: "Surface and the defaults for new sessions",
+                symbol: "sparkles", order: 30
+            ) { AgentSettingsView(model: self) })
+        shell.settings.section(
+            SettingsSection(
                 id: "notifications", group: .notifications, title: "Notifications", symbol: "bell", order: 0
             ) {
                 NotificationsSection(model: self)

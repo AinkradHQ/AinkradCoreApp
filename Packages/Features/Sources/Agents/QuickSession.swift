@@ -11,8 +11,10 @@ struct QuickSessionView: View {
     @State private var shown = false
     @FocusState private var focus: Bool
 
+    private let prefs = AgentPrefs.shared
     private var runner: RunnerInfo? {
-        model.runners.first { $0.online && $0.runsAgents && !$0.degraded } ?? model.runners.first { $0.online }
+        if !prefs.runner.isEmpty, let r = model.runners.first(where: { $0.id == prefs.runner }) { return r }
+        return model.runners.first { $0.online && $0.runsAgents && !$0.degraded } ?? model.runners.first { $0.online }
     }
     private var ready: Bool {
         runner != nil && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy
@@ -45,8 +47,11 @@ struct QuickSessionView: View {
                 .overlay { coreShape(Radius.row).strokeBorder(.white.opacity(focus ? 0.3 : 0.14), lineWidth: 1) }
                 .coreRise(shown, 1)
             HStack(spacing: Space.s2) {
-                chip("sparkles", "claude", GlassInk.violet)
-                chip("hand.raised", "asks first", GlassInk.orange)
+                chip("sparkles", prefs.harness, GlassInk.violet)
+                chip(
+                    "hand.raised",
+                    prefs.mode == "ask" ? "asks first" : prefs.mode == "sandboxed" ? "sandboxed" : "accepts edits",
+                    GlassInk.orange)
                 chip("server.rack", runner?.name ?? "no runner", runner == nil ? GlassInk.red : GlassInk.green)
                 Spacer(minLength: 0)
                 Text(PromptSize.words(prompt)).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
