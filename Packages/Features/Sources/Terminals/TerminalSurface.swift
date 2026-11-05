@@ -41,6 +41,9 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         let t = p.theme
         term.font = p.font
         term.nativeBackgroundColor = t.background.withAlphaComponent(CGFloat(p.opacity))
+        // SwiftTerm paints its own layer opaque when it is made (and again on every resize); keep it clear so only the
+        // themed background, at the chosen transparency, is drawn (SurfaceContainer.layout re-applies after a resize).
+        term.layer?.backgroundColor = NSColor.clear.cgColor
         term.nativeForegroundColor = t.foreground
         term.caretColor = t.caret
         term.installColors(
@@ -144,6 +147,7 @@ final class SurfaceContainer: NSView {
             term.frame = CGRect(
                 x: 0, y: 0, width: min(want.width, bounds.width + strip), height: min(want.height, bounds.height))
         }
+        term.layer?.backgroundColor = NSColor.clear.cgColor
         placeThumb()
     }
 
