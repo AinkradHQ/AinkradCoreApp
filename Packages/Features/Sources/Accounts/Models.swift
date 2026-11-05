@@ -126,27 +126,42 @@ struct GateState: Equatable, Sendable {
         return .other
     }
 
+    // Plain words for the screen (Ahmed, 2026-11-05: easy to understand). The settings and codes stay in `technical`.
     var title: String {
         switch kind {
-        case .unknown: "The gate for real accounts is not readable"
-        case .off: "Secrets are off"
-        case .throwaway: "Real accounts are off"
-        case .real: "Real provider keys are allowed"
-        case .other: "Secrets mode \(mode ?? 0)"
+        case .unknown: "Can't tell if accounts can be added"
+        case .off: "Adding accounts is turned off"
+        case .throwaway: "Test keys only, for now"
+        case .real: "Real keys are allowed"
+        case .other: "An unusual setting"
         }
     }
 
     var detail: String {
         switch kind {
-        case .unknown:
-            "This Mac could not read secrets.mode or secrets.provider_accounts, so it cannot say what Core accepts."
-        case .off: "secrets.mode is 0: Core refuses to store any account key (secrets_disabled)."
+        case .unknown: "This Mac couldn't read your Core's settings. Try again in a moment."
+        case .off:
+            "Your Core is set to keep no provider keys, so an account can't be added yet. Turn it on in Settings."
         case .throwaway:
-            "Core accepts throwaway test values only. A key shaped like a real one is refused (real_secret_refused). Turn on secrets.provider_accounts in Feature switches to change that."
-        case .real:
-            "secrets.provider_accounts is on: a key of a provider's own shape can be stored while secrets.mode is 1."
-        case .other:
-            "secrets.mode is \(mode ?? 0) and secrets.provider_accounts is \(providerAccounts ?? 0). This app does not know that combination."
+            "Your Core takes practice keys but refuses real ones, to keep you safe while testing. Allow real keys in Settings when you're ready."
+        case .real: "Your Core can keep real provider keys for your agents."
+        case .other: "Your Core has a setting this app doesn't know yet."
+        }
+    }
+
+    /// The same, in the Core's own terms, for the hover help.
+    var technical: String {
+        "secrets.mode = \(mode.map(String.init) ?? "?"), secrets.provider_accounts = \(providerAccounts.map(String.init) ?? "?")"
+            + (kind == .off ? " (secrets_disabled)" : kind == .throwaway ? " (real_secret_refused)" : "")
+    }
+
+    /// Where it stands on the way from off to real keys: 0 off, 1 test keys, 2 real keys; nil when unknown.
+    var step: Int? {
+        switch kind {
+        case .off: 0
+        case .throwaway: 1
+        case .real: 2
+        default: nil
         }
     }
 

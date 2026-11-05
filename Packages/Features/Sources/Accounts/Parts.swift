@@ -223,18 +223,62 @@ struct AccNotice: View {
     }
 }
 
-/// Where the real-accounts gate stands, in words, with the way to change it.
+/// Where your Core stands on keeping account keys, in plain words and as three steps (Off, Test keys, Real keys) with
+/// the current one lit, and the way to change it. The settings' own names are in the hover help.
 struct GateBanner: View {
     let model: AccountsModel
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
     var body: some View {
         let g = model.gate
         if g.kind != .real {
-            CoreNotice(symbol: g.symbol, title: g.title, text: g.detail, tone: g.tone) {
-                Button("Feature switches") { model.openSwitches() }.buttonStyle(.coreSecondary)
-                    .help("Open Settings, Core, Feature switches")
+            let hue = g.kind == .off ? GlassInk.orange : g.kind == .throwaway ? GlassInk.blue : GlassInk.slate
+            HStack(alignment: .center, spacing: Space.s4) {
+                IconTile(
+                    g.kind == .off ? "lock.fill" : g.kind == .throwaway ? "testtube.2" : "questionmark", hue: hue,
+                    size: 44, bounce: shown
+                )
+                .shadow(color: hue.opacity(0.45), radius: 10)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(g.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Space.s3)
+                if let step = g.step { steps(step, hue) }
+                AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "", hue: hue) {
+                    model.openSwitches()
+                }
+                .help("Settings → Core → Feature switches")
             }
+            .padding(Space.s3)
+            .background(hue.opacity(0.12), in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+            .help(g.technical)
+            .onAppear { shown = true }
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("gate-banner")
         }
+    }
+
+    /// Off → Test keys → Real keys: the steps passed fill in, the current one glows and breathes.
+    private func steps(_ at: Int, _ hue: Color) -> some View {
+        HStack(spacing: 6) {
+            ForEach(Array(["Off", "Test keys", "Real keys"].enumerated()), id: \.offset) { i, name in
+                if i > 0 {
+                    coreShape(1).fill(i <= at ? hue : GlassInk.track).frame(width: 14, height: 2)
+                }
+                Text(name).font(.system(size: MacTextSize.meta, weight: i == at ? .semibold : .regular))
+                    .foregroundStyle(i == at ? .white : GlassInk.secondary)
+                    .padding(.horizontal, 8).frame(height: 24)
+                    .background(i == at ? hue.opacity(0.75) : GlassInk.well, in: coreShape(6))
+                    .shadow(color: hue.opacity(i == at ? 0.5 : 0), radius: 8)
+                    .scaleEffect(i == at && shown && !reduce ? 1.04 : 1)
+                    .animation(i == at && !reduce ? .easeInOut(duration: 1.4).repeatForever() : .default, value: shown)
+            }
+        }
+        .fixedSize()
+        .accessibilityHidden(true)
     }
 }
 
