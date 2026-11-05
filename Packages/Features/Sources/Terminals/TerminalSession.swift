@@ -110,15 +110,17 @@ final class TerminalSession {
             item.rows = opened.rows
         } else {
             surface.layoutMode(.fill)
-            let size = surface.size
-            if size.cols > 0, (size.cols, size.rows) != (opened.cols, opened.rows) {
-                l.resize(rows: size.rows, cols: size.cols)
-                item.cols = size.cols
-                item.rows = size.rows
-            }
+            item.cols = opened.cols
+            item.rows = opened.rows
         }
         firstOutputAfterReattach = after > 0 && opened.seq > after
         link = .attached(letterbox: letterbox)
+        // The pane is often still sliding open here: its size goes through the same settle as every resize, so the shell
+        // redraws its prompt once, at the final width (an in-between width left a broken prompt line behind).
+        if !letterbox {
+            let size = surface.size
+            fit(size.cols, size.rows)
+        }
         pump = Task { [weak self] in
             for await update in l.updates {
                 guard let self else { return }
@@ -288,7 +290,7 @@ final class TerminalSession {
         guard cols > 0, rows > 0 else { return }
         settle?.cancel()
         settle = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: .milliseconds(450))
             guard !Task.isCancelled, let self, let l = self.attachment, case .attached(false) = self.link else {
                 return
             }
