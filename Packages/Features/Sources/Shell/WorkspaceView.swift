@@ -54,23 +54,28 @@ struct WorkspaceView: View {
                 if !shell.panes.isEmpty {
                     // Every pane's tab, tiled or focused: title, state and all its actions. Dragging a tab over another
                     // pane tiles it there.
-                    PaneTabs(shell: shell) { id, location, translation in
-                        guard focus == nil, let slot = layout.frames[id] else { return }
-                        if drag?.id != id { shell.activePane = id }
-                        drag = (id, drag?.id == id ? drag!.origin : slot.origin, translation)
-                        let p = CGPoint(x: location.x - ShellMetrics.paneInset, y: location.y - ShellMetrics.topBar)
-                        drop = TileTree.dropTarget(at: p, frames: layout.frames, excluding: id)
-                    } onDragEnd: { id in
-                        withAnimation(Motion.out(Motion.move)) {
-                            if let drop { shell.dropPane(id, on: drop.target, edge: drop.edge) }
-                            drag = nil
-                            drop = nil
-                        }
-                    }
-                    .frame(maxHeight: .infinity, alignment: .top)
+                    PaneTabs(shell: shell, onDrag: { dragTo($0, $1, $2, layout) }, onDragEnd: { dropIt($0) })
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
             .coordinateSpace(name: "wsroot")
+        }
+    }
+
+    /// Dragging a pane (its tab, or the grip on the pane) moves it with the pointer and shows where it will tile.
+    private func dragTo(_ id: String, _ location: CGPoint, _ translation: CGSize, _ layout: TileLayout) {
+        guard shell.focusedPane == nil, let slot = layout.frames[id] else { return }
+        if drag?.id != id { shell.activePane = id }
+        drag = (id, drag?.id == id ? drag!.origin : slot.origin, translation)
+        let p = CGPoint(x: location.x - ShellMetrics.paneInset, y: location.y - ShellMetrics.topBar)
+        drop = TileTree.dropTarget(at: p, frames: layout.frames, excluding: id)
+    }
+
+    private func dropIt(_ id: String) {
+        withAnimation(Motion.out(Motion.move)) {
+            if let drop { shell.dropPane(id, on: drop.target, edge: drop.edge) }
+            drag = nil
+            drop = nil
         }
     }
 
@@ -81,23 +86,27 @@ struct WorkspaceView: View {
         let tiled = layout.frames[spec.id] ?? CGRect(origin: .zero, size: area)
         let slot = focus == spec.id ? CGRect(origin: .zero, size: area) : tiled
         let dragging = drag?.id == spec.id
-        PaneHost(spec: spec, active: shell.activePane == spec.id && (focus != nil || shell.panes.count > 1))
-            .frame(width: slot.width, height: slot.height)
-            // Reduce Motion: positions snap, the pane fades in and out; otherwise it travels and scales.
-            .scaleEffect(folded || dragging ? coreScale(0.96) : 1)
-            .offset(
-                x: dragging ? drag!.origin.x + drag!.translation.width : slot.minX,
-                y: dragging ? drag!.origin.y + drag!.translation.height : slot.minY
-            )
-            .animation(reduce || resizing ? nil : Motion.out(Motion.move), value: slot)
-            .opacity(folded ? 0 : 1)
-            .allowsHitTesting(!folded)
-            .zIndex(dragging ? 1 : 0)
-            // A pane rises 18 pt and settles from 97 %; Reduce Motion is a fade.
-            .transition(
-                reduce ? .opacity : .opacity.combined(with: .offset(y: 18)).combined(with: .scale(scale: 0.97))
-            )
-            .onTapGesture { shell.activePane = spec.id }
+        PaneHost(
+            spec: spec, active: shell.activePane == spec.id && (focus != nil || shell.panes.count > 1),
+            canDrag: focus == nil && shell.panes.count > 1,
+            onDrag: { dragTo(spec.id, $0, $1, layout) }, onDragEnd: { dropIt(spec.id) }
+        )
+        .frame(width: slot.width, height: slot.height)
+        // Reduce Motion: positions snap, the pane fades in and out; otherwise it travels and scales.
+        .scaleEffect(folded || dragging ? coreScale(0.96) : 1)
+        .offset(
+            x: dragging ? drag!.origin.x + drag!.translation.width : slot.minX,
+            y: dragging ? drag!.origin.y + drag!.translation.height : slot.minY
+        )
+        .animation(reduce || resizing ? nil : Motion.out(Motion.move), value: slot)
+        .opacity(folded ? 0 : 1)
+        .allowsHitTesting(!folded)
+        .zIndex(dragging ? 1 : 0)
+        // A pane rises 18 pt and settles from 97 %; Reduce Motion is a fade.
+        .transition(
+            reduce ? .opacity : .opacity.combined(with: .offset(y: 18)).combined(with: .scale(scale: 0.97))
+        )
+        .onTapGesture { shell.activePane = spec.id }
     }
 
     /// The half of the target pane that the drop will take.
@@ -297,10 +306,16 @@ private struct PaneTab: View {
     }
 }
 
-/// One pane in the workspace: the chrome (clear glass, no head) around its content. Its tab carries the title and actions.
+/// One pane in the workspace: the chrome (clear glass, no head) around its content. On hover a grip appears on its top
+/// edge: drag it to move the pane and drop it beside or into another (the drop hint shows where).
 private struct PaneHost: View {
     let spec: PaneSpec
     let active: Bool
+    let canDrag: Bool
+    let onDrag: (CGPoint, CGSize) -> Void
+    let onDragEnd: () -> Void
+    @State private var hovering = false
+    @State private var gripHover = false
 
     var body: some View {
         CorePaneChrome(
@@ -309,6 +324,29 @@ private struct PaneHost: View {
         ) {
             spec.content
         }
+        .overlay(alignment: .top) {
+            if canDrag && hovering {
+                Capsule().fill(.white.opacity(gripHover ? 0.75 : 0.4))
+                    .frame(width: gripHover ? 64 : 44, height: 5)
+                    .padding(.vertical, 6).padding(.horizontal, 24)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        gripHover = inside
+                        if inside { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 2, coordinateSpace: .named("wsroot"))
+                            .onChanged { onDrag($0.location, $0.translation) }
+                            .onEnded { _ in onDragEnd() }
+                    )
+                    .help("Drag to move this app")
+                    .transition(.opacity)
+                    .accessibilityHidden(true)
+            }
+        }
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(.spring(duration: 0.2), value: gripHover)
     }
 }
 

@@ -223,7 +223,7 @@ public final class TerminalsModel {
         shell.openPane(
             PaneSpec(
                 id: "terminals", title: "Terminals", sub: "Rune", symbol: "terminal",
-                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack")
+                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
             ) { TerminalsListView(model: self) })
         Task { await reload() }
     }
@@ -253,7 +253,7 @@ public final class TerminalsModel {
         }
         let pane = "terminal-\(id)"
         shell.openPane(
-            PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 520) {
+            PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 560) {
                 TerminalPaneView(model: self, session: session)
             })
         shell.setPaneMenu(pane) { [weak self, weak session] in
