@@ -234,12 +234,51 @@ public final class TerminalsModel {
             PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 520) {
                 TerminalPaneView(model: self, session: session)
             })
+        shell.setPaneMenu(pane) { [weak self, weak session] in
+            guard let self, let session else { return [] }
+            return self.menu(for: session)
+        }
         paneChanged(id)
         if attach, item.status == "running" || item.status == "created", item.attached == 0 || session.isAttached {
             Task { await session.attach() }
         } else if attach, item.status == "exited" {
             Task { await session.attach() }
         }
+    }
+
+    /// A terminal pane's tab menu: what it is, then signal, detach and end, enabled by the pane's state.
+    func menu(for session: TerminalSession) -> [PaneMenuItem] {
+        let v = session.view
+        let live = v.controls == .running
+        let canEnd = v.controls == .running || v.controls == .endOnly
+        var items = [PaneMenuItem(v.info, symbol: "info.circle", enabled: false)]
+        if v.controls == .ended {
+            items.append(PaneMenuItem("Close Pane", symbol: "xmark") { [weak self] in self?.closePane(session.id) })
+            return items
+        }
+        items.append(
+            PaneMenuItem(
+                "Send Signal", symbol: "bolt", enabled: live,
+                children: TerminalSignals.all.map { name in
+                    PaneMenuItem("SIG\(name)", symbol: "bolt") { Task { _ = await session.signal(name) } }
+                }))
+        items.append(PaneMenuItem("Detach", symbol: "eject", enabled: live) { session.detach() })
+        items.append(
+            PaneMenuItem("End Terminal…", symbol: "stop.circle", destructive: true, enabled: canEnd) { [weak self] in
+                self?.confirmEnd(session)
+            })
+        return items
+    }
+
+    func confirmEnd(_ session: TerminalSession) {
+        shell.presentSheet(
+            title: "End this terminal?",
+            message:
+                "The terminal on \(session.machine) and everything running in it will stop. Closing the pane only detaches. This needs Touch ID.",
+            actions: [
+                ShellSheetAction("Keep it"),
+                ShellSheetAction("End terminal", primary: false) { Task { _ = await session.end() } },
+            ])
     }
 
     func paneChanged(_ id: String) {

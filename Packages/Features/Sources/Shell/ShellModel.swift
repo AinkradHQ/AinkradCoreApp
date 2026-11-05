@@ -40,6 +40,29 @@ public struct PaneSpec: Identifiable {
     }
 }
 
+/// One action in a pane's tab menu (the pane itself has no head or footer).
+public struct PaneMenuItem: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let symbol: String
+    public let destructive: Bool
+    public let enabled: Bool
+    /// Items in a submenu (Send signal ▸ INT, TERM…); empty for a plain action.
+    public let children: [PaneMenuItem]
+    public let run: @MainActor () -> Void
+    public init(
+        _ title: String, symbol: String, destructive: Bool = false, enabled: Bool = true,
+        children: [PaneMenuItem] = [], run: @escaping @MainActor () -> Void = {}
+    ) {
+        self.title = title
+        self.symbol = symbol
+        self.destructive = destructive
+        self.enabled = enabled
+        self.children = children
+        self.run = run
+    }
+}
+
 public struct ShellSheetAction: Identifiable {
     public let id = UUID()
     public let label: String
@@ -275,6 +298,10 @@ public final class ShellModel {
             activePane = nil
         }
     }
+
+    /// A pane's own actions, read each time its tab menu opens (so they follow the pane's state).
+    public private(set) var paneMenus: [String: @MainActor () -> [PaneMenuItem]] = [:]
+    public func setPaneMenu(_ id: String, _ items: @escaping @MainActor () -> [PaneMenuItem]) { paneMenus[id] = items }
 
     public func updatePane(_ id: String, title: String? = nil, sub: String?? = nil, chip: PaneChip?? = nil) {
         guard let i = panes.firstIndex(where: { $0.id == id }) else { return }

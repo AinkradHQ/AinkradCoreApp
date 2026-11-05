@@ -59,8 +59,9 @@ final class TerminalsLiveUITests: XCTestCase {
         screen.typeText("echo live-$((40+2))-ok\n")
         waitForScreen(containing: "live-42-ok", "the echo came back")
 
-        // Detach: the terminal keeps running and says so.
-        app.buttons["Detach"].click()
+        // Detach from the pane's tab menu: the terminal keeps running and says so.
+        app.menuButtons["Rune actions"].click()
+        app.menuItems["Detach"].click()
         XCTAssertTrue(element("Still running").waitForExistence(timeout: 10), "detached: still running, not attached")
         XCTAssertTrue(app.buttons["Attach here"].exists || app.buttons["Attach"].exists)
 
@@ -72,9 +73,10 @@ final class TerminalsLiveUITests: XCTestCase {
         screen.typeText("echo again-$((50+5))-ok\n")
         waitForScreen(containing: "again-55-ok", "typing works after reattach")
 
-        // End it: confirm, then the pane says it ended.
-        app.buttons["End terminal"].click()
-        let confirm = app.buttons.matching(NSPredicate(format: "label == 'End terminal'")).element(boundBy: 1)
+        // End it from the tab menu: confirm, then the pane says it ended.
+        app.menuButtons["Rune actions"].click()
+        app.menuItems["End Terminal…"].click()
+        let confirm = app.buttons["End terminal"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10), "the confirm sheet asks")
         confirm.click()
         // The Core drops an ended terminal's output at once when a client closes it ("reaped"): the pane says so.

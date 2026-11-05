@@ -24,32 +24,17 @@ public struct CorePaneChrome<Content: View>: View {
         self.content = content()
     }
 
+    /// No head and no footer (Ahmed, 2026-11-05): the pane is clear glass holding its content; its title and actions
+    /// live in its tab in the top bar. The active pane's edge is a touch brighter.
     public var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Space.s2) {
-                // Neutral icon and a 13 pt title, as the prototype's pane head (`shell.css` .pane-head).
-                Image(systemName: symbol).foregroundStyle(palette.text2).accessibilityHidden(true)
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                if let sub {
-                    Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2).lineLimit(1)
-                }
-                Spacer(minLength: Space.s2)
-                if let state { StateBadge(state.label, tone: state.tone, symbol: state.symbol) }
-                CoreIconButton(symbol: "xmark", label: "Close \(title)", action: onClose)
+        content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(Space.s2)
+            .coreGlass(radius: Radius.pane, interactive: false, tinted: false)
+            .overlay {
+                coreShape(Radius.pane).strokeBorder(.white.opacity(active ? 0.3 : 0.12), lineWidth: 1)
             }
-            .padding(.horizontal, Space.s4)
-            .frame(height: MacSize.controlLg + Space.s4)
-            .contentShape(Rectangle())
             .accessibilityElement(children: .contain)
-            content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .corePanel(radius: Radius.pane, padding: 0)
-        .clipShape(coreShape(Radius.pane))
-        .overlay {
-            coreShape(Radius.pane).strokeBorder(active ? palette.navActiveEdge : palette.glassCardEdge, lineWidth: 1)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(sub.map { "\(title), \($0)" } ?? title)
+            .accessibilityLabel(sub.map { "\(title), \($0)" } ?? title)
     }
 }
 
