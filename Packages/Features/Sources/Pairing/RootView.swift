@@ -60,8 +60,8 @@ private struct BlockedView: View {
             )
             .foregroundStyle(palette.text)
             .font(.system(size: MacTextSize.body))
-            .corePanel(radius: Radius.panel, padding: Space.s6)
-            .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .padding(Space.s6)
+            .coreGlass(radius: Radius.panel, interactive: false)
             .frame(width: Space.s8 * 17)
         }
         .ignoresSafeArea()

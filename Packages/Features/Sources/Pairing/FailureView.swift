@@ -108,29 +108,25 @@ struct FailureView: View {
     var retryAt: Date?
     let actions: [FailureAction]
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in card(now: context.date) }
+            // Arrives with a short rise; Reduce Motion keeps the fade and drops the travel.
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : Space.s4)
+            .onAppear { withAnimation(.spring(duration: 0.45, bounce: 0.2)) { shown = true } }
     }
 
     private func card(now: Date) -> some View {
         let wait = max(0, Int((retryAt ?? now).timeIntervalSince(now).rounded(.up)))
         return VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: failure.symbol).font(.system(size: MacTextSize.large))
-                    .foregroundStyle(palette.tone(failure.tone).ink)
-                    .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                    .background(palette.tone(failure.tone).fill, in: coreShape(Radius.control))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(failure.title).font(.system(size: MacTextSize.large, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
-                    if let code = failure.code {
-                        Text(code).font(.system(size: MacTextSize.meta, design: .monospaced))
-                            .foregroundStyle(palette.text2)
-                    }
-                }
-            }
+            FailureDiagram(failure: failure).frame(maxWidth: .infinity)
+            // The error code is for support, so it sits in the tooltip, not on the card.
+            Text(failure.title).font(.system(size: MacTextSize.large, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+                .help(failure.code ?? "")
             Text(failure.text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             if !failure.reasons.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s1) {
@@ -152,10 +148,10 @@ struct FailureView: View {
                 Spacer(minLength: 0)
                 ForEach(actions) { a in
                     if a.style == .primary {
-                        Button(a.label, action: a.run).buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                        Button(a.label, action: a.run).coreGlassButton(prominent: true).keyboardShortcut(.defaultAction)
                             .disabled(a.disabled || wait > 0)
                     } else {
-                        Button(a.label, action: a.run).buttonStyle(.coreSecondary).disabled(a.disabled)
+                        Button(a.label, action: a.run).coreGlassButton().disabled(a.disabled)
                     }
                 }
             }
