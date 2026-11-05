@@ -65,16 +65,15 @@ public struct CoreDialogPanel<Content: View>: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             // An empty title leaves the header to the content (a sheet with its own hero).
-            if !title.isEmpty {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            }
+            if !title.isEmpty { ModalHeader(title) }
             content
         }
         .foregroundStyle(palette.text)
         .font(.system(size: MacTextSize.body))
         .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .frame(width: width)
+        .shadow(color: .black.opacity(0.3), radius: 34, y: 14)
+        .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }

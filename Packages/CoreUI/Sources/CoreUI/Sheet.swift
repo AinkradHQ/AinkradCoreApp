@@ -15,7 +15,7 @@ public struct CoreSheet<Content: View, Footer: View>: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            ModalHeader(title)
             content.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
             // Right-aligned by default; a footer that holds a Spacer spreads its buttons to both edges.
             HStack(spacing: Space.s2) { footer }.frame(maxWidth: .infinity, alignment: .trailing)
@@ -23,6 +23,7 @@ public struct CoreSheet<Content: View, Footer: View>: View {
         .padding(Space.s5)
         .frame(width: Space.s8 * 11)
         .coreGlass(radius: Radius.panel, interactive: false)
+        .coreModalEntrance()
         .presentationBackground(.clear)
         .coreTheme()
         .accessibilityElement(children: .contain)

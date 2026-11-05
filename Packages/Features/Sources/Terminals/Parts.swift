@@ -63,32 +63,32 @@ struct TermCard: View {
     let title: String
     let text: String
     var note: String?
-    var actions: [(title: String, primary: Bool, run: () -> Void)]
-    @Environment(\.corePalette) private var palette
-    @FocusState private var focus: Int?
+    var actions: [(title: String, primary: Bool, run: @MainActor () -> Void)]
+
+    /// The card's picture and colour, from what it says.
+    private var look: (symbol: String, hue: Color) {
+        let t = title.lowercased()
+        if t.contains("verify") || t.contains("touch id") { return ("touchid", GlassInk.blue) }
+        if t.contains("still running") || t.contains("detached") { return ("play.circle", GlassInk.green) }
+        if t.contains("exited") || t.contains("ended") || t.contains("gone") { return ("stop.circle", GlassInk.slate) }
+        if t.contains("lost") || t.contains("offline") || t.contains("can't") || t.contains("not") {
+            return ("wifi.exclamationmark", GlassInk.orange)
+        }
+        return ("terminal", GlassInk.blue)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            Text(text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            if let note { Text(note).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2) }
-            HStack(spacing: Space.s2) {
-                Spacer(minLength: 0)
-                ForEach(Array(actions.enumerated()), id: \.offset) { i, a in
-                    Button(a.title, action: a.run)
-                        .buttonStyle(CoreButtonStyle(a.primary ? .prominent : .secondary))
-                        .focused($focus, equals: i)
-                }
-            }
-            .padding(.top, Space.s2)
-        }
-        .font(.system(size: MacTextSize.body))
-        .padding(Space.s4)
-        .frame(maxWidth: Space.s8 * 11)
-        .corePanel(radius: Radius.panel, padding: 0)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .accessibilityElement(children: .contain)
-        .onAppear { focus = actions.firstIndex { $0.primary } ?? 0 }
+        ModalCard(
+            title: title, message: text, note: note, symbol: look.symbol, hue: look.hue,
+            choices: actions.map { a in
+                (
+                    ConfirmChoice(
+                        a.title,
+                        symbol: a.primary ? (look.symbol == "touchid" ? "touchid" : "arrow.right.circle") : "xmark"
+                    ) { a.run() },
+                    a.primary
+                )
+            })
     }
 }
 

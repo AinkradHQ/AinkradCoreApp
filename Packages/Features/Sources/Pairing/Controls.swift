@@ -12,18 +12,14 @@ struct DialogCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(alignment: .top) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Space.s2)
-                if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
-            }
+            ModalHeader(title, close: close)
             content
         }
         .foregroundStyle(palette.text)
         .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .frame(width: width)
+        .shadow(color: .black.opacity(0.3), radius: 34, y: 14)
+        .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }

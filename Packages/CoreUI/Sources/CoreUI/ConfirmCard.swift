@@ -111,12 +111,19 @@ public struct ConfirmCard: View {
     }
 }
 
-private struct ChoiceTile: View {
+/// A choice as a glass tile: icon, label and its key, lit when highlighted (red when destructive).
+public struct ChoiceTile: View {
     let choice: ConfirmChoice
     let on: Bool
     let keys: String?
     let run: () -> Void
-    var body: some View {
+    public init(choice: ConfirmChoice, on: Bool, keys: String?, run: @escaping () -> Void) {
+        self.choice = choice
+        self.on = on
+        self.keys = keys
+        self.run = run
+    }
+    public var body: some View {
         let hue = choice.destructive ? GlassInk.red : GlassInk.blue
         Button(action: run) {
             HStack(spacing: Space.s2) {
@@ -144,5 +151,131 @@ private struct ChoiceTile: View {
         .buttonStyle(.plain)
         .accessibilityLabel(choice.label)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// A modal that stands in for content (a terminal that needs Touch ID, one that ended): the confirmation card's look,
+/// without taking the window's keys. The primary choice answers Return.
+public struct ModalCard: View {
+    let title: String
+    let message: String
+    let note: String?
+    let symbol: String
+    let hue: Color
+    let choices: [(choice: ConfirmChoice, primary: Bool)]
+    @State private var shown = false
+    @State private var hovered: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    public init(
+        title: String, message: String, note: String? = nil, symbol: String, hue: Color,
+        choices: [(choice: ConfirmChoice, primary: Bool)]
+    ) {
+        self.title = title
+        self.message = message
+        self.note = note
+        self.symbol = symbol
+        self.hue = hue
+        self.choices = choices
+    }
+    public var body: some View {
+        VStack(spacing: Space.s3) {
+            IconTile(symbol, hue: hue, size: 56, bounce: shown)
+                .shadow(color: hue.opacity(0.45), radius: 16)
+                .scaleEffect(shown || reduce ? 1 : 0.6)
+            Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+            Text(message).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if let note {
+                Text(note).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            HStack(spacing: Space.s2) {
+                ForEach(Array(choices.enumerated()), id: \.element.choice.id) { i, c in
+                    ChoiceTile(
+                        choice: c.choice, on: hovered == nil ? c.primary : hovered == i, keys: c.primary ? "↩" : nil
+                    ) {
+                        c.choice.run()
+                    }
+                    .keyboardShortcut(
+                        c.primary || (!choices.contains { $0.primary } && i == 0) ? .defaultAction : nil
+                    )
+                    .onHover { hovered = $0 ? i : nil }
+                }
+            }
+            .padding(.top, Space.s1)
+            .coreRise(shown, 1)
+        }
+        .foregroundStyle(GlassInk.primary)
+        .padding(Space.s5)
+        .frame(maxWidth: Space.s8 * 13)
+        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .scaleEffect(shown || reduce ? 1 : 0.94)
+        .opacity(shown ? 1 : 0)
+        .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
+        .animation(.spring(duration: 0.25), value: hovered)
+        .onAppear { shown = true }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// A modal's picture and colour from its title, so every dialog has one without each call site choosing.
+public enum ModalLook {
+    public static func of(_ title: String) -> (symbol: String, hue: Color) {
+        let t = title.lowercased()
+        func has(_ words: String...) -> Bool { words.contains { t.contains($0) } }
+        if has("revoke", "remove", "delete", "forget", "kill", "end ", "end this", "stop") {
+            return ("trash", GlassInk.red)
+        }
+        if has("rename") { return ("pencil", GlassInk.blue) }
+        if has("may do", "access", "scope") { return ("lock.shield", GlassInk.violet) }
+        if has("secret", "lease") { return ("key.horizontal", GlassInk.orange) }
+        if has("pool") { return ("square.stack.3d.up", GlassInk.violet) }
+        if has("account", "connect") { return ("person.crop.circle.badge.plus", GlassInk.green) }
+        if has("device", "pair") { return ("laptopcomputer.and.iphone", GlassInk.blue) }
+        if has("terminal") { return ("terminal", GlassInk.slate) }
+        if has("session", "agent") { return ("sparkles", GlassInk.violet) }
+        if has("switch", "setting") { return ("slider.horizontal.3", GlassInk.blue) }
+        if has("add", "new", "create") { return ("plus.circle", GlassInk.green) }
+        return ("sparkles", GlassInk.blue)
+    }
+}
+
+/// The header every dialog shares: its icon tile (bouncing in), a big title, and an optional close at the right.
+public struct ModalHeader: View {
+    let title: String
+    let symbol: String?
+    let close: (() -> Void)?
+    @State private var shown = false
+    public init(_ title: String, symbol: String? = nil, close: (() -> Void)? = nil) {
+        self.title = title
+        self.symbol = symbol
+        self.close = close
+    }
+    public var body: some View {
+        let look = ModalLook.of(title)
+        HStack(spacing: Space.s3) {
+            IconTile(symbol ?? look.symbol, hue: look.hue, size: 44, bounce: shown)
+                .shadow(color: look.hue.opacity(0.4), radius: 12)
+            Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: Space.s2)
+            if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
+        }
+        .onAppear { shown = true }
+    }
+}
+
+extension View {
+    /// The modal entrance: settles from 94 % with a spring; Reduce Motion fades.
+    public func coreModalEntrance() -> some View { modifier(ModalEntrance()) }
+}
+
+private struct ModalEntrance: ViewModifier {
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    func body(content: Content) -> some View {
+        content.scaleEffect(shown || reduce ? 1 : 0.94).opacity(shown ? 1 : 0)
+            .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
+            .onAppear { shown = true }
     }
 }
