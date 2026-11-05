@@ -193,14 +193,17 @@ public struct GlassSlider: View {
     let high: String
     let percent: (Double) -> Int
     let unit: String
+    /// Every value lands on a step: 5 % by default, 1 pt for a size.
+    let step: Double
     @State private var dragging = false
     @FocusState private var focused: Bool
 
     public init(
         value: Binding<Double>, in range: ClosedRange<Double> = 0...1, low: String, high: String, unit: String = "%",
-        percent: @escaping (Double) -> Int = { Int(($0 * 100).rounded()) }
+        step: Double = 0.05, percent: @escaping (Double) -> Int = { Int(($0 * 100).rounded()) }
     ) {
         self.unit = unit
+        self.step = step
         self._value = value
         self.range = range
         self.low = low
@@ -229,7 +232,9 @@ public struct GlassSlider: View {
                         .onChanged { d in
                             dragging = true
                             let t = min(max(d.location.x / max(g.size.width, 1), 0), 1)
-                            value = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
+                            let raw = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
+                            let snapped = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
+                            if snapped != value { value = snapped }
                         }
                         .onEnded { _ in dragging = false })
             }
@@ -239,21 +244,21 @@ public struct GlassSlider: View {
                 .contentTransition(.numericText()).frame(width: 46, alignment: .trailing)
         }
         .animation(.spring(duration: 0.2), value: dragging)
+        .animation(.spring(duration: 0.2), value: value)
         .focusable().focused($focused).focusEffectDisabled()
-        .onKeyPress(.leftArrow) { step(-0.05) }
-        .onKeyPress(.rightArrow) { step(0.05) }
+        .onKeyPress(.leftArrow) { move(-1) }
+        .onKeyPress(.rightArrow) { move(1) }
         .accessibilityElement()
         .accessibilityLabel("\(low) to \(high)")
         .accessibilityValue("\(percent(value))\(unit == "%" ? " percent" : unit)")
         .accessibilityAdjustableAction { direction in
-            let by = direction == .increment ? 0.05 : -0.05
-            _ = step(by)
+            _ = move(direction == .increment ? 1 : -1)
         }
     }
 
-    private func step(_ by: Double) -> KeyPress.Result {
-        let span = range.upperBound - range.lowerBound
-        value = min(max(value + by * span, range.lowerBound), range.upperBound)
+    private func move(_ steps: Double) -> KeyPress.Result {
+        let next = ((value / step).rounded() + steps) * step
+        value = min(max(next, range.lowerBound), range.upperBound)
         return .handled
     }
 }

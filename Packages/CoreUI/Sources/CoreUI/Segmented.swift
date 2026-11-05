@@ -32,13 +32,12 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
     }
 
     public var body: some View {
-        HStack(spacing: Space.s1 / 2) {
+        // Each option is its own glass tile (the section-action look); the picked one lights blue and the light glides.
+        HStack(spacing: Space.s2) {
             ForEach(segments) { seg in
                 Segment(segment: seg, selected: seg.id == selection, fill: fill, lens: lens) { selection = seg.id }
             }
         }
-        .padding(Space.s1 / 2)
-        .background(palette.uDim, in: coreShape(Radius.control))
         .coreFocusRing(focused || forced == .focused, radius: Radius.control, palette: palette)
         .coreDimWhenDisabled(enabled)
         .focusable(enabled)
@@ -74,34 +73,47 @@ private struct Segment<ID: Hashable & Sendable>: View {
     let fill: Bool
     let lens: Namespace.ID
     let action: () -> Void
-    @Environment(\.corePalette) private var palette
     @State private var hovering = false
+    @State private var pressed = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: Space.s1 + Space.s1 / 2) {
-                if let symbol = segment.symbol { Image(systemName: symbol).accessibilityHidden(true) }
-                Text(segment.title)
+            HStack(spacing: Space.s2) {
+                if let symbol = segment.symbol {
+                    Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                        .symbolEffect(.bounce, value: selected)
+                        .symbolEffect(.bounce, value: hovering)
+                        .accessibilityHidden(true)
+                }
+                Text(segment.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
             }
-            .font(.system(size: MacTextSize.body, weight: .medium))
-            .foregroundStyle(selected ? palette.navActiveInk : hovering ? palette.text : palette.text2)
-            .padding(.horizontal, Space.s3 - Space.s1 / 2)
-            .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd - Space.s1)
+            .foregroundStyle(.white.opacity(selected || hovering ? 1 : 0.8))
+            .padding(.horizontal, Space.s3)
+            .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
                 if selected {
-                    coreShape(Radius.chip)
-                        .fill(palette.navActive)
-                        .overlay { coreShape(Radius.chip).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+                    coreShape(Radius.control).fill(GlassInk.blue.opacity(0.8))
+                        .shadow(color: GlassInk.blue.opacity(0.45), radius: 10)
                         .matchedGeometryEffect(id: "lens", in: lens)
-                } else if hovering {
-                    coreShape(Radius.chip).fill(palette.uDim)
+                } else {
+                    coreShape(Radius.control).fill(hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
                 }
             }
-            .contentShape(coreShape(Radius.chip))
+            .overlay {
+                coreShape(Radius.control).strokeBorder(.white.opacity(selected ? 0.3 : 0.15), lineWidth: 1)
+            }
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .scaleEffect(pressed ? 0.96 : hovering ? 1.04 : 1)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
+        )
         .onHover { hovering = $0 }
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
+        .animation(.spring(duration: 0.35, bounce: 0.25), value: selected)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

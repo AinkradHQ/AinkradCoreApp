@@ -31,7 +31,8 @@ struct TerminalSettingsView: View {
                     Text("\(Int(prefs.fontSize)) pt").font(.system(size: MacTextSize.body, weight: .semibold))
                         .monospacedDigit().contentTransition(.numericText())
                 }
-                GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt") { _ in
+                GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) {
+                    _ in
                     Int(prefs.fontSize.rounded())
                 }
             }
@@ -51,15 +52,17 @@ struct TerminalSettingsView: View {
                 symbol: "circle.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
-                SectionAction(prefs.blur ? "Blurred" : "Sharp", symbol: prefs.blur ? "drop.halffull" : "drop") {
-                    prefs.blur.toggle()
-                }
+                CoreSegmented(
+                    "Behind the terminal",
+                    segments: [
+                        CoreSegment(true, "Blurred", symbol: "drop.halffull"),
+                        CoreSegment(false, "Sharp", symbol: "drop"),
+                    ],
+                    selection: $prefs.blur)
             } content: {
                 GlassSlider(
                     value: Binding(get: { 1 - prefs.opacity }, set: { prefs.opacity = 1 - $0 }), in: 0...0.6,
-                    low: "Solid",
-                    high: "See-through")
-                Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
+                    low: "Solid", high: "See-through")
             }
             GlassSection(
                 "App surface", sub: "The Terminals app's own background.", symbol: "square.on.square",
@@ -68,9 +71,12 @@ struct TerminalSettingsView: View {
                 CoreSegmented(
                     "Surface",
                     segments: [
-                        CoreSegment(TerminalPrefs.Surface.clear, "Clear glass"), CoreSegment(.frosted, "Frosted glass"),
-                        CoreSegment(.theme, "Theme colour"), CoreSegment(.solid, "Solid"),
-                    ], selection: $prefs.surface, fill: true)
+                        CoreSegment(TerminalPrefs.Surface.clear, "Clear", symbol: "square.dashed"),
+                        CoreSegment(.frosted, "Frosted", symbol: "drop.halffull"),
+                        CoreSegment(.theme, "Theme", symbol: "paintpalette"),
+                        CoreSegment(.solid, "Solid", symbol: "square.fill"),
+                    ], selection: $prefs.surface)
+            } content: {
                 GlassSlider(value: $prefs.surfaceOpacity, low: "Clear", high: "Solid")
             }
             GlassSection(

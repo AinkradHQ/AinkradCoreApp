@@ -60,9 +60,12 @@ struct AgentSettingsView: View {
                 CoreSegmented(
                     "Surface",
                     segments: [
-                        CoreSegment(AgentPrefs.Surface.clear, "Clear glass"), CoreSegment(.frosted, "Frosted glass"),
-                        CoreSegment(.tinted, "Tinted"), CoreSegment(.solid, "Solid"),
-                    ], selection: $prefs.surface, fill: true)
+                        CoreSegment(AgentPrefs.Surface.clear, "Clear", symbol: "square.dashed"),
+                        CoreSegment(.frosted, "Frosted", symbol: "drop.halffull"),
+                        CoreSegment(.tinted, "Tinted", symbol: "paintpalette"),
+                        CoreSegment(.solid, "Solid", symbol: "square.fill"),
+                    ], selection: $prefs.surface)
+            } content: {
                 GlassSlider(value: $prefs.opacity, low: "Clear", high: "Solid")
             }
             GlassSection(

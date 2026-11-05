@@ -229,7 +229,7 @@ struct AppearancePopover: View {
                 high: "See-through")
             Toggle("Blur what's behind", isOn: $prefs.blur).toggleStyle(.switch)
             Text("Font size").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt") { _ in
+            GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) { _ in
                 Int(prefs.fontSize.rounded())
             }
         }
