@@ -98,17 +98,25 @@ struct FactCard<Content: View>: View {
 }
 
 /// A scope as a checkbox with its plain meaning beside it (a locked scope says why instead).
+/// One scope to switch on or off: the same tappable scope tile everywhere (Add device, Edit access). A scope that cannot
+/// be given stays dim and says why.
 struct ScopeToggle: View {
     let scope: String
     @Binding var on: Bool
     var locked: String?
 
     var body: some View {
-        CoreCheckbox(
-            scope, detail: locked ?? ScopeText.text(scope), isOn: $on, mono: true,
-            spoken: "\(scope), \(ScopeText.text(scope))"
-        )
+        Button {
+            on.toggle()
+        } label: {
+            ScopeTile(
+                symbol: ScopeText.symbol(scope), name: scope, detail: locked ?? ScopeText.text(scope),
+                hue: ScopeText.hue(scope), on: on)
+        }
+        .buttonStyle(.plain)
         .disabled(locked != nil)
+        .accessibilityLabel("\(scope), \(ScopeText.text(scope))")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

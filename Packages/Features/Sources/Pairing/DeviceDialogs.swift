@@ -11,9 +11,10 @@ private struct DialogButtons: View {
     let run: () -> Void
 
     var body: some View {
+        // Cancel at the left edge, the confirm at the right, as in every dialog.
         HStack(spacing: Space.s2) {
-            Spacer(minLength: 0)
             Button("Cancel") { app.shell.closeDialog() }.buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
+            Spacer(minLength: 0)
             if destructive {
                 Button(confirm, action: run).buttonStyle(DangerButtonStyle()).disabled(!enabled || busy)
             } else {
@@ -47,19 +48,23 @@ struct ScopesDialog: View {
     }
 
     var body: some View {
-        DialogCard(title: "What \(device.name) may do", width: Space.s8 * 15, close: { app.shell.closeDialog() }) {
+        DialogCard(title: "What \(device.name) may do", width: Space.s8 * 16, close: { app.shell.closeDialog() }) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("You can take scopes away here. To give more, pair the device again.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if device.kind == "runner" {
                     Text("A runner holds exactly runner. Revoke it to remove its access.")
                 } else {
-                    ForEach(ScopeText.all, id: \.self) { s in
-                        ScopeToggle(
-                            scope: s,
-                            on: Binding(
-                                get: { on.contains(s) }, set: { if $0 { on.insert(s) } else { on.remove(s) } }),
-                            locked: device.scopes.contains(s) ? nil : "Can't be added. Pair again for more access.")
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
+                    ) {
+                        ForEach(ScopeText.all, id: \.self) { s in
+                            ScopeToggle(
+                                scope: s,
+                                on: Binding(
+                                    get: { on.contains(s) }, set: { if $0 { on.insert(s) } else { on.remove(s) } }),
+                                locked: device.scopes.contains(s) ? nil : "Can't be added. Pair again for more access.")
+                        }
                     }
                 }
                 ScopeWarnings(app: app, device: device, kept: on)

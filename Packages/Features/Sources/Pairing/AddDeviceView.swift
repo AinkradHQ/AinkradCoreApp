@@ -77,18 +77,13 @@ struct AddDeviceView: View {
                         columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
                     ) {
                         ForEach(ScopeText.all, id: \.self) { s in
-                            let held = model.mine.contains(s)
-                            Button {
-                                if model.scopes.contains(s) { model.scopes.remove(s) } else { model.scopes.insert(s) }
-                            } label: {
-                                ScopeTile(
-                                    symbol: ScopeText.symbol(s), name: s,
-                                    detail: held
-                                        ? ScopeText.text(s) : "This Mac does not hold it, so it cannot hand it on.",
-                                    hue: ScopeText.hue(s), on: model.scopes.contains(s))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(!held)
+                            ScopeToggle(
+                                scope: s,
+                                on: Binding(
+                                    get: { model.scopes.contains(s) },
+                                    set: { if $0 { model.scopes.insert(s) } else { model.scopes.remove(s) } }),
+                                locked: model.mine.contains(s)
+                                    ? nil : "This Mac does not hold it, so it cannot hand it on.")
                         }
                     }
                 }
