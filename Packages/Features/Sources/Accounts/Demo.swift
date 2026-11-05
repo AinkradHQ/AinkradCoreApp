@@ -197,6 +197,14 @@ public final class AccountsDemo {
         self.setNotice = setNotice
     }
 
+    /// For clicking through by hand: links say where they would go instead of doing nothing (the demo never opens a
+    /// browser).
+    public func showInteractive(_ scene: String) async {
+        await show(scene)
+        let shell = model.host.shell
+        model.opener = { url in shell.showToast("Demo: this opens \(url.host ?? "the page") in your browser") }
+    }
+
     public func show(_ scene: String) async {
         let shell = model.host.shell
         shell.dialog = nil
