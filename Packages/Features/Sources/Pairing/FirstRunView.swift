@@ -190,7 +190,7 @@ struct FirstRunView: View {
             CoreSegmented(
                 "How to connect",
                 segments: [CoreSegment(false, "Type its address"), CoreSegment(true, "Paste a pairing link")],
-                selection: Binding(get: { pasteQR }, set: { setQR($0) }))
+                selection: Binding(get: { pasteQR }, set: { setQR($0) }), fill: true)
             if pasteQR {
                 note(
                     "Copy the pairing link from the device that added this Mac. It already holds the address and the code."

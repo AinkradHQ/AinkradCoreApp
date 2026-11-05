@@ -127,7 +127,7 @@ struct BellGlance: View {
                     CoreSegment(.approvals, "Approvals \(all.filter { $0.kind == .approval }.count)"),
                     CoreSegment(.alerts, "Alerts \(all.filter { $0.kind != .approval }.count)"),
                     CoreSegment(.runners, "Runners \(shell.home.machines.filter(\.online).count)"),
-                ], selection: $tab)
+                ], selection: $tab, fill: true)
             // As tall as what it holds; past the cap the list scrolls.
             ViewThatFits(in: .vertical) {
                 list

@@ -16,14 +16,17 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
     let segments: [CoreSegment<ID>]
     @Binding var selection: ID
     let label: String
+    /// Stretch to the container's width, the segments sharing it equally.
+    let fill: Bool
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
     @Environment(\.coreForcedInteraction) private var forced
     @FocusState private var focused: Bool
     @Namespace private var lens
 
-    public init(_ label: String, segments: [CoreSegment<ID>], selection: Binding<ID>) {
+    public init(_ label: String, segments: [CoreSegment<ID>], selection: Binding<ID>, fill: Bool = false) {
         self.label = label
+        self.fill = fill
         self.segments = segments
         self._selection = selection
     }
@@ -31,7 +34,7 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
     public var body: some View {
         HStack(spacing: Space.s1 / 2) {
             ForEach(segments) { seg in
-                Segment(segment: seg, selected: seg.id == selection, lens: lens) { selection = seg.id }
+                Segment(segment: seg, selected: seg.id == selection, fill: fill, lens: lens) { selection = seg.id }
             }
         }
         .padding(Space.s1 / 2)
@@ -68,6 +71,7 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
 private struct Segment<ID: Hashable & Sendable>: View {
     let segment: CoreSegment<ID>
     let selected: Bool
+    let fill: Bool
     let lens: Namespace.ID
     let action: () -> Void
     @Environment(\.corePalette) private var palette
@@ -82,7 +86,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .font(.system(size: MacTextSize.body, weight: .medium))
             .foregroundStyle(selected ? palette.navActiveInk : hovering ? palette.text : palette.text2)
             .padding(.horizontal, Space.s3 - Space.s1 / 2)
-            .frame(minHeight: MacSize.controlMd - Space.s1)
+            .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd - Space.s1)
             .background {
                 if selected {
                     coreShape(Radius.chip)
