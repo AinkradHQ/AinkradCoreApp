@@ -1,6 +1,8 @@
 import CoreKit
 import CoreUI
 import Foundation
+import LocalAuthentication
+import LocalAuthenticationEmbeddedUI
 import Observation
 import SwiftUI
 
@@ -73,7 +75,15 @@ struct StepUpNotice: Equatable {
 @MainActor @Observable
 final class StepUpModel {
     private(set) var phase: StepUpPhase?
-    func set(_ p: StepUpPhase?) { phase = p }
+    /// The context the embedded Touch ID view and the Secure Enclave signature share (one per ask).
+    private(set) var context = LAContext()
+    func set(_ p: StepUpPhase?) {
+        if case .asking = p {
+            context = LAContext()
+            StepUpAuthContext.prepare(context)
+        }
+        phase = p
+    }
 }
 
 /// The inline outcome of a Touch ID that did not elevate: a banner in the panel, with the words from the prototype.
@@ -114,19 +124,23 @@ struct StepUpSheet: View {
     var body: some View {
         // Centred, as the prototype's sheet: the tile, the title, what it is for, then the wait.
         VStack(spacing: Space.s3) {
-            Image(systemName: done ? "checkmark" : missed ? "xmark" : "touchid")
-                .font(.system(size: MacTextSize.large * 1.5))
-                .foregroundStyle(palette.tone(missed ? .warn : .done).ink)
-                .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 2)
-                .background(palette.tone(missed ? .warn : .done).fill, in: coreShape(Radius.cardMac))
-                .opacity(scan && !done && !missed && !reduce ? 0.55 : 1)
-                .animation(
-                    reduce || done || missed ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
-                    value: scan
-                )
-                .modifier(Shake(count: missed && !reduce ? 3 : 0))
-                .animation(.linear(duration: 0.45), value: missed)
-                .accessibilityHidden(true)
+            ZStack {
+                if done || missed {
+                    Image(systemName: done ? "checkmark" : "xmark")
+                        .font(.system(size: MacTextSize.large * 1.5))
+                        .foregroundStyle(palette.tone(missed ? .warn : .done).ink)
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    // Apple's own Touch ID view, inside this sheet: macOS asks here instead of a second system panel.
+                    LocalAuthenticationView("Touch ID", context: model.context)
+                }
+            }
+            .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 2)
+            .background(palette.tone(missed ? .warn : .done).fill, in: coreShape(Radius.cardMac))
+            .modifier(Shake(count: missed && !reduce ? 3 : 0))
+            .animation(.linear(duration: 0.45), value: missed)
+            .animation(.spring(duration: 0.3, bounce: 0.3), value: done)
+            .accessibilityHidden(true)
             Text("Confirm with Touch ID").font(.system(size: MacTextSize.title, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
             Text(done ? "Unlocked." : missed ? "Touch ID didn't match." : reason)

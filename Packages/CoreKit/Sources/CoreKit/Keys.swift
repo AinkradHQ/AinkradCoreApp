@@ -36,6 +36,20 @@ struct SoftwareKey: DeviceKey {
     func sign(_ message: Data) throws -> Data { try key.signature(for: message).rawRepresentation }
 }
 
+/// The authentication context for the next step-up signature. The app shows Apple's embedded Touch ID view
+/// (`LocalAuthenticationView`) bound to it, so macOS asks inside the app's own sheet instead of a second system panel.
+/// One use: the signature takes it.
+public enum StepUpAuthContext {
+    // ponytail: one shared slot, set on the main actor just before the step-up and taken by its signature; a per-call
+    // parameter through KeyStore if step-ups ever run in parallel.
+    nonisolated(unsafe) private static var slot: LAContext?
+    public static func prepare(_ context: LAContext) { slot = context }
+    static func take() -> LAContext? {
+        defer { slot = nil }
+        return slot
+    }
+}
+
 struct SecureEnclaveKey: DeviceKey {
     let blob: Data
     let spki: Data
@@ -43,7 +57,7 @@ struct SecureEnclaveKey: DeviceKey {
     let reason: String?
     var storage: KeyStorage { .secureEnclave }
     func sign(_ message: Data) throws -> Data {
-        let context = LAContext()
+        let context = (reason != nil ? StepUpAuthContext.take() : nil) ?? LAContext()
         if let reason { context.localizedReason = reason }
         let key = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: blob, authenticationContext: context)
         return try key.signature(for: message).rawRepresentation
