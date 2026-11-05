@@ -80,6 +80,7 @@ enum PairingSnapshots {
         }
         await app.debugReload()
         app.debugOpenSettings("lockouts")
+        app.debugSampleLockouts()  // the throwaway Core rarely locks anything: two sample locks show the countdown rows
         await shot("lockouts")
         app.shell.overlay = nil
         await shot("elevated-chip")

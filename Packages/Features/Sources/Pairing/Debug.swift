@@ -100,6 +100,8 @@ extension AppModel {
             })
     }
 
+    public func debugSampleLockouts() { lockouts.debugSample() }
+
     public func debugCloseStepUp() { shell.closeTopDialog() }
 
     /// Live: the first-run form filled and sent, as a person would.
