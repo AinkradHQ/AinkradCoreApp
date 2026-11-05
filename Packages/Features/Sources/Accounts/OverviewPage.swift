@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-private let cardColumns = [GridItem(.adaptive(minimum: Space.s8 * 10), spacing: Space.s3, alignment: .top)]
+private let cardColumns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
 
 /// What is usable, who is tried first, and what needs you.
 struct OverviewPage: View {
@@ -81,7 +81,7 @@ private struct AlertRow: View {
     let model: AccountsModel
     let account: AccountItem
     var body: some View {
-        AccBanner(
+        CoreNotice(
             symbol: account.phase.symbol, title: "\(account.label): \(account.phase.label)",
             text: AccountsWords.why(account, now: model.now()), tone: account.phase.tone
         ) {

@@ -1,8 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// The prototype's `t-banner`: a small square mark, a bold line, a quiet line, an optional action and a busy bar. The mark
-/// never carries the state alone: the title says it.
+/// A CoreUI notice with the optional action button and a busy bar under it. The title says the state; the tone backs it up.
 struct TermBanner: View {
     let tone: Tone
     let title: String
@@ -11,35 +10,16 @@ struct TermBanner: View {
     var symbol: String?
     var actionTitle: String?
     var action: () -> Void = {}
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
-        let colours = palette.tone(tone)
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: symbol ?? Self.symbol(tone)).font(.system(size: MacTextSize.body, weight: .semibold))
-                    .foregroundStyle(colours.ink).frame(width: Space.s4, height: Space.s4)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !detail.isEmpty {
-                        Text(detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                Spacer(minLength: Space.s2)
+            CoreNotice(symbol: symbol ?? Self.symbol(tone), title: title, text: detail, tone: tone) {
                 if let actionTitle {
                     Button(actionTitle, action: action).buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
             }
-            .padding(.horizontal, Space.s3).padding(.vertical, Space.s3)
-            if busy { BusyBar().padding(.horizontal, Space.s3).padding(.bottom, Space.s2) }
+            if busy { BusyBar().padding(.horizontal, Space.s3).padding(.vertical, Space.s2) }
         }
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .background(colours.fill, in: coreShape(Radius.cardMac))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(detail.isEmpty ? title : "\(title). \(detail)")
         .accessibilityAddTraits(busy ? .updatesFrequently : [])
     }
 
@@ -112,22 +92,6 @@ struct TermCard: View {
     }
 }
 
-/// Filled squares for "n of capacity" (work slots, attachments). The number always sits beside it.
-struct Slots: View {
-    let used: Int
-    let capacity: Int
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        HStack(spacing: Space.s1 / 2) {
-            ForEach(0..<max(1, min(capacity, 16)), id: \.self) { i in
-                coreShape(Space.s1 / 2).fill(i < used ? palette.primary : palette.track)
-                    .frame(width: Space.s2, height: Space.s2)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
 /// A bar for a value against a maximum, with an optional limit mark.
 struct Meter: View {
     let value: Double
@@ -149,43 +113,6 @@ struct Meter: View {
         }
         .frame(height: Space.s2)
         .accessibilityHidden(true)
-    }
-}
-
-/// A destructive action that is not the default: an outline, the fail ink, a word.
-struct TermDangerStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: MacTextSize.body, weight: .medium))
-            .foregroundStyle(palette.tone(.fail).ink)
-            .padding(.horizontal, Space.s3)
-            .frame(minHeight: MacSize.controlMd)
-            .background(configuration.isPressed ? palette.tone(.fail).fill : .clear, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(palette.tone(.fail).ink.opacity(0.6), lineWidth: 1) }
-            .opacity(enabled ? 1 : 0.45)
-    }
-}
-
-/// A dialog over the shell: title, content, a rounded panel.
-struct TermDialog<Content: View>: View {
-    let title: String
-    var width: CGFloat = Space.s8 * 17
-    @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            content
-        }
-        .foregroundStyle(palette.text)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-        .frame(width: width)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
     }
 }
 

@@ -91,7 +91,7 @@ struct TerminalPaneView: View {
 
     private func endButton(_ off: Bool) -> some View {
         Button("End terminal") { confirmEnd() }
-            .buttonStyle(TermDangerStyle()).disabled(off)
+            .buttonStyle(CoreButtonStyle(.danger)).disabled(off)
             .keyboardShortcut("e", modifiers: [.command, .option])
             .help("Stop the terminal and everything running in it (⌥⌘E)")
     }

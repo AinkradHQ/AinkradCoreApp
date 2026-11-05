@@ -45,18 +45,23 @@ struct TerminalsListView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: Space.s1) {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s2, alignment: .top)],
+                            spacing: Space.s2
+                        ) {
                             ForEach(model.shown) { t in
                                 TerminalTile(model: model, item: t).id(t.id)
                             }
                         }
-                        .padding(.horizontal, Space.s2)
+                        .padding(.horizontal, Space.s3)
                     }
                     .focusable()
                     .focused($listFocus)
                     .focusEffectDisabled()
                     .onKeyPress(.downArrow) { move(1, proxy) }
                     .onKeyPress(.upArrow) { move(-1, proxy) }
+                    .onKeyPress(.rightArrow) { move(1, proxy) }
+                    .onKeyPress(.leftArrow) { move(-1, proxy) }
                     .onKeyPress(.return) {
                         guard let id = model.selected else { return .ignored }
                         model.openTerminal(id)
@@ -132,11 +137,30 @@ struct TerminalTile: View {
                     Text(item.id).font(.system(size: MacTextSize.meta, design: .monospaced))
                         .foregroundStyle(palette.text2).lineLimit(1).truncationMode(.middle)
                     HStack(spacing: Space.s2) {
-                        if item.cols > 0 { Text("\(item.cols)×\(item.rows)").monospacedDigit() }
+                        if item.cols > 0 {
+                            // The screen's shape, drawn to scale: wide terminals read wide.
+                            coreShape(Radius.chip / 2).strokeBorder(palette.text2.opacity(0.6), lineWidth: 1)
+                                .frame(
+                                    width: Space.s5,
+                                    height: Space.s5 * CGFloat(item.rows) / CGFloat(max(item.cols, 1)) * 1.6
+                                )
+                                .accessibilityHidden(true)
+                            Text("\(item.cols)×\(item.rows)").monospacedDigit()
+                        }
                         Text(item.isEnded ? "ended" : "open \(ago(item.createdAt))")
-                        Spacer(minLength: Space.s2)
-                        Slots(used: item.attached, capacity: max(item.attached, 1))
+                    }
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    HStack(spacing: Space.s2) {
+                        CoreSlots(used: item.attached, capacity: max(item.attached, 1))
                         Text("\(item.attached) attached").monospacedDigit()
+                        Spacer(minLength: Space.s2)
+                        if let session {
+                            // Only terminals this Mac attached to have a strip: it is output this Mac saw.
+                            TimelineView(.periodic(from: .now, by: 60)) { ctx in
+                                CoreHeat(session.heat(now: ctx.date))
+                                    .help("Output this Mac saw in the last hour, five minutes a cell")
+                            }
+                        }
                     }
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 }
@@ -147,7 +171,13 @@ struct TerminalTile: View {
                 selected ? palette.navActive : hovering ? palette.rowHover : palette.glassCard,
                 in: coreShape(Radius.row)
             )
-            .overlay { if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
+            .overlay {
+                if model.rang.contains(item.id) {
+                    coreShape(Radius.row).strokeBorder(palette.tone(.warn).ink, lineWidth: 1)
+                } else if selected {
+                    coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1)
+                }
+            }
             .contentShape(coreShape(Radius.row))
             .opacity(item.isEnded ? 0.75 : 1)
         }

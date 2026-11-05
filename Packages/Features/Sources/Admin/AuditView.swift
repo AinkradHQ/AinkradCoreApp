@@ -20,6 +20,7 @@ struct AuditSection: View {
         ) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 Filters(model: model)
+                if let d = model.density() { Density(cells: d.cells, from: d.from, to: d.to) }
                 if model.items.isEmpty {
                     StateCard(
                         symbol: "magnifyingglass", title: "No rows match",
@@ -47,12 +48,21 @@ private struct Filters: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: Space.s2) {
             CoreTextField("Kind", placeholder: "device. or setting.set", text: $model.filter.kind)
+            if !model.knownKinds.isEmpty {
+                Menu("Known kinds") {
+                    ForEach(model.knownKinds, id: \.self) { k in Button(k) { model.filter.kind = k } }
+                }
+                .menuStyle(.button).buttonStyle(.coreSecondary).fixedSize()
+                .help("Pick a kind from the rows read so far")
+            }
             CoreTextField("Target", placeholder: "device:d_… or secret", text: $model.filter.target)
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("Actor")
                 CoreSegmented(
                     "Actor", segments: ActorFilter.allCases.map { CoreSegment($0, $0.rawValue.capitalized) },
-                    selection: $model.filter.actor)
+                    selection: $model.filter.actor
+                )
+                .fixedSize()
             }
             if !model.filter.isEmpty {
                 Button("Clear") { model.clearFilters() }.buttonStyle(.coreSecondary).help("Clear every filter")
@@ -179,5 +189,34 @@ private struct AuditDetail: View {
             }
             .accessibilityElement(children: .combine)
         }
+    }
+}
+
+/// How many rows fall in each slice of the loaded span: a picture of when things happened, with the span in words.
+private struct Density: View {
+    let cells: [Double]
+    let from: Date
+    let to: Date
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, v in
+                    coreShape(1).fill(v <= 0 ? palette.track : palette.primary.opacity(0.3 + 0.7 * v))
+                        .frame(maxWidth: .infinity).frame(height: Space.s1 + CGFloat(v) * (Space.s5 - Space.s1))
+                }
+            }
+            .frame(height: Space.s5, alignment: .bottom)
+            .accessibilityHidden(true)
+            HStack {
+                Text(AdminWords.when(from))
+                Spacer()
+                Text(AdminWords.when(to))
+            }
+            .font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Rows over time, \(AdminWords.when(from)) to \(AdminWords.when(to))")
     }
 }

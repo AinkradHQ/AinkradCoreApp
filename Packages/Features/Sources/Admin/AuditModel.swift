@@ -1,3 +1,4 @@
+import CoreUI
 import Foundation
 import Observation
 
@@ -63,6 +64,18 @@ final class AuditModel {
             nextBefore = page.nextBefore
         } catch { moreError = hub.words(error) }
     }
+
+    /// Rows per slice of time across the loaded span, oldest first, scaled 0...1 by the busiest slice. It counts what is loaded,
+    /// so it says nothing about rows not read yet.
+    func density(slices: Int = 32) -> (cells: [Double], from: Date, to: Date)? {
+        guard let first = items.map(\.at).min(), let last = items.map(\.at).max(), first < last else { return nil }
+        let slice = last.timeIntervalSince(first) / Double(slices)
+        let cells = heatBuckets(items.map(\.at), now: last, slice: slice, count: slices)
+        return (cells, first, last)
+    }
+
+    /// The kinds seen in the loaded rows, for the Kind menu.
+    var knownKinds: [String] { Array(Set(items.map(\.action))).sorted() }
 
     func clearFilters() { filter = AuditFilter() }
 

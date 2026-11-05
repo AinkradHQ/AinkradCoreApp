@@ -46,6 +46,9 @@ public final class TerminalsModel {
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Terminals whose bell rang since they were last opened.
     private(set) var rang: Set<String> = []
+    /// Host load (1 minute average per core) of each runner, as this Mac read it on each look, oldest first. The Core reports
+    /// only the current value, so the chart is what was sampled while the app watched.
+    private(set) var loadSamples: [String: [Double]] = [:]
     var newTerminal: NewTerminalModel?
 
     let host: any TerminalHost
@@ -94,11 +97,24 @@ public final class TerminalsModel {
             let (terminals, fleet) = try await (t, r)
             items = terminals.sorted(by: Self.order)
             runners = fleet.sorted { $0.name < $1.name }
+            for r in runners { sampleLoad(r) }
             load = .ready
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
             syncRunners()
         } catch { load = .failed(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription) }
+    }
+
+    #if DEBUG
+    func debugSeedLoad(_ id: String, _ values: [Double]) { loadSamples[id] = values }
+    #endif
+
+    func sampleLoad(_ r: RunnerItem) {
+        guard r.online, let p = r.perCore else { return }
+        var list = loadSamples[r.id] ?? []
+        list.append(p)
+        if list.count > 60 { list.removeFirst(list.count - 60) }
+        loadSamples[r.id] = list
     }
 
     private static func order(_ a: TerminalItem, _ b: TerminalItem) -> Bool {

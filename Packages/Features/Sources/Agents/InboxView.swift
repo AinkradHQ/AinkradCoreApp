@@ -9,7 +9,7 @@ struct InboxView: View {
     var body: some View {
         let pending = model.pending
         let decided = model.decided
-        AgentDialogCard(title: "Approvals", width: Space.s8 * 20) {
+        CoreDialogPanel("Approvals", width: Space.s8 * 20) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s3) {
                     Text(
@@ -18,11 +18,8 @@ struct InboxView: View {
                             : "\(pending.count) \(pending.count == 1 ? "agent is" : "agents are") waiting on you."
                     )
                     .foregroundStyle(palette.text2)
-                    Label(
-                        "Approving an agent action needs Touch ID. After one, the others need none for a while.",
-                        systemImage: "lock.shield"
-                    )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    Label(touchNote, systemImage: elevatedUntil == nil ? "lock.shield" : "checkmark.shield")
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                     if pending.isEmpty {
                         VStack(spacing: Space.s1) {
                             Text("All clear").font(.system(size: MacTextSize.headline, weight: .semibold))
@@ -49,6 +46,16 @@ struct InboxView: View {
                 Button("Done") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).keyboardShortcut(.cancelAction)
             }
         }
+    }
+
+    private var elevatedUntil: Date? { model.shell.elevatedUntil.flatMap { $0 > Date() ? $0 : nil } }
+
+    /// Words follow the elevation: before Touch ID it says it is needed, after it says until when it is not.
+    private var touchNote: String {
+        guard let until = elevatedUntil else {
+            return "Approving an agent action needs Touch ID. After one, the others need none for a while."
+        }
+        return "Touch ID done. Approvals need no new prompt until \(until.formatted(date: .omitted, time: .shortened))."
     }
 
     private func who(_ r: ApprovalRequest) -> some View {
@@ -85,6 +92,15 @@ struct NotificationsSection: View {
                 )
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
+                // Failures, finished sessions and stalls have no push channel on the Core yet: shown, never pretended.
+                ForEach(["A session fails", "A session finishes", "A session stalls"], id: \.self) { kind in
+                    CoreCheckbox(kind, detail: "Not available yet.", isOn: .constant(false)).disabled(true)
+                }
+            }
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Text("What a banner looks like").font(.system(size: MacTextSize.title, weight: .semibold))
+                    .agentHeading()
+                BannerPreview()
             }
         }
         .task { await model.refreshPermission() }
@@ -112,5 +128,25 @@ struct NotificationsSection: View {
                         "Turn them on in System Settings, Notifications, Ainkrad. Ainkrad cannot change this itself.",
                     symbol: "bell.slash"))
         }
+    }
+}
+
+/// A picture of the macOS banner an approval produces: the real one is drawn by macOS, this is only a preview of its words.
+private struct BannerPreview: View {
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        HStack(alignment: .top, spacing: Space.s3) {
+            AgentMark(harness: "claude")
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text("claude is waiting on you").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("It wants to use Bash on mac-studio.").foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: 0)
+            Text("now").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+        }
+        .padding(Space.s3).frame(maxWidth: Space.s8 * 12, alignment: .leading)
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .accessibilityElement(children: .combine).accessibilityLabel("Preview: claude is waiting on you")
     }
 }

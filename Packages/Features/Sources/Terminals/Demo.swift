@@ -167,11 +167,20 @@ public final class TerminalsDemo {
         shell.overlay = nil
         reset()
         await model.reload()
+        for r in model.runners {
+            let base = r.perCore ?? 0.2
+            model.debugSeedLoad(r.id, (0..<24).map { base * (0.6 + 0.4 * abs(sin(Double($0) * 0.7))) })
+        }
         func pane(
             _ i: Int, _ link: Link? = nil, note: ResumeNote? = nil, letterbox: (Int, Int)? = nil, screen: Bool = true
         ) async {
             model.openTerminal(id(i), attach: false)
             let s = model.sessions[id(i)]!
+            // Output this Mac "saw" over the last hour, so the tile strip has something to draw.
+            let weights = [1, 3, 2, 0, 5, 9, 4, 2, 8, 10, 6, 9]
+            for (k, w) in weights.enumerated() {
+                for j in 0..<w { s.noteOutput(at: Date().addingTimeInterval(-Double(11 - k) * 300 - Double(j) * 20)) }
+            }
             if screen { s.surface.feed(Data(Self.screen.utf8)) }
             if let letterbox { s.surface.layoutMode(.letterbox(cols: letterbox.0, rows: letterbox.1)) }
             if let link { s.debugForce(link: link, note: note) }

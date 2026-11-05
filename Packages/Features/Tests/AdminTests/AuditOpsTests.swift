@@ -29,6 +29,17 @@ struct AuditTests {
         #expect(service.auditQueries.map(\.before) == [nil, 71, 21])
     }
 
+    @Test("the density counts loaded rows per slice of their span, and the kinds are the ones loaded")
+    func densityAndKinds() async {
+        let (admin, _) = await world(30)
+        let a = admin.audit!
+        let d = a.density(slices: 4)
+        #expect(d != nil && d?.cells.count == 4 && d?.cells.max() == 1)
+        #expect(a.knownKinds == ["device.revoked", "setting.set"])
+        a.reset()
+        #expect(a.density() == nil && a.knownKinds.isEmpty)
+    }
+
     @Test("a filter reads from the top again after a moment, and only kind, target and actor can be set")
     func filtering() async {
         let (admin, service) = await world(30)
@@ -118,6 +129,17 @@ struct OpsTests {
         #expect(
             o.alarms == [AlarmState(name: "backup_age", raised: true), AlarmState(name: "disk_free", raised: false)])
         #expect(o.tiles[0].help == "Seconds since this process started.")
+    }
+
+    @Test("each look adds one history point for a count-like tile, and a labelled series gets none")
+    func history() async {
+        let s = FakeService()
+        s.metricsText = Self.text
+        let (admin, _, _) = await makeAdmin(s)
+        let o = admin.ops!
+        await o.reload()
+        #expect(o.history["ainkrad_disk_free_percent"]?.count == 2)
+        #expect(o.history["ainkrad_devices_active"] == nil, "devices carry labels, so there is no single series")
     }
 
     @Test("an empty answer is the empty state")

@@ -21,7 +21,7 @@ struct CoreSettingsSection: View {
                     AdminSection(
                         title: group.name,
                         detail:
-                            "settings/server. Values outside the limits are refused with out_of_bounds, never clamped."
+                            "settings/\(group.name.lowercased()). Values outside the limits are refused with out_of_bounds, never clamped."
                     ) {
                         AdminPanel(spacing: Space.s6) {
                             ForEach(group.items) { s in SettingRow(model: model, setting: s) }

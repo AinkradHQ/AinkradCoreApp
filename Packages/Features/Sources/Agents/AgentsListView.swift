@@ -40,6 +40,14 @@ struct AgentsListView: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// The cost of what is loaded. Older sessions load as you scroll, so until all are in, the words say what the sum covers.
+    private var totalWords: String {
+        guard model.sessions.items.contains(where: { $0.usage?.costMicros != nil }),
+            let c = AgentWords.cost(model.sessions.totalCostMicros)
+        else { return "" }
+        return model.sessions.hasMore ? " · \(c) in \(model.sessions.items.count) loaded" : " · \(c) total"
+    }
+
     private func bar(waiting: Int) -> some View {
         let active = model.count(.active)
         let summary =
@@ -47,6 +55,7 @@ struct AgentsListView: View {
             .fontWeight(waiting > 0 ? .semibold : .regular)
             .foregroundStyle(waiting > 0 ? palette.navActiveInk : palette.text)
             + Text(" · \(active) active").foregroundStyle(palette.text2)
+            + Text(totalWords).foregroundStyle(palette.text2)
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: Space.s2) {
                 summary.lineLimit(1)
@@ -111,10 +120,15 @@ struct AgentsListView: View {
                 spacing: Space.s2
             ) {
                 ForEach(rows) { s in
-                    AgentRowButton(id: s.id, focus: $focusedRow, selected: model.selected == s.id) {
+                    AgentRowButton(
+                        id: s.id, focus: $focusedRow, selected: model.selected == s.id,
+                        waiting: waitingIDs.contains(s.id)
+                    ) {
                         model.openSession(s.id)
                     } label: {
-                        SessionRow(session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id))
+                        SessionRow(
+                            session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id),
+                            burn: model.sessions.burn[s.id] ?? [])
                     }
                     .accessibilityLabel(label(s, waiting: waitingIDs.contains(s.id)))
                     .accessibilityHint("Opens the session")
@@ -202,6 +216,7 @@ struct SessionRow: View {
     let session: AgentSessionInfo
     let runner: String
     let waiting: Bool
+    var burn: [Double] = []
     @Environment(\.corePalette) private var palette
 
     var body: some View {
@@ -218,10 +233,16 @@ struct SessionRow: View {
                     palette.text2
                 )
                 .lineLimit(1).truncationMode(.middle)
+                // Only what this Mac saw the total do: a line needs two samples, and none is drawn before that.
+                if burn.count >= 2 {
+                    CoreSpark(burn, tone: st.tone == .fail ? .fail : .run).padding(.vertical, Space.s1)
+                }
                 HStack(spacing: Space.s2) {
                     if let u = session.usage {
+                        if let c = AgentWords.cost(u.costMicros) {
+                            Text(c).fontWeight(.semibold).foregroundStyle(palette.text)
+                        }
                         Text("\(AgentWords.tokens(u.tokens)) tokens")
-                        if let c = AgentWords.cost(u.costMicros) { Text(c) }
                     }
                     Spacer(minLength: 0)
                     if session.live {

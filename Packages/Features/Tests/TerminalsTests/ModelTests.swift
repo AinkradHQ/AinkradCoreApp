@@ -24,6 +24,17 @@ import Testing
         #expect(m.shown.map(\.id) == ["t_run"])
     }
 
+    @Test func hostLoadIsSampledOnEachLookAndOnlyWhileTheRunnerIsOnline() async {
+        let (m, svc, _) = make()
+        svc.terminalList = []
+        await m.reload()
+        await m.reload()
+        #expect(m.loadSamples["r1"]?.count == 2)
+        svc.runnerList = [runner(online: false)]
+        await m.reload()
+        #expect(m.loadSamples["r1"]?.count == 2)
+    }
+
     @Test func aFailedLoadShowsTheCoresWords() async {
         let (m, svc, _) = make()
         svc.terminalList = []
