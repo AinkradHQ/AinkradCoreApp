@@ -216,21 +216,17 @@ struct AppearancePopover: View {
                 }
             }
             Text("Terminal screen").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            SurfaceStyleTabs(
-                style: Binding(get: { TerminalPrefs.app(prefs.screen) }, set: { prefs.screen = TerminalPrefs.term($0) })
-            )
-            SurfaceControls(blur: $prefs.blur, opacity: $prefs.opacity, in: 0.4...1)
+            SurfaceModeTabs(mode: prefs.screenMode)
+            GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             Text("App surface").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
-            SurfaceStyleTabs(
-                style: Binding(
-                    get: { TerminalPrefs.app(prefs.surface) }, set: { prefs.surface = TerminalPrefs.term($0) }))
-            SurfaceControls(blur: $prefs.surfaceBlur, opacity: $prefs.surfaceOpacity)
+            SurfaceModeTabs(mode: prefs.surfaceMode)
+            GlassSlider(value: $prefs.surfaceOpacity, low: "See-through", high: "Solid")
             Text("Font size").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.secondary)
             GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) { _ in
                 Int(prefs.fontSize.rounded())
             }
         }
         .padding(Space.s4)
-        .frame(width: 560)
+        .frame(width: 440)
     }
 }

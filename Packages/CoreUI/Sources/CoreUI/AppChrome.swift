@@ -262,49 +262,29 @@ public struct GlassSlider: View {
     }
 }
 
-/// The full set of surface options, the same in every app and for the terminal screen: style tabs at the section's top
-/// right, then Blurred / Sharp and the 5 % slider.
-public struct SurfaceStyleTabs: View {
-    @Binding var style: AppSurfaceStyle
-    let tintTitle: String
-    /// Three styles (Ahmed, 2026-11-05): Clear, Theme (or Tinted), Solid. Frosted reads as Clear, since Blurred / Sharp
-    /// is its own choice now.
-    public init(style: Binding<AppSurfaceStyle>, tintTitle: String = "Theme") {
-        self._style = Binding(
-            get: { style.wrappedValue == .frosted ? .clear : style.wrappedValue }, set: { style.wrappedValue = $0 })
-        self.tintTitle = tintTitle
+/// A surface's look in three choices (Ahmed, 2026-11-05), shown at the section's top right; the slider sits below.
+/// Blurred: the colour over frosted glass. Clear: the colour over the sky, sharp. Solid: opaque.
+public enum SurfaceMode: String, CaseIterable, Sendable {
+    case blurred, clear, solid
+
+    public init(style: AppSurfaceStyle, blur: Bool) {
+        self = style == .solid ? .solid : blur ? .blurred : .clear
     }
-    public var body: some View {
-        CoreSegmented(
-            "Style",
-            segments: [
-                CoreSegment(AppSurfaceStyle.clear, "Clear", symbol: "square.dashed"),
-                CoreSegment(.tinted, tintTitle, symbol: "paintpalette"),
-                CoreSegment(.solid, "Solid", symbol: "square.fill"),
-            ], selection: $style)
-    }
+    /// The style and blur this choice stands for.
+    public var style: AppSurfaceStyle { self == .solid ? .solid : .tinted }
+    public var blur: Bool { self == .blurred }
 }
 
-public struct SurfaceControls: View {
-    @Binding var blur: Bool
-    @Binding var opacity: Double
-    let range: ClosedRange<Double>
-    public init(blur: Binding<Bool>, opacity: Binding<Double>, in range: ClosedRange<Double> = 0...1) {
-        self._blur = blur
-        self._opacity = opacity
-        self.range = range
-    }
+public struct SurfaceModeTabs: View {
+    @Binding var mode: SurfaceMode
+    public init(mode: Binding<SurfaceMode>) { self._mode = mode }
     public var body: some View {
-        HStack(spacing: Space.s4) {
-            CoreSegmented(
-                "Behind",
-                segments: [
-                    CoreSegment(true, "Blurred", symbol: "drop.halffull"), CoreSegment(false, "Sharp", symbol: "drop"),
-                ],
-                selection: $blur
-            )
-            .fixedSize()
-            GlassSlider(value: $opacity, in: range, low: "See-through", high: "Solid")
-        }
+        CoreSegmented(
+            "Look",
+            segments: [
+                CoreSegment(SurfaceMode.blurred, "Blurred", symbol: "drop.halffull"),
+                CoreSegment(.clear, "Clear", symbol: "square.dashed"),
+                CoreSegment(.solid, "Solid", symbol: "square.fill"),
+            ], selection: $mode)
     }
 }

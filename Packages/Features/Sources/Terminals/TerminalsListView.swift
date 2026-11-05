@@ -21,7 +21,7 @@ struct TerminalsListView: View {
             AppSurfaceFill(
                 style: AppSurfaceStyle(rawValue: prefs.surface == .theme ? "tinted" : prefs.surface.rawValue)
                     ?? .frosted,
-                opacity: prefs.surfaceOpacity, tint: Color(nsColor: prefs.theme.background), blur: prefs.blur)
+                opacity: prefs.surfaceOpacity, tint: Color(nsColor: prefs.theme.background), blur: prefs.surfaceBlur)
         }
         .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }

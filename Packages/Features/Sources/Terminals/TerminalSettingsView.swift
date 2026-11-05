@@ -52,21 +52,17 @@ struct TerminalSettingsView: View {
                 symbol: "circle.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
-                SurfaceStyleTabs(
-                    style: Binding(
-                        get: { TerminalPrefs.app(prefs.screen) }, set: { prefs.screen = TerminalPrefs.term($0) }))
+                SurfaceModeTabs(mode: prefs.screenMode)
             } content: {
-                SurfaceControls(blur: $prefs.blur, opacity: $prefs.opacity, in: 0.4...1)
+                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "App surface", sub: "The Terminals app's own background.", symbol: "square.on.square",
                 hue: GlassInk.blue, index: 5
             ) {
-                SurfaceStyleTabs(
-                    style: Binding(
-                        get: { TerminalPrefs.app(prefs.surface) }, set: { prefs.surface = TerminalPrefs.term($0) }))
+                SurfaceModeTabs(mode: prefs.surfaceMode)
             } content: {
-                SurfaceControls(blur: $prefs.surfaceBlur, opacity: $prefs.surfaceOpacity)
+                GlassSlider(value: $prefs.surfaceOpacity, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",

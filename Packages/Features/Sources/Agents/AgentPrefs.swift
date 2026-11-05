@@ -61,13 +61,18 @@ struct AgentSettingsView: View {
             GlassSection(
                 "App surface", sub: "The Agents app's background.", symbol: "square.on.square", hue: GlassInk.violet
             ) {
-                SurfaceStyleTabs(
-                    style: Binding(
-                        get: { AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted },
-                        set: { prefs.surface = AgentPrefs.Surface(rawValue: $0.rawValue) ?? .frosted }),
-                    tintTitle: "Tinted")
+                SurfaceModeTabs(
+                    mode: Binding(
+                        get: {
+                            SurfaceMode(
+                                style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .tinted, blur: prefs.blur)
+                        },
+                        set: {
+                            prefs.surface = AgentPrefs.Surface(rawValue: $0.style.rawValue) ?? .tinted
+                            prefs.blur = $0.blur
+                        }))
             } content: {
-                SurfaceControls(blur: $prefs.blur, opacity: $prefs.opacity)
+                GlassSlider(value: $prefs.opacity, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,

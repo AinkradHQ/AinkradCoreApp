@@ -2,6 +2,7 @@ import AppKit
 import CoreUI
 import Observation
 import SwiftTerm
+import SwiftUI
 
 /// How terminals look on this Mac: font, size, theme, cursor, background (Settings, Terminal). Kept in UserDefaults; every
 /// open terminal follows a change at once.
@@ -63,6 +64,24 @@ final class TerminalPrefs {
     static let changed = Notification.Name("ainkrad.terminal.prefs")
 
     var theme: TermTheme { TermTheme.all.first { $0.id == themeID } ?? TermTheme.all[0] }
+
+    /// The three-choice look of the screen and of the app surface.
+    var screenMode: Binding<SurfaceMode> {
+        Binding(
+            get: { SurfaceMode(style: Self.app(self.screen), blur: self.blur) },
+            set: {
+                self.screen = Self.term($0.style)
+                self.blur = $0.blur
+            })
+    }
+    var surfaceMode: Binding<SurfaceMode> {
+        Binding(
+            get: { SurfaceMode(style: Self.app(self.surface), blur: self.surfaceBlur) },
+            set: {
+                self.surface = Self.term($0.style)
+                self.surfaceBlur = $0.blur
+            })
+    }
 
     /// The style as the shared surface type (theme ↔ tinted).
     static func app(_ s: Surface) -> AppSurfaceStyle {
