@@ -22,10 +22,11 @@ public struct Palette: Sendable {
     public var btnPrimaryHover: Color { theme["btnPrimaryHover"] }
     public var btnPrimaryPress: Color { theme["btnPrimaryPress"] }
     public var btnInk: Color { theme["btnInk"] }
-    public var navActive: Color { theme["navActive"] }
-    public var navActiveEdge: Color { theme["navActiveEdge"] }
-    public var navActiveInk: Color { theme["navActiveInk"] }
-    public var rowHover: Color { theme["mRowHover"] }
+    /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
+    public var navActive: Color { .white.opacity(0.18) }
+    public var navActiveEdge: Color { .white.opacity(0.3) }
+    public var navActiveInk: Color { .white }
+    public var rowHover: Color { .white.opacity(0.1) }
     public var edge: Color { theme["edge"] }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
@@ -45,8 +46,8 @@ public struct Palette: Sendable {
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
-    public var uDim: Color { pick("uDim", fallback: theme["text"].opacity(0.08)) }
-    public var uDimHover: Color { pick("uDimHover", fallback: theme["text"].opacity(0.14)) }
+    public var uDim: Color { .white.opacity(0.1) }
+    public var uDimHover: Color { .white.opacity(0.16) }
 
     public func tone(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {

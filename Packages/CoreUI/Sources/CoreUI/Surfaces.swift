@@ -62,17 +62,23 @@ private struct GlassModifier: ViewModifier {
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if #available(macOS 26, iOS 26, *) {
-            let base = frosted ? Glass.regular : Glass.clear
-            // Untinted is Apple's widget glass: clear, so the sky shows through sharp and only the edges bend the light
-            // (Ahmed's macOS widget screenshots, 2026-11-05). Night darkens it a touch, like macOS does on a dark desktop.
-            let glass =
-                tinted
-                ? Glass.regular.tint(palette.glassTint)
-                : palette.isDay
+            if tinted {
+                // The one glass for cards, tiles and dialogs (the launcher's): a dark layer on Apple's glass, clear by
+                // day and frosted at night. The older deep-blue tint is gone (Ahmed, 2026-11-05: latest style everywhere).
+                let glass = palette.isDay ? Glass.clear : Glass.regular
+                content.environment(\.colorScheme, .dark)
+                    .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: shape)
+                    .glassEffect(interactive ? glass.interactive() : glass, in: shape)
+            } else {
+                let base = frosted ? Glass.regular : Glass.clear
+                // Untinted is the widgets' glass: clear, so the sky shows through sharp; darkened a touch at night.
+                let glass =
+                    palette.isDay
                     ? base.tint(Color(red: 0.08, green: 0.22, blue: 0.5).opacity(0.35))
                     : base.tint(.black.opacity(0.32))
-            content.environment(\.colorScheme, .dark)
-                .glassEffect(interactive ? glass.interactive() : glass, in: shape)
+                content.environment(\.colorScheme, .dark)
+                    .glassEffect(interactive ? glass.interactive() : glass, in: shape)
+            }
         } else {
             content.background(shape.fill(.regularMaterial).environment(\.colorScheme, .dark))
                 .background(palette.glassTint, in: shape)

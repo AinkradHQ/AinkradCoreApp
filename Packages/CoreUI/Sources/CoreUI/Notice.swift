@@ -23,7 +23,7 @@ public struct CoreNotice<Action: View>: View {
     public var body: some View {
         let c = palette.tone(tone)
         HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: symbol).foregroundStyle(c.ink).frame(width: Space.s4).accessibilityHidden(true)
+            IconTile(symbol, hue: c.ink, size: 26)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
@@ -36,8 +36,8 @@ public struct CoreNotice<Action: View>: View {
             action
         }
         .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .background(c.fill, in: coreShape(Radius.cardMac))
+        .background(c.ink.opacity(0.14), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.35), lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(text.isEmpty ? title : "\(title). \(text)")
     }
