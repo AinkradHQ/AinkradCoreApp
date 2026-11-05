@@ -140,7 +140,11 @@ public final class ShellModel {
     /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
     public var actionsOpen = false
     /// Names the person gave tabs, by pane id; the tab being renamed in place.
-    public var tabNames: [String: String] = [:]
+    /// Kept on this Mac across launches (pane ids are stable: terminal-<id>, agents, runners…).
+    public var tabNames: [String: String] = [:] {
+        didSet { defaults.set(tabNames, forKey: Self.tabNamesKey) }
+    }
+    static let tabNamesKey = "ainkrad.core.tab.names"
     public var renamingTab: String?
     public var bellOpen = false
     public var overlay: ShellOverlay?
@@ -208,6 +212,7 @@ public final class ShellModel {
     public init(defaults: UserDefaults = .coreStore()) {
         self.defaults = defaults
         profile = UserProfile(defaults: defaults)
+        tabNames = defaults.dictionary(forKey: Self.tabNamesKey) as? [String: String] ?? [:]
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
         showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
@@ -465,6 +470,7 @@ public final class ShellModel {
         widgets = .standard()
         defaults.removeObject(forKey: Self.layoutKey)
         theme = .system
+        tabNames = [:]
     }
 
     // MARK: widgets

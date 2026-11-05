@@ -125,7 +125,24 @@ public final class TerminalsModel {
     // MARK: launcher and bell
 
     /// Launcher entries and the bell for runner problems. Ids match the shell's own sample entries, so Demo mode keeps its own.
+    /// One Touch ID unlocks every terminal: when the session is elevated, each pane waiting on "Verify to reattach"
+    /// attaches again on its own (Ahmed, 2026-11-05).
+    private func followElevation() {
+        withObservationTracking {
+            _ = shell.elevatedUntil
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.host.isElevated {
+                    for s in self.sessions.values where s.waitsForVerify { Task { await s.attach(prompt: false) } }
+                }
+                self.followElevation()
+            }
+        }
+    }
+
     public func install() {
+        followElevation()
         shell.settings.section(
             SettingsSection(
                 id: "terminal", group: .mac, title: "Terminal", sub: "Font, colours, cursor and background",
