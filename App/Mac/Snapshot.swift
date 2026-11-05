@@ -29,6 +29,19 @@ enum SnapshotRunner {
         }
         if let dir = env["CORE_ADMIN_SNAPSHOT"] { return await AdminSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_LOCK_SNAPSHOT=<dir>`: Settings, Lockouts with two sample locks (needs a paired Core).
+        if let dir = env["CORE_LOCK_SNAPSHOT"] {
+            try? await Task.sleep(for: .seconds(4))
+            app.debugOpenSettings("lockouts")
+            try? await Task.sleep(for: .seconds(1))
+            app.debugSampleLockouts()
+            try? await Task.sleep(for: .seconds(2))
+            if let w = NSApp.windows.first(where: { $0.title == "Ainkrad" }) {
+                log("shot lockouts \(capture(w, to: "\(dir)/lockouts.png"))")
+            }
+            NSApp.terminate(nil)
+            return
+        }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         // The full-screen toggle above must not undo the theme.
