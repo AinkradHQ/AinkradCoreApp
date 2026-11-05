@@ -27,7 +27,10 @@ struct WorkspaceView: View {
             let focus = shell.focusedPane
             ZStack(alignment: .topLeading) {
                 if shell.panes.isEmpty { empty }
-                ScrollView(.horizontal, showsIndicators: layout.isStrip && focus == nil) {
+                // The strip scrolls by its own offset, not a ScrollView: a terminal pane takes every scroll event, so
+                // sideways swipes are caught for the whole workspace (StripSwipe), and picking a pane slides it into view.
+                let maxX = focus == nil && layout.isStrip ? max(0, layout.contentWidth - area.width) : 0
+                ZStack(alignment: .topLeading) {
                     ZStack(alignment: .topLeading) {
                         ForEach(shell.panes) { spec in
                             pane(spec, layout: layout, area: area)
@@ -48,11 +51,31 @@ struct WorkspaceView: View {
                     .coordinateSpace(name: "ws")
                     .frame(
                         width: focus == nil ? max(layout.contentWidth, area.width) : area.width,
-                        height: max(area.height, layout.frames.values.map(\.maxY).max() ?? 0), alignment: .topLeading)
+                        height: max(area.height, layout.frames.values.map(\.maxY).max() ?? 0), alignment: .topLeading
+                    )
+                    .offset(x: -min(scrollX, maxX))
                 }
-                .scrollDisabled(focus != nil || !layout.isStrip)
-                .modifier(StripScroll(x: $scrollX, scrolling: $scrolling))
-                .frame(width: area.width, height: area.height)
+                .frame(width: area.width, height: area.height, alignment: .topLeading)
+                .clipped()
+                .overlay(alignment: .bottom) {
+                    if maxX > 0 {
+                        StripBar(offset: min(scrollX, maxX), visible: area.width, total: layout.contentWidth)
+                    }
+                }
+                .background {
+                    StripSwipe(enabled: maxX > 0) { dx in
+                        scrolling = true
+                        scrollX = min(max(scrollX - dx, 0), maxX)
+                    } ended: {
+                        scrolling = false
+                    }
+                }
+                .onChange(of: shell.activePane) { _, id in
+                    guard maxX > 0, let id, let f = layout.frames[id] else { return }
+                    let target =
+                        f.minX < scrollX ? f.minX : f.maxX > scrollX + area.width ? f.maxX - area.width : scrollX
+                    withAnimation(.spring(duration: 0.4, bounce: 0.1)) { scrollX = min(max(target, 0), maxX) }
+                }
                 .padding(.leading, ShellMetrics.paneInset)
                 .padding(.top, ShellMetrics.topBar)
                 if !shell.panes.isEmpty {
@@ -407,22 +430,74 @@ private struct SeamHandle: View {
     }
 }
 
-/// The strip's scroll offset and whether it is moving (macOS 15; below that, no offset and no pause).
-private struct StripScroll: ViewModifier {
-    @Binding var x: CGFloat
-    @Binding var scrolling: Bool
-    func body(content: Content) -> some View {
-        if #available(macOS 15, *) {
-            content
-                .onScrollGeometryChange(for: CGFloat.self) {
-                    $0.contentOffset.x
-                } action: { _, new in
-                    x = new
+/// Sideways swipes anywhere over the workspace move the strip (the terminal panes eat scroll events, so the window's
+/// events are watched while the strip can scroll). Vertical scrolling is left to the panes.
+private struct StripSwipe: NSViewRepresentable {
+    let enabled: Bool
+    let moved: (CGFloat) -> Void
+    let ended: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        context.coordinator.view = v
+        return v
+    }
+
+    func updateNSView(_ v: NSView, context: Context) {
+        context.coordinator.enabled = enabled
+        context.coordinator.moved = moved
+        context.coordinator.ended = ended
+        context.coordinator.listen()
+    }
+
+    static func dismantleNSView(_ v: NSView, coordinator: Coordinator) { coordinator.stop() }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    @MainActor final class Coordinator {
+        weak var view: NSView?
+        var enabled = false
+        var moved: (CGFloat) -> Void = { _ in }
+        var ended: () -> Void = {}
+        private var monitor: Any?
+
+        func listen() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] e in
+                guard let self, self.enabled, let v = self.view, e.window === v.window else { return e }
+                let p = v.convert(e.locationInWindow, from: nil)
+                guard v.bounds.contains(p), abs(e.scrollingDeltaX) > abs(e.scrollingDeltaY) else {
+                    if e.phase == .ended || e.momentumPhase == .ended { self.ended() }
+                    return e
                 }
-                .onScrollPhaseChange { _, phase in scrolling = phase != .idle }
-        } else {
-            content
+                self.moved(e.hasPreciseScrollingDeltas ? e.scrollingDeltaX : e.scrollingDeltaX * 12)
+                if e.phase == .ended || e.momentumPhase == .ended { self.ended() }
+                return nil
+            }
         }
+
+        func stop() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+    }
+}
+
+/// Where the strip is: a thin glass bar along the bottom edge.
+private struct StripBar: View {
+    let offset: CGFloat
+    let visible: CGFloat
+    let total: CGFloat
+    var body: some View {
+        GeometryReader { g in
+            let w = max(48, g.size.width * visible / max(total, 1))
+            let x = (g.size.width - w) * offset / max(total - visible, 1)
+            Capsule().fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
+        }
+        .frame(height: 4)
+        .padding(.horizontal, Space.s4).padding(.bottom, 2)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
