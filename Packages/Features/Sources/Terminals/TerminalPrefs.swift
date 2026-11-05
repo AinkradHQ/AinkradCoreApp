@@ -80,12 +80,9 @@ final class TerminalPrefs {
     /// The terminal screen's background colour for its style, at its transparency.
     var screenColor: NSColor {
         let a = CGFloat(opacity)
-        switch screen {
-        case .clear: return NSColor.black.withAlphaComponent(a * 0.6)
-        case .frosted: return NSColor(white: 0.06, alpha: a * 0.6)
-        case .theme: return theme.background.withAlphaComponent(a)
-        case .solid: return NSColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.5 + a * 0.5)
-        }
+        // As the app surface: a stored clear or frosted from before draws as the theme colour.
+        if screen == .solid { return NSColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.5 + a * 0.5) }
+        return theme.background.withAlphaComponent(a)
     }
 
     var font: NSFont {

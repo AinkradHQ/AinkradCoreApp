@@ -40,13 +40,13 @@ final class AgentPrefs {
     }
 }
 
-/// The Agents app's surface inside the pane's glass rim: the same fill as the Terminals app (tinted uses violet).
+/// The Agents app's surface inside the pane's glass rim: the same fill and tint as every other app.
 struct AgentSurface: View {
     @Bindable var prefs = AgentPrefs.shared
     var body: some View {
         AppSurfaceFill(
             style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted, opacity: prefs.opacity,
-            tint: Color(red: 0.1, green: 0.06, blue: 0.22), blur: prefs.blur)
+            blur: prefs.blur)
     }
 }
 
@@ -73,7 +73,7 @@ struct AgentSettingsView: View {
                             prefs.blur = $0.blur
                         }))
             } content: {
-                GlassSlider(value: $prefs.opacity, low: "See-through", high: "Solid")
+                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,

@@ -14,7 +14,10 @@ public struct AppSurfaceFill: View {
     let opacity: Double
     let tint: Color
     let blur: Bool
-    public init(style: AppSurfaceStyle, opacity: Double, tint: Color, blur: Bool = true) {
+    /// The one tint every app's surface uses (Ahmed, 2026-11-05: the same settings must look the same in every app).
+    /// The Terminals app's Deep Blue.
+    public static let tint = Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255)
+    public init(style: AppSurfaceStyle, opacity: Double, tint: Color = AppSurfaceFill.tint, blur: Bool = true) {
         self.style = style
         self.opacity = opacity
         self.tint = tint
@@ -25,11 +28,12 @@ public struct AppSurfaceFill: View {
         // Blur is its own choice: any style can sit on frosted glass (Blurred) or over the sky as it is (Sharp).
         ZStack {
             if blur { shape.fill(.ultraThinMaterial) }
-            switch style {
-            case .clear: shape.fill(.black.opacity(opacity * 0.6))
-            case .frosted: shape.fill(.white.opacity(0.06)).overlay { shape.fill(.black.opacity(opacity * 0.5)) }
-            case .tinted: shape.fill(tint.opacity(opacity))
-            case .solid: shape.fill(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.5 + opacity * 0.5))
+            // Only three looks are offered (Blurred, Clear, Solid); a stored clear or frosted from before draws as the
+            // tint, so the same choice looks the same in every app.
+            if style == .solid {
+                shape.fill(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.5 + opacity * 0.5))
+            } else {
+                shape.fill(tint.opacity(opacity))
             }
         }
         .environment(\.colorScheme, .dark)

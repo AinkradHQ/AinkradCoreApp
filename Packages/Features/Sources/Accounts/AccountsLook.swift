@@ -32,13 +32,12 @@ final class AccountsPrefs {
     }
 }
 
-/// The app's surface inside the pane's glass rim, tinted teal.
+/// The app's surface inside the pane's glass rim: the same fill and tint as every other app.
 struct AccountsSurface: View {
     @Bindable var prefs = AccountsPrefs.shared
     var body: some View {
         AppSurfaceFill(
-            style: prefs.style, opacity: prefs.opacity, tint: Color(red: 0.03, green: 0.13, blue: 0.15),
-            blur: prefs.blur)
+            style: prefs.style, opacity: prefs.opacity, blur: prefs.blur)
     }
 }
 
