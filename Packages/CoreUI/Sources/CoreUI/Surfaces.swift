@@ -3,10 +3,12 @@ import SwiftUI
 extension View {
     /// Clear glass control: system Liquid Glass on macOS 26 / iOS 26, regular material below, both tinted with the
     /// theme's deep-blue glass (the prototype's day theme is deep glass, not pale). Never put it on a `corePanel`.
-    /// `tinted: false` is Apple's own regular glass with only a breath of the theme blue: the sky shows through (widgets).
-    public func coreGlass(radius: CGFloat = Radius.control, interactive: Bool = true, tinted: Bool = true) -> some View
-    {
-        modifier(GlassModifier(radius: radius, interactive: interactive, tinted: tinted))
+    /// `tinted: false` is the widgets' clear glass: the sky shows through sharp. `frosted: true` keeps that look but blurs
+    /// what is behind (inputs such as the launcher).
+    public func coreGlass(
+        radius: CGFloat = Radius.control, interactive: Bool = true, tinted: Bool = true, frosted: Bool = false
+    ) -> some View {
+        modifier(GlassModifier(radius: radius, interactive: interactive, tinted: tinted, frosted: frosted))
     }
 
     /// Regular material panel: the content surface. Material only, never glass.
@@ -57,17 +59,19 @@ private struct GlassModifier: ViewModifier {
     let radius: CGFloat
     let interactive: Bool
     let tinted: Bool
+    let frosted: Bool
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if #available(macOS 26, iOS 26, *) {
+            let base = frosted ? Glass.regular : Glass.clear
             // Untinted is Apple's widget glass: clear, so the sky shows through sharp and only the edges bend the light
             // (Ahmed's macOS widget screenshots, 2026-11-05). Night darkens it a touch, like macOS does on a dark desktop.
             let glass =
                 tinted
                 ? Glass.regular.tint(palette.glassTint)
                 : palette.isDay
-                    ? Glass.clear.tint(Color(red: 0.08, green: 0.22, blue: 0.5).opacity(0.35))
-                    : Glass.clear.tint(.black.opacity(0.32))
+                    ? base.tint(Color(red: 0.08, green: 0.22, blue: 0.5).opacity(0.35))
+                    : base.tint(.black.opacity(0.32))
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
         } else {
