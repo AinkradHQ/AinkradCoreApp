@@ -20,21 +20,39 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         term = TerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
         super.init()
         term.terminalDelegate = self
-        term.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        // The prototype's terminal: deep blue glass with cool text, the same in night and day.
-        term.nativeBackgroundColor = NSColor(red: 3 / 255, green: 8 / 255, blue: 16 / 255, alpha: 0.78)
-        term.nativeForegroundColor = NSColor(red: 0xCF / 255, green: 0xE0 / 255, blue: 0xF5 / 255, alpha: 1)
-        term.caretColor = NSColor(red: 0x7F / 255, green: 0xB8 / 255, blue: 0xFF / 255, alpha: 1)
         term.optionAsMetaKey = true
-        // Reduce Motion: the cursor does not blink.
-        let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        term.getTerminal().setCursorStyle(still ? .steadyBlock : .blinkBlock)
+        applyPrefs()
+        // Settings, Terminal: every open terminal follows a change at once.
+        NotificationCenter.default.addObserver(forName: TerminalPrefs.changed, object: nil, queue: .main) {
+            [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPrefs() }
+        }
         container.addSubview(term)
         container.term = term
         container.surface = self
         container.wantsLayer = true
         container.layer?.cornerRadius = 12
         container.layer?.masksToBounds = true
+    }
+
+    /// Font, theme, cursor and background from Settings, Terminal. Reduce Motion: the cursor does not blink.
+    func applyPrefs() {
+        let p = TerminalPrefs.shared
+        let t = p.theme
+        term.font = p.font
+        term.nativeBackgroundColor = t.background.withAlphaComponent(CGFloat(p.opacity))
+        term.nativeForegroundColor = t.foreground
+        term.caretColor = t.caret
+        term.installColors(
+            t.ansi.map { c in
+                let rgb = c.usingColorSpace(.sRGB) ?? c
+                return SwiftTerm.Color(
+                    red: UInt16(rgb.redComponent * 65535), green: UInt16(rgb.greenComponent * 65535),
+                    blue: UInt16(rgb.blueComponent * 65535))
+            })
+        term.getTerminal().setCursorStyle(
+            p.cursorStyle(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))
+        container.needsLayout = true
     }
 
     // MARK: output

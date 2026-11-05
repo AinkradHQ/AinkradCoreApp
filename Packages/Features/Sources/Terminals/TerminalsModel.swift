@@ -126,6 +126,11 @@ public final class TerminalsModel {
 
     /// Launcher entries and the bell for runner problems. Ids match the shell's own sample entries, so Demo mode keeps its own.
     public func install() {
+        shell.settings.section(
+            SettingsSection(
+                id: "terminal", group: .mac, title: "Terminal", sub: "Font, colours, cursor and background",
+                symbol: "terminal", order: 10
+            ) { TerminalSettingsView() })
         let l = shell.launcher
         l.register(
             LauncherEntry(
