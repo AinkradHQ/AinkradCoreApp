@@ -1,3 +1,4 @@
+import AppKit
 import CoreKit
 import CoreUI
 import Foundation
@@ -84,6 +85,42 @@ final class StepUpModel {
         }
         phase = p
     }
+
+    private var choice: CheckedContinuation<Bool, Never>?
+
+    /// Asks for Touch ID in the sheet's embedded view and waits. True once it went through. A miss shows in the sheet and
+    /// waits for Try again (asks again) or Cancel (false); Esc cancels while it is asking.
+    func confirm(_ reason: String) async -> Bool {
+        cancelled = false
+        // Let the sheet and its Touch ID view lay out before asking: the view cancels itself while it is still sizing.
+        try? await Task.sleep(for: .milliseconds(300))
+        while true {
+            do {
+                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)
+                return true
+            } catch let e as LAError where e.code == .userCancel || e.code == .appCancel || e.code == .systemCancel {
+                if cancelled { return false }
+                phase = .failed("Touch ID stopped before it finished.")
+            } catch {
+                phase = .failed(error.localizedDescription)
+            }
+            let again = await withCheckedContinuation { choice = $0 }
+            choice = nil
+            guard again else { return false }
+            set(.asking(reason))
+            try? await Task.sleep(for: .milliseconds(300))
+        }
+    }
+
+    private var cancelled = false
+
+    /// The sheet's buttons and keys: Try again (↩) after a miss, Cancel (esc) at any time.
+    func retry() { choice?.resume(returning: true) }
+    func cancel() {
+        cancelled = true
+        context.invalidate()
+        choice?.resume(returning: false)
+    }
 }
 
 /// The inline outcome of a Touch ID that did not elevate: a banner in the panel, with the words from the prototype.
@@ -121,6 +158,8 @@ struct StepUpSheet: View {
     @State private var ripple = false
     @State private var sweep = false
     @State private var drawn: CGFloat = 0
+    /// Esc and Return are caught here first: the window's own Esc handler leaves this sheet alone (it is not dismissible).
+    @State private var keys: Any?
 
     private var hue: Color { done ? GlassInk.green : missed ? GlassInk.red : GlassInk.blue }
 
@@ -169,7 +208,10 @@ struct StepUpSheet: View {
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         // Apple's own Touch ID view, inside this sheet: macOS asks here instead of a second panel.
-                        LocalAuthenticationView("Touch ID", context: model.context).frame(width: 72, height: 72)
+                        // Fixed size, never animated: it cancels itself if it lays out while sizing.
+                        LocalAuthenticationView("Touch ID", context: model.context)
+                            .frame(width: 64, height: 64)
+                            .transaction { $0.animation = nil }
                     }
                 }
             }
@@ -192,7 +234,15 @@ struct StepUpSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.opacity)
             }
-            if !done && !missed {
+            if missed {
+                HStack(spacing: Space.s2) {
+                    Button("Cancel") { model.cancel() }.buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
+                    Spacer(minLength: 0)
+                    Button("Try again") { model.retry() }.buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(
+                        .primary)
+                }
+            } else if !done {
+                Button("Cancel") { model.cancel() }.buttonStyle(CoreButtonStyle(.plain)).coreShortcut(.cancel)
                 HStack(spacing: Space.s2) {
                     Image(systemName: "touchid").symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                     Text("Waiting for Touch ID").font(.system(size: MacTextSize.body, weight: .semibold))
@@ -208,11 +258,23 @@ struct StepUpSheet: View {
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         // No fade or scale on the way in: Apple's Touch ID view cancels while it is see-through or still sizing.
-        .animation(.spring(duration: 0.35), value: model.phase)
         .onAppear {
             ripple = true
             sweep = true
+            keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+                switch e.keyCode {
+                case 53:  // Esc
+                    model.cancel()
+                    return nil
+                case 36,
+                    76 where missed:  // Return: Try again after a miss
+                    model.retry()
+                    return nil
+                default: return e
+                }
+            }
         }
+        .onDisappear { if let keys { NSEvent.removeMonitor(keys) } }
         .onChange(of: done) { _, now in
             if now { withAnimation(.easeOut(duration: reduce ? 0.01 : 0.4).delay(0.1)) { drawn = 1 } }
         }
