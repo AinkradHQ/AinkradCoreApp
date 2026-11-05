@@ -66,7 +66,7 @@ private struct GlassModifier: ViewModifier {
                 tinted
                 ? Glass.regular.tint(palette.glassTint)
                 : palette.isDay
-                    ? Glass.clear.tint(Color(red: 0.08, green: 0.22, blue: 0.5).opacity(0.22))
+                    ? Glass.clear.tint(Color(red: 0.08, green: 0.22, blue: 0.5).opacity(0.3))
                     : Glass.clear.tint(.black.opacity(0.32))
             content.environment(\.colorScheme, .dark)
                 .glassEffect(interactive ? glass.interactive() : glass, in: shape)
