@@ -5,7 +5,7 @@ import SwiftUI
 struct AgentsListView: View {
     @Bindable var model: AgentsModel
     @Environment(\.corePalette) private var palette
-    @FocusState private var focusedRow: String?
+    @FocusState private var listFocus: Bool
 
     var body: some View {
         let waitingIDs = Set(model.pending.map(\.session))
@@ -55,7 +55,7 @@ struct AgentsListView: View {
                 AppStatChip("dollarsign", c, GlassInk.blue)
             }
             Spacer(minLength: 0)
-            Text("↩ open · A approvals · C cancel · K kill · R resume").font(.system(size: MacTextSize.meta))
+            Text("↩ open · ← → move · A approvals · C cancel · K kill · R resume").font(.system(size: MacTextSize.meta))
                 .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
@@ -106,6 +106,8 @@ struct AgentsListView: View {
         }
     }
 
+    /// The Terminals list's keyboard model: the grid itself holds focus (taken on arrival), one tile is the cursor and
+    /// glows, arrows move it and scroll, Return or Space opens, C K R act on it, A opens approvals.
     private func list(_ rows: [AgentSessionInfo], _ waitingIDs: Set<String>) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -114,69 +116,59 @@ struct AgentsListView: View {
                     spacing: Space.s3
                 ) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, s in
-                        AgentRowButton(
-                            id: s.id, focus: $focusedRow, selected: model.selected == s.id,
-                            waiting: waitingIDs.contains(s.id)
-                        ) {
-                            model.openSession(s.id)
-                        } label: {
-                            SessionTile(
-                                session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id),
-                                selected: model.selected == s.id || focusedRow == s.id,
-                                burn: model.sessions.burn[s.id] ?? []
-                            ) { key in act(key, s.id) }
+                        SessionTile(
+                            session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id),
+                            selected: model.selected == s.id, burn: model.sessions.burn[s.id] ?? []
+                        ) { key in act(key, s.id) }
+                        .onTapGesture(count: 2) { model.openSession(s.id) }
+                        .onTapGesture {
+                            withAnimation(.spring(duration: 0.25)) { model.selected = s.id }
+                            listFocus = true
                         }
                         .accessibilityLabel(label(s, waiting: waitingIDs.contains(s.id)))
-                        .accessibilityHint("Opens the session")
+                        .accessibilityAddTraits(model.selected == s.id ? [.isSelected, .isButton] : .isButton)
+                        .accessibilityAction { model.openSession(s.id) }
                         .modifier(RiseIn(index: i))
                         .id(s.id)
                         .onAppear { if s.id == rows.last?.id && model.filter == .all { model.loadMore() } }
                     }
                 }
-                .padding(.horizontal, Space.s3)
+                .padding(.horizontal, Space.s4).padding(.vertical, Space.s1)
                 if model.sessions.hasMore {
                     Label("Older sessions load as you scroll", systemImage: "arrow.down")
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                         .padding(Space.s4).frame(maxWidth: .infinity)
                 }
             }
-            // Keyboard first: the first tile is focused on arrival, arrows move (and scroll), Return or Space opens.
-            .onAppear { if focusedRow == nil { focusedRow = model.selected ?? rows.first?.id } }
-            .onChange(of: focusedRow) { _, id in
-                if let id { withAnimation(.spring(duration: 0.3)) { proxy.scrollTo(id) } }
+            .scrollIndicators(.never)
+            .focusable()
+            .focused($listFocus)
+            .focusEffectDisabled()
+            .onAppear {
+                listFocus = true
+                if model.selected == nil || !rows.contains(where: { $0.id == model.selected }) {
+                    model.selected = rows.first?.id
+                }
             }
-            .onKeyPress(.downArrow) { move(rows, 1) }
-            .onKeyPress(.upArrow) { move(rows, -1) }
-            .onKeyPress(.rightArrow) { move(rows, 1) }
-            .onKeyPress(.leftArrow) { move(rows, -1) }
-            .onKeyPress(.home) { jump(rows.first?.id) }
-            .onKeyPress(.end) { jump(rows.last?.id) }
-            .onKeyPress(.return) { open(rows) }
-            .onKeyPress(.space) { open(rows) }
+            .onKeyPress(.downArrow) { move(rows, 1, proxy) }
+            .onKeyPress(.upArrow) { move(rows, -1, proxy) }
+            .onKeyPress(.rightArrow) { move(rows, 1, proxy) }
+            .onKeyPress(.leftArrow) { move(rows, -1, proxy) }
+            .onKeyPress(.home) { move(rows, -rows.count, proxy) }
+            .onKeyPress(.end) { move(rows, rows.count, proxy) }
+            .onKeyPress(.return) { act("o", rows) }
+            .onKeyPress(.space) { act("o", rows) }
             .onKeyPress(characters: .letters) { press in
-                let id = focusedRow ?? model.selected ?? rows.first?.id
                 let key = press.characters.lowercased()
                 if key == "a" {
                     model.openInbox()
                     return .handled
                 }
-                guard let id, "ckr".contains(key) else { return .ignored }
-                act(Character(key), id)
-                return .handled
+                guard let c = key.first, "ckr".contains(c) else { return .ignored }
+                return act(c, rows)
             }
+            .accessibilityLabel("Agent sessions")
         }
-    }
-
-    private func open(_ rows: [AgentSessionInfo]) -> KeyPress.Result {
-        guard let id = focusedRow ?? model.selected ?? rows.first?.id else { return .ignored }
-        model.openSession(id)
-        return .handled
-    }
-
-    private func jump(_ id: String?) -> KeyPress.Result {
-        guard let id else { return .ignored }
-        focusedRow = id
-        return .handled
     }
 
     /// A tile's action, from its hover buttons or the keyboard: ↩ open, R resume, C cancel, K kill.
@@ -189,12 +181,18 @@ struct AgentsListView: View {
         }
     }
 
-    private func move(_ rows: [AgentSessionInfo], _ step: Int) -> KeyPress.Result {
-        guard let cur = focusedRow, let i = rows.firstIndex(where: { $0.id == cur }) else {
-            focusedRow = rows.first?.id
-            return .handled
-        }
-        focusedRow = rows[min(max(i + step, 0), rows.count - 1)].id
+    private func act(_ key: Character, _ rows: [AgentSessionInfo]) -> KeyPress.Result {
+        guard let id = model.selected ?? rows.first?.id else { return .ignored }
+        act(key, id)
+        return .handled
+    }
+
+    private func move(_ rows: [AgentSessionInfo], _ step: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
+        guard !rows.isEmpty else { return .ignored }
+        let i = rows.firstIndex { $0.id == model.selected } ?? (step > 0 ? -1 : rows.count)
+        let next = rows[min(max(i + step, 0), rows.count - 1)].id
+        withAnimation(.spring(duration: 0.25)) { model.selected = next }
+        withAnimation(.spring(duration: 0.3)) { proxy.scrollTo(next) }
         return .handled
     }
 

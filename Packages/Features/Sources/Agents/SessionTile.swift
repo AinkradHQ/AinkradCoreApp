@@ -59,10 +59,22 @@ struct SessionTile: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s2)
+        // The terminal tile's frame: the cursor tile tints and glows in its harness colour and lifts a little.
+        .background(
+            selected ? hue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
+        )
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                selected ? hue.opacity(0.7) : waiting ? GlassInk.orange.opacity(0.6) : GlassInk.wellEdge,
+                lineWidth: selected || waiting ? 1.5 : 1)
+        }
+        .shadow(color: hue.opacity(selected ? 0.45 : hovering ? 0.25 : 0), radius: 16, y: 4)
         .opacity(session.live || waiting ? 1 : 0.85)
+        .scaleEffect(hovering ? 1.02 : selected ? 1.01 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onHover { hovering = $0 }
         .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
+        .animation(.spring(duration: 0.3), value: selected)
         .onAppear { shown = true }
         .accessibilityElement(children: .combine)
     }
