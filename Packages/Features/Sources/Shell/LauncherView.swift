@@ -168,17 +168,16 @@ struct LauncherView: View {
         return .handled
     }
 
-    /// The keyboard moves the highlight with a glide and scrolls along on the same curve. The pointer moves it at once
-    /// (`point`), like Spotlight: a glide per row the pointer crossed lagged behind it.
+    /// The keyboard moves the highlight with a glide and scrolls along on the same curve.
     private func glide(_ to: Int) {
         withAnimation(reduce ? nil : Motion.out(0.18)) { selection = to }
     }
 
+    /// The pointer glides it too, on a short spring that redirects as the pointer moves on instead of queueing one glide
+    /// per row it crossed (that lag read as a glitch).
     private func point(_ to: Int) {
         guard to != selection else { return }
-        var t = Transaction()
-        t.disablesAnimations = true
-        withTransaction(t) { selection = to }
+        withAnimation(reduce ? nil : .spring(duration: 0.14, bounce: 0)) { selection = to }
     }
 
     private func run(_ rows: [LauncherRow]) {
@@ -202,6 +201,8 @@ private struct LauncherItem: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var arrived = false
     @State private var lastPoint: CGPoint?
+    /// Counts only the moments this row becomes selected, so the icon bounces on select and not on deselect.
+    @State private var picked = 0
 
     var body: some View {
         Button(action: action) {
@@ -215,6 +216,13 @@ private struct LauncherItem: View {
                         in: coreShape(Radius.control)
                     )
                     .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                    .symbolEffect(.bounce, value: picked)
+                    // The selected tile glows; the glow fades in and out with the highlight instead of popping.
+                    .background {
+                        if selected {
+                            coreShape(Radius.control).fill(hue).blur(radius: 8).opacity(0.55).transition(.opacity)
+                        }
+                    }
                     .accessibilityHidden(true)
                 title
                 Spacer(minLength: Space.s2)
@@ -237,6 +245,7 @@ private struct LauncherItem: View {
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)
+        .onChange(of: selected) { _, now in if now { picked += 1 } }
         // Rows arrive one after another when the launcher opens (22 ms apart, the first nine).
         .opacity(arrived || reduce ? 1 : 0)
         .offset(y: arrived || reduce ? 0 : 6)
