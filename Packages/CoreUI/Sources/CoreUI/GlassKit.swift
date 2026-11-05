@@ -226,3 +226,70 @@ private struct RiseModifier: ViewModifier {
                 value: shown)
     }
 }
+
+/// A scroll view with a glass scroll bar: a thin white thumb at the very right edge that fades in while scrolling and
+/// widens under the pointer, instead of the grey system bar (Ahmed, 2026-11-05). macOS 15 and later; below that the
+/// system bar stays.
+public struct GlassScroll<Content: View>: View {
+    let content: Content
+    @State private var metrics = ScrollMetrics()
+    @State private var active = false
+    @State private var hovering = false
+    @State private var fade: Task<Void, Never>?
+    public init(@ViewBuilder content: () -> Content) { self.content = content() }
+
+    public var body: some View {
+        if #available(macOS 15, iOS 18, *) {
+            ScrollView { content }
+                .scrollIndicators(.hidden)
+                .onScrollGeometryChange(for: ScrollMetrics.self) { g in
+                    ScrollMetrics(
+                        offset: g.contentOffset.y, content: g.contentSize.height, visible: g.containerSize.height)
+                } action: { _, new in
+                    metrics = new
+                    wake()
+                }
+                .overlay(alignment: .topTrailing) { thumb }
+        } else {
+            ScrollView { content }
+        }
+    }
+
+    @ViewBuilder private var thumb: some View {
+        if metrics.content > metrics.visible + 1 {
+            let ratio = metrics.visible / metrics.content
+            let height = max(36, metrics.visible * ratio)
+            let travel = metrics.visible - height
+            let progress = min(max(metrics.offset / (metrics.content - metrics.visible), 0), 1)
+            Capsule()
+                .fill(.white.opacity(hovering ? 0.55 : 0.38))
+                .overlay { Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
+                .frame(width: hovering ? 8 : 5, height: height)
+                .offset(y: travel * progress)
+                .padding(.trailing, 3)
+                .opacity(active || hovering ? 1 : 0)
+                .animation(.easeOut(duration: 0.25), value: active)
+                .animation(.spring(duration: 0.25), value: hovering)
+                .frame(width: 16, alignment: .trailing)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func wake() {
+        active = true
+        fade?.cancel()
+        fade = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            if !Task.isCancelled { active = false }
+        }
+    }
+}
+
+struct ScrollMetrics: Equatable {
+    var offset: CGFloat = 0
+    var content: CGFloat = 0
+    var visible: CGFloat = 0
+}

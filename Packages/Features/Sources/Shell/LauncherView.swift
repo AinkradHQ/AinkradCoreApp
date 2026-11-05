@@ -42,7 +42,7 @@ struct LauncherView: View {
             }
             .padding(Space.s4)
             ScrollViewReader { proxy in
-                ScrollView {
+                GlassScroll {
                     // Not lazy: a lazy stack builds rows as they scroll in, and each one replayed its arrival.
                     VStack(alignment: .leading, spacing: Space.s1) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in

@@ -97,7 +97,7 @@ struct SettingsView: View {
             shell.settings.sections.first { $0.id == shell.settings.selected } ?? shell.settings.sections.first
         let dir = shell.settings.direction
         HStack(alignment: .top, spacing: 0) {
-            ScrollView {
+            GlassScroll {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s2) {
                         Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
@@ -169,13 +169,16 @@ struct SettingsView: View {
                         .animation(Motion.out(Motion.ui), value: closeHover)
                         .onHover { closeHover = $0 }
                 }
-                ScrollView {
+                .padding(.trailing, Space.s6)
+                // The scroll view runs to the panel's right edge, so its glass bar sits at the edge, not over the cards.
+                GlassScroll {
                     current?.content.frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, Space.s6)
                         .id("body-\(current?.id ?? "")")
                         .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 10 * dir)))
                 }
             }
-            .padding(Space.s6)
+            .padding([.leading, .top, .bottom], Space.s6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .animation(Motion.out(reduce ? 0.16 : 0.34), value: current?.id)
             .clipped()
