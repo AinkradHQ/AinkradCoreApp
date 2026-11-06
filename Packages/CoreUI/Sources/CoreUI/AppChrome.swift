@@ -42,13 +42,14 @@ public struct AppSurfaceFill: View {
             if solidOnly {
                 shape.fill(Self.solid)
             } else {
-                if blur { shape.fill(.ultraThinMaterial) }
+                // No system material: it is a neutral grey frost that turned every surface grey (Ahmed, 2026-11-06). The
+                // frame's own Liquid Glass sits under this fill, so Blurred adds only a light tint on that glass.
                 // Only three looks are offered (Blurred, Clear, Solid); a stored clear or frosted from before draws as
                 // the tint, so the same choice looks the same in every app.
                 if style == .solid {
                     shape.fill(Self.solid.opacity(0.5 + opacity * 0.5))
                 } else {
-                    shape.fill(tint.opacity(opacity))
+                    shape.fill(tint.opacity(blur ? opacity * 0.5 : opacity))
                 }
             }
         }
