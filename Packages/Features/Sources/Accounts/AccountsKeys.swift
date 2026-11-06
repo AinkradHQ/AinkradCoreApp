@@ -16,6 +16,9 @@ enum AccountsKeys {
             return m.providersByUse.flatMap { $0.1 }.map { "a-\($0.id)" }
         case .pools: return m.selectedPool.map { $0.members.map { "m-\($0)" } } ?? []
         case .bindings: return m.bindings.map { "b-\($0.id)" }
+        case .budgets:
+            let mine = m.budgets.filter { ["account", "pool"].contains($0.kind) }
+            return (mine + m.budgets.filter { !["account", "pool"].contains($0.kind) }).map { "g-\($0.id)" }
         default: return []
         }
     }
@@ -44,6 +47,10 @@ enum AccountsKeys {
     static func open(_ m: AccountsModel) -> KeyPress.Result {
         guard let c = m.cursor, let id = Int64(c.dropFirst(2)) else {
             return .ignored
+        }
+        if c.hasPrefix("g-"), let b = m.budgets.first(where: { $0.id == id }), !m.readOnly {
+            AccountDialogs.openBudget(m, editing: b)
+            return .handled
         }
         if c.hasPrefix("a-") || c.hasPrefix("m-") {
             withAnimation(.smooth(duration: 0.35)) {
@@ -80,6 +87,17 @@ enum AccountsKeys {
                 } else {
                     AccountDialogs.openNewPool(m)
                 }
+            default: return .ignored
+            }
+            return .handled
+        }
+        if m.page == .budgets, !ro, let c = m.cursor, c.hasPrefix("g-"),
+            let b = m.budgets.first(where: { "g-\($0.id)" == c })
+        {
+            switch key {
+            case "e": AccountDialogs.openBudget(m, editing: b)
+            case "r" where b.standing == .stopped || b.standing == .over: AccountDialogs.openRaise(m, b)
+            case "⌫", "x": AccountDialogs.openDeleteBudget(m, b)
             default: return .ignored
             }
             return .handled
@@ -122,6 +140,7 @@ enum AccountsKeys {
         case .accounts: "↑↓ move · ↩ open · F filter · ⌘N connect"
         case .pools: "← → pool · ↑↓ account · D default · A add · B bind · ⌫ remove"
         case .bindings: "↑↓ move · U unbind · ⌘N bind"
+        case .budgets: "↑↓ move · E edit · R raise · ⌫ remove · ⌘N new budget"
         default: "⌘1–5 pages · ⌘J audit"
         }
     }

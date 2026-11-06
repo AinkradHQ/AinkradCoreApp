@@ -128,6 +128,15 @@ final class FakeService: AccountsService, @unchecked Sendable {
     func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
     var tested = TestedItem(result: "ok", latencyMs: 300)
     func runners() async throws -> [AccountRunner] { [] }
+    var budgetList: [BudgetItem] = []
+    func budgets() async throws -> [BudgetItem] { budgetList }
+    func setBudget(_ b: BudgetDraft) async throws {
+        try note("setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)")
+    }
+    func deleteBudget(_ id: Int64) async throws { try note("deleteBudget \(id)") }
+    func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {
+        try note("raiseBudget \(id) \(periodKey) \(tokens ?? 0) \(usdMicros ?? 0)")
+    }
     func test(account: Int64) async throws -> TestedItem {
         try note("test \(account)")
         return tested

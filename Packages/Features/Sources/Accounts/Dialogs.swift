@@ -28,6 +28,15 @@ enum AccountDialogs {
     static func openLimits(_ m: AccountsModel, _ a: AccountItem) {
         present(m, "account-limits") { close in LimitsDialog(model: m, account: a, close: close) }
     }
+    static func openBudget(_ m: AccountsModel, editing: BudgetItem?) {
+        present(m, "budget") { close in BudgetDialog(model: m, editing: editing, close: close) }
+    }
+    static func openRaise(_ m: AccountsModel, _ b: BudgetItem) {
+        present(m, "budget-raise") { close in RaiseDialog(model: m, budget: b, close: close) }
+    }
+    static func openDeleteBudget(_ m: AccountsModel, _ b: BudgetItem) {
+        present(m, "budget-delete") { close in DeleteBudgetDialog(model: m, budget: b, close: close) }
+    }
     static func openNewPool(_ m: AccountsModel) {
         present(m, "pool-new") { close in NewPoolDialog(model: m, close: close) }
     }

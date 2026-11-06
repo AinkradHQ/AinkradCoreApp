@@ -84,38 +84,20 @@ struct SubscriptionSignIn: View {
     /// Automatic first, then each runner; one that is offline can't be picked.
     private var runnerPicker: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Space.s2)], spacing: Space.s2) {
-            choice(nil, "Automatic", "Best ready runner", "sparkles", true)
-            ForEach(runners) { r in choice(r.id, r.name, r.online ? "Online" : "Offline", "server.rack", r.online) }
+            AccPick(title: "Automatic", sub: "Best ready runner", symbol: "sparkles", hue: hue, on: runner == nil) {
+                runner = nil
+            }
+            ForEach(runners) { r in
+                AccPick(
+                    title: r.name, sub: r.online ? "Online" : "Offline", symbol: "server.rack", hue: hue,
+                    on: runner == r.id, enabled: r.online
+                ) { runner = r.id }
+            }
         }
         .task {
             guard runners.isEmpty, let svc = model.service else { return }
             runners = (try? await svc.runners()) ?? []
         }
-    }
-
-    private func choice(_ id: String?, _ title: String, _ sub: String, _ symbol: String, _ ok: Bool) -> some View {
-        let on = runner == id
-        return Button {
-            withAnimation(.smooth(duration: 0.25)) { runner = id }
-        } label: {
-            HStack(spacing: Space.s2) {
-                Image(systemName: on ? "checkmark" : symbol).foregroundStyle(on ? .white : hue)
-                    .frame(width: 26, height: 26).background(on ? hue : hue.opacity(0.15), in: coreShape(7))
-                    .contentTransition(.symbolEffect(.replace))
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(Space.s2)
-            .background(on ? hue.opacity(0.14) : GlassInk.well, in: coreShape(Radius.control + 2))
-            .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
-            }
-            .contentShape(coreShape(Radius.control + 2))
-        }
-        .buttonStyle(.plain).focusEffectDisabled().disabled(!ok).opacity(ok ? 1 : 0.45)
     }
 
     private func signIn(_ url: URL) -> some View {

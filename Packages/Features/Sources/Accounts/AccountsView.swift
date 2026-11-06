@@ -65,7 +65,7 @@ struct AccountsView: View {
     ]
 
     private func on(_ page: AccountsPage) -> Bool {
-        page == .budgets ? model.page.notYet && model.page != .activity : model.page == page
+        page == .budgets ? model.page.isSpend : model.page == page
     }
 
     private func count(_ page: AccountsPage) -> Int {
@@ -74,6 +74,7 @@ struct AccountsView: View {
         case .accounts: model.accounts.count
         case .pools: model.pools.count
         case .bindings: model.bindings.count
+        case .budgets: model.budgets.filter { $0.standing == .stopped }.count
         default: -1
         }
     }
@@ -93,6 +94,11 @@ struct AccountsView: View {
         case .pools:
             AppActionTile(title: "New pool", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 AccountDialogs.openNewPool(model)
+            }
+            .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
+        case .budgets:
+            AppActionTile(title: "New budget", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                AccountDialogs.openBudget(model, editing: nil)
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .bindings:
@@ -127,6 +133,8 @@ struct AccountsView: View {
             AccStateCard(
                 symbol: "wifi.slash", title: "Not connected",
                 text: "Accounts, pools and bindings come from your Core. This Mac is not connected to one right now.")
+        } else if model.page == .budgets {
+            BudgetsPage(model: model).transition(.opacity)
         } else if model.page.notYet {
             NotYetPage(model: model, page: model.page)
         } else {
@@ -172,18 +180,10 @@ struct NotYetPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            AccHeader(
-                title: "Spend", detail: "Budgets, costs, the ledger and prices, once the Core reports them.",
-                symbol: "chart.bar.fill", hue: GlassInk.green
-            ) { EmptyView() }
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 8), spacing: Space.s3, alignment: .top)],
-                spacing: Space.s3
-            ) {
-                ForEach([AccountsPage.budgets, .costs, .ledger, .prices]) { p in
-                    NotYetCard(title: p.title, text: Self.detail(p) + " Not available yet; nothing here is estimated.")
-                }
+            if page.isSpend {
+                SpendHeader(model: model, title: page.title, detail: Self.detail(page), symbol: page.symbol)
             }
+            NotYetCard(title: "Coming next", text: "This page is being built. Nothing here is estimated.")
         }
         .accessibilityIdentifier("not-yet-\(page.rawValue)")
     }

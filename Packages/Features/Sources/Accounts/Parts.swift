@@ -338,3 +338,44 @@ struct AccFact<Value: View>: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// One choice among a few, as a tile: its icon turns into a check when picked. Off when it can't be picked.
+struct AccPick: View {
+    let title: String
+    let sub: String
+    let symbol: String
+    let hue: Color
+    let on: Bool
+    var enabled = true
+    let pick: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            withAnimation(.smooth(duration: 0.25)) { pick() }
+        } label: {
+            HStack(spacing: Space.s2) {
+                Image(systemName: on ? "checkmark" : symbol).foregroundStyle(on ? .white : hue)
+                    .frame(width: 26, height: 26).background(on ? hue : hue.opacity(0.15), in: coreShape(7))
+                    .contentTransition(.symbolEffect(.replace))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s2)
+            .background(
+                on ? hue.opacity(0.14) : hovering ? GlassInk.wellHover : GlassInk.well,
+                in: coreShape(Radius.control + 2)
+            )
+            .overlay {
+                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
+            }
+            .contentShape(coreShape(Radius.control + 2))
+        }
+        .buttonStyle(.plain).focusEffectDisabled().disabled(!enabled).opacity(enabled ? 1 : 0.45)
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.2), value: hovering)
+    }
+}

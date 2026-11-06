@@ -175,6 +175,45 @@ public final class AccountsDemo {
             return try await login(id)
         }
         func cancelLogin(_ id: String) async throws { loginStart = nil }
+        func b(
+            _ id: Int64, _ kind: String, _ subject: String, _ period: String, cap: Int64, usd: Int64?, spent: Int64,
+            usdSpent: Int64, stop: Bool = true, held: Int64 = 0
+        ) -> BudgetItem {
+            let ex = (cap > 0 && spent >= cap) || (usd.map { usdSpent >= $0 } ?? false)
+            return BudgetItem(
+                id: id, kind: kind, subject: subject, company: nil, period: period,
+                periodKey: period == "day" ? "2026-11-06" : period == "month" ? "2026-11" : "total", tokenCap: cap,
+                usdCap: usd, spent: spent, usdSpent: usdSpent, held: held, raised: 0, raisedUSD: 0, warnAt: 80,
+                hardStop: stop, exhausted: ex)
+        }
+        lazy var budgetList: [BudgetItem] = [
+            b(1, "account", "1", "day", cap: 0, usd: 25_000_000, spent: 210_000, usdSpent: 1_240_000),
+            b(2, "account", "3", "day", cap: 0, usd: 20_000_000, spent: 1_240_000, usdSpent: 20_000_000),
+            b(3, "pool", "2", "month", cap: 80_000_000, usd: 400_000_000, spent: 52_000_000, usdSpent: 182_000_000),
+            b(4, "agent", "atlas", "week", cap: 12_000_000, usd: nil, spent: 10_400_000, usdSpent: 0, held: 320_000),
+            b(
+                5, "project", "kan-ainkrad", "month", cap: 40_000_000, usd: 150_000_000, spent: 9_100_000,
+                usdSpent: 31_000_000, stop: false),
+        ]
+        func budgets() async throws -> [BudgetItem] { budgetList }
+        func setBudget(_ d: BudgetDraft) async throws {
+            budgetList.removeAll { $0.kind == d.kind && $0.subject == d.subject && $0.period == d.period }
+            budgetList.append(
+                b(
+                    Int64(budgetList.count + 10), d.kind, d.subject, d.period, cap: d.tokenCap, usd: d.usdCap, spent: 0,
+                    usdSpent: 0, stop: d.hardStop))
+        }
+        func deleteBudget(_ id: Int64) async throws { budgetList.removeAll { $0.id == id } }
+        func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {
+            budgetList = budgetList.map {
+                guard $0.id == id else { return $0 }
+                return BudgetItem(
+                    id: $0.id, kind: $0.kind, subject: $0.subject, company: nil, period: $0.period,
+                    periodKey: $0.periodKey, tokenCap: $0.tokenCap, usdCap: $0.usdCap, spent: $0.spent,
+                    usdSpent: $0.usdSpent, held: $0.held, raised: tokens ?? 0, raisedUSD: usdMicros ?? 0,
+                    warnAt: $0.warnAt, hardStop: $0.hardStop, exhausted: false)
+            }
+        }
         func runners() async throws -> [AccountRunner] {
             [
                 AccountRunner(id: "r_linux01", name: "linux-01", online: true),
@@ -216,6 +255,7 @@ public final class AccountsDemo {
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
         "account-ready",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
+        "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "bindings",
         "bindings-empty",
         "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
@@ -261,6 +301,7 @@ public final class AccountsDemo {
                 PoolItem(id: $0.id, name: $0.name, provider: $0.provider, isDefault: $0.isDefault, members: [])
             }
         case "bindings-empty": svc.bindingList = []
+        case "budgets-empty": svc.budgetList = []
         default: break
         }
         model.use(svc)
@@ -276,6 +317,7 @@ public final class AccountsDemo {
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
             case "bindings", "bindings-empty", "bind": .bindings
             case "budgets", "costs", "ledger", "prices", "activity": AccountsPage(rawValue: scene)!
+            case "budget-new", "budget-edit", "budget-raise", "budgets-empty": .budgets
             default: .overview
             }
         let detail: Int64? =
@@ -308,6 +350,10 @@ public final class AccountsDemo {
         case "delete-account": AccountDialogs.openDelete(model, model.account(1)!)
         case "cap": AccountDialogs.openCap(model, model.account(1)!)
         case "limits": AccountDialogs.openLimits(model, model.account(1)!)
+        case "budget-new": AccountDialogs.openBudget(model, editing: nil)
+        case "budget-edit": AccountDialogs.openBudget(model, editing: model.budgets.first { $0.id == 3 })
+        case "budget-raise": AccountDialogs.openRaise(model, model.budgets.first { $0.id == 2 }!)
+        case "budgets": model.cursor = "g-3"
         case "account-testing": Task { await model.test(model.account(1)!) }
         case "new-pool": AccountDialogs.openNewPool(model)
         case "bind": AccountDialogs.openBind(model, pool: nil)

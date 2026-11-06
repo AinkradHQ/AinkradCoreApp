@@ -64,6 +64,38 @@ struct ModelTests {
         #expect(why.hasPrefix("Nothing happened for 10 minutes"))
     }
 
+    @Test func budgetStandingCountsWhatWasRaisedAndTheHardStop() {
+        func b(
+            cap: Int64, usd: Int64?, spent: Int64, usdSpent: Int64, raised: Int64 = 0, stop: Bool = true,
+            ex: Bool = false
+        )
+            -> BudgetItem
+        {
+            BudgetItem(
+                id: 1, kind: "account", subject: "1", company: nil, period: "day", periodKey: "2026-11-06",
+                tokenCap: cap, usdCap: usd, spent: spent, usdSpent: usdSpent, held: 0, raised: raised, raisedUSD: 0,
+                warnAt: 80, hardStop: stop, exhausted: ex)
+        }
+        #expect(b(cap: 100, usd: nil, spent: 10, usdSpent: 0).standing == .fine)
+        #expect(b(cap: 100, usd: nil, spent: 85, usdSpent: 0).standing == .warning)
+        #expect(b(cap: 100, usd: nil, spent: 100, usdSpent: 0, raised: 100).standing == .fine)
+        #expect(b(cap: 0, usd: 10, spent: 999, usdSpent: 10, ex: true).standing == .stopped)
+        #expect(b(cap: 0, usd: 10, spent: 0, usdSpent: 10, stop: false, ex: true).standing == .over)
+        #expect(b(cap: 0, usd: 10, spent: 999, usdSpent: 1).tokenShare == nil)
+    }
+
+    @Test func raisingABudgetNamesItsPeriodAndAsksForTouchID() async {
+        let (m, svc, host) = await make()
+        let budget = BudgetItem(
+            id: 7, kind: "account", subject: "1", company: nil, period: "day", periodKey: "2026-11-06", tokenCap: 0,
+            usdCap: 1_000_000, spent: 0, usdSpent: 1_000_000, held: 0, raised: 0, raisedUSD: 0, warnAt: 80,
+            hardStop: true, exhausted: true)
+        #expect(m.budgetName(budget) == "claude-main")
+        #expect(await m.raiseBudget(budget, tokens: nil, usdMicros: 500_000))
+        #expect(svc.log.contains("raiseBudget 7 2026-11-06 0 500000"))
+        #expect(host.reasons.count == 1)
+    }
+
     @Test func stateWordsKeepUnknownRawAndNeverAlarm() {
         #expect(AccountPhase("active").label == "Ready")
         #expect(AccountPhase("weird").label == "weird")

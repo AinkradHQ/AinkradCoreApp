@@ -33,6 +33,11 @@ protocol AccountsService: Sendable {
     func test(account: Int64) async throws -> TestedItem
     /// What one session may spend on the account; nil clears that limit.
     func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws
+    /// Budgets with where each stands in its period now (`read`); changing one needs `admin` and Touch ID.
+    func budgets() async throws -> [BudgetItem]
+    func setBudget(_ b: BudgetDraft) async throws
+    func deleteBudget(_ id: Int64) async throws
+    func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws
 }
 
 struct AccountRunner: Identifiable, Equatable, Sendable {
@@ -160,6 +165,39 @@ struct LiveAccountsService: AccountsService {
                 path: .init(id: String(account)), body: .json(.init(maxTokens: maxTokens, maxUsdMicros: maxUSDMicros))
             ).ok
         }
+    }
+
+    func budgets() async throws -> [BudgetItem] {
+        try await run { try await client.listBudgets().ok.body.json.map(Self.budget) }
+    }
+    func setBudget(_ b: BudgetDraft) async throws {
+        try await run {
+            _ = try await client.setBudget(
+                body: .json(
+                    .init(
+                        hardStop: b.hardStop, kind: b.kind, period: b.period, subject: b.subject, tokenCap: b.tokenCap,
+                        usdCapMicros: b.usdCap, warnAtPercent: b.warnAt))
+            ).ok
+        }
+    }
+    func deleteBudget(_ id: Int64) async throws {
+        try await run { _ = try await client.deleteBudget(path: .init(id: String(id))).ok }
+    }
+    func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {
+        try await run {
+            _ = try await client.raiseBudget(
+                path: .init(id: String(id)),
+                body: .json(.init(periodKey: periodKey, tokens: tokens, usdMicros: usdMicros))
+            ).ok
+        }
+    }
+
+    static func budget(_ b: Components.Schemas.SubjectBudget) -> BudgetItem {
+        BudgetItem(
+            id: b.id, kind: b.kind, subject: b.subject, company: b.company, period: b.period, periodKey: b.periodKey,
+            tokenCap: b.tokenCap, usdCap: b.usdCapMicros, spent: b.spent, usdSpent: b.usdSpent, held: b.held,
+            raised: b.raised, raisedUSD: b.raisedUsd, warnAt: b.warnAtPercent, hardStop: b.hardStop,
+            exhausted: b.exhausted)
     }
 
     // MARK: mapping
