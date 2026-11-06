@@ -8,6 +8,7 @@ struct FailureDiagram: View {
     let failure: Failure
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pinged = false
 
     var body: some View {
         let tone = palette.tone(failure.tone)
@@ -19,8 +20,9 @@ struct FailureDiagram: View {
             }
             .frame(height: MacSize.controlLg * 1.6)
             node(failure.diagramEnd, failure.diagramLabel, ink: tone.ink, fill: tone.fill)
-                .symbolEffect(.pulse, options: .repeating)
+                .symbolEffect(.pulse, options: .nonRepeating, value: pinged)
         }
+        .onAppear { pinged = !reduceMotion }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("This Mac to \(failure.diagramLabel): stopped")
     }

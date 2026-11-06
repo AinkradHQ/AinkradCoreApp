@@ -76,7 +76,7 @@ private struct SummaryBar: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             GeometryReader { geo in
                 let total = max(1, model.accounts.count)
-                HStack(spacing: 3) {
+                HStack(spacing: Space.s1 / 2) {
                     seg(ready, GlassInk.green, geo.size.width, total)
                     seg(need, GlassInk.orange, geo.size.width, total)
                     seg(off + other, GlassInk.slate, geo.size.width, total)
@@ -84,7 +84,7 @@ private struct SummaryBar: View {
             }
             .frame(height: 8).accessibilityHidden(true)
         }
-        .animation(.smooth(duration: 0.8), value: shown)
+        .animation(Motion.out(Motion.move), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(ready) ready, \(need) need a look, \(off + other) turned off or other")
@@ -92,9 +92,8 @@ private struct SummaryBar: View {
 
     @ViewBuilder private func seg(_ n: Int, _ c: Color, _ width: CGFloat, _ total: Int) -> some View {
         if n > 0 {
-            coreShape(4).fill(c.gradient)
+            coreShape(Radius.chip).fill(c.gradient)
                 .frame(width: shown ? max(8, width * CGFloat(n) / CGFloat(total) - 3) : 8)
-                .shadow(color: c.opacity(0.5), radius: 4)
         }
     }
 }
@@ -119,8 +118,8 @@ private struct ProviderSection: View {
                     .foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s3)
-                AccLink(title: open ? "Hide details" : "About", symbol: open ? "chevron.up" : "info.circle") {
-                    withAnimation(.smooth(duration: 0.35)) { open.toggle() }
+                AccLink(title: open ? "Hide details" : "About", symbol: open ? "chevron.up" : "info.square") {
+                    withAnimation(Motion.out(Motion.move)) { open.toggle() }
                 }
                 if !provider.builtin {
                     AccLink(title: "Edit", symbol: "slider.horizontal.3") {
@@ -154,12 +153,18 @@ struct ProviderAbout: View {
         AccPanel(spacing: Space.s2) {
             AccFact(label: "Sign-in") {
                 Text(
-                    provider.loginMethods.isEmpty ? "Not available" : provider.loginMethods.joined(separator: ", "))
+                    provider.loginMethods.isEmpty
+                        ? "Not available" : provider.loginMethods.map(Self.signIn).joined(separator: ", "))
             }
-            AccFact(label: "Delivery") { Text(provider.delivery.joined(separator: ", ")) }
-            AccFact(label: "Harness") { Text(provider.harness) }
-            AccFact(label: "Variable") { AccChip(text: provider.authVar, mono: true) }
-            AccFact(label: "Address") { AccChip(text: provider.baseURL, mono: true) }
+            .help(provider.loginMethods.joined(separator: ", "))
+            AccFact(label: "Reaches agents") { Text(provider.delivery.map(Self.delivery).joined(separator: ", ")) }
+                .help(provider.delivery.joined(separator: ", "))
+            AccFact(label: "Runs with") { Text(Self.harness(provider.harness)) }
+                .help(provider.harness)
+            AccFact(label: "Key name") { Text("Passed to agents as a variable") }
+                .help(provider.authVar)
+            AccFact(label: "Address") { Text(URL(string: provider.baseURL)?.host ?? "Its own address") }
+                .help(provider.baseURL)
             AccFact(label: "Models") {
                 if provider.models.isEmpty {
                     Text("None").foregroundStyle(palette.text2)
@@ -180,6 +185,27 @@ struct ProviderAbout: View {
             }
         }
         .accessibilityIdentifier("about-\(provider.id)")
+    }
+
+    private static func signIn(_ m: String) -> String {
+        switch m {
+        case "browser_code": "Your plan, in a browser"
+        case "api_key": "API key"
+        default: m
+        }
+    }
+    private static func delivery(_ d: String) -> String {
+        switch d {
+        case "env": "Variable"
+        case "file": "File"
+        case "askpass": "Prompt"
+        default: d
+        }
+    }
+    private static func harness(_ h: String) -> String {
+        let l = h.lowercased()
+        return l.contains("claude")
+            ? "Claude's own app" : l.contains("codex") ? "Codex" : l.contains("gemini") ? "Gemini" : "Its standard tool"
     }
 }
 
@@ -225,18 +251,20 @@ struct BackTile: View {
     @State private var hovering = false
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
-                .offset(x: hovering ? -2 : 0)
-                .frame(width: 36, height: 56)
-                .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(10))
-                .overlay { coreShape(10).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-                .contentShape(coreShape(10))
+            Image(systemName: "chevron.left").font(.system(size: MacTextSize.title, weight: .semibold)).foregroundStyle(
+                .white
+            )
+            .offset(x: hovering ? -2 : 0)
+            .frame(width: Space.s8 + Space.s1, height: Space.s8 * 2 - Space.s2)
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .focusable(false)
         .keyboardShortcut(.leftArrow, modifiers: .command)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(Motion.out(Motion.ui), value: hovering)
         .help("All accounts (esc)")
         .accessibilityLabel("All accounts")
     }
@@ -269,6 +297,6 @@ private struct AddProviderCard: View {
         }
         .buttonStyle(.plain).focusEffectDisabled().disabled(model.readOnly)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(Motion.out(Motion.ui), value: hovering)
     }
 }

@@ -60,10 +60,9 @@ struct LedgerPage: View {
                         let spent = list.compactMap(\.costMicros).reduce(0, +)
                         Text("\(list.count) calls · \(CostWords.usd(spent))").foregroundStyle(GlassInk.secondary)
                     }
-                    VStack(spacing: 1) {
+                    VStack(spacing: Space.s1) {
                         ForEach(list) { c in LedgerRow(model: model, cost: c) }
                     }
-                    .clipShape(coreShape(Radius.cardMac))
                 }
             }
             Text(
@@ -88,7 +87,7 @@ private struct LedgerRow: View {
                 .system(size: MacTextSize.body).monospacedDigit()
             )
             .foregroundStyle(GlassInk.secondary).frame(width: 64, alignment: .leading)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(c.model).font(.system(size: MacTextSize.body, weight: .semibold, design: .monospaced)).lineLimit(1)
                 Text(model.label(ofAccount: c.accountID)).font(.system(size: MacTextSize.meta))
                     .foregroundStyle(GlassInk.secondary)
@@ -102,12 +101,12 @@ private struct LedgerRow: View {
             Text(b.title).font(.system(size: MacTextSize.meta, weight: .medium)).foregroundStyle(b.hue)
                 .frame(width: 150, alignment: .trailing)
             Text(c.costMicros.map { (c.approximate ? "≈ " : "") + CostWords.usd($0) } ?? "—")
-                .font(.system(size: MacTextSize.headline, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: MacTextSize.headline, weight: .semibold, design: .rounded).monospacedDigit())
                 .foregroundStyle(c.costMicros == nil ? GlassInk.orange : GlassInk.primary)
                 .frame(width: 86, alignment: .trailing)
         }
-        .padding(.horizontal, Space.s3).frame(minHeight: 44)
-        .background(hovering ? GlassInk.wellHover : GlassInk.well)
+        .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg + Space.s3)
+        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
         .onHover { hovering = $0 }
         .help(
             "Session \(c.session) · \(c.provider)\(c.approximate ? " · interrupted, tokens are the last reading" : "")"
@@ -152,7 +151,7 @@ struct PricesPage: View {
                 model.providerName(g.key), sub: "\(g.value.count) model\(g.value.count == 1 ? "" : "s")",
                 symbol: "tag.fill", hue: ProviderLook.hue(g.key), index: i
             ) {
-                VStack(spacing: 1) {
+                VStack(spacing: Space.s1) {
                     HStack(spacing: Space.s3) {
                         Text("Model").frame(maxWidth: .infinity, alignment: .leading)
                         Text("In").frame(width: 90, alignment: .trailing)
@@ -176,8 +175,9 @@ private struct PriceRow: View {
 
     var body: some View {
         let p = price
+        let on = model.cursor == "p-\(p.id)"
         HStack(spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(p.model).font(.system(size: MacTextSize.body, weight: .semibold, design: .monospaced))
                 Text("Version \(p.version) · read \(p.pricedAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
@@ -190,13 +190,14 @@ private struct PriceRow: View {
             AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "", hue: GlassInk.blue) {
                 AccountDialogs.openPrice(model, editing: p)
             }
-            .opacity(hovering && !model.readOnly ? 1 : 0).allowsHitTesting(hovering && !model.readOnly)
+            .opacity((hovering || on) && !model.readOnly ? 1 : 0).allowsHitTesting((hovering || on) && !model.readOnly)
             .frame(width: 170, alignment: .trailing)
         }
-        .padding(.horizontal, Space.s3).frame(minHeight: 48)
-        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2))
+        .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg + Space.s4)
+        .background(hovering || on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(Motion.out(Motion.ui), value: hovering)
+        .id("p-\(p.id)")
         .accessibilityElement(children: .combine)
     }
 }
@@ -233,7 +234,7 @@ struct PriceDialog: View {
         if provider.isEmpty { return "Pick a provider." }
         if let m = CostWords.modelIssue(modelID) { return m }
         if micros(input) == nil || micros(output) == nil || micros(cache) == nil {
-            return "Prices are dollars per million tokens, like 3 or 0.30."
+            return "Prices are in dollars per million tokens, like $3.00 or $0.30."
         }
         return nil
     }
@@ -256,18 +257,20 @@ struct PriceDialog: View {
                         "Model", placeholder: "claude-sonnet-4-5-20250929", text: $modelID, mono: true, autofocus: true)
                 }
                 HStack(alignment: .top, spacing: Space.s3) {
-                    CoreTextField("In", placeholder: "3.00", text: $input, suffix: "$ / M", autofocus: editing != nil) {
+                    CoreTextField("In", placeholder: "3.00", text: $input, suffix: "$", autofocus: editing != nil) {
                         go()
                     }
-                    CoreTextField("Out", placeholder: "15.00", text: $output, suffix: "$ / M") { go() }
-                    CoreTextField("Cache", placeholder: "0.30", text: $cache, suffix: "$ / M") { go() }
+                    CoreTextField("Out", placeholder: "15.00", text: $output, suffix: "$") { go() }
+                    CoreTextField("Cache", placeholder: "0.30", text: $cache, suffix: "$") { go() }
                 }
-                Text("Calls from now on are priced with it. Calls already recorded keep the price they had.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(
+                    "Dollars per million tokens. Calls from now on are priced with it; calls already recorded keep the price they had."
+                )
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 if let i = issue, !modelID.isEmpty || editing != nil, !input.isEmpty { AccIssue(text: i) }
                 if let e = model.writeError["price"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Save price", busy: busy, enabled: issue == nil, cancel: close) { go() }
+                CoreDialogFooter(confirm: "Save price", busy: busy, enabled: issue == nil, cancel: close) { go() }
             }
         }
         .accessibilityIdentifier("price-dialog")

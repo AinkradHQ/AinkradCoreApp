@@ -114,12 +114,12 @@ enum AccountPhase: Equatable, Sendable {
 
     var symbol: String {
         switch self {
-        case .active: "checkmark.circle"
+        case .active: "checkmark.square"
         case .cooling: "clock"
         case .limited: "gauge.with.dots.needle.100percent"
         case .unhealthy: "exclamationmark.triangle"
-        case .disabled: "pause.circle"
-        case .other: "questionmark.circle"
+        case .disabled: "pause.fill"
+        case .other: "questionmark.square"
         }
     }
 
@@ -186,7 +186,7 @@ struct GateState: Equatable, Sendable {
     var symbol: String {
         switch kind {
         case .real: "checkmark.shield"
-        case .unknown, .other: "questionmark.circle"
+        case .unknown, .other: "questionmark.square"
         default: "lock"
         }
     }
@@ -203,19 +203,17 @@ enum AccountsLoad: Equatable {
 }
 
 enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
-    case overview, accounts, pools, bindings, budgets, costs, ledger, prices, activity
+    case overview, accounts, pools, budgets, costs, ledger, prices
     var id: String { rawValue }
     var title: String {
         switch self {
         case .overview: "Overview"
         case .accounts: "Accounts"
         case .pools: "Pools"
-        case .bindings: "Bindings"
         case .budgets: "Budgets"
         case .costs: "Costs and usage"
         case .ledger: "Ledger"
         case .prices: "Prices"
-        case .activity: "Activity"
         }
     }
     var symbol: String {
@@ -223,20 +221,16 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .overview: "waveform.path.ecg"
         case .accounts: "creditcard"
         case .pools: "square.grid.2x2"
-        case .bindings: "link"
-        case .budgets: "dollarsign.circle"
+        case .budgets: "dollarsign.square"
         case .costs: "chart.bar"
         case .ledger: "list.bullet"
         case .prices: "tag"
-        case .activity: "text.alignleft"
         }
     }
-    /// Pages the Core has nothing for yet (KAN-448 to KAN-450).
-    var notYet: Bool { self == .activity }
     var isSpend: Bool { [.budgets, .costs, .ledger, .prices].contains(self) }
     static let groups: [(String?, [AccountsPage])] = [
-        (nil, [.overview]), ("Accounts", [.accounts, .pools, .bindings]),
-        ("Spend", [.budgets, .costs, .ledger, .prices]), (nil, [.activity]),
+        (nil, [.overview]), ("Accounts", [.accounts, .pools]),
+        ("Spend", [.budgets, .costs, .ledger, .prices]),
     ]
 }
 

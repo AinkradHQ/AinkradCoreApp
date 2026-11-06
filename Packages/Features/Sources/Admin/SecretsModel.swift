@@ -45,7 +45,7 @@ final class SecretForm {
     fileprivate func working(_ b: Bool) { busy = b }
 }
 
-/// The lease sheet: which runner, how long, and the person's word that an agent there can read the value.
+/// The lend sheet: which runner, how long, and the person's word that an agent there can read the value.
 @MainActor @Observable
 final class LeaseForm {
     let secret: SecretItem
@@ -144,7 +144,7 @@ final class SecretsModel {
             ) { try await service.rotateSecret(old.name, value: value) }
             form.wipe()
             if let i = items.firstIndex(where: { $0.name == made.name }) { items[i] = made }
-            hub.host.shell.showToast("\(made.name) is now v\(made.version)")
+            hub.host.shell.showToast("\(made.name) has a new value")
             return true
         } catch is AdminDeclined {
             return false
@@ -160,7 +160,7 @@ final class SecretsModel {
         rowError[s.name] = nil
         do {
             try await hub.host.elevated(
-                "Delete \(s.name). Runners can no longer lease it.", done: "deleted", keepsEdit: false
+                "Delete \(s.name). Runners can no longer be lent it.", done: "deleted", keepsEdit: false
             ) {
                 try await service.deleteSecret(s.name)
             }
@@ -180,7 +180,7 @@ final class SecretsModel {
     func checkLease(_ f: LeaseForm) -> FieldIssue? {
         if f.runner.isEmpty {
             return FieldIssue(
-                code: "bad_request", message: "Choose a runner. A secret with no runners cannot be leased.")
+                code: "bad_request", message: "Choose a runner. A secret with no runners cannot be lent.")
         }
         let t = f.ttl.trimmingCharacters(in: .whitespaces)
         if !t.isEmpty {
@@ -189,7 +189,7 @@ final class SecretsModel {
             }
             if n < 1 || n > leaseLimit {
                 return FieldIssue(
-                    code: "out_of_bounds", message: "A lease lasts 1 to \(leaseLimit) seconds (secrets.lease_secs).")
+                    code: "out_of_bounds", message: "A loan lasts 1 to \(leaseLimit) seconds.")
             }
         }
         if !f.understood {
@@ -210,12 +210,12 @@ final class SecretsModel {
         let ttl = Int64(f.ttl.trimmingCharacters(in: .whitespaces))
         do {
             let granted = try await hub.host.elevated(
-                "Lease \(f.secret.name) to \(f.runner).", done: "leased", keepsEdit: true
+                "Lend \(f.secret.name) to \(runnerName(f.runner)).", done: "lent", keepsEdit: true
             ) {
                 try await service.lease(f.secret.name, runner: f.runner, ttl: ttl)
             }
             leases.insert(granted, at: 0)
-            hub.host.shell.showToast("\(f.secret.name) leased to \(f.runner)")
+            hub.host.shell.showToast("\(f.secret.name) lent to \(runnerName(f.runner))")
             return true
         } catch is AdminDeclined {
             return false

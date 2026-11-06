@@ -22,15 +22,16 @@ struct FirstRunHero: View {
             .frame(height: MacSize.controlLg * 1.6)
             .opacity(scene == .you ? 0.35 : 1)
             tile(right.symbol, right.label, ink: scene == .paired ? palette.tone(.run).ink : palette.primary)
-                .symbolEffect(.pulse, options: .repeating, isActive: scene == .find || scene == .checking)
+                .symbolEffect(
+                    .pulse, options: .repeating, isActive: (scene == .find || scene == .checking) && !reduceMotion)
         }
         .symbolEffect(.bounce, value: scene)
-        .animation(.spring(duration: 0.5, bounce: 0.25), value: scene)
+        .animation(Motion.out(Motion.move), value: scene)
         .accessibilityHidden(true)
     }
 
     private var left: (symbol: String, label: String) {
-        scene == .you ? ("person.crop.circle", name.isEmpty ? "You" : name) : ("laptopcomputer", "This Mac")
+        scene == .you ? ("person.crop.square", name.isEmpty ? "You" : name) : ("laptopcomputer", "This Mac")
     }
 
     private var right: (symbol: String, label: String) {

@@ -23,10 +23,10 @@ struct AccountDetailView: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 BackTile { model.detail = nil }
                 AccTile(large: true, provider: a.provider)
-                    .symbolEffect(.pulse, options: .repeating, isActive: usable && !reduce)
-                VStack(alignment: .leading, spacing: 3) {
+                    .symbolEffect(.pulse, options: .nonRepeating, value: reduce ? false : usable)
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     HStack(spacing: Space.s2) {
-                        Text(a.label).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(
+                        Text(a.label).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(
                             .isHeader)
                         PhaseBadge(phase: a.phase)
                     }
@@ -38,13 +38,13 @@ struct AccountDetailView: View {
                         AccountDialogs.openDelete(model, a)
                     }
                     .disabled(ro)
-                    AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.orange) {
+                    AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.blue) {
                         AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
                     }
                     .disabled(ro)
                     AppActionTile(
                         title: on ? "Turn off" : "Turn on", symbol: on ? "pause.fill" : "play.fill", key: "T",
-                        hue: on ? GlassInk.slate : GlassInk.green, prominent: !on
+                        hue: on ? GlassInk.slate : GlassInk.blue, prominent: !on
                     ) {
                         Task { await model.setEnabled(a, !on) }
                     }
@@ -68,24 +68,29 @@ struct AccountDetailView: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Space.s2) {
-                Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
-                Text("Spend and usage over time appear here once Core reports them.")
+                Image(systemName: "chart.bar").foregroundStyle(GlassInk.slate)
+                Text("Spend and usage for every account are on Costs.")
                     .foregroundStyle(GlassInk.secondary)
+                AccLink(title: "Open Costs", symbol: "arrow.right") {
+                    withAnimation(Motion.out(Motion.ui)) {
+                        model.page = .costs
+                        model.detail = nil
+                    }
+                }
                 Spacer(minLength: Space.s2)
                 AccLink(
                     title: tech ? "Hide details" : "Technical details", symbol: tech ? "chevron.up" : "chevron.down"
                 ) {
-                    withAnimation(.smooth(duration: 0.35)) { tech.toggle() }
+                    withAnimation(Motion.out(Motion.move)) { tech.toggle() }
                 }
             }
             .font(.system(size: MacTextSize.meta))
             if tech {
                 HStack(spacing: Space.s2) {
-                    AccChip(text: "state \(a.state)", mono: true)
                     AccChip(text: a.baseURL, mono: true)
-                    AccChip(text: "id \(a.id)", mono: true)
                     AccChip(text: "added \(a.createdAt.formatted(date: .abbreviated, time: .shortened))")
                 }
+                .help("State \(a.state), id \(a.id)")
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -100,9 +105,10 @@ struct AccountDetailView: View {
     /// One refusal no longer turns an account off: Core tests the key again and only a second refusal does.
     private var confirming: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold)).foregroundStyle(GlassInk.orange)
-                .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
-            VStack(alignment: .leading, spacing: 2) {
+            Image(systemName: "key.slash").font(.system(size: MacTextSize.title, weight: .semibold))
+                .foregroundStyle(GlassInk.orange)
+                .symbolEffect(.pulse, options: .nonRepeating, value: shown && !reduce)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text("The provider refused this key once").font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text("Core is checking it again. If it's refused again, the account turns off by itself.")
                     .foregroundStyle(GlassInk.secondary)
@@ -110,8 +116,8 @@ struct AccountDetailView: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3)
-        .background(GlassInk.orange.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.4), lineWidth: 1) }
+        .background(GlassInk.orange.opacity(0.1))
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .transition(.opacity)
     }
 
@@ -124,23 +130,22 @@ struct AccountDetailView: View {
             : !on ? "Turned off" : a.phase != .active ? a.phase.label : "Not in a pool yet"
         let line =
             usable
-            ? "It's in \(pools.map { "\($0.name)" }.joined(separator: ", ")). Agents bound to \(pools.count == 1 ? "that pool" : "those pools") draw on it."
+            ? "It's in \(pools.map { "\($0.name)" }.joined(separator: ", ")). Agents using \(pools.count == 1 ? "that pool" : "those pools") draw on it."
             : !on || a.phase != .active
                 ? AccountsWords.why(a, now: model.now())
                 : "Agents only use accounts that are in a pool. Add it to one and it's ready."
         return HStack(spacing: Space.s4) {
             Image(systemName: usable ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 52, height: 52)
+                .font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: Space.s8 + Space.s5, height: Space.s8 + Space.s5)
                 .background(
                     LinearGradient(colors: [tone, tone.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(13)
+                    in: coreShape(Radius.cardMac)
                 )
-                .shadow(color: tone.opacity(0.5), radius: 12)
                 .symbolEffect(.bounce, value: usable)
                 .contentTransition(.symbolEffect(.replace))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: MacTextSize.title, weight: .bold)).foregroundStyle(tone)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).foregroundStyle(tone)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
@@ -153,31 +158,22 @@ struct AccountDetailView: View {
             }
         }
         .padding(Space.s4)
-        // The glow is an overlay of the fill, so it can never change the banner's size.
-        .background {
-            tone.opacity(0.1)
-                .overlay(alignment: .leading) {
-                    coreShape(60).fill(tone.opacity(0.35)).frame(width: 200, height: 80).blur(radius: 50)
-                        .offset(x: shown && !reduce ? 40 : -60)
-                        .animation(reduce ? nil : .easeInOut(duration: 4).repeatForever(), value: shown)
-                }
-                .clipShape(coreShape(Radius.cardMac))
-        }
-        .overlay { coreShape(Radius.cardMac).strokeBorder(tone.opacity(0.45), lineWidth: 1) }
-        .animation(.smooth(duration: 0.4), value: usable)
+        .background(tone.opacity(0.1))
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .animation(Motion.out(Motion.move), value: usable)
     }
 
     /// Key saved → Turned on → In a pool: each step lit once it holds.
     private func path(on: Bool, inPool: Bool, hue: Color) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Space.s2) {
             ForEach(Array([("Key saved", true), ("Turned on", on), ("In a pool", inPool)].enumerated()), id: \.offset) {
                 i, s in
                 if i > 0 { coreShape(1).fill(s.1 ? hue : GlassInk.track).frame(width: 14, height: 2) }
-                Label(s.0, systemImage: s.1 ? "checkmark" : "circle.dashed")
+                Label(s.0, systemImage: s.1 ? "checkmark" : "square.dashed")
                     .font(.system(size: MacTextSize.meta, weight: .semibold))
                     .foregroundStyle(s.1 ? .white : GlassInk.secondary)
-                    .padding(.horizontal, 8).frame(height: 24)
-                    .background(s.1 ? hue.opacity(0.6) : GlassInk.well, in: coreShape(6))
+                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
+                    .background(s.1 ? hue.opacity(0.6) : GlassInk.well, in: coreShape(Radius.chip))
             }
         }
         .fixedSize()
@@ -198,16 +194,15 @@ struct AccountDetailView: View {
         }
         .padding(Space.s4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 
     private func keyTile(_ a: AccountItem, _ hue: Color) -> some View {
         tile("Key", "lock.shield.fill", hue) {
-            HStack(spacing: 6) {
+            HStack(spacing: Space.s2) {
                 ForEach(0..<4, id: \.self) { i in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
-                        .opacity(shown ? 1 : 0).animation(.smooth(duration: 0.3).delay(Double(i) * 0.06), value: shown)
+                        .opacity(shown ? 1 : 0).animation(Motion.out(Motion.ui).delay(Double(i) * 0.06), value: shown)
                 }
                 Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).font(
                     .system(size: MacTextSize.title, weight: .semibold, design: .monospaced))
@@ -221,19 +216,23 @@ struct AccountDetailView: View {
     private func capTile(_ a: AccountItem, _ hue: Color) -> some View {
         tile("At once", "square.stack.3d.up.fill", hue) {
             HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                Text(a.cap == 0 ? "∞" : "\(a.cap)").font(.system(size: 30, weight: .bold, design: .rounded))
-                    .contentTransition(.numericText())
+                Text(a.cap == 0 ? "∞" : "\(a.cap)").font(
+                    .system(size: MacTextSize.large * 1.5, weight: .semibold, design: .rounded)
+                )
+                .monospacedDigit().contentTransition(.numericText())
                 Text(a.cap == 0 ? "no limit" : a.cap == 1 ? "session" : "sessions").foregroundStyle(
                     GlassInk.secondary)
                 Spacer(minLength: 0)
-                AccLink(title: "Change · L", symbol: "slider.horizontal.3") { AccountDialogs.openCap(model, a) }
-                    .disabled(model.readOnly)
+                AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "L", hue: hue) {
+                    AccountDialogs.openCap(model, a)
+                }
+                .disabled(model.readOnly)
             }
-            HStack(spacing: 4) {
+            HStack(spacing: Space.s1) {
                 ForEach(0..<Int(min(max(a.cap, 1), 12)), id: \.self) { i in
                     coreShape(3).fill(a.cap == 0 ? hue.opacity(0.35) : hue.opacity(0.8)).frame(height: 8)
                         .scaleEffect(x: 1, y: shown ? 1 : 0.2, anchor: .bottom)
-                        .animation(.smooth(duration: 0.4).delay(Double(i) * 0.05), value: shown)
+                        .animation(Motion.out(Motion.move).delay(Double(i) * 0.05), value: shown)
                 }
             }
             Text(AccountsWords.used(a.lastUsedAt, now: model.now())).font(.system(size: MacTextSize.meta))
@@ -250,7 +249,7 @@ struct AccountDetailView: View {
             }
             ForEach(pools) { p in
                 Button {
-                    withAnimation(.smooth(duration: 0.3)) {
+                    withAnimation(Motion.out(Motion.ui)) {
                         model.poolSelection = p.id
                         model.page = .pools
                         model.detail = nil
@@ -262,7 +261,7 @@ struct AccountDetailView: View {
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
                     }
-                    .padding(.horizontal, Space.s2).frame(minHeight: 30)
+                    .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlMd)
                     .background(GlassInk.well, in: coreShape(Radius.control))
                 }
                 .buttonStyle(.plain).focusable(false)
