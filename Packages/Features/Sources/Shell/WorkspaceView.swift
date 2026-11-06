@@ -91,7 +91,7 @@ struct WorkspaceView: View {
                     guard maxX > 0, let id, let f = layout.frames[id] else { return }
                     let target =
                         f.minX < scrollX ? f.minX : f.maxX > scrollX + area.width ? f.maxX - area.width : scrollX
-                    withAnimation(.spring(duration: 0.4, bounce: 0.1)) { scrollX = min(max(target, 0), maxX) }
+                    withAnimation(Motion.out(Motion.move)) { scrollX = min(max(target, 0), maxX) }
                 }
                 .padding(.leading, ShellMetrics.paneInset)
                 .padding(.top, ShellMetrics.topBar)
@@ -197,15 +197,7 @@ private struct PaneTabs: View {
         }
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac)
-        .animation(reduce ? nil : .spring(duration: 0.3, bounce: 0.2), value: shell.focusedPane ?? shell.activePane)
-        .onKeyPress(.leftArrow) {
-            shell.cyclePane(-1)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            shell.cyclePane(1)
-            return .handled
-        }
+        .animation(Motion.out(reduce ? Motion.hover : Motion.move), value: shell.focusedPane ?? shell.activePane)
         .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, Space.s4)
@@ -222,6 +214,7 @@ private struct PaneTab: View {
     let onDrag: (CGPoint, CGSize) -> Void
     let onDragEnd: () -> Void
     @State private var hovering = false
+    @State private var menuOpen = false
     @State private var draft = ""
     @FocusState private var editing: Bool
 
@@ -239,12 +232,12 @@ private struct PaneTab: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: spec.symbol).font(.system(size: MacTextSize.body, weight: .medium))
-                .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary)
+                .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
                 .accessibilityHidden(true)
             if shell.renamingTab == spec.id {
                 TextField("Tab name", text: $draft)
                     .textFieldStyle(.plain).font(.system(size: MacTextSize.body, weight: .semibold))
-                    .foregroundStyle(WidgetInk.primary).frame(width: Space.s8 * 4)
+                    .foregroundStyle(GlassInk.primary).frame(width: Space.s8 * 4)
                     .focused($editing)
                     .onSubmit { shell.renameTab(spec.id, to: draft) }
                     .onExitCommand { shell.renamingTab = nil }
@@ -254,22 +247,32 @@ private struct PaneTab: View {
                     }
             } else {
                 Text(shell.tabName(spec)).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
-                    .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary).lineLimit(1)
+                    .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary).lineLimit(1)
                     .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
             }
             if let c = stateColor {
-                Circle().fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
+                coreShape(2).fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
             }
-            if hovering {
+            // Always laid out and faded in on hover, so a tab never changes width under the pointer.
+            HStack(spacing: Space.s1) {
+                CoreDropdown(items: dropdownItems, isPresented: $menuOpen) {
+                    Image(systemName: "ellipsis").font(.system(size: MacTextSize.meta, weight: .semibold))
+                        .frame(width: Space.s4, height: Space.s4).contentShape(Rectangle())
+                }
+                .help("Actions")
+                .accessibilityLabel("Actions for \(spec.title)")
                 Button {
                     shell.dismissPane(spec.id)
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 16, height: 16)
+                    Image(systemName: "xmark").font(.system(size: MacTextSize.meta, weight: .semibold))
+                        .frame(width: Space.s4, height: Space.s4)
                 }
-                .buttonStyle(.plain).accessibilityLabel("Close \(spec.title)")
+                .buttonStyle(.plain).help("Close").accessibilityLabel("Close \(spec.title)")
             }
+            .opacity(hovering || on || menuOpen ? 1 : 0)
+            .allowsHitTesting(hovering || on || menuOpen)
         }
-        .foregroundStyle(WidgetInk.secondary)
+        .foregroundStyle(GlassInk.secondary)
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
         .background {
             if on {
@@ -277,7 +280,7 @@ private struct PaneTab: View {
                     .matchedGeometryEffect(id: "on", in: indicator)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .contentShape(coreShape(Radius.control))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { toggleFocus() }
@@ -292,6 +295,39 @@ private struct PaneTab: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(shell.tabName(spec))
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// The same actions as `menu`, as rows of the glass dropdown (a submenu's entries follow their title, indented).
+    private var dropdownItems: [CoreDropdownItem] {
+        var out: [CoreDropdownItem] = []
+        for item in shell.paneMenus[spec.id]?() ?? [] {
+            if item.children.isEmpty {
+                out.append(
+                    CoreDropdownItem(
+                        item.title, symbol: item.symbol, destructive: item.destructive, enabled: item.enabled,
+                        run: item.run))
+            } else {
+                out.append(CoreDropdownItem(item.title, symbol: item.symbol, enabled: false) {})
+                for c in item.children {
+                    out.append(
+                        CoreDropdownItem(
+                            c.title, destructive: c.destructive, enabled: item.enabled && c.enabled, indented: true,
+                            run: c.run))
+                }
+            }
+        }
+        out.append(CoreDropdownItem("Rename Tab", symbol: "pencil") { shell.renamingTab = spec.id })
+        out.append(
+            CoreDropdownItem(
+                shell.focusedPane == spec.id ? "Tile All Panes" : "Full Pane",
+                symbol: shell.focusedPane == spec.id ? "rectangle.split.2x1" : "arrow.up.left.and.arrow.down.right"
+            ) { toggleFocus() })
+        out.append(CoreDropdownItem("Close Pane", symbol: "xmark") { shell.dismissPane(spec.id) })
+        out.append(
+            CoreDropdownItem(
+                "Close Other Panes", symbol: "xmark.square", enabled: shell.panes.count >= 2
+            ) { shell.closeOtherPanes(except: spec.id) })
+        return out
     }
 
     /// The pane's own actions, then the workspace's.
@@ -311,7 +347,6 @@ private struct PaneTab: View {
                 .disabled(!item.enabled)
             }
         }
-        if shell.paneMenus[spec.id] != nil { Divider() }
         Button {
             shell.renamingTab = spec.id
         } label: {
@@ -373,9 +408,9 @@ private struct PaneHost: View {
         }
         .overlay(alignment: .top) {
             if canDrag && (dragging || (hovering && !scrolling)) {
-                Capsule().fill(.white.opacity(gripHover ? 0.75 : 0.4))
-                    .frame(width: gripHover ? 64 : 44, height: 5)
-                    .padding(.vertical, 6).padding(.horizontal, 24)
+                coreShape(2).fill(.white.opacity(gripHover ? 0.75 : 0.4))
+                    .frame(width: Space.s8 + Space.s5 * 2, height: Space.s1)
+                    .padding(.vertical, Space.s2).padding(.horizontal, Space.s6)
                     .contentShape(Rectangle())
                     .onHover { gripHover = $0 }
                     .modifier(GrabPointer(active: dragging))
@@ -396,8 +431,8 @@ private struct PaneHost: View {
             }
         }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
-        .animation(.spring(duration: 0.2), value: gripHover)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.hover), value: gripHover)
     }
 }
 
@@ -421,14 +456,8 @@ private struct SeamHandle: View {
             }
             .contentShape(Rectangle())
             .offset(x: seam.frame.minX, y: seam.frame.minY)
-            .onHover { inside in
-                hovering = inside
-                if inside {
-                    (horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
+            .onHover { hovering = $0 }
+            .modifier(SeamPointer(horizontal: horizontal))
             .gesture(
                 DragGesture(minimumDistance: 1, coordinateSpace: .named("ws"))
                     .onChanged { v in
@@ -453,6 +482,18 @@ private struct GrabPointer: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 15, *) {
             content.pointerStyle(active ? .grabActive : .grabIdle)
+        } else {
+            content
+        }
+    }
+}
+
+/// The resize cursor over a seam. `pointerStyle` scopes it to the view, so no cursor is left pushed when a pane goes away.
+private struct SeamPointer: ViewModifier {
+    let horizontal: Bool
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content.pointerStyle(horizontal ? .columnResize : .rowResize)
         } else {
             content
         }

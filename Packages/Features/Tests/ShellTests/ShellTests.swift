@@ -50,7 +50,7 @@ struct ShellModelTests {
         shell.closePane("a")  // a feature closing its own pane leaves nothing to reopen
         #expect(shell.closedPanes.isEmpty)
         shell.reopenClosedPane()
-        #expect(shell.toast?.message == "No closed pane to reopen.")
+        #expect(shell.toast?.message == "No closed pane to reopen")
     }
 
     @Test func aDropReordersThePanesAndKeepsThemAllOpen() {

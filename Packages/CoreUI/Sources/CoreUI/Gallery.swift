@@ -98,7 +98,7 @@ public struct CoreUIGallery: View {
     private var surfaces: some View {
         section("Clear glass control and material panel") {
             HStack(spacing: Space.s4) {
-                Label("Glass control", systemImage: "sparkles").padding(Space.s3).coreGlass()
+                Label("Glass control", systemImage: "square.dashed").padding(Space.s3).coreGlass()
                 Text("Regular material panel. Content lives here; glass never sits on it.").corePanel()
             }
         }
