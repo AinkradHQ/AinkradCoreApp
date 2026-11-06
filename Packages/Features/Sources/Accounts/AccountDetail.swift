@@ -53,15 +53,23 @@ struct AccountDetailView: View {
             }
             verdict(a, usable: usable, on: on, pools: pools, hue: hue)
             if let e = model.writeError["account-\(a.id)"] { AccIssue(text: e) }
+            if a.lastTest?.result == "auth_failed", a.phase != .disabled { confirming }
             HStack(alignment: .top, spacing: Space.s3) {
                 keyTile(a, hue)
                 capTile(a, hue)
                 poolsTile(a, pools, hue)
             }
             .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: Space.s3) {
+                tile("Key test", "checkmark.shield.fill", hue) { TestTile(model: model, account: a, hue: hue) }
+                tile("Each session", "gauge.with.needle.fill", hue) {
+                    LimitsTileBody(model: model, account: a, hue: hue)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Space.s2) {
                 Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
-                Text("Spend, limits left and usage over time appear here once Core reports them.")
+                Text("Spend and usage over time appear here once Core reports them.")
                     .foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 AccLink(
@@ -88,6 +96,24 @@ struct AccountDetailView: View {
     }
 
     // MARK: the answer
+
+    /// One refusal no longer turns an account off: Core tests the key again and only a second refusal does.
+    private var confirming: some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold)).foregroundStyle(GlassInk.orange)
+                .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("The provider refused this key once").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("Core is checking it again. If it's refused again, the account turns off by itself.")
+                    .foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Space.s3)
+        .background(GlassInk.orange.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.4), lineWidth: 1) }
+        .transition(.opacity)
+    }
 
     /// "Agents can use it" or what is missing, with the three things an account needs as a path, and the fix.
     private func verdict(_ a: AccountItem, usable: Bool, on: Bool, pools: [PoolItem], hue: Color) -> some View {

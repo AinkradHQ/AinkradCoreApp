@@ -126,6 +126,17 @@ final class FakeService: AccountsService, @unchecked Sendable {
         return loginItem
     }
     func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
+    var tested = TestedItem(result: "ok", latencyMs: 300)
+    func runners() async throws -> [AccountRunner] { [] }
+    func test(account: Int64) async throws -> TestedItem {
+        try note("test \(account)")
+        return tested
+    }
+    func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws {
+        try note(
+            "setSessionLimits \(account) \(maxTokens.map(String.init) ?? "nil") \(maxUSDMicros.map(String.init) ?? "nil")"
+        )
+    }
     func deleteAccount(_ id: Int64) async throws {
         try note("deleteAccount \(id)")
         accountList.removeAll { $0.id == id }

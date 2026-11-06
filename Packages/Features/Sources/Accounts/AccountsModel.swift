@@ -33,6 +33,9 @@ public final class AccountsModel {
     /// A refusal from the Core for the row or control being written, in words.
     private(set) var writeError: [String: String] = [:]
     private(set) var busy: String?
+    /// The account whose key is being tested now, and what the last test of each answered when it could not run.
+    var testing: Int64?
+    var testNote: [Int64: String] = [:]
     /// Opens a provider's own page. Tests and the demo replace it: they must never open a browser.
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var now: () -> Date = { Date() }

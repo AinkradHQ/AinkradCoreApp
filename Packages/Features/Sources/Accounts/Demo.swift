@@ -40,14 +40,16 @@ public final class AccountsDemo {
             ]
         }
         lazy var accountList: [AccountItem] = [
-            a(1, "claude-api-metered", "anthropic", "active", "x9Lm", 4, used: 7_200),
+            a(
+                1, "claude-api-metered", "anthropic", "active", "x9Lm", 4, used: 7_200, test: (10_800, "ok"),
+                limits: (2_000_000, 5_000_000)),
             a(
                 2, "claude-api-batch", "anthropic", "cooling", "k2Tq", 4, used: 1_100,
                 reason: "Rate limit from the provider", until: 2_460),
-            a(3, "codex-api", "openai", "active", "b2Rt", 0, used: 660),
+            a(3, "codex-api", "openai", "active", "b2Rt", 0, used: 660, test: (240, "auth_failed")),
             a(
                 4, "codex-api-ci", "openai", "unhealthy", "r7Vd", 2, used: 86_400,
-                reason: "The provider refused the key"),
+                reason: "The provider refused the key", test: (3_600, "auth_failed")),
             a(5, "gemini-key", "google", "active", "Qp0s", 4, used: 10_800),
             a(
                 6, "gemini-spare", "google", "disabled", "d1Zn", 4, used: 777_600,
@@ -55,13 +57,16 @@ public final class AccountsDemo {
         ]
         func a(
             _ id: Int64, _ label: String, _ provider: String, _ state: String, _ tail: String, _ cap: Int64,
-            used: TimeInterval, reason: String? = nil, until: TimeInterval? = nil
+            used: TimeInterval, reason: String? = nil, until: TimeInterval? = nil,
+            test: (TimeInterval, String)? = nil, limits: (Int64?, Int64?) = (nil, nil)
         ) -> AccountItem {
             AccountItem(
                 id: id, provider: provider, label: label, maskedTail: tail, baseURL: "https://api.example.com",
                 state: state,
                 stateReason: reason, stateUntil: until.map { now.addingTimeInterval($0) }, cap: cap,
-                lastUsedAt: now.addingTimeInterval(-used), createdAt: now.addingTimeInterval(-9_000_000))
+                lastUsedAt: now.addingTimeInterval(-used), createdAt: now.addingTimeInterval(-9_000_000),
+                lastTest: test.map { (now.addingTimeInterval(-$0.0), $0.1) }, maxTokens: limits.0,
+                maxUSDMicros: limits.1)
         }
         var poolList = [
             PoolItem(id: 1, name: "Default", provider: "anthropic", isDefault: true, members: [1, 2]),
@@ -128,7 +133,8 @@ public final class AccountsDemo {
             let new = AccountItem(
                 id: old.id, provider: old.provider, label: label, maskedTail: old.maskedTail, baseURL: old.baseURL,
                 state: state, stateReason: nil, stateUntil: nil, cap: cap, lastUsedAt: old.lastUsedAt,
-                createdAt: old.createdAt)
+                createdAt: old.createdAt, lastTest: old.lastTest, maxTokens: old.maxTokens,
+                maxUSDMicros: old.maxUSDMicros)
             accountList = accountList.map { $0.id == id ? new : $0 }
             return new
         }
@@ -169,6 +175,33 @@ public final class AccountsDemo {
             return try await login(id)
         }
         func cancelLogin(_ id: String) async throws { loginStart = nil }
+        func runners() async throws -> [AccountRunner] {
+            [
+                AccountRunner(id: "r_linux01", name: "linux-01", online: true),
+                AccountRunner(id: "r_mac", name: "studio-mac", online: true),
+                AccountRunner(id: "r_old", name: "old-box", online: false),
+            ]
+        }
+        func test(account: Int64) async throws -> TestedItem {
+            try await Task.sleep(for: .seconds(1))
+            let r = account == 4 ? "auth_failed" : "ok"
+            accountList = accountList.map {
+                guard $0.id == account else { return $0 }
+                var n = $0
+                n.lastTest = (Date(), r)
+                return n
+            }
+            return TestedItem(result: r, latencyMs: 412)
+        }
+        func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws {
+            accountList = accountList.map {
+                guard $0.id == account else { return $0 }
+                var n = $0
+                n.maxTokens = maxTokens
+                n.maxUSDMicros = maxUSDMicros
+                return n
+            }
+        }
         func deleteAccount(_ id: Int64) async throws {
             accountList.removeAll { $0.id == id }
             poolList = poolList.map {
@@ -182,7 +215,8 @@ public final class AccountsDemo {
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
         "account-ready",
-        "account-cooling", "account-unhealthy", "account-disabled", "pools", "pools-second", "bindings",
+        "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
+        "limits", "pools", "pools-second", "bindings",
         "bindings-empty",
         "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
         "add-member",
@@ -234,7 +268,9 @@ public final class AccountsDemo {
         let page: AccountsPage =
             switch scene {
             case "accounts", "accounts-need", "account-ready", "account-cooling", "account-unhealthy",
-                "account-disabled", "connect", "delete-account", "cap", "signin-intro", "signin-url", "signin-working",
+                "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
+                "cap",
+                "signin-intro", "signin-url", "signin-working",
                 "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
@@ -244,7 +280,8 @@ public final class AccountsDemo {
             }
         let detail: Int64? =
             switch scene {
-            case "account-ready", "delete-account", "cap": 1
+            case "account-ready", "delete-account", "cap", "limits", "account-testing": 1
+            case "account-confirming": 3
             case "account-cooling": 2
             case "account-unhealthy": 4
             case "account-disabled": 6
@@ -270,6 +307,8 @@ public final class AccountsDemo {
                             ), login: "lg_demo", runner: "linux-01", label: "claude-plan", opened: true)
         case "delete-account": AccountDialogs.openDelete(model, model.account(1)!)
         case "cap": AccountDialogs.openCap(model, model.account(1)!)
+        case "limits": AccountDialogs.openLimits(model, model.account(1)!)
+        case "account-testing": Task { await model.test(model.account(1)!) }
         case "new-pool": AccountDialogs.openNewPool(model)
         case "bind": AccountDialogs.openBind(model, pool: nil)
         case "add-member": AccountDialogs.openAddMember(model, pool: model.pool(2)!)

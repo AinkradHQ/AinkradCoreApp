@@ -25,6 +25,9 @@ enum AccountDialogs {
     static func openCap(_ m: AccountsModel, _ a: AccountItem) {
         present(m, "account-cap") { close in CapDialog(model: m, account: a, close: close) }
     }
+    static func openLimits(_ m: AccountsModel, _ a: AccountItem) {
+        present(m, "account-limits") { close in LimitsDialog(model: m, account: a, close: close) }
+    }
     static func openNewPool(_ m: AccountsModel) {
         present(m, "pool-new") { close in NewPoolDialog(model: m, close: close) }
     }

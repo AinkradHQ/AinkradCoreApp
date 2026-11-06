@@ -31,6 +31,39 @@ struct ModelTests {
         #expect(m.bindings(of: m.pools[1]).map(\.agent) == ["atlas"])
     }
 
+    @Test func testingAKeyNeedsNoTouchIDAndSaysWhyWhenRefused() async {
+        let (m, svc, host) = await make()
+        await m.test(m.account(1)!)
+        #expect(svc.log.contains("test 1"))
+        #expect(host.reasons.isEmpty)
+        #expect(m.testing == nil && m.testNote[1] == nil)
+        svc.failure = CoreError.http(status: 409, code: "no_runner", message: "none")
+        await m.test(m.account(1)!)
+        #expect(m.testNote[1]?.hasPrefix("No runner is online") == true)
+    }
+
+    @Test func sessionLimitsGoBehindTouchIDAndClearWithNil() async {
+        let (m, svc, host) = await make()
+        #expect(await m.setLimits(m.account(1)!, tokens: 500_000, usdMicros: nil))
+        #expect(svc.log.contains("setSessionLimits 1 500000 nil"))
+        #expect(host.reasons.count == 1)
+        #expect(LimitWords.usd(2_500_000) == "$2.50")
+        #expect(LimitWords.tokens(nil) == "no token limit")
+    }
+
+    @Test func anExpiredSignInEndsInsteadOfWaitingForever() async {
+        let (m, svc, _) = await make()
+        svc.loginItem = LoginItem(
+            id: "lg", provider: "claude-sub", label: "plan", runner: "r", state: "expired", url: nil, reason: "expired",
+            accountID: nil)
+        await m.startSignIn(provider: "claude-sub", label: "plan")
+        guard case .failed(let why)? = m.signIn?.stage else {
+            Issue.record("still \(String(describing: m.signIn?.stage))")
+            return
+        }
+        #expect(why.hasPrefix("Nothing happened for 10 minutes"))
+    }
+
     @Test func stateWordsKeepUnknownRawAndNeverAlarm() {
         #expect(AccountPhase("active").label == "Ready")
         #expect(AccountPhase("weird").label == "weird")

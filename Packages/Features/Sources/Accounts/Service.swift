@@ -27,6 +27,23 @@ protocol AccountsService: Sendable {
     func login(_ id: String) async throws -> LoginItem
     func sendLoginCode(_ id: String, code: String) async throws -> LoginItem
     func cancelLogin(_ id: String) async throws
+    /// Runners a sign-in may be pinned to (the advanced choice).
+    func runners() async throws -> [AccountRunner]
+    /// One free request with the key through a runner: the status class and the latency, never a body.
+    func test(account: Int64) async throws -> TestedItem
+    /// What one session may spend on the account; nil clears that limit.
+    func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws
+}
+
+struct AccountRunner: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let online: Bool
+}
+
+struct TestedItem: Equatable, Sendable {
+    let result: String
+    let latencyMs: Int64
 }
 
 /// The Core's transport already turns every non-2xx answer into a `CoreError`, so only `.ok` is read here.
@@ -124,6 +141,27 @@ struct LiveAccountsService: AccountsService {
         try await run { _ = try await client.cancelAccountLogin(path: .init(id: id)).ok }
     }
 
+    func runners() async throws -> [AccountRunner] {
+        try await run {
+            try await client.listRunners().ok.body.json.map {
+                AccountRunner(id: $0.id, name: $0.name, online: $0.online ?? false)
+            }
+        }
+    }
+    func test(account: Int64) async throws -> TestedItem {
+        try await run {
+            let t = try await client.testAccount(path: .init(id: String(account))).ok.body.json
+            return TestedItem(result: t.result, latencyMs: t.latencyMs)
+        }
+    }
+    func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws {
+        try await run {
+            _ = try await client.setAccountSessionLimits(
+                path: .init(id: String(account)), body: .json(.init(maxTokens: maxTokens, maxUsdMicros: maxUSDMicros))
+            ).ok
+        }
+    }
+
     // MARK: mapping
 
     static func login(_ l: Components.Schemas.AccountLogin) -> LoginItem {
@@ -152,7 +190,8 @@ struct LiveAccountsService: AccountsService {
         AccountItem(
             id: a.id, provider: a.provider, label: a.label, maskedTail: a.maskedTail, baseURL: a.baseUrl,
             state: a.state, stateReason: a.stateReason, stateUntil: a.stateUntil, cap: a.cap,
-            lastUsedAt: a.lastUsedAt, createdAt: a.createdAt)
+            lastUsedAt: a.lastUsedAt, createdAt: a.createdAt, lastTest: a.lastTest.map { ($0.at, $0.result) },
+            maxTokens: a.sessionLimits?.maxTokens, maxUSDMicros: a.sessionLimits?.maxUsdMicros)
     }
 
     static func pool(_ p: Components.Schemas.Pool) -> PoolItem {

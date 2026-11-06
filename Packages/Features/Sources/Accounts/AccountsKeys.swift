@@ -71,6 +71,8 @@ enum AccountsKeys {
             case "t": Task { await m.setEnabled(a, a.phase == .disabled) }
             case "k": AccountDialogs.openConnect(m, provider: a.provider, replacing: a)
             case "l": AccountDialogs.openCap(m, a)
+            case "s": AccountDialogs.openLimits(m, a)
+            case "v": Task { await m.test(a) }
             case "⌫": AccountDialogs.openDelete(m, a)
             case "p" where m.pools(of: a).isEmpty:
                 if let p = m.defaultPool(a.provider) ?? m.pools(for: a.provider).first {
@@ -116,7 +118,7 @@ enum AccountsKeys {
         switch m.page {
         case .overview: "⌘1–5 pages · ↑↓ move · ↩ open · ⌘N connect"
         case .accounts where m.detail != nil:
-            "esc back · T turn on/off · P add to a pool · K new key · L limit · ⌫ remove"
+            "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
         case .accounts: "↑↓ move · ↩ open · F filter · ⌘N connect"
         case .pools: "← → pool · ↑↓ account · D default · A add · B bind · ⌫ remove"
         case .bindings: "↑↓ move · U unbind · ⌘N bind"

@@ -38,7 +38,21 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var cap: Int64
     let lastUsedAt: Date?
     let createdAt: Date
+    /// The last key test (`POST /accounts/{id}/test`): when, and the status class the provider answered.
+    var lastTest: (at: Date, result: String)?
+    /// What one session may spend on it; nil is no limit.
+    var maxTokens: Int64?
+    var maxUSDMicros: Int64?
     var phase: AccountPhase { AccountPhase(state) }
+
+    static func == (l: Self, r: Self) -> Bool {
+        l.id == r.id && l.provider == r.provider && l.label == r.label && l.maskedTail == r.maskedTail
+            && l.baseURL == r.baseURL && l.state == r.state && l.stateReason == r.stateReason
+            && l.stateUntil == r.stateUntil && l.cap == r.cap && l.lastUsedAt == r.lastUsedAt
+            && l.createdAt == r.createdAt && l.lastTest?.at == r.lastTest?.at
+            && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
+            && l.maxUSDMicros == r.maxUSDMicros
+    }
 }
 
 struct PoolItem: Identifiable, Equatable, Sendable {

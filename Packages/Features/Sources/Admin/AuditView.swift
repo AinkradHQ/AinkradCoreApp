@@ -73,6 +73,11 @@ enum AuditWords {
         "approved": "approved", "rejected": "turned down", "ended": "ended", "killed": "stopped",
         "step_up": "used Touch ID on",
         "approval_decided": "answered an approval in", "resumed": "resumed",
+        "tested": "tested the key of", "auth_failed": "saw a refused key on",
+        "auth_inconclusive": "couldn't confirm a refused key on", "session_limits_set": "changed the session limits of",
+        "limit_set": "set a provider limit on", "limit_cleared": "cleared a provider limit on",
+        "login_started": "started a sign-in for", "login_failed": "had a failed sign-in for",
+        "login_cancelled": "stopped a sign-in for",
     ]
 
     /// `You created secret github-token-test`, `The Core cleared the lock on 198.51.100.7`.

@@ -9,7 +9,7 @@ struct LoginItem: Equatable, Sendable {
     let provider: String
     let label: String
     let runner: String
-    /// `starting | open_url | waiting_code | storing | done | failed | cancelled`.
+    /// `starting | open_url | waiting_code | storing | done | failed | expired | cancelled`.
     let state: String
     let url: String?
     let reason: String?
@@ -35,13 +35,13 @@ struct SignInFlow: Equatable {
 
 extension AccountsModel {
     /// Starts a sign-in behind Touch ID, then follows it until it ends.
-    func startSignIn(provider: String, label: String) async {
+    func startSignIn(provider: String, label: String, runner: String? = nil) async {
         guard let service, mayWrite() else { return }
         signIn = SignInFlow(stage: .starting, label: label)
         do {
             let l = try await host.elevated(
                 "Sign in to \(providerName(provider)) as \(label).", done: "started", keepsEdit: true
-            ) { try await service.startLogin(provider: provider, label: label, runner: nil) }
+            ) { try await service.startLogin(provider: provider, label: label, runner: runner) }
             apply(l)
             await follow(l.id)
         } catch is AdminDeclined {
@@ -62,14 +62,8 @@ extension AccountsModel {
         signIn?.codeError = nil
         signIn?.stage = .working
         do {
-            let l = try await host.elevated("Connect your Claude plan.", done: "sent", keepsEdit: true) {
-                try await service.sendLoginCode(id, code: c)
-            }
-            apply(l)
-        } catch is AdminDeclined {
-            if let url = signIn.flatMap({ f -> URL? in if case .open(let u) = f.stage { u } else { nil } }) {
-                signIn?.stage = .open(url)
-            }
+            // No Touch ID here: the one that started the sign-in covers it.
+            apply(try await service.sendLoginCode(id, code: c))
         } catch {
             signIn?.stage = .failed(Self.signInWords(error, provider: "Claude"))
         }
@@ -112,7 +106,7 @@ extension AccountsModel {
             }
         case "waiting_code", "storing": signIn?.stage = .working
         case "done": signIn?.stage = .done(account: l.accountID)
-        case "failed", "cancelled": signIn?.stage = .failed(Self.reasonWords(l.reason ?? l.state))
+        case "failed", "cancelled", "expired": signIn?.stage = .failed(Self.reasonWords(l.reason ?? l.state))
         default: signIn?.stage = .starting
         }
     }
@@ -129,7 +123,10 @@ extension AccountsModel {
                 "Your Core doesn't take real sign-ins yet. Turn on Real provider keys in Settings → Feature switches."
         case "secrets_disabled":
             return "Keys and secrets is Off. Set it to Test keys in Settings → Feature switches."
-        case "conflict": return "An account with that name exists. Pick another name."
+        case "conflict": return "An account with that name exists, or is signing in now. Pick another name."
+        case "limit_reached": return "Four sign-ins are already open. Finish or stop one, then try again."
+        case "login_state": return "This sign-in has moved on. Start again."
+        case "rate_limited": return "Too many tries just now. Wait a minute, then try again."
         default: return e.localizedDescription
         }
     }
