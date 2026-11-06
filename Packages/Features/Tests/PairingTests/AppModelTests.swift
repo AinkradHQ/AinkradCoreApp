@@ -246,6 +246,41 @@ struct AppModelTests {
         #expect(add.error?.contains("read, approve, admin") == true)
     }
 
+    @Test func quickAddDeviceMakesTheCodeWithTheSheetsDefaults() async throws {
+        let s = FakeService()
+        let m = try app(s)
+        await m.start()
+        m.shell.elevatedUntil = Date().addingTimeInterval(300)
+        let add = AddDeviceModel(host: m, quickMode: true)
+        await add.quick()
+        #expect(add.name == AddDeviceModel.quickName && add.kind == "device")
+        #expect(add.effectiveScopes == ["read", "approve"])
+        guard case .code(let p) = add.stage else {
+            Issue.record("no code")
+            return
+        }
+        #expect(p.code == "ABCDEFGHJK" && add.error == nil)
+    }
+
+    @Test func quickAddDeviceFallsBackToTheFormWithTheReason() async throws {
+        let s = FakeService()
+        let m = try app(s)
+        await m.start()
+        m.shell.elevatedUntil = Date().addingTimeInterval(300)
+        s.refuseCreate = true
+        let add = AddDeviceModel(host: m, quickMode: true)
+        await add.quick()
+        #expect(add.stage == .form)
+        #expect(add.error?.contains("only hand on the scopes it holds") == true)
+    }
+
+    @Test func addDeviceLauncherHasAQuickAndAnAdvancedEntry() async throws {
+        let m = try app(FakeService())
+        await m.start()
+        #expect(m.shell.launcher.entry("add-device")?.isAction == true)
+        #expect(m.shell.launcher.entry("add-device-advanced")?.title == "Add device (advanced)…")
+    }
+
     @Test func aRunnerGetsExactlyRunner() {
         let add = AddDeviceModel(
             host: AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() })

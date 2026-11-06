@@ -26,10 +26,14 @@ final class AddDeviceModel {
     private(set) var pairing: NewPairing?
     private weak var host: AppModel?
     private let existing: String?
+    /// Opened by the quick entry: the code is made at once with the sheet's defaults; the form is the fallback.
+    let quickMode: Bool
+    static let quickName = "New device"
 
-    init(host: AppModel, existing: String? = nil) {
+    init(host: AppModel, existing: String? = nil, quickMode: Bool = false) {
         self.host = host
         self.existing = existing
+        self.quickMode = quickMode
     }
 
     var pairingID: String? { pairing?.id ?? existing }
@@ -94,6 +98,19 @@ final class AddDeviceModel {
         mine = try await service.myScopes()
         if let me = try? await service.devices().first(where: { $0.id == service.deviceID }) { mine = me.scopes }
         scopes = scopes.intersection(mine)
+    }
+
+    /// Add device, the quick way: a device that reads and approves (what the sheet preselects), named "New device", made at
+    /// once after Touch ID. If this Mac cannot hand those scopes on, or the Core refuses, the form stays with the reason.
+    func quick() async {
+        await prepare()
+        guard error == nil else { return }
+        guard !effectiveScopes.isEmpty else {
+            error = "This Mac cannot hand on read or approve. Choose what the device may do."
+            return
+        }
+        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = Self.quickName }
+        await create()
     }
 
     func create() async {

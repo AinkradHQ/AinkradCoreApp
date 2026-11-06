@@ -240,6 +240,27 @@ public final class AccountsModel {
         return ok
     }
 
+    /// Say why a sheet opened, in the sheet's own error line (nil clears it).
+    func note(_ key: String, _ text: String?) { writeError[key] = text }
+
+    /// The next free `pool-N` (the Core wants lowercase, so not "Pool 3").
+    func nextPoolName() -> String {
+        var n = pools.count + 1
+        while pools.contains(where: { $0.name == "pool-\(n)" }) { n += 1 }
+        return "pool-\(n)"
+    }
+
+    /// New pool, the quick way: the first provider (what the sheet preselects), a generated name, no members, then selected.
+    /// With no provider, or when the Core refuses, the sheet opens and says why.
+    func quickPool() async {
+        guard let provider = providers.first?.id else {
+            return AccountDialogs.openNewPool(self, reason: "No provider yet. Connect an account first.")
+        }
+        if await createPool(name: nextPoolName(), provider: provider) { return }
+        // A declined Touch ID changes nothing and opens nothing; a refusal opens the sheet with the Core's words.
+        if let why = writeError["new-pool"] { AccountDialogs.openNewPool(self, reason: why) }
+    }
+
     func delete(_ p: PoolItem) async -> Bool {
         let ok = await write(
             "delete-pool-\(p.id)",
@@ -373,6 +394,14 @@ public final class AccountsModel {
             $0.show(.accounts)
             AccountDialogs.openConnect($0, provider: nil)
         }
+        entry(
+            "new-pool", "New pool", "Makes an empty pool at once · needs Touch ID", "plus", ["create", "pool"],
+            action: true
+        ) { m in Task { await m.quickPool() } }
+        entry(
+            "new-pool-advanced", "New pool (advanced)…", "Name it and choose the provider", "slider.horizontal.3",
+            ["create", "pool", "provider"], action: true
+        ) { AccountDialogs.openNewPool($0) }
         entry(
             "accounts-pools", "Account pools", "Which accounts serve which agents", "square.grid.2x2",
             ["pool", "default", "fallback"]
