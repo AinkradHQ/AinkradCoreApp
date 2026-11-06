@@ -33,7 +33,8 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
 
     public var body: some View {
         // Each option is its own glass tile (the section-action look); the picked one lights blue and the light glides.
-        HStack(spacing: Space.s2) {
+        // Choices keep their full names: they size to content and wrap onto another row when they do not fit.
+        ChoiceFlow(spacing: Space.s2, fill: fill) {
             ForEach(segments) { seg in
                 Segment(segment: seg, selected: seg.id == selection, fill: fill, lens: lens) { selection = seg.id }
             }
@@ -67,6 +68,62 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
     }
 }
 
+/// Lays choices out at their natural width and wraps to a new row when the next one will not fit. With `fill`, a set that
+/// fits one row shares the width equally; a wrapped set stretches each row to the full width.
+struct ChoiceFlow: Layout {
+    let spacing: CGFloat
+    let fill: Bool
+
+    private func rows(_ subviews: Subviews, width: CGFloat) -> (rows: [[Int]], sizes: [CGSize]) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        var rows: [[Int]] = [[]]
+        var used: CGFloat = 0
+        for (i, size) in sizes.enumerated() {
+            let need = (rows[rows.count - 1].isEmpty ? 0 : spacing) + size.width
+            if used + need > width, !rows[rows.count - 1].isEmpty {
+                rows.append([i])
+                used = size.width
+            } else {
+                rows[rows.count - 1].append(i)
+                used += need
+            }
+        }
+        return (rows, sizes)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let (rows, sizes) = rows(subviews, width: width)
+        let heights = rows.map { r in r.map { sizes[$0].height }.max() ?? 0 }
+        let height = heights.reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        let widest =
+            rows.map { r in r.reduce(CGFloat(0)) { $0 + sizes[$1].width } + spacing * CGFloat(r.count - 1) }.max() ?? 0
+        return CGSize(width: fill && proposal.width != nil ? width : widest, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let (rows, sizes) = rows(subviews, width: bounds.width)
+        let count = CGFloat(subviews.count)
+        let maxW = sizes.map(\.width).max() ?? 0
+        let equal = fill && count * maxW + spacing * (count - 1) <= bounds.width
+        var y = bounds.minY
+        for row in rows {
+            let n = CGFloat(row.count)
+            let natural = row.reduce(CGFloat(0)) { $0 + sizes[$1].width } + spacing * (n - 1)
+            let extra = fill && !equal ? max(0, bounds.width - natural) / n : 0
+            let share = (bounds.width - spacing * (n - 1)) / n
+            let h = row.map { sizes[$0].height }.max() ?? 0
+            var x = bounds.minX
+            for i in row {
+                let w = equal ? share : sizes[i].width + extra
+                subviews[i].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: w, height: h))
+                x += w + spacing
+            }
+            y += h + spacing
+        }
+    }
+}
+
 private struct Segment<ID: Hashable & Sendable>: View {
     let segment: CoreSegment<ID>
     let selected: Bool
@@ -85,6 +142,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
                         .accessibilityHidden(true)
                 }
                 Text(segment.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundStyle(.white.opacity(selected || hovering ? 1 : 0.8))
             .padding(.horizontal, Space.s3)
@@ -164,10 +222,9 @@ public struct GlassToggleTile: View {
             .padding(.horizontal, Space.s3).padding(.vertical, sub == nil ? 0 : Space.s3)
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
-                coreShape(Radius.control)
-                    .fill(isOn ? GlassInk.blue.opacity(0.8) : hovering ? GlassInk.wellHover : GlassInk.well)
+                coreShape(Radius.control).fill(hovering ? GlassInk.wellHover : GlassInk.well)
             }
-            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(isOn ? 0.3 : 0.15), lineWidth: 1) }
+            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.15), lineWidth: 1) }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
@@ -187,10 +244,10 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(Radius.chip).fill(.white.opacity(isOn ? 0.35 : 0.12))
+        coreShape(4).fill(isOn ? GlassInk.blue : .white.opacity(0.12))
             .frame(width: 30, height: 18)
             .overlay(alignment: isOn ? .trailing : .leading) {
-                coreShape(Radius.chip).fill(.white).frame(width: 14, height: 14).padding(2)
+                coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)
                     .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
             }
             .accessibilityHidden(true)

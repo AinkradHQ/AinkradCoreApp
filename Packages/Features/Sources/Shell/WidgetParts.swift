@@ -61,7 +61,7 @@ struct WidgetCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
                         .lineLimit(compact ? 1 : 3).multilineTextAlignment(.leading)
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(1)
+                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }

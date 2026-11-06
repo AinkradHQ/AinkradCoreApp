@@ -161,8 +161,11 @@ private struct RunnerTile: View {
                         )
                         .contentTransition(.symbolEffect(.replace))
                     }
-                    Text([runner.arch, "\(model.onRunner(runner.id)) open"].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(
+                        [runner.arch.map(RunnerWords.arch), "\(model.onRunner(runner.id)) open"].compactMap { $0 }
+                            .joined(separator: " · ")
+                    )
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     CoreSlots(used: runner.load, capacity: runner.capacity)
                     if let warn {
                         Label(warn, systemImage: st.symbol).font(.system(size: MacTextSize.meta, weight: .medium))

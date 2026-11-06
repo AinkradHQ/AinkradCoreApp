@@ -125,7 +125,7 @@ struct NotificationsSection: View {
                             title, sub: "Coming: your Core can't send this yet.", symbol: symbol,
                             isOn: .constant(false), fill: true
                         )
-                        .disabled(true).opacity(0.55)
+                        .disabled(true)
                     }
                 }
                 BannerPreview()

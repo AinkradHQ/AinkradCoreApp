@@ -22,8 +22,10 @@ struct DeskWidget: View {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
                 // White ink on clear glass: a soft shadow keeps it readable over bright clouds (stronger by day).
                 .shadow(color: .black.opacity(palette.isDay ? 0.35 : 0.25), radius: 3, y: 1)
-                .padding(Space.s4).padding(.top, editing ? Space.s8 : 0)
+                .padding(Space.s4)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
+                // Editing makes room for the size choices by shrinking the content, never by pushing it past the frame.
+                .scaleEffect(editing ? (size.height - Space.s8) / size.height : 1, anchor: .bottom)
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
                 .animation(Motion.out(Motion.ui), value: editing)

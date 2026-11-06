@@ -17,12 +17,19 @@ public struct ShellView: View {
         ZStack {
             base
             covers
+            // Above the scrim: a dropped link must stay visible with Settings or a dialog open.
+            connectionBanner.padding(.top, ShellMetrics.topBar)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             escape
         }
         .animation(reduce ? nil : Motion.out(Motion.move), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
         .coreToast($shell.toast)
+        // A toast left from before must not sit under a dialog that has just opened.
+        .onChange(of: shell.dialog != nil || shell.topDialog != nil || shell.sheet != nil) { _, open in
+            if open { shell.toast = nil }
+        }
         .environment(\.coreLook, look.look)
         // The window opens calm: focus rests on the root, so no control shows a ring until the keyboard moves it.
         .focusable()
@@ -53,7 +60,6 @@ public struct ShellView: View {
                 .accessibilityHidden(shell.surface != .workspace)
             VStack(spacing: 0) {
                 StatusCluster(shell: shell)
-                connectionBanner
                 Spacer(minLength: 0)
             }
         }
@@ -69,20 +75,19 @@ public struct ShellView: View {
         if let notice = shell.linkNotice {
             switch notice {
             case .rateLimited(let until):
-                LinkBanner(.rateLimited(until: until)).frame(maxWidth: width).padding(.top, Space.s1)
-            case .renewing: LinkBanner(.renewing).frame(maxWidth: width).padding(.top, Space.s1)
+                LinkBanner(.rateLimited(until: until)).frame(maxWidth: width)
+            case .renewing: LinkBanner(.renewing).frame(maxWidth: width)
             case .restarted:
-                LinkBanner(.restarted, dismiss: { shell.linkNotice = nil }).frame(maxWidth: width).padding(
-                    .top, Space.s1)
+                LinkBanner(.restarted, dismiss: { shell.linkNotice = nil }).frame(maxWidth: width)
             }
         } else {
             switch shell.coreLink {
             case .reconnecting:
                 LinkBanner(.resuming(since: shell.lastLiveAt), retry: shell.retryConnection.map { r in { r() } })
-                    .frame(maxWidth: width).padding(.top, Space.s1)
+                    .frame(maxWidth: width)
             case .offline:
                 ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
-                    .frame(maxWidth: width).padding(.top, Space.s1)
+                    .frame(maxWidth: width)
             default: EmptyView()
             }
         }

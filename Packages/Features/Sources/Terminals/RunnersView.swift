@@ -77,7 +77,10 @@ private struct RunnerTile: View {
                     }
                     StateBadge(st.label, tone: st.tone, symbol: st.symbol)
                 }
-                if let a = runner.arch { Text(a).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2) }
+                if let a = runner.arch {
+                    Text(RunnerWords.arch(a)).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                        .help(a)
+                }
                 labelled(
                     "Work running\(st == .off ? " · last known" : "")", "\(runner.load) of \(runner.capacity) slots"
                 ) {
@@ -95,9 +98,9 @@ private struct RunnerTile: View {
                 }
                 HStack(spacing: Space.s2) {
                     ForEach(runner.drivers, id: \.name) { d in
-                        Text(d.name).font(.system(size: MacTextSize.meta, weight: .medium, design: .monospaced))
+                        Text(RunnerWords.driver(d.name)).font(.system(size: MacTextSize.meta, weight: .medium))
                             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-                            .background(palette.uDim, in: coreShape(Radius.chip))
+                            .background(palette.uDim, in: coreShape(Radius.chip)).help(d.name)
                     }
                     if runner.drivers.isEmpty {
                         Text("No drivers reported yet").font(.system(size: MacTextSize.meta)).foregroundStyle(
@@ -152,8 +155,11 @@ private struct RunnerDetail: View {
             Text(runner.name).font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
             StateBadge(st.label, tone: st.tone, symbol: st.symbol)
         }
-        Text([runner.arch, runner.version.map { "runner v\($0)" }].compactMap { $0 }.joined(separator: " · "))
-            .foregroundStyle(palette.text2)
+        Text(
+            [runner.arch.map(RunnerWords.arch), runner.version.map { "runner v\($0)" }].compactMap { $0 }.joined(
+                separator: " · ")
+        )
+        .foregroundStyle(palette.text2).help(runner.arch ?? "")
         switch st {
         case .degraded:
             TermBanner(
@@ -194,13 +200,14 @@ private struct RunnerDetail: View {
             ForEach(runner.drivers, id: \.name) { d in
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
-                        Text(d.name).font(.system(size: MacTextSize.body, weight: .semibold, design: .monospaced))
+                        Text(RunnerWords.driver(d.name)).font(.system(size: MacTextSize.body, weight: .semibold))
+                            .help(d.name)
                         Spacer()
                         if let c = d.capacity { Text("\(c) at once").foregroundStyle(palette.text2) }
                     }
                     if !d.commands.isEmpty {
-                        Text(d.commands.joined(separator: ", ")).font(.system(size: MacTextSize.meta)).foregroundStyle(
-                            palette.text2)
+                        Text(RunnerWords.commands(d.commands)).font(.system(size: MacTextSize.meta))
+                            .foregroundStyle(palette.text2).help(d.commands.joined(separator: ", "))
                     }
                 }
             }

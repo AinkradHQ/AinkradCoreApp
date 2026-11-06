@@ -188,7 +188,7 @@ struct AccountDetailView: View {
     {
         VStack(alignment: .leading, spacing: Space.s2) {
             Label(title, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
-                .foregroundStyle(hue)
+                .foregroundStyle(GlassInk.secondary)
             c()
             Spacer(minLength: 0)
         }

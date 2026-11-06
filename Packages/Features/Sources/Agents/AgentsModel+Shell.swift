@@ -50,7 +50,7 @@ extension AgentsModel {
     func head(_ s: AgentSessionInfo) -> (title: String, sub: String, chip: PaneChip) {
         let st = AgentWords.status(s, waiting: waiting(s.id))
         return (
-            AgentWords.harness(s.harness), "\(runnerName(s.runner)) · \(s.shortID)",
+            AgentWords.harness(s.harness), runnerName(s.runner),
             PaneChip(st.label, tone: st.tone, symbol: st.symbol)
         )
     }
@@ -103,7 +103,7 @@ extension AgentsModel {
         shell.launcher.register(
             LauncherEntry(
                 id: "agents.new-advanced", title: "New agent session (advanced)…",
-                sub: "Choose the harness, runner, model, mode and secrets", symbol: "slider.horizontal.3",
+                sub: "Pick the runner, model and mode", symbol: "slider.horizontal.3",
                 keywords: ["start", "agent", "harness", "codex", "model"], isAction: true
             ) { [weak self] in self?.openNewSession(advanced: true) })
         shell.launcher.register(
@@ -141,7 +141,7 @@ extension AgentsModel {
             let st = AgentWords.status(s, waiting: false).label
             shell.launcher.register(
                 LauncherEntry(
-                    id: "agents.s-\(s.id)", title: "\(AgentWords.harness(s.harness)) · \(s.shortID)",
+                    id: "agents.s-\(s.id)", title: AgentWords.harness(s.harness),
                     sub: "\(runnerName(s.runner)) · \(st)", symbol: Self.harnessSymbol(s.harness),
                     keywords: ["agent", "session", s.harness, runnerName(s.runner), st]
                 ) { [weak self] in self?.openSession(s.id) })

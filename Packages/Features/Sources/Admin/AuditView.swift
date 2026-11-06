@@ -270,10 +270,12 @@ private struct AuditDetail: View {
                                 Text(k.replacingOccurrences(of: "_", with: " ").capitalized).foregroundStyle(
                                     GlassInk.secondary)
                                 Spacer(minLength: Space.s2)
-                                Text(v).font(.system(size: MacTextSize.body, design: .monospaced)).textSelection(
-                                    .enabled
-                                )
-                                .multilineTextAlignment(.trailing)
+                                let shown = Self.plain(k, v) { id in admin.registry.runners.first { $0.id == id }?.name
+                                }
+                                Text(shown.text)
+                                    .font(.system(size: MacTextSize.body, design: shown.words ? .default : .monospaced))
+                                    .textSelection(.enabled).help(v)
+                                    .multilineTextAlignment(.trailing)
                             }
                         }
                     }
@@ -294,6 +296,22 @@ private struct AuditDetail: View {
 
     private func fact(_ symbol: String, _ text: String) -> some View {
         Label(text, systemImage: symbol).foregroundStyle(GlassInk.primary)
+    }
+
+    /// Raw ids and codes in plain words; the raw value stays in the row's help.
+    static func plain(_ key: String, _ value: String, runnerName: (String) -> String?) -> (text: String, words: Bool) {
+        switch key {
+        case "runner": return (runnerName(value) ?? "a runner", true)
+        case "delivery":
+            let words = [
+                "env": "Given as an environment variable", "file": "Given as a file",
+                "askpass": "Given when a password is asked for",
+            ]
+            if let w = words[value] { return (w, true) }
+        case "size": if Int(value) != nil { return ("\(value) bytes", true) }
+        default: break
+        }
+        return (value, false)
     }
 
     /// A details object as name and value pairs; a value that is a list or object is shown compactly.

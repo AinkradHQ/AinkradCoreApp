@@ -166,10 +166,11 @@ struct EntryRow: View, Equatable {
         case .gap(let from, let to):
             chip("ellipsis", "Entries \(from) to \(to) were not kept", GlassInk.orange)
         case .ended(let kind, let reason):
+            let why = Self.sentence(reason ?? "")
             chip(
                 kind == "succeeded" ? "flag.checkered" : "stop.fill",
-                "Ended: \(SessionOutcome(rawValue: kind).label)" + (reason.map { $0.isEmpty ? "" : " · \($0)" } ?? ""),
-                kind == "succeeded" ? GlassInk.green : GlassInk.orange, help: kind)
+                "Ended: \(SessionOutcome(rawValue: kind).label)" + (why.isEmpty ? "" : " · \(why)"),
+                kind == "succeeded" ? GlassInk.green : kind == "failed" ? GlassInk.red : GlassInk.orange, help: kind)
         case .note(let type, let detail):
             chip(
                 "info.square.fill", detail.isEmpty ? Self.words(type) : "\(Self.words(type)): \(detail)",
@@ -178,6 +179,13 @@ struct EntryRow: View, Equatable {
             )
         case .hidden: EmptyView()
         }
+    }
+
+    /// A reason as a short label: first letter capital, no trailing period.
+    static func sentence(_ text: String) -> String {
+        var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while t.hasSuffix(".") { t.removeLast() }
+        return t.prefix(1).uppercased() + t.dropFirst()
     }
 
     /// `approval_escalated` → `Approval escalated`.

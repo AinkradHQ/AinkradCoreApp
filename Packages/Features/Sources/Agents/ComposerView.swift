@@ -20,7 +20,7 @@ struct ComposerView: View {
 
     private var placeholder: String {
         switch session.state {
-        case .running: "Reply to \(session.harness)…"
+        case .running: "Reply to \(session.harness.prefix(1).uppercased() + session.harness.dropFirst())…"
         case .starting: "Starting. You can write when it is running."
         case .interrupted: "Resuming. You can write again when it is running."
         default: "This session ended. Resume it to send a message."
@@ -34,17 +34,20 @@ struct ComposerView: View {
                 .font(.system(size: MacTextSize.body, weight: .semibold))
                 .foregroundStyle(on ? GlassInk.blue : GlassInk.secondary)
                 .contentTransition(.symbolEffect(.replace))
-            TextField("Reply to the agent", text: draft, prompt: Text(placeholder))
-                .accessibilityIdentifier("agent-composer")
-                .textFieldStyle(.plain)
-                .focused(focused)
-                .focusEffectDisabled()
-                .disabled(!enabled)
-                .onSubmit { Task { await model.send(session.id) } }
-                .onKeyPress(.escape) {
-                    focused.wrappedValue = false
-                    return .handled
-                }
+            TextField(
+                "Reply to the agent", text: draft,
+                prompt: Text(placeholder).foregroundStyle(.white.opacity(enabled ? 0.6 : 0.55))
+            )
+            .accessibilityIdentifier("agent-composer")
+            .textFieldStyle(.plain)
+            .focused(focused)
+            .focusEffectDisabled()
+            .disabled(!enabled)
+            .onSubmit { Task { await model.send(session.id) } }
+            .onKeyPress(.escape) {
+                focused.wrappedValue = false
+                return .handled
+            }
             Text(String(format: "%.1f of 16 KiB", Double(bytes) / 1024))
                 .font(.system(size: MacTextSize.meta, design: .monospaced)).monospacedDigit()
                 .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
@@ -62,7 +65,6 @@ struct ComposerView: View {
         .padding(.leading, Space.s3).padding(Space.s2)
         .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .opacity(enabled || session.over ? 1 : 0.6)
         .animation(Motion.out(Motion.hover), value: on)
         .animation(Motion.out(Motion.ui), value: bytes > 0)
         .padding(.horizontal, Space.s3).padding(.bottom, Space.s1)

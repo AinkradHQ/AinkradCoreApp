@@ -167,18 +167,18 @@ struct ProviderAbout: View {
                 .help(provider.baseURL)
             AccFact(label: "Models") {
                 if provider.models.isEmpty {
-                    Text("None").foregroundStyle(palette.text2)
+                    Text("None").foregroundStyle(GlassInk.secondary)
                 } else {
                     VStack(alignment: .leading, spacing: Space.s1) {
                         ForEach(provider.models, id: \.id) { m in
                             HStack(spacing: Space.s2) {
                                 AccChip(text: m.id, mono: true)
-                                Text(m.words).foregroundStyle(palette.text2)
+                                Text(m.words).foregroundStyle(GlassInk.secondary)
                             }
                         }
                         if let at = provider.pricedAt {
                             Text("List prices read \(at)").font(.system(size: MacTextSize.meta)).foregroundStyle(
-                                palette.text2)
+                                GlassInk.secondary)
                         }
                     }
                 }
