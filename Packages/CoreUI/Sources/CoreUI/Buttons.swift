@@ -34,8 +34,7 @@ extension View {
     /// Apple's own Liquid Glass button (`.glass` / `.glassProminent`) on macOS 26 / iOS 26, as an 8 pt rounded rect,
     /// tinted with the theme blue; the CoreUI button below that.
     /// The large glass button of first run and the failure cards: the CoreUI button (Liquid Glass on macOS 26), so it
-    /// shows its key like every other. Any non-nil `tint` makes it the danger (red) button: the only tint callers ever
-    /// pass is red for a destructive choice, so the colour itself is not read.
+    /// shows its key like every other; `tint` colours a prominent one (red for a destructive choice).
     @ViewBuilder
     public func coreGlassButton(prominent: Bool = false, tint: Color? = nil) -> some View {
         buttonStyle(CoreButtonStyle(tint != nil ? .danger : prominent ? .prominent : .secondary, size: .large))
@@ -69,13 +68,13 @@ private struct CoreButtonBody: View {
         HStack(spacing: Space.s2) {
             ZStack {
                 configuration.label.opacity(busy ? 0 : 1)
-                if busy { BusyBar().frame(width: Space.s6) }
+                if busy { ProgressView().controlSize(.small).tint(ink) }
             }
             // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
             if let keycap {
-                Text(keycap).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
-                    .padding(.horizontal, Space.s1).frame(minHeight: MacSize.chip)
-                    .background(.white.opacity(0.16), in: coreShape(Radius.chip))
+                Text(keycap).font(.system(size: 10, weight: .medium, design: .rounded))
+                    .padding(.horizontal, 5).frame(minHeight: 16)
+                    .background(.white.opacity(0.16), in: coreShape(5))
                     .accessibilityHidden(true)
             }
         }
@@ -83,7 +82,7 @@ private struct CoreButtonBody: View {
         .foregroundStyle(ink)
         .frame(minHeight: size.height)
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
-        .modifier(ButtonSurface(kind: kind, radius: size.radius, hover: hover))
+        .modifier(ButtonSurface(kind: kind, radius: size.radius, fill: fill, hover: hover))
         // Gallery only: pinned "focused" preview. Real focus is the system ring below, drawn only on the one control that
         // has keyboard focus (isFocused here reports the container's focus, which lit every button in it).
         .coreFocusRing(forced == .focused, radius: size.radius, palette: palette)
@@ -97,14 +96,27 @@ private struct CoreButtonBody: View {
         .accessibilityAddTraits(busy ? .updatesFrequently : [])
         .accessibilityValue(busy ? "Busy" : "")
     }
+
+    private var fill: Color {
+        switch kind {
+        case .prominent: pressed ? palette.btnPrimaryPress : hover ? palette.btnPrimaryHover : palette.btnPrimary
+        case .secondary: hover || pressed ? palette.uDim : .clear
+        case .plain: hover || pressed ? palette.uDim : .clear
+        // ui.css `.btn.danger`: solid #D92D20, #E4402F on hover, white label in both themes.
+        case .danger:
+            hover || pressed
+                ? Color(red: 0.894, green: 0.251, blue: 0.184) : Color(red: 0.851, green: 0.176, blue: 0.125)
+        }
+    }
 }
 
 /// Every CoreUI button is the app-header tile (Ahmed, 2026-11-05: "apply this style of buttons everywhere"): prominent is
-/// a soft blue tile, danger a soft red one, secondary a dark glass well; a light edge. Hover changes the fill only.
+/// a soft blue tile, danger a soft red one, secondary a dark glass well; a light edge, a glow and a small lift on hover.
 /// Plain buttons stay quiet until hovered.
 private struct ButtonSurface: ViewModifier {
     let kind: CoreButtonKind
     let radius: CGFloat
+    let fill: Color
     let hover: Bool
 
     func body(content: Content) -> some View {
@@ -115,7 +127,7 @@ private struct ButtonSurface: ViewModifier {
             .background {
                 switch kind {
                 case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.95 : 0.8))
-                case .secondary: shape.fill(hover ? GlassInk.wellHover : GlassInk.well)
+                case .secondary: shape.fill(hover ? hue.opacity(0.28) : GlassInk.well)
                 case .plain: shape.fill(hover ? GlassInk.wellHover : .clear)
                 }
             }
@@ -124,6 +136,9 @@ private struct ButtonSurface: ViewModifier {
                     shape.strokeBorder(.white.opacity(kind == .secondary ? 0.15 : 0.3), lineWidth: 1)
                 }
             }
+            .shadow(color: (kind == .plain ? Color.clear : hue).opacity(hover ? 0.45 : 0), radius: 10)
+            .scaleEffect(hover && kind != .plain ? 1.04 : 1)
+            .animation(.spring(duration: 0.25, bounce: 0.3), value: hover)
     }
 }
 
@@ -171,11 +186,11 @@ extension View {
     public func coreTileKey(_ label: String, key: Character, modifiers: EventModifiers = .command) -> some View {
         keyboardShortcut(KeyEquivalent(key), modifiers: modifiers)
             .overlay(alignment: .topTrailing) {
-                Text(label).font(.system(size: MacTextSize.meta, weight: .semibold, design: .rounded))
+                Text(label).font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
-                    .padding(.horizontal, Space.s1).frame(minHeight: MacSize.chip)
-                    .background(.black.opacity(0.35), in: coreShape(Radius.chip))
-                    .padding(Space.s1)
+                    .padding(.horizontal, 5).frame(minHeight: 16)
+                    .background(.black.opacity(0.35), in: coreShape(4))
+                    .padding(6)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }

@@ -63,8 +63,8 @@ struct FirstRunView: View {
             codeField = model.codeText
             pasteQR = model.usesQR
         }
-        .animation(reduce ? Motion.out(Motion.ui) : Motion.out(Motion.ui), value: model.stage)
-        .animation(reduce ? Motion.out(Motion.ui) : Motion.out(Motion.ui), value: model.step)
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: model.stage)
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: model.step)
         .ignoresSafeArea()
     }
 
@@ -207,7 +207,7 @@ struct FirstRunView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                Button("I don't have a Core yet") { model.goTo(.bootstrap) }.coreGlassButton()
+                LinkButton(title: "I don't have a Core yet") { model.goTo(.bootstrap) }
                 Spacer()
                 if pasteQR {
                     Button("Pair this Mac") { Task { await model.submit() } }
@@ -219,14 +219,14 @@ struct FirstRunView: View {
                 }
             }
         }
-        .animation(Motion.out(Motion.move), value: model.localCore)
+        .animation(.spring(duration: 0.4, bounce: 0.2), value: model.localCore)
         .task { await model.lookForLocalCore() }
     }
 
     /// A Core answered on this Mac: the easiest way in is one click.
     private func foundLocalCore(_ address: String) -> some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: "checkmark.square.fill").font(.system(size: MacTextSize.large))
+            Image(systemName: "checkmark.circle.fill").font(.system(size: MacTextSize.large))
                 .foregroundStyle(palette.tone(.run).ink).symbolEffect(.bounce, value: address)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -285,8 +285,7 @@ struct FirstRunView: View {
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(spacing: Space.s1) {
                     Text("This Mac keeps its keys in \(keysHome)")
-                    Button("Details") { showKeys.toggle() }.coreGlassButton()
-                        .help("Shows which keys this Mac makes")
+                    LinkButton(title: "Details", hint: "Shows which keys this Mac makes") { showKeys.toggle() }
                 }
                 if showKeys { keyDetails }
             }
@@ -306,8 +305,9 @@ struct FirstRunView: View {
                 key: "Step-up key",
                 value: SecureEnclave.isAvailable
                     ? "Secure Enclave, asks for Touch ID" : "None: it cannot unlock admin actions")
-            FactRow(key: "Reported as", value: SecureEnclave.isAvailable ? "Kept in a chip" : "Kept in a file")
-                .help("key_storage = \(SecureEnclave.isAvailable ? "secure_enclave" : "software")")
+            FactRow(
+                key: "Reported as", value: "key_storage = \(SecureEnclave.isAvailable ? "secure_enclave" : "software")",
+                mono: true)
             Text(
                 "The keys stay on this Mac. The Core only ever sees their public halves, and records the storage as a claim."
             )
@@ -395,8 +395,7 @@ struct FirstRunView: View {
                     FactRow(
                         key: "Key storage",
                         value: SecureEnclave.isAvailable ? "Secure Enclave, routine and step-up" : "Keychain")
-                    FactRow(key: "This Mac", value: model.displayName ?? "Paired")
-                        .help("Device ID \(claim.deviceID)")
+                    FactRow(key: "This Mac", value: claim.deviceID, mono: true)
                     FactRow(key: "Core fingerprint", value: String(claim.coreFingerprint.prefix(24)) + "…", mono: true)
                 }
             }

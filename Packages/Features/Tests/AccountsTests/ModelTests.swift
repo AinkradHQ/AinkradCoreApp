@@ -187,7 +187,7 @@ struct ModelTests {
         svc.failure = CoreError.http(status: 409, code: "conflict", message: "That name is taken.")
         await m.quickPool()
         #expect(host.shell.dialog?.id == "pool-new")
-        #expect(m.writeError["new-pool"] == "That name is taken.")
+        #expect(m.writeError["new-pool"] == "That name is taken. (conflict)")
         // No provider at all: no write is tried.
         let (n, s2, h2) = await make()
         s2.providerList = []
@@ -223,7 +223,7 @@ struct ModelTests {
         let (m, svc, _) = await make()
         svc.failure = CoreError.http(status: 409, code: "conflict", message: "The default pool cannot be deleted.")
         #expect(await m.delete(m.pools[0]) == false)
-        #expect(m.writeError["delete-pool-1"] == "The default pool cannot be deleted.")
+        #expect(m.writeError["delete-pool-1"] == "The default pool cannot be deleted. (conflict)")
         #expect(m.readOnly == false)
     }
 

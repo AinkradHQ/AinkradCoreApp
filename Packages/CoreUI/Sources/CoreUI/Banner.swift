@@ -53,7 +53,7 @@ public struct ConnectionBanner: View {
         HStack(alignment: .top, spacing: Space.s3) {
             Group {
                 if state == .loading || state == .reconnecting {
-                    BusyBar().frame(width: Space.s6)
+                    ProgressView().controlSize(.small)
                 } else {
                     Image(systemName: state.symbol)
                 }

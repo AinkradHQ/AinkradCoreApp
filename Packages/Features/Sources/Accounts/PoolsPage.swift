@@ -12,7 +12,7 @@ struct PoolsPage: View {
                 title: "Pools",
                 detail:
                     "A pool is a team of accounts from one provider. Agents share it, and Core picks who works next.",
-                symbol: "square.grid.2x2.fill", hue: GlassInk.blue
+                symbol: "square.grid.2x2.fill", hue: GlassInk.violet
             ) { EmptyView() }
             if model.pools.isEmpty {
                 AccStateCard(
@@ -57,7 +57,7 @@ private struct PoolTab: View {
     var body: some View {
         let hue = ProviderLook.hue(pool.provider)
         Button {
-            withAnimation(Motion.out(Motion.ui)) {
+            withAnimation(.smooth(duration: 0.3)) {
                 model.poolSelection = pool.id
                 model.cursor = nil
             }
@@ -65,13 +65,12 @@ private struct PoolTab: View {
             HStack(spacing: Space.s2) {
                 AccTile(provider: pool.provider).scaleEffect(0.8)
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: Space.s1) {
+                    HStack(spacing: 4) {
                         Text("\(ProviderLook.short(pool.provider, pool.provider)) · \(pool.name)").font(
                             .system(size: MacTextSize.headline, weight: .semibold)
                         ).lineLimit(1)
                         if pool.isDefault {
-                            Image(systemName: "star.fill").font(.system(size: MacTextSize.meta)).foregroundStyle(
-                                GlassInk.blue)
+                            Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orange)
                         }
                     }
                     Text("\(pool.members.count) account\(pool.members.count == 1 ? "" : "s")")
@@ -79,22 +78,26 @@ private struct PoolTab: View {
                 }
             }
             .foregroundStyle(GlassInk.primary)
-            .padding(.leading, Space.s1).padding(.trailing, Space.s3).frame(minHeight: Space.s8 + Space.s4)
+            .padding(.leading, Space.s1).padding(.trailing, Space.s3).frame(minHeight: 48)
             .background {
                 if on {
-                    coreShape(Radius.control).fill(hue.opacity(0.35))
+                    coreShape(Radius.control + 2).fill(hue.opacity(0.35))
+                        .shadow(color: hue.opacity(0.45), radius: 10)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
-                    coreShape(Radius.control).fill(hovering ? GlassInk.wellHover : GlassInk.well)
+                    coreShape(Radius.control + 2).fill(hovering ? GlassInk.wellHover : GlassInk.well)
                 }
             }
-            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-            .contentShape(coreShape(Radius.control))
+            .overlay {
+                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
+            }
+            .contentShape(coreShape(Radius.control + 2))
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .scaleEffect(hovering ? 1.03 : 1)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: hovering)
+        .animation(.smooth(duration: 0.25), value: hovering)
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("pool-tab-\(pool.name)")
     }
@@ -110,15 +113,15 @@ private struct PoolDetail: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(alignment: .center, spacing: Space.s3) {
                 AccTile(large: true, provider: pool.provider)
-                VStack(alignment: .leading, spacing: Space.s1) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("\(ProviderLook.short(pool.provider, model.providerName(pool.provider))) · \(pool.name)")
-                        .font(.system(size: MacTextSize.large, weight: .semibold))
+                        .font(.system(size: MacTextSize.large, weight: .bold))
                     HStack(spacing: Space.s2) {
                         if pool.isDefault {
-                            Label("Default: also serves agents with no pool of their own", systemImage: "star.fill")
-                                .foregroundStyle(GlassInk.blue)
+                            Label("Default: also serves agents with no binding", systemImage: "star.fill")
+                                .foregroundStyle(GlassInk.orange)
                         } else {
-                            Label("Not the default pool", systemImage: "square.grid.2x2").foregroundStyle(
+                            Label("Serves the agents bound to it", systemImage: "link").foregroundStyle(
                                 GlassInk.secondary)
                         }
                     }
@@ -126,7 +129,7 @@ private struct PoolDetail: View {
                 }
                 Spacer(minLength: Space.s2)
                 if !pool.isDefault {
-                    AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.blue) {
+                    AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.orange) {
                         Task { await model.makeDefault(pool) }
                     }
                     .disabled(ro || model.busy != nil)
@@ -144,10 +147,8 @@ private struct PoolDetail: View {
                         Label("Accounts, in the order they're tried", systemImage: "list.number").font(
                             .system(size: MacTextSize.title, weight: .semibold))
                         Spacer()
-                        AppActionTile(title: "Add", symbol: "plus", key: "A", hue: GlassInk.blue) {
-                            AccountDialogs.openAddMember(model, pool: pool)
-                        }
-                        .disabled(ro)
+                        AccLink(title: "Add · A", symbol: "plus") { AccountDialogs.openAddMember(model, pool: pool) }
+                            .disabled(ro)
                     }
                     if pool.members.isEmpty {
                         Text("Add an account to get this pool working.").foregroundStyle(GlassInk.orange)
@@ -169,7 +170,7 @@ private struct PoolDetail: View {
 }
 
 /// One member in fallback order: its place as a numbered tile (glowing for the one tried first), its provider tile, its
-/// state, and a remove action. The keyboard's cursor is lit.
+/// state, and a remove action. The keyboard's cursor glows.
 private struct MemberRow: View {
     let model: AccountsModel
     let pool: PoolItem
@@ -183,37 +184,39 @@ private struct MemberRow: View {
         let hue = ProviderLook.hue(pool.provider)
         let on = model.cursor == "m-\(id)"
         HStack(spacing: Space.s3) {
-            Text("\(index + 1)").font(.system(size: MacTextSize.body, weight: .semibold, design: .rounded))
+            Text("\(index + 1)").font(.system(size: MacTextSize.body, weight: .bold, design: .rounded))
                 .foregroundStyle(first ? .white : GlassInk.secondary)
-                .frame(width: Space.s6 + Space.s1, height: Space.s6 + Space.s1)
-                .background(first ? hue.opacity(0.85) : GlassInk.well, in: coreShape(Radius.chip))
+                .frame(width: 26, height: 26)
+                .background(first ? hue.opacity(0.85) : GlassInk.well, in: coreShape(7))
+                .shadow(color: hue.opacity(first ? 0.5 : 0), radius: 6)
             AccTile(provider: pool.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
                 Text(a?.label ?? "Account \(id)").font(.system(size: MacTextSize.headline, weight: .semibold))
                     .lineLimit(1)
                 Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(GlassInk.secondary)
+                    .foregroundStyle(first ? hue : GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let a { PhaseBadge(phase: a.phase) }
-            if let a {
-                // Always laid out, only faded: showing it never moves the row.
+            if let a, hovering || on {
                 AccLink(title: "Remove", symbol: "xmark", danger: true, help: "Remove \(a.label) from \(pool.name)") {
                     Task { await model.remove(a, from: pool) }
                 }
                 .disabled(model.readOnly || model.busy != nil)
-                .opacity(hovering || on ? 1 : 0).allowsHitTesting(hovering || on)
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
         }
         .padding(Space.s2)
         .background(
-            on ? hue.opacity(0.18) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control)
+            on ? hue.opacity(0.18) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2)
         )
-        .contentShape(coreShape(Radius.control))
-        .onTapGesture { withAnimation(Motion.out(Motion.ui)) { model.cursor = "m-\(id)" } }
+        .overlay { coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.7) : .clear, lineWidth: 1.5) }
+        .shadow(color: hue.opacity(on ? 0.4 : 0), radius: 10)
+        .contentShape(coreShape(Radius.control + 2))
+        .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "m-\(id)" } }
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: hovering)
-        .animation(Motion.out(Motion.ui), value: on)
+        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(.smooth(duration: 0.25), value: on)
         .id("m-\(id)")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("member-\(a?.label ?? String(id))")

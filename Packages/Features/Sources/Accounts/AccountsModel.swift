@@ -6,7 +6,7 @@ import Observation
 import Shell
 import SwiftUI
 
-/// The Core app: provider accounts and pools. It owns the lists, the Core service and the writes (each behind
+/// The Core app: provider accounts, pools and bindings. It owns the lists, the Core service and the writes (each behind
 /// Touch ID through the host), registers the launcher entries and Settings sections, and turns a failure into words.
 @MainActor @Observable
 public final class AccountsModel {
@@ -28,7 +28,7 @@ public final class AccountsModel {
     var poolSelection: Int64?
     /// A subscription sign-in in the Connect sheet, while it runs (`SignIn.swift`).
     var signIn: SignInFlow?
-    /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member), "g-<budget>" or "p-<price>".
+    /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
     var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
     private(set) var writeError: [String: String] = [:]
@@ -126,8 +126,8 @@ public final class AccountsModel {
         gate = (try? await service.gate()) ?? GateState()
         let chip: PaneChip =
             switch load {
-            case .ready: PaneChip("Connected", tone: .run, symbol: "checkmark.square")
-            default: PaneChip("Not loaded", tone: .queue, symbol: "exclamationmark.square")
+            case .ready: PaneChip("Connected", tone: .run, symbol: "checkmark.circle")
+            default: PaneChip("Not loaded", tone: .queue, symbol: "exclamationmark.circle")
             }
         host.shell.updatePane("accounts", chip: chip)
     }
@@ -158,11 +158,11 @@ public final class AccountsModel {
 
     func code(_ error: any Error) -> String? { CoreError.unwrapping(error).map(Self.code) }
 
-    /// One line for a refused write, in words.
+    /// One line for a refused write, with the Core's code.
     func words(_ error: any Error) -> String {
         if case .rateLimited(let after)? = CoreError.unwrapping(error) { host.rateLimited(retryAfter: after) }
         guard let e = CoreError.unwrapping(error) else { return error.localizedDescription }
-        return e.localizedDescription
+        return "\(e.localizedDescription) (\(Self.code(e)))"
     }
 
     /// Writes are refused while the Core is unreachable or rate limiting: a toast says so.
@@ -358,7 +358,7 @@ public final class AccountsModel {
         shell.openPane(
             PaneSpec(
                 id: "accounts", title: "Core", sub: "Accounts", symbol: "creditcard",
-                chip: PaneChip("Connected", tone: .run, symbol: "checkmark.square"), minWidth: 720
+                chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
             ) { AccountsView(model: self) })
         Task { await reload() }
     }
@@ -378,7 +378,7 @@ public final class AccountsModel {
                 })
         }
         entry(
-            "core", "Core", "Accounts and pools", "creditcard",
+            "core", "Core", "Accounts, pools and bindings", "creditcard",
             ["provider", "claude", "codex", "gemini", "budget"]
         ) {
             $0.show(.overview)
@@ -410,7 +410,7 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .apps, title: "Core", symbol: "creditcard", order: 4
+                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
             ) {
                 AccountsLinkSection(model: self)
             })

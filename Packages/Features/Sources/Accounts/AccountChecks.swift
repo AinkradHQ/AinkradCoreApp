@@ -58,11 +58,10 @@ enum TestWords {
         case "inconclusive":
             (
                 "Can't tell", "This provider has no way to test a key, so nothing was sent.", GlassInk.slate,
-                "questionmark.square"
+                "questionmark.circle"
             )
         case "failed": ("Runner didn't answer", "The test didn't run to the end.", GlassInk.orange, "server.rack")
-        default:
-            ("Unknown result", "Core reported a result this app does not know.", GlassInk.slate, "questionmark.square")
+        default: (r, "Core reported this result.", GlassInk.slate, "questionmark.circle")
         }
     }
 }
@@ -91,7 +90,7 @@ struct TestTile: View {
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(spacing: Space.s2) {
                     Image(systemName: running ? "arrow.triangle.2.circlepath" : w?.symbol ?? "checkmark.shield")
-                        .font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(
+                        .font(.system(size: 22, weight: .semibold)).foregroundStyle(
                             running ? hue : w?.hue ?? GlassInk.slate
                         )
                         .symbolEffect(.pulse, options: .repeating, isActive: running)
@@ -100,8 +99,8 @@ struct TestTile: View {
                         .font(.system(size: MacTextSize.title, weight: .semibold))
                         .foregroundStyle(running ? GlassInk.primary : w?.hue ?? GlassInk.primary)
                     Spacer(minLength: 0)
-                    AppActionTile(
-                        title: rest > 0 ? "Again in \(rest) s" : "Test now", symbol: "play.fill", key: "V", hue: hue
+                    AccLink(
+                        title: rest > 0 ? "Again in \(rest) s" : "Test now · V", symbol: "play.fill"
                     ) { Task { await model.test(account) } }
                     .disabled(model.readOnly || running || rest > 0)
                     .help("Sends one free request with the key through a runner. Nothing is spent.")
@@ -125,7 +124,7 @@ struct TestTile: View {
                     .help("result \(last.result)")
                 }
             }
-            .animation(Motion.out(Motion.ui), value: running)
+            .animation(.smooth(duration: 0.3), value: running)
         }
     }
 }
@@ -141,10 +140,8 @@ struct LimitsTileBody: View {
             figure(account.maxTokens.map { $0.formatted(.number.notation(.compactName)) }, "tokens")
             figure(account.maxUSDMicros.map { ModelPriceItem.usd($0) }, "dollars")
             Spacer(minLength: 0)
-            AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "S", hue: hue) {
-                AccountDialogs.openLimits(model, account)
-            }
-            .disabled(model.readOnly)
+            AccLink(title: "Change · S", symbol: "slider.horizontal.3") { AccountDialogs.openLimits(model, account) }
+                .disabled(model.readOnly)
         }
         Text("When a session reaches either, Core stops it.").font(.system(size: MacTextSize.meta))
             .foregroundStyle(GlassInk.secondary)
@@ -152,13 +149,9 @@ struct LimitsTileBody: View {
 
     private func figure(_ v: String?, _ unit: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(v ?? "∞").font(.system(size: MacTextSize.large, weight: .semibold, design: .rounded))
-                .monospacedDigit().contentTransition(.numericText())
-            Text(
-                v == nil
-                    ? "no \(unit == "tokens" ? "token" : "dollar") limit" : unit == "tokens" ? "tokens" : "to spend"
-            )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(v ?? "∞").font(.system(size: 26, weight: .bold, design: .rounded)).contentTransition(.numericText())
+            Text(v == nil ? "no \(unit == "tokens" ? "token" : "dollar") limit" : unit)
+                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
     }
 }
@@ -210,7 +203,7 @@ struct LimitsDialog: View {
                     ) { go() }
                     CoreTextField(
                         "Most dollars", placeholder: "No limit", text: $dollars,
-                        error: usdValue == nil ? "An amount in dollars, like $5.00 or $2.50." : nil, suffix: "$"
+                        error: usdValue == nil ? "An amount in dollars, like 5 or 2.50." : nil, suffix: "USD"
                     ) { go() }
                 }
                 Text(
@@ -220,7 +213,7 @@ struct LimitsDialog: View {
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["limits-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(
+                AccDialogButtons(
                     confirm: "Save", busy: busy, enabled: tokenValue != nil && usdValue != nil, cancel: close
                 ) { go() }
             }

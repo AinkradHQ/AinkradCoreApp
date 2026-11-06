@@ -18,17 +18,6 @@ extension View {
         modifier(PanelModifier(radius: radius, padding: padding, part: part))
     }
 
-    /// An input's well: clear Liquid Glass on macOS 26 / iOS 26 (the field reads as cut into the glass card), the
-    /// glass-card tint below.
-    @ViewBuilder
-    public func coreGlassField(radius: CGFloat = Radius.control, fallback: Color) -> some View {
-        if #available(macOS 26, iOS 26, *) {
-            glassEffect(.clear.interactive(), in: coreShape(radius))
-        } else {
-            background(fallback, in: coreShape(radius))
-        }
-    }
-
     /// The neutral glass-card tint used by rows, banners and toasts. A tint, not a second material.
     public func coreCard(_ fill: Color, radius: CGFloat) -> some View {
         background(fill, in: coreShape(radius))

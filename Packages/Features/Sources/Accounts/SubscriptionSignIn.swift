@@ -14,6 +14,8 @@ struct SubscriptionSignIn: View {
     @State private var advanced = false
     @State private var runners: [AccountRunner] = []
     @State private var runner: String?
+    @FocusState private var codeFocus: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var hue: Color { ProviderLook.hue(provider.id) }
     private var labelOK: Bool { label.range(of: "^[a-z][a-z0-9._-]{0,63}$", options: .regularExpression) != nil }
@@ -33,7 +35,7 @@ struct SubscriptionSignIn: View {
             }
             .transition(.opacity.combined(with: .move(edge: .trailing)))
         }
-        .animation(Motion.out(Motion.move), value: model.signIn)
+        .animation(.smooth(duration: 0.4), value: model.signIn)
         .accessibilityIdentifier("subscription-sign-in")
     }
 
@@ -69,11 +71,11 @@ struct SubscriptionSignIn: View {
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: 0)
                 AccLink(title: advanced ? "Hide" : "Pick a runner", symbol: advanced ? "chevron.up" : "chevron.down") {
-                    withAnimation(Motion.out(Motion.move)) { advanced.toggle() }
+                    withAnimation(.smooth(duration: 0.35)) { advanced.toggle() }
                 }
             }
             if advanced { runnerPicker.transition(.opacity.combined(with: .move(edge: .top))) }
-            CoreDialogFooter(confirm: "Sign in with Claude", enabled: ack && labelOK, cancel: close) {
+            AccDialogButtons(confirm: "Sign in with Claude", enabled: ack && labelOK, cancel: close) {
                 Task { await model.startSignIn(provider: provider.id, label: label, runner: runner) }
             }
         }
@@ -82,7 +84,7 @@ struct SubscriptionSignIn: View {
     /// Automatic first, then each runner; one that is offline can't be picked.
     private var runnerPicker: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Space.s2)], spacing: Space.s2) {
-            AccPick(title: "Automatic", sub: "Best ready runner", symbol: "bolt", hue: hue, on: runner == nil) {
+            AccPick(title: "Automatic", sub: "Best ready runner", symbol: "sparkles", hue: hue, on: runner == nil) {
                 runner = nil
             }
             ForEach(runners) { r in
@@ -107,14 +109,25 @@ struct SubscriptionSignIn: View {
                 .keyboardShortcut("o", modifiers: .command)
             }
             numbered(2, "Paste the code Claude shows you", "It's a short code, not a password.") {
-                CoreTextField(
-                    "Code", placeholder: "Paste the code here", text: $code, mono: true, autofocus: true,
-                    onSubmit: send
-                )
-                .accessibilityIdentifier("sign-in-code")
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "doc.on.clipboard").foregroundStyle(codeFocus ? hue : GlassInk.secondary)
+                        .symbolEffect(.bounce, value: codeFocus)
+                    TextField("Paste the code here", text: $code).textFieldStyle(.plain)
+                        .font(.system(size: MacTextSize.title, design: .monospaced)).focused($codeFocus)
+                        .autocorrectionDisabled().onSubmit(send)
+                        .accessibilityIdentifier("sign-in-code")
+                }
+                .padding(.horizontal, Space.s3).frame(minHeight: 44)
+                .background(codeFocus ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2))
+                .overlay {
+                    coreShape(Radius.control + 2).strokeBorder(
+                        codeFocus ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: codeFocus ? 1.5 : 1)
+                }
+                .shadow(color: hue.opacity(codeFocus ? 0.35 : 0), radius: 10)
+                .focusEffectDisabled()
                 if let e = model.signIn?.codeError { AccIssue(text: e) }
             }
-            CoreDialogFooter(
+            AccDialogButtons(
                 confirm: "Connect", enabled: !code.trimmingCharacters(in: .whitespaces).isEmpty,
                 cancel: {
                     Task {
@@ -123,14 +136,23 @@ struct SubscriptionSignIn: View {
                     }
                 }, run: send)
         }
+        .onAppear { codeFocus = true }
+        .animation(.smooth(duration: 0.3), value: codeFocus)
     }
 
     private func send() { Task { await model.sendSignInCode(code) } }
 
     private func waiting(_ title: String, _ line: String) -> some View {
         VStack(spacing: Space.s3) {
-            IconTile("person.badge.clock", hue: hue, size: Space.s8 * 2)
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold))
+            Image(systemName: "person.crop.circle.badge.clock").font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.white).frame(width: 64, height: 64)
+                .background(
+                    LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
+                    in: coreShape(16)
+                )
+                .shadow(color: hue.opacity(0.5), radius: 16)
+                .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
+            Text(title).font(.system(size: MacTextSize.large, weight: .bold))
             Text(line).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             AccBar().frame(maxWidth: Space.s8 * 6)
             AppActionTile(title: "Stop", symbol: "xmark", key: "esc", hue: GlassInk.slate) {
@@ -146,14 +168,22 @@ struct SubscriptionSignIn: View {
 
     private func done(_ account: Int64?) -> some View {
         VStack(spacing: Space.s3) {
-            IconTile("checkmark.seal.fill", hue: GlassInk.green, size: Space.s8 * 2, bounce: account)
-            Text("Your Claude plan is connected").font(.system(size: MacTextSize.large, weight: .semibold))
+            Image(systemName: "checkmark.seal.fill").font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.white).frame(width: 72, height: 72)
+                .background(
+                    LinearGradient(
+                        colors: [GlassInk.green, GlassInk.green.opacity(0.55)], startPoint: .top, endPoint: .bottom),
+                    in: coreShape(18)
+                )
+                .shadow(color: GlassInk.green.opacity(0.55), radius: 18)
+                .symbolEffect(.bounce, value: account)
+            Text("Your Claude plan is connected").font(.system(size: MacTextSize.large, weight: .bold))
             Text(
                 "It's saved in your Core as \(model.signIn?.label ?? "your plan"). Put it in a pool of its own so agents can use it."
             )
             .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            CoreDialogFooter(confirm: "Open the account", cancelTitle: "Close", cancel: finish) {
+            AccDialogButtons(confirm: "Open the account", cancelTitle: "Close", cancel: finish) {
                 let id = account
                 finish()
                 if let id {
@@ -167,11 +197,12 @@ struct SubscriptionSignIn: View {
 
     private func failed(_ why: String) -> some View {
         VStack(spacing: Space.s3) {
-            IconTile("exclamationmark.triangle.fill", hue: GlassInk.red, size: Space.s8 * 2, bounce: true)
-            Text("Couldn't connect Claude").font(.system(size: MacTextSize.large, weight: .semibold))
+            IconTile("exclamationmark.triangle.fill", hue: GlassInk.red, size: 64, bounce: true)
+                .shadow(color: GlassInk.red.opacity(0.5), radius: 16)
+            Text("Couldn't connect Claude").font(.system(size: MacTextSize.large, weight: .bold))
             Text(why).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true).help(model.signIn?.reason ?? "")
-            CoreDialogFooter(confirm: "Try again", cancelTitle: "Close", cancel: finish) { model.signIn = nil }
+                .fixedSize(horizontal: false, vertical: true)
+            AccDialogButtons(confirm: "Try again", cancelTitle: "Close", cancel: finish) { model.signIn = nil }
         }
         .frame(maxWidth: .infinity)
     }
@@ -183,8 +214,8 @@ struct SubscriptionSignIn: View {
 
     private func numbered<C: View>(_ n: Int, _ title: String, _ line: String, @ViewBuilder _ c: () -> C) -> some View {
         HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: "\(n).square.fill").font(.system(size: MacTextSize.large, weight: .semibold))
-                .foregroundStyle(hue)
+            Image(systemName: "\(n).square.fill").font(.system(size: 26, weight: .semibold)).foregroundStyle(hue)
+                .shadow(color: hue.opacity(0.45), radius: 8)
             VStack(alignment: .leading, spacing: Space.s2) {
                 Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text(line).foregroundStyle(GlassInk.secondary)

@@ -118,7 +118,7 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .machines: "Runner slots in use and host load, sampled on this Mac."
         case .board: "Issues by state across the board."
         case .events: "What just happened on the Core."
-        case .core: "Your Core's connection and the alarms it raised."
+        case .core: "Home Core connection and the alarms it raised."
         case .quick: "New session, new terminal, add a device, open the launcher."
         case .clock: "Time and date."
         }

@@ -79,7 +79,7 @@ public final class AdminModel {
 
     /// One line for a refused write, shown in place.
     func words(_ error: any Error) -> String {
-        if let f = error as? AdminFailure { return f.message }
+        if let f = error as? AdminFailure { return "\(f.message) (\(f.code))" }
         if case .rateLimited(let after)? = CoreError.unwrapping(error) { host.rateLimited(retryAfter: after) }
         return CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription
     }
@@ -120,19 +120,19 @@ public final class AdminModel {
             [(id: String, group: SettingsGroup, title: String, symbol: String, order: Int, sub: String, keys: [String])] =
                 [
                     (
-                        "core", .core, "Core settings", "gearshape", 0, "The settings your Core runs on",
+                        "core", .core, "Core settings", "gearshape", 0, "Registry values, their limits and history",
                         ["registry", "limits", "out_of_bounds", "history"]
                     ),
                     (
                         "switches", .core, "Feature switches", "switch.2", 2,
-                        "Turn Core features on or off", ["flags", "secrets mode", "passkey", "gates"]
+                        "Secrets mode, passkey admin, terminal drivers", ["flags", "secrets mode", "passkey", "gates"]
                     ),
                     (
-                        "ops", .core, "Ops", "waveform.path.ecg", 3, "How your Core is doing",
+                        "ops", .core, "Ops", "waveform.path.ecg", 3, "Alarms, health and metrics",
                         ["health", "alarms", "metrics", "prometheus"]
                     ),
                     (
-                        "secrets", .security, "Secrets", "key", 1, "Keys your runners can be lent",
+                        "secrets", .security, "Secrets", "key", 1, "Write-only values the broker leases to runners",
                         ["broker", "keys", "leases", "tokens"]
                     ),
                     (

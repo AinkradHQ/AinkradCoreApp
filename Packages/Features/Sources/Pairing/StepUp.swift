@@ -190,6 +190,7 @@ struct StepUpSheet: View {
                     )
                     .overlay { coreShape(Radius.cardMac + 6).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                     .frame(width: 112, height: 112)
+                    .shadow(color: hue.opacity(0.6), radius: done ? 30 : 18)
                 // A light sweep across the tile while it waits, under the Touch ID view: Apple's view cancels when anything
                 // covers it.
                 if !done && !missed && !reduce {
@@ -208,8 +209,7 @@ struct StepUpSheet: View {
                             .frame(width: 46, height: 46)
                             .transition(.scale.combined(with: .opacity))
                     } else if missed {
-                        Image(systemName: "xmark").font(.system(size: MacTextSize.large * 1.5, weight: .semibold))
-                            .foregroundStyle(.white)
+                        Image(systemName: "xmark").font(.system(size: 40, weight: .bold)).foregroundStyle(.white)
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         // Apple's own Touch ID view, inside this sheet: macOS asks here instead of a second panel.
@@ -223,11 +223,11 @@ struct StepUpSheet: View {
             .frame(width: 170, height: 170)
             .modifier(Shake(count: missed && !reduce ? 3 : 0))
             .animation(.linear(duration: 0.45), value: missed)
-            .animation(Motion.out(Motion.move), value: done)
+            .animation(.spring(duration: 0.4, bounce: 0.35), value: done)
             .accessibilityHidden(true)
             VStack(spacing: Space.s2) {
                 Text(done ? "Unlocked" : missed ? "Didn't match" : "Touch the sensor")
-                    .font(.system(size: MacTextSize.large, weight: .semibold))
+                    .font(.system(size: MacTextSize.large + 6, weight: .bold))
                     .contentTransition(.opacity)
                     .accessibilityAddTraits(.isHeader)
                 Text(
@@ -281,7 +281,7 @@ struct StepUpSheet: View {
         }
         .onDisappear { if let keys { NSEvent.removeMonitor(keys) } }
         .onChange(of: done) { _, now in
-            if now { withAnimation(Motion.out(reduce ? 0.01 : Motion.move).delay(0.1)) { drawn = 1 } }
+            if now { withAnimation(.easeOut(duration: reduce ? 0.01 : 0.4).delay(0.1)) { drawn = 1 } }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Confirm with Touch ID")

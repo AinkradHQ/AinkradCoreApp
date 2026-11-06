@@ -10,7 +10,7 @@ struct AddDeviceView: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        CoreDialogPanel(title, width: Space.s8 * 16) {
+        DialogCard(title: title, width: Space.s8 * 16, close: close) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 switch model.stage {
                 case .form, .creating: form
@@ -70,7 +70,7 @@ struct AddDeviceView: View {
                     .system(size: MacTextSize.meta, weight: .semibold)
                 ).foregroundStyle(palette.text2)
                 if model.kind == "runner" {
-                    Text("A runner can only use secrets that are lent to it.").foregroundStyle(palette.text2)
+                    Text("A runner holds exactly runner: it only redeems secret leases.").foregroundStyle(palette.text2)
                 } else {
                     // Each scope a tile that lights up when chosen; a scope this Mac does not hold stays dim and says why.
                     LazyVGrid(
@@ -89,10 +89,10 @@ struct AddDeviceView: View {
                 }
             }
             HStack(spacing: Space.s2) {
-                Button("Cancel", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
-                Spacer(minLength: 0)
                 Text("Lasts 5 minutes · single use").font(.system(size: MacTextSize.meta))
                     .foregroundStyle(palette.text2)
+                Spacer(minLength: 0)
+                Button("Cancel", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
                 Button("Create pairing") { Task { await model.create() } }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.stage == .creating))
                     .coreShortcut(.primary).disabled(!model.canCreate)
@@ -133,8 +133,8 @@ struct AddDeviceView: View {
             }
             .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)
             HStack {
-                Button("Cancel pairing") { Task { await model.reject() } }.buttonStyle(.coreSecondary)
                 Spacer()
+                Button("Cancel pairing") { Task { await model.reject() } }.buttonStyle(.coreSecondary)
                 Button("Close", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
             }
         }
@@ -167,8 +167,7 @@ struct AddDeviceView: View {
                 FactRow(key: "Name", value: info.name ?? "Unnamed")
                 FactRow(key: "Platform", value: DeviceWords.platform(info.platform))
                 FactRow(key: "Its key", value: DeviceWords.storage(info.keyStorage))
-                FactRow(key: "Will get", value: info.scopes.map(ScopeText.name).joined(separator: ", "))
-                    .help(info.scopes.joined(separator: ", "))
+                FactRow(key: "Will get", value: info.scopes.joined(separator: ", "), mono: true)
                 if let until = info.expiresAt {
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
                         let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
@@ -190,8 +189,8 @@ struct AddDeviceView: View {
             Text("Typing it proves you looked at this device's own screen.")
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             HStack(spacing: Space.s2) {
-                Button("Reject") { Task { await model.reject() } }.buttonStyle(.coreSecondary).disabled(model.busy)
                 Spacer(minLength: 0)
+                Button("Reject") { Task { await model.reject() } }.buttonStyle(.coreSecondary).disabled(model.busy)
                 Button("Approve") { Task { await model.approve() } }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.busy)).coreShortcut(.primary)
                     .disabled(!model.checkMatches)
@@ -211,7 +210,7 @@ struct AddDeviceView: View {
             }
             .foregroundStyle(palette.tone(.fail).ink)
         } else if model.checkMatches {
-            Label("All \(total) groups match", systemImage: "checkmark.square")
+            Label("All \(total) groups match.", systemImage: "checkmark.circle")
                 .foregroundStyle(palette.tone(.done).ink)
         } else {
             Label(
@@ -245,8 +244,8 @@ struct AddDeviceView: View {
             )
             .foregroundStyle(palette.text2)
             HStack {
-                Button("Close", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
                 Spacer()
+                Button("Close", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
                 Button("Create a new pairing") { model.restart() }.buttonStyle(.coreProminent)
                     .coreShortcut(.primary)
             }

@@ -9,7 +9,7 @@ public enum GlassInk {
     public static let well = Color.white.opacity(0.08)
     public static let wellHover = Color.white.opacity(0.13)
     public static let wellEdge = Color.white.opacity(0.14)
-    public static let blue = Color(red: 96 / 255, green: 165 / 255, blue: 255 / 255)
+    public static let blue = Color(red: 0.25, green: 0.6, blue: 1)
     public static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
     public static let orange = Color(red: 1, green: 0.62, blue: 0.1)
     public static let red = Color(red: 1, green: 0.38, blue: 0.4)
@@ -35,10 +35,10 @@ public struct IconTile<Trigger: Equatable>: View {
             .frame(width: size, height: size)
             .background(
                 LinearGradient(colors: [hue, hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(size > 40 ? Radius.cardMac : Radius.control)
+                in: coreShape(size > 40 ? Radius.control + 4 : Radius.control)
             )
             .overlay {
-                coreShape(size > 40 ? Radius.cardMac : Radius.control).strokeBorder(
+                coreShape(size > 40 ? Radius.control + 4 : Radius.control).strokeBorder(
                     .white.opacity(0.25), lineWidth: 1)
             }
             .accessibilityHidden(true)
@@ -77,7 +77,7 @@ public struct GlassSection<Content: View, Accessory: View>: View {
             HStack(spacing: Space.s3) {
                 IconTile(symbol, hue: hue, bounce: shown)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(title).font(.system(size: MacTextSize.headline + 1, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                     if let sub { Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary) }
                 }
@@ -104,12 +104,13 @@ extension GlassSection where Accessory == EmptyView {
     }
 }
 
-/// A section's action: an icon and a word.
+/// A section's action: an icon and a word, the icon bouncing when the pointer arrives.
 public struct SectionAction: View {
     let title: String
     let symbol: String
     let danger: Bool
     let action: () -> Void
+    @State private var hovering = false
     public init(_ title: String, symbol: String, danger: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.symbol = symbol
@@ -121,10 +122,11 @@ public struct SectionAction: View {
             Label {
                 Text(title)
             } icon: {
-                Image(systemName: symbol)
+                Image(systemName: symbol).symbolEffect(.bounce, value: hovering)
             }
         }
         .buttonStyle(CoreButtonStyle(danger ? .danger : .secondary))
+        .onHover { hovering = $0 }
     }
 }
 
@@ -183,13 +185,13 @@ public struct ScopeTile: View {
     public var body: some View {
         HStack(alignment: .top, spacing: Space.s3) {
             IconTile(symbol, hue: on ? hue : GlassInk.slate.opacity(0.5), bounce: on)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(name.capitalized).font(.system(size: MacTextSize.body, weight: .semibold))
                 Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Image(systemName: on ? "checkmark.square.fill" : "square").font(.system(size: MacTextSize.title))
+            Image(systemName: on ? "checkmark.circle.fill" : "circle").font(.system(size: MacTextSize.title))
                 .foregroundStyle(on ? hue : GlassInk.track).contentTransition(.symbolEffect(.replace))
                 .accessibilityHidden(true)
         }
@@ -198,7 +200,7 @@ public struct ScopeTile: View {
         .background(on ? hue.opacity(0.16) : GlassInk.well, in: coreShape(Radius.row))
         .overlay { coreShape(Radius.row).strokeBorder(on ? hue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1) }
         .opacity(on ? 1 : 0.75)
-        .animation(Motion.out(Motion.ui), value: on)
+        .animation(.spring(duration: 0.3, bounce: 0.2), value: on)
         .accessibilityElement(children: .combine)
         .accessibilityValue(on ? "on" : "off")
     }
@@ -218,14 +220,14 @@ private struct RiseModifier: ViewModifier {
     func body(content: Content) -> some View {
         content.opacity(shown ? 1 : 0).offset(y: shown || reduce ? 0 : 10)
             .animation(
-                (reduce ? Motion.out(Motion.hover) : Motion.out(Motion.move))
-                    .delay(Double(min(index, 10)) * Motion.stagger),
+                (reduce ? Animation.easeOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.2))
+                    .delay(Double(min(index, 10)) * 0.05),
                 value: shown)
     }
 }
 
 /// A scroll view with a glass scroll bar: a thin white thumb at the very right edge that fades in while scrolling and
-/// brightens under the pointer, instead of the grey system bar (Ahmed, 2026-11-05). macOS 15 and later; below that the
+/// widens under the pointer, instead of the grey system bar (Ahmed, 2026-11-05). macOS 15 and later; below that the
 /// system bar stays.
 public struct GlassScroll<Content: View>: View {
     let content: Content
@@ -258,15 +260,15 @@ public struct GlassScroll<Content: View>: View {
             let height = max(36, metrics.visible * ratio)
             let travel = metrics.visible - height
             let progress = min(max(metrics.offset / (metrics.content - metrics.visible), 0), 1)
-            coreShape(2)
+            Capsule()
                 .fill(.white.opacity(hovering ? 0.55 : 0.38))
-                .overlay { coreShape(2).strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
-                .frame(width: 6, height: height)
+                .overlay { Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
+                .frame(width: hovering ? 8 : 5, height: height)
                 .offset(y: travel * progress)
                 .padding(.trailing, 3)
                 .opacity(active || hovering ? 1 : 0)
-                .animation(Motion.out(Motion.ui), value: active)
-                .animation(Motion.out(Motion.ui), value: hovering)
+                .animation(.easeOut(duration: 0.25), value: active)
+                .animation(.spring(duration: 0.25), value: hovering)
                 .frame(width: 16, alignment: .trailing)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .contentShape(Rectangle())

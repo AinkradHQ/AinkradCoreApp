@@ -229,12 +229,12 @@ public final class ShellModel {
         }
         launcher.register(
             LauncherEntry(
-                id: "settings", title: "Settings", sub: "Mac, Apps, Core, Security, Notifications",
+                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
                 symbol: "gearshape", keywords: ["preferences", "appearance", "activity"], tile: .slate
             ) { [weak self] in self?.open(.settings) })
         launcher.register(
             LauncherEntry(
-                id: "shortcuts", title: "Keyboard Shortcuts", sub: "Every key the app answers to",
+                id: "shortcuts", title: "Keyboard Shortcuts", sub: "every key the app answers to",
                 symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
             ) { [weak self] in self?.open(.shortcuts) })
         launcher.register(
@@ -295,7 +295,7 @@ public final class ShellModel {
     }
 
     public func reopenClosedPane() {
-        guard let spec = closedPanes.popLast() else { return showToast("No closed pane to reopen", kind: .info) }
+        guard let spec = closedPanes.popLast() else { return showToast("No closed pane to reopen.", kind: .info) }
         openPane(spec)
     }
 
@@ -434,8 +434,8 @@ public final class ShellModel {
 
     /// Anything the shell shows over Home or the workspace.
     public var coverOpen: Bool {
-        sheet != nil || launcherOpen || actionsOpen || overviewOpen || elevationPanelOpen || bellOpen
-            || overlay != nil || dialog != nil || topDialog != nil
+        sheet != nil || launcherOpen || elevationPanelOpen || bellOpen || overlay != nil || dialog != nil
+            || topDialog != nil
     }
 
     public func present(_ d: ShellDialog) {
@@ -498,7 +498,7 @@ public final class ShellModel {
     public func moveWidget(_ id: UUID, dx: Int, dy: Int) { _ = edit { $0.nudge(id, dx: dx, dy: dy) } }
 
     public func resizeWidget(_ id: UUID, to size: WidgetSize) {
-        if !edit({ $0.resize(id, to: size) }) { showToast("Not enough room for that size") }
+        if !edit({ $0.resize(id, to: size) }) { showToast("Not enough room for that size.") }
     }
 
     @discardableResult
@@ -526,7 +526,7 @@ public final class ShellModel {
         else { return }
         showToast("Removed \(gone.kind.title)") { [weak self] in
             guard let self else { return }
-            if !self.edit({ $0.restore(gone) }) { self.showToast("No room to bring it back") }
+            if !self.edit({ $0.restore(gone) }) { self.showToast("No room to bring it back.") }
         }
     }
 

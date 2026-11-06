@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// New terminal (advanced): where it runs, what it starts, a live preview of what Open will do. The quick New terminal
-/// skips this sheet. A refusal lands inline in words; the Core's own code is in its hover help.
+/// skips this sheet. A refusal lands inline with the Core's own code.
 struct NewTerminalView: View {
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
@@ -18,9 +18,9 @@ struct NewTerminalView: View {
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
             HStack(spacing: Space.s3) {
-                IconTile("terminal", hue: GlassInk.slate, size: Space.s8 + Space.s5, bounce: shown)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text("New terminal").font(.system(size: MacTextSize.large, weight: .semibold))
+                IconTile("terminal", hue: GlassInk.slate, size: 52, bounce: shown)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("New terminal").font(.system(size: MacTextSize.large + 4, weight: .bold))
                         .accessibilityAddTraits(.isHeader)
                     Text("Pick where it runs and what it starts.").foregroundStyle(GlassInk.secondary)
                 }
@@ -28,12 +28,8 @@ struct NewTerminalView: View {
             .coreRise(shown, 0)
             step("Where", "server.rack", index: 1) {
                 if model.runners.isEmpty {
-                    if model.load == .ready {
-                        Label("No runners are paired with this Core.", systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(GlassInk.secondary)
-                    } else {
-                        BusyBar()
-                    }
+                    Label("No runners are paired with this Core.", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(GlassInk.secondary)
                 }
                 LazyVGrid(
                     columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
@@ -57,21 +53,23 @@ struct NewTerminalView: View {
                     .textFieldStyle(.plain).font(.system(size: MacTextSize.body, design: .monospaced))
                     .autocorrectionDisabled()
                     .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
-                    .coreGlassField(fallback: GlassInk.well)
+                    .coreFieldSurface()
                     .onSubmit { Task { await form.submit() } }
                     .accessibilityLabel("Program to start")
             }
             preview.coreRise(shown, 3)
-            Label("Runs as the runner's user in a sandbox.", systemImage: "info.square")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                .help(
-                    "sudo, su and ping don't work in it. Opening a terminal needs the same permission as admin tools today."
-                )
+            Label(
+                "Runs as the runner's user in a sandbox: sudo, su and ping don't work. The terminal scope counts as admin-level today.",
+                systemImage: "info.circle"
+            )
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .fixedSize(horizontal: false, vertical: true)
             if let n = model.host.elevationNotice { ElevationBanner(notice: n) }
             if let e = form.error {
                 TermBanner(
                     tone: .fail, title: e.title,
-                    detail: e.text, help: e.http > 0 ? "\(e.code) · \(e.http)" : e.code
+                    detail: [e.text, e.http > 0 ? "\(e.code) · \(e.http)" : e.code].filter { !$0.isEmpty }.joined(
+                        separator: "\n")
                 )
                 .accessibilityIdentifier("new-terminal-error")
             }
@@ -90,8 +88,8 @@ struct NewTerminalView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .onAppear { shown = true }
-        .animation(Motion.out(Motion.ui), value: form.runner)
-        .animation(Motion.out(Motion.ui), value: form.program)
+        .animation(.spring(duration: 0.3, bounce: 0.2), value: form.runner)
+        .animation(.spring(duration: 0.3, bounce: 0.2), value: form.program)
     }
 
     private func step<C: View>(_ title: String, _ symbol: String, index: Int, @ViewBuilder _ content: () -> C)
@@ -113,14 +111,16 @@ struct NewTerminalView: View {
                 Text("\(form.chosen?.name ?? "no runner") $ \(program.isEmpty ? "login shell" : program)")
                     .font(.system(size: MacTextSize.body, design: .monospaced))
                     .contentTransition(.opacity)
-                Text("30 × 100").font(.system(size: MacTextSize.meta, design: .monospaced)).monospacedDigit()
-                    .foregroundStyle(GlassInk.secondary)
+                HStack(spacing: 0) {
+                    Text("30 × 100").font(.system(size: MacTextSize.meta, design: .monospaced))
+                        .foregroundStyle(GlassInk.secondary)
+                }
             }
             Spacer(minLength: 0)
             BlinkingCursor()
         }
         .padding(Space.s3)
-        .background(GlassInk.well, in: coreShape(Radius.row))
+        .background(Color.black.opacity(0.35), in: coreShape(Radius.row))
         .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
@@ -139,8 +139,7 @@ private struct RunnerTile: View {
     var body: some View {
         let st = RunnerStatus(runner)
         let on = form.runner == runner.id
-        let hue: Color = st == .ok ? GlassInk.blue : GlassInk.slate
-        let statusHue: Color = st == .off ? GlassInk.red : GlassInk.orange
+        let hue: Color = st == .off ? GlassInk.red : st == .ok ? GlassInk.green : GlassInk.orange
         let warn: String? =
             st == .off
             ? "Not connected"
@@ -156,20 +155,17 @@ private struct RunnerTile: View {
                     HStack {
                         Text(runner.name).font(.system(size: MacTextSize.headline, weight: .semibold))
                         Spacer()
-                        Image(systemName: on ? "checkmark.square.fill" : "square").foregroundStyle(
+                        Image(systemName: on ? "checkmark.circle.fill" : "circle").foregroundStyle(
                             on ? GlassInk.blue : GlassInk.track
                         )
                         .contentTransition(.symbolEffect(.replace))
                     }
-                    Text(
-                        [runner.arch.map(RunnerWords.arch), "\(model.onRunner(runner.id)) open"].compactMap { $0 }
-                            .joined(separator: " · ")
-                    )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text([runner.arch, "\(model.onRunner(runner.id)) open"].compactMap { $0 }.joined(separator: " · "))
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     CoreSlots(used: runner.load, capacity: runner.capacity)
                     if let warn {
                         Label(warn, systemImage: st.symbol).font(.system(size: MacTextSize.meta, weight: .medium))
-                            .foregroundStyle(statusHue)
+                            .foregroundStyle(hue)
                     }
                 }
             }
@@ -188,8 +184,9 @@ private struct RunnerTile: View {
         }
         .buttonStyle(.plain)
         .disabled(st == .off && !on)
+        .scaleEffect(hovering ? 1.015 : 1)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(.spring(duration: 0.25), value: hovering)
         .accessibilityLabel("\(runner.name), \(st.label)\(warn.map { ", \($0)" } ?? "")")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
@@ -205,12 +202,11 @@ private struct ShellTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s1) {
-                Image(systemName: symbol).font(.system(size: MacTextSize.title, weight: .semibold)).symbolEffect(
-                    .bounce, value: on)
+                Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).symbolEffect(.bounce, value: on)
                 Text(title).font(.system(size: MacTextSize.meta, weight: .medium, design: .monospaced)).lineLimit(1)
             }
             .foregroundStyle(GlassInk.primary)
-            .frame(maxWidth: .infinity, minHeight: Space.s8 + Space.s6)
+            .frame(maxWidth: .infinity, minHeight: 58)
             .background(
                 on ? GlassInk.blue.opacity(0.22) : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.row)
@@ -227,10 +223,14 @@ private struct ShellTile: View {
     }
 }
 
-/// A terminal cursor, at rest (the blink is the terminal's own setting).
+/// A terminal cursor that blinks (opacity, so it stays under Reduce Motion).
 private struct BlinkingCursor: View {
+    @State private var on = true
     var body: some View {
-        coreShape(Radius.chip / 3).fill(GlassInk.blue).frame(width: Space.s2, height: Space.s5)
+        Rectangle().fill(GlassInk.green).frame(width: 9, height: 18)
+            .opacity(on ? 1 : 0.15)
+            .animation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
+            .onAppear { on = false }
             .accessibilityHidden(true)
     }
 }

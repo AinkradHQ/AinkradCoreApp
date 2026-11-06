@@ -51,13 +51,13 @@ enum AuditWords {
 
     static let areas: [Area] = [
         Area(id: "device.", title: "Devices", symbol: "laptopcomputer.and.iphone", hue: GlassInk.blue),
-        Area(id: "pairing.", title: "Pairing", symbol: "qrcode", hue: GlassInk.blue),
-        Area(id: "auth.", title: "Sign-in", symbol: "lock.shield.fill", hue: GlassInk.blue),
+        Area(id: "pairing.", title: "Pairing", symbol: "qrcode", hue: GlassInk.violet),
+        Area(id: "auth.", title: "Sign-in", symbol: "lock.shield.fill", hue: GlassInk.red),
         Area(id: "setting.", title: "Settings", symbol: "slider.horizontal.3", hue: GlassInk.blue),
-        Area(id: "secret.", title: "Secrets", symbol: "key.fill", hue: GlassInk.blue),
-        Area(id: "account.", title: "Accounts", symbol: "person.crop.square.fill", hue: GlassInk.blue),
-        Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.blue),
-        Area(id: "agent.", title: "Agents", symbol: "play.fill", hue: GlassInk.blue),
+        Area(id: "secret.", title: "Secrets", symbol: "key.fill", hue: GlassInk.orange),
+        Area(id: "account.", title: "Accounts", symbol: "person.crop.circle.fill", hue: GlassInk.green),
+        Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.green),
+        Area(id: "agent.", title: "Agents", symbol: "sparkles", hue: GlassInk.violet),
     ]
 
     static func area(_ action: String) -> Area {
@@ -94,8 +94,7 @@ enum AuditWords {
         switch a.entityKind {
         case "setting": return "“\(title(ref) ?? ref)”"
         case "lockout": return ref.split(separator: ":").dropFirst().joined(separator: ":")
-        case "secret": return "secret \(ref)"
-        case let k?: return "a \(k)"
+        case let k?: return "\(k) \(ref)"
         case nil: return ref
         }
     }
@@ -109,19 +108,32 @@ private struct AuditFilters: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Space.s2) {
-                    AppFilterTile(title: "All", count: -1, on: model.filter.kind.isEmpty, key: "") {
+                    chip("All", "square.grid.2x2.fill", GlassInk.slate, on: model.filter.kind.isEmpty) {
                         model.filter.kind = ""
                     }
                     ForEach(AuditWords.areas) { a in
-                        AppFilterTile(title: a.title, count: -1, on: model.filter.kind == a.id, key: "") {
-                            model.filter.kind = a.id
-                        }
+                        chip(a.title, a.symbol, a.hue, on: model.filter.kind == a.id) { model.filter.kind = a.id }
                     }
                 }
             }
             HStack(spacing: Space.s3) {
-                CoreTextField("Find", placeholder: "A device, secret or setting", text: $model.filter.target)
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary)
+                    TextField("Find a name: a device, secret or setting", text: $model.filter.target)
+                        .textFieldStyle(.plain)
+                    if !model.filter.target.isEmpty {
+                        Button {
+                            model.filter.target = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                        }
+                        .buttonStyle(.plain).foregroundStyle(GlassInk.secondary)
+                    }
+                }
+                .padding(.horizontal, Space.s3).frame(height: 34)
+                .background(GlassInk.well, in: coreShape(Radius.control + 2))
+                .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .focusEffectDisabled()
                 CoreSegmented(
                     "Who",
                     segments: [
@@ -140,7 +152,23 @@ private struct AuditFilters: View {
                 }
             }
         }
-        .animation(Motion.out(Motion.ui), value: model.filter)
+        .animation(.smooth(duration: 0.3), value: model.filter)
+    }
+
+    private func chip(_ title: String, _ symbol: String, _ hue: Color, on: Bool, run: @escaping () -> Void) -> some View
+    {
+        Button(action: run) {
+            Label(title, systemImage: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                .foregroundStyle(on ? .white : GlassInk.secondary)
+                .padding(.horizontal, Space.s3).frame(height: 30)
+                .background(on ? hue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.control))
+                .overlay {
+                    coreShape(Radius.control).strokeBorder(on ? .white.opacity(0.25) : GlassInk.wellEdge, lineWidth: 1)
+                }
+                .shadow(color: hue.opacity(on ? 0.45 : 0), radius: 8)
+                .contentShape(coreShape(Radius.control))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -152,7 +180,7 @@ private struct AuditList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             ScrollViewReader { proxy in
-                VStack(spacing: Space.s1 / 2) {
+                VStack(spacing: 2) {
                     ForEach(Array(model.items.enumerated()), id: \.element.id) { i, a in
                         if i == 0 || !Calendar.current.isDate(a.at, inSameDayAs: model.items[i - 1].at) {
                             Text(day(a.at)).font(.system(size: MacTextSize.meta, weight: .semibold))
@@ -165,11 +193,12 @@ private struct AuditList: View {
                 }
                 .onChange(of: model.selected) { _, s in
                     guard let s else { return }
-                    withAnimation(Motion.out(Motion.ui)) { proxy.scrollTo(s, anchor: .center) }
+                    withAnimation(.smooth(duration: 0.25)) { proxy.scrollTo(s, anchor: .center) }
                 }
             }
             .padding(Space.s2)
-            .coreWell()
+            .background(GlassInk.well, in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             .focusable().focused($focused).focusEffectDisabled()
             .onKeyPress(phases: .down) { press in
                 switch press.key {
@@ -220,7 +249,7 @@ private struct AuditList: View {
         let s = AuditWords.sentence(a) { admin.registry.item($0).map(SettingWords.title) }
         return HStack(spacing: Space.s3) {
             IconTile(area.symbol, hue: area.hue, size: 28)
-            (Text(s.who).fontWeight(.semibold) + Text(" \(s.verb) ") + Text(s.what).fontWeight(.semibold))
+            (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
                 .lineLimit(1).truncationMode(.middle)
             Spacer(minLength: Space.s2)
             Text(a.at.formatted(date: .omitted, time: .shortened)).font(
@@ -236,8 +265,8 @@ private struct AuditList: View {
             model.selected = a.seq
             focused = true
         }
-        .animation(Motion.out(Motion.ui), value: on)
-        .help("\(a.action) \(a.entityRef ?? "")")
+        .animation(.smooth(duration: 0.2), value: on)
+        .help(a.action)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction { model.selected = a.seq }
@@ -254,8 +283,9 @@ private struct AuditDetail: View {
             if let a = item {
                 let area = AuditWords.area(a.action)
                 let s = AuditWords.sentence(a) { admin.registry.item($0).map(SettingWords.title) }
-                IconTile(area.symbol, hue: area.hue, size: 44, bounce: a.seq)
-                (Text(s.who).fontWeight(.semibold) + Text(" \(s.verb) ") + Text(s.what).fontWeight(.semibold))
+                IconTile(area.symbol, hue: area.hue, size: 44, bounce: a.seq).shadow(
+                    color: area.hue.opacity(0.45), radius: 12)
+                (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
                     .font(.system(size: MacTextSize.headline)).fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: Space.s2) {
                     fact("clock.fill", AdminWords.whenExact(a.at))
@@ -270,48 +300,32 @@ private struct AuditDetail: View {
                                 Text(k.replacingOccurrences(of: "_", with: " ").capitalized).foregroundStyle(
                                     GlassInk.secondary)
                                 Spacer(minLength: Space.s2)
-                                let shown = Self.plain(k, v) { id in admin.registry.runners.first { $0.id == id }?.name
-                                }
-                                Text(shown.text)
-                                    .font(.system(size: MacTextSize.body, design: shown.words ? .default : .monospaced))
-                                    .textSelection(.enabled).help(v)
-                                    .multilineTextAlignment(.trailing)
+                                Text(v).font(.system(size: MacTextSize.body, design: .monospaced)).textSelection(
+                                    .enabled
+                                )
+                                .multilineTextAlignment(.trailing)
                             }
                         }
                     }
                     .padding(Space.s3)
-                    .background(.black.opacity(0.2), in: coreShape(Radius.control))
+                    .background(.black.opacity(0.2), in: coreShape(Radius.control + 2))
                 }
+                Text("Entry \(a.seq) · \(a.action)").font(.system(size: MacTextSize.meta, design: .monospaced))
+                    .foregroundStyle(GlassInk.secondary).textSelection(.enabled)
             } else {
                 Text("Pick a row to see everything about it.").foregroundStyle(GlassInk.secondary)
             }
         }
         .padding(Space.s4).frame(maxWidth: .infinity, alignment: .topLeading)
-        .coreWell()
-        .help(item.map { "Entry \($0.seq) · \($0.action)" } ?? "")
-        .animation(Motion.out(Motion.ui), value: item?.seq)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .animation(.smooth(duration: 0.25), value: item?.seq)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Row details")
     }
 
     private func fact(_ symbol: String, _ text: String) -> some View {
         Label(text, systemImage: symbol).foregroundStyle(GlassInk.primary)
-    }
-
-    /// Raw ids and codes in plain words; the raw value stays in the row's help.
-    static func plain(_ key: String, _ value: String, runnerName: (String) -> String?) -> (text: String, words: Bool) {
-        switch key {
-        case "runner": return (runnerName(value) ?? "a runner", true)
-        case "delivery":
-            let words = [
-                "env": "Given as an environment variable", "file": "Given as a file",
-                "askpass": "Given when a password is asked for",
-            ]
-            if let w = words[value] { return (w, true) }
-        case "size": if Int(value) != nil { return ("\(value) bytes", true) }
-        default: break
-        }
-        return (value, false)
     }
 
     /// A details object as name and value pairs; a value that is a list or object is shown compactly.
@@ -333,7 +347,7 @@ private struct AuditDetail: View {
     }
 }
 
-/// When things happened across the rows loaded: bars, the busiest slice tallest.
+/// When things happened across the rows loaded: glowing bars, the busiest slice tallest.
 private struct Activity: View {
     let cells: [Double]
     let from: Date
@@ -341,7 +355,7 @@ private struct Activity: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            HStack(alignment: .bottom, spacing: Space.s1 / 2) {
+            HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, v in
                     coreShape(2)
                         .fill(
@@ -353,6 +367,7 @@ private struct Activity: View {
                                         endPoint: .top))
                         )
                         .frame(maxWidth: .infinity).frame(height: 4 + CGFloat(v) * 28)
+                        .shadow(color: GlassInk.blue.opacity(v > 0.6 ? 0.5 : 0), radius: 5)
                 }
             }
             .frame(height: 32, alignment: .bottom)

@@ -76,16 +76,74 @@ public struct CoreTextField: View {
                             .foregroundStyle(palette.text2).padding(.trailing, Space.s3).allowsHitTesting(false)
                     }
                 }
-                .coreGlassField(fallback: palette.glassCard)
-                .overlay {
-                    coreShape(Radius.control).strokeBorder(
-                        error == nil ? palette.glassCardEdge : palette.tone(.fail).ink, lineWidth: 1)
-                }
-                .coreFocusRing(focused || forced == .focused, radius: Radius.control, palette: palette)
+                .coreFieldSurface(focused: focused || forced == .focused, error: error != nil)
                 .coreDimWhenDisabled(enabled)
                 .accessibilityLabel(label)
                 .onAppear { if autofocus { focused = true } }
             if let error { CoreFieldError(error) }
         }
+    }
+}
+
+extension View {
+    /// The one surface every form field sits on (Ahmed, 2026-11-06): a plain well at night, a light glass piece by day.
+    /// Hover lightens it, focus lightens it more and lifts the edge; an error turns the edge the fail tone. No focus ring.
+    public func coreFieldSurface(focused: Bool = false, error: Bool = false, radius: CGFloat = Radius.control)
+        -> some View
+    {
+        modifier(FieldSurface(focused: focused, error: error, radius: radius))
+    }
+}
+
+private struct FieldSurface: ViewModifier {
+    let focused: Bool
+    let error: Bool
+    let radius: CGFloat
+    @Environment(\.corePalette) private var palette
+    @Environment(\.coreForcedInteraction) private var forced
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        let lit = hovering || forced == .hover
+        content
+            .background { fill(lit: lit) }
+            .overlay { coreShape(radius).strokeBorder(edge, lineWidth: 1) }
+            .shadow(
+                color: palette.isDay
+                    ? Color(red: 40 / 255, green: 80 / 255, blue: 140 / 255).opacity(focused ? 0.16 : 0.1)
+                    : .clear,
+                radius: focused ? 6 : 2, y: focused ? 3 : 1
+            )
+            .onHover { hovering = $0 }
+            .coreAnimation(Motion.out(Motion.hover), value: lit)
+            .coreAnimation(Motion.out(Motion.hover), value: focused)
+    }
+
+    @ViewBuilder private func fill(lit: Bool) -> some View {
+        if palette.isDay {
+            // Day: a white sheen, brighter at the top, like the glass controls.
+            let top = focused ? 1.0 : lit ? 0.86 : 0.72
+            let mid = focused ? 0.78 : lit ? 0.6 : 0.46
+            coreShape(radius).fill(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(top), location: 0),
+                        .init(color: .white.opacity(mid), location: 0.55),
+                        .init(color: .white.opacity((top + mid) / 2), location: 1),
+                    ], startPoint: .top, endPoint: .bottom))
+        } else {
+            coreShape(radius).fill(focused || lit ? GlassInk.wellHover : GlassInk.well)
+        }
+    }
+
+    private var edge: AnyShapeStyle {
+        if error { return AnyShapeStyle(palette.tone(.fail).ink) }
+        if palette.isDay {
+            return AnyShapeStyle(
+                LinearGradient(
+                    colors: [.white.opacity(focused ? 1 : 0.95), .white.opacity(focused ? 0.9 : 0.5)],
+                    startPoint: .top, endPoint: .bottom))
+        }
+        return AnyShapeStyle(focused ? Color.white.opacity(0.3) : GlassInk.wellEdge)
     }
 }

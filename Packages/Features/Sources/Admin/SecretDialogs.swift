@@ -43,6 +43,29 @@ enum SecretDialogs {
     }
 }
 
+private struct DialogButtons: View {
+    let confirm: String
+    var danger = false
+    var busy: Bool
+    var enabled = true
+    let cancel: () -> Void
+    let run: () -> Void
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            Button("Cancel", action: cancel).buttonStyle(.coreSecondary).coreShortcut(.cancel)
+            Spacer(minLength: 0)
+            if danger {
+                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger)).disabled(!enabled || busy)
+            } else {
+                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
+                    .coreShortcut(.primary).disabled(!enabled || busy)
+            }
+        }
+    }
+}
+
 struct SecretFormDialog: View {
     let admin: AdminModel
     @Bindable var form: SecretForm
@@ -75,15 +98,15 @@ struct SecretFormDialog: View {
                             .foregroundStyle(GlassInk.secondary)
                     }
                     VStack(alignment: .leading, spacing: Space.s1) {
-                        CoreFieldLabel("Runners it may be lent to")
+                        CoreFieldLabel("Runners that may borrow it")
                         if model.runners.isEmpty {
-                            Text("No runners yet. A secret no runner may use can't be lent.").foregroundStyle(
+                            Text("No runners yet. A secret no runner may borrow can't be lent.").foregroundStyle(
                                 palette.text2)
                         }
                         ForEach(model.runners) { r in
                             GlassToggleTile(
                                 r.name, sub: r.online ? "Online" : "Offline right now", symbol: "server.rack",
-                                onSymbol: "checkmark.square.fill",
+                                onSymbol: "checkmark.circle.fill",
                                 isOn: Binding(
                                     get: { form.runners.contains(r.id) },
                                     set: { if $0 { form.runners.insert(r.id) } else { form.runners.remove(r.id) } }),
@@ -97,9 +120,8 @@ struct SecretFormDialog: View {
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 if let i = form.issue { IssueLine(code: nil, text: i.message) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
-                CoreDialogFooter(
-                    confirm: form.existing == nil ? "Store" : "Replace value", busy: form.busy, cancel: close
-                ) {
+                DialogButtons(confirm: form.existing == nil ? "Store" : "Replace value", busy: form.busy, cancel: close)
+                {
                     go(model)
                 }
             }
@@ -128,7 +150,7 @@ struct LeaseDialog: View {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("To which runner")
                     if form.secret.runners.isEmpty {
-                        Text("No runner may be lent this secret yet.").foregroundStyle(
+                        Text("No runner may borrow this secret yet.").foregroundStyle(
                             palette.text2)
                     } else {
                         CoreSegmented(
@@ -150,7 +172,7 @@ struct LeaseDialog: View {
                     fill: true)
                 if let i = form.issue { IssueLine(code: nil, text: i.message) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
-                CoreDialogFooter(confirm: "Lend", busy: form.busy, cancel: close) { go(model) }
+                DialogButtons(confirm: "Lend", busy: form.busy, cancel: close) { go(model) }
             }
         }
         .accessibilityIdentifier("secret-lease")
@@ -170,9 +192,9 @@ struct DeleteDialog: View {
     var body: some View {
         CoreDialogPanel("Delete \(secret.name)?", width: Space.s8 * 13) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("Runners can no longer be lent it. This can't be undone.")
+                Text("Runners can no longer borrow it. This can't be undone.")
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
-                CoreDialogFooter(confirm: "Delete", danger: true, busy: busy, cancel: close) {
+                DialogButtons(confirm: "Delete", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let done = await admin.secrets.delete(secret)

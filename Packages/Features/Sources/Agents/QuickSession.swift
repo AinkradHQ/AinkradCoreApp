@@ -23,40 +23,27 @@ struct QuickSessionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                IconTile("play.fill", hue: GlassInk.blue, size: 44, bounce: shown)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text("New agent session").font(.system(size: MacTextSize.large, weight: .semibold))
+                IconTile("sparkles", hue: GlassInk.violet, size: 44, bounce: shown)
+                    .shadow(color: GlassInk.violet.opacity(0.45), radius: 12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("New agent session").font(.system(size: MacTextSize.large + 2, weight: .bold))
                     Text("Say what it should do. It keeps running if you close this Mac.")
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 }
             }
             .coreRise(shown, 0)
-            TextEditor(text: $prompt)
-                .font(.system(size: MacTextSize.headline)).scrollContentBackground(.hidden)
-                .focused($focus)
-                .padding(Space.s3)
-                .frame(minHeight: 110, maxHeight: 220)
-                .background(GlassInk.well, in: coreShape(Radius.row))
-                .overlay(alignment: .topLeading) {
-                    if prompt.isEmpty {
-                        Text("Fix the failing tests in the citadel module…").foregroundStyle(GlassInk.secondary)
-                            .padding(Space.s3).padding(.leading, Space.s1).allowsHitTesting(false)
-                    }
-                }
-                .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-                .focusEffectDisabled()
-                .coreRise(shown, 1)
+            CoreTextArea(
+                nil, placeholder: "Fix the failing tests in the citadel module…", text: $prompt,
+                size: MacTextSize.headline, minHeight: 110, maxHeight: 220, focus: $focus
+            )
+            .coreRise(shown, 1)
             HStack(spacing: Space.s2) {
-                chip(AgentsModel.harnessSymbol(prefs.harness), AgentWords.harness(prefs.harness), GlassInk.blue)
-                    .help("Harness: \(prefs.harness)")
-                chip("hand.raised", AgentWords.mode(prefs.mode), GlassInk.blue).help("Mode: \(prefs.mode)")
-                if runner == nil && !model.runnersLoaded {
-                    BusyBar().frame(width: Space.s8 * 2)
-                } else {
-                    chip(
-                        "server.rack", runner?.name ?? "No runner",
-                        runner == nil ? GlassInk.red : GlassInk.blue)
-                }
+                chip("sparkles", prefs.harness, GlassInk.violet)
+                chip(
+                    "hand.raised",
+                    prefs.mode == "ask" ? "asks first" : prefs.mode == "sandboxed" ? "sandboxed" : "accepts edits",
+                    GlassInk.orange)
+                chip("server.rack", runner?.name ?? "no runner", runner == nil ? GlassInk.red : GlassInk.green)
                 Spacer(minLength: 0)
                 Text(PromptSize.words(prompt)).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     .monospacedDigit()
@@ -93,13 +80,13 @@ struct QuickSessionView: View {
     }
 
     private func chip(_ symbol: String, _ text: String, _ hue: Color) -> some View {
-        HStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+        HStack(spacing: 5) {
+            Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(hue)
             Text(text).font(.system(size: MacTextSize.meta, weight: .medium))
         }
-        .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
-        .background(GlassInk.well, in: coreShape(Radius.chip))
-        .overlay { coreShape(Radius.chip).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .padding(.horizontal, Space.s2).frame(height: 22)
+        .background(GlassInk.well, in: coreShape(6))
+        .overlay { coreShape(6).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
     }
 
     private func start() {
@@ -107,8 +94,7 @@ struct QuickSessionView: View {
         busy = true
         notice = nil
         let new = NewAgentSession(
-            runner: runner.id, harness: prefs.harness, model: prefs.model.isEmpty ? nil : prefs.model, prompt: prompt,
-            mode: prefs.mode, secrets: [])
+            runner: runner.id, harness: "claude", model: nil, prompt: prompt, mode: "ask", secrets: [])
         Task {
             let n = await model.create(new)
             busy = false

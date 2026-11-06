@@ -60,7 +60,8 @@ struct AccountsView: View {
 
     /// The pages as tiles. Spend holds Budgets, Costs, Ledger and Prices, which the Core does not fill yet.
     static let tabs: [(title: String, page: AccountsPage)] = [
-        ("Overview", .overview), ("Accounts", .accounts), ("Pools", .pools), ("Spend", .budgets),
+        ("Overview", .overview), ("Accounts", .accounts), ("Pools", .pools),
+        ("Spend", .budgets),
     ]
 
     private func on(_ page: AccountsPage) -> Bool {
@@ -78,7 +79,7 @@ struct AccountsView: View {
     }
 
     private func go(_ page: AccountsPage) {
-        withAnimation(Motion.out(Motion.ui)) {
+        withAnimation(.smooth(duration: 0.3)) {
             model.page = page
             model.detail = nil
             model.cursor = nil
@@ -169,20 +170,17 @@ struct AccountsView: View {
             case .failed(let code, let message):
                 AccStateCard(
                     symbol: "exclamationmark.triangle", title: "Could not load this",
-                    text: "Your Core couldn't answer that. Nothing was changed.", tone: .fail
+                    text: "The Core answered with an error. \(message) Nothing was changed.", tone: .fail, code: code
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
+                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
                         Task { await model.reload() }
                     }
-                    .keyboardShortcut("r", modifiers: .command)
                 }
-                .help("\(message) (\(code))")
             case .forbidden:
                 AccStateCard(
                     symbol: "lock", title: "This device is not allowed to read this",
-                    text: "Accounts need a device that can see everything. Use one that can."
-                )
-                .help("forbidden_scope")
+                    text: "Accounts need the read scope (forbidden_scope). Use a device that holds it.",
+                    code: "forbidden_scope")
             }
         }
     }

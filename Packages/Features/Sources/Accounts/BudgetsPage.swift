@@ -9,7 +9,7 @@ struct SpendHeader: View {
     let symbol: String
 
     var body: some View {
-        AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.blue) {
+        AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.green) {
             CoreSegmented(
                 "Spend",
                 segments: [AccountsPage.budgets, .costs, .ledger, .prices].map {
@@ -18,7 +18,7 @@ struct SpendHeader: View {
                 selection: Binding(
                     get: { model.page },
                     set: { p in
-                        withAnimation(Motion.out(Motion.ui)) {
+                        withAnimation(.smooth(duration: 0.3)) {
                             model.page = p
                             model.cursor = nil
                         }
@@ -40,39 +40,35 @@ struct BudgetsPage: View {
                 model: model, title: "Budgets",
                 detail:
                     "Caps on what an account, pool, agent or project may spend. A hard stop also ends work already running.",
-                symbol: "dollarsign.square.fill")
+                symbol: "dollarsign.circle.fill")
             switch model.spendLoad {
             case .loading: AccSkeleton()
             case .forbidden:
-                // Budgets need the same access as accounts. When accounts load, a refusal here means the Core has no
-                // budgets yet (an older Core answers a route it doesn't know with a refusal).
+                // Budgets need the same `read` scope as accounts. When accounts load, a refusal here means the Core has no
+                // budgets yet (an older Core answers a route it doesn't know as `forbidden_scope`).
                 if model.load == .ready {
                     OlderCoreCard(what: "Budgets")
                 } else {
                     AccStateCard(
-                        symbol: "lock", title: "This device can't see budgets",
-                        text: "Budgets need a device that can see everything. Use one that can."
-                    )
-                    .help("forbidden_scope")
+                        symbol: "lock", title: "This device can't read budgets",
+                        text: "Budgets need the read scope. Use a device that holds it.", code: "forbidden_scope")
                 }
             case .failed(let code, let message):
                 AccStateCard(
                     symbol: "exclamationmark.triangle", title: "Could not load budgets",
-                    text: "Your Core couldn't answer that. Nothing was changed.", tone: .fail
+                    text: "The Core answered with an error. \(message)", tone: .fail, code: code
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
+                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
                         Task { await model.reloadBudgets() }
                     }
-                    .keyboardShortcut("r", modifiers: .command)
                 }
-                .help("\(message) (\(code))")
             case .ready:
                 verdict
                 let mine = model.budgets.filter { ["account", "pool"].contains($0.kind) }
                 let theirs = model.budgets.filter { !["account", "pool"].contains($0.kind) }
                 if !mine.isEmpty { section("Accounts and pools", "creditcard.fill", GlassInk.blue, mine, 0) }
                 if !theirs.isEmpty {
-                    section("Agents, companies and projects", "person.3.fill", GlassInk.blue, theirs, 1)
+                    section("Agents, companies and projects", "person.3.fill", GlassInk.violet, theirs, 1)
                 }
             }
         }
@@ -108,27 +104,28 @@ struct BudgetsPage: View {
         return HStack(spacing: Space.s4) {
             IconTile(
                 !stopped.isEmpty
-                    ? "stop.fill"
+                    ? "stop.circle.fill"
                     : !warn.isEmpty
                         ? "exclamationmark.triangle.fill"
-                        : none ? "dollarsign.square" : "checkmark.seal.fill", hue: hue, size: 56, bounce: stopped.count
+                        : none ? "dollarsign.circle" : "checkmark.seal.fill", hue: hue, size: 56, bounce: stopped.count
             )
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(hue)
+            .shadow(color: hue.opacity(0.5), radius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
             if let s = stopped.first {
-                AppActionTile(title: "Raise", symbol: "arrow.up.square", key: "R", hue: GlassInk.red, prominent: true) {
+                AppActionTile(title: "Raise", symbol: "arrow.up.circle", key: "R", hue: GlassInk.red, prominent: true) {
                     AccountDialogs.openRaise(model, s)
                 }
                 .disabled(model.readOnly)
             }
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1))
-        .coreWell()
-        .animation(Motion.out(Motion.move), value: title)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .animation(.smooth(duration: 0.4), value: title)
     }
 
     private func section(_ title: String, _ symbol: String, _ hue: Color, _ list: [BudgetItem], _ i: Int) -> some View {
@@ -162,15 +159,15 @@ private struct BudgetCard: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
                 IconTile(BudgetWords.symbol(b.kind), hue: s.hue, size: 36)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(model.budgetName(b)).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                     Text("\(BudgetWords.kind(b.kind)) · \(BudgetWords.period(b.period))")
                         .foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s2)
                 Label(s.title, systemImage: s.symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
-                    .foregroundStyle(s.hue).padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
-                    .background(s.hue.opacity(0.14), in: coreShape(Radius.chip))
+                    .foregroundStyle(s.hue).padding(.horizontal, Space.s2).frame(height: 24)
+                    .background(s.hue.opacity(0.14), in: coreShape(6))
             }
             if let t = b.tokenShare {
                 bar(
@@ -184,7 +181,7 @@ private struct BudgetCard: View {
             HStack(spacing: Space.s2) {
                 Label(
                     b.hardStop ? "Hard stop" : "Warns only", systemImage: b.hardStop ? "hand.raised.fill" : "bell.fill")
-                if b.raised > 0 || b.raisedUSD > 0 { Label("Raised this period", systemImage: "arrow.up.square") }
+                if b.raised > 0 || b.raisedUSD > 0 { Label("Raised this period", systemImage: "arrow.up.circle") }
                 if b.held > 0 {
                     Label("\(BudgetWords.tokens(b.held)) held by running work", systemImage: "hourglass")
                 }
@@ -192,7 +189,7 @@ private struct BudgetCard: View {
                 HStack(spacing: Space.s1) {
                     if b.standing == .stopped || b.standing == .over {
                         AppActionTile(
-                            title: "Raise", symbol: "arrow.up.square", key: selected ? "R" : "", hue: GlassInk.red
+                            title: "Raise", symbol: "arrow.up.circle", key: selected ? "R" : "", hue: GlassInk.red
                         ) {
                             AccountDialogs.openRaise(model, b)
                         }
@@ -209,11 +206,17 @@ private struct BudgetCard: View {
             .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
-        .coreWell(active: selected || hovering)
+        .background(
+            selected ? s.hue.opacity(0.1) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
+        )
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                selected ? s.hue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
+        }
         .contentShape(coreShape(Radius.cardMac))
-        .onTapGesture { withAnimation(Motion.out(Motion.ui)) { model.cursor = "g-\(b.id)" } }
+        .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "g-\(b.id)" } }
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: shows)
+        .animation(.smooth(duration: 0.25), value: shows)
         .help("\(b.kind) \(b.subject), \(b.period) \(b.periodKey)")
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(model.budgetName(b)), \(s.title)")
@@ -221,7 +224,7 @@ private struct BudgetCard: View {
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {
         let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.orange : GlassInk.green
-        return VStack(alignment: .leading, spacing: Space.s1) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)
                 Spacer()
@@ -235,6 +238,7 @@ private struct BudgetCard: View {
                             LinearGradient(colors: [hue.opacity(0.55), hue], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: g.size.width * min(1, share))
+                        .shadow(color: hue.opacity(0.5), radius: 5)
                     // The warning point, as a notch on the track.
                     coreShape(1).fill(GlassInk.secondary.opacity(0.7)).frame(width: 2, height: 10)
                         .offset(x: g.size.width * Double(b.warnAt) / 100 - 1)
@@ -330,7 +334,7 @@ struct BudgetDialog: View {
                     CoreTextField(
                         "Token cap", placeholder: "None", text: $tokens, suffix: "tokens", autofocus: editing != nil
                     ) { go() }
-                    CoreTextField("Dollar cap", placeholder: "None", text: $dollars, suffix: "$") { go() }
+                    CoreTextField("Dollar cap", placeholder: "None", text: $dollars, suffix: "USD") { go() }
                     CoreTextField("Warn at", placeholder: "80", text: $warn, suffix: "%") { go() }
                         .frame(width: Space.s8 * 4)
                 }
@@ -340,7 +344,7 @@ struct BudgetDialog: View {
                 if let i = issue, !(tokens.isEmpty && dollars.isEmpty && subject.isEmpty) { AccIssue(text: i) }
                 if let e = model.writeError["budget"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(
+                AccDialogButtons(
                     confirm: editing == nil ? "Create budget" : "Save", busy: busy, enabled: issue == nil, cancel: close
                 ) { go() }
             }
@@ -430,14 +434,14 @@ struct RaiseDialog: View {
                     }
                     .disabled(budget.tokenCap == 0)
                     CoreTextField(
-                        "More dollars", placeholder: "None", text: $dollars, suffix: "$",
+                        "More dollars", placeholder: "None", text: $dollars, suffix: "USD",
                         autofocus: budget.tokenCap == 0
                     ) { go() }
                     .disabled(budget.usdCap == nil)
                 }
                 if let e = model.writeError["raise-\(budget.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Raise", busy: busy, enabled: ok, cancel: close) { go() }
+                AccDialogButtons(confirm: "Raise", busy: busy, enabled: ok, cancel: close) { go() }
             }
         }
         .accessibilityIdentifier("budget-raise")
@@ -467,7 +471,7 @@ struct DeleteBudgetDialog: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["budget-\(budget.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Remove budget", danger: true, busy: busy, cancel: close) {
+                AccDialogButtons(confirm: "Remove budget", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.deleteBudget(budget)
@@ -489,6 +493,6 @@ struct OlderCoreCard: View {
             symbol: "arrow.down.app", title: "Your Core doesn't have \(what.lowercased()) yet",
             text: "This Mac is newer than your Core. Update Core, then open this page again. Nothing was changed."
         )
-        .help("The Core refused a route this device's access allows (forbidden_scope), so the route is missing.")
+        .help("The Core answered forbidden_scope to a route this device's scopes allow, so the route is missing.")
     }
 }

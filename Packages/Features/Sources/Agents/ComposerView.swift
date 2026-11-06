@@ -20,7 +20,7 @@ struct ComposerView: View {
 
     private var placeholder: String {
         switch session.state {
-        case .running: "Reply to \(session.harness.prefix(1).uppercased() + session.harness.dropFirst())…"
+        case .running: "Reply to \(session.harness)…"
         case .starting: "Starting. You can write when it is running."
         case .interrupted: "Resuming. You can write again when it is running."
         default: "This session ended. Resume it to send a message."
@@ -32,29 +32,33 @@ struct ComposerView: View {
         HStack(alignment: .center, spacing: Space.s2) {
             Image(systemName: enabled ? "text.bubble" : "lock")
                 .font(.system(size: MacTextSize.body, weight: .semibold))
-                .foregroundStyle(on ? GlassInk.blue : GlassInk.secondary)
-                .contentTransition(.symbolEffect(.replace))
-            TextField(
-                "Reply to the agent", text: draft,
-                prompt: Text(placeholder).foregroundStyle(.white.opacity(enabled ? 0.6 : 0.55))
-            )
-            .accessibilityIdentifier("agent-composer")
-            .textFieldStyle(.plain)
-            .focused(focused)
-            .focusEffectDisabled()
-            .disabled(!enabled)
-            .onSubmit { Task { await model.send(session.id) } }
-            .onKeyPress(.escape) {
-                focused.wrappedValue = false
-                return .handled
+                .foregroundStyle(on ? GlassInk.violet : GlassInk.secondary)
+                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: on)
+            TextField("Reply to the agent", text: draft, prompt: Text(placeholder))
+                .accessibilityIdentifier("agent-composer")
+                .textFieldStyle(.plain)
+                .focused(focused)
+                .disabled(!enabled)
+                .onSubmit { Task { await model.send(session.id) } }
+                .onKeyPress(.escape) {
+                    focused.wrappedValue = false
+                    return .handled
+                }
+            if bytes > 0 {
+                Text("\(String(format: bytes < 1024 ? "%.2f" : "%.1f", Double(bytes) / 1024)) / 16 KiB")
+                    .font(.system(size: MacTextSize.meta, design: .monospaced))
+                    .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
-            Text(String(format: "%.1f of 16 KiB", Double(bytes) / 1024))
-                .font(.system(size: MacTextSize.meta, design: .monospaced)).monospacedDigit()
-                .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
-                .opacity(bytes > 0 ? 1 : 0)
-            // A session that is over is resumed from the hero above; the composer only sends.
-            if !session.over {
-                AppActionTile(title: "Send", symbol: "paperplane.fill", key: "↩", hue: GlassInk.blue, prominent: true) {
+            if session.over {
+                AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
+                {
+                    model.resume(session.id)
+                }
+                .help("Start this session again from where it stopped")
+            } else {
+                AppActionTile(title: "Send", symbol: "paperplane.fill", key: "↩", hue: GlassInk.violet, prominent: true)
+                {
                     Task { await model.send(session.id) }
                 }
                 .disabled(!model.canSend(session.id))
@@ -64,9 +68,13 @@ struct ComposerView: View {
         }
         .padding(.leading, Space.s3).padding(Space.s2)
         .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .animation(Motion.out(Motion.hover), value: on)
-        .animation(Motion.out(Motion.ui), value: bytes > 0)
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(on ? GlassInk.violet.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
+        }
+        .shadow(color: GlassInk.violet.opacity(on ? 0.35 : 0), radius: 14)
+        .opacity(enabled || session.over ? 1 : 0.6)
+        .animation(.spring(duration: 0.3, bounce: 0.25), value: on)
+        .animation(.spring(duration: 0.3), value: bytes > 0)
         .padding(.horizontal, Space.s3).padding(.bottom, Space.s1)
     }
 }

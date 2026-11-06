@@ -64,10 +64,10 @@ struct StripBar: View {
         GeometryReader { g in
             let w = max(48, g.size.width * visible / max(total, 1))
             let x = (g.size.width - w) * offset / max(total - visible, 1)
-            coreShape(2).fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
+            Capsule().fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
         }
         .frame(height: 4)
-        .padding(.horizontal, Space.s4).padding(.bottom, Space.s1)
+        .padding(.horizontal, Space.s4).padding(.bottom, 2)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -140,13 +140,13 @@ struct StackBadge: View {
         }
         .font(.system(size: MacTextSize.meta, weight: .semibold))
         .foregroundStyle(.white)
-        .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
-        .background(.black.opacity(0.45), in: coreShape(Radius.chip))
-        .overlay { coreShape(Radius.chip).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
+        .padding(.horizontal, Space.s2).frame(height: 22)
+        .background(.black.opacity(0.45), in: coreShape(6))
+        .overlay { coreShape(6).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
         .padding(Space.s2)
         .frame(width: slot.width, height: slot.height, alignment: .bottomTrailing)
         .offset(x: slot.minX, y: slot.minY)
         .allowsHitTesting(false)
-        .animation(Motion.out(Motion.ui), value: index)
+        .animation(.spring(duration: 0.3), value: index)
     }
 }

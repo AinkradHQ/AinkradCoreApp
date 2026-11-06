@@ -29,8 +29,8 @@ public enum LinkState: Sendable, Hashable {
         switch self {
         case .resuming: "Reconnecting, resuming from where you were"
         case .rateLimited: "Slow down"
-        case .renewing: "Session expired, signing in again"
-        case .restarted: "Your Core restarted"
+        case .renewing: "Session expired. Signing in again"
+        case .restarted: "Home Core restarted"
         }
     }
 }
@@ -50,10 +50,11 @@ public struct LinkBanner: View {
     public var body: some View {
         let c = palette.tone(state.tone)
         HStack(alignment: .top, spacing: Space.s3) {
-            IconTile(state.symbol, hue: c.ink, size: 32)
+            Image(systemName: state.symbol).foregroundStyle(c.ink).frame(width: Space.s4, height: Space.s4)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(state.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                detail.font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
+                detail.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
                 if state == .renewing { LinkBar().padding(.top, Space.s1) }
             }
@@ -67,8 +68,8 @@ public struct LinkBanner: View {
         }
         .padding(.horizontal, Space.s3)
         .padding(.vertical, Space.s2 + Space.s1 / 2)
-        .foregroundStyle(GlassInk.primary)
-        .coreGlass(radius: Radius.cardMac, interactive: false)
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .background(c.fill, in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(state == .renewing ? .updatesFrequently : [])
         .accessibilityIdentifier("link-banner")
@@ -78,21 +79,24 @@ public struct LinkBanner: View {
         switch state {
         case .resuming(let since):
             Text(
-                "The connection to your Core dropped. What you see is from \(since.map { $0.formatted(date: .omitted, time: .standard) } ?? "before it dropped"). Changes are paused and nothing is lost: events replay by sequence once it is back."
+                "The connection to Home Core dropped. What you see is from \(since.map { $0.formatted(date: .omitted, time: .standard) } ?? "before it dropped"). Changes are paused and nothing is lost: events replay by sequence once it is back."
             )
         case .rateLimited(let until):
             if let until {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
-                    Text("Too many requests. Try again in \(left) s. Changes are paused until then.")
-                        .monospacedDigit()
-                        .help("rate_limited")
+                    Text(
+                        "Too many requests (rate_limited). Try again in \(left) s. Changes are paused until then."
+                    )
+                    .monospacedDigit()
                 }
             } else {
-                Text("Too many requests. Changes are paused until the limit lifts.").help("rate_limited")
+                Text("Too many requests (rate_limited). Changes are paused until the limit lifts.")
             }
         case .renewing:
-            Text("This Mac is renewing its session in the background. Nothing to do.").help("session_expired")
+            Text(
+                "This Mac is renewing its session in the background (session_expired). Nothing to do."
+            )
         case .restarted:
             Text(
                 "Sessions were renewed silently. Elevation did not survive the restart, so your next change asks for Touch ID again."

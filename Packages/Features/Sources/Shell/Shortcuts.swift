@@ -4,13 +4,12 @@ import SwiftUI
 /// Every shortcut the shell owns. The ⌘/ sheet reads this; `ShellCommands` binds the same keys.
 enum ShortcutCatalog {
     static let groups: [(name: String, items: [(title: String, keys: String)])] = [
-        ("Ainkrad", [("Settings…", "⌘,"), ("Back from a settings page", "⌘←"), ("Keyboard Shortcuts", "⌘/")]),
+        ("Ainkrad", [("Settings…", "⌘,"), ("Keyboard Shortcuts", "⌘/")]),
         (
             "File",
             [
                 ("Launcher…", "⌘K"), ("Actions…", "⇧⌘A"), ("Overview", "⇧⌘O"), ("Next / Previous Tab", "⌃Tab / ⌃⇧Tab"),
                 ("Rename Tab…", "⇧⌘R"), ("New Agent Session", "⌘N"), ("New Terminal", "⌘T"),
-                ("New Terminal (Advanced)…", "⌥⌘T"),
                 ("Close Pane", "⌘W"),
                 ("Reopen Closed Pane", "⇧⌘T"), ("Close All Panes", "⌥⌘W"),
             ]
@@ -26,7 +25,7 @@ enum ShortcutCatalog {
         ),
         (
             "Panes",
-            [("Focus or tile a pane", "double-click tab"), ("Tile a pane", "drag tab")]
+            [("Focus mode tabs", "← →"), ("Focus or tile a pane", "double click head"), ("Tile a pane", "drag head")]
         ),
         (
             "Launcher",
@@ -42,13 +41,22 @@ enum ShortcutCatalog {
 struct ShortcutsView: View {
     @Bindable var shell: ShellModel
     @State private var filter = ""
+    @FocusState private var focused: Bool
+    @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             Text("Keyboard Shortcuts").font(.system(size: MacTextSize.title, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            CoreTextField("Filter", placeholder: "Filter shortcuts", text: $filter, autofocus: true)
+            TextField("Filter shortcuts", text: $filter)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg)
+                .background(palette.uDim, in: coreShape(Radius.control))
+                .overlay {
+                    if focused { coreShape(Radius.control).strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2) }
+                }
+                .focused($focused)
                 .onKeyPress(.escape) {
                     shell.overlay = nil
                     return .handled
@@ -81,8 +89,15 @@ struct ShortcutsView: View {
                 Button("Done") { shell.overlay = nil }.buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
             }
         }
-        .frame(width: Space.s8 * 14 - Space.s5 * 2, height: Space.s8 * 16 - Space.s5 * 2)
-        .corePanel(radius: Radius.panel, padding: Space.s5)
+        .padding(Space.s5)
+        .frame(width: Space.s8 * 14, height: Space.s8 * 16)
+        .corePanel(radius: Radius.panel, padding: 0)
+        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .task {
+            // The root holds focus while the window is calm; take it once the overlay is in place.
+            try? await Task.sleep(for: .milliseconds(80))
+            focused = true
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Keyboard Shortcuts")
         .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.97)))
@@ -130,6 +145,7 @@ public struct ShellCommands: Commands {
                 .disabled(paneCount == 0)
             Button("Actions…") { shell.toggleActions() }.keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(paneCount == 0)
+            Divider()
             Button("New Agent Session") { shell.launcher.entry("agents.new")?.run() }.keyboardShortcut("n")
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
             Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
@@ -149,12 +165,14 @@ public struct ShellCommands: Commands {
             Button(!focusMode ? "Focus Mode" : "Tile Panes") { shell.toggleFocusMode() }
                 .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(paneCount == 0)
             Button("Notifications") { shell.toggleBell() }.keyboardShortcut("n", modifiers: [.command, .shift])
+            Divider()
             Button("Switch Day and Night") {
                 shell.theme = shell.theme == .night ? .day : .night
             }
             .keyboardShortcut("d", modifiers: [.control, .command])
             Button("Reconnect to Core") { shell.retryConnection?() }.keyboardShortcut("r").disabled(!coreOffline)
             Toggle("Show Activity in Status Bar", isOn: Binding(get: { chipOn }, set: { shell.showActivityChip = $0 }))
+            Divider()
             Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(paneCount < 2)
             Button("Previous Pane") { shell.cyclePane(-1) }.keyboardShortcut("`", modifiers: [.command, .shift])
                 .disabled(paneCount < 2)
