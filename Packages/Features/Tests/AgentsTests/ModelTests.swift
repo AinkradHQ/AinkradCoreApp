@@ -45,6 +45,14 @@ struct ModelTests {
         return (m, api, host, notifier)
     }
 
+    @Test func toolRequestsReadAsSentences() {
+        #expect(ApprovalWords.ask("Bash").verb == "run a command")
+        #expect(ApprovalWords.ask("Edit").verb == "change a file")
+        #expect(ApprovalWords.ask("WebFetch").verb == "reach the internet")
+        #expect(ApprovalWords.ask("Secrets").verb == "use a secret")
+        #expect(ApprovalWords.ask("Frobnicate").verb == "use Frobnicate")
+    }
+
     @Test func ledgerSpendIsMeasuredAgainstTheAccountsSessionLimit() {
         #expect(SessionLedger(costMicros: 4_000_000, tokens: 0, unpriced: false, maxUSDMicros: 5_000_000).share == 0.8)
         #expect(SessionLedger(costMicros: 0, tokens: 500, unpriced: false, maxTokens: 1_000).share == 0.5)

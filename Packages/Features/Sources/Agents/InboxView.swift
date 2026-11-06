@@ -1,70 +1,95 @@
 import CoreUI
 import SwiftUI
 
-/// Approvals: everything agents wait on you for, newest request last, with what was decided since this Mac opened.
+/// Approvals: one verdict (all clear, or how many agents wait), then each waiting request under its session (the session's
+/// glyph, runner and Open session), then what was decided since this Mac opened. The first waiting card answers the keys.
 struct InboxView: View {
     @Bindable var model: AgentsModel
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let pending = model.pending
         let decided = model.decided
-        CoreDialogPanel("Approvals", width: Space.s8 * 20) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    Text(
-                        pending.isEmpty
-                            ? "Nothing is waiting on you."
-                            : "\(pending.count) \(pending.count == 1 ? "agent is" : "agents are") waiting on you."
-                    )
-                    .foregroundStyle(palette.text2)
-                    Label(touchNote, systemImage: elevatedUntil == nil ? "lock.shield" : "checkmark.shield")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    if pending.isEmpty {
-                        VStack(spacing: Space.s1) {
-                            Text("All clear").font(.system(size: MacTextSize.headline, weight: .semibold))
-                            Text("New requests from agents show up here and in the bell.").foregroundStyle(
-                                palette.text2)
+        CoreDialogPanel("Approvals", width: Space.s8 * 22) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                verdict(pending.count)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.s4) {
+                        ForEach(Array(pending.enumerated()), id: \.element.id) { i, r in
+                            VStack(alignment: .leading, spacing: Space.s2) {
+                                who(r)
+                                ApprovalCardView(model: model, request: r, keys: i == 0)
+                            }
                         }
-                        .frame(maxWidth: .infinity).padding(Space.s6)
-                    }
-                    ForEach(Array(pending.enumerated()), id: \.element.id) { i, r in
-                        VStack(alignment: .leading, spacing: Space.s1) {
-                            who(r)
-                            ApprovalCardView(model: model, request: r, keys: i == 0)
+                        if !decided.isEmpty {
+                            VStack(alignment: .leading, spacing: Space.s2) {
+                                Text("Answered since this Mac opened").font(
+                                    .system(size: MacTextSize.headline, weight: .semibold)
+                                )
+                                .agentHeading()
+                                ForEach(decided) { r in ApprovalCardView(model: model, request: r) }
+                            }
                         }
-                    }
-                    if !decided.isEmpty {
-                        Text("Decided").font(.system(size: MacTextSize.headline, weight: .semibold)).agentHeading()
-                        ForEach(decided) { r in ApprovalCardView(model: model, request: r) }
                     }
                 }
+                .frame(maxHeight: Space.s8 * 18)
+                HStack {
+                    Spacer(minLength: 0)
+                    AppActionTile(title: "Done", symbol: "checkmark", key: "esc", hue: GlassInk.slate) {
+                        model.shell.closeDialog()
+                    }
+                    .coreShortcut(.cancel)
+                }
             }
-            .frame(maxHeight: Space.s8 * 18)
-            HStack {
-                Spacer(minLength: 0)
-                Button("Done") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
-            }
+            .foregroundStyle(GlassInk.primary)
         }
     }
 
     private var elevatedUntil: Date? { model.shell.elevatedUntil.flatMap { $0 > Date() ? $0 : nil } }
 
+    private func verdict(_ n: Int) -> some View {
+        let hue = n == 0 ? GlassInk.green : GlassInk.orange
+        return HStack(spacing: Space.s4) {
+            IconTile(n == 0 ? "checkmark.seal.fill" : "hand.raised.fill", hue: hue, size: 52, bounce: n)
+                .shadow(color: hue.opacity(0.5), radius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(
+                    n == 0
+                        ? "Nothing is waiting on you"
+                        : n == 1 ? "1 agent is waiting on you" : "\(n) agents are waiting on you"
+                )
+                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                .contentTransition(.numericText())
+                Label(touchNote, systemImage: elevatedUntil == nil ? "touchid" : "checkmark.shield")
+                    .foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Space.s4)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .animation(.smooth(duration: 0.4), value: n)
+    }
+
     /// Words follow the elevation: before Touch ID it says it is needed, after it says until when it is not.
     private var touchNote: String {
         guard let until = elevatedUntil else {
-            return "Approving an agent action needs Touch ID. After one, the others need none for a while."
+            return "Approving needs Touch ID once; the next ones need none for a while."
         }
-        return "Touch ID done. Approvals need no new prompt until \(until.formatted(date: .omitted, time: .shortened))."
+        return "Touch ID done: no new prompt until \(until.formatted(date: .omitted, time: .shortened))."
     }
 
     private func who(_ r: ApprovalRequest) -> some View {
         let s = model.sessions.session(r.session)
+        let hue = SessionTile.hue(s?.harness ?? "")
         return HStack(spacing: Space.s2) {
-            Text("\(s?.harness ?? "agent") · \(s.map { model.runnerName($0.runner) } ?? "")").fontWeight(.semibold)
-            Button("Open session") { model.openSession(r.session) }.buttonStyle(CoreButtonStyle(.plain, size: .small))
+            IconTile(AgentsModel.harnessSymbol(s?.harness ?? ""), hue: hue, size: 26)
+            Text("\((s?.harness ?? "agent").capitalized) on \(s.map { model.runnerName($0.runner) } ?? "a runner")")
+                .font(.system(size: MacTextSize.body, weight: .semibold))
+            Spacer(minLength: 0)
+            AppActionTile(title: "Open session", symbol: "arrow.up.right", key: "", hue: hue) {
+                model.openSession(r.session)
+            }
         }
-        .font(.system(size: MacTextSize.body))
     }
 }
 
