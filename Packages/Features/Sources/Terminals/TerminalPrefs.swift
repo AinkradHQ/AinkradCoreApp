@@ -89,7 +89,11 @@ final class TerminalPrefs {
     var screenColor: NSColor {
         let a = CGFloat(lookOpacity)
         // As the app surface: a stored clear or frosted from before draws as the theme colour.
-        if lookScreen == .solid { return NSColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.5 + a * 0.5) }
+        if lookScreen == .solid {
+            return NSColor(
+                red: TerminalInk.solid.red, green: TerminalInk.solid.green, blue: TerminalInk.solid.blue,
+                alpha: 0.5 + a * 0.5)
+        }
         return theme.background.withAlphaComponent(a)
     }
 
