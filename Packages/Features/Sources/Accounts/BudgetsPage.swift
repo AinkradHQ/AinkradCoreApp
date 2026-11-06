@@ -127,7 +127,7 @@ struct BudgetsPage: View {
         }
         .padding(Space.s4)
         .background(hue.opacity(0.1))
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .animation(Motion.out(Motion.move), value: title)
     }
 
@@ -209,7 +209,7 @@ private struct BudgetCard: View {
             .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
-        .coreWell(active: selected || hovering)
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: selected || hovering)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { withAnimation(Motion.out(Motion.ui)) { model.cursor = "g-\(b.id)" } }
         .onHover { hovering = $0 }

@@ -117,7 +117,7 @@ struct AccountDetailView: View {
         }
         .padding(Space.s3)
         .background(GlassInk.orange.opacity(0.1))
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .transition(.opacity)
     }
 
@@ -159,7 +159,7 @@ struct AccountDetailView: View {
         }
         .padding(Space.s4)
         .background(tone.opacity(0.1))
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .animation(Motion.out(Motion.move), value: usable)
     }
 
@@ -194,7 +194,7 @@ struct AccountDetailView: View {
         }
         .padding(Space.s4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 
     private func keyTile(_ a: AccountItem, _ hue: Color) -> some View {

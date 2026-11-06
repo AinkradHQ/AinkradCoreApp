@@ -133,14 +133,3 @@ public struct AppLookTabs: View {
         .help("Appearance uses the content background from Settings, Appearance")
     }
 }
-
-extension View {
-    /// A card or component inside content (Ahmed, 2026-11-06: the glass frame is only for panes, dialogs, pop-ups and
-    /// menus, never for what sits inside them): a plain well with a hairline edge, lit when active.
-    public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
-        background(active ? GlassInk.wellHover : GlassInk.well, in: coreShape(radius))
-            .overlay {
-                coreShape(radius).strokeBorder(active ? Color.white.opacity(0.28) : GlassInk.wellEdge, lineWidth: 1)
-            }
-    }
-}

@@ -255,7 +255,7 @@ struct NotificationAsk: View {
             }
         }
         .padding(Space.s3)
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .accessibilityElement(children: .contain)
     }
 }

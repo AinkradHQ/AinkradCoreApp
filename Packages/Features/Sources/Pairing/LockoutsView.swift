@@ -71,7 +71,7 @@ struct LockoutsSection: View {
             .keyboardShortcut("r", modifiers: .command)
         }
         .padding(Space.s4)
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .animation(Motion.out(Motion.move), value: n)
     }
 
@@ -155,7 +155,7 @@ private struct LockCard: View {
                 }
             }
             .padding(Space.s3)
-            .coreWell(active: selected || hovering)
+            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: selected || hovering)
             .contentShape(coreShape(Radius.cardMac))
             .onTapGesture(perform: pick)
             .onHover { hovering = $0 }

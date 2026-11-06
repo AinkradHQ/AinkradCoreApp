@@ -26,7 +26,7 @@ struct ForgetSection: View {
                 .accessibilityIdentifier("forget-core")
             }
             .padding(Space.s4)
-            .coreWell()
+            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
             HStack(alignment: .top, spacing: Space.s3) {
                 fact("key.slash", GlassInk.slate, "This Mac's keys", "Deleted from this Mac.")
                 fact("qrcode", GlassInk.slate, "To come back", "A new pairing code from an admin device.")
@@ -49,6 +49,6 @@ struct ForgetSection: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 }

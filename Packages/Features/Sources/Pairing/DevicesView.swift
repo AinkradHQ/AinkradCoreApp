@@ -116,7 +116,7 @@ private struct OnlyAdminWarning: View {
         .font(.system(size: MacTextSize.body))
         .padding(Space.s3)
         .background(t.fill)
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("only-admin")
     }
@@ -222,7 +222,7 @@ private struct DeviceCard: View {
             .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Space.s4)
-            .coreWell(active: selected || hovering)
+            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: selected || hovering)
             .opacity(device.revoked ? 0.6 : 1)
             .contentShape(coreShape(Radius.cardMac))
         }

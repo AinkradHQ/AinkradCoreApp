@@ -32,7 +32,7 @@ struct AdminPanel<Content: View>: View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .coreWell()
+            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 }
 
@@ -131,7 +131,7 @@ struct StateCard<Actions: View>: View {
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .coreWell()
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .accessibilityElement(children: .contain)
     }
 }
