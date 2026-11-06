@@ -131,22 +131,16 @@ private struct FrameModifier: ViewModifier {
     let part: LookPart?
     let fill: Bool
     @Environment(\.coreLook) private var inForce
-    @Environment(\.corePalette) private var palette
     func body(content: Content) -> some View {
         let prefs = LookPrefs.shared
-        // The rim is clear glass; over the night sky (and a dimmed scrim) it went dark and vanished, so it gets a light
-        // lift and a brighter edge at night (the screenshot review, 2026-11-06).
-        let lift = palette.isDay ? 0.04 : 0.1
-        let edge = active ? 0.34 : palette.isDay ? 0.14 : 0.22
         let look = part.flatMap { prefs.custom[$0] } ?? inForce
         content
             .foregroundStyle(GlassInk.primary)
             .background { if fill { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) } }
             .clipShape(coreShape(max(radius - rim, Radius.chip)))
             .padding(rim)
-            .background(Color.white.opacity(lift), in: coreShape(radius))
             .coreGlass(radius: radius, interactive: false, tinted: false)
-            .overlay { coreShape(radius).strokeBorder(.white.opacity(edge), lineWidth: 1) }
+            .overlay { coreShape(radius).strokeBorder(.white.opacity(active ? 0.3 : 0.12), lineWidth: 1) }
     }
 }
 
