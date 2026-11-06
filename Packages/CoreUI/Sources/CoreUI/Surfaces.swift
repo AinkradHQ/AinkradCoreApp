@@ -12,10 +12,8 @@ extension View {
     }
 
     /// The content surface of dialogs, sheets and pop-ups: the one frame (see `coreFrame`).
-    public func corePanel(radius: CGFloat = Radius.pane, padding: CGFloat = Space.s4, part: LookPart = .dialogs)
-        -> some View
-    {
-        modifier(PanelModifier(radius: radius, padding: padding, part: part))
+    public func corePanel(radius: CGFloat = Radius.pane, padding: CGFloat = Space.s4) -> some View {
+        modifier(PanelModifier(radius: radius, padding: padding))
     }
 
     /// An input's well: clear Liquid Glass on macOS 26 / iOS 26 (the field reads as cut into the glass card), the
@@ -40,14 +38,13 @@ private struct PanelModifier: ViewModifier {
     @Environment(\.corePalette) private var palette
     let radius: CGFloat
     let padding: CGFloat
-    let part: LookPart
     /// Every panel, dialog, sheet and pop-up is the one frame (Ahmed, 2026-11-06): a clear glass rim holding the content
     /// on the Look's background (Settings, Appearance). Reduce Transparency keeps a solid panel.
     func body(content: Content) -> some View {
         if solid {
             content.padding(padding).background(palette.panelStrong, in: coreShape(radius))
         } else {
-            content.padding(padding).coreFrame(radius: radius, rim: Space.s2, part: part)
+            content.padding(padding).coreFrame(radius: radius, rim: Space.s2)
         }
     }
 }

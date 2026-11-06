@@ -19,49 +19,12 @@ extension EnvironmentValues {
     @Entry public var coreLook: CoreLook = .standard
 }
 
-/// The kinds of framed surface, each of which may set its own Look in Settings, Appearance, Advanced.
-public enum LookPart: String, CaseIterable, Sendable {
-    case panes, launcher, dialogs, popups, dropdowns, settings
-    public var title: String {
-        switch self {
-        case .panes: "Panes"
-        case .launcher: "Launcher"
-        case .dialogs: "Dialogs"
-        case .popups: "Pop-ups"
-        case .dropdowns: "Menus"
-        case .settings: "Settings"
-        }
-    }
-    public var symbol: String {
-        switch self {
-        case .panes: "rectangle.split.2x1"
-        case .launcher: "magnifyingglass"
-        case .dialogs: "rectangle.portrait.on.rectangle.portrait"
-        case .popups: "bell"
-        case .dropdowns: "filemenu.and.selection"
-        case .settings: "gearshape"
-        }
-    }
-    public var sub: String {
-        switch self {
-        case .panes: "Every app's pane"
-        case .launcher: "⌘K and the app switcher"
-        case .dialogs: "Confirmations, sheets and forms"
-        case .popups: "Notifications, admin unlock, overview"
-        case .dropdowns: "A pane's tab menu"
-        case .settings: "This window"
-        }
-    }
-}
-
 /// Settings, Appearance, Content background: the Look every surface uses unless its app replaces it.
 @MainActor @Observable
 public final class LookPrefs {
     public static let shared = LookPrefs()
     public var mode: SurfaceMode { didSet { save() } }
     public var opacity: Double { didSet { save() } }
-    /// Advanced: a part's own Look; a part that is missing follows the content background.
-    public private(set) var custom: [LookPart: CoreLook]
     /// Posted on every change, for surfaces drawn outside SwiftUI (the terminal screen).
     public static let changed = Notification.Name("ainkrad.look")
 
@@ -69,33 +32,14 @@ public final class LookPrefs {
     private init() {
         mode = SurfaceMode(rawValue: d.string(forKey: "look.mode") ?? "") ?? CoreLook.standard.mode
         opacity = d.object(forKey: "look.opacity") as? Double ?? CoreLook.standard.opacity
-        var c: [LookPart: CoreLook] = [:]
-        for part in LookPart.allCases {
-            if let m = SurfaceMode(rawValue: d.string(forKey: "look.\(part.rawValue).mode") ?? "") {
-                c[part] = CoreLook(
-                    mode: m, opacity: d.object(forKey: "look.\(part.rawValue).opacity") as? Double ?? 0.6)
-            }
-        }
-        custom = c
     }
     private func save() {
         d.set(mode.rawValue, forKey: "look.mode")
         d.set(opacity, forKey: "look.opacity")
-        for part in LookPart.allCases {
-            d.set(custom[part]?.mode.rawValue, forKey: "look.\(part.rawValue).mode")
-            d.set(custom[part]?.opacity, forKey: "look.\(part.rawValue).opacity")
-        }
         NotificationCenter.default.post(name: Self.changed, object: nil)
     }
 
     public var look: CoreLook { CoreLook(mode: mode, opacity: opacity) }
-    /// The Look a part draws with: its own, or the content background.
-    public func look(for part: LookPart) -> CoreLook { custom[part] ?? look }
-    /// Give a part its own Look, or nil to follow the content background again.
-    public func setCustom(_ part: LookPart, _ look: CoreLook?) {
-        custom[part] = look
-        save()
-    }
 }
 
 /// The content background for the Look in force.
@@ -110,11 +54,8 @@ extension View {
     /// The one surface style (Ahmed, 2026-11-06, from the terminal pane): a clear Liquid Glass rim, rounded, holding the
     /// content on the Look's background. Panes, dialogs and pop-ups take the wide rim (`Space.s2`); cards and menus the
     /// narrow one (`Space.s1`). The inner corner is the outer one less the rim, so the two curves stay parallel.
-    /// `part` lets Settings, Appearance, Advanced give this kind of surface its own Look; nil uses the Look in force.
-    public func coreFrame(
-        radius: CGFloat = Radius.pane, rim: CGFloat = Space.s2, active: Bool = false, part: LookPart? = nil
-    ) -> some View {
-        modifier(FrameModifier(radius: radius, rim: rim, active: active, part: part))
+    public func coreFrame(radius: CGFloat = Radius.pane, rim: CGFloat = Space.s2, active: Bool = false) -> some View {
+        modifier(FrameModifier(radius: radius, rim: rim, active: active))
     }
 }
 
@@ -122,14 +63,10 @@ private struct FrameModifier: ViewModifier {
     let radius: CGFloat
     let rim: CGFloat
     let active: Bool
-    let part: LookPart?
-    @Environment(\.coreLook) private var inForce
     func body(content: Content) -> some View {
-        let prefs = LookPrefs.shared
-        let look = part.flatMap { prefs.custom[$0] } ?? inForce
         content
             .foregroundStyle(GlassInk.primary)
-            .background { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) }
+            .background { LookFill(radius: max(radius - rim, Radius.chip)) }
             .clipShape(coreShape(max(radius - rim, Radius.chip)))
             .padding(rim)
             .coreGlass(radius: radius, interactive: false, tinted: false)
@@ -165,21 +102,19 @@ extension View {
 public struct AppLookTabs: View {
     @Binding var follow: Bool
     @Binding var mode: SurfaceMode
-    let followTitle: String
     private enum Choice: Hashable {
         case appearance
         case own(SurfaceMode)
     }
-    public init(follow: Binding<Bool>, mode: Binding<SurfaceMode>, followTitle: String = "Appearance") {
+    public init(follow: Binding<Bool>, mode: Binding<SurfaceMode>) {
         self._follow = follow
         self._mode = mode
-        self.followTitle = followTitle
     }
     public var body: some View {
         CoreSegmented(
             "Look",
             segments: [
-                CoreSegment(Choice.appearance, followTitle, symbol: "paintpalette"),
+                CoreSegment(Choice.appearance, "Appearance", symbol: "paintpalette"),
                 CoreSegment(.own(.blurred), "Blurred", symbol: "drop.halffull"),
                 CoreSegment(.own(.clear), "Clear", symbol: "square.dashed"),
                 CoreSegment(.own(.solid), "Solid", symbol: "square.fill"),

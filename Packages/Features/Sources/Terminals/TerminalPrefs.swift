@@ -27,11 +27,9 @@ final class TerminalPrefs {
     /// The terminal screen's style. The app surface shares it, its blur and its opacity: one look for both (Ahmed, 2026-11-05).
     var screen: Surface { didSet { save() } }
     /// What is drawn: Settings, Appearance's Look, or the app's own (the terminal keeps its theme's colour either way).
-    var lookScreen: Surface {
-        followLook ? (LookPrefs.shared.look(for: .panes).mode == .solid ? .solid : .theme) : screen
-    }
-    var lookBlur: Bool { followLook ? LookPrefs.shared.look(for: .panes).mode.blur : blur }
-    var lookOpacity: Double { followLook ? LookPrefs.shared.look(for: .panes).opacity : opacity }
+    var lookScreen: Surface { followLook ? (LookPrefs.shared.mode == .solid ? .solid : .theme) : screen }
+    var lookBlur: Bool { followLook ? LookPrefs.shared.mode.blur : blur }
+    var lookOpacity: Double { followLook ? LookPrefs.shared.opacity : opacity }
     /// The app's own Look for the list, or nil to follow Settings, Appearance.
     var look: CoreLook? {
         followLook ? nil : CoreLook(mode: SurfaceMode(style: Self.app(screen), blur: blur), opacity: opacity)

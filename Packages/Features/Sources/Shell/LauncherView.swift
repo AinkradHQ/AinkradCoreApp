@@ -90,7 +90,7 @@ struct LauncherView: View {
         .frame(maxHeight: Space.s8 * 18)
         .fixedSize(horizontal: false, vertical: true)
         // The one frame: a glass rim around the Look's background (Settings, Appearance).
-        .coreFrame(radius: Radius.panel + Space.s1, part: .launcher)
+        .coreFrame(radius: Radius.panel + Space.s1)
         .background { numberShortcuts(rows) }
         .task {
             // The root holds focus while the window is calm; take it once the overlay is in place.

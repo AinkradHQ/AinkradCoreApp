@@ -51,7 +51,7 @@ private struct PaneFrame<Content: View>: View {
         let look: CoreLook =
             switch ask {
             case .look(let l): l
-            default: LookPrefs.shared.custom[.panes] ?? appearance
+            default: appearance
             }
         Group {
             if ask == .own {
