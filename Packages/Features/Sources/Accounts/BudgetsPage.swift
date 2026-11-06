@@ -44,9 +44,15 @@ struct BudgetsPage: View {
             switch model.spendLoad {
             case .loading: AccSkeleton()
             case .forbidden:
-                AccStateCard(
-                    symbol: "lock", title: "This device can't read budgets",
-                    text: "Budgets need the read scope. Use a device that holds it.", code: "forbidden_scope")
+                // Budgets need the same `read` scope as accounts. When accounts load, a refusal here means the Core has no
+                // budgets yet (an older Core answers a route it doesn't know as `forbidden_scope`).
+                if model.load == .ready {
+                    OlderCoreCard(what: "Budgets")
+                } else {
+                    AccStateCard(
+                        symbol: "lock", title: "This device can't read budgets",
+                        text: "Budgets need the read scope. Use a device that holds it.", code: "forbidden_scope")
+                }
             case .failed(let code, let message):
                 AccStateCard(
                     symbol: "exclamationmark.triangle", title: "Could not load budgets",
@@ -476,5 +482,17 @@ struct DeleteBudgetDialog: View {
             }
         }
         .accessibilityIdentifier("budget-delete")
+    }
+}
+
+/// The Core refused a page this device's scopes allow: it is older than the page.
+struct OlderCoreCard: View {
+    let what: String
+    var body: some View {
+        AccStateCard(
+            symbol: "arrow.down.app", title: "Your Core doesn't have \(what.lowercased()) yet",
+            text: "This Mac is newer than your Core. Update Core, then open this page again. Nothing was changed."
+        )
+        .help("The Core answered forbidden_scope to a route this device's scopes allow, so the route is missing.")
     }
 }
