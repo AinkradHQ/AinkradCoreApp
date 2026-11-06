@@ -192,7 +192,7 @@ private struct MemberRow: View {
                 Text(a?.label ?? "Account \(id)").font(.system(size: MacTextSize.headline, weight: .semibold))
                     .lineLimit(1)
                 Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(first ? hue : GlassInk.secondary)
+                    .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let a { PhaseBadge(phase: a.phase) }

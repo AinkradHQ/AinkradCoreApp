@@ -34,7 +34,7 @@ struct WidgetBody: View {
 struct GaugeRow<Content: View>: View {
     @ViewBuilder let content: Content
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s4) { content }
+        HStack(alignment: .top, spacing: Space.s3) { content }
             .frame(maxWidth: .infinity)
     }
 }

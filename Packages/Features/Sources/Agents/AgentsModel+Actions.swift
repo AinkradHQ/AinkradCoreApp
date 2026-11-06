@@ -140,7 +140,11 @@ extension AgentsModel {
             syncDerived()
         } catch {
             t.unmark(r.id)
-            approvalNotices[r.id] = Self.notice(error, doing: approved ? "Approving" : "Denying")
+            var n = Self.notice(error, doing: approved ? "Approving" : "Denying")
+            if case .http(_, _, let message)? = CoreError.unwrapping(error), message.contains("no such request") {
+                n.detail = "That request is no longer waiting"
+            }
+            approvalNotices[r.id] = n
         }
     }
 

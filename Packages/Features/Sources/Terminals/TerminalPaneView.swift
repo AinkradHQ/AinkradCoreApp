@@ -57,7 +57,8 @@ struct TerminalPaneView: View {
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         }
-        // No margin of its own: the pane frame gives the same space on every side.
+        // The pane's drag grip rides over the top edge; keep the first line clear of it.
+        .padding(.top, Space.s3)
         .coreAnimation(Motion.out(Motion.move), value: v)
         .onDisappear { model.paneClosed(session.id) }
         .accessibilityIdentifier("terminal-pane-\(session.id)")

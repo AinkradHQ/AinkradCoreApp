@@ -117,7 +117,6 @@ private struct TileScreen: View {
                 Spacer()
                 StateBadge(chip.label, tone: chip.tone, symbol: chip.symbol)
             }
-            Spacer(minLength: Space.s3)
             HStack(spacing: 0) {
                 Text(runner).foregroundStyle(GlassInk.blue)
                 Text(" ~ ").foregroundStyle(Color(nsColor: t.foreground).opacity(0.7))
@@ -130,6 +129,9 @@ private struct TileScreen: View {
             }
             .font(Font(prefs.font).weight(.medium))
             .lineLimit(1)
+            .padding(.top, Space.s2)
+            // The prompt sits under the dots so the hover actions at the bottom never cover it.
+            Spacer(minLength: 0)
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, minHeight: Space.s8 * 3 + Space.s2, alignment: .topLeading)

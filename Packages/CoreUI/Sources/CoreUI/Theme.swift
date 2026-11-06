@@ -111,7 +111,7 @@ extension View {
     }
 
     /// The disabled look every control shares.
-    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
+    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.55) }
 
     /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
     /// Draws nothing in the app: focus rings are off everywhere (Ahmed, 2026-11-05). Kept so callers need no change.

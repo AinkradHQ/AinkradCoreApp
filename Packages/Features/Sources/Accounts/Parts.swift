@@ -86,7 +86,7 @@ struct AccLink: View {
                 }
                 Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).lineLimit(1)
             }
-            .foregroundStyle(hovering ? .white : hue)
+            .foregroundStyle(hovering || !danger ? Color.white : hue)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm + Space.s1)
             .background(hovering ? hue.opacity(0.7) : hue.opacity(0.12), in: coreShape(Radius.chip))
             .overlay { coreShape(Radius.chip).strokeBorder(hue.opacity(0.35), lineWidth: 1) }

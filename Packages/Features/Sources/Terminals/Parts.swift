@@ -99,3 +99,30 @@ func ago(_ date: Date?, now: Date = Date()) -> String {
     if m < 1440 { return "\(m / 60) h ago" }
     return "\(m / 1440) d ago"
 }
+
+/// Runner facts in plain words; the raw value goes in `.help`.
+enum RunnerWords {
+    static func arch(_ raw: String) -> String {
+        switch raw.lowercased() {
+        case "x86_64", "amd64": "Intel"
+        case "aarch64", "arm64": "ARM"
+        default: raw
+        }
+    }
+
+    static func driver(_ raw: String) -> String {
+        switch raw {
+        case "pty": "Terminals"
+        case "exec": "Commands"
+        case "agent": "Agents"
+        case "noop": "Test only"
+        default: raw
+        }
+    }
+
+    /// "pty.open, pty.attach" -> "open, attach"; the empty round trip is "test only".
+    static func commands(_ raw: [String]) -> String {
+        raw.map { $0 == "noop" ? "test only" : String($0.split(separator: ".").last ?? Substring($0)) }
+            .joined(separator: ", ")
+    }
+}

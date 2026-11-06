@@ -226,7 +226,7 @@ public final class TerminalsModel {
     }
 
     static func spec(_ r: RunnerItem) -> String {
-        [r.arch, r.version.map { "v\($0)" }].compactMap { $0 }.joined(separator: " · ")
+        [r.arch.map(RunnerWords.arch), r.version.map { "v\($0)" }].compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: panes

@@ -98,7 +98,7 @@ enum AgentsSnapshots {
                 detail: "The Secure Enclave could not sign the request. Try again.", symbol: "exclamationmark.triangle")
             await shot("approval-touchid-failed")
             a.debugNotice(
-                r.id, title: "Approving did not go through.", detail: "no such request waits",
+                r.id, title: "Approving did not go through.", detail: "That request is no longer waiting",
                 symbol: "exclamationmark.triangle")
             await shot("approval-refused")
             a.debugNotice(r.id, title: "", detail: "", symbol: "")

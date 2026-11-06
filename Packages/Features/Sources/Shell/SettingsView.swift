@@ -119,7 +119,6 @@ struct SettingsView: View {
                 .onKeyPress(.downArrow) { moveSection(1) }
             }
             .frame(width: Space.s8 * 8)
-            .background(Color.black.opacity(0.12))
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(alignment: .top, spacing: Space.s4) {
                     if let back = shell.settings.back {

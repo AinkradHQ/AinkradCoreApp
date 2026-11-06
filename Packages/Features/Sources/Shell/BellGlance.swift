@@ -124,7 +124,7 @@ struct BellGlance: View {
                 "Notification filter",
                 segments: [
                     CoreSegment(BellTab.all, "All \(all.count)"),
-                    CoreSegment(.approvals, "Approvals \(all.filter { $0.kind == .approval }.count)"),
+                    CoreSegment(.approvals, "Approve \(all.filter { $0.kind == .approval }.count)"),
                     CoreSegment(.alerts, "Other \(all.filter { $0.kind != .approval }.count)"),
                     CoreSegment(.runners, "Runners \(shell.home.machines.filter(\.online).count)"),
                 ], selection: $tab, fill: true)

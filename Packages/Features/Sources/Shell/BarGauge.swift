@@ -36,7 +36,7 @@ struct BarGauge: View {
                     }
                 }
         }
-        .frame(minWidth: 64)
+        .frame(minWidth: 40, maxWidth: .infinity)
         .onAppear { fill() }
         .onChange(of: value) { _, _ in fill() }
         .accessibilityElement(children: .ignore)

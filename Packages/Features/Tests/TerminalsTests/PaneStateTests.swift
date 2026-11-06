@@ -71,7 +71,7 @@ import Testing
     @Test func resumedAndRepaintedBannersDismiss() {
         let a = view(item(attached: 1), .attached(letterbox: false), note: .resumed(from: 4_182_913, to: 4_190_000))
         #expect(a.banner?.title == "Resumed. Nothing was lost" && a.banner?.action == .dismiss)
-        #expect(a.banner?.detail.contains("4,182,913") == true)
+        #expect(a.banner?.help.contains("4,182,913") == true)
         let b = view(item(attached: 1), .attached(letterbox: false), note: .repainted)
         #expect(b.banner?.title == "Screen repainted from a snapshot")
     }

@@ -66,7 +66,7 @@ struct SessionTile: View {
     }
 
     private var facts: String {
-        var parts = [runner, session.shortID]
+        var parts = [runner]
         if let u = session.usage {
             parts.append("\(AgentWords.tokens(u.tokens)) tokens")
             if let c = AgentWords.cost(u.costMicros) { parts.append(c) }
@@ -77,7 +77,8 @@ struct SessionTile: View {
     /// The stage: a well, the glyph at the left, state at the top right, the burn line along the bottom.
     private func stage(st: (label: String, tone: Tone, symbol: String)) -> some View {
         ZStack(alignment: .topLeading) {
-            HStack(alignment: .center, spacing: Space.s3) {
+            // Top-aligned: the hover actions sit in the bottom right and never cover these lines.
+            HStack(alignment: .top, spacing: Space.s3) {
                 IconTile(AgentsModel.harnessSymbol(session.harness), hue: GlassInk.blue, size: Space.s8 * 1.5)
                 VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     Text(session.model ?? "Default model").font(.system(size: MacTextSize.body, weight: .semibold))
@@ -88,7 +89,7 @@ struct SessionTile: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3)
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: .infinity, alignment: .top)
             HStack {
                 Spacer()
                 StateBadge(st.label, tone: st.tone, symbol: st.symbol)

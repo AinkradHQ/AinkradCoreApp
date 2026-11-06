@@ -197,8 +197,8 @@ struct PaneView: Equatable {
             case .resumed(let from, let to)?:
                 v.banner = .init(
                     tone: .run, title: "Resumed. Nothing was lost",
-                    detail: "Replayed from byte \(from.formatted()) to \(to.formatted()) while you were away.",
-                    action: .dismiss)
+                    detail: "Replayed the output you missed",
+                    action: .dismiss, help: "Replayed from byte \(from.formatted()) to \(to.formatted()).")
             case .repainted?:
                 v.banner = .init(
                     tone: .done, title: "Screen repainted from a snapshot",
