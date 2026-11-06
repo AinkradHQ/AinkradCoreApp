@@ -38,7 +38,7 @@ struct ConnectionsTests {
         #expect(m.flow?.userCode == "WDJB-MJHT")
         m.openSignIn()
         await settle(m) { if case .chooseResources = $0 { true } else { false } }
-        guard case .chooseResources(let login)? = m.flow?.step else {
+        guard case .chooseResources(let login, _)? = m.flow?.step else {
             Issue.record("no repo step")
             return
         }
@@ -47,6 +47,20 @@ struct ConnectionsTests {
         #expect(m.flow?.isConnected == true)
         #expect(m.items(of: "github").count == 3)
         #expect(m.items.last?.isDefault == false)  // the kind already has a default
+    }
+
+    @Test func choosingRepositoriesOnGitHubFinishesByItself() async {
+        let (m, _, _) = await make()
+        var opened: [URL] = []
+        m.opener = { opened.append($0) }
+        await m.startFlow("github")
+        m.openSignIn()
+        await settle(m) { if case .chooseResources = $0 { true } else { false } }
+        m.openInstall()
+        #expect(m.installing)
+        await settle(m) { if case .connected = $0 { true } else { false } }
+        #expect(m.flow?.isConnected == true)
+        #expect(opened.last?.absoluteString == "https://github.com/apps")
     }
 
     @Test func aFailedSignInSaysWhatToDoNotACode() async {
@@ -87,6 +101,8 @@ struct ConnectionsTests {
 
     @Test func aHealthEventSaysOnceWhenASignInStartsNeedingYou() async {
         let (m, s, host) = await make()
+        var notes: [String] = []
+        m.notify = { id, _, _ in notes.append(id) }
         m.event(kind: "connection.health")
         try? await Task.sleep(for: .milliseconds(50))
         #expect(host.shell.toast == nil)  // the expired one was already known
@@ -97,6 +113,7 @@ struct ConnectionsTests {
         m.event(kind: "connection.health")
         for _ in 0..<200 where host.shell.toast == nil { try? await Task.sleep(for: .milliseconds(2)) }
         #expect(host.shell.toast?.message.hasPrefix("Personal GitHub needs you.") == true)
+        #expect(notes == ["connection-1"])
     }
 
     @Test func theLoopbackTakesOnlyItsOwnCallback() {
@@ -126,4 +143,23 @@ struct ConnectionsTests {
 private actor Got {
     var code: String?
     func set(_ c: String) { code = c }
+}
+
+@MainActor
+struct ConnectionsKeysTests {
+    @Test func arrowsWalkTheCardsInDrawnOrderAndStopAtTheEnds() async {
+        let host = FakeHost()
+        let m = ConnectionsModel(host: host)
+        m.use(SampleConnections())
+        await m.reload()
+        m.move(1)
+        #expect(m.cursor == 1)
+        m.move(1)
+        m.move(1)
+        m.move(1)
+        #expect(m.cursor == 3)
+        m.move(-1)
+        #expect(m.cursor == 2)
+        #expect(m.key("x") == false)
+    }
 }

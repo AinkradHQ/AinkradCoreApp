@@ -59,7 +59,8 @@ struct ConnFlow: Equatable, Sendable {
     enum Step: Equatable, Sendable {
         case waiting
         /// GitHub: signed in, now choose repositories on GitHub (or skip).
-        case chooseResources(login: String)
+        /// `install` is GitHub's page for the Ainkrad app, where the person picks repositories.
+        case chooseResources(login: String, install: URL)
         /// Jira: approved, now pick a site.
         case pickSite([String])
         case connected(Int64)

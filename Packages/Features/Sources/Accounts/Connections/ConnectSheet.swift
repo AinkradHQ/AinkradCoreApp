@@ -154,7 +154,7 @@ struct ConnectSheet: View {
         return CoreDialogPanel(gh ? "Sign in with GitHub" : "Sign in with Atlassian") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 switch f?.step {
-                case .chooseResources(let login):
+                case .chooseResources(let login, _):
                     Text("Signed in as \(login). Now pick which repositories Core may reach. GitHub shows the list.")
                         .foregroundStyle(GlassInk.secondary)
                 case .pickSite:
@@ -209,12 +209,13 @@ struct ConnectSheet: View {
                 AccLink(title: "Skip for now") { Task { await model.choose(site: nil) } }
                 Spacer()
                 AppActionTile(
-                    title: "Choose on github.com", symbol: "arrow.up.right.square", key: "↩", hue: GlassInk.blue,
-                    prominent: true
+                    title: model.installing ? "Waiting for GitHub…" : "Choose on github.com",
+                    symbol: "arrow.up.right.square",
+                    key: "↩", hue: GlassInk.blue, prominent: true
                 ) {
-                    model.openSignIn()
-                    Task { await model.choose(site: nil) }
+                    model.openInstall()
                 }
+                .disabled(model.installing)
                 .keyboardShortcut(.defaultAction)
             case .pickSite(let sites):
                 Spacer()

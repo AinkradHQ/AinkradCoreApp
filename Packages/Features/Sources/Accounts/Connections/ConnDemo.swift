@@ -34,7 +34,10 @@ extension AccountsDemo {
         switch scene {
         case "conn-pick": await open(nil)
         case "conn-github-code": await open("github")
-        case "conn-github-repos": await open("github", then: .chooseResources(login: "@sample-dev"))
+        case "conn-github-repos":
+            await open(
+                "github", then: .chooseResources(login: "@sample-dev", install: URL(string: "https://github.com/apps")!)
+            )
         case "conn-jira-sites": await open("jira", then: .pickSite(["sample.atlassian.net", "other.atlassian.net"]))
         case "conn-failed":
             await open(

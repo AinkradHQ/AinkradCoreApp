@@ -163,9 +163,11 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
                 } else {
                     f.step =
                         f.kind == "github"
-                        ? .chooseResources(login: "@sample-dev")
+                        ? .chooseResources(login: "@sample-dev", install: URL(string: "https://github.com/apps")!)
                         : .pickSite(["sample.atlassian.net", "other.atlassian.net"])
                 }
+            } else if n >= 5, case .chooseResources = f.step {
+                add(&f, site: nil)  // the person picked repositories on GitHub
             }
             flows[id] = (f, n)
             return f
@@ -176,17 +178,22 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         try lock.withLock {
             guard let (old, n) = flows[id] else { throw URLError(.badURL) }
             var f = old
-            nextID += 1
-            let gh = f.kind == "github"
-            list.append(
-                ConnItem(
-                    id: nextID, kind: f.kind, name: gh ? "GitHub (\(nextID))" : "Jira (\(nextID))",
-                    identity: gh ? "@sample-dev" : (site ?? "sample.atlassian.net"), status: .connected,
-                    isDefault: !list.contains { $0.kind == f.kind }, allowed: ["read"], only: nil, users: 1))
-            f.step = .connected(nextID)
+            add(&f, site: site)
             flows[id] = (f, n)
             return f
         }
+    }
+
+    /// Called under the lock: the new connection, and the flow marked done.
+    private func add(_ f: inout ConnFlow, site: String?) {
+        nextID += 1
+        let gh = f.kind == "github"
+        list.append(
+            ConnItem(
+                id: nextID, kind: f.kind, name: gh ? "GitHub (\(nextID))" : "Jira (\(nextID))",
+                identity: gh ? "@sample-dev" : (site ?? "sample.atlassian.net"), status: .connected,
+                isDefault: !list.contains { $0.kind == f.kind }, allowed: ["read"], only: nil, users: 1))
+        f.step = .connected(nextID)
     }
 
     func deliver(_ id: String, code: String, state: String) async throws -> ConnFlow { try await flow(id) }

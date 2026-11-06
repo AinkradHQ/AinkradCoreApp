@@ -24,12 +24,18 @@ public final class ConnectionsModel {
     var activityFilter: Int64?
     /// The sign-in running in the Connect sheet.
     var flow: ConnFlow?
+    /// GitHub's repository page is open; waiting for GitHub to say which were chosen.
+    var installing = false
+    /// The card the keyboard is on.
+    var cursor: Int64?
     /// What the last Test of each connection said.
     var tested: [Int64: String] = [:]
     var testing: Int64?
     private(set) var writeError: [String: String] = [:]
     private(set) var busy: String?
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// A macOS notification (id, title, body); the app routes it through the Agents notifier.
+    @ObservationIgnored public var notify: ((String, String, String) -> Void)?
     @ObservationIgnored var pollEvery: Duration = .seconds(1)
     @ObservationIgnored private var poller: Task<Void, Never>?
     @ObservationIgnored private var catcher: LoopbackCatcher?
@@ -67,6 +73,9 @@ public final class ConnectionsModel {
             // CN5: a sign-in that just started needing you is said once, in plain words.
             for c in items where c.status == .needsLook && !before.contains(c.id) {
                 host.shell.showToast("\(c.name) needs you. \(c.reason ?? "") Open Connections to sign in again.")
+                notify?(
+                    "connection-\(c.id)", "\(c.name) needs you",
+                    "\(c.reason ?? "This sign-in stopped working.") Open Ainkrad and press Sign in again.")
             }
         }
     }
@@ -78,6 +87,30 @@ public final class ConnectionsModel {
     var laterKinds: [ConnKind] { kinds.filter { !$0.available } }
     func items(of kind: String) -> [ConnItem] { items.filter { $0.kind == kind && filter.matches($0) } }
     func item(_ id: Int64) -> ConnItem? { items.first { $0.id == id } }
+    /// The cards in the order they are drawn, for the arrows.
+    var ordered: [ConnItem] { liveKinds.flatMap { items(of: $0.id) } }
+
+    func move(_ step: Int) {
+        let ids = ordered.map(\.id)
+        guard !ids.isEmpty else { return }
+        let i = cursor.flatMap { ids.firstIndex(of: $0) } ?? (step > 0 ? -1 : ids.count)
+        cursor = ids[min(max(i + step, 0), ids.count - 1)]
+    }
+
+    /// A key on the card under the cursor: ↩ who can use it (or sign in again), T test, R rename, D default, ⌫ disconnect.
+    func key(_ k: String) -> Bool {
+        guard let c = cursor.flatMap(item) else { return false }
+        switch k {
+        case "↩": c.status == .needsLook ? ConnDialogs.openConnect(self, kind: c.kind) : ConnDialogs.openAccess(self, c)
+        case "t": Task { await test(c) }
+        case "r": ConnDialogs.openRename(self, c)
+        case "d": Task { await makeDefault(c) }
+        case "⌫": ConnDialogs.openDisconnect(self, c)
+        default: return false
+        }
+        return true
+    }
+
     var needLook: Int { items.filter { $0.status == .needsLook }.count }
     var connected: Int { items.filter { $0.status == .connected }.count }
 
@@ -139,12 +172,24 @@ public final class ConnectionsModel {
         poller = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self, let f = self.flow, let service = self.service else { return }
-                guard case .waiting = f.step else { return }
+                switch f.step {
+                case .waiting: break
+                case .chooseResources where self.installing: break
+                default: return
+                }
                 try? await Task.sleep(for: self.pollEvery)
                 guard let next = try? await service.flow(f.id), self.flow?.id == f.id else { continue }
                 self.flow = next
             }
         }
+    }
+
+    /// GitHub's page for the Ainkrad app, where the person picks repositories; the sheet then waits for GitHub.
+    func openInstall() {
+        guard case .chooseResources(_, let install)? = flow?.step else { return }
+        opener(install)
+        installing = true
+        poll()
     }
 
     /// GitHub: done choosing repositories on GitHub, or skipped. Jira: the site picked.
@@ -163,6 +208,7 @@ public final class ConnectionsModel {
         poller = nil
         catcher?.stop()
         catcher = nil
+        installing = false
         if let f = flow, !f.id.isEmpty, let service, !f.isConnected { Task { try? await service.cancel(f.id) } }
         flow = nil
     }

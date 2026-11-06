@@ -4,6 +4,13 @@ import SwiftUI
 /// The Connections pane (CN1, CN6): page tiles and the Connect action in the header, the page, status chips at the foot.
 struct ConnectionsView: View {
     let model: ConnectionsModel
+    @FocusState private var paneFocus: Bool
+
+    private func arrow(_ step: Int) -> KeyPress.Result {
+        guard model.page == .list else { return .ignored }
+        withAnimation(.smooth(duration: 0.2)) { model.move(step) }
+        return .handled
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -41,6 +48,22 @@ struct ConnectionsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollIndicators(.never)
+            .focusable()
+            .focused($paneFocus)
+            .focusEffectDisabled()
+            .onAppear { paneFocus = true }
+            .onKeyPress(.downArrow) { arrow(1) }
+            .onKeyPress(.rightArrow) { arrow(1) }
+            .onKeyPress(.upArrow) { arrow(-1) }
+            .onKeyPress(.leftArrow) { arrow(-1) }
+            .onKeyPress(.return) { model.key("↩") ? .handled : .ignored }
+            .onKeyPress(.delete) { model.key("⌫") ? .handled : .ignored }
+            .onKeyPress(.escape) {
+                guard model.cursor != nil else { return .ignored }
+                model.cursor = nil
+                return .handled
+            }
+            .onKeyPress(characters: .letters) { model.key($0.characters.lowercased()) ? .handled : .ignored }
             if model.page == .list && !model.items.isEmpty {
                 HStack(spacing: Space.s2) {
                     AppStatChip("checkmark.seal.fill", "\(model.connected) connected", GlassInk.green)
@@ -48,7 +71,11 @@ struct ConnectionsView: View {
                         AppStatChip("exclamationmark.triangle.fill", "\(model.needLook) need a look", GlassInk.orange)
                     }
                     Spacer(minLength: 0)
-                    Text("⌘N connect · ⌘2 activity").font(.system(size: MacTextSize.meta))
+                    Text(
+                        model.cursor == nil
+                            ? "↑↓ move · ⌘N connect · ⌘2 activity"
+                            : "↩ who can use it · T test · R rename · D default · ⌫ disconnect"
+                    ).font(.system(size: MacTextSize.meta))
                         .foregroundStyle(GlassInk.secondary)
                 }
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
@@ -187,6 +214,7 @@ struct ConnCard: View {
     var body: some View {
         let (label, tone, symbol) = ConnLook.badge(item.status)
         let need = item.status == .needsLook
+        let on = model.cursor == item.id
         AccPanel(spacing: Space.s2) {
             HStack(alignment: .top, spacing: Space.s3) {
                 ConnTile(kind: item.kind)
@@ -238,13 +266,15 @@ struct ConnCard: View {
                 Spacer(minLength: 0)
                 AccLink(title: "Disconnect", symbol: "trash", danger: true) { ConnDialogs.openDisconnect(model, item) }
             }
-            .opacity(need || hovering ? 1 : 0)
-            .allowsHitTesting(need || hovering)
+            .opacity(need || hovering || on ? 1 : 0)
+            .allowsHitTesting(need || hovering || on)
             .animation(.smooth(duration: 0.2), value: hovering)
         }
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(on ? 0.7 : 0), lineWidth: 1.5) }
         .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.name), \(label)")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     private var when: String {
