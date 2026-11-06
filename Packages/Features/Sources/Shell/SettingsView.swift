@@ -9,7 +9,6 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
     case core = "Core"
     case security = "Security"
     case notifications = "Notifications"
-    case appearance = "Appearance"
 
     /// Each group has its colour on the nav tiles, so the list reads at a glance.
     var hue: Color {
@@ -19,7 +18,6 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
         case .core: WidgetInk.blue
         case .security: WidgetInk.orange
         case .notifications: Color(red: 1, green: 0.38, blue: 0.4)
-        case .appearance: Color(red: 0.62, green: 0.45, blue: 1)
         }
     }
 }
@@ -248,27 +246,6 @@ struct SettingsPage<Content: View>: View {
     }
 }
 
-struct SettingsValueRow: View {
-    let title: String
-    let detail: String
-    let value: String
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        HStack(spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-            }
-            Spacer(minLength: Space.s3)
-            Text(value).font(.system(size: MacTextSize.body, weight: .medium))
-        }
-        .padding(Space.s3)
-        .frame(maxWidth: Space.s8 * 16)
-        .background(palette.glassCard, in: coreShape(Radius.row))
-        .accessibilityElement(children: .combine)
-    }
-}
-
 /// The app's own look: Night, Day, Follow the sun (day from 07:00 to 18:00, as the prototype), or follow the Mac's appearance.
 public enum ThemeChoice: String, CaseIterable, Sendable {
     case night, day, sun, system
@@ -295,140 +272,6 @@ public enum ThemeChoice: String, CaseIterable, Sendable {
     }
 }
 
-/// A setting with a switch: title, one line of what it does, the switch on the right.
-struct SettingsSwitchRow: View {
-    let title: String
-    let detail: String
-    @Binding var isOn: Bool
-    var locked = false
-    var identifier: String?
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        HStack(spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s3)
-            // The switch keeps its own accessibility element (labelled with the title), so it can be found and pressed.
-            Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).disabled(locked)
-                .accessibilityLabel(title).accessibilityIdentifier(identifier ?? "switch-\(title)")
-        }
-        .padding(Space.s3)
-        .frame(maxWidth: Space.s8 * 16)
-        .background(palette.glassCard, in: coreShape(Radius.row))
-        .opacity(locked ? 0.7 : 1)
-        .accessibilityElement(children: .contain)
-    }
-}
-
-/// A titled block: heading and one line, then the controls.
-struct SettingsBlock<Content: View>: View {
-    let title: String
-    let detail: String
-    @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-            }
-            content
-        }
-    }
-}
-
-struct AppearanceSection: View {
-    @Bindable var shell: ShellModel
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s6) {
-            SettingsBlock(title: "Theme", detail: "The desktop sky and the glass follow it.") {
-                HStack(alignment: .top, spacing: Space.s3) {
-                    ForEach(ThemeChoice.allCases, id: \.self) { choice in
-                        ThemeCard(choice: choice, selected: shell.theme == choice) {
-                            shell.theme = choice
-                            shell.settings.saved()
-                        }
-                    }
-                }
-            }
-            SettingsBlock(title: "Motion", detail: "Reduce Motion keeps every state change and drops the travel.") {
-                SettingsValueRow(
-                    title: "Reduce Motion",
-                    detail: "Set in System Settings → Accessibility → Display. Shown here, not changed.",
-                    value: reduce ? "On" : "Off")
-            }
-            SettingsBlock(title: "Live sky", detail: "The desktop sky moves slowly on its own.") {
-                SettingsValueRow(
-                    title: "Live sky", detail: "Not built yet. The sky is a still picture for now.", value: "Off")
-            }
-        }
-    }
-}
-
-/// A 150 × 94 thumbnail of a theme, its name under it. The chosen one has a ring; a hover lifts it.
-private struct ThemeCard: View {
-    let choice: ThemeChoice
-    let selected: Bool
-    let action: () -> Void
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: Space.s2) {
-                thumb.frame(width: 150, height: 94).clipShape(coreShape(Radius.cardMac))
-                    .overlay {
-                        coreShape(Radius.cardMac).strokeBorder(
-                            selected ? palette.primary : palette.glassCardEdge, lineWidth: selected ? 2 : 1)
-                    }
-                Text(choice.title).font(.system(size: MacTextSize.body, weight: selected ? .semibold : .regular))
-            }
-            .offset(y: hovering && !reduce ? -2 : 0)
-            .animation(Motion.out(Motion.hover), value: hovering)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityLabel(choice.title)
-        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
-    }
-
-    @ViewBuilder private var thumb: some View {
-        switch choice {
-        case .night: sky("HomeSky")
-        case .day: sky("HomeSkyDay")
-        case .sun:
-            HStack(spacing: 0) {
-                sky("HomeSky").frame(width: 75, alignment: .leading).clipped()
-                sky("HomeSkyDay").frame(width: 75, alignment: .trailing).clipped()
-            }
-        case .system:
-            ZStack {
-                palette.glassCard
-                Image(systemName: "laptopcomputer").font(.system(size: 28)).foregroundStyle(palette.text2)
-            }
-        }
-    }
-
-    private func sky(_ name: String) -> some View {
-        Image(name, bundle: .main).resizable().scaledToFill().frame(width: 150, height: 94)
-    }
-}
-
-struct WindowSection: View {
-    var body: some View {
-        SettingsPage(intro: "Ainkrad always runs full screen, in its own Space. It cannot be resized or windowed.") {
-            SettingsValueRow(title: "Window", detail: "One window, full screen.", value: "Full screen")
-        }
-    }
-}
-
 /// A section whose feature module has not landed yet.
 struct PlaceholderSection: View {
     let what: String
@@ -445,10 +288,6 @@ extension ShellModel {
                     PlaceholderSection(what: what)
                 })
         }
-        settings.section(
-            SettingsSection(id: "window", group: .mac, title: "Window", symbol: "rectangle.inset.filled") {
-                WindowSection()
-            })
         later("core", .core, "Core settings", "gearshape", 0, "Core settings")
         later("devices", .core, "Devices", "iphone", 1, "Devices")
         later("lockouts", .security, "Lockouts", "lock", 0, "Lockouts")
@@ -457,7 +296,7 @@ extension ShellModel {
         later("notifications", .notifications, "Notifications", "bell", 0, "Notification settings")
         settings.section(
             SettingsSection(
-                id: "appearance", group: .appearance, title: "Appearance", sub: "Theme and motion",
+                id: "appearance", group: .mac, title: "Appearance", sub: "Night, day, or with the sun",
                 symbol: "circle.lefthalf.filled"
             ) { AppearanceSection(shell: self) })
     }
