@@ -262,7 +262,7 @@ struct AccountsLinkSection: View {
                     Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
                         .foregroundStyle(GlassInk.secondary)
                 } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
                 }
             }
             GlassSection(

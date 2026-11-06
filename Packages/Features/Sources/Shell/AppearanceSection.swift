@@ -33,7 +33,7 @@ struct AppearanceSection: View {
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
-                GlassSlider(value: $look.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
@@ -206,7 +206,7 @@ private struct LookPartRow: View {
                 AppLookTabs(follow: follow, mode: mode, followTitle: "Same")
             }
             if own != nil {
-                GlassSlider(value: opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                GlassSlider(value: opacity, in: 0.05...1, low: "See-through", high: "Solid")
             }
         }
         .padding(Space.s3)

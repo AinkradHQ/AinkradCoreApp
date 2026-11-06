@@ -5,7 +5,7 @@ import SwiftUI
 /// menu. Settings, Appearance holds the one for the whole app; an app's own settings may replace it for that app.
 public struct CoreLook: Equatable, Sendable {
     public var mode: SurfaceMode
-    /// 0.4 (see-through) to 1 (solid).
+    /// 0.05 (almost clear) to 1 (solid).
     public var opacity: Double
     public init(mode: SurfaceMode, opacity: Double) {
         self.mode = mode
