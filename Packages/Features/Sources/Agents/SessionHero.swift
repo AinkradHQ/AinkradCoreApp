@@ -57,6 +57,7 @@ struct SessionHero: View {
                 Spacer(minLength: 0)
                 timer
             }
+            if let l = model.ledgers[session.id] { SessionSpendStrip(session: session, ledger: l).transition(.opacity) }
             let burn = model.sessions.burn[session.id] ?? []
             if burn.count >= 2 {
                 CoreSpark(burn, tone: st.tone == .fail ? .fail : .run).frame(height: 26)
@@ -92,6 +93,7 @@ struct SessionHero: View {
         .padding([.horizontal, .top], Space.s3).padding(.bottom, Space.s2)
         .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
         .onAppear { shown = true }
+        .task(id: session.id) { await model.followLedger(session.id) }
         .accessibilityElement(children: .contain)
     }
 

@@ -45,6 +45,12 @@ struct ModelTests {
         return (m, api, host, notifier)
     }
 
+    @Test func ledgerSpendIsMeasuredAgainstTheAccountsSessionLimit() {
+        #expect(SessionLedger(costMicros: 4_000_000, tokens: 0, unpriced: false, maxUSDMicros: 5_000_000).share == 0.8)
+        #expect(SessionLedger(costMicros: 0, tokens: 500, unpriced: false, maxTokens: 1_000).share == 0.5)
+        #expect(SessionLedger(costMicros: 9, tokens: 9, unpriced: true).share == nil)
+    }
+
     @Test func startupFindsTheThreeWaitingApprovalsAndPutsThemInTheBell() async {
         let (m, _, _, n) = await make()
         #expect(m.sessions.items.count == 11)

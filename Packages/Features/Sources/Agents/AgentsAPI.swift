@@ -47,6 +47,12 @@ public protocol AgentsAPI: Sendable {
     func wake(_ id: String, key: String) async throws
     func decide(_ id: String, request: String, approved: Bool) async throws -> AgentSessionInfo
     func events() -> AsyncStream<AgentFeed>
+    /// What Core's ledger holds for a session (`admin`), or nil when this device can't read it.
+    func ledger(_ session: String) async throws -> SessionLedger?
+}
+
+extension AgentsAPI {
+    public func ledger(_ session: String) async throws -> SessionLedger? { nil }
 }
 
 /// Reading a transcript entry body (the runner's JSON) into words. Pure, so it is tested without a Core.

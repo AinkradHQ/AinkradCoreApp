@@ -59,6 +59,8 @@ public final class AgentsModel {
     public var selected: String?
 
     var api: (any AgentsAPI)?
+    /// Each open session's spend from Core's ledger (`SessionSpend.swift`).
+    var ledgers: [String: SessionLedger] = [:]
     weak var host: (any AgentsHost)?
     let notifier: any ApprovalNotifier
     let defaults: UserDefaults
