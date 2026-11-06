@@ -146,7 +146,7 @@ private struct Verdict: View {
             .keyboardShortcut("r", modifiers: .command)
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .animation(Motion.out(Motion.move), value: ok)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ops-health")
@@ -197,7 +197,7 @@ private struct WarningCard: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(a.raised ? GlassInk.orange.opacity(0.1) : .clear)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .accessibilityElement(children: .combine)
     }
 }
@@ -247,7 +247,7 @@ private struct FigureTile: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .help(tile.help.isEmpty ? tile.name : tile.help)
         .accessibilityElement(children: .combine)
     }

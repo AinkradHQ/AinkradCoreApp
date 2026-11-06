@@ -65,7 +65,7 @@ struct WidgetGallery: View {
         }
         .padding(Space.s2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .accessibilityElement(children: .contain)
     }
 

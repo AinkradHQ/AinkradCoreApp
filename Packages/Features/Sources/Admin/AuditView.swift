@@ -169,7 +169,7 @@ private struct AuditList: View {
                 }
             }
             .padding(Space.s2)
-            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+            .coreWell()
             .focusable().focused($focused).focusEffectDisabled()
             .onKeyPress(phases: .down) { press in
                 switch press.key {
@@ -285,7 +285,7 @@ private struct AuditDetail: View {
             }
         }
         .padding(Space.s4).frame(maxWidth: .infinity, alignment: .topLeading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .help(item.map { "Entry \($0.seq) · \($0.action)" } ?? "")
         .animation(Motion.out(Motion.ui), value: item?.seq)
         .accessibilityElement(children: .contain)

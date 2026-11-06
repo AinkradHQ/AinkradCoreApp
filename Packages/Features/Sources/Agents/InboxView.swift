@@ -64,7 +64,7 @@ struct InboxView: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .animation(Motion.out(Motion.move), value: n)
     }
 
@@ -194,7 +194,7 @@ struct NotificationsSection: View {
             }
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .animation(Motion.out(Motion.move), value: p)
         .accessibilityElement(children: .contain)
     }

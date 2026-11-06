@@ -89,7 +89,7 @@ public struct GlassSection<Content: View, Accessory: View>: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .coreRise(shown, index)
         .onAppear { shown = true }
     }

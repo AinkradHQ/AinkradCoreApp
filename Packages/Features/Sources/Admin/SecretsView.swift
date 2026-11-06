@@ -124,7 +124,7 @@ private struct ModePanel: View {
         }
         .padding(Space.s3)
         .background(hue.opacity(0.1))
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("secrets-mode")
     }
@@ -207,7 +207,7 @@ private struct SecretCard: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: selected || hovering)
+        .coreWell(active: selected || hovering)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }

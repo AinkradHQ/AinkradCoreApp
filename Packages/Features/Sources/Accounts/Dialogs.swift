@@ -350,7 +350,7 @@ struct AccountsGateSection: View {
             if let s = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: s, hue: hue) }
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
     }
 
     private func step(
@@ -382,7 +382,7 @@ struct AccountsGateSection: View {
             }
         }
         .padding(Space.s3)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: next)
+        .coreWell(active: next)
         .opacity(done || next ? 1 : 0.7)
     }
 
@@ -396,7 +396,7 @@ struct AccountsGateSection: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3).frame(maxWidth: .infinity)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
     }
 }
 
