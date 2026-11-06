@@ -166,7 +166,7 @@ struct AddDeviceView: View {
             FactCard {
                 FactRow(key: "Name", value: info.name ?? "Unnamed")
                 FactRow(key: "Platform", value: DeviceWords.platform(info.platform))
-                FactRow(key: "Key storage", value: DeviceWords.storage(info.keyStorage))
+                FactRow(key: "Its key", value: DeviceWords.storage(info.keyStorage))
                 FactRow(key: "Will get", value: info.scopes.joined(separator: ", "), mono: true)
                 if let until = info.expiresAt {
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in

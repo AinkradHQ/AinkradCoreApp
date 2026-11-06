@@ -50,7 +50,8 @@ struct DevicesSection: View {
     }
 
     @ViewBuilder private func list(_ model: DevicesModel) -> some View {
-        HStack(alignment: .top) {
+        @Bindable var model = model
+        HStack(alignment: .center, spacing: Space.s3) {
             Text(
                 app.service == nil
                     ? "Every device that can reach a Core."
@@ -58,7 +59,20 @@ struct DevicesSection: View {
             )
             .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s3)
-            Button("Add device…") { app.openAddDevice() }.buttonStyle(.coreProminent).disabled(app.service == nil)
+            if app.service != nil, !model.items.isEmpty {
+                CoreSegmented(
+                    "Show",
+                    segments: DeviceFilter.allCases.map { f in
+                        CoreSegment(f, "\(f.rawValue) \(model.items.filter { f.matches($0.kind) }.count)")
+                    }, selection: $model.filter
+                )
+                .fixedSize()
+            }
+            AppActionTile(title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                app.openAddDevice()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(app.service == nil)
         }
         if app.service == nil {
             NotConnectedNote(what: "Devices")
@@ -67,11 +81,9 @@ struct DevicesSection: View {
             if let only = model.onlyAdmin { OnlyAdminWarning(app: app, device: only) }
             if model.load == .ready || !model.items.isEmpty {
                 DeviceTable(app: app, model: model)
-                Text(
-                    "Key storage is what each device reported when it paired. The Core records it as a claim and can't verify it."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Where a key is kept is what each device said when it paired. Your Core can't check it.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -95,7 +107,7 @@ private struct OnlyAdminWarning: View {
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s2)
-            Button("Add device…") { app.openAddDevice() }.buttonStyle(.coreSecondary)
+            AppActionTile(title: "Add device", symbol: "plus", key: "", hue: GlassInk.orange) { app.openAddDevice() }
         }
         .font(.system(size: MacTextSize.body))
         .padding(Space.s3)
@@ -110,17 +122,32 @@ private struct DeviceTable: View {
     let app: AppModel
     @Bindable var model: DevicesModel
     @Environment(\.corePalette) private var palette
+    @State private var cursor: String?
+    @FocusState private var focus: Bool
+
+    private func keys(_ press: KeyPress) -> KeyPress.Result {
+        let ids = model.shown.map(\.id)
+        guard !ids.isEmpty else { return .ignored }
+        let i = ids.firstIndex { $0 == cursor } ?? 0
+        let step: Int? =
+            switch press.key {
+            case .rightArrow, .downArrow: 1
+            case .leftArrow, .upArrow: -1
+            default: nil
+            }
+        if let step {
+            withAnimation(.smooth(duration: 0.25)) { cursor = ids[min(max(i + step, 0), ids.count - 1)] }
+            return .handled
+        }
+        if press.key == .return, let c = cursor {
+            model.detailID = c
+            return .handled
+        }
+        return .ignored
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            HStack {
-                CoreSegmented(
-                    "Filter devices",
-                    segments: DeviceFilter.allCases.map { CoreSegment($0, $0.rawValue) }, selection: $model.filter)
-                Spacer(minLength: Space.s3)
-                Text("\(model.shown.count) of \(model.items.count)").foregroundStyle(palette.text2)
-                    .font(.system(size: MacTextSize.body).monospacedDigit())
-            }
             if model.shown.isEmpty {
                 Text("Nothing of that kind.").foregroundStyle(palette.text2).padding(Space.s3)
             }
@@ -129,10 +156,18 @@ private struct DeviceTable: View {
                 spacing: Space.s3
             ) {
                 ForEach(Array(model.shown.enumerated()), id: \.element.id) { i, d in
-                    DeviceCard(app: app, device: d, index: i) { model.detailID = d.id }
+                    DeviceCard(app: app, device: d, index: i, selected: cursor == d.id) { model.detailID = d.id }
                 }
             }
         }
+        // ↑ ↓ ← → move the cursor tile, Return opens it.
+        .focusable().focused($focus).focusEffectDisabled()
+        .onKeyPress(phases: .down) { press in keys(press) }
+        .onAppear {
+            cursor = cursor ?? model.shown.first?.id
+            focus = true
+        }
+        .onChange(of: model.shown.map(\.id)) { _, ids in if !ids.contains(cursor ?? "") { cursor = ids.first } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("device-table")
     }
@@ -144,6 +179,7 @@ private struct DeviceCard: View {
     let app: AppModel
     let device: DeviceInfo
     var index = 0
+    var selected = false
     let open: () -> Void
     @Environment(\.corePalette) private var palette
     @State private var hovering = false
@@ -182,16 +218,25 @@ private struct DeviceCard: View {
             .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Space.s4)
-            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .background(
+                selected ? hue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                in: coreShape(Radius.cardMac)
+            )
+            .overlay {
+                coreShape(Radius.cardMac).strokeBorder(
+                    selected ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
+            }
+            .shadow(color: hue.opacity(selected ? 0.3 : 0), radius: 12)
             .opacity(device.revoked ? 0.6 : 1)
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .scaleEffect(hovering ? 1.02 : 1)
         .shadow(color: .black.opacity(hovering ? 0.25 : 0), radius: 16, y: 8)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
+        .animation(.smooth(duration: 0.3), value: hovering)
+        .animation(.smooth(duration: 0.3), value: selected)
         .coreRise(shown, index)
         .onAppear { shown = true }
         .accessibilityLabel(
@@ -226,13 +271,20 @@ struct KeyStorageLabel: View {
     var body: some View {
         let software = storage == "software"
         Label {
-            Text(storage.map { $0 == "secure_enclave" ? "Secure Enclave" : $0 } ?? "not reported")
+            Text(
+                storage == "secure_enclave"
+                    ? "Key locked in the device's chip"
+                    : software ? "Key kept in a file" : "Didn't say where its key is")
         } icon: {
             Image(systemName: software ? "exclamationmark.triangle" : "checkmark.shield")
         }
         .font(.system(size: MacTextSize.meta))
         .foregroundStyle(software ? palette.tone(.warn).ink : palette.text2)
         .lineLimit(1)
+        .help(
+            software
+                ? "A key in a file can be copied if the device is taken. A chip (Secure Enclave) can't give its key away."
+                : storage ?? "not reported")
     }
 }
 
@@ -385,11 +437,11 @@ struct DeviceDetail: View {
                     KeyFact(
                         symbol: device.keyStorage == "software" ? "exclamationmark.triangle" : "cpu",
                         title: DeviceWords.storage(device.keyStorage),
-                        detail: device.keyStorage == "software" ? "Kept in software" : "In the Secure Enclave",
+                        detail: device.keyStorage == "software" ? "Kept in a file" : "Locked in the device's chip",
                         hue: device.keyStorage == "software" ? GlassInk.orange : GlassInk.green)
                     KeyFact(
                         symbol: device.stepup == true ? "touchid" : "touchid",
-                        title: device.stepup.map { $0 ? "Step-up key" : "No step-up key" } ?? "Not reported",
+                        title: device.stepup.map { $0 ? "Can use Touch ID" : "No Touch ID key" } ?? "Didn't say",
                         detail: device.stepup == true ? "Asks for the person" : "Can never unlock admin actions",
                         hue: device.stepup == true ? GlassInk.green : GlassInk.slate)
                 }
