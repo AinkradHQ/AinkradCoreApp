@@ -17,19 +17,12 @@ public struct ShellView: View {
         ZStack {
             base
             covers
-            // Above the scrim: a dropped link must stay visible with Settings or a dialog open.
-            connectionBanner.padding(.top, ShellMetrics.topBar)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             escape
         }
         .animation(reduce ? nil : Motion.out(Motion.move), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
         .coreToast($shell.toast)
-        // A toast left from before must not sit under a dialog that has just opened.
-        .onChange(of: shell.dialog != nil || shell.topDialog != nil || shell.sheet != nil) { _, open in
-            if open { shell.toast = nil }
-        }
         .environment(\.coreLook, look.look)
         // The window opens calm: focus rests on the root, so no control shows a ring until the keyboard moves it.
         .focusable()
@@ -60,6 +53,7 @@ public struct ShellView: View {
                 .accessibilityHidden(shell.surface != .workspace)
             VStack(spacing: 0) {
                 StatusCluster(shell: shell)
+                connectionBanner
                 Spacer(minLength: 0)
             }
         }
@@ -75,19 +69,20 @@ public struct ShellView: View {
         if let notice = shell.linkNotice {
             switch notice {
             case .rateLimited(let until):
-                LinkBanner(.rateLimited(until: until)).frame(maxWidth: width)
-            case .renewing: LinkBanner(.renewing).frame(maxWidth: width)
+                LinkBanner(.rateLimited(until: until)).frame(maxWidth: width).padding(.top, Space.s1)
+            case .renewing: LinkBanner(.renewing).frame(maxWidth: width).padding(.top, Space.s1)
             case .restarted:
-                LinkBanner(.restarted, dismiss: { shell.linkNotice = nil }).frame(maxWidth: width)
+                LinkBanner(.restarted, dismiss: { shell.linkNotice = nil }).frame(maxWidth: width).padding(
+                    .top, Space.s1)
             }
         } else {
             switch shell.coreLink {
             case .reconnecting:
                 LinkBanner(.resuming(since: shell.lastLiveAt), retry: shell.retryConnection.map { r in { r() } })
-                    .frame(maxWidth: width)
+                    .frame(maxWidth: width).padding(.top, Space.s1)
             case .offline:
                 ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
-                    .frame(maxWidth: width)
+                    .frame(maxWidth: width).padding(.top, Space.s1)
             default: EmptyView()
             }
         }
@@ -104,7 +99,7 @@ public struct ShellView: View {
                 .scaleEffect(ws && !reduce ? 1.03 : 1)
         }
         .clipped()
-        .animation(reduce ? nil : Motion.out(Motion.reveal), value: ws)
+        .animation(reduce ? nil : Motion.out(0.5), value: ws)
         .accessibilityHidden(true)
     }
 
@@ -160,30 +155,23 @@ public struct ShellView: View {
     /// `Mac.sheet`: every confirmation is the one ConfirmCard (visual, animated, keyboard driven), over the scrim. The safe
     /// choice comes first and starts highlighted.
     private func sheetLayer(_ sheet: ShellSheet) -> some View {
-        let safe = sheet.actions.filter { !$0.primary && !$0.destructive }
-        let rest = sheet.actions.filter { $0.primary || $0.destructive }
-        // Choice 0 is the one Esc and a bare Return run, so it must never destroy: with no safe action of its own the
-        // sheet gets a plain Cancel in front.
-        let cancel = ConfirmChoice("Cancel", symbol: "arrow.uturn.backward") { shell.sheet = nil }
-        let choices: [ConfirmChoice] =
-            (safe.isEmpty ? [cancel] : [])
-            + (safe + rest).map { a in
-                let isSafe = !a.primary && !a.destructive
-                return ConfirmChoice(
-                    a.label,
-                    symbol: isSafe && a.id == safe.first?.id
-                        ? "arrow.uturn.backward" : a.destructive ? "trash" : "checkmark",
-                    destructive: a.destructive
-                ) {
-                    shell.sheet = nil
-                    a.run()
-                }
-            }
+        let ordered =
+            sheet.actions.filter { !$0.primary && !$0.destructive }
+            + sheet.actions.filter { $0.primary || $0.destructive }
         return ZStack {
             Self.scrim.onTapGesture { shell.sheet = nil }.accessibilityHidden(true)
             ConfirmCard(
                 title: sheet.title, message: sheet.message, symbol: sheet.symbol,
-                choices: choices, cancel: { shell.sheet = nil })
+                choices: ordered.enumerated().map { i, a in
+                    ConfirmChoice(
+                        a.label, symbol: i == 0 ? "arrow.uturn.backward" : a.destructive ? "trash" : "checkmark",
+                        destructive: a.destructive
+                    ) {
+                        shell.sheet = nil
+                        a.run()
+                    }
+                },
+                cancel: { shell.sheet = nil })
         }
         .id("sheet-\(sheet.id)")
         .transition(.opacity)

@@ -19,7 +19,7 @@ struct OverviewPage: View {
             if model.accounts.isEmpty {
                 FirstAccount(model: model)
             } else {
-                // How it's going, at a glance: three figures that fill in as they appear.
+                // How it's going, at a glance: four figures that fill in as they appear.
                 HStack(spacing: Space.s3) {
                     let total = max(model.accounts.count, 1)
                     let pooled = model.accounts.filter { !model.pools(of: $0).isEmpty }.count
@@ -29,6 +29,9 @@ struct OverviewPage: View {
                         "Need a look", value: need.count, of: total, symbol: "exclamationmark.triangle.fill",
                         hue: need.isEmpty ? GlassInk.slate : GlassInk.orange)
                     StatTile("In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue)
+                    StatTile(
+                        "Agents bound", value: model.bindings.count, of: max(model.bindings.count, 1),
+                        symbol: "link", hue: GlassInk.violet)
                 }
                 if !need.isEmpty {
                     section("Needs you", "hand.raised.fill", GlassInk.orange)
@@ -120,18 +123,18 @@ private struct AlertRow: View {
                 .frame(maxWidth: .infinity, minHeight: 34, alignment: .topLeading)
         }
         .padding(Space.s3)
-        .background(hue.opacity(on || hovering ? 0.2 : 0.12))
-        .coreWell(active: on || hovering)
+        .background(hue.opacity(on || hovering ? 0.2 : 0.12), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(on ? 0.8 : 0.4), lineWidth: on ? 1.5 : 1) }
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture {
-            withAnimation(Motion.out(Motion.ui)) {
+            withAnimation(.smooth(duration: 0.3)) {
                 model.page = .accounts
                 model.detail = account.id
             }
         }
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: hovering)
-        .animation(Motion.out(Motion.ui), value: on)
+        .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(.smooth(duration: 0.2), value: on)
         .help("Open \(account.label)")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -160,9 +163,7 @@ private struct StatTile: View {
                 Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: 0)
             }
-            Text("\(value)").font(.system(size: MacTextSize.large, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
+            Text("\(value)").font(.system(size: 30, weight: .bold, design: .rounded)).contentTransition(.numericText())
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.track)
@@ -174,9 +175,10 @@ private struct StatTile: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
-        .coreWell()
-        .animation(Motion.out(Motion.move), value: shown)
-        .animation(Motion.out(Motion.move), value: value)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .animation(.smooth(duration: 0.8), value: shown)
+        .animation(.smooth(duration: 0.4), value: value)
         .onAppear { shown = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title): \(value) of \(of)")
@@ -191,7 +193,7 @@ private struct TriedFirst: View {
             Label {
                 Text("Tried first").font(.system(size: MacTextSize.title, weight: .semibold))
             } icon: {
-                Image(systemName: "arrow.right.to.line").foregroundStyle(GlassInk.blue)
+                Image(systemName: "arrow.right.to.line").foregroundStyle(GlassInk.violet)
             }
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s2, alignment: .leading)],
@@ -204,38 +206,33 @@ private struct TriedFirst: View {
 
     private func chip(_ p: ProviderItem) -> some View {
         let first = model.defaultPool(p.id).flatMap { model.firstReady(in: $0) }
-        let on = model.cursor == "t-\(p.id)"
-        return Button {
+        return HStack(spacing: Space.s2) {
+            AccTile(provider: p.id).scaleEffect(0.8)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(ProviderLook.short(p.id, p.name) + (p.loginMethods.contains("browser_code") ? " · plan" : ""))
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(first?.label ?? (model.defaultPool(p.id) == nil ? "No default pool" : "None ready"))
+                    .font(.system(size: MacTextSize.body, weight: .semibold))
+                    .foregroundStyle(first == nil ? GlassInk.orange : GlassInk.primary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Space.s2).frame(minHeight: 44)
+        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .contentShape(coreShape(Radius.control + 2))
+        .onTapGesture {
             if let first {
-                withAnimation(Motion.out(Motion.ui)) {
+                withAnimation(.smooth(duration: 0.3)) {
                     model.page = .accounts
                     model.detail = first.id
                 }
             }
-        } label: {
-            HStack(spacing: Space.s2) {
-                AccTile(provider: p.id).scaleEffect(0.8)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(ProviderLook.short(p.id, p.name) + (p.loginMethods.contains("browser_code") ? " · plan" : ""))
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                    Text(first?.label ?? (model.defaultPool(p.id) == nil ? "No default pool" : "None ready"))
-                        .font(.system(size: MacTextSize.body, weight: .semibold))
-                        .foregroundStyle(first == nil ? GlassInk.orange : GlassInk.primary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlLg + Space.s3)
-            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-            .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain).focusable(false)
-        .disabled(first == nil)
-        .id("t-\(p.id)")
     }
 }
 
 /// An account at a glance, as a tile (the terminal-tile look): its provider's tile and colour, its state, why, and when
-/// it was last used. The keyboard's cursor lights it. Limits and spend are not
+/// it was last used. Hover lifts it; the keyboard's cursor glows in the provider's colour. Limits and spend are not
 /// reported yet, and the card says so rather than showing a number.
 struct AccountCard: View {
     let model: AccountsModel
@@ -246,6 +243,7 @@ struct AccountCard: View {
 
     var body: some View {
         let a = account
+        let hue = ProviderLook.hue(a.provider)
         let on = model.cursor == "a-\(a.id)"
         let usable = model.usable(a)
         // The bar says whether agents can use it: full green only when ready and in a pool, two thirds orange when it
@@ -257,7 +255,7 @@ struct AccountCard: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
                 AccTile(provider: a.provider).symbolEffect(.bounce, value: hovering)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(a.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                     Text(model.providerName(a.provider)).font(.system(size: MacTextSize.meta))
                         .foregroundStyle(GlassInk.secondary).lineLimit(1)
@@ -276,6 +274,7 @@ struct AccountCard: View {
                                     * (usable ? 1 : a.phase == .active ? 0.66 : a.phase == .disabled ? 0.08 : 0.45)
                                 : 0
                         )
+                        .shadow(color: state.opacity(0.6), radius: 4)
                 }
             }
             .frame(height: 4)
@@ -296,14 +295,21 @@ struct AccountCard: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s3)
-        .coreWell(active: on || hovering)
+        .background(
+            on ? hue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
+        )
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(on ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
+        }
+        .shadow(color: hue.opacity(on ? 0.45 : hovering ? 0.25 : 0), radius: 16, y: 4)
         .opacity(a.phase == .disabled ? 0.7 : 1)
+        .scaleEffect(hovering ? 1.02 : on ? 1.01 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: hovering)
-        .animation(Motion.out(Motion.ui), value: on)
-        .animation(Motion.out(Motion.move).delay(0.1 + Double(index) * 0.05), value: shown)
+        .animation(.smooth(duration: 0.3), value: hovering)
+        .animation(.smooth(duration: 0.3), value: on)
+        .animation(.smooth(duration: 0.7).delay(0.1 + Double(index) * 0.05), value: shown)
         .coreRise(shown, index)
         .onAppear { shown = true }
         .accessibilityElement(children: .combine)
@@ -315,7 +321,7 @@ struct AccountCard: View {
     }
 
     private func openIt() {
-        withAnimation(Motion.out(Motion.move)) {
+        withAnimation(.smooth(duration: 0.35)) {
             model.page = .accounts
             model.detail = account.id
             model.cursor = nil

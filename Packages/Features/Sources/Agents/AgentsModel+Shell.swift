@@ -10,10 +10,8 @@ extension AgentsModel {
 
     static func harnessSymbol(_ h: String) -> String {
         switch h {
-        case "claude": "c.square"
+        case "claude": "sparkles"
         case "codex": "chevron.left.forwardslash.chevron.right"
-        case "opencode": "curlybraces"
-        case "agy": "atom"
         default: "terminal"
         }
     }
@@ -22,7 +20,7 @@ extension AgentsModel {
 
     public func openList() {
         shell.openPane(
-            PaneSpec(id: Self.listPane, title: "Agents", sub: "Your Core", symbol: "play.fill", chip: listChip) {
+            PaneSpec(id: Self.listPane, title: "Agents", sub: "Home Core", symbol: "sparkles", chip: listChip) {
                 AgentsListView(model: self)
             })
     }
@@ -50,8 +48,7 @@ extension AgentsModel {
     func head(_ s: AgentSessionInfo) -> (title: String, sub: String, chip: PaneChip) {
         let st = AgentWords.status(s, waiting: waiting(s.id))
         return (
-            AgentWords.harness(s.harness), runnerName(s.runner),
-            PaneChip(st.label, tone: st.tone, symbol: st.symbol)
+            s.harness, "\(runnerName(s.runner)) · \(s.shortID)", PaneChip(st.label, tone: st.tone, symbol: st.symbol)
         )
     }
 
@@ -92,7 +89,7 @@ extension AgentsModel {
     func registerBase() {
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.list", title: "Agents", sub: "Sessions on your Core", symbol: "play.fill",
+                id: "agents.list", title: "Agents", sub: "sessions on the Home Core", symbol: "sparkles",
                 keywords: ["sessions", "claude", "codex", "agent"]
             ) { [weak self] in self?.openList() })
         shell.launcher.register(
@@ -103,7 +100,7 @@ extension AgentsModel {
         shell.launcher.register(
             LauncherEntry(
                 id: "agents.new-advanced", title: "New agent session (advanced)…",
-                sub: "Pick the runner, model and mode", symbol: "slider.horizontal.3",
+                sub: "Choose the harness, runner, model, mode and secrets", symbol: "slider.horizontal.3",
                 keywords: ["start", "agent", "harness", "codex", "model"], isAction: true
             ) { [weak self] in self?.openNewSession(advanced: true) })
         shell.launcher.register(
@@ -122,7 +119,7 @@ extension AgentsModel {
         shell.settings.section(
             SettingsSection(
                 id: "agents", group: .apps, title: "Agents", sub: "Surface and the defaults for new sessions",
-                symbol: "play.fill", order: 30
+                symbol: "sparkles", order: 30
             ) { AgentSettingsView(model: self) })
         shell.settings.section(
             SettingsSection(
@@ -141,7 +138,7 @@ extension AgentsModel {
             let st = AgentWords.status(s, waiting: false).label
             shell.launcher.register(
                 LauncherEntry(
-                    id: "agents.s-\(s.id)", title: AgentWords.harness(s.harness),
+                    id: "agents.s-\(s.id)", title: "\(s.harness) · \(s.shortID)",
                     sub: "\(runnerName(s.runner)) · \(st)", symbol: Self.harnessSymbol(s.harness),
                     keywords: ["agent", "session", s.harness, runnerName(s.runner), st]
                 ) { [weak self] in self?.openSession(s.id) })
@@ -169,10 +166,10 @@ extension AgentsModel {
             if primed, !announced.contains(id) {
                 announced.insert(id)
                 if notifyApprovals {
-                    let h = sessions.session(r.session).map { AgentWords.harness($0.harness) } ?? "An agent"
+                    let h = sessions.session(r.session)?.harness ?? "An agent"
                     notifier.post(
-                        id: id, title: "\(h) wants to \(ApprovalWords.ask(r.tool).verb)",
-                        body: r.input.prefix(180).description, session: r.session)
+                        id: id, title: "\(h) needs approval", body: "\(r.tool): \(r.input)".prefix(180).description,
+                        session: r.session)
                 }
             } else {
                 announced.insert(id)
@@ -198,8 +195,7 @@ extension AgentsModel {
         let left = r.remaining(now: now).map { "expires in \(AgentWords.clock($0))" }
         return BellItem(
             id: r.key, kind: .approval,
-            title:
-                "\(s.map { AgentWords.harness($0.harness) } ?? "An agent") wants to \(ApprovalWords.ask(r.tool).verb)",
+            title: "\(s?.harness ?? "An agent") wants to use \(r.tool)",
             sub: [s.map { runnerName($0.runner) }, r.input.isEmpty ? nil : r.input, left].compactMap { $0 }
                 .joined(separator: " · "),
             time: AgentWords.ago(r.requestedAt, now: now),

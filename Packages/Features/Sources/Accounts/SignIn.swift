@@ -31,8 +31,6 @@ struct SignInFlow: Equatable {
     var label: String
     var opened = false
     var codeError: String?
-    /// The Core's own word for why it ended, for the hover help only.
-    var reason: String?
 }
 
 extension AccountsModel {
@@ -108,9 +106,7 @@ extension AccountsModel {
             }
         case "waiting_code", "storing": signIn?.stage = .working
         case "done": signIn?.stage = .done(account: l.accountID)
-        case "failed", "cancelled", "expired":
-            signIn?.reason = l.reason ?? l.state
-            signIn?.stage = .failed(Self.reasonWords(l.reason ?? l.state))
+        case "failed", "cancelled", "expired": signIn?.stage = .failed(Self.reasonWords(l.reason ?? l.state))
         default: signIn?.stage = .starting
         }
     }
@@ -139,7 +135,7 @@ extension AccountsModel {
         switch r {
         case "expired": "Nothing happened for 10 minutes, so the sign-in stopped. Start again when you're ready."
         case "cancelled": "The sign-in was stopped."
-        default: "The sign-in didn't finish. Start again when you're ready."
+        default: r.prefix(1).uppercased() + r.dropFirst()
         }
     }
 }

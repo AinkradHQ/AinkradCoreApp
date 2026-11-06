@@ -37,12 +37,7 @@ public struct CoreSecureField: View {
                 .onSubmit(onSubmit)
                 .padding(.horizontal, Space.s3)
                 .frame(minHeight: MacSize.controlLg)
-                .coreGlassField(fallback: palette.glassCard)
-                .overlay {
-                    coreShape(Radius.control).strokeBorder(
-                        error == nil ? palette.glassCardEdge : palette.tone(.fail).ink, lineWidth: 1)
-                }
-                .coreFocusRing(focused || forced == .focused, radius: Radius.control, palette: palette)
+                .coreFieldSurface(focused: focused || forced == .focused, error: error != nil)
                 .coreDimWhenDisabled(enabled)
                 .accessibilityLabel(label)
                 .onAppear { if autofocus { focused = true } }

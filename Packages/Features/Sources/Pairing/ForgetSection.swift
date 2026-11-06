@@ -9,13 +9,14 @@ struct ForgetSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(spacing: Space.s4) {
-                IconTile("link.badge.minus", hue: GlassInk.blue, size: 56)
+                IconTile("link.badge.plus", hue: GlassInk.blue, size: 56).shadow(
+                    color: GlassInk.blue.opacity(0.45), radius: 14)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
                         app.service == nil
                             ? "Not connected to a Core" : "This Mac is paired with \(app.shell.home.coreName)"
                     )
-                    .font(.system(size: MacTextSize.large, weight: .semibold))
+                    .font(.system(size: MacTextSize.large, weight: .bold))
                     Text("Forget it to pair with another Core, or to start this one over from a new code.")
                         .foregroundStyle(GlassInk.secondary)
                 }
@@ -26,11 +27,12 @@ struct ForgetSection: View {
                 .accessibilityIdentifier("forget-core")
             }
             .padding(Space.s4)
-            .coreWell()
+            .background(GlassInk.blue.opacity(0.08), in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.35), lineWidth: 1) }
             HStack(alignment: .top, spacing: Space.s3) {
-                fact("key.slash", GlassInk.slate, "This Mac's keys", "Deleted from this Mac.")
-                fact("qrcode", GlassInk.slate, "To come back", "A new pairing code from an admin device.")
-                fact("externaldrive.badge.checkmark", GlassInk.blue, "Your Core and its data", "Not touched.")
+                fact("key.slash", GlassInk.red, "This Mac's keys", "Deleted from this Mac.")
+                fact("qrcode", GlassInk.orange, "To come back", "A new pairing code from an admin device.")
+                fact("externaldrive.badge.checkmark", GlassInk.green, "Your Core and its data", "Not touched.")
             }
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -49,6 +51,7 @@ struct ForgetSection: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .coreWell()
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }

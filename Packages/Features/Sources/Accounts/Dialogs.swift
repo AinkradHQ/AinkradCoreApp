@@ -75,7 +75,7 @@ private struct DeleteAccountDialog: View {
                     .system(size: MacTextSize.meta))
                 if let e = model.writeError["delete-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Delete account", danger: true, busy: busy, cancel: close) {
+                AccDialogButtons(confirm: "Delete account", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.delete(account)
@@ -120,7 +120,7 @@ private struct CapDialog: View {
                 Text("Over the limit, new sessions take another account or wait.").font(.system(size: MacTextSize.meta))
                 if let e = model.writeError["cap-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Save", busy: busy, enabled: issue == nil, cancel: close) { go() }
+                AccDialogButtons(confirm: "Save", busy: busy, enabled: issue == nil, cancel: close) { go() }
             }
         }
         .accessibilityIdentifier("account-cap")
@@ -159,7 +159,7 @@ private struct NewPoolDialog: View {
                 }
                 if let e = model.writeError["new-pool"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(
+                AccDialogButtons(
                     confirm: "Create pool", busy: busy,
                     enabled: PoolName.isValid(name.trimmingCharacters(in: .whitespaces)) && !chosen.isEmpty,
                     cancel: close
@@ -194,7 +194,7 @@ private struct DeletePoolDialog: View {
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["delete-pool-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Delete pool", danger: true, busy: busy, cancel: close) {
+                AccDialogButtons(confirm: "Delete pool", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.delete(pool)
@@ -232,7 +232,7 @@ private struct AddMemberDialog: View {
                 }
                 if let e = model.writeError["member-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Add account", busy: busy, enabled: !rest.isEmpty, cancel: close) {
+                AccDialogButtons(confirm: "Add account", busy: busy, enabled: !rest.isEmpty, cancel: close) {
                     guard let a = rest.first(where: { $0.id == (pick ?? rest[0].id) }) else { return }
                     busy = true
                     Task {
@@ -254,7 +254,7 @@ struct AccountsLinkSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Look", sub: "The Core app's content background.", symbol: "square.lefthalf.filled",
+                "Look", sub: "The Core app's content background.", symbol: "circle.lefthalf.filled",
                 hue: GlassInk.blue
             ) {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
@@ -267,7 +267,7 @@ struct AccountsLinkSection: View {
                 }
             }
             GlassSection(
-                "The Core app", sub: "Accounts and pools, shared by agents, Citadel and every device.",
+                "The Core app", sub: "Accounts, pools and bindings, shared by agents, Citadel and every device.",
                 symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
             ) {
                 AppActionTile(
@@ -287,7 +287,7 @@ struct AccountsLinkSection: View {
 
 /// Settings, Security: where the real-accounts gate stands.
 /// Settings, Security, Real accounts: the way from no keys to real provider keys, as three steps in plain words. The next
-/// step to take is lit and has the tile that opens it.
+/// step to take glows and has the tile that opens it.
 struct AccountsGateSection: View {
     let model: AccountsModel
 
@@ -313,7 +313,7 @@ struct AccountsGateSection: View {
                     3, "Add a real account", "Connect Claude, OpenAI or Gemini in Accounts.",
                     off: next == nil
                         ? "Connect Claude, OpenAI or Gemini in Accounts." : "Opens once the two steps above are done.",
-                    symbol: "person.badge.plus",
+                    symbol: "person.crop.circle.badge.plus",
                     done: false, next: next == nil,
                     open: (
                         "Open Accounts",
@@ -332,7 +332,7 @@ struct AccountsGateSection: View {
         .foregroundStyle(GlassInk.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .help(g.technical)
-        .animation(Motion.out(Motion.move), value: g)
+        .animation(.smooth(duration: 0.35), value: g)
         .task { await model.reload() }
     }
 
@@ -343,15 +343,17 @@ struct AccountsGateSection: View {
                 g.kind == .real ? "checkmark.shield.fill" : g.kind == .off ? "lock.fill" : "testtube.2", hue: hue,
                 size: 56, bounce: g.step ?? -1
             )
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(g.title).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(hue)
+            .shadow(color: hue.opacity(0.5), radius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(g.title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
                 Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
             if let s = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: s, hue: hue) }
         }
         .padding(Space.s4)
-        .coreWell()
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
     }
 
     private func step(
@@ -367,7 +369,7 @@ struct AccountsGateSection: View {
             }
             Spacer(minLength: Space.s3)
             if done {
-                Label("Done", systemImage: "checkmark.square.fill").font(
+                Label("Done", systemImage: "checkmark.circle.fill").font(
                     .system(size: MacTextSize.meta, weight: .semibold)
                 )
                 .foregroundStyle(GlassInk.green)
@@ -383,7 +385,12 @@ struct AccountsGateSection: View {
             }
         }
         .padding(Space.s3)
-        .coreWell(active: next)
+        .background(next ? GlassInk.blue.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                next ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: next ? 1.5 : 1)
+        }
+        .shadow(color: GlassInk.blue.opacity(next ? 0.25 : 0), radius: 12)
         .opacity(done || next ? 1 : 0.7)
     }
 
@@ -397,7 +404,7 @@ struct AccountsGateSection: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3).frame(maxWidth: .infinity)
-        .coreWell()
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
     }
 }
 

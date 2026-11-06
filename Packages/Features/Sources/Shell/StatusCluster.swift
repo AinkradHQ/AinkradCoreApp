@@ -131,7 +131,7 @@ private struct StatusButton: View {
                 }
                 if let title { Text(title).lineLimit(1).contentTransition(.numericText()) }
                 if let meter {
-                    CoreMeter(meter.value, low: meter.low, label: "Admin unlock time left").frame(width: Space.s6)
+                    CoreMeter(meter.value, low: meter.low, label: "Elevation time left").frame(width: Space.s6)
                 }
             }
             .font(.system(size: MacTextSize.body))
@@ -164,13 +164,13 @@ private struct ElevationChip: View {
                 StatusButton(
                     title: "\(soon ? "Locks in" : "Unlocked") \(Countdown.text(left))",
                     symbol: soon ? "lock.badge.clock" : "lock.open",
-                    label: "Admin unlock: admin actions unlocked for \(Countdown.text(left))",
+                    label: "Touch ID elevation: admin actions unlocked for \(Countdown.text(left))",
                     on: shell.elevationPanelOpen, meter: (Double(left) / shell.elevationSpan, soon)
                 ) { shell.elevationPanelOpen.toggle() }
             }
         } else {
             StatusButton(
-                title: "Locked", symbol: "lock", label: "Admin unlock: admin actions are locked",
+                title: "Locked", symbol: "lock", label: "Touch ID elevation: admin actions are locked",
                 on: shell.elevationPanelOpen
             ) { shell.elevationPanelOpen.toggle() }
         }
@@ -182,7 +182,7 @@ public enum Countdown {
     public static func text(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
 }
 
-/// What the admin unlock chip opens: what is unlocked, the time left, and Renew / Unlock with Touch ID.
+/// What the elevation chip opens: what is unlocked, the time left, and Renew / Unlock with Touch ID.
 struct ElevationPanel: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
@@ -196,7 +196,7 @@ struct ElevationPanel: View {
                         header(
                             left <= 60 ? "Locks in \(Countdown.text(left))" : "Unlocked for \(Countdown.text(left))",
                             "lock.open")
-                        CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Admin unlock time left")
+                        CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Elevation time left")
                     }
                 }
                 text(
@@ -207,7 +207,7 @@ struct ElevationPanel: View {
                     "Adding, renaming or revoking a device, changing scopes and clearing lockouts ask for Touch ID. Once confirmed they stay unlocked for 5 minutes."
                 )
             }
-            Text("The unlock ends early if the Core restarts or this device is revoked.")
+            Text("Elevation ends early if the Core restarts or this device is revoked.")
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
             let on = shell.elevatedUntil.map { $0 > Date() } ?? false
@@ -221,8 +221,9 @@ struct ElevationPanel: View {
         .padding(Space.s4)
         .frame(width: Space.s8 * 10)
         .corePanel(radius: Radius.panel, padding: 0, part: .popups)
+        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Admin unlock")
+        .accessibilityLabel("Touch ID elevation")
     }
 
     private func header(_ title: String, _ symbol: String) -> some View {
@@ -238,11 +239,12 @@ struct ElevationPanel: View {
     }
 }
 
-/// The mark beside the Core's name: a rounded diamond, blue while connected, amber while it comes back, grey when away.
-/// (Shown only while the link is not live, so it never beats.)
+/// The blue mark beside "Home Core": a rounded diamond. Connected, it beats once every 3.6 s; Reduce Motion: a slow fade instead.
 private struct GemMark: View {
     let state: CoreGem
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var beat = false
 
     var body: some View {
         coreShape(Space.s1 / 2)
@@ -251,6 +253,12 @@ private struct GemMark: View {
             )
             .frame(width: Space.s2 + Space.s1, height: Space.s2 + Space.s1)
             .rotationEffect(.degrees(45))
+            .scaleEffect(state == .live && beat && !reduce ? 1.18 : 1)
+            .opacity(state == .live && beat && reduce ? 0.55 : 1)
+            .animation(
+                state == .live ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : .default, value: beat
+            )
+            .onAppear { beat = true }
             .accessibilityHidden(true)
     }
 }

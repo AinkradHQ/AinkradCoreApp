@@ -74,8 +74,6 @@ enum SnapshotRunner {
         shell.toggleLauncher()
         await shot("02-launcher")
         shell.toggleLauncher()
-        // Let the launcher leave the screen first: the query is read when it appears again.
-        try? await Task.sleep(for: .seconds(1))
         shell.launcherQuery = "dev"
         shell.toggleLauncher()
         await shot("02b-launcher-query")

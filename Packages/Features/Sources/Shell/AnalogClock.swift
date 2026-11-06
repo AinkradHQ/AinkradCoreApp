@@ -2,12 +2,13 @@ import CoreUI
 import SwiftUI
 
 /// The clock widget's face, after the macOS clock widget (Ahmed, 2026-11-05): a white dial with 60 ticks and the hour
-/// numbers, black hour and minute hands, and a blue second hand that sweeps. Round is the one exception to the
+/// numbers, black hour and minute hands, and an orange second hand that sweeps. Round is the one exception to the
 /// rounded-rectangle rule, because a clock dial is round. Reduce Motion: the second hand steps once a second.
 struct AnalogClock: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    /// The dial is drawn once; only the three hands move, as rotated layers, ticking once a second like a quartz clock. A continuous sweep kept an animation running every frame and cost about 30% CPU at idle.
+    /// The dial is drawn once; only the three hands move, as rotated layers, ticking once a second with a short spring
+    /// like a quartz clock. A continuous sweep kept an animation running every frame and cost about 30% CPU at idle.
     var body: some View {
         GeometryReader { g in
             let r = min(g.size.width, g.size.height) / 2
@@ -21,12 +22,12 @@ struct AnalogClock: View {
                     ZStack {
                         hand(width: r * 0.07, length: r * 0.5, color: .black).rotationEffect(.degrees(sec / 120))
                         hand(width: r * 0.05, length: r * 0.78, color: .black).rotationEffect(.degrees(sec / 10))
-                        hand(width: r * 0.015, length: r * 0.86, color: Self.accent, tail: r * 0.16)
+                        hand(width: r * 0.015, length: r * 0.86, color: Self.orange, tail: r * 0.16)
                             .rotationEffect(.degrees(sec * 6))
                     }
-                    .animation(reduce ? nil : Motion.out(Motion.ui), value: sec)
+                    .animation(reduce ? nil : .spring(duration: 0.2, bounce: 0.3), value: sec)
                 }
-                Circle().fill(Self.accent).frame(width: r * 0.09, height: r * 0.09)
+                Circle().fill(Self.orange).frame(width: r * 0.09, height: r * 0.09)
                 Circle().fill(.white).frame(width: r * 0.04, height: r * 0.04)
             }
             .frame(width: 2 * r, height: 2 * r)
@@ -37,7 +38,7 @@ struct AnalogClock: View {
         .accessibilityLabel(Text(Date.now, format: .dateTime.hour().minute()))
     }
 
-    static let accent = GlassInk.blue
+    static let orange = Color(red: 1, green: 0.58, blue: 0)
 
     /// A hand pointing at 12 from the centre, with an optional tail past it; rotation turns it about the centre.
     private func hand(width: CGFloat, length: CGFloat, color: Color, tail: CGFloat = 0) -> some View {

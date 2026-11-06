@@ -21,24 +21,25 @@ struct WidgetGallery: View {
                 Spacer()
                 Button("Done") { shell.addingWidget = false }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
-            .padding(.horizontal, Space.s4).padding(.top, Space.s3).padding(.bottom, Space.s2)
+            .padding(.horizontal, 18).padding(.top, 14).padding(.bottom, 6)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Space.s2) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(Self.cats, id: \.self) { cat in
                         let kinds = WidgetKind.allCases.filter { $0.category == cat }
                         if !kinds.isEmpty {
                             Text(cat).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
                                 palette.text2
                             )
-                            .padding(.horizontal, Space.s2).padding(.top, Space.s2)
+                            .padding(.horizontal, 6).padding(.top, 8)
                             ForEach(kinds) { kind in card(kind) }
                         }
                     }
                 }
-                .padding(.horizontal, Space.s3).padding(.bottom, Space.s3)
+                .padding(.horizontal, 12).padding(.bottom, 14)
             }
         }
-        .corePanel(radius: Radius.panel, padding: 0)
+        .corePanel(radius: 20, padding: 0)
+        .overlay { coreShape(20).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Add a widget")
     }
@@ -47,42 +48,45 @@ struct WidgetGallery: View {
 
     private func card(_ kind: WidgetKind) -> some View {
         let s = size(kind)
-        return VStack(alignment: .leading, spacing: Space.s2) {
+        return VStack(alignment: .leading, spacing: 8) {
             preview(kind, s)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(kind.title).font(.system(size: MacTextSize.body, weight: .semibold))
                 Text(kind.about).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            CoreSegmented(
-                "Size", segments: kind.sizes.map { CoreSegment($0, $0.title) },
-                selection: Binding(get: { size(kind) }, set: { sel[kind] = $0 }), fill: true)
-            HStack(spacing: Space.s2) {
+            HStack(spacing: 4) {
+                ForEach(kind.sizes, id: \.self) { z in
+                    Button(z.title) { sel[kind] = z }
+                        .buttonStyle(ChoiceStyle(on: z == s))
+                        .accessibilityAddTraits(z == s ? .isSelected : [])
+                }
                 Spacer(minLength: 0)
                 Button("Add") { shell.addWidget(kind, s) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     .accessibilityLabel("Add \(kind.title), \(s.title)")
             }
         }
-        .padding(Space.s2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
+        .padding(10)
+        .background(palette.glassCard, in: coreShape(14))
+        .overlay { coreShape(14).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
     }
 
     private func preview(_ kind: WidgetKind, _ s: WidgetSize) -> some View {
         let full = DeskGrid.frameSize(s)
-        let k = min(Space.s8 * 8 / full.width, Space.s8 * 4 / full.height, 0.6)
+        let k = min(268 / full.width, 150 / full.height, 0.6)
         return ZStack {
             WidgetBody(kind: kind, size: s, shell: shell)
-                .padding(Space.s3).frame(width: full.width, height: full.height, alignment: .topLeading)
-                .background(GlassInk.well, in: coreShape(Radius.panel))
+                .padding(14).frame(width: full.width, height: full.height, alignment: .topLeading)
+                .background(palette.glassCard, in: coreShape(20))
+                .overlay { coreShape(20).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
                 .scaleEffect(k)
                 .frame(width: full.width * k, height: full.height * k)
                 .allowsHitTesting(false)
         }
-        .frame(maxWidth: .infinity).frame(height: Space.s8 * 5)
-        .background(GlassInk.well, in: coreShape(Radius.control))
-        .clipShape(coreShape(Radius.control))
+        .frame(maxWidth: .infinity).frame(height: 168)
+        .background(palette.text.opacity(0.05), in: coreShape(10))
+        .clipShape(coreShape(10))
         .contentShape(Rectangle())
         .help("Drag onto Home")
         .highPriorityGesture(
@@ -105,4 +109,24 @@ struct WidgetGallery: View {
     }
 
     @State private var started = false
+}
+
+/// The size choice in the gallery (`.wd-gs .btn.on`): blue tint and edge when chosen.
+private struct ChoiceStyle: ButtonStyle {
+    let on: Bool
+    @Environment(\.corePalette) private var palette
+    @State private var hovering = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: MacTextSize.meta, weight: .medium))
+            .foregroundStyle(on ? palette.primary : palette.text)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm)
+            .background(on ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.chip))
+            .overlay {
+                coreShape(Radius.chip).strokeBorder(on ? palette.navActiveEdge : palette.glassCardEdge, lineWidth: 1)
+            }
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .onHover { hovering = $0 }
+            .animation(Motion.out(Motion.hover), value: hovering)
+    }
 }

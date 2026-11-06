@@ -45,6 +45,7 @@ struct HomeView: View {
                 .contextMenu {
                     Button("Add Widget…") { shell.addingWidget = true }
                     Button(shell.editingWidgets ? "Done Editing" : "Edit Widgets") { shell.editingWidgets.toggle() }
+                    Divider()
                     Button("Reset Layout") { shell.resetWidgets() }
                 }
             GreetingView(profile: shell.profile).frame(maxWidth: .infinity).padding(.top, Self.greetingTop)
@@ -66,7 +67,7 @@ struct HomeView: View {
             }
         }
         .coordinateSpace(name: Self.stageSpace)
-        .animation(Motion.out(reduce ? Motion.hover : Motion.ui), value: shell.addingWidget)
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: shell.addingWidget)
     }
 
     /// The prototype puts the greeting in the upper third (about 24% of the height).
@@ -89,7 +90,7 @@ struct HomeView: View {
         let p = held ? drag!.origin : DeskGrid.origin(item.x, item.y)
         let index = sorted.firstIndex { $0.id == item.id } ?? 0
         DeskWidget(item: item, shell: shell, editing: shell.editingWidgets, lifting: held, focus: $focus)
-            .coreRise(arrived, index + 1)
+            .rise(arrived, index + 1, reduce)
             .offset(x: p.x, y: p.y)
             .animation(held || reduce ? nil : Motion.out(Motion.move), value: item)
             .zIndex(held ? 30 : 0)
@@ -114,11 +115,11 @@ struct HomeView: View {
         if let d = drag, let c = d.cell, d.preview != nil {
             let o = DeskGrid.origin(c[0], c[1])
             let s = DeskGrid.frameSize(d.item.size)
-            coreShape(Radius.panel + Space.s1).fill(palette.glassCard).overlay {
-                coreShape(Radius.panel + Space.s1).strokeBorder(palette.navActiveEdge, lineWidth: 1.5)
+            coreShape(20).fill(palette.glassCard).overlay {
+                coreShape(20).strokeBorder(palette.navActiveEdge, lineWidth: 1.5)
             }
             .frame(width: s.width, height: s.height).offset(x: o.x, y: o.y).allowsHitTesting(false)
-            .animation(reduce ? nil : Motion.out(Motion.hover), value: c)
+            .animation(reduce ? nil : Motion.out(0.18), value: c)
             .accessibilityHidden(true)
         }
     }
@@ -206,13 +207,13 @@ struct GreetingView: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             Text(profile.hasName ? "\(dayPart), \(profile.name)" : dayPart)
-                .font(.system(size: MacTextSize.large * 1.5, weight: .semibold))
+                .font(.system(size: 28, weight: .semibold))
             HStack(spacing: Space.s2) {
                 Text("Press")
                 CoreKeycap("⌘K")
                 Text("to open the launcher.")
             }
-            .font(.system(size: MacTextSize.headline)).opacity(0.85)
+            .font(.system(size: 14)).opacity(0.85)
             if !profile.hasName { nameAsk }
         }
         .foregroundStyle(ink)
@@ -222,7 +223,7 @@ struct GreetingView: View {
         )
         .opacity(shown ? 1 : 0)
         .offset(y: shown ? 0 : coreMove(reduce, 10))
-        .animation(Motion.out(reduce ? Motion.ui : Motion.reveal), value: shown)
+        .animation(reduce ? .easeOut(duration: 0.3) : Motion.out(1.0), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
     }

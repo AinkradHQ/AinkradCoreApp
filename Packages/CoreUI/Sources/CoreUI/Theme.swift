@@ -23,10 +23,10 @@ public struct Palette: Sendable {
     public var btnPrimaryPress: Color { theme["btnPrimaryPress"] }
     public var btnInk: Color { theme["btnInk"] }
     /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
-    public var navActive: Color { Self.navActiveFill }
-    public var navActiveEdge: Color { Self.navActiveStroke }
+    public var navActive: Color { .white.opacity(0.18) }
+    public var navActiveEdge: Color { .white.opacity(0.3) }
     public var navActiveInk: Color { .white }
-    public var rowHover: Color { Self.rowHoverFill }
+    public var rowHover: Color { .white.opacity(0.1) }
     public var edge: Color { theme["edge"] }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
@@ -41,22 +41,13 @@ public struct Palette: Sendable {
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
     /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
     /// soft white well with a light edge, not a dark slab, in both themes.
-    public var glassCard: Color { Self.glassCardFill }
-    public var glassCardEdge: Color { Self.glassCardStroke }
+    public var glassCard: Color { .white.opacity(0.08) }
+    public var glassCardEdge: Color { .white.opacity(0.14) }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
-    public var uDim: Color { Self.uDimFill }
-    public var uDimHover: Color { Self.uDimHoverFill }
-
-    // TODO tokens.json: hard-coded white overrides of theme roles, named here until tokens.json carries them.
-    private static let navActiveFill = Color.white.opacity(0.18)
-    private static let navActiveStroke = Color.white.opacity(0.3)
-    private static let rowHoverFill = Color.white.opacity(0.1)
-    private static let glassCardFill = Color.white.opacity(0.08)
-    private static let glassCardStroke = Color.white.opacity(0.14)
-    private static let uDimFill = Color.white.opacity(0.1)
-    private static let uDimHoverFill = Color.white.opacity(0.16)
+    public var uDim: Color { .white.opacity(0.1) }
+    public var uDimHover: Color { .white.opacity(0.16) }
 
     public func tone(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {
@@ -111,7 +102,7 @@ extension View {
     }
 
     /// The disabled look every control shares.
-    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.55) }
+    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
 
     /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
     /// Draws nothing in the app: focus rings are off everywhere (Ahmed, 2026-11-05). Kept so callers need no change.
@@ -123,7 +114,7 @@ private struct CoreAnimationModifier<V: Equatable>: ViewModifier {
     let animation: Animation
     let value: V
     func body(content: Content) -> some View {
-        content.animation(reduce ? Motion.out(Motion.hover) : animation, value: value)
+        content.animation(reduce ? nil : animation, value: value)
     }
 }
 

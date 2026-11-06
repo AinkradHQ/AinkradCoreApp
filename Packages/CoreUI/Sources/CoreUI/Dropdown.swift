@@ -10,16 +10,22 @@ public struct CoreDropdownItem: Identifiable {
     public let enabled: Bool
     /// A row that belongs to the one above it (a submenu's entry).
     public let indented: Bool
+    /// The current value, in a `CoreSelect`: a check before the title and a light blue row.
+    public let checked: Bool
+    /// Quiet words at the right of the row.
+    public let note: String?
     public let run: @MainActor () -> Void
     public init(
         _ title: String, symbol: String? = nil, destructive: Bool = false, enabled: Bool = true, indented: Bool = false,
-        run: @escaping @MainActor () -> Void
+        checked: Bool = false, note: String? = nil, run: @escaping @MainActor () -> Void
     ) {
         self.title = title
         self.symbol = symbol
         self.destructive = destructive
         self.enabled = enabled
         self.indented = indented
+        self.checked = checked
+        self.note = note
         self.run = run
     }
 }
@@ -75,7 +81,7 @@ public struct CoreDropdown<Label: View>: View {
         .animation(Motion.out(Motion.ui), value: open)
         .onChange(of: open) { _, now in
             if now {
-                selected = items.firstIndex { $0.enabled } ?? 0
+                selected = items.firstIndex { $0.checked && $0.enabled } ?? items.firstIndex { $0.enabled } ?? 0
                 listen()
             } else {
                 stop()
@@ -89,7 +95,7 @@ public struct CoreDropdown<Label: View>: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { i, item in row(item, on: i == selected) }
         }
         .padding(Space.s1)
-        .frame(minWidth: Space.s8 * 6, alignment: .leading)
+        .frame(minWidth: max(Space.s8 * 6, triggerFrame.width), alignment: .leading)
         .fixedSize()
         .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, part: .dropdowns)
         .shadow(color: .black.opacity(0.3), radius: 24, y: 8)
@@ -106,19 +112,29 @@ public struct CoreDropdown<Label: View>: View {
             choose(item)
         } label: {
             HStack(spacing: Space.s2) {
+                if checks {
+                    Image(systemName: "checkmark").font(.system(size: MacTextSize.meta, weight: .bold))
+                        .foregroundStyle(GlassInk.blue).frame(width: Space.s3).opacity(item.checked ? 1 : 0)
+                        .accessibilityHidden(true)
+                }
                 if let symbol = item.symbol {
                     Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .medium))
                         .frame(width: Space.s4).accessibilityHidden(true)
                 }
                 Text(item.title).font(.system(size: MacTextSize.body)).lineLimit(1)
                 Spacer(minLength: Space.s3)
+                if let note = item.note {
+                    Text(note).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                }
             }
             .foregroundStyle(item.destructive ? GlassInk.red : GlassInk.primary)
             .padding(.leading, item.indented ? Space.s4 : 0)
             .padding(.horizontal, Space.s3)
             .frame(height: MacSize.controlMd + Space.s1)
             .background(
-                on || hovered == item.id ? GlassInk.wellHover : .clear, in: coreShape(Radius.control)
+                on || hovered == item.id
+                    ? GlassInk.wellHover : item.checked ? GlassInk.blue.opacity(0.22) : .clear,
+                in: coreShape(Radius.control)
             )
             .contentShape(coreShape(Radius.control))
         }
@@ -127,8 +143,10 @@ public struct CoreDropdown<Label: View>: View {
         .disabled(!item.enabled)
         .onHover { inside in hovered = inside ? item.id : (hovered == item.id ? nil : hovered) }
         .animation(Motion.out(Motion.hover), value: hovered)
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityAddTraits(on || item.checked ? .isSelected : [])
     }
+
+    private var checks: Bool { items.contains { $0.checked } }
 
     private func choose(_ item: CoreDropdownItem) {
         open = false

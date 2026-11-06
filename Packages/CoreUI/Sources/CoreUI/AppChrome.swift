@@ -80,13 +80,14 @@ public struct AppFilterTile: View {
                 Text(title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
                 if count >= 0 {  // a negative count hides the badge (a page with nothing to count)
                     Text("\(count)").font(.system(size: MacTextSize.meta, weight: .semibold)).monospacedDigit()
-                        .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-                        .background(.white.opacity(on ? 0.22 : 0.1), in: coreShape(Radius.chip))
+                        .padding(.horizontal, 6).frame(minHeight: 18)
+                        .background(.white.opacity(on ? 0.22 : 0.1), in: coreShape(5))
                         .contentTransition(.numericText())
                 }
-                // Always laid out, so the tile never changes width under the pointer.
-                Text(key).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
-                    .foregroundStyle(GlassInk.secondary).opacity(hovering || on ? 1 : 0)
+                if hovering || on {
+                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(
+                        GlassInk.secondary)
+                }
             }
             .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
             .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
@@ -98,14 +99,14 @@ public struct AppFilterTile: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: on)
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(.spring(duration: 0.25), value: on)
+        .animation(.easeOut(duration: 0.15), value: hovering)
         .accessibilityLabel("\(title), \(count)")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
-/// A header action: an icon (that pulses once when something starts to wait), a word and its key.
+/// A header action: an icon that bounces on hover (or pulses while something waits), a word and its key.
 public struct AppActionTile: View {
     let title: String
     let symbol: String
@@ -131,27 +132,29 @@ public struct AppActionTile: View {
         Button(action: run) {
             HStack(spacing: Space.s2) {
                 Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                    .symbolEffect(.pulse, value: pulse)
+                    .symbolEffect(.bounce, value: hovering)
+                    .symbolEffect(.pulse, options: .repeating, isActive: pulse)
                 Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
                 if !key.isEmpty {
-                    Text(key).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
-                        .padding(.horizontal, Space.s1).frame(minHeight: MacSize.chip)
-                        .background(.white.opacity(0.16), in: coreShape(Radius.chip))
+                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
+                        .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
                 }
             }
             .foregroundStyle(.white)
             .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
             .background(
-                prominent || pulse ? hue.opacity(hovering ? 0.95 : 0.8) : hovering ? GlassInk.wellHover : GlassInk.well,
+                prominent || pulse ? hue.opacity(hovering ? 0.95 : 0.8) : hovering ? hue.opacity(0.28) : GlassInk.well,
                 in: coreShape(Radius.control)
             )
             .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(prominent ? 0.3 : 0.15), lineWidth: 1) }
+            .shadow(color: hue.opacity(hovering || pulse ? 0.45 : 0), radius: 10)
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .fixedSize()
+        .scaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
     }
 }
 
@@ -167,7 +170,7 @@ public struct AppStatChip: View {
     }
     public var body: some View {
         HStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+            Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(hue)
             Text(text).monospacedDigit()
         }
         .font(.system(size: MacTextSize.meta, weight: .medium))
@@ -238,9 +241,10 @@ public struct GlassSlider: View {
                 let f = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
                 let x = g.size.width * CGFloat(min(max(f, 0), 1))
                 ZStack(alignment: .leading) {
-                    coreShape(2).fill(.white.opacity(0.14)).frame(height: 6)
-                    coreShape(2).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
-                    coreShape(Radius.chip).fill(.white).frame(width: dragging ? 22 : 18, height: dragging ? 22 : 18)
+                    coreShape(3).fill(.white.opacity(0.14)).frame(height: 6)
+                    coreShape(3).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
+                        .shadow(color: GlassInk.blue.opacity(0.5), radius: 4)
+                    coreShape(6).fill(.white).frame(width: dragging ? 22 : 18, height: dragging ? 22 : 18)
                         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                         .offset(x: x - (dragging ? 11 : 9))
                 }
@@ -262,8 +266,8 @@ public struct GlassSlider: View {
             Text("\(percent(value))\(unit)").font(.system(size: MacTextSize.body, weight: .semibold)).monospacedDigit()
                 .contentTransition(.numericText()).frame(width: 46, alignment: .trailing)
         }
-        .animation(Motion.out(Motion.hover), value: dragging)
-        .animation(Motion.out(Motion.hover), value: value)
+        .animation(.spring(duration: 0.2), value: dragging)
+        .animation(.spring(duration: 0.2), value: value)
         .focusable().focused($focused).focusEffectDisabled()
         .onKeyPress(.leftArrow) { move(-1) }
         .onKeyPress(.rightArrow) { move(1) }
@@ -329,12 +333,14 @@ public struct SettingRow<Content: View>: View {
 }
 
 /// Where something stands on a short way, as steps (e.g. Off → Test keys → Real keys): the steps passed join in the
-/// colour, the current one is lit, a closed one shows a lock.
+/// colour, the current one is lit and breathes, a closed one shows a lock.
 public struct StepTrack: View {
     let steps: [String]
     let at: Int
     let hue: Color
     let locked: Set<Int>
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
     public init(_ steps: [String], at: Int, hue: Color, locked: Set<Int> = []) {
         self.steps = steps
         self.at = at
@@ -342,21 +348,24 @@ public struct StepTrack: View {
         self.locked = locked
     }
     public var body: some View {
-        HStack(spacing: Space.s2) {
+        HStack(spacing: 6) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, name in
-                if i > 0 { coreShape(1).fill(i <= at ? hue : GlassInk.track).frame(width: Space.s4, height: 2) }
-                HStack(spacing: Space.s1) {
-                    if locked.contains(i) { Image(systemName: "lock.fill").font(.system(size: MacTextSize.meta)) }
+                if i > 0 { coreShape(1).fill(i <= at ? hue : GlassInk.track).frame(width: 14, height: 2) }
+                HStack(spacing: 4) {
+                    if locked.contains(i) { Image(systemName: "lock.fill").font(.system(size: 9)) }
                     Text(name)
                 }
                 .font(.system(size: MacTextSize.meta, weight: i == at ? .semibold : .regular))
                 .foregroundStyle(i == at ? .white : GlassInk.secondary)
-                .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
-                .background(i == at ? hue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.chip))
-                .animation(Motion.out(Motion.ui), value: at)
+                .padding(.horizontal, 8).frame(height: 24)
+                .background(i == at ? hue.opacity(0.75) : GlassInk.well, in: coreShape(6))
+                .shadow(color: hue.opacity(i == at ? 0.5 : 0), radius: 8)
+                .scaleEffect(i == at && shown && !reduce ? 1.04 : 1)
+                .animation(i == at && !reduce ? .easeInOut(duration: 1.4).repeatForever() : .default, value: shown)
             }
         }
         .fixedSize()
+        .onAppear { shown = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(steps.indices.contains(at) ? steps[at] : "Unknown"), step \(at + 1) of \(steps.count)")
     }

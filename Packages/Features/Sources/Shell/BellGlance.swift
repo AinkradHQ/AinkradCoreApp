@@ -92,7 +92,7 @@ private enum BellGroup: String, CaseIterable {
     }
 }
 
-/// The bell glance (`shell-glance.js` notes): "your Core" and what waits on you, four tabs with counts, collapsible groups, cards
+/// The bell glance (`shell-glance.js` notes): "Home Core" and what waits on you, four tabs with counts, collapsible groups, cards
 /// with their actions on the right, and a Runners tab. It drops from the bell; Reduce Motion fades instead.
 struct BellGlance: View {
     @Bindable var shell: ShellModel
@@ -115,7 +115,7 @@ struct BellGlance: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Notifications").font(.system(size: MacTextSize.title, weight: .semibold))
                     .accessibilityAddTraits(.isHeader)
                 summary.foregroundStyle(palette.text2)
@@ -124,8 +124,8 @@ struct BellGlance: View {
                 "Notification filter",
                 segments: [
                     CoreSegment(BellTab.all, "All \(all.count)"),
-                    CoreSegment(.approvals, "Approve \(all.filter { $0.kind == .approval }.count)"),
-                    CoreSegment(.alerts, "Other \(all.filter { $0.kind != .approval }.count)"),
+                    CoreSegment(.approvals, "Approvals \(all.filter { $0.kind == .approval }.count)"),
+                    CoreSegment(.alerts, "Alerts \(all.filter { $0.kind != .approval }.count)"),
                     CoreSegment(.runners, "Runners \(shell.home.machines.filter(\.online).count)"),
                 ], selection: $tab, fill: true)
             // As tall as what it holds; past the cap the list scrolls.
@@ -143,7 +143,7 @@ struct BellGlance: View {
         .scaleEffect(arrived || reduce ? 1 : 0.96, anchor: .topTrailing)
         .opacity(arrived ? 1 : 0)
         .offset(y: arrived ? 0 : coreMove(reduce, -10))
-        .animation(Motion.out(reduce ? Motion.hover : Motion.ui), value: arrived)
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(0.3), value: arrived)
         .onAppear { arrived = true }
     }
 
@@ -151,7 +151,7 @@ struct BellGlance: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             if tab == .runners { runners } else { groups }
         }
-        .padding(.horizontal, Space.s1)
+        .padding(.horizontal, 2)
     }
 
     private var summary: some View {
@@ -176,8 +176,8 @@ struct BellGlance: View {
                         }
                     } label: {
                         HStack(spacing: Space.s1) {
-                            Image(systemName: "chevron.right").font(.system(size: MacTextSize.meta, weight: .semibold))
-                                .rotationEffect(.degrees(shut.contains(g) ? 0 : 90)).frame(width: Space.s3)
+                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
+                                .rotationEffect(.degrees(shut.contains(g) ? 0 : 90)).frame(width: 12)
                             Text(g.title).font(.system(size: MacTextSize.body, weight: .semibold))
                             Text("\(rows.count)").font(.system(size: MacTextSize.meta)).monospacedDigit()
                                 .foregroundStyle(palette.text2)
@@ -192,15 +192,12 @@ struct BellGlance: View {
                     .accessibilityValue(shut.contains(g) ? "collapsed" : "expanded")
                     if !shut.contains(g) {
                         ForEach(rows) { item in
-                            BellCard(
-                                item: item, perform: { $0.run() },
-                                dismiss: item.needsPerson ? nil : { shell.bell.remove(item.id) }
-                            )
-                            .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -Space.s2))))
+                            BellCard(item: item) { $0.run() }
+                                .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -Space.s2))))
                         }
                     }
                 }
-                .coreRise(arrived, idx + 1)
+                .rise(arrived, idx + 1, reduce)
             }
         }
         if shown.isEmpty { empty }
@@ -214,7 +211,7 @@ struct BellGlance: View {
                 .foregroundStyle(palette.primary)
                 .symbolEffect(.bounce, value: arrived)
                 .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
-                .background(GlassInk.well, in: coreShape(Radius.control))
+                .coreGlass(radius: Radius.control, interactive: false)
             Text(tab == .approvals ? "Nothing needs your approval" : "You're all caught up")
                 .font(.system(size: MacTextSize.body, weight: .semibold))
             Text(
@@ -233,8 +230,8 @@ struct BellGlance: View {
         ForEach(shell.home.machines) { m in
             HStack(alignment: .top, spacing: Space.s2) {
                 coreShape(2).fill(m.online ? palette.tone(.run).ink : palette.tone(.queue).ink)
-                    .frame(width: Space.s2, height: Space.s2).padding(.top, Space.s1).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 0) {
+                    .frame(width: 8, height: 8).padding(.top, 5).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(m.id).font(.system(size: MacTextSize.headline, weight: .semibold))
                     if !m.online {
                         Text("Offline").foregroundStyle(palette.text2)
@@ -257,30 +254,22 @@ struct BellGlance: View {
 private struct BellCard: View {
     let item: BellItem
     let perform: (BellAction) -> Void
-    /// Nil for what needs a person (an approval is answered, never swiped away).
-    var dismiss: (() -> Void)?
     @Environment(\.corePalette) private var palette
-    @State private var hovering = false
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s3) {
-            IconTile(item.symbol, hue: item.kind == .approval ? GlassInk.blue : GlassInk.slate, size: 28)
-            VStack(alignment: .leading, spacing: 0) {
+            Image(systemName: item.symbol).font(.system(size: 12))
+                .frame(width: 22, height: 22)
+                .foregroundStyle(item.kind == .approval ? palette.primary : palette.text2)
+                .background(item.kind == .approval ? palette.navActive : palette.uDim, in: coreShape(7))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(item.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Space.s2)
                     if let time = item.time {
                         Text(time).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    }
-                    // Always laid out and faded in on hover, so the title never shifts.
-                    if let dismiss {
-                        Button(action: dismiss) {
-                            Image(systemName: "xmark").font(.system(size: MacTextSize.meta, weight: .semibold))
-                                .frame(width: Space.s4, height: Space.s4).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).help("Dismiss").accessibilityLabel("Dismiss \(item.title)")
-                        .opacity(hovering ? 1 : 0).allowsHitTesting(hovering)
                     }
                 }
                 if let sub = item.sub { Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2) }
@@ -297,9 +286,8 @@ private struct BellCard: View {
             }
         }
         .padding(Space.s3)
-        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.row))
-        .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .background(palette.glassCard, in: coreShape(14))
+        .overlay { coreShape(14).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.kindLabel): \(item.title)")
     }

@@ -408,8 +408,6 @@ public final class AccountsDemo {
         model.show(page, account: detail, pool: scene == "pools-second" || scene == "delete-pool" ? 2 : nil)
         try? await Task.sleep(for: .milliseconds(600))
         if scene == "accounts-need" { model.filter = .need }
-        // The page may already be open from the last scene: read the budgets again so the empty list shows.
-        if scene == "budgets-empty" { await model.reloadBudgets() }
         switch scene {
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
         case "signin-intro": AccountDialogs.openConnect(model, provider: "claude-sub")

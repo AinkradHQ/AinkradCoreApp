@@ -113,7 +113,7 @@ import Testing
     @Test func signalAndEndNeedElevationAndReport() async {
         let (s, svc, host) = make()
         #expect(await s.signal("INT"))
-        #expect(svc.signals == ["INT"] && host.reasons.last?.contains("Interrupt (Ctrl-C)") == true)
+        #expect(svc.signals == ["INT"] && host.reasons.last?.contains("SIGINT") == true)
         host.declines = true
         #expect(!(await s.signal("KILL")) && svc.signals == ["INT"])
         host.declines = false

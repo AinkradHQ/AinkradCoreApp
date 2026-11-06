@@ -24,7 +24,7 @@ extension CoreState {
     public var rawValue: String { unknownRaw ?? entry?.raw ?? "" }
     public var label: String { entry?.label ?? rawValue }
     public var tone: Tone { entry?.tone ?? .queue }
-    public var symbol: String { entry?.symbol ?? "questionmark.square" }
+    public var symbol: String { entry?.symbol ?? "questionmark.circle" }
     public init(from decoder: any Decoder) throws {
         self = Self.parse(try decoder.singleValueContainer().decode(String.self))
     }
@@ -40,12 +40,12 @@ public enum AccountState: CoreState {
     case unknown(String)
     public var unknownRaw: String? { if case .unknown(let r) = self { r } else { nil } }
     public static let table: [Entry] = [
-        (.healthy, "healthy", "Ready", .run, "checkmark.square"),
+        (.healthy, "healthy", "Ready", .run, "checkmark.circle"),
         (.cooling, "cooling", "Resting", .warn, "clock"),
         (.overBudget, "over_budget", "Budget reached", .warn, "gauge.with.dots.needle.100percent"),
-        (.expired, "expired", "Sign in again", .fail, "person.fill.questionmark"),
+        (.expired, "expired", "Sign in again", .fail, "person.crop.circle.badge.exclamationmark"),
         (.auth, "auth", "Sign-in failed", .fail, "exclamationmark.triangle"),
-        (.disabled, "disabled", "Turned off", .queue, "pause.rectangle"),
+        (.disabled, "disabled", "Turned off", .queue, "pause.circle"),
     ]
 }
 
@@ -58,7 +58,7 @@ public enum SessionState: CoreState {
         (.starting, "starting", "Starting", .done, "hourglass"),
         (.running, "running", "Running", .run, "waveform"),
         (.interrupted, "interrupted", "Resuming", .warn, "arrow.clockwise"),
-        (.ended, "ended", "Ended", .queue, "stop"),
+        (.ended, "ended", "Ended", .queue, "stop.circle"),
         (.lost, "lost", "Lost", .fail, "wifi.exclamationmark"),
     ]
 }
@@ -69,11 +69,11 @@ public enum SessionOutcome: CoreState {
     case unknown(String)
     public var unknownRaw: String? { if case .unknown(let r) = self { r } else { nil } }
     public static let table: [Entry] = [
-        (.succeeded, "succeeded", "Succeeded", .run, "checkmark.square"),
+        (.succeeded, "succeeded", "Succeeded", .run, "checkmark.circle"),
         (.failed, "failed", "Failed", .fail, "xmark.octagon"),
         (.stalled, "stalled", "Stalled", .warn, "tortoise"),
         (.tokenCap, "token_cap", "Token cap", .warn, "gauge.with.dots.needle.100percent"),
-        (.cancelled, "cancelled", "Cancelled", .queue, "xmark.square"),
+        (.cancelled, "cancelled", "Cancelled", .queue, "xmark.circle"),
         (.lost, "lost", "Lost", .fail, "wifi.exclamationmark"),
     ]
 }
@@ -85,9 +85,9 @@ public enum TerminalState: CoreState {
     public var unknownRaw: String? { if case .unknown(let r) = self { r } else { nil } }
     public static let table: [Entry] = [
         (.running, "running", "Running", .run, "terminal"),
-        (.exited, "exited", "Exited", .queue, "checkmark.square"),
-        (.reaped, "reaped", "Closed", .queue, "xmark.square"),
-        (.orphaned, "orphaned", "Orphaned", .warn, "questionmark.square"),
+        (.exited, "exited", "Exited", .queue, "checkmark.circle"),
+        (.reaped, "reaped", "Closed", .queue, "xmark.circle"),
+        (.orphaned, "orphaned", "Orphaned", .warn, "questionmark.circle"),
         (.hostLost, "host_lost", "Runner lost it", .fail, "wifi.exclamationmark"),
     ]
 }
@@ -99,12 +99,12 @@ public enum IssueState: CoreState {
     public var unknownRaw: String? { if case .unknown(let r) = self { r } else { nil } }
     public static let table: [Entry] = [
         (.backlog, "backlog", "Backlog", .queue, "tray"),
-        (.todo, "todo", "To do", .queue, "square.dashed"),
-        (.inProgress, "in_progress", "In progress", .done, "play.square"),
+        (.todo, "todo", "To do", .queue, "circle.dashed"),
+        (.inProgress, "in_progress", "In progress", .done, "play.circle"),
         (.inReview, "in_review", "In review", .done, "eye"),
         (.blocked, "blocked", "Blocked", .warn, "exclamationmark.triangle"),
-        (.done, "done", "Done", .run, "checkmark.square"),
-        (.cancelled, "cancelled", "Cancelled", .queue, "xmark.square"),
+        (.done, "done", "Done", .run, "checkmark.circle"),
+        (.cancelled, "cancelled", "Cancelled", .queue, "xmark.circle"),
     ]
 }
 
@@ -116,9 +116,9 @@ public enum RunState: CoreState {
     public static let table: [Entry] = [
         (.queued, "queued", "Queued", .queue, "clock"),
         (.running, "running", "Running", .run, "waveform"),
-        (.succeeded, "succeeded", "Succeeded", .run, "checkmark.square"),
+        (.succeeded, "succeeded", "Succeeded", .run, "checkmark.circle"),
         (.failed, "failed", "Failed", .fail, "xmark.octagon"),
-        (.cancelled, "cancelled", "Cancelled", .queue, "xmark.square"),
+        (.cancelled, "cancelled", "Cancelled", .queue, "xmark.circle"),
         (.timedOut, "timed_out", "Timed out", .warn, "timer"),
         (.runnerLost, "runner_lost", "Runner lost", .fail, "wifi.exclamationmark"),
     ]

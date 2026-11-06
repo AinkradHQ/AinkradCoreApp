@@ -1,11 +1,12 @@
 import CoreUI
 import SwiftUI
 
-/// Quick actions. Tiles stack the icon over
+/// Quick actions. Buttons use the one CoreUI button (ghost: glass edge, `u-dim` on hover, 0.97 press), tiles stack the icon over
 /// the label in the wide size and list in the large one; they rise in one after another when the widget arrives.
 struct QuickBody: View {
     @Bindable var shell: ShellModel
     let size: WidgetSize
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var arrived = false
 
     private func forcedHover(_ i: Int) -> CoreInteraction? {
@@ -20,7 +21,7 @@ struct QuickBody: View {
         if let e = shell.launcher.entry(id) {
             e.run()
         } else {
-            shell.showToast("Not available yet")
+            shell.showToast("\(title) arrives with its feature module.")
         }
     }
 
@@ -39,7 +40,7 @@ struct QuickBody: View {
                     } label: {
                         label(t.2, t.1, wide: wide)
                     }
-                    .buttonStyle(QuickTileStyle(prominent: false)).coreRise(arrived, i)
+                    .buttonStyle(QuickTileStyle(prominent: false)).rise(arrived, i, reduce)
                     .environment(\.coreForcedInteraction, forcedHover(i))
                 }
                 Button {
@@ -47,7 +48,7 @@ struct QuickBody: View {
                 } label: {
                     label("magnifyingglass", "Launcher", wide: wide, key: "⌘K")
                 }
-                .buttonStyle(QuickTileStyle(prominent: true)).coreRise(arrived, tiles.count)
+                .buttonStyle(QuickTileStyle(prominent: true)).rise(arrived, tiles.count, reduce)
             }
             if !wide { Spacer(minLength: 0) }
         }
@@ -58,7 +59,7 @@ struct QuickBody: View {
     /// A big icon over a short label, Apple style; the launcher tile adds its key.
     private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
         VStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.large, weight: .medium)).accessibilityHidden(true)
+            Image(systemName: symbol).font(.system(size: 22, weight: .medium)).accessibilityHidden(true)
             Text(key.map { "\(title) \($0)" } ?? title).font(.system(size: MacTextSize.meta, weight: .medium))
                 .lineLimit(1).minimumScaleFactor(0.8)
         }
@@ -66,25 +67,32 @@ struct QuickBody: View {
     }
 }
 
+extension View {
+    /// `fx.stagger({ from: 'rise', gap: 40 })`: rises 10 pt and fades in, one after another. Reduce Motion: a 200 ms fade, no travel.
+    func rise(_ shown: Bool, _ index: Int, _ reduce: Bool) -> some View {
+        opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : coreMove(reduce, 10))
+            .animation(
+                (reduce ? Animation.easeOut(duration: 0.2) : Motion.out(Motion.move)).delay(
+                    reduce ? 0 : Double(index) * 0.04),
+                value: shown)
+    }
+}
+
 /// A quick-action tile on clear glass: a white well (no second glass inside the widget), the launcher one blue.
-/// Hover brightens the fill; a press dips the tile.
 struct QuickTileStyle: ButtonStyle {
     let prominent: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var hovering = false
-    @Environment(\.coreForcedInteraction) private var forced
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(GlassInk.primary)
+            .foregroundStyle(WidgetInk.primary)
             .background(
                 prominent
-                    ? GlassInk.blue.opacity(configuration.isPressed ? 0.75 : hovering ? 1 : 0.9)
-                    : configuration.isPressed || hovering || forced == .hover ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.cardMac)
+                    ? WidgetInk.blue.opacity(configuration.isPressed ? 0.75 : 0.9)
+                    : configuration.isPressed ? WidgetInk.wellEdge : WidgetInk.well,
+                in: coreShape(Radius.control + 4)
             )
-            .scaleEffect(configuration.isPressed && !reduce ? 0.97 : 1)
-            .onHover { hovering = $0 }
-            .animation(Motion.out(Motion.hover), value: hovering)
-            .animation(Motion.press(Motion.press), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduce ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

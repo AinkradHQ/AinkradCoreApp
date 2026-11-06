@@ -10,6 +10,12 @@ public struct CoreUIGallery: View {
     @State private var confirm = false
     @State private var destructive = false
     @State private var fieldText = "linux-01"
+    @State private var selectPick = "claude"
+    private static let selectOptions = [
+        CoreSelectOption("claude", "Claude Code", symbol: "sparkle", note: "default"),
+        CoreSelectOption("codex", "Codex", symbol: "chevron.left.forwardslash.chevron.right"),
+        CoreSelectOption("opencode", "OpenCode", symbol: "terminal"),
+    ]
     @State private var checks: Set<String> = ["read", "terminal"]
 
     private let officialOnly: Bool
@@ -98,7 +104,7 @@ public struct CoreUIGallery: View {
     private var surfaces: some View {
         section("Clear glass control and material panel") {
             HStack(spacing: Space.s4) {
-                Label("Glass control", systemImage: "square.dashed").padding(Space.s3).coreGlass()
+                Label("Glass control", systemImage: "sparkles").padding(Space.s3).coreGlass()
                 Text("Regular material panel. Content lives here; glass never sits on it.").corePanel()
             }
         }
@@ -152,9 +158,11 @@ public struct CoreUIGallery: View {
     }
 
     private var fields: some View {
-        section("Text field and checkbox") {
+        section("Text field, text area, select and checkbox") {
             HStack(alignment: .top, spacing: Space.s4) {
                 CoreTextField("Rest", placeholder: "Device name", text: $fieldText)
+                CoreTextField("Hover", placeholder: "Device name", text: $fieldText)
+                    .environment(\.coreForcedInteraction, .hover)
                 CoreTextField("Focus", placeholder: "Device name", text: $fieldText)
                     .environment(\.coreForcedInteraction, .focused)
                 CoreTextField("Error", placeholder: "Device name", text: $fieldText, error: "Use 1 to 64 characters.")
@@ -163,6 +171,20 @@ public struct CoreUIGallery: View {
             HStack(alignment: .top, spacing: Space.s4) {
                 CoreTextField("Code", placeholder: "ainkrad-pair:v1?", text: $fieldText, mono: true, suffix: ":443")
                 CoreTextField("Large", placeholder: "K7QD", text: $fieldText, mono: true, big: true)
+            }
+            HStack(alignment: .top, spacing: Space.s4) {
+                CoreTextArea("Prompt", placeholder: "What should the agent do?", text: $fieldText)
+                CoreTextArea("Focus", placeholder: "What should the agent do?", text: $fieldText)
+                    .environment(\.coreForcedInteraction, .focused)
+            }
+            HStack(alignment: .top, spacing: Space.s4) {
+                CoreSelect("Select", selection: $selectPick, options: Self.selectOptions)
+                CoreSelect("Hover", selection: $selectPick, options: Self.selectOptions)
+                    .environment(\.coreForcedInteraction, .hover)
+                CoreSelect("Open", selection: $selectPick, options: Self.selectOptions)
+                    .environment(\.coreForcedInteraction, .focused)
+                CoreSelect("Error", selection: $selectPick, options: Self.selectOptions, error: "Pick a runner.")
+                CoreSelect("Disabled", selection: $selectPick, options: Self.selectOptions).disabled(true)
             }
             VStack(alignment: .leading, spacing: Space.s2) {
                 ForEach(["read", "approve", "terminal"], id: \.self) { name in

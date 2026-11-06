@@ -34,8 +34,8 @@ public enum MacSize {
 public enum MacTextSize {
     public static let meta: CGFloat = 11
     public static let body: CGFloat = 13
-    public static let headline: CGFloat = 14
-    public static let title: CGFloat = 16
+    public static let headline: CGFloat = 13
+    public static let title: CGFloat = 15
     public static let large: CGFloat = 20
 }
 

@@ -115,7 +115,7 @@ public final class AdminDemo {
             await open("audit")
             if scene == "audit-selected" { admin.audit.selected = DemoData.audit[2].seq }
             if scene == "audit-nomatch" {
-                admin.audit.filter.target = "no-such-thing"
+                admin.audit.filter.kind = "terminal."
                 try? await Task.sleep(for: .milliseconds(900))
             }
         case "ops":

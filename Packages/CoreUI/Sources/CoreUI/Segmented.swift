@@ -33,8 +33,7 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
 
     public var body: some View {
         // Each option is its own glass tile (the section-action look); the picked one lights blue and the light glides.
-        // Choices keep their full names: they size to content and wrap onto another row when they do not fit.
-        ChoiceFlow(spacing: Space.s2, fill: fill) {
+        HStack(spacing: Space.s2) {
             ForEach(segments) { seg in
                 Segment(segment: seg, selected: seg.id == selection, fill: fill, lens: lens) { selection = seg.id }
             }
@@ -68,62 +67,6 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
     }
 }
 
-/// Lays choices out at their natural width and wraps to a new row when the next one will not fit. With `fill`, a set that
-/// fits one row shares the width equally; a wrapped set stretches each row to the full width.
-struct ChoiceFlow: Layout {
-    let spacing: CGFloat
-    let fill: Bool
-
-    private func rows(_ subviews: Subviews, width: CGFloat) -> (rows: [[Int]], sizes: [CGSize]) {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        var rows: [[Int]] = [[]]
-        var used: CGFloat = 0
-        for (i, size) in sizes.enumerated() {
-            let need = (rows[rows.count - 1].isEmpty ? 0 : spacing) + size.width
-            if used + need > width, !rows[rows.count - 1].isEmpty {
-                rows.append([i])
-                used = size.width
-            } else {
-                rows[rows.count - 1].append(i)
-                used += need
-            }
-        }
-        return (rows, sizes)
-    }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let (rows, sizes) = rows(subviews, width: width)
-        let heights = rows.map { r in r.map { sizes[$0].height }.max() ?? 0 }
-        let height = heights.reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
-        let widest =
-            rows.map { r in r.reduce(CGFloat(0)) { $0 + sizes[$1].width } + spacing * CGFloat(r.count - 1) }.max() ?? 0
-        return CGSize(width: fill && proposal.width != nil ? width : widest, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let (rows, sizes) = rows(subviews, width: bounds.width)
-        let count = CGFloat(subviews.count)
-        let maxW = sizes.map(\.width).max() ?? 0
-        let equal = fill && count * maxW + spacing * (count - 1) <= bounds.width
-        var y = bounds.minY
-        for row in rows {
-            let n = CGFloat(row.count)
-            let natural = row.reduce(CGFloat(0)) { $0 + sizes[$1].width } + spacing * (n - 1)
-            let extra = fill && !equal ? max(0, bounds.width - natural) / n : 0
-            let share = (bounds.width - spacing * (n - 1)) / n
-            let h = row.map { sizes[$0].height }.max() ?? 0
-            var x = bounds.minX
-            for i in row {
-                let w = equal ? share : sizes[i].width + extra
-                subviews[i].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: w, height: h))
-                x += w + spacing
-            }
-            y += h + spacing
-        }
-    }
-}
-
 private struct Segment<ID: Hashable & Sendable>: View {
     let segment: CoreSegment<ID>
     let selected: Bool
@@ -139,10 +82,10 @@ private struct Segment<ID: Hashable & Sendable>: View {
                 if let symbol = segment.symbol {
                     Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
                         .symbolEffect(.bounce, value: selected)
+                        .symbolEffect(.bounce, value: hovering)
                         .accessibilityHidden(true)
                 }
                 Text(segment.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundStyle(.white.opacity(selected || hovering ? 1 : 0.8))
             .padding(.horizontal, Space.s3)
@@ -150,9 +93,10 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .background {
                 if selected {
                     coreShape(Radius.control).fill(GlassInk.blue.opacity(0.8))
+                        .shadow(color: GlassInk.blue.opacity(0.45), radius: 10)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
-                    coreShape(Radius.control).fill(hovering ? GlassInk.wellHover : GlassInk.well)
+                    coreShape(Radius.control).fill(hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
                 }
             }
             .overlay {
@@ -162,20 +106,20 @@ private struct Segment<ID: Hashable & Sendable>: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(pressed ? 0.97 : 1)
+        .scaleEffect(pressed ? 0.96 : hovering ? 1.04 : 1)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
         )
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
-        .animation(Motion.press(Motion.press), value: pressed)
-        .animation(Motion.out(Motion.move), value: selected)
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
+        .animation(.spring(duration: 0.35, bounce: 0.25), value: selected)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
 /// An on/off setting as a glass tile in the segment look (Ahmed, 2026-11-05): its icon swaps and bounces, a small
-/// rounded switch slides inside, and it lights blue when on. Hover changes the fill; a press dips it.
+/// rounded switch slides inside, and it lights blue when on. Hover lifts it; a press springs.
 public struct GlassToggleTile: View {
     let title: String
     let sub: String?
@@ -185,6 +129,8 @@ public struct GlassToggleTile: View {
     @Binding var isOn: Bool
     @State private var hovering = false
     @State private var pressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
     public init(
         _ title: String, sub: String? = nil, symbol: String, onSymbol: String? = nil, isOn: Binding<Bool>,
         fill: Bool = false
@@ -203,12 +149,13 @@ public struct GlassToggleTile: View {
         } label: {
             HStack(spacing: Space.s3) {
                 Image(systemName: isOn ? onSymbol : symbol)
-                    .font(.system(size: sub == nil ? MacTextSize.body : MacTextSize.title, weight: .semibold))
+                    .font(.system(size: sub == nil ? MacTextSize.body : MacTextSize.headline + 2, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
                     .symbolEffect(.bounce, value: isOn)
+                    .symbolEffect(.pulse, options: .repeating, isActive: isOn && !reduce && sub == nil)
                     .frame(width: sub == nil ? nil : 28)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
                     if let sub {
                         Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(.white.opacity(0.7))
@@ -222,21 +169,23 @@ public struct GlassToggleTile: View {
             .padding(.horizontal, Space.s3).padding(.vertical, sub == nil ? 0 : Space.s3)
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
-                coreShape(Radius.control).fill(hovering ? GlassInk.wellHover : GlassInk.well)
+                coreShape(Radius.control)
+                    .fill(isOn ? GlassInk.blue.opacity(0.8) : hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
+                    .shadow(color: GlassInk.blue.opacity(isOn ? 0.45 : 0), radius: 10)
             }
-            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.15), lineWidth: 1) }
+            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(isOn ? 0.3 : 0.15), lineWidth: 1) }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(pressed ? 0.97 : 1)
+        .scaleEffect(pressed ? 0.96 : hovering ? 1.03 : 1)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
         )
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
-        .animation(Motion.press(Motion.press), value: pressed)
-        .animation(Motion.out(Motion.move), value: isOn)
+        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
+        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
+        .animation(.spring(duration: 0.35, bounce: 0.35), value: isOn)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
@@ -244,7 +193,7 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(4).fill(isOn ? GlassInk.blue : .white.opacity(0.12))
+        coreShape(5).fill(.white.opacity(isOn ? 0.35 : 0.12))
             .frame(width: 30, height: 18)
             .overlay(alignment: isOn ? .trailing : .leading) {
                 coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)

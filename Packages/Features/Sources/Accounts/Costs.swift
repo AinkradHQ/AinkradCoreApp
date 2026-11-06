@@ -144,7 +144,8 @@ extension AccountsModel {
     }
 }
 
-/// A refused Spend page: an older Core (when accounts load, a refusal here means the route is missing), or the Core's error.
+/// A refused Spend page: an older Core (when accounts load, a `forbidden_scope` here means the route is missing), a device
+/// without `admin`, or the Core's error.
 struct SpendState: View {
     let model: AccountsModel
     let state: AccountsLoad
@@ -156,27 +157,24 @@ struct SpendState: View {
         switch state {
         case .loading: AccSkeleton()
         case .forbidden:
-            if model.load == .ready {
+            if model.load == .ready && scope == "read" {
                 OlderCoreCard(what: what)
             } else {
                 AccStateCard(
                     symbol: "lock", title: "This device can't see \(what.lowercased())",
                     text:
-                        "\(what) need\(what.hasSuffix("s") ? "" : "s") \(scope == "admin" ? "an admin device" : "a device that can see everything"), or a newer Core."
-                )
-                .help("forbidden_scope (\(scope))")
+                        "\(what) need\(what.hasSuffix("s") ? "" : "s") the \(scope) scope, or a newer Core. Use a device that holds it, or update Core.",
+                    code: "forbidden_scope")
             }
         case .failed(let code, let message):
             AccStateCard(
                 symbol: "exclamationmark.triangle", title: "Could not load \(what.lowercased())",
-                text: "Your Core couldn't answer that. Nothing was changed.", tone: .fail
+                text: "The Core answered with an error. \(message)", tone: .fail, code: code
             ) {
-                AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
+                AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
                     Task { await retry() }
                 }
-                .keyboardShortcut("r", modifiers: .command)
             }
-            .help("\(message) (\(code))")
         case .ready: EmptyView()
         }
     }

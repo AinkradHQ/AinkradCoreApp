@@ -114,12 +114,12 @@ enum AccountPhase: Equatable, Sendable {
 
     var symbol: String {
         switch self {
-        case .active: "checkmark.square"
+        case .active: "checkmark.circle"
         case .cooling: "clock"
         case .limited: "gauge.with.dots.needle.100percent"
         case .unhealthy: "exclamationmark.triangle"
-        case .disabled: "pause.fill"
-        case .other: "questionmark.square"
+        case .disabled: "pause.circle"
+        case .other: "questionmark.circle"
         }
     }
 
@@ -186,7 +186,7 @@ struct GateState: Equatable, Sendable {
     var symbol: String {
         switch kind {
         case .real: "checkmark.shield"
-        case .unknown, .other: "questionmark.square"
+        case .unknown, .other: "questionmark.circle"
         default: "lock"
         }
     }
@@ -221,7 +221,7 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .overview: "waveform.path.ecg"
         case .accounts: "creditcard"
         case .pools: "square.grid.2x2"
-        case .budgets: "dollarsign.square"
+        case .budgets: "dollarsign.circle"
         case .costs: "chart.bar"
         case .ledger: "list.bullet"
         case .prices: "tag"

@@ -20,7 +20,7 @@ extension AgentsModel {
         if let d = error as? ElevationDeclined { return d.notice }
         let e = CoreError.unwrapping(error)
         let words = e?.localizedDescription ?? error.localizedDescription
-        return InlineNotice(title: "\(doing) did not go through", detail: words)
+        return InlineNotice(title: "\(doing) did not go through.", detail: words)
     }
 
     func note(_ id: String, _ n: InlineNotice?) { notices[id] = n }
@@ -60,7 +60,7 @@ extension AgentsModel {
         shell.presentSheet(
             title: "Cancel this session?",
             message:
-                "\(AgentWords.harness(s.harness)) finishes the tool call in flight, then the session ends as cancelled. What it already did stays in the transcript.",
+                "\(s.harness) finishes the tool call in flight, then the session ends as cancelled. What it already did stays in the transcript.",
             actions: [
                 ShellSheetAction("Keep running"),
                 ShellSheetAction("Cancel session", primary: true, destructive: true) { [weak self] in
@@ -74,7 +74,7 @@ extension AgentsModel {
         shell.presentSheet(
             title: "Kill this session?",
             message:
-                "Cancel asks \(AgentWords.harness(s.harness)) to stop. Kill stops it at once on \(runnerName(s.runner)) and can leave files half-written. Use it only if Cancel did not work.",
+                "Cancel asks \(s.harness) to stop. Kill stops it at once on \(runnerName(s.runner)) and can leave files half-written. Use it only if Cancel did not work.",
             actions: [
                 ShellSheetAction("Keep running"),
                 ShellSheetAction("Kill session", primary: true, destructive: true) { [weak self] in
@@ -140,24 +140,19 @@ extension AgentsModel {
             syncDerived()
         } catch {
             t.unmark(r.id)
-            var n = Self.notice(error, doing: approved ? "Approving" : "Denying")
-            if case .http(_, _, let message)? = CoreError.unwrapping(error), message.contains("no such request") {
-                n.detail = "That request is no longer waiting"
-            }
-            approvalNotices[r.id] = n
+            approvalNotices[r.id] = Self.notice(error, doing: approved ? "Approving" : "Denying")
         }
     }
 
     // MARK: new session
 
     public func loadRunners() async {
-        defer { runnersLoaded = true }
         if let api, let r = try? await api.runners() { runners = r }
     }
 
     /// Starts a session. The error comes back as words for the sheet; nothing is half done.
     public func create(_ new: NewAgentSession) async -> InlineNotice? {
-        guard let api else { return InlineNotice(title: "Connect to a Core first") }
+        guard let api else { return InlineNotice(title: "Connect to a Core first.") }
         do {
             let s = try await elevated("Start \(new.harness) on \(runnerName(new.runner)).") {
                 try await api.create(new)

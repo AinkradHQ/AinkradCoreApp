@@ -16,11 +16,10 @@ public struct ConfirmChoice: Identifiable {
     }
 }
 
-/// Every confirmation in the app (Ahmed, 2026-11-05: visual, animated, keyboard driven): an icon tile that pulses once
-/// for a destructive choice, a large title and the consequence, then the choices as glass tiles with their keys.
-/// ← → (Tab, Shift-Tab) move between choices, Return runs the highlighted one, Esc runs the first (the safe one),
-/// ⌘Return runs the last (the confirm) at once. The first choice is the safe one and starts highlighted, so Return alone
-/// never destroys anything. Hover only tints a tile; the highlight follows the keyboard.
+/// Every confirmation in the app (Ahmed, 2026-11-05: visual, animated, keyboard driven): a coloured icon tile that
+/// pulses for a destructive choice, a large title and the consequence, then the choices as glass tiles with their keys.
+/// ← → move between choices, Return runs the highlighted one, Esc cancels, ⌘Return runs the last (the confirm) at once.
+/// The first choice is the safe one and starts highlighted, so Return alone never destroys anything.
 public struct ConfirmCard: View {
     let title: String
     let message: String
@@ -40,7 +39,7 @@ public struct ConfirmCard: View {
         self.choices = choices
         self.cancel = cancel
         self.symbol =
-            symbol ?? (choices.contains(where: \.destructive) ? "exclamationmark.triangle" : "questionmark.square")
+            symbol ?? (choices.contains(where: \.destructive) ? "exclamationmark.triangle" : "questionmark.circle")
     }
 
     private var danger: Bool { choices.contains(where: \.destructive) }
@@ -49,10 +48,11 @@ public struct ConfirmCard: View {
     public var body: some View {
         VStack(spacing: Space.s4) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown)
-                .symbolEffect(.pulse, options: .nonRepeating, value: shown)
+                .symbolEffect(.pulse, options: .repeating, isActive: danger && !reduce)
+                .shadow(color: hue.opacity(0.5), radius: 18)
                 .scaleEffect(shown || reduce ? 1 : 0.6)
             VStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).multilineTextAlignment(.center)
+                Text(title).font(.system(size: MacTextSize.large + 4, weight: .bold)).multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text(message).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -62,21 +62,24 @@ public struct ConfirmCard: View {
                 ForEach(Array(choices.enumerated()), id: \.element.id) { i, c in
                     ChoiceTile(
                         choice: c, on: i == selected,
-                        keys: i == choices.count - 1 && i > 0 ? "⌘↩" : i == 0 ? "esc" : nil
+                        keys: i == 0 ? "esc" : i == choices.count - 1 ? (c.destructive ? "⌘↩" : "↩") : nil
                     ) { run(i) }
+                    .onHover { if $0 { selected = i } }
                 }
             }
             .coreRise(shown, 2)
+            Text("← → choose · ↩ run the highlighted · esc cancel").font(.system(size: MacTextSize.meta))
+                .foregroundStyle(GlassInk.secondary.opacity(0.8))
         }
         .foregroundStyle(GlassInk.primary)
-        .frame(width: Space.s8 * 14 - Space.s6 * 2)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .padding(Space.s6)
+        .frame(width: Space.s8 * 14)
+        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         .scaleEffect(shown || reduce ? 1 : 0.92)
         .opacity(shown ? 1 : 0)
-        .animation(Motion.out(Motion.move), value: shown)
-        .animation(Motion.out(Motion.ui), value: selected)
-        .help("← → choose · ↩ run the highlighted · esc cancel")
+        .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
+        .animation(.spring(duration: 0.25, bounce: 0.2), value: selected)
         .onAppear {
             shown = true
             listen()
@@ -97,14 +100,10 @@ public struct ConfirmCard: View {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
             switch e.keyCode {
             case 123: selected = max(selected - 1, 0)  // ←
-            case 124: selected = min(selected + 1, choices.count - 1)  // →
-            case 48:  // Tab, Shift-Tab goes back
-                selected =
-                    e.modifierFlags.contains(.shift) ? max(selected - 1, 0) : min(selected + 1, choices.count - 1)
+            case 124, 48: selected = min(selected + 1, choices.count - 1)  // → or Tab
             case 36, 76:  // Return, Enter
                 run(e.modifierFlags.contains(.command) ? choices.count - 1 : selected)
-            case 53:  // Esc runs the safe first choice
-                if choices.isEmpty { cancel() } else { run(0) }
+            case 53: cancel()  // Esc
             default: return e
             }
             return nil
@@ -112,13 +111,12 @@ public struct ConfirmCard: View {
     }
 }
 
-/// A choice as a glass tile: icon, label and its key, lit when highlighted (red when destructive). Hover tints only.
+/// A choice as a glass tile: icon, label and its key, lit when highlighted (red when destructive).
 public struct ChoiceTile: View {
     let choice: ConfirmChoice
     let on: Bool
     let keys: String?
     let run: () -> Void
-    @State private var hovering = false
     public init(choice: ConfirmChoice, on: Bool, keys: String?, run: @escaping () -> Void) {
         self.choice = choice
         self.on = on
@@ -134,24 +132,23 @@ public struct ChoiceTile: View {
                 Text(choice.label).font(.system(size: MacTextSize.body, weight: .semibold))
                 if let keys {
                     Text(keys).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
-                        .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-                        .background(.white.opacity(0.14), in: coreShape(Radius.chip))
+                        .padding(.horizontal, 6).frame(minHeight: 20)
+                        .background(.white.opacity(0.14), in: coreShape(5))
                 }
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
-                on ? hue.opacity(choice.destructive ? 0.85 : 0.6) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.control)
+                on ? hue.opacity(choice.destructive ? 0.85 : 0.6) : GlassInk.well, in: coreShape(Radius.control + 2)
             )
             .overlay {
-                coreShape(Radius.control).strokeBorder(on ? .white.opacity(0.4) : GlassInk.wellEdge, lineWidth: 1)
+                coreShape(Radius.control + 2).strokeBorder(on ? .white.opacity(0.4) : GlassInk.wellEdge, lineWidth: 1)
             }
-            .contentShape(coreShape(Radius.control))
+            .shadow(color: on ? hue.opacity(0.45) : .clear, radius: 10)
+            .scaleEffect(on ? 1.03 : 1)
+            .contentShape(coreShape(Radius.control + 2))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityLabel(choice.label)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
@@ -167,6 +164,7 @@ public struct ModalCard: View {
     let hue: Color
     let choices: [(choice: ConfirmChoice, primary: Bool)]
     @State private var shown = false
+    @State private var hovered: Int?
     @Environment(\.accessibilityReduceMotion) private var reduce
     public init(
         title: String, message: String, note: String? = nil, symbol: String, hue: Color,
@@ -182,8 +180,9 @@ public struct ModalCard: View {
     public var body: some View {
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 56, bounce: shown)
+                .shadow(color: hue.opacity(0.45), radius: 16)
                 .scaleEffect(shown || reduce ? 1 : 0.6)
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).multilineTextAlignment(.center)
+            Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(message).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -196,7 +195,10 @@ public struct ModalCard: View {
             HStack(spacing: Space.s2) {
                 ForEach(Array(choices.enumerated()), id: \.element.choice.id) { i, c in
                     let n = i < lead ? i + 1 : i
-                    ChoiceTile(choice: c.choice, on: i == lead, keys: i == lead ? "↩" : "⌘\(n)") {
+                    ChoiceTile(
+                        choice: c.choice, on: hovered == nil ? i == lead : hovered == i,
+                        keys: i == lead ? "↩" : "⌘\(n)"
+                    ) {
                         c.choice.run()
                     }
                     .keyboardShortcut(
@@ -204,45 +206,45 @@ public struct ModalCard: View {
                             ? KeyboardShortcut.defaultAction
                             : KeyboardShortcut(KeyEquivalent(Character("\(min(n, 9))")), modifiers: .command)
                     )
+                    .onHover { hovered = $0 ? i : nil }
                 }
             }
             .padding(.top, Space.s1)
             .coreRise(shown, 1)
         }
         .foregroundStyle(GlassInk.primary)
-        .frame(maxWidth: Space.s8 * 13 - Space.s5 * 2)
-        .corePanel(radius: Radius.panel, padding: Space.s5)
+        .padding(Space.s5)
+        .frame(maxWidth: Space.s8 * 13)
+        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
         .scaleEffect(shown || reduce ? 1 : 0.94)
         .opacity(shown ? 1 : 0)
-        .animation(Motion.out(Motion.move), value: shown)
+        .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
+        .animation(.spring(duration: 0.25), value: hovered)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
     }
 }
 
-/// A modal's picture and colour from its title, so every dialog has one without each call site choosing. Whole words
-/// only ("add" never matches "address"); a plural counts as the word. Red is for removing, blue for everything else.
+/// A modal's picture and colour from its title, so every dialog has one without each call site choosing.
 public enum ModalLook {
     public static func of(_ title: String) -> (symbol: String, hue: Color) {
-        let words = title.lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init)
-        let padded = " " + words.joined(separator: " ") + " "
-        func has(_ phrases: String...) -> Bool {
-            phrases.contains { padded.contains(" \($0) ") || padded.contains(" \($0)s ") }
-        }
-        if has("revoke", "remove", "delete", "forget", "kill", "end", "end this", "stop") {
+        let t = title.lowercased()
+        func has(_ words: String...) -> Bool { words.contains { t.contains($0) } }
+        if t.hasPrefix("lend ") { return ("key.horizontal", GlassInk.orange) }  // not "end "
+        if has("revoke", "remove", "delete", "forget", "kill", "end ", "end this", "stop") {
             return ("trash", GlassInk.red)
         }
         if has("rename") { return ("pencil", GlassInk.blue) }
-        if has("may do", "access", "scope") { return ("lock.shield", GlassInk.blue) }
-        if has("secret", "lease", "lend") { return ("key.horizontal", GlassInk.blue) }
-        if has("pool") { return ("square.stack.3d.up", GlassInk.blue) }
-        if has("account", "connect") { return ("person.badge.plus", GlassInk.blue) }
+        if has("may do", "access", "scope") { return ("lock.shield", GlassInk.violet) }
+        if has("secret", "lease") { return ("key.horizontal", GlassInk.orange) }
+        if has("pool") { return ("square.stack.3d.up", GlassInk.violet) }
+        if has("account", "connect") { return ("person.crop.circle.badge.plus", GlassInk.green) }
         if has("device", "pair") { return ("laptopcomputer.and.iphone", GlassInk.blue) }
         if has("terminal") { return ("terminal", GlassInk.slate) }
-        if has("session", "agent") { return ("play.fill", GlassInk.blue) }
+        if has("session", "agent") { return ("sparkles", GlassInk.violet) }
         if has("switch", "setting") { return ("slider.horizontal.3", GlassInk.blue) }
-        if has("add", "new", "create") { return ("plus.square", GlassInk.blue) }
-        return ("square.dashed", GlassInk.blue)
+        if has("add", "new", "create") { return ("plus.circle", GlassInk.green) }
+        return ("sparkles", GlassInk.blue)
     }
 }
 
@@ -261,7 +263,8 @@ public struct ModalHeader: View {
         let look = ModalLook.of(title)
         HStack(spacing: Space.s3) {
             IconTile(symbol ?? look.symbol, hue: look.hue, size: 44, bounce: shown)
-            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+                .shadow(color: look.hue.opacity(0.4), radius: 12)
+            Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s2)
             if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
         }
@@ -270,7 +273,7 @@ public struct ModalHeader: View {
 }
 
 extension View {
-    /// The modal entrance: settles from 94 % with an ease; Reduce Motion fades.
+    /// The modal entrance: settles from 94 % with a spring; Reduce Motion fades.
     public func coreModalEntrance() -> some View { modifier(ModalEntrance()) }
 }
 
@@ -279,7 +282,7 @@ private struct ModalEntrance: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduce
     func body(content: Content) -> some View {
         content.scaleEffect(shown || reduce ? 1 : 0.94).opacity(shown ? 1 : 0)
-            .animation(Motion.out(Motion.move), value: shown)
+            .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
             .onAppear { shown = true }
     }
 }

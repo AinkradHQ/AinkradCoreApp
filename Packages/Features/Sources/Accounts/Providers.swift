@@ -179,13 +179,13 @@ struct ProviderDialog: View {
                 .fixedSize(horizontal: false, vertical: true)
                 modelsList
                 Label(
-                    "Its accounts can't join pools yet. Models need a price to count as spend.",
-                    systemImage: "info.square"
+                    "Its accounts can't join pools or bindings yet. Models need a price to count as spend.",
+                    systemImage: "info.circle"
                 )
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 if let e = model.writeError["provider"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(
+                AccDialogButtons(
                     confirm: editing == nil ? "Add provider" : "Save", busy: busy, enabled: issue == nil, cancel: close
                 ) { go() }
             }
@@ -205,14 +205,14 @@ struct ProviderDialog: View {
                     PriceField(label: "in", micros: $m.input)
                     PriceField(label: "out", micros: $m.output)
                     Button {
-                        withAnimation(Motion.out(Motion.ui)) { models.removeAll { $0.id == m.id } }
+                        withAnimation(.smooth(duration: 0.25)) { models.removeAll { $0.id == m.id } }
                     } label: {
-                        Image(systemName: "xmark").frame(width: MacSize.controlSm, height: MacSize.controlSm)
+                        Image(systemName: "xmark").frame(width: 24, height: 24)
                     }
                     .buttonStyle(.plain).foregroundStyle(GlassInk.secondary).help("Remove \(m.id)")
                 }
                 .padding(.horizontal, Space.s2).frame(minHeight: 36)
-                .background(GlassInk.well, in: coreShape(Radius.control))
+                .background(GlassInk.well, in: coreShape(Radius.control + 2))
                 .transition(.opacity)
             }
             HStack(alignment: .top, spacing: Space.s2) {
@@ -233,7 +233,7 @@ struct ProviderDialog: View {
     private func add() {
         let m = newModel.trimmingCharacters(in: .whitespaces)
         guard ProviderRules.modelIssue(m) == nil, !models.contains(where: { $0.id == m }) else { return }
-        withAnimation(Motion.out(Motion.ui)) { models.append(.init(id: m, input: 0, output: 0)) }
+        withAnimation(.smooth(duration: 0.25)) { models.append(.init(id: m, input: 0, output: 0)) }
         newModel = ""
     }
 
@@ -258,7 +258,7 @@ private struct PriceField: View {
     @State private var text = ""
 
     var body: some View {
-        HStack(spacing: Space.s1) {
+        HStack(spacing: 4) {
             Text("$").foregroundStyle(GlassInk.secondary)
             TextField("0.00", text: $text).textFieldStyle(.plain).frame(width: 56).monospacedDigit()
                 .onChange(of: text) { _, t in
@@ -266,10 +266,10 @@ private struct PriceField: View {
                         micros = Int64((d * 1_000_000).rounded())
                     }
                 }
-            Text("\(label) per million").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text("\(label) / M").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s2).frame(height: 28)
-        .background(GlassInk.well, in: coreShape(Radius.control))
+        .coreFieldSurface()
         .onAppear { text = micros == 0 ? "" : String(format: "%.2f", Double(micros) / 1_000_000) }
     }
 }
@@ -287,7 +287,7 @@ struct DeleteProviderDialog: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["provider-\(provider.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                CoreDialogFooter(confirm: "Remove provider", danger: true, busy: busy, cancel: close) {
+                AccDialogButtons(confirm: "Remove provider", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.deleteProvider(provider)

@@ -37,7 +37,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         container.term = term
         container.surface = self
         container.wantsLayer = true
-        container.layer?.cornerRadius = Radius.cardMac
+        container.layer?.cornerRadius = 12
         container.layer?.masksToBounds = true
     }
 
@@ -148,7 +148,7 @@ final class SurfaceContainer: NSView {
             layer?.backgroundColor = nil
             term.frame = CGRect(x: 0, y: 0, width: bounds.width + strip, height: bounds.height)
         case .letterbox:
-            layer?.backgroundColor = TerminalInk.letterbox.cgColor
+            layer?.backgroundColor = NSColor(red: 2 / 255, green: 6 / 255, blue: 12 / 255, alpha: 0.92).cgColor
             let want = term.getOptimalFrameSize().size
             term.frame = CGRect(
                 x: 0, y: 0, width: min(want.width, bounds.width + strip), height: min(want.height, bounds.height))

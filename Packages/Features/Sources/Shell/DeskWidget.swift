@@ -14,7 +14,7 @@ struct DeskWidget: View {
     @State private var hovering = false
 
     /// Apple widget corners: large and soft.
-    private var radius: CGFloat { Radius.panel + Space.s1 }
+    private var radius: CGFloat { 26 }
 
     var body: some View {
         let size = DeskGrid.frameSize(item.size)
@@ -22,13 +22,11 @@ struct DeskWidget: View {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
                 // White ink on clear glass: a soft shadow keeps it readable over bright clouds (stronger by day).
                 .shadow(color: .black.opacity(palette.isDay ? 0.35 : 0.25), radius: 3, y: 1)
-                .padding(Space.s4)
+                .padding(18).padding(.top, editing ? 30 : 0)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
-                // Editing makes room for the size choices by shrinking the content, never by pushing it past the frame.
-                .scaleEffect(editing ? (size.height - Space.s8) / size.height : 1, anchor: .bottom)
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
-                .animation(Motion.out(Motion.ui), value: editing)
+                .animation(.easeOut(duration: 0.2), value: editing)
             chrome
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -40,8 +38,8 @@ struct DeskWidget: View {
         }
         .shadow(color: .black.opacity(lifting ? 0.35 : 0.12), radius: lifting ? 30 : 14, y: lifting ? 14 : 4)
         .scaleEffect(lifting && !reduce ? 1.025 : 1)
-        .animation(Motion.out(Motion.ui), value: lifting)
-        .animation(Motion.out(Motion.ui), value: hovering)
+        .animation(.easeOut(duration: 0.2), value: lifting)
+        .animation(.easeOut(duration: 0.24), value: hovering)
         .contentShape(coreShape(radius))
         .onHover { hovering = $0 }
         .focusable()
@@ -65,13 +63,12 @@ struct DeskWidget: View {
 
     private func key(_ p: KeyPress) -> KeyPress.Result {
         guard p.modifiers.isEmpty else { return .ignored }
-        // Moving and removing answer the keys only while editing the desk; at rest they must not touch a widget.
         switch p.key {
-        case .leftArrow where editing: shell.moveWidget(item.id, dx: -1, dy: 0)
-        case .rightArrow where editing: shell.moveWidget(item.id, dx: 1, dy: 0)
-        case .upArrow where editing: shell.moveWidget(item.id, dx: 0, dy: -1)
-        case .downArrow where editing: shell.moveWidget(item.id, dx: 0, dy: 1)
-        case .delete where editing, .deleteForward where editing: shell.removeWidget(item.id)
+        case .leftArrow: shell.moveWidget(item.id, dx: -1, dy: 0)
+        case .rightArrow: shell.moveWidget(item.id, dx: 1, dy: 0)
+        case .upArrow: shell.moveWidget(item.id, dx: 0, dy: -1)
+        case .downArrow: shell.moveWidget(item.id, dx: 0, dy: 1)
+        case .delete, .deleteForward: shell.removeWidget(item.id)
         case .return where !editing: open()
         default: return .ignored
         }
@@ -90,15 +87,17 @@ struct DeskWidget: View {
                 }
             }
         }
+        Divider()
         Button(editing ? "Done Editing" : "Edit Widgets") { shell.editingWidgets.toggle() }
         Button("Add Widget…") { shell.addingWidget = true }
+        Divider()
         Button("Remove", role: .destructive) { shell.removeWidget(item.id) }
     }
 
     /// `.wd-edit`: the size choices at the top left, remove at the top right. They fade in; they are Tab stops only while editing.
     private var chrome: some View {
         HStack {
-            HStack(spacing: Space.s1) {
+            HStack(spacing: 3) {
                 ForEach(item.kind.sizes, id: \.self) { s in
                     Button {
                         shell.resizeWidget(item.id, to: s)
@@ -111,26 +110,26 @@ struct DeskWidget: View {
                     .help(s.title)
                 }
             }
-            .padding(Space.s1).background(palette.panelStrong, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .padding(3).background(palette.panelStrong, in: coreShape(9))
+            .overlay { coreShape(9).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             Spacer(minLength: 0)
             Button {
                 shell.removeWidget(item.id)
             } label: {
-                Image(systemName: "xmark").font(.system(size: MacTextSize.meta, weight: .semibold))
+                Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(SizeChoiceStyle(selected: false, destructive: true))
-            .background(palette.panelStrong, in: coreShape(Radius.chip))
-            .overlay { coreShape(Radius.chip).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .background(palette.panelStrong, in: coreShape(6))
+            .overlay { coreShape(6).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             .accessibilityLabel("Remove \(item.kind.title)")
             .help("Remove")
         }
-        .padding(Space.s2)
+        .padding(8)
         .opacity(editing ? 1 : 0)
         .allowsHitTesting(editing)
         .disabled(!editing)
         .accessibilityHidden(!editing)
-        .animation(Motion.out(Motion.ui), value: editing)
+        .animation(.easeOut(duration: 0.2), value: editing)
     }
 
     private func sizeMark(_ s: WidgetSize) -> some View {
@@ -152,9 +151,9 @@ struct SizeChoiceStyle: ButtonStyle {
             .foregroundStyle(
                 selected ? palette.primary : hovering && destructive ? palette.tone(.fail).ink : palette.text2
             )
-            .frame(minWidth: MacSize.controlSm, minHeight: MacSize.controlSm)
-            .background(selected ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.chip))
-            .overlay { if selected { coreShape(Radius.chip).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
+            .frame(minWidth: 22, minHeight: 22)
+            .background(selected ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(6))
+            .overlay { if selected { coreShape(6).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
             .animation(Motion.out(Motion.hover), value: hovering)

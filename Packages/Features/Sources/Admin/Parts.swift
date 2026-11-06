@@ -32,7 +32,7 @@ struct AdminPanel<Content: View>: View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .coreWell()
+            .background(palette.glassCard, in: coreShape(Radius.cardMac))
     }
 }
 
@@ -83,6 +83,24 @@ struct AdminBar: View {
     }
 }
 
+/// A text link in the primary colour with the one focus ring.
+struct AdminLink: View {
+    let title: String
+    var danger = false
+    var help: String?
+    let action: () -> Void
+    @Environment(\.corePalette) private var palette
+    @FocusState private var focused: Bool
+    var body: some View {
+        Button(action: action) { Text(title).font(.system(size: MacTextSize.body)) }
+            .buttonStyle(.plain)
+            .foregroundStyle(danger ? palette.tone(.fail).ink : palette.primary)
+            .focused($focused).focusEffectDisabled()
+            .coreFocusRing(focused, radius: Radius.chip, palette: palette)
+            .help(help ?? title)
+    }
+}
+
 /// The inline outcome of a Touch ID that did not elevate, in the panel that asked.
 struct AdminNoticeBanner: View {
     let notice: AdminNotice?
@@ -94,7 +112,7 @@ struct AdminNoticeBanner: View {
     }
 }
 
-/// A refusal from the Core under a field or a row, in words.
+/// A refusal from the Core under a field or a row: the code in mono, then the words.
 struct IssueLine: View {
     let code: String?
     let text: String
@@ -102,7 +120,8 @@ struct IssueLine: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
             Image(systemName: "exclamationmark.triangle").accessibilityHidden(true)
-            Text(text).fixedSize(horizontal: false, vertical: true).help(code ?? "")
+            if let code { Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)) }
+            Text(text).fixedSize(horizontal: false, vertical: true)
         }
         .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
         .accessibilityElement(children: .combine)
@@ -115,6 +134,8 @@ struct StateCard<Actions: View>: View {
     let title: String
     let text: String
     var tone: Tone = .queue
+    var code: String?
+    var errorID: String?
     @ViewBuilder let actions: Actions
     @Environment(\.corePalette) private var palette
 
@@ -127,18 +148,31 @@ struct StateCard<Actions: View>: View {
             Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
+            if let code {
+                Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)).padding(.horizontal, Space.s2)
+                    .frame(minHeight: MacSize.chip).background(palette.uDim, in: coreShape(Radius.chip))
+            }
+            if let errorID {
+                HStack(spacing: Space.s2) {
+                    Text("error_id").foregroundStyle(palette.text2)
+                    Text(errorID).font(.system(size: MacTextSize.meta, design: .monospaced)).textSelection(.enabled)
+                }
+                .font(.system(size: MacTextSize.meta))
+            }
             HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .coreWell()
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .overlay { if tone == .fail { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.5), lineWidth: 1) } }
         .accessibilityElement(children: .contain)
     }
 }
 
 extension StateCard where Actions == EmptyView {
-    init(symbol: String, title: String, text: String, tone: Tone = .queue) {
-        self.init(symbol: symbol, title: title, text: text, tone: tone) { EmptyView() }
+    init(symbol: String, title: String, text: String, tone: Tone = .queue, code: String? = nil, errorID: String? = nil)
+    {
+        self.init(symbol: symbol, title: title, text: text, tone: tone, code: code, errorID: errorID) { EmptyView() }
     }
 }
 
@@ -187,7 +221,7 @@ struct AdminScreen<Content: View>: View {
                 case .empty:
                     StateCard(
                         symbol: empty.symbol, title: empty.title,
-                        text: empty.text
+                        text: empty.text + " This is not a permission problem: this device holds the admin scope."
                     ) {
                         if let emptyAction {
                             Button(emptyAction.title, action: emptyAction.run).buttonStyle(.coreProminent)
@@ -196,15 +230,16 @@ struct AdminScreen<Content: View>: View {
                 case .failed(let code, let message, let id):
                     StateCard(
                         symbol: "exclamationmark.triangle", title: "Could not load this",
-                        text: "Your Core couldn't answer that. Nothing was changed.", tone: .fail
+                        text: "The Core answered with an error. \(message) Nothing was changed.", tone: .fail,
+                        code: code,
+                        errorID: id
                     ) { Button("Try again", action: retry).buttonStyle(.coreProminent) }
-                    .help([message, code, id].compactMap { $0 }.joined(separator: " · "))
                 case .forbidden:
                     StateCard(
                         symbol: "lock", title: "This device is not allowed to do that",
-                        text: "Reading and changing this needs an admin device. Use one that can manage this Core."
-                    )
-                    .help("forbidden_scope")
+                        text:
+                            "Reading and changing this needs the admin scope (forbidden_scope). Use a device that holds it.",
+                        code: "forbidden_scope")
                 }
             }
         }
