@@ -15,16 +15,16 @@ public struct CoreSheet<Content: View, Footer: View>: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            ModalHeader(title)
             content.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
-            HStack(spacing: Space.s2) {
-                Spacer(minLength: 0)
-                footer
-            }
+            // Right-aligned by default; a footer that holds a Spacer spreads its buttons to both edges.
+            HStack(spacing: Space.s2) { footer }.frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(Space.s5)
         .frame(width: Space.s8 * 11)
-        .background(palette.panelStrong)
+        .coreGlass(radius: Radius.panel, interactive: false)
+        .coreModalEntrance()
+        .presentationBackground(.clear)
         .coreTheme()
         .accessibilityElement(children: .contain)
     }
@@ -38,6 +38,7 @@ public struct CoreConfirmDialog: View {
     let destructive: Bool
     let onConfirm: () -> Void
     let onCancel: () -> Void
+    @Environment(\.corePalette) private var palette
 
     public init(
         _ title: String, message: String, confirmTitle: String, destructive: Bool = false,
@@ -52,16 +53,16 @@ public struct CoreConfirmDialog: View {
     }
 
     public var body: some View {
-        CoreSheet(title) {
-            Text(message).fixedSize(horizontal: false, vertical: true)
-        } footer: {
-            Button("Cancel", action: onCancel)
-                .buttonStyle(CoreButtonStyle(destructive ? .prominent : .secondary))
-                .keyboardShortcut(.cancelAction)
-            Button(confirmTitle, action: onConfirm)
-                .buttonStyle(CoreButtonStyle(destructive ? .secondary : .prominent))
-                .keyboardShortcut(destructive ? nil : .defaultAction)
-        }
+        ConfirmCard(
+            title: title, message: message,
+            choices: [
+                ConfirmChoice("Cancel", symbol: "arrow.uturn.backward") { onCancel() },
+                ConfirmChoice(confirmTitle, symbol: destructive ? "trash" : "checkmark", destructive: destructive) {
+                    onConfirm()
+                },
+            ], cancel: onCancel
+        )
+        .presentationBackground(.clear)
     }
 }
 

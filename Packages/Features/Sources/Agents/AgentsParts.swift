@@ -89,18 +89,30 @@ struct AgentRowButton<Label: View>: View {
     var body: some View {
         Button(action: action) { label }
             .buttonStyle(.plain)
+            // Focusable even with the system's keyboard navigation off, so the arrows always reach the tiles.
+            .focusable()
             .focused(focus, equals: id)
             .focusEffectDisabled()
             .background(
-                selected ? palette.navActive : hovering ? palette.rowHover : palette.glassCard,
-                in: coreShape(Radius.row)
+                selected || focus.wrappedValue == id
+                    ? .white.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                in: coreShape(Radius.cardMac)
             )
             .overlay {
-                // A session that waits on you keeps the edge the selected row has, so it stands out in a long list.
-                if selected || waiting { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+                // Waiting on you: an orange edge that stands out in a long list; selected: a white one.
+                if waiting {
+                    coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.6), lineWidth: 1.5)
+                } else if selected || focus.wrappedValue == id {
+                    coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                } else {
+                    coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1)
+                }
             }
-            .coreFocusRing(focus.wrappedValue == id, radius: Radius.row, palette: palette)
-            .animation(Motion.out(Motion.hover), value: hovering)
+            .shadow(
+                color: (waiting ? GlassInk.orange : GlassInk.violet).opacity(hovering || waiting ? 0.3 : 0), radius: 14
+            )
+            .scaleEffect(hovering ? 1.015 : 1)
+            .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
             .onHover { hovering = $0 }
     }
 }

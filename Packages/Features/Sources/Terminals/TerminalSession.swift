@@ -110,15 +110,17 @@ final class TerminalSession {
             item.rows = opened.rows
         } else {
             surface.layoutMode(.fill)
-            let size = surface.size
-            if size.cols > 0, (size.cols, size.rows) != (opened.cols, opened.rows) {
-                l.resize(rows: size.rows, cols: size.cols)
-                item.cols = size.cols
-                item.rows = size.rows
-            }
+            item.cols = opened.cols
+            item.rows = opened.rows
         }
         firstOutputAfterReattach = after > 0 && opened.seq > after
         link = .attached(letterbox: letterbox)
+        // The pane is often still sliding open here: its size goes through the same settle as every resize, so the shell
+        // redraws its prompt once, at the final width (an in-between width left a broken prompt line behind).
+        if !letterbox {
+            let size = surface.size
+            fit(size.cols, size.rows)
+        }
         pump = Task { [weak self] in
             for await update in l.updates {
                 guard let self else { return }
@@ -281,13 +283,26 @@ final class TerminalSession {
         l.input(bytes)
     }
 
+    /// The size is sent once it settles: a pane animating open, closed or into a new tile resizes every frame, and each
+    /// resize makes the shell redraw its prompt (Powerlevel10k printed one line per frame).
+    private var settle: Task<Void, Never>?
     private func fit(_ cols: Int, _ rows: Int) {
-        guard let l = attachment, case .attached(false) = link, cols > 0, rows > 0 else { return }
-        guard (cols, rows) != (item.cols, item.rows) else { return }
-        item.cols = cols
-        item.rows = rows
-        l.resize(rows: rows, cols: cols)
+        guard cols > 0, rows > 0 else { return }
+        settle?.cancel()
+        settle = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled, let self, let l = self.attachment, case .attached(false) = self.link else {
+                return
+            }
+            guard (cols, rows) != (self.item.cols, self.item.rows) else { return }
+            self.item.cols = cols
+            self.item.rows = rows
+            l.resize(rows: rows, cols: cols)
+        }
     }
+
+    /// Waiting on "Verify to reattach" (the elevation lapsed).
+    var waitsForVerify: Bool { link == .stepUp }
 
     // MARK: actions
 

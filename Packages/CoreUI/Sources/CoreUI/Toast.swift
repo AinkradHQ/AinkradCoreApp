@@ -51,16 +51,16 @@ public struct CoreToast: View {
 
     public var body: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: kind.symbol).foregroundStyle(palette.tone(kind.tone).ink).accessibilityHidden(true)
+            IconTile(kind.symbol, hue: palette.tone(kind.tone).ink, size: 26)
             Text(message).font(.system(size: MacTextSize.body))
             if let undo {
                 Button("Undo", action: undo).buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
         }
+        .foregroundStyle(GlassInk.primary)
         .padding(.horizontal, Space.s3)
         .padding(.vertical, Space.s2)
-        .background(palette.panelStrong, in: coreShape(Radius.cardMac))
-        .background(coreShape(Radius.cardMac).fill(.regularMaterial).environment(\.colorScheme, .dark))
+        .coreGlass(radius: Radius.cardMac, interactive: false)
         .accessibilityElement(children: .contain)
     }
 }

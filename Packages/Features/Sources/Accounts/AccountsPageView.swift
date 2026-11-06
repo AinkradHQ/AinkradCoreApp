@@ -24,38 +24,37 @@ private struct AccountsList: View {
         VStack(alignment: .leading, spacing: Space.s5) {
             AccHeader(
                 title: "Accounts",
-                detail: "Your provider keys, by provider. Core keeps each one, and your agents share it."
+                detail: "Your provider keys, by provider. Core keeps each one, and your agents share it.",
+                symbol: "creditcard.fill", hue: GlassInk.blue
             ) {
-                Button {
-                    AccountDialogs.openConnect(model, provider: nil)
-                } label: {
-                    Label("Connect an account", systemImage: "plus")
+                if !model.accounts.isEmpty {
+                    CoreSegmented(
+                        "Show",
+                        segments: AccountFilter.allCases.map { f in
+                            CoreSegment(
+                                f, "\(f.rawValue) \(model.accounts.filter { f.matches($0) }.count)", symbol: f.symbol)
+                        }, selection: $model.filter
+                    )
+                    .fixedSize()
                 }
-                .buttonStyle(.coreProminent).disabled(model.readOnly)
-                .help("Open a provider's own page to get a key")
             }
             if model.accounts.isEmpty {
                 FirstAccount(model: model)
             } else {
-                CoreSegmented(
-                    "Show",
-                    segments: AccountFilter.allCases.map { f in
-                        CoreSegment(f, "\(f.rawValue) \(model.accounts.filter { f.matches($0) }.count)")
-                    }, selection: $model.filter
-                )
-                .frame(maxWidth: Space.s8 * 14, alignment: .leading)
                 SummaryBar(model: model)
                 if model.providersByUse.isEmpty {
-                    Text("Nothing here. All your accounts are fine.").foregroundStyle(palette.text2)
+                    Label("Nothing here. All your accounts are fine.", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(GlassInk.green)
                 }
                 ForEach(model.providersByUse, id: \.0.id) { p, group in
                     ProviderSection(model: model, provider: p, accounts: group)
                 }
-                if model.filter == .all, !model.spareProviders.isEmpty {
+                if model.filter == .all {
                     Text("More you can connect").font(.system(size: MacTextSize.title, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: cardColumns, spacing: Space.s3) {
                         ForEach(model.spareProviders) { p in SpareCard(model: model, provider: p) }
+                        AddProviderCard(model: model)
                     }
                 }
             }
@@ -65,10 +64,10 @@ private struct AccountsList: View {
     }
 }
 
-/// Ready, needs a look, turned off: a bar in proportion and the same three counts in words.
+/// Ready, needs a look, turned off: a bar in proportion that grows in, counted in the app's foot.
 private struct SummaryBar: View {
     let model: AccountsModel
-    @Environment(\.corePalette) private var palette
+    @State private var shown = false
     var body: some View {
         let ready = model.readyCount
         let off = model.accounts.filter { $0.phase == .disabled }.count
@@ -77,29 +76,25 @@ private struct SummaryBar: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             GeometryReader { geo in
                 let total = max(1, model.accounts.count)
-                HStack(spacing: Space.s1 / 2) {
-                    seg(ready, .run, geo.size.width, total)
-                    seg(need, .warn, geo.size.width, total)
-                    seg(off + other, .queue, geo.size.width, total)
+                HStack(spacing: 3) {
+                    seg(ready, GlassInk.green, geo.size.width, total)
+                    seg(need, GlassInk.orange, geo.size.width, total)
+                    seg(off + other, GlassInk.slate, geo.size.width, total)
                 }
             }
-            .frame(height: Space.s1).accessibilityHidden(true)
-            HStack(spacing: Space.s4) {
-                Label("\(ready) ready", systemImage: "checkmark.circle")
-                if need > 0 {
-                    Label("\(need) \(need == 1 ? "needs" : "need") a look", systemImage: "exclamationmark.triangle")
-                }
-                if off + other > 0 { Label("\(off + other) turned off or other", systemImage: "pause.circle") }
-            }
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            .frame(height: 8).accessibilityHidden(true)
         }
-        .accessibilityElement(children: .combine)
+        .animation(.smooth(duration: 0.8), value: shown)
+        .onAppear { shown = true }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(ready) ready, \(need) need a look, \(off + other) turned off or other")
     }
 
-    @ViewBuilder private func seg(_ n: Int, _ tone: Tone, _ width: CGFloat, _ total: Int) -> some View {
+    @ViewBuilder private func seg(_ n: Int, _ c: Color, _ width: CGFloat, _ total: Int) -> some View {
         if n > 0 {
-            coreShape(Space.s1 / 2).fill(tone == .queue ? palette.track : palette.tone(tone).ink)
-                .frame(width: max(Space.s1, width * CGFloat(n) / CGFloat(total) - Space.s1))
+            coreShape(4).fill(c.gradient)
+                .frame(width: shown ? max(8, width * CGFloat(n) / CGFloat(total) - 3) : 8)
+                .shadow(color: c.opacity(0.5), radius: 4)
         }
     }
 }
@@ -114,23 +109,35 @@ private struct ProviderSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                AccTile()
+                AccTile(provider: provider.id)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(provider.name).font(.system(size: MacTextSize.title, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                     Text(
                         "\(accounts.count) account\(accounts.count == 1 ? "" : "s")\(provider.builtin ? "" : " · custom")"
                     )
-                    .foregroundStyle(palette.text2)
+                    .foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s3)
-                Button("Connect another") { AccountDialogs.openConnect(model, provider: provider.id) }
-                    .buttonStyle(.coreSecondary).disabled(model.readOnly)
-                    .help("Open \(provider.name)'s own page to get a key")
+                AccLink(title: open ? "Hide details" : "About", symbol: open ? "chevron.up" : "info.circle") {
+                    withAnimation(.smooth(duration: 0.35)) { open.toggle() }
+                }
+                if !provider.builtin {
+                    AccLink(title: "Edit", symbol: "slider.horizontal.3") {
+                        AccountDialogs.openProvider(model, editing: provider)
+                    }
+                    .disabled(model.readOnly)
+                }
+                AccLink(title: "Connect another", symbol: "plus") {
+                    AccountDialogs.openConnect(model, provider: provider.id)
+                }
+                .disabled(model.readOnly).help("Open \(provider.name)'s own page to get a key")
             }
-            ProviderAbout(provider: provider, open: $open)
+            if open { ProviderAbout(provider: provider).transition(.opacity.combined(with: .move(edge: .top))) }
             LazyVGrid(columns: cardColumns, spacing: Space.s3) {
-                ForEach(accounts) { a in AccountCard(model: model, account: a) }
+                ForEach(Array(accounts.enumerated()), id: \.element.id) { i, a in
+                    AccountCard(model: model, account: a, index: i).id("a-\(a.id)")
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -138,45 +145,39 @@ private struct ProviderSection: View {
     }
 }
 
-/// What the Core knows about a provider, folded away until asked for.
+/// What the Core knows about a provider, shown when asked for (About).
 struct ProviderAbout: View {
     let provider: ProviderItem
-    @Binding var open: Bool
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        DisclosureGroup(isExpanded: $open) {
-            AccPanel(spacing: Space.s2) {
-                AccFact(label: "Sign-in") {
-                    Text(
-                        provider.loginMethods.isEmpty ? "Not available" : provider.loginMethods.joined(separator: ", "))
-                }
-                AccFact(label: "Delivery") { Text(provider.delivery.joined(separator: ", ")) }
-                AccFact(label: "Harness") { Text(provider.harness) }
-                AccFact(label: "Variable") { AccChip(text: provider.authVar, mono: true) }
-                AccFact(label: "Address") { AccChip(text: provider.baseURL, mono: true) }
-                AccFact(label: "Models") {
-                    if provider.models.isEmpty {
-                        Text("None").foregroundStyle(palette.text2)
-                    } else {
-                        VStack(alignment: .leading, spacing: Space.s1) {
-                            ForEach(provider.models, id: \.id) { m in
-                                HStack(spacing: Space.s2) {
-                                    AccChip(text: m.id, mono: true)
-                                    Text(m.words).foregroundStyle(palette.text2)
-                                }
+        AccPanel(spacing: Space.s2) {
+            AccFact(label: "Sign-in") {
+                Text(
+                    provider.loginMethods.isEmpty ? "Not available" : provider.loginMethods.joined(separator: ", "))
+            }
+            AccFact(label: "Delivery") { Text(provider.delivery.joined(separator: ", ")) }
+            AccFact(label: "Harness") { Text(provider.harness) }
+            AccFact(label: "Variable") { AccChip(text: provider.authVar, mono: true) }
+            AccFact(label: "Address") { AccChip(text: provider.baseURL, mono: true) }
+            AccFact(label: "Models") {
+                if provider.models.isEmpty {
+                    Text("None").foregroundStyle(palette.text2)
+                } else {
+                    VStack(alignment: .leading, spacing: Space.s1) {
+                        ForEach(provider.models, id: \.id) { m in
+                            HStack(spacing: Space.s2) {
+                                AccChip(text: m.id, mono: true)
+                                Text(m.words).foregroundStyle(palette.text2)
                             }
-                            if let at = provider.pricedAt {
-                                Text("List prices read \(at)").font(.system(size: MacTextSize.meta)).foregroundStyle(
-                                    palette.text2)
-                            }
+                        }
+                        if let at = provider.pricedAt {
+                            Text("List prices read \(at)").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                                palette.text2)
                         }
                     }
                 }
             }
-            .padding(.top, Space.s2)
-        } label: {
-            Text("About \(provider.name)").foregroundStyle(palette.primary)
         }
         .accessibilityIdentifier("about-\(provider.id)")
     }
@@ -189,124 +190,85 @@ private struct SpareCard: View {
     var body: some View {
         AccPanel(spacing: Space.s2) {
             HStack(spacing: Space.s3) {
-                AccTile()
+                AccTile(provider: provider.id)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(provider.name).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text("Add an API key").foregroundStyle(palette.text2)
+                    Text(provider.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                    Text(
+                        provider.loginMethods.contains("browser_code")
+                            ? "Sign in with your Claude plan"
+                            : provider.builtin ? "Add an API key" : "Your provider · no accounts yet"
+                    )
+                    .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
-                Spacer(minLength: Space.s2)
-                Button("Connect") { AccountDialogs.openConnect(model, provider: provider.id) }
-                    .buttonStyle(.coreSecondary).disabled(model.readOnly)
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: Space.s2) {
+                Spacer(minLength: 0)
+                if !provider.builtin {
+                    AccLink(title: "Remove", symbol: "trash") { AccountDialogs.openDeleteProvider(model, provider) }
+                        .disabled(model.readOnly)
+                    AccLink(title: "Edit", symbol: "slider.horizontal.3") {
+                        AccountDialogs.openProvider(model, editing: provider)
+                    }
+                    .disabled(model.readOnly)
+                }
+                AccLink(title: "Connect", symbol: "plus") { AccountDialogs.openConnect(model, provider: provider.id) }
+                    .disabled(model.readOnly)
             }
         }
     }
 }
 
-/// One account: its state, its sign-in (a key that cannot be read back), its limit, its pools.
-struct AccountDetailView: View {
-    let model: AccountsModel
-    let account: AccountItem
-    @Environment(\.corePalette) private var palette
-
+/// The way back to a list, as a tile beside the page's icon (the Devices look): it nudges left on hover. Esc does the same.
+struct BackTile: View {
+    let action: () -> Void
+    @State private var hovering = false
     var body: some View {
-        let a = account
-        let ro = model.readOnly
-        VStack(alignment: .leading, spacing: Space.s5) {
-            AccLink(title: "All accounts", symbol: "chevron.left") { model.detail = nil }
-                .keyboardShortcut(.leftArrow, modifiers: .command)
-            HStack(alignment: .top, spacing: Space.s4) {
-                AccTile(large: true)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(a.label).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(
-                        .isHeader)
-                    Text(model.providerName(a.provider)).foregroundStyle(palette.text2)
-                    HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                        PhaseBadge(phase: a.phase)
-                        Text(AccountsWords.why(a, now: model.now())).foregroundStyle(palette.text2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                Spacer(minLength: Space.s3)
-                if a.phase == .disabled {
-                    Button {
-                        Task { await model.setEnabled(a, true) }
-                    } label: {
-                        Label("Turn on", systemImage: "play")
-                    }
-                    .buttonStyle(.coreProminent).disabled(ro || model.busy != nil)
-                } else {
-                    Button {
-                        Task { await model.setEnabled(a, false) }
-                    } label: {
-                        Label("Turn off", systemImage: "pause")
-                    }
-                    .buttonStyle(.coreSecondary).disabled(ro || model.busy != nil)
-                }
-            }
-            if let e = model.writeError["account-\(a.id)"] { AccIssue(text: e) }
-            NotYetCard(
-                title: "How much is left",
-                text:
-                    "Limits and budget are not available yet. Core does not report them yet.")
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s3, alignment: .top)],
-                spacing: Space.s3
-            ) {
-                AccPanel(spacing: Space.s2) {
-                    Text("Sign-in").font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(a.maskedTail.isEmpty ? "Key saved" : "•••• \(a.maskedTail)").font(
-                        .system(size: MacTextSize.title, design: .monospaced))
-                    Text("Saved safely in Core. It can never be shown again, and this app has no place to type one.")
-                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: Space.s3) {
-                        AccLink(title: "Use a new key…", symbol: ro ? "lock" : nil) {
-                            AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
-                        }
-                        .disabled(ro)
-                        AccLink(title: "Remove account…", symbol: ro ? "lock" : nil, danger: true) {
-                            AccountDialogs.openDelete(model, a)
-                        }
-                        .disabled(ro)
-                    }
-                }
-                AccPanel(spacing: Space.s2) {
-                    Text("Right now").font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(AccountsWords.capWords(a.cap))
-                    Text(AccountsWords.used(a.lastUsedAt, now: model.now())).foregroundStyle(palette.text2)
-                    AccLink(title: "Set a limit…", symbol: ro ? "lock" : nil) { AccountDialogs.openCap(model, a) }
-                        .disabled(ro)
-                }
-                AccPanel(spacing: Space.s2) {
-                    Text("Used by").font(.system(size: MacTextSize.headline, weight: .semibold))
-                    let pools = model.pools(of: a)
-                    if pools.isEmpty {
-                        Text("Not in a pool yet, so agents cannot use it.").foregroundStyle(palette.text2)
-                    }
-                    ForEach(pools) { p in
-                        AccLink(title: "\(p.name) pool", symbol: "square.grid.2x2") {
-                            model.poolSelection = p.id
-                            model.page = .pools
-                        }
-                    }
-                }
-            }
-            NotYetCard(
-                title: "Last 12 hours",
-                text:
-                    "Usage is not available yet. Core does not report tokens, messages or cost yet."
-            )
-            DisclosureGroup("Technical details") {
-                AccPanel(spacing: Space.s2) {
-                    AccFact(label: "State") { AccChip(text: a.state, mono: true) }
-                    AccFact(label: "Address") { AccChip(text: a.baseURL, mono: true) }
-                    AccFact(label: "Added") { Text(a.createdAt.formatted(date: .abbreviated, time: .shortened)) }
-                    AccFact(label: "Core id") { AccChip(text: String(a.id), mono: true) }
-                }
-                .padding(.top, Space.s2)
-            }
-            .foregroundStyle(palette.primary)
+        Button(action: action) {
+            Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                .offset(x: hovering ? -2 : 0)
+                .frame(width: 36, height: 56)
+                .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(10))
+                .overlay { coreShape(10).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .contentShape(coreShape(10))
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("account-detail")
+        .buttonStyle(.plain)
+        .focusable(false)
+        .keyboardShortcut(.leftArrow, modifiers: .command)
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.25), value: hovering)
+        .help("All accounts (esc)")
+        .accessibilityLabel("All accounts")
+    }
+}
+
+/// Your own provider, such as OpenRouter: a definition Core checks, whose keys go through its gateway only.
+private struct AddProviderCard: View {
+    let model: AccountsModel
+    @State private var hovering = false
+    var body: some View {
+        Button {
+            AccountDialogs.openProvider(model, editing: nil)
+        } label: {
+            HStack(spacing: Space.s3) {
+                IconTile("plus", hue: GlassInk.slate, size: 32)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Add a provider").font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text("OpenRouter, or any API like Anthropic, OpenAI or Gemini").foregroundStyle(GlassInk.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s3)
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .overlay {
+                coreShape(Radius.cardMac).strokeBorder(
+                    GlassInk.wellEdge, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            }
+            .contentShape(coreShape(Radius.cardMac))
+        }
+        .buttonStyle(.plain).focusEffectDisabled().disabled(model.readOnly)
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.2), value: hovering)
     }
 }

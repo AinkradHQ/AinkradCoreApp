@@ -44,25 +44,25 @@ private struct BlockedView: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        ZStack {
-            Color.clear.overlay {
-                Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
-            }
-            .clipped().accessibilityHidden(true)
-            FailureView(
-                failure: failure, retryAt: nil,
-                actions: failure.fatal && failure.kind != .identityMismatch
-                    ? [FailureAction(label: "Connect again", style: .primary) { Task { await app.forgetCore() } }]
-                    : [
-                        FailureAction(label: "Forget this Core…") { app.confirmForget = true },
-                        FailureAction(label: "Try again", style: .primary) { Task { await app.tryAgain() } },
-                    ]
-            )
-            .foregroundStyle(palette.text)
-            .font(.system(size: MacTextSize.body))
-            .corePanel(radius: Radius.panel, padding: Space.s6)
-            .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-            .frame(width: Space.s8 * 17)
+        // The card is centred in the whole window and the sky sits behind it, so the picture can never move the card.
+        FailureView(
+            failure: failure, retryAt: nil,
+            actions: failure.fatal && failure.kind != .identityMismatch
+                ? [FailureAction(label: "Connect again", style: .primary) { Task { await app.forgetCore() } }]
+                : [
+                    FailureAction(label: "Forget this Core…") { app.confirmForget = true },
+                    FailureAction(label: "Try again", style: .primary) { Task { await app.tryAgain() } },
+                ]
+        )
+        .foregroundStyle(palette.text)
+        .font(.system(size: MacTextSize.body))
+        .padding(Space.s6)
+        .coreGlass(radius: Radius.panel, interactive: false)
+        .frame(width: Space.s8 * 17)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .background {
+            Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
+                .clipped().accessibilityHidden(true)
         }
         .ignoresSafeArea()
     }

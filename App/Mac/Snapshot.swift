@@ -22,8 +22,28 @@ enum SnapshotRunner {
         if let dir = env["CORE_HOME_SNAPSHOT"] { return await HomeSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_ACC_SNAPSHOT"] { return await AccountsSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_ACC_DEMO=<scene>`: Accounts on the stand-in data, left open to click through (no Core is reached).
+        if let scene = env["CORE_ACC_DEMO"] {
+            try? await Task.sleep(for: .seconds(3))
+            return await app.debugAccountsDemo().showInteractive(scene)
+        }
         if let dir = env["CORE_ADMIN_SNAPSHOT"] { return await AdminSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_LOCK_SNAPSHOT=<dir> [CORE_SETTINGS_PAGE=<id>]`: one Settings page on the paired Core (Lockouts, the default,
+        // gets two sample locks).
+        if let dir = env["CORE_LOCK_SNAPSHOT"] {
+            let page = env["CORE_SETTINGS_PAGE"] ?? "lockouts"
+            try? await Task.sleep(for: .seconds(4))
+            app.debugOpenSettings(page)
+            try? await Task.sleep(for: .seconds(1))
+            if page == "lockouts" { app.debugSampleLockouts() }
+            try? await Task.sleep(for: .seconds(2))
+            if let w = NSApp.windows.first(where: { $0.title == "Ainkrad" }) {
+                log("shot \(page) \(capture(w, to: "\(dir)/\(page).png"))")
+            }
+            NSApp.terminate(nil)
+            return
+        }
         guard let dir = env["CORE_SNAPSHOT"] else { return }
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         // The full-screen toggle above must not undo the theme.
@@ -99,7 +119,7 @@ enum SnapshotRunner {
         shell.show(.home)
         shell.open(.settings)
         await shot("09-settings")
-        shell.settings.selected = "activity"
+        shell.settings.selected = "notifications"
         await shot("09b-settings-activity")
         shell.settings.selected = "appearance"
         shell.open(.shortcuts)

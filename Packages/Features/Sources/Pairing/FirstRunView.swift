@@ -1,6 +1,7 @@
 import CoreKit
 import CoreUI
 import CryptoKit
+import Shell
 import SwiftUI
 
 /// The screen before the desktop: connect to a Core and pair this Mac with it.
@@ -22,6 +23,9 @@ struct FirstRunView: View {
             .clipped().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s4) {
                 header
+                if step.0 > 0 {
+                    FirstRunHero(scene: heroScene, name: UserProfile.clean(model.nameText)).frame(maxWidth: .infinity)
+                }
                 Group {
                     switch model.stage {
                     case .form:
@@ -43,8 +47,8 @@ struct FirstRunView: View {
             }
             .foregroundStyle(palette.text)
             .font(.system(size: MacTextSize.body))
-            .corePanel(radius: Radius.panel, padding: Space.s6)
-            .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .padding(Space.s6)
+            .coreGlass(radius: Radius.panel, interactive: false)
             .frame(width: Space.s8 * 17)
             .accessibilityElement(children: .contain)
             cluster
@@ -75,6 +79,20 @@ struct FirstRunView: View {
         case .claiming, .sas: (3, "Pair this Mac")
         case .approved: (4, "Done")
         case .failed: (0, "Connect to a Core")
+        }
+    }
+
+    private var heroScene: FirstRunHero.Scene {
+        switch model.stage {
+        case .form:
+            switch model.step {
+            case .name: .you
+            case .address, .bootstrap: .find
+            case .code: .key
+            }
+        case .claiming, .sas: .checking
+        case .approved: .paired
+        case .failed: .find
         }
     }
 
@@ -146,12 +164,14 @@ struct FirstRunView: View {
                 "Your name", placeholder: "Ahmed", text: $model.nameText, autofocus: true,
                 onSubmit: { model.submitName() })
             HStack {
-                LinkButton(title: "Not now") {
+                Button("Not now") {
                     model.nameText = ""
                     model.submitName()
                 }
+                .coreGlassButton()
+                .coreShortcut(.cancel)
                 Spacer()
-                Button("Continue") { model.submitName() }.buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                Button("Continue") { model.submitName() }.coreGlassButton(prominent: true).coreShortcut(.primary)
             }
         }
     }
@@ -160,41 +180,66 @@ struct FirstRunView: View {
 
     private var addressStep: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            title("Connect to a Core")
-            note("Enter the address of your Core. Ainkrad checks who answers before it sends anything signed.")
+            title("Where is your Core?")
+            note(
+                "Your Core is the server that runs your agents and terminals. This Mac connects to it to show you everything."
+            )
+            if let local = model.localCore, !pasteQR {
+                foundLocalCore(local)
+            }
             CoreSegmented(
-                "How to find the Core",
-                segments: [CoreSegment(false, "Address"), CoreSegment(true, "Paste QR text")],
-                selection: Binding(get: { pasteQR }, set: { setQR($0) }))
+                "How to connect",
+                segments: [CoreSegment(false, "Type its address"), CoreSegment(true, "Paste a pairing link")],
+                selection: Binding(get: { pasteQR }, set: { setQR($0) }), fill: true)
             if pasteQR {
-                Label("A QR names its Core and its fingerprint, so no address is needed.", systemImage: "qrcode")
-                    .foregroundStyle(palette.text2)
+                note(
+                    "Copy the pairing link from the device that added this Mac. It already holds the address and the code."
+                )
                 CoreTextField(
-                    "QR text", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
+                    "Pairing link", placeholder: "ainkrad-pair:v1?…", text: $codeField, error: model.codeError,
                     mono: true, autofocus: true, onSubmit: { Task { await model.submit() } })
             } else {
                 CoreTextField(
-                    "Core address", placeholder: "core.example.net", text: $model.endpointText,
+                    "Core address", placeholder: "core.myhome.net", text: $model.endpointText,
                     error: model.endpointError, suffix: addressSuffix, onSubmit: { model.submitAddress() })
-                Text(
-                    "Always https. Add a port only if it is not 443, for example core.example.net:7443. Plain http is only for a Core on this Mac."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("The address you gave your Core when you set it up. Add :port only if it uses one.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                LinkButton(title: "Setting up a new Core?") { model.goTo(.bootstrap) }
+                LinkButton(title: "I don't have a Core yet") { model.goTo(.bootstrap) }
                 Spacer()
                 if pasteQR {
                     Button("Pair this Mac") { Task { await model.submit() } }
-                        .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
+                        .coreGlassButton(prominent: true).coreShortcut(.primary).disabled(!model.canSubmit)
                 } else {
                     Button("Continue") { model.submitAddress() }
-                        .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                        .coreGlassButton(prominent: true).coreShortcut(.primary)
                         .disabled(model.endpointText.isEmpty)
                 }
             }
         }
+        .animation(.spring(duration: 0.4, bounce: 0.2), value: model.localCore)
+        .task { await model.lookForLocalCore() }
+    }
+
+    /// A Core answered on this Mac: the easiest way in is one click.
+    private func foundLocalCore(_ address: String) -> some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: MacTextSize.large))
+                .foregroundStyle(palette.tone(.run).ink).symbolEffect(.bounce, value: address)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Found a Core on this Mac").font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(address).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: 0)
+            Button("Use it") { model.useLocalCore() }.coreGlassButton(prominent: true)
+        }
+        .padding(Space.s3)
+        .coreGlass(radius: Radius.control, interactive: false)
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        .accessibilityElement(children: .combine)
     }
 
     private func setQR(_ on: Bool) {
@@ -218,10 +263,10 @@ struct FirstRunView: View {
                 note("3. Add a second admin device (your iPhone) afterwards, so losing one never needs SSH.")
             }
             HStack {
-                Button("Back") { model.goTo(.address) }.buttonStyle(.coreSecondary)
+                Button("Back") { model.goTo(.address) }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
-                Button("I have a code") { model.goTo(.address) }.buttonStyle(.coreProminent)
-                    .keyboardShortcut(.defaultAction)
+                Button("I have a code") { model.goTo(.address) }.coreGlassButton(prominent: true)
+                    .coreShortcut(.primary)
             }
         }
     }
@@ -245,10 +290,10 @@ struct FirstRunView: View {
                 if showKeys { keyDetails }
             }
             HStack {
-                LinkButton(title: "Back") { model.goTo(.address) }
+                Button("Back") { model.goTo(.address) }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
                 Button("Pair this Mac") { Task { await model.submit() } }
-                    .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction).disabled(!model.canSubmit)
+                    .coreGlassButton(prominent: true).coreShortcut(.primary).disabled(!model.canSubmit)
             }
         }
     }
@@ -296,13 +341,15 @@ struct FirstRunView: View {
             if let claim = model.claim { SASView(sas: claim.sas) }
             statusLine
             HStack(spacing: Space.s2) {
+                Button("It doesn't match") { Task { await model.cancel() } }
+                    .coreGlassButton(prominent: true, tint: palette.tone(.fail).ink)
+                    .coreShortcut(.number(1))
                 Spacer(minLength: 0)
-                Button("It doesn't match") { Task { await model.cancel() } }.buttonStyle(.coreDanger)
                 if model.matched {
-                    Button("Waiting…") {}.buttonStyle(.coreProminent).disabled(true)
+                    Button("Waiting…") {}.coreGlassButton(prominent: true).disabled(true)
                 } else {
                     Button("It matches") { Task { await model.confirmMatch() } }
-                        .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                        .coreGlassButton(prominent: true).coreShortcut(.primary)
                 }
             }
         }
@@ -355,7 +402,7 @@ struct FirstRunView: View {
             HStack {
                 Spacer()
                 Button("Open Ainkrad") { model.finish() }
-                    .buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
+                    .coreGlassButton(prominent: true).coreShortcut(.primary)
             }
         }
     }

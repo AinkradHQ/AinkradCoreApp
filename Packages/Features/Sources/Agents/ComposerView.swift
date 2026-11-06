@@ -5,8 +5,8 @@ import SwiftUI
 struct ComposerView: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
+    var focused: FocusState<Bool>.Binding
     @Environment(\.corePalette) private var palette
-    @FocusState private var focused: Bool
 
     private var draft: Binding<String> {
         Binding(get: { model.drafts[session.id] ?? "" }, set: { model.drafts[session.id] = $0 })
@@ -28,36 +28,53 @@ struct ComposerView: View {
     }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: Space.s2) {
+        let on = focused.wrappedValue
+        HStack(alignment: .center, spacing: Space.s2) {
+            Image(systemName: enabled ? "text.bubble" : "lock")
+                .font(.system(size: MacTextSize.body, weight: .semibold))
+                .foregroundStyle(on ? GlassInk.violet : GlassInk.secondary)
+                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: on)
             TextField("Reply to the agent", text: draft, prompt: Text(placeholder))
                 .accessibilityIdentifier("agent-composer")
                 .textFieldStyle(.plain)
-                .focused($focused)
+                .focused(focused)
                 .disabled(!enabled)
                 .onSubmit { Task { await model.send(session.id) } }
-            Text("\(String(format: bytes < 1024 ? "%.2f" : "%.1f", Double(bytes) / 1024)) / 16 KiB")
-                .font(.system(size: MacTextSize.meta, design: .monospaced))
-                .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
-                .overlay(alignment: .leading) {
-                    if over { Image(systemName: "exclamationmark.triangle").offset(x: -Space.s4) }
+                .onKeyPress(.escape) {
+                    focused.wrappedValue = false
+                    return .handled
                 }
+            if bytes > 0 {
+                Text("\(String(format: bytes < 1024 ? "%.2f" : "%.1f", Double(bytes) / 1024)) / 16 KiB")
+                    .font(.system(size: MacTextSize.meta, design: .monospaced))
+                    .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
             if session.over {
-                Button("Resume") { model.resume(session.id) }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                    .help("Start this session again from where it stopped")
+                AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
+                {
+                    model.resume(session.id)
+                }
+                .help("Start this session again from where it stopped")
             } else {
-                Button("Send") { Task { await model.send(session.id) } }
-                    .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                    .disabled(!model.canSend(session.id))
-                    .help("Send the message (Return)")
+                AppActionTile(title: "Send", symbol: "paperplane.fill", key: "↩", hue: GlassInk.violet, prominent: true)
+                {
+                    Task { await model.send(session.id) }
+                }
+                .disabled(!model.canSend(session.id))
+                .opacity(model.canSend(session.id) ? 1 : 0.5)
+                .help("Send the message (Return)")
             }
         }
         .padding(.leading, Space.s3).padding(Space.s2)
-        .background(palette.glassCard, in: coreShape(Radius.control))
+        .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay {
-            coreShape(Radius.control).strokeBorder(
-                focused ? palette.focusRing : palette.glassCardEdge, lineWidth: focused ? 2 : 1)
+            coreShape(Radius.cardMac).strokeBorder(on ? GlassInk.violet.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
         }
-        .coreDimWhenDisabled(enabled || session.over)
-        .padding([.horizontal, .bottom], Space.s3)
+        .shadow(color: GlassInk.violet.opacity(on ? 0.35 : 0), radius: 14)
+        .opacity(enabled || session.over ? 1 : 0.6)
+        .animation(.spring(duration: 0.3, bounce: 0.25), value: on)
+        .animation(.spring(duration: 0.3), value: bytes > 0)
+        .padding(.horizontal, Space.s3).padding(.bottom, Space.s1)
     }
 }

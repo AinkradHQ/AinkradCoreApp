@@ -76,7 +76,7 @@ public struct CoreTextField: View {
                             .foregroundStyle(palette.text2).padding(.trailing, Space.s3).allowsHitTesting(false)
                     }
                 }
-                .background(palette.glassCard, in: coreShape(Radius.control))
+                .coreGlassField(fallback: palette.glassCard)
                 .overlay {
                     coreShape(Radius.control).strokeBorder(
                         error == nil ? palette.glassCardEdge : palette.tone(.fail).ink, lineWidth: 1)

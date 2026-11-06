@@ -9,43 +9,63 @@ struct LauncherView: View {
     @State private var selection = 0
     /// The pointer only moves the selection while the keyboard has not moved it just now (a list scrolling under a still pointer is not a hover).
     @State private var keyAt = Date.distantPast
+    /// The text field's own editor takes ↑ ↓ (it moves the text cursor), so the list never saw them: while the launcher
+    /// is open, these keys are caught first and move the selection.
+    @State private var arrowMonitor: Any?
     @Namespace private var glide
     @FocusState private var focused: Bool
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
+    /// The active pane's actions (⇧⌘A) instead of the launcher's entries.
+    var actionsOnly = false
+
     private var rows: [LauncherRow] {
-        Fuzzy.rank(shell.launcher.entries, query: query, recents: shell.launcher.recents)
+        actionsOnly
+            ? Fuzzy.rank(shell.paneActionEntries(), query: query, recents: [])
+            : Fuzzy.rank(shell.launcher.entries, query: query, recents: shell.launcher.recents)
     }
 
     var body: some View {
         let rows = rows
         VStack(spacing: 0) {
+            if actionsOnly { PaneActionsHeader(shell: shell) }
             HStack(spacing: Space.s3) {
                 Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
                     .accessibilityHidden(true)
-                TextField("Open an app or run a command…", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: MacTextSize.large))
-                    .focused($focused)
-                    .onSubmit { run(rows) }
-                    .onKeyPress(.escape) {
-                        shell.closeTopmost()
-                        return .handled
-                    }
-                    .onKeyPress(phases: [.down, .repeat]) { press in key(press, rows.count) }
-                    .accessibilityLabel("Launcher")
+                TextField(
+                    "Launcher", text: $query,
+                    prompt: Text(actionsOnly ? "Do something with this pane…" : "Open an app or run a command…")
+                        .foregroundStyle(WidgetInk.secondary)
+                )
+                .textFieldStyle(.plain)
+                .foregroundStyle(WidgetInk.primary)
+                .font(.system(size: MacTextSize.large))
+                .focused($focused)
+                .onSubmit { run(rows) }
+                .onKeyPress(.escape) {
+                    shell.closeTopmost()
+                    return .handled
+                }
+                .onKeyPress(phases: [.down, .repeat]) { press in key(press, rows.count) }
+                .onAppear { catchArrows() }
+                .onDisappear {
+                    if let arrowMonitor { NSEvent.removeMonitor(arrowMonitor) }
+                    arrowMonitor = nil
+                }
+                .accessibilityLabel("Launcher")
             }
             .padding(Space.s4)
             ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: Space.s1) {
+                GlassScroll {
+                    // Not lazy: a lazy stack builds rows as they scroll in, and each one replayed its arrival.
+                    VStack(alignment: .leading, spacing: Space.s1) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
                             if i == 0 || rows[i - 1].group != row.group { groupTitle(row.group) }
                             LauncherItem(
                                 row: row, index: i, number: i < 9 ? i + 1 : nil, selected: i == selection, glide: glide,
                                 hover: {
-                                    if Date().timeIntervalSince(keyAt) > 0.3 { selection = i }
+                                    if Date().timeIntervalSince(keyAt) > 0.3 { point(i) }
                                 }
                             ) {
                                 selection = i
@@ -56,10 +76,12 @@ struct LauncherView: View {
                         if rows.isEmpty { empty }
                     }
                     .padding(.horizontal, Space.s3)
-                    .animation(reduce ? nil : Motion.out(0.22), value: selection)
                 }
                 .onChange(of: selection) { _, new in
-                    if rows.indices.contains(new) { proxy.scrollTo(rows[new].id) }
+                    // The list scrolls on the same curve the highlight glides on, so the two move together.
+                    // Only the keyboard scrolls the list; a row under the pointer is already in view.
+                    guard rows.indices.contains(new), Date().timeIntervalSince(keyAt) < 0.3 else { return }
+                    withAnimation(reduce ? nil : Motion.out(0.18)) { proxy.scrollTo(rows[new].id) }
                 }
             }
             footer
@@ -67,8 +89,9 @@ struct LauncherView: View {
         .frame(width: ShellMetrics.launcherWidth)
         .frame(maxHeight: Space.s8 * 18)
         .fixedSize(horizontal: false, vertical: true)
-        .corePanel(radius: Radius.panel, padding: 0)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        // The widgets' glass, darker since it is an input; frosted at night, clear by day (Ahmed, 2026-11-05).
+        .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: coreShape(Radius.panel + Space.s1))
+        .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false, frosted: !palette.isDay)
         .background { numberShortcuts(rows) }
         .task {
             // The root holds focus while the window is calm; take it once the overlay is in place.
@@ -86,14 +109,14 @@ struct LauncherView: View {
     }
 
     private func groupTitle(_ group: LauncherEntry.Group) -> some View {
-        Text(group.title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+        Text(group.title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(WidgetInk.secondary)
             .padding(.top, Space.s3).padding(.horizontal, Space.s2).accessibilityAddTraits(.isHeader)
     }
 
     private var empty: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Text("Nothing matches “\(query)”").font(.system(size: MacTextSize.headline, weight: .semibold))
-            Text("Try fewer letters, or the first letters of each word.").foregroundStyle(palette.text2)
+            Text("Try fewer letters, or the first letters of each word.").foregroundStyle(WidgetInk.secondary)
         }
         .padding(Space.s4)
     }
@@ -106,7 +129,7 @@ struct LauncherView: View {
             hint("⌘/", "all shortcuts")
             hint("esc", "close")
         }
-        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+        .font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary)
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(Space.s3)
     }
@@ -150,14 +173,53 @@ struct LauncherView: View {
         default: return .ignored
         }
         keyAt = Date()
-        selection = (selection + step + count) % count
+        glide((selection + step + count) % count)
         return .handled
+    }
+
+    private func catchArrows() {
+        guard arrowMonitor == nil else { return }
+        arrowMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            let count = rows.count
+            guard count > 0 else { return e }
+            let command = e.modifierFlags.contains(.command)
+            let control = e.modifierFlags.contains(.control)
+            switch e.keyCode {
+            case 125 where command: _ = jump(count - 1)  // ⌘↓
+            case 126 where command: _ = jump(0)  // ⌘↑
+            case 125: step(1, count)  // ↓
+            case 126: step(-1, count)  // ↑
+            case 121: _ = jump(min(selection + 8, count - 1))  // page down
+            case 116: _ = jump(max(selection - 8, 0))  // page up
+            case 45 where control: step(1, count)  // ⌃N
+            case 35 where control: step(-1, count)  // ⌃P
+            default: return e
+            }
+            return nil
+        }
+    }
+
+    private func step(_ by: Int, _ count: Int) {
+        keyAt = Date()
+        glide((selection + by + count) % count)
     }
 
     private func jump(_ to: Int) -> KeyPress.Result {
         keyAt = Date()
-        selection = to
+        glide(to)
         return .handled
+    }
+
+    /// The keyboard moves the highlight with a glide and scrolls along on the same curve.
+    private func glide(_ to: Int) {
+        withAnimation(reduce ? nil : Motion.out(0.18)) { selection = to }
+    }
+
+    /// The pointer glides it too, on a short spring that redirects as the pointer moves on instead of queueing one glide
+    /// per row it crossed (that lag read as a glitch).
+    private func point(_ to: Int) {
+        guard to != selection else { return }
+        withAnimation(reduce ? nil : .spring(duration: 0.14, bounce: 0)) { selection = to }
     }
 
     private func run(_ rows: [LauncherRow]) {
@@ -165,6 +227,7 @@ struct LauncherView: View {
         let entry = rows[selection].entry
         shell.launcher.remember(entry.id)
         shell.launcherOpen = false
+        shell.actionsOpen = false
         entry.run()
     }
 }
@@ -181,35 +244,51 @@ private struct LauncherItem: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var arrived = false
     @State private var lastPoint: CGPoint?
+    /// Counts only the moments this row becomes selected, so the icon bounces on select and not on deselect.
+    @State private var picked = 0
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s3) {
-                Image(systemName: row.entry.symbol).font(.system(size: MacTextSize.body, weight: .medium))
-                    .foregroundStyle(row.entry.tile == .slate ? palette.text : palette.btnInk)
-                    .frame(width: MacSize.controlMd, height: MacSize.controlMd)
-                    .background(tile, in: coreShape(Radius.control))
+                Image(systemName: row.entry.symbol).font(.system(size: MacTextSize.body + 1, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: MacSize.controlLg, height: MacSize.controlLg)
+                    .background(
+                        LinearGradient(
+                            colors: [hue.opacity(0.95), hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
+                        in: coreShape(Radius.control)
+                    )
+                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                    .symbolEffect(.bounce, value: picked)
+                    // The selected tile glows; the glow fades in and out with the highlight instead of popping.
+                    .background {
+                        if selected {
+                            coreShape(Radius.control).fill(hue).blur(radius: 8).opacity(0.55).transition(.opacity)
+                        }
+                    }
                     .accessibilityHidden(true)
                 title
                 Spacer(minLength: Space.s2)
                 if let sub = row.entry.sub {
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(1)
+                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary).lineLimit(1)
                 }
                 if let number { CoreKeycap("⌘\(number)") }
             }
+            .foregroundStyle(WidgetInk.primary)
             .padding(.horizontal, Space.s2)
-            .frame(height: MacSize.controlLg + Space.s2)
+            .frame(height: MacSize.controlLg + Space.s3)
             // One highlight that glides between rows (`shell-fx.css` .l-glide), not a background swapped per row.
             .background {
                 if selected {
-                    coreShape(Radius.row).fill(palette.navActive)
-                        .overlay { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+                    coreShape(Radius.row).fill(.white.opacity(0.18))
+                        .overlay { coreShape(Radius.row).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
                         .matchedGeometryEffect(id: "selection", in: glide)
                 }
             }
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)
+        .onChange(of: selected) { _, now in if now { picked += 1 } }
         // Rows arrive one after another when the launcher opens (22 ms apart, the first nine).
         .opacity(arrived || reduce ? 1 : 0)
         .offset(y: arrived || reduce ? 0 : 6)
@@ -217,11 +296,14 @@ private struct LauncherItem: View {
             withAnimation(Motion.out(0.3).delay(Double(min(index, 8)) * 0.022)) { arrived = true }
         }
         // Only a moving pointer selects: the first event on arrival (the launcher opening under a still pointer) does not.
+        // Only a pointer that really moves selects. Rows scrolling under a still pointer change the row-local point, so
+        // the screen position is what is compared (that loop made scrolling jitter).
         .onContinuousHover { phase in
-            guard case .active(let p) = phase else {
+            guard case .active = phase else {
                 lastPoint = nil
                 return
             }
+            let p = NSEvent.mouseLocation
             if let last = lastPoint, last != p { hover() }
             lastPoint = p
         }
@@ -236,7 +318,17 @@ private struct LauncherItem: View {
         .accessibilityLabel([row.entry.title, row.entry.sub].compactMap { $0 }.joined(separator: ", "))
     }
 
-    private var tile: Color { row.entry.tile == .slate ? palette.uDimHover : palette.btnPrimary }
+    /// Each group has its colour, so the list reads at a glance; slate entries stay quiet.
+    private var hue: Color {
+        if row.entry.tile == .slate { return .white.opacity(0.35) }
+        if row.entry.tile == .danger { return Color(red: 1, green: 0.38, blue: 0.4) }
+        if row.entry.tile == .view { return Color(red: 0.62, green: 0.45, blue: 1) }
+        switch row.group {
+        case .recent, .topHit: return WidgetInk.blue
+        case .actions: return WidgetInk.green
+        case .goTo: return WidgetInk.orange
+        }
+    }
 
     private var title: Text {
         var out = AttributedString(row.entry.title)
@@ -244,8 +336,46 @@ private struct LauncherItem: View {
         for i in row.matched where chars.indices.contains(i) {
             let r = chars[i]..<out.characters.index(after: chars[i])
             out[r].font = .system(size: MacTextSize.headline, weight: .bold)
-            out[r].foregroundColor = palette.primary
+            out[r].foregroundColor = hue == .white.opacity(0.35) ? WidgetInk.blue : hue
         }
         return Text(out).font(.system(size: MacTextSize.headline, weight: .semibold))
+    }
+}
+
+/// ⇧⌘A's header: the pane the actions are for, its picture, title and live state, arriving with a bounce.
+private struct PaneActionsHeader: View {
+    let shell: ShellModel
+    @State private var shown = false
+    var body: some View {
+        if let id = shell.activePane ?? shell.panes.first?.id, let spec = shell.panes.first(where: { $0.id == id }) {
+            HStack(spacing: Space.s3) {
+                IconTile(spec.symbol, hue: GlassInk.blue, size: 44, bounce: shown)
+                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Actions").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                        WidgetInk.secondary)
+                    HStack(spacing: Space.s2) {
+                        Text(spec.title).font(.system(size: MacTextSize.title, weight: .bold))
+                        if let sub = spec.sub { Text(sub).foregroundStyle(WidgetInk.secondary) }
+                    }
+                }
+                Spacer(minLength: 0)
+                if let chip = spec.chip {
+                    HStack(spacing: Space.s1) {
+                        StatusDot(
+                            color: chip.tone == .fail
+                                ? GlassInk.red : chip.tone == .warn ? GlassInk.orange : GlassInk.green,
+                            live: chip.tone == .run || chip.tone == .done)
+                        Text(chip.label).font(.system(size: MacTextSize.meta, weight: .medium))
+                    }
+                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
+                    .background(GlassInk.well, in: coreShape(Radius.chip))
+                }
+            }
+            .foregroundStyle(WidgetInk.primary)
+            .padding([.horizontal, .top], Space.s4)
+            .coreRise(shown, 0)
+            .onAppear { shown = true }
+        }
     }
 }

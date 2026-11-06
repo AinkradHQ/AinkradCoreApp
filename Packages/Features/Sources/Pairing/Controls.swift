@@ -12,18 +12,14 @@ struct DialogCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(alignment: .top) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Space.s2)
-                if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
-            }
+            ModalHeader(title, close: close)
             content
         }
         .foregroundStyle(palette.text)
         .corePanel(radius: Radius.panel, padding: Space.s6)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .frame(width: width)
+        .shadow(color: .black.opacity(0.3), radius: 34, y: 14)
+        .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }
@@ -98,22 +94,55 @@ struct FactCard<Content: View>: View {
 }
 
 /// A scope as a checkbox with its plain meaning beside it (a locked scope says why instead).
+/// One scope to switch on or off: the same tappable scope tile everywhere (Add device, Edit access). A scope that cannot
+/// be given stays dim and says why.
 struct ScopeToggle: View {
     let scope: String
     @Binding var on: Bool
     var locked: String?
+    /// Its number in the list: ⌘1… switches it.
+    var index: Int?
 
     var body: some View {
-        CoreCheckbox(
-            scope, detail: locked ?? ScopeText.text(scope), isOn: $on, mono: true,
-            spoken: "\(scope), \(ScopeText.text(scope))"
-        )
+        Button {
+            on.toggle()
+        } label: {
+            ScopeTile(
+                symbol: ScopeText.symbol(scope), name: scope, detail: locked ?? ScopeText.text(scope),
+                hue: ScopeText.hue(scope), on: on)
+        }
+        .buttonStyle(.plain)
+        .modifier(TileKey(index: index))
         .disabled(locked != nil)
+        .accessibilityLabel("\(scope), \(ScopeText.text(scope))")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
 enum ScopeText {
     static let all = ["read", "approve", "terminal", "agent", "admin"]
+    /// Each scope's picture and colour, the same on every screen.
+    static func symbol(_ s: String) -> String {
+        switch s {
+        case "read": "eye"
+        case "approve": "checkmark.seal"
+        case "terminal": "terminal"
+        case "agent": "sparkles"
+        case "admin": "key"
+        case "runner": "server.rack"
+        default: "questionmark"
+        }
+    }
+    static func hue(_ s: String) -> Color {
+        switch s {
+        case "read": GlassInk.blue
+        case "approve": GlassInk.green
+        case "terminal": GlassInk.slate
+        case "agent": GlassInk.violet
+        case "admin": GlassInk.orange
+        default: GlassInk.slate
+        }
+    }
     static func text(_ s: String) -> String {
         switch s {
         case "read": "See sessions, runners, events and settings"
@@ -277,14 +306,28 @@ struct CodeBoxes: View {
                 Text(i < chars.count ? String(chars[i]) : "")
                     .font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(palette.glassCard, in: coreShape(Radius.control))
+                    .coreGlassField(fallback: palette.glassCard)
                     .overlay {
                         coreShape(Radius.control).strokeBorder(
-                            active ? palette.primary : error != nil ? palette.tone(.fail).ink : palette.glassCardEdge,
+                            active
+                                ? palette.text.opacity(0.55)
+                                : error != nil ? palette.tone(.fail).ink : palette.glassCardEdge,
                             lineWidth: active ? 2 : 1)
                     }
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// ⌘ + a tile's number, shown on the tile; none when it has no number.
+struct TileKey: ViewModifier {
+    let index: Int?
+    func body(content: Content) -> some View {
+        if let index, index < 9 {
+            content.coreTileKey("⌘\(index + 1)", key: Character("\(index + 1)"))
+        } else {
+            content
+        }
     }
 }

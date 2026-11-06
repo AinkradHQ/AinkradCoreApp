@@ -4,10 +4,24 @@ import SwiftUI
 
 public enum SettingsGroup: String, CaseIterable, Sendable {
     case mac = "Mac"
+    /// One page per app (Ahmed, 2026-11-05): its look and its defaults.
+    case apps = "Apps"
     case core = "Core"
     case security = "Security"
     case notifications = "Notifications"
     case appearance = "Appearance"
+
+    /// Each group has its colour on the nav tiles, so the list reads at a glance.
+    var hue: Color {
+        switch self {
+        case .mac: Color(red: 0.55, green: 0.6, blue: 0.7)
+        case .apps: Color(red: 0.3, green: 0.82, blue: 0.9)
+        case .core: WidgetInk.blue
+        case .security: WidgetInk.orange
+        case .notifications: Color(red: 1, green: 0.38, blue: 0.4)
+        case .appearance: Color(red: 0.62, green: 0.45, blue: 1)
+        }
+    }
 }
 
 /// `Mac.settings.section({ id, group, title, icon, order, mount })`.
@@ -34,6 +48,15 @@ public struct SettingsSection: Identifiable {
     }
 }
 
+public struct SettingsBack {
+    public let title: String
+    public let run: @MainActor () -> Void
+    public init(title: String, run: @escaping @MainActor () -> Void) {
+        self.title = title
+        self.run = run
+    }
+}
+
 @MainActor @Observable
 public final class SettingsRegistry {
     public private(set) var sections: [SettingsSection] = []
@@ -47,6 +70,8 @@ public final class SettingsRegistry {
     private(set) var direction: CGFloat = 1
     /// When a setting last changed: the header says "Saved 14:32" for a moment.
     public private(set) var savedAt: Date?
+    /// A page inside a section (one device) puts its way back here: the title bar shows it beside the section's icon.
+    public var back: SettingsBack?
     public init() {}
     public func saved() { savedAt = Date() }
     public func section(_ s: SettingsSection) {
@@ -75,7 +100,7 @@ struct SettingsView: View {
             shell.settings.sections.first { $0.id == shell.settings.selected } ?? shell.settings.sections.first
         let dir = shell.settings.direction
         HStack(alignment: .top, spacing: 0) {
-            ScrollView {
+            GlassScroll {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s2) {
                         Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
@@ -86,7 +111,8 @@ struct SettingsView: View {
                     .padding(.bottom, Space.s3)
                     ForEach(shell.settings.grouped(), id: \.0) { group, list in
                         Text(group.rawValue).font(.system(size: MacTextSize.body, weight: .semibold))
-                            .foregroundStyle(palette.text2).padding(.top, Space.s3).accessibilityAddTraits(.isHeader)
+                            .foregroundStyle(WidgetInk.secondary).padding(.top, Space.s3).accessibilityAddTraits(
+                                .isHeader)
                         ForEach(list) { s in
                             Button {
                                 shell.settings.selected = s.id
@@ -102,13 +128,34 @@ struct SettingsView: View {
                 .animation(reduce ? nil : Motion.out(0.26), value: shell.settings.selected)
             }
             .frame(width: Space.s8 * 8)
+            .background(Color.black.opacity(0.12))
             VStack(alignment: .leading, spacing: Space.s2) {
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: Space.s4) {
+                    if let back = shell.settings.back {
+                        SettingsBackTile(back: back).transition(.opacity.combined(with: .move(edge: .leading)))
+                    }
+                    if let current {
+                        // The section's own icon, large, bouncing in each time the section changes.
+                        Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .symbolEffect(.bounce, value: current.id)
+                            .contentTransition(.symbolEffect(.replace))
+                            .frame(width: 56, height: 56)
+                            .background(
+                                LinearGradient(
+                                    colors: [current.group.hue, current.group.hue.opacity(0.6)], startPoint: .top,
+                                    endPoint: .bottom),
+                                in: coreShape(Radius.control + 4)
+                            )
+                            .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                            .shadow(color: current.group.hue.opacity(0.5), radius: 12)
+                            .accessibilityHidden(true)
+                    }
                     VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                        Text(current?.title ?? "").font(.system(size: MacTextSize.large, weight: .semibold))
+                        Text(current?.title ?? "").font(.system(size: MacTextSize.large + 6, weight: .bold))
                             .accessibilityAddTraits(.isHeader)
                         if let sub = current?.sub {
-                            Text(sub).foregroundStyle(palette.text2)
+                            Text(sub).foregroundStyle(WidgetInk.secondary)
                         }
                     }
                     .id("title-\(current?.id ?? "")")
@@ -116,7 +163,7 @@ struct SettingsView: View {
                     Spacer()
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")
-                            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                            .font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary)
                             .transition(.opacity).accessibilityLabel("Saved")
                     }
                     // The close button turns a quarter on hover (Reduce Motion: no turn).
@@ -125,20 +172,28 @@ struct SettingsView: View {
                         .animation(Motion.out(Motion.ui), value: closeHover)
                         .onHover { closeHover = $0 }
                 }
-                ScrollView {
+                .padding(.trailing, Space.s6)
+                // The scroll view runs to the panel's right edge, so its glass bar sits at the edge, not over the cards.
+                GlassScroll {
                     current?.content.frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, Space.s6)
                         .id("body-\(current?.id ?? "")")
                         .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 10 * dir)))
                 }
             }
-            .padding(Space.s6)
+            .padding([.leading, .top, .bottom], Space.s6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .animation(Motion.out(reduce ? 0.16 : 0.34), value: current?.id)
             .clipped()
         }
-        .frame(width: ShellMetrics.settingsSize.width, height: ShellMetrics.settingsSize.height)
-        .corePanel(radius: Radius.panel, padding: 0)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        // Most of the screen (Ahmed, 2026-11-05: larger), on the launcher's glass: darker than a widget, frosted at
+        // night, clear by day, with white ink.
+        .foregroundStyle(WidgetInk.primary)
+        .containerRelativeFrame([.horizontal, .vertical]) { length, _ in length * 0.86 }
+        .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: coreShape(Radius.panel + Space.s1))
+        .clipShape(coreShape(Radius.panel + Space.s1))
+        .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false, frosted: !palette.isDay)
+        .shadow(color: .black.opacity(0.3), radius: 40, y: 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")
         .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.95)))
@@ -151,18 +206,27 @@ struct SettingsView: View {
     }
 
     private func navRow(_ s: SettingsSection, selected: Bool) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: s.symbol).frame(width: MacSize.controlMd).accessibilityHidden(true)
-            Text(s.title).font(.system(size: MacTextSize.headline))
+        HStack(spacing: Space.s3) {
+            Image(systemName: s.symbol).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(.white)
+                .symbolEffect(.bounce, value: selected)
+                .frame(width: MacSize.controlMd + 2, height: MacSize.controlMd + 2)
+                .background(
+                    LinearGradient(
+                        colors: [s.group.hue, s.group.hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
+                    in: coreShape(Radius.control)
+                )
+                .accessibilityHidden(true)
+            Text(s.title).font(.system(size: MacTextSize.headline, weight: selected ? .semibold : .regular))
             Spacer(minLength: 0)
         }
+        .foregroundStyle(WidgetInk.primary)
         .padding(.horizontal, Space.s2)
-        .frame(height: MacSize.controlLg)
+        .frame(height: MacSize.controlLg + Space.s1)
         // One selection that glides between rows (`s-glide`), not a background swapped per row.
         .background {
             if selected {
-                coreShape(Radius.control).fill(palette.navActive)
-                    .overlay { coreShape(Radius.control).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
+                coreShape(Radius.control).fill(.white.opacity(0.18))
+                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
                     .matchedGeometryEffect(id: "nav", in: glide)
             }
         }
@@ -357,29 +421,6 @@ private struct ThemeCard: View {
     }
 }
 
-/// Where activity shows. The bell is always there; the status bar chip is optional.
-struct ActivitySection: View {
-    @Bindable var shell: ShellModel
-    var body: some View {
-        SettingsBlock(
-            title: "Where activity shows",
-            detail: "What is running and what needs you. The bell is always there; turn on the rest as you like."
-        ) {
-            SettingsSwitchRow(
-                title: "Bell", detail: "Summary, what waits on you, runners and recent events",
-                isOn: .constant(true), locked: true)
-            SettingsSwitchRow(
-                title: "Status bar chip", detail: "“2 running · 1 waiting” next to the bell",
-                isOn: Binding(
-                    get: { shell.showActivityChip },
-                    set: {
-                        shell.showActivityChip = $0
-                        shell.settings.saved()
-                    }))
-        }
-    }
-}
-
 struct WindowSection: View {
     var body: some View {
         SettingsPage(intro: "Ainkrad always runs full screen, in its own Space. It cannot be resized or windowed.") {
@@ -416,13 +457,38 @@ extension ShellModel {
         later("notifications", .notifications, "Notifications", "bell", 0, "Notification settings")
         settings.section(
             SettingsSection(
-                id: "activity", group: .notifications, title: "Activity",
-                sub: "The bell always shows it · other places are optional", symbol: "waveform.path.ecg", order: 90
-            ) { ActivitySection(shell: self) })
-        settings.section(
-            SettingsSection(
                 id: "appearance", group: .appearance, title: "Appearance", sub: "Theme and motion",
                 symbol: "circle.lefthalf.filled"
             ) { AppearanceSection(shell: self) })
+    }
+}
+
+/// Back from a page to its list, in the title bar beside the section's icon: a glass tile whose arrow slides left and
+/// bounces on hover. ⌘← does the same.
+private struct SettingsBackTile: View {
+    let back: SettingsBack
+    @State private var hovering = false
+    var body: some View {
+        Button {
+            back.run()
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold))
+                    .offset(x: hovering ? -3 : 0)
+                    .symbolEffect(.bounce, value: hovering)
+                Text(back.title).font(.system(size: 10, weight: .medium)).lineLimit(1)
+            }
+            .foregroundStyle(WidgetInk.primary)
+            .frame(width: 72, height: 56)
+            .background(.white.opacity(hovering ? 0.16 : 0.1), in: coreShape(Radius.control + 4))
+            .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.18), lineWidth: 1) }
+            .contentShape(coreShape(Radius.control + 4))
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut(.leftArrow, modifiers: .command)
+        .scaleEffect(hovering ? 1.04 : 1)
+        .onHover { hovering = $0 }
+        .animation(.spring(duration: 0.3, bounce: 0.3), value: hovering)
+        .accessibilityLabel("Back to \(back.title)")
     }
 }

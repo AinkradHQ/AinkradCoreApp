@@ -113,6 +113,51 @@ final class FakeService: AccountsService, @unchecked Sendable {
         }
         return accountList.first { $0.id == id }!
     }
+    var loginItem = LoginItem(
+        id: "lg_1", provider: "claude-sub", label: "claude-plan", runner: "r_1", state: "open_url",
+        url: "https://claude.ai/oauth/authorize?test", reason: nil, accountID: nil)
+    func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
+        try note("startLogin \(provider) \(label)")
+        return loginItem
+    }
+    func login(_ id: String) async throws -> LoginItem { loginItem }
+    func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
+        try note("sendLoginCode \(id)")
+        return loginItem
+    }
+    func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
+    var tested = TestedItem(result: "ok", latencyMs: 300)
+    func runners() async throws -> [AccountRunner] { [] }
+    func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws {
+        try note("saveProvider \(p.id) \(p.harness) \(p.authVar) \(p.keyPrefix) \(replacing)")
+    }
+    func deleteProvider(_ id: String) async throws { try note("deleteProvider \(id)") }
+    var usageList: [UsageItem] = []
+    var costList: [CostItem] = []
+    func usage() async throws -> [UsageItem] { usageList }
+    func costs(account: Int64?) async throws -> [CostItem] { costList }
+    func prices() async throws -> [PriceItem] { [] }
+    func setPrice(_ p: PriceDraft) async throws {
+        try note("setPrice \(p.provider) \(p.model) \(p.input) \(p.output) \(p.cache)")
+    }
+    var budgetList: [BudgetItem] = []
+    func budgets() async throws -> [BudgetItem] { budgetList }
+    func setBudget(_ b: BudgetDraft) async throws {
+        try note("setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)")
+    }
+    func deleteBudget(_ id: Int64) async throws { try note("deleteBudget \(id)") }
+    func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {
+        try note("raiseBudget \(id) \(periodKey) \(tokens ?? 0) \(usdMicros ?? 0)")
+    }
+    func test(account: Int64) async throws -> TestedItem {
+        try note("test \(account)")
+        return tested
+    }
+    func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws {
+        try note(
+            "setSessionLimits \(account) \(maxTokens.map(String.init) ?? "nil") \(maxUSDMicros.map(String.init) ?? "nil")"
+        )
+    }
     func deleteAccount(_ id: Int64) async throws {
         try note("deleteAccount \(id)")
         accountList.removeAll { $0.id == id }

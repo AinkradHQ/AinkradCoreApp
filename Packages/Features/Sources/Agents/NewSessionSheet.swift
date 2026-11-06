@@ -63,15 +63,20 @@ struct NewSessionSheet: View {
             HStack(spacing: Space.s2) {
                 Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
-                Button("Cancel") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).keyboardShortcut(
-                    .cancelAction)
+                Button("Cancel") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
                 Button(busy ? "Starting…" : "Start session") { start() }
-                    .buttonStyle(.coreProminent).keyboardShortcut(.return, modifiers: .command).disabled(!ready)
+                    .buttonStyle(.coreProminent).keyboardShortcut(.return, modifiers: .command).environment(
+                        \.coreKeycap, "⌘↩"
+                    ).disabled(!ready)
                     .help("Start the session (⌘Return)")
             }
         }
         .onAppear {
             pickRunner()
+            if prompt.isEmpty, !model.draftPrompt.isEmpty {
+                prompt = model.draftPrompt
+                model.draftPrompt = ""
+            }
         }
         .task {
             // The prompt is the one thing to type here; focus it once the sheet is on screen.

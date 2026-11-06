@@ -125,17 +125,55 @@ public final class TerminalsModel {
     // MARK: launcher and bell
 
     /// Launcher entries and the bell for runner problems. Ids match the shell's own sample entries, so Demo mode keeps its own.
+    /// One Touch ID unlocks every terminal: when the session is elevated, each pane waiting on "Verify to reattach"
+    /// attaches again on its own (Ahmed, 2026-11-05).
+    private func followElevation() {
+        withObservationTracking {
+            _ = shell.elevatedUntil
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.host.isElevated {
+                    for s in self.sessions.values where s.waitsForVerify { Task { await s.attach(prompt: false) } }
+                }
+                self.followElevation()
+            }
+        }
+    }
+
     public func install() {
+        followElevation()
+        shell.settings.section(
+            SettingsSection(
+                id: "terminal", group: .apps, title: "Terminals", sub: "Look, screen, surface and defaults",
+                symbol: "terminal", order: 10
+            ) { TerminalSettingsView(model: self) })
         let l = shell.launcher
+        l.register(
+            LauncherEntry(
+                id: "settings.terminal", title: "Terminals settings", sub: "Look, screen, surface and defaults",
+                symbol: "gearshape", keywords: ["appearance", "theme", "font", "transparency", "terminal"]
+            ) { [weak self] in
+                self?.shell.settings.selected = "terminal"
+                self?.shell.open(.settings)
+            })
         l.register(
             LauncherEntry(
                 id: "terminals", title: "Terminals", sub: "Rune terminals on your runners", symbol: "terminal",
                 keywords: ["rune", "shell", "zsh", "bash"]
             ) { [weak self] in self?.openList() })
+        // Quick by default, advanced on request (Ahmed, 2026-11-05): New terminal opens one at once with the defaults;
+        // the advanced sheet picks the runner and the shell.
         l.register(
             LauncherEntry(
-                id: "new-terminal", title: "New terminal", sub: "Open a shell on a runner · needs Touch ID",
+                id: "new-terminal", title: "New terminal", sub: "Opens at once on the best runner · needs Touch ID",
                 symbol: "terminal", keywords: ["shell", "rune"], isAction: true
+            ) { [weak self] in self?.quickNew() })
+        l.register(
+            LauncherEntry(
+                id: "new-terminal-advanced", title: "New terminal (advanced)…",
+                sub: "Choose the runner and the shell", symbol: "slider.horizontal.3",
+                keywords: ["shell", "rune", "runner", "zsh", "bash"], isAction: true
             ) { [weak self] in self?.openNew() })
         l.register(
             LauncherEntry(
@@ -193,7 +231,7 @@ public final class TerminalsModel {
         shell.openPane(
             PaneSpec(
                 id: "terminals", title: "Terminals", sub: "Rune", symbol: "terminal",
-                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack")
+                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
             ) { TerminalsListView(model: self) })
         Task { await reload() }
     }
@@ -223,15 +261,64 @@ public final class TerminalsModel {
         }
         let pane = "terminal-\(id)"
         shell.openPane(
-            PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 520) {
+            PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 560) {
                 TerminalPaneView(model: self, session: session)
             })
+        shell.setPaneMenu(pane) { [weak self, weak session] in
+            guard let self, let session else { return [] }
+            return self.menu(for: session)
+        }
         paneChanged(id)
         if attach, item.status == "running" || item.status == "created", item.attached == 0 || session.isAttached {
             Task { await session.attach() }
         } else if attach, item.status == "exited" {
             Task { await session.attach() }
         }
+    }
+
+    /// A terminal pane's tab menu: what it is, then signal, detach and end, enabled by the pane's state.
+    func menu(for session: TerminalSession) -> [PaneMenuItem] {
+        let v = session.view
+        let live = v.controls == .running
+        let canEnd = v.controls == .running || v.controls == .endOnly
+        var items = [PaneMenuItem(v.info, symbol: "info.circle", enabled: false)]
+        if v.controls == .ended {
+            items.append(PaneMenuItem("Close Pane", symbol: "xmark") { [weak self] in self?.closePane(session.id) })
+            return items
+        }
+        items.append(
+            PaneMenuItem(
+                "Send Signal", symbol: "bolt", enabled: live,
+                children: TerminalSignals.all.map { name in
+                    PaneMenuItem("SIG\(name)", symbol: "bolt") { Task { _ = await session.signal(name) } }
+                }))
+        items.append(PaneMenuItem("Detach", symbol: "eject", enabled: live) { session.detach() })
+        items.append(
+            PaneMenuItem("End Terminal…", symbol: "stop.circle", destructive: true, enabled: canEnd) { [weak self] in
+                self?.confirmEnd(session)
+            })
+        return items
+    }
+
+    /// Acts on a terminal from the list: its session if this Mac has one, else one made without attaching.
+    func session(for id: String) -> TerminalSession? {
+        if sessions[id] == nil { openTerminal(id, attach: false) }
+        return sessions[id]
+    }
+
+    func confirmEnd(_ session: TerminalSession) {
+        guard TerminalPrefs.shared.confirmEnd else {
+            Task { _ = await session.end() }
+            return
+        }
+        shell.presentSheet(
+            title: "End this terminal?",
+            message:
+                "The terminal on \(session.machine) and everything running in it will stop. Closing the pane only detaches. This needs Touch ID.",
+            actions: [
+                ShellSheetAction("Keep it"),
+                ShellSheetAction("End terminal", destructive: true) { Task { _ = await session.end() } },
+            ], symbol: "stop.circle")
     }
 
     func paneChanged(_ id: String) {
@@ -272,8 +359,22 @@ public final class TerminalsModel {
 
     // MARK: new terminal
 
-    func openNew(runner: String? = nil) {
-        let m = NewTerminalModel(model: self, runner: runner)
+    /// New terminal with the defaults: the first ready runner, its login shell, opened after Touch ID with no sheet. When
+    /// nothing is ready or the Core refuses, the advanced sheet opens with the reason.
+    func quickNew() {
+        Task {
+            if runners.isEmpty { await reload() }
+            let prefs = TerminalPrefs.shared
+            let m = NewTerminalModel(model: self, runner: prefs.defaultRunner.isEmpty ? nil : prefs.defaultRunner)
+            m.program = prefs.defaultShell
+            guard m.canOpen else { return openNew(form: m) }
+            await m.submit()
+            if m.error != nil { openNew(form: m) }
+        }
+    }
+
+    func openNew(runner: String? = nil, form: NewTerminalModel? = nil) {
+        let m = form ?? NewTerminalModel(model: self, runner: runner)
         newTerminal = m
         host.clearElevationNotice()
         shell.present(
@@ -292,6 +393,10 @@ public final class TerminalsModel {
         items.insert(t, at: 0)
         openTerminal(t.id)
         await reload()
+        if TerminalPrefs.shared.openFullPane {
+            shell.activePane = "terminal-\(t.id)"
+            shell.focusedPane = "terminal-\(t.id)"
+        }
         shell.showToast("A terminal opened on \(name(of: t.runner))")
     }
 

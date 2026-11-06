@@ -8,7 +8,9 @@ enum ShortcutCatalog {
         (
             "File",
             [
-                ("Launcher…", "⌘K"), ("New Agent Session", "⌘N"), ("New Terminal", "⌘T"), ("Close Pane", "⌘W"),
+                ("Launcher…", "⌘K"), ("Actions…", "⇧⌘A"), ("Overview", "⇧⌘O"), ("Next / Previous Tab", "⌃Tab / ⌃⇧Tab"),
+                ("Rename Tab…", "⇧⌘R"), ("New Agent Session", "⌘N"), ("New Terminal", "⌘T"),
+                ("Close Pane", "⌘W"),
                 ("Reopen Closed Pane", "⇧⌘T"), ("Close All Panes", "⌥⌘W"),
             ]
         ),
@@ -133,9 +135,21 @@ public struct ShellCommands: Commands {
         }
         CommandGroup(replacing: .newItem) {
             Button("Launcher…") { shell.toggleLauncher() }.keyboardShortcut("k")
+            Button("Next Tab") { shell.cyclePane(1) }.keyboardShortcut(.tab, modifiers: .control).disabled(
+                paneCount < 2)
+            Button("Previous Tab") { shell.cyclePane(-1) }.keyboardShortcut(.tab, modifiers: [.control, .shift])
+                .disabled(paneCount < 2)
+            Button("Rename Tab…") { shell.renamingTab = shell.activePane ?? shell.panes.first?.id }
+                .keyboardShortcut("r", modifiers: [.command, .shift]).disabled(paneCount == 0)
+            Button("Overview") { shell.overviewOpen.toggle() }.keyboardShortcut("o", modifiers: [.command, .shift])
+                .disabled(paneCount == 0)
+            Button("Actions…") { shell.toggleActions() }.keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(paneCount == 0)
             Divider()
             Button("New Agent Session") { shell.launcher.entry("agents.new")?.run() }.keyboardShortcut("n")
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
+            Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
+                .keyboardShortcut("t", modifiers: [.command, .option])
         }
         CommandGroup(replacing: .saveItem) {
             Button("Close Pane") { if let id = shell.activePane { shell.dismissPane(id) } }

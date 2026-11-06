@@ -211,26 +211,32 @@ public struct WidgetLayout: Equatable, Sendable {
 
 /// Stage geometry (`widgets.js`: 150 pt cells, 14 pt gaps, origin 71 / 50), in the 1440 x 900 design stage.
 public enum DeskGrid {
-    public static let cell: CGFloat = 150
-    public static let gap: CGFloat = 14
-    public static let originX: CGFloat = 71
+    /// Side margin on the 1440 x 900 stage (Ahmed, 2026-11-05: as little empty space at the screen edges as the bottom
+    /// margin; the prototype had 71).
+    public static let originX: CGFloat = 20
     public static let originY: CGFloat = 50
-    public static var step: CGFloat { cell + gap }
+    public static let gap: CGFloat = 14
+    /// The eight columns fill the width between the side margins; the five rows fill the height under the top bar with
+    /// a 20 pt floor, so a cell is a little wider than tall.
+    public static let cellW: CGFloat = (1440 - 2 * originX - 7 * gap) / 8
+    public static let cellH: CGFloat = (900 - originY - 20 - 4 * gap) / 5
+    public static var stepX: CGFloat { cellW + gap }
+    public static var stepY: CGFloat { cellH + gap }
 
     public static func origin(_ x: Int, _ y: Int) -> CGPoint {
-        CGPoint(x: originX + CGFloat(x) * step, y: originY + CGFloat(y) * step)
+        CGPoint(x: originX + CGFloat(x) * stepX, y: originY + CGFloat(y) * stepY)
     }
 
     public static func frameSize(_ s: WidgetSize) -> CGSize {
         CGSize(
-            width: CGFloat(s.cols) * cell + CGFloat(s.cols - 1) * gap,
-            height: CGFloat(s.rows) * cell + CGFloat(s.rows - 1) * gap)
+            width: CGFloat(s.cols) * cellW + CGFloat(s.cols - 1) * gap,
+            height: CGFloat(s.rows) * cellH + CGFloat(s.rows - 1) * gap)
     }
 
     /// The cell a widget's top-left corner is nearest to, kept on the grid.
     public static func cell(at p: CGPoint, size: WidgetSize) -> (x: Int, y: Int) {
-        let x = Int(((p.x - originX) / step).rounded())
-        let y = Int(((p.y - originY) / step).rounded())
+        let x = Int(((p.x - originX) / stepX).rounded())
+        let y = Int(((p.y - originY) / stepY).rounded())
         return (
             max(0, min(WidgetLayout.cols - size.cols, x)), max(0, min(WidgetLayout.rows - size.rows, y))
         )

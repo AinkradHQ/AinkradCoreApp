@@ -2,7 +2,8 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// One terminal pane: banner, screen (or the card that stands in for it), footer. It reads the session and asks it to act.
+/// One terminal pane: banner and screen (or the card that stands in for it). Its actions (signal, detach, end) live in the
+/// pane's tab menu.
 struct TerminalPaneView: View {
     let model: TerminalsModel
     let session: TerminalSession
@@ -18,12 +19,15 @@ struct TerminalPaneView: View {
                     tone: b.tone, title: b.title, detail: b.detail, busy: b.busy,
                     actionTitle: b.action.map(PaneView.label)
                 ) { b.action.map(perform) }
-                .padding(.horizontal, Space.s2)
                 .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
             ZStack {
                 if v.screenVisible {
                     TerminalScreen(surface: session.surface).opacity(v.dim ? 0.5 : 1)
+                        // Settings, Terminal, Transparency: frost what shows through a see-through terminal.
+                        .background {
+                            if TerminalPrefs.shared.blur { Rectangle().fill(.ultraThinMaterial) }
+                        }
                         .animation(reduce ? nil : Motion.out(Motion.ui), value: v.dim)
                 } else {
                     coreShape(Radius.cardMac).fill(Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255).opacity(0.78))
@@ -51,60 +55,12 @@ struct TerminalPaneView: View {
                 }
             }
             .clipShape(coreShape(Radius.cardMac))
-            .padding(.horizontal, Space.s2)
             .accessibilityElement(children: .contain)
-            footer(v)
         }
-        .padding(.top, Space.s1)
+        // No margin of its own: the pane frame gives the same space on every side.
         .coreAnimation(Motion.out(Motion.move), value: v)
         .onDisappear { model.paneClosed(session.id) }
         .accessibilityIdentifier("terminal-pane-\(session.id)")
-    }
-
-    private func footer(_ v: PaneView) -> some View {
-        HStack(spacing: Space.s2) {
-            Text(v.info).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2).lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            switch v.controls {
-            case .ended:
-                Button("Close pane") { model.closePane(session.id) }.buttonStyle(CoreButtonStyle(.secondary))
-            case .running, .pending:
-                let off = v.controls == .pending
-                Button("Send signal") { signals.toggle() }
-                    .buttonStyle(CoreButtonStyle(.secondary)).disabled(off)
-                    .keyboardShortcut("s", modifiers: [.command, .option])
-                    .help("Send a signal to the terminal's process group (⌥⌘S)")
-                    .popover(isPresented: $signals, arrowEdge: .top) {
-                        SignalMenu(session: session) { signals = false }
-                    }
-                Button("Detach") { session.detach() }
-                    .buttonStyle(CoreButtonStyle(.secondary)).disabled(off)
-                    .keyboardShortcut("d", modifiers: [.command, .option])
-                    .help("Leave the terminal running and close this connection (⌥⌘D)")
-                endButton(off)
-            case .endOnly:
-                endButton(false)
-            }
-        }
-        .padding(.horizontal, Space.s4).padding(.bottom, Space.s3).frame(minHeight: MacSize.controlLg + Space.s2)
-    }
-
-    private func endButton(_ off: Bool) -> some View {
-        Button("End terminal") { confirmEnd() }
-            .buttonStyle(CoreButtonStyle(.danger)).disabled(off)
-            .keyboardShortcut("e", modifiers: [.command, .option])
-            .help("Stop the terminal and everything running in it (⌥⌘E)")
-    }
-
-    private func confirmEnd() {
-        model.shell.presentSheet(
-            title: "End this terminal?",
-            message:
-                "The terminal on \(session.machine) and everything running in it will stop. Closing the pane only detaches. This needs Touch ID.",
-            actions: [
-                ShellSheetAction("Keep it"),
-                ShellSheetAction("End terminal", primary: false) { Task { _ = await session.end() } },
-            ])
     }
 
     private func perform(_ a: PaneAction) {

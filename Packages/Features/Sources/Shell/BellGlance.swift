@@ -116,9 +116,9 @@ struct BellGlance: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(shell.home.coreName).font(.system(size: MacTextSize.title, weight: .semibold))
+                Text("Notifications").font(.system(size: MacTextSize.title, weight: .semibold))
                     .accessibilityAddTraits(.isHeader)
-                summary
+                summary.foregroundStyle(palette.text2)
             }
             CoreSegmented(
                 "Notification filter",
@@ -127,19 +127,16 @@ struct BellGlance: View {
                     CoreSegment(.approvals, "Approvals \(all.filter { $0.kind == .approval }.count)"),
                     CoreSegment(.alerts, "Alerts \(all.filter { $0.kind != .approval }.count)"),
                     CoreSegment(.runners, "Runners \(shell.home.machines.filter(\.online).count)"),
-                ], selection: $tab)
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    if tab == .runners { runners } else { groups }
-                }
-                .padding(.horizontal, 2)
+                ], selection: $tab, fill: true)
+            // As tall as what it holds; past the cap the list scrolls.
+            ViewThatFits(in: .vertical) {
+                list
+                ScrollView { list }
             }
         }
         .padding(Space.s4)
         .frame(width: ShellMetrics.bellWidth)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .corePanel(radius: Radius.panel, padding: 0)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .coreGlass(radius: Radius.panel, interactive: false)
         .coreAnimation(Motion.out(Motion.ui), value: all.map(\.id))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Notifications")
@@ -148,6 +145,13 @@ struct BellGlance: View {
         .offset(y: arrived ? 0 : coreMove(reduce, -10))
         .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(0.3), value: arrived)
         .onAppear { arrived = true }
+    }
+
+    private var list: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            if tab == .runners { runners } else { groups }
+        }
+        .padding(.horizontal, 2)
     }
 
     private var summary: some View {
@@ -196,13 +200,30 @@ struct BellGlance: View {
                 .rise(arrived, idx + 1, reduce)
             }
         }
-        if shown.isEmpty {
+        if shown.isEmpty { empty }
+    }
+
+    /// Nothing here: a calm picture and one line on what will show up.
+    private var empty: some View {
+        VStack(spacing: Space.s2) {
+            Image(systemName: tab == .approvals ? "checkmark.seal" : "bell")
+                .font(.system(size: MacTextSize.large * 1.6, weight: .medium))
+                .foregroundStyle(palette.primary)
+                .symbolEffect(.bounce, value: arrived)
+                .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
+                .coreGlass(radius: Radius.control, interactive: false)
+            Text(tab == .approvals ? "Nothing needs your approval" : "You're all caught up")
+                .font(.system(size: MacTextSize.body, weight: .semibold))
             Text(
                 tab == .approvals
-                    ? "Nothing is waiting for your approval." : tab == .alerts ? "No alerts." : "No notifications."
+                    ? "When an agent asks to do something, it waits here for you."
+                    : "Approvals and alerts from your Core show up here."
             )
-            .font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2).padding(Space.s2)
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Space.s4)
+        .transition(.opacity)
     }
 
     @ViewBuilder private var runners: some View {

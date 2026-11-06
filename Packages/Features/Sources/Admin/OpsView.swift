@@ -2,201 +2,307 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// Settings, Core, Ops: what the Core's metrics say, in words, and the metrics themselves.
+/// Settings, Core, Ops: how your Core is doing, in plain words. One verdict at the top, the three warnings (backup,
+/// certificate, disk) with how close each is to its limit, then the figures the Core reports about itself. It reads the
+/// metrics again every 15 seconds while shown; R reads now, M shows the raw metrics.
 struct OpsSection: View {
     let admin: AdminModel
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let model = admin.ops!
         AdminScreen(
             admin: admin, what: "Ops",
-            intro: "From the Core's own metrics. Backups, restore and export run on the host.",
-            state: model.state, empty: ("All clear", "The Core reported no metrics.", "checkmark.circle"),
+            intro: "How your Core is doing, from its own figures. Updates by itself while you look.",
+            state: model.state, empty: ("All clear", "Your Core reported no figures.", "checkmark.circle"),
             retry: { Task { await model.reload() } }
         ) {
-            VStack(alignment: .leading, spacing: Space.s5) {
-                Hero(model: model)
-                if !model.alarms.isEmpty {
-                    AdminSection(
-                        title: "Alarms",
-                        detail:
-                            "ainkrad_alarm_active. Each bar shows how close the reading is to its threshold, which is a setting."
+            VStack(alignment: .leading, spacing: Space.s4) {
+                Verdict(admin: admin, model: model)
+                let warnings = model.details(admin.registry.items)
+                if !warnings.isEmpty {
+                    GlassSection(
+                        "Warnings", sub: "Your Core warns you before these become a problem.",
+                        symbol: "exclamationmark.triangle.fill", hue: GlassInk.orange, index: 1
+                    ) {
+                        HStack(alignment: .top, spacing: Space.s3) {
+                            ForEach(warnings) { d in WarningCard(admin: admin, detail: d) }
+                        }
+                    }
+                }
+                let tiles = model.tiles.filter { OpsWords.figure[$0.name] != nil }
+                if !tiles.isEmpty {
+                    GlassSection(
+                        "Right now", sub: "What your Core reports about itself.", symbol: "waveform.path.ecg",
+                        hue: GlassInk.blue, index: 2
                     ) {
                         LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: Space.s8 * 6), spacing: Space.s3, alignment: .top)],
+                            columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 3),
                             spacing: Space.s3
                         ) {
-                            ForEach(model.details(admin.registry.items)) { d in AlarmCard(detail: d) }
+                            ForEach(tiles) { t in FigureTile(model: model, tile: t) }
                         }
                     }
                 }
-                if !model.tiles.isEmpty {
-                    AdminSection(title: "Health", detail: "Figures the Core reports about itself.") {
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: Space.s8 * 6), spacing: Space.s3, alignment: .top)],
-                            spacing: Space.s3
-                        ) {
-                            ForEach(model.tiles) { t in tile(t) }
-                        }
-                    }
-                }
-                AdminSection(
-                    title: "Lockouts",
-                    detail: "Too many failed requests lock an address for a while. They are managed under Security."
-                ) {
-                    AdminPanel {
-                        HStack {
-                            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                                Text("Lockouts live in Security").font(
-                                    .system(size: MacTextSize.headline, weight: .semibold))
-                                Text("See which addresses and devices are locked out, and clear them there.")
-                                    .foregroundStyle(palette.text2)
-                            }
-                            Spacer()
-                            Button("Open lockouts") {
-                                admin.host.shell.settings.selected = "lockouts"
-                            }
-                            .buttonStyle(.coreSecondary)
-                        }
-                    }
-                }
-                AdminSection(
-                    title: "Metrics",
-                    detail:
-                        "\(model.samples.count) samples, read \(model.readAt.map { AdminWords.time($0) } ?? "just now"). Admin only."
-                ) {
-                    HStack(spacing: Space.s3) {
-                        Button(model.showRaw ? "Hide Prometheus text" : "View Prometheus text") {
-                            model.showRaw.toggle()
-                        }
-                        .buttonStyle(.coreSecondary)
-                        Button("Refresh") { Task { await model.reload() } }.buttonStyle(.coreSecondary)
-                            .help("Read the metrics again")
-                    }
-                    if model.showRaw {
-                        ScrollView(.horizontal) {
-                            Text(model.raw).font(.system(size: MacTextSize.meta, design: .monospaced))
-                                .textSelection(.enabled).padding(Space.s3)
-                        }
-                        .frame(maxHeight: Space.s8 * 10)
-                        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-                    }
-                }
-                Text(
-                    "Backups run on the host. Restore, export and import are host commands with no button here. The Core only raises the backup age alarm above."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                RawMetrics(model: model)
+            }
+            .foregroundStyle(GlassInk.primary)
+        }
+        .task {
+            await model.reload()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                if Task.isCancelled { break }
+                await model.reload()
             }
         }
-        .task { await model.reload() }
         .accessibilityIdentifier("ops")
-    }
-
-    private func tile(_ t: MetricTile) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text(t.title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
-            Text(t.value).font(.system(size: MacTextSize.title, weight: .semibold).monospacedDigit()).lineLimit(2)
-            if let h = admin.ops?.history[t.name], h.count >= 2 { CoreSpark(h) }
-            Text(t.help).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(2)
-        }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .accessibilityElement(children: .combine)
-        .help(t.name)
     }
 }
 
-/// Core health in one line: whether any alarm is raised, and which.
-private struct Hero: View {
-    let model: OpsModel
-    @Environment(\.corePalette) private var palette
+/// Plain words for what the metrics name.
+enum OpsWords {
+    static let figure: [String: (symbol: String, hue: Color)] = [
+        "ainkrad_uptime_seconds": ("clock.fill", GlassInk.blue),
+        "ainkrad_devices_active": ("laptopcomputer.and.iphone", GlassInk.violet),
+        "ainkrad_runners": ("server.rack", GlassInk.green),
+        "ainkrad_terminals": ("terminal.fill", GlassInk.green),
+        "ainkrad_agent_sessions": ("sparkles", GlassInk.violet),
+        "ainkrad_db_size_bytes": ("cylinder.fill", GlassInk.slate),
+    ]
+
+    static let warning: [String: (title: String, symbol: String, ok: String, raised: String, fix: String)] = [
+        "backup_age": (
+            "Backup", "externaldrive.fill.badge.timemachine", "Your newest backup is recent enough.",
+            "Your newest backup is too old.", "Backups run on the Core's host. Run one there."
+        ),
+        "cert_expiry": (
+            "Certificate", "lock.shield.fill", "The certificate has plenty of time left.",
+            "The certificate runs out soon.", "Renew it on the Core's host."
+        ),
+        "disk_free": (
+            "Disk space", "internaldrive.fill", "There is enough free space for the database.",
+            "Disk space is running low.", "Free space on the Core's host."
+        ),
+    ]
+
+    /// `2 days 4 h`, `41 days`, `38%`.
+    static func reading(_ name: String, _ v: Double) -> String {
+        switch name {
+        case "backup_age": duration(v)
+        case "cert_expiry": Int(v.rounded()) == 1 ? "1 day left" : "\(Int(v.rounded())) days left"
+        case "disk_free": "\(Int(v.rounded()))% free"
+        default: v.formatted()
+        }
+    }
+
+    static func duration(_ seconds: Double) -> String {
+        let s = Int(seconds)
+        func n(_ k: Int, _ w: String) -> String { "\(k) \(w)\(k == 1 ? "" : "s")" }
+        if s >= 86_400 {
+            return s % 86_400 / 3_600 == 0 ? n(s / 86_400, "day") : "\(n(s / 86_400, "day")) \(s % 86_400 / 3_600) h"
+        }
+        if s >= 3_600 { return "\(s / 3_600) h \(s % 3_600 / 60) min" }
+        if s >= 60 { return "\(s / 60) min" }
+        return "\(s) s"
+    }
+}
+
+/// The one answer at the top: all good, or what needs a look. Refresh and the raw metrics at the top right.
+private struct Verdict: View {
+    let admin: AdminModel
+    @Bindable var model: OpsModel
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         let raised = model.alarms.filter(\.raised)
-        let quiet = model.alarms.isEmpty
-        let tone: Tone = raised.isEmpty ? .run : .warn
-        let c = palette.tone(tone)
-        HStack(alignment: .top, spacing: Space.s4) {
-            Image(systemName: raised.isEmpty ? "checkmark.circle" : "exclamationmark.triangle")
-                .font(.system(size: MacTextSize.large * 1.4)).foregroundStyle(c.ink)
-                .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 2)
-                .background(c.fill, in: coreShape(Radius.cardMac)).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s1) {
-                Text("Core health").foregroundStyle(palette.text2)
-                Text(raised.isEmpty ? (quiet ? "No alarms reported" : "All clear") : "Needs attention")
-                    .font(.system(size: MacTextSize.large, weight: .semibold))
-                Text(
-                    raised.isEmpty
-                        ? (quiet ? "The metrics name no alarm." : "No alarm is raised.")
-                        : "Raised: \(raised.map(\.name).joined(separator: ", "))."
+        let ok = raised.isEmpty
+        let hue = ok ? GlassInk.green : GlassInk.orange
+        let names = raised.map { OpsWords.warning[$0.name]?.title ?? $0.name }
+        HStack(spacing: Space.s4) {
+            Image(systemName: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 28, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 60, height: 60)
+                .background(
+                    LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
+                    in: coreShape(14)
                 )
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                .overlay { coreShape(14).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                .shadow(color: hue.opacity(0.55), radius: 14)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.pulse, options: .repeating, isActive: !ok && !reduce)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(ok ? "Your Core is doing well" : "\(names.joined(separator: " and ")) needs a look")
+                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(
+                    ok
+                        ? "Nothing needs you. Last read \(model.readAt.map { AdminWords.time($0) } ?? "just now")."
+                        : raised.compactMap { OpsWords.warning[$0.name]?.fix }.joined(separator: " ")
+                )
+                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Space.s3)
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                Task { await model.reload() }
+            }
+            .keyboardShortcut("r", modifiers: [])
         }
-        .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .background(c.fill, in: coreShape(Radius.cardMac))
-        .accessibilityElement(children: .combine)
+        .padding(Space.s4)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .animation(.smooth(duration: 0.4), value: ok)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ops-health")
     }
 }
 
-private struct AlarmCard: View {
+/// One warning: what it watches, the reading as people say it, a bar to the point where it warns, and a tile that opens
+/// the limit in Core settings.
+private struct WarningCard: View {
+    let admin: AdminModel
     let detail: AlarmDetail
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let a = detail.alarm
-        VStack(alignment: .leading, spacing: Space.s2) {
-            HStack {
-                Text(a.name).font(.system(size: MacTextSize.headline, weight: .semibold, design: .monospaced))
-                    .lineLimit(1)
-                Spacer(minLength: Space.s2)
-                if a.raised {
-                    StateBadge("Raised", tone: .warn, symbol: "exclamationmark.triangle")
-                } else {
-                    StateBadge("Clear", tone: .run, symbol: "checkmark")
+        let w = OpsWords.warning[a.name]
+        let hue = a.raised ? GlassInk.orange : GlassInk.green
+        VStack(alignment: .leading, spacing: Space.s3) {
+            HStack(spacing: Space.s3) {
+                IconTile(w?.symbol ?? "bell.fill", hue: hue, size: 36, bounce: a.raised)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(w?.title ?? a.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Label(
+                        a.raised ? "Needs a look" : "Fine",
+                        systemImage: a.raised ? "exclamationmark.circle.fill" : "checkmark.circle.fill"
+                    )
+                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
                 }
+                Spacer(minLength: 0)
             }
-            if let text = detail.readingText {
-                Text(text).font(.system(size: MacTextSize.large, weight: .semibold).monospacedDigit())
-                if let r = detail.reading, let l = detail.limit {
-                    Gauge(reading: r, limit: l, raised: a.raised)
-                    Text("limit \(detail.limitText ?? "") (\(detail.setting ?? ""))")
-                        .font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
-                        .lineLimit(2).truncationMode(.middle)
+            if let r = detail.reading {
+                Text(OpsWords.reading(a.name, r)).font(
+                    .system(size: MacTextSize.large, weight: .bold, design: .rounded)
+                )
+                .contentTransition(.numericText())
+                if let l = detail.limit { Meter(reading: r, limit: l, hue: hue) }
+            }
+            Text(a.raised ? (w?.raised ?? "Raised.") : (w?.ok ?? "Clear."))
+                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            if let key = detail.setting, let item = admin.registry.item(key) {
+                let limit = SettingWords.value(item, item.value)
+                AppActionTile(title: "Warns at \(limit)", symbol: "slider.horizontal.3", key: "", hue: GlassInk.slate) {
+                    admin.registry.cursor = key
+                    admin.host.shell.settings.selected = "core"
                 }
+                .help("Change this limit in Core settings (\(key))")
             }
         }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(a.raised ? GlassInk.orange.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay {
-            if a.raised { coreShape(Radius.cardMac).strokeBorder(palette.tone(.warn).ink.opacity(0.6), lineWidth: 1) }
+            coreShape(Radius.cardMac).strokeBorder(
+                a.raised ? GlassInk.orange.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
         }
+        .shadow(color: GlassInk.orange.opacity(a.raised ? 0.25 : 0), radius: 12)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A reading against its threshold: a filled track and a tick at the limit.
-private struct Gauge: View {
+/// A reading against the point where it warns: a glowing fill and a tick at the limit.
+private struct Meter: View {
     let reading: Double
     let limit: Double
-    let raised: Bool
-    @Environment(\.corePalette) private var palette
+    let hue: Color
     var body: some View {
         let top = max(reading, limit, 1) * 1.25
         GeometryReader { g in
             ZStack(alignment: .leading) {
-                coreShape(Space.s1 / 2).fill(palette.track)
-                coreShape(Space.s1 / 2).fill(raised ? palette.tone(.warn).ink : palette.primary)
-                    .frame(width: g.size.width * reading / top)
-                coreShape(1).fill(palette.text).frame(width: 2, height: Space.s3).offset(
-                    x: g.size.width * limit / top - 1)  // grid: ok tick
+                coreShape(3).fill(GlassInk.track.opacity(0.6)).frame(height: 6)
+                coreShape(3).fill(
+                    LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
+                )
+                .frame(width: max(g.size.width * reading / top, 6), height: 6)
+                .shadow(color: hue.opacity(0.6), radius: 6)
+                coreShape(1).fill(.white).frame(width: 2, height: 14)
+                    .offset(x: g.size.width * limit / top - 1)  // grid: ok tick
+            }
+            .frame(height: 14)
+        }
+        .frame(height: 14)
+        .animation(.smooth(duration: 0.5), value: reading)
+        .accessibilityHidden(true)
+    }
+}
+
+/// One figure: a glyph in its colour, the value, its name, and a line of its last readings when there are some.
+private struct FigureTile: View {
+    let model: OpsModel
+    let tile: MetricTile
+
+    var body: some View {
+        let look = OpsWords.figure[tile.name] ?? ("number", GlassInk.slate)
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                IconTile(look.symbol, hue: look.hue, size: 28)
+                Text(tile.title).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(
+                    GlassInk.secondary)
+                Spacer(minLength: 0)
+            }
+            Text(value).font(.system(size: MacTextSize.large, weight: .bold, design: .rounded)).lineLimit(1)
+                .minimumScaleFactor(0.7).contentTransition(.numericText())
+            if let h = model.history[tile.name], h.count >= 2 { CoreSpark(h).frame(height: 24) }
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .help(tile.help.isEmpty ? tile.name : tile.help)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// One figure, or the non-zero parts of a split one, number first: `3 apps · 2 runners`, `2 connected`.
+    private var value: String {
+        let rows = model.samples.filter { $0.name == tile.name }
+        guard rows.count > 1 || !(rows.first?.labels.isEmpty ?? true) else {
+            return tile.name == "ainkrad_uptime_seconds"
+                ? OpsWords.duration(rows.first?.value ?? 0) : tile.value
+        }
+        let parts = rows.filter { $0.value != 0 }.map { r -> String in
+            let n = Int(r.value.rounded())
+            let (key, word) = r.labels.sorted { $0.key < $1.key }.first ?? ("", "")
+            return "\(n) \(key == "kind" && n != 1 ? word + "s" : word)"
+        }
+        return parts.isEmpty ? "None" : parts.joined(separator: " · ")
+    }
+}
+
+/// The metrics as the Core sends them, folded away; M opens them.
+private struct RawMetrics: View {
+    @Bindable var model: OpsModel
+
+    var body: some View {
+        GlassSection(
+            "Raw metrics", sub: "\(model.samples.count) figures in Prometheus text, for tools and debugging.",
+            symbol: "chevron.left.forwardslash.chevron.right", hue: GlassInk.slate, index: 3
+        ) {
+            AppActionTile(
+                title: model.showRaw ? "Hide" : "Show", symbol: model.showRaw ? "eye.slash" : "eye", key: "M",
+                hue: GlassInk.slate
+            ) {
+                model.showRaw.toggle()
+            }
+            .keyboardShortcut("m", modifiers: [])
+        } content: {
+            if model.showRaw {
+                ScrollView(.horizontal) {
+                    Text(model.raw).font(.system(size: MacTextSize.meta, design: .monospaced))
+                        .textSelection(.enabled).padding(Space.s3)
+                }
+                .frame(maxHeight: Space.s8 * 10)
+                .background(GlassInk.well, in: coreShape(Radius.control + 2))
+                .transition(.opacity)
             }
         }
-        .frame(height: Space.s3)
-        .accessibilityHidden(true)
+        .animation(.smooth(duration: 0.3), value: model.showRaw)
     }
 }

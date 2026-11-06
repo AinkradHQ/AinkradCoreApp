@@ -13,13 +13,16 @@ struct DeskWidget: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var hovering = false
 
-    private var radius: CGFloat { 20 }
+    /// Apple widget corners: large and soft.
+    private var radius: CGFloat { 26 }
 
     var body: some View {
         let size = DeskGrid.frameSize(item.size)
         ZStack(alignment: .topLeading) {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
-                .padding(14).padding(.top, editing ? 30 : 0)
+                // White ink on clear glass: a soft shadow keeps it readable over bright clouds (stronger by day).
+                .shadow(color: .black.opacity(palette.isDay ? 0.35 : 0.25), radius: 3, y: 1)
+                .padding(18).padding(.top, editing ? 30 : 0)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
@@ -28,14 +31,12 @@ struct DeskWidget: View {
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipShape(coreShape(radius))
-        .coreGlass(radius: radius, interactive: false)
-        .overlay { coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)) }
-        .overlay { coreShape(radius).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        // Apple's Liquid Glass draws its own edge and light; no extra stroke or ring on top.
+        .coreGlass(radius: radius, interactive: false, tinted: false)
         .overlay {
-            coreShape(radius).inset(by: -Space.s1 / 2).strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2)
-                .opacity(focus.wrappedValue == item.id ? 1 : 0).allowsHitTesting(false)
+            coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)).allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(lifting ? 0.42 : 0.28), radius: lifting ? 35 : 22, y: lifting ? 17 : 9)
+        .shadow(color: .black.opacity(lifting ? 0.35 : 0.12), radius: lifting ? 30 : 14, y: lifting ? 14 : 4)
         .scaleEffect(lifting && !reduce ? 1.025 : 1)
         .animation(.easeOut(duration: 0.2), value: lifting)
         .animation(.easeOut(duration: 0.24), value: hovering)

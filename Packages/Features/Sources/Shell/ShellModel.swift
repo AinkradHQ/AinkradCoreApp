@@ -40,6 +40,29 @@ public struct PaneSpec: Identifiable {
     }
 }
 
+/// One action in a pane's tab menu (the pane itself has no head or footer).
+public struct PaneMenuItem: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let symbol: String
+    public let destructive: Bool
+    public let enabled: Bool
+    /// Items in a submenu (Send signal ▸ INT, TERM…); empty for a plain action.
+    public let children: [PaneMenuItem]
+    public let run: @MainActor () -> Void
+    public init(
+        _ title: String, symbol: String, destructive: Bool = false, enabled: Bool = true,
+        children: [PaneMenuItem] = [], run: @escaping @MainActor () -> Void = {}
+    ) {
+        self.title = title
+        self.symbol = symbol
+        self.destructive = destructive
+        self.enabled = enabled
+        self.children = children
+        self.run = run
+    }
+}
+
 public struct ShellSheetAction: Identifiable {
     public let id = UUID()
     public let label: String
@@ -63,6 +86,7 @@ public struct ShellSheet: Identifiable {
     public let title: String
     public let message: String
     public let actions: [ShellSheetAction]
+    public var symbol: String?
 }
 
 public enum ShellSurface: Sendable { case home, workspace }
@@ -113,6 +137,17 @@ public final class ShellModel {
     /// The pane the keyboard acts on (⌃⌥← / →, ⌘W).
     public var activePane: String?
     public var launcherOpen = false
+    /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
+    public var actionsOpen = false
+    /// ⇧⌘O: every open app as a card to pick from.
+    public var overviewOpen = false
+    /// Names the person gave tabs, by pane id; the tab being renamed in place.
+    /// Kept on this Mac across launches (pane ids are stable: terminal-<id>, agents, runners…).
+    public var tabNames: [String: String] = [:] {
+        didSet { defaults.set(tabNames, forKey: Self.tabNamesKey) }
+    }
+    static let tabNamesKey = "ainkrad.core.tab.names"
+    public var renamingTab: String?
     public var bellOpen = false
     public var overlay: ShellOverlay?
     public var toast: ToastItem?
@@ -172,13 +207,14 @@ public final class ShellModel {
     public var theme: ThemeChoice = ThemeChoice.stored() {
         didSet {
             UserDefaults.standard.set(theme.rawValue, forKey: ThemeChoice.key)
-            NSApp.appearance = theme.appearance
+            NSApp?.appearance = theme.appearance
         }
     }
 
     public init(defaults: UserDefaults = .coreStore()) {
         self.defaults = defaults
         profile = UserProfile(defaults: defaults)
+        tabNames = defaults.dictionary(forKey: Self.tabNamesKey) as? [String: String] ?? [:]
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
         showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
@@ -275,6 +311,10 @@ public final class ShellModel {
             activePane = nil
         }
     }
+
+    /// A pane's own actions, read each time its tab menu opens (so they follow the pane's state).
+    public private(set) var paneMenus: [String: @MainActor () -> [PaneMenuItem]] = [:]
+    public func setPaneMenu(_ id: String, _ items: @escaping @MainActor () -> [PaneMenuItem]) { paneMenus[id] = items }
 
     public func updatePane(_ id: String, title: String? = nil, sub: String?? = nil, chip: PaneChip?? = nil) {
         guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
@@ -374,6 +414,10 @@ public final class ShellModel {
             elevationPanelOpen = false
         } else if launcherOpen {
             launcherOpen = false
+        } else if actionsOpen {
+            actionsOpen = false
+        } else if overviewOpen {
+            overviewOpen = false
         } else if bellOpen {
             bellOpen = false
         } else if overlay != nil {
@@ -420,8 +464,17 @@ public final class ShellModel {
         toast = ToastItem(message, kind: kind, undo: undo)
     }
 
-    public func presentSheet(title: String, message: String, actions: [ShellSheetAction]) {
-        sheet = ShellSheet(title: title, message: message, actions: actions)
+    public func presentSheet(title: String, message: String, actions: [ShellSheetAction], symbol: String? = nil) {
+        sheet = ShellSheet(title: title, message: message, actions: actions, symbol: symbol)
+    }
+
+    /// Forget this Core: every preference this Mac kept goes back to a fresh install (name, Home widgets, theme).
+    public func resetToFresh() {
+        profile.set("")
+        widgets = .standard()
+        defaults.removeObject(forKey: Self.layoutKey)
+        theme = .system
+        tabNames = [:]
     }
 
     // MARK: widgets

@@ -48,7 +48,11 @@ enum LivePairing {
         open.click()
 
         XCTAssertTrue(app.buttons["Show workspace"].waitForExistence(timeout: 30), "the desktop opens")
-        XCTAssertTrue(app.buttons["Home Core, connected"].waitForExistence(timeout: 30), "the status cluster is live")
+        // Live, the bar names no Core state: "Connecting" goes away once the link is up.
+        let connecting = app.buttons["Home Core, connecting"]
+        XCTAssertTrue(
+            connecting.waitForNonExistence(timeout: 30) && !app.buttons["Home Core, offline"].exists,
+            "the status cluster is live")
 
     }
 }

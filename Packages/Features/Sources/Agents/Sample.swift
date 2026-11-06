@@ -159,6 +159,9 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         return try await session(id)
     }
 
+    public var ledgerList: [String: SessionLedger] = [:]
+    public func ledger(_ session: String) async throws -> SessionLedger? { ledgerList[session] }
+
     public func events() -> AsyncStream<AgentFeed> {
         AsyncStream { c in
             lock.withLock { feed = c }
@@ -244,6 +247,9 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                 .assistant("Ready to push the branch. That leaves this machine, so I need your approval."),
                 ask("req_push", "Bash", "git push -u origin feat/e2-14-citadel-bootstrap"),
             ], endsAt: ago(8))
+        api.ledgerList[a1.id] = SessionLedger(
+            costMicros: 3_910_000, tokens: 413_700, unpriced: false, account: "claude-api-metered",
+            maxUSDMicros: 5_000_000, maxTokens: 2_000_000)
         let a2 = session(2, "claude", "d_ora", .running, age: 27 * 60, tin: 121_800, tout: 30_200, cost: 870_000)
         api.add(
             a2,

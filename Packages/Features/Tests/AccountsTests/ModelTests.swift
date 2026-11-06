@@ -31,6 +31,118 @@ struct ModelTests {
         #expect(m.bindings(of: m.pools[1]).map(\.agent) == ["atlas"])
     }
 
+    @Test func testingAKeyNeedsNoTouchIDAndSaysWhyWhenRefused() async {
+        let (m, svc, host) = await make()
+        await m.test(m.account(1)!)
+        #expect(svc.log.contains("test 1"))
+        #expect(host.reasons.isEmpty)
+        #expect(m.testing == nil && m.testNote[1] == nil)
+        svc.failure = CoreError.http(status: 409, code: "no_runner", message: "none")
+        await m.test(m.account(1)!)
+        #expect(m.testNote[1]?.hasPrefix("No runner is online") == true)
+    }
+
+    @Test func sessionLimitsGoBehindTouchIDAndClearWithNil() async {
+        let (m, svc, host) = await make()
+        #expect(await m.setLimits(m.account(1)!, tokens: 500_000, usdMicros: nil))
+        #expect(svc.log.contains("setSessionLimits 1 500000 nil"))
+        #expect(host.reasons.count == 1)
+        #expect(LimitWords.usd(2_500_000) == "$2.50")
+        #expect(LimitWords.tokens(nil) == "no token limit")
+    }
+
+    @Test func anExpiredSignInEndsInsteadOfWaitingForever() async {
+        let (m, svc, _) = await make()
+        svc.loginItem = LoginItem(
+            id: "lg", provider: "claude-sub", label: "plan", runner: "r", state: "expired", url: nil, reason: "expired",
+            accountID: nil)
+        await m.startSignIn(provider: "claude-sub", label: "plan")
+        guard case .failed(let why)? = m.signIn?.stage else {
+            Issue.record("still \(String(describing: m.signIn?.stage))")
+            return
+        }
+        #expect(why.hasPrefix("Nothing happened for 10 minutes"))
+    }
+
+    @Test func budgetStandingCountsWhatWasRaisedAndTheHardStop() {
+        func b(
+            cap: Int64, usd: Int64?, spent: Int64, usdSpent: Int64, raised: Int64 = 0, stop: Bool = true,
+            ex: Bool = false
+        )
+            -> BudgetItem
+        {
+            BudgetItem(
+                id: 1, kind: "account", subject: "1", company: nil, period: "day", periodKey: "2026-11-06",
+                tokenCap: cap, usdCap: usd, spent: spent, usdSpent: usdSpent, held: 0, raised: raised, raisedUSD: 0,
+                warnAt: 80, hardStop: stop, exhausted: ex)
+        }
+        #expect(b(cap: 100, usd: nil, spent: 10, usdSpent: 0).standing == .fine)
+        #expect(b(cap: 100, usd: nil, spent: 85, usdSpent: 0).standing == .warning)
+        #expect(b(cap: 100, usd: nil, spent: 100, usdSpent: 0, raised: 100).standing == .fine)
+        #expect(b(cap: 0, usd: 10, spent: 999, usdSpent: 10, ex: true).standing == .stopped)
+        #expect(b(cap: 0, usd: 10, spent: 0, usdSpent: 10, stop: false, ex: true).standing == .over)
+        #expect(b(cap: 0, usd: 10, spent: 999, usdSpent: 1).tokenShare == nil)
+    }
+
+    @Test func raisingABudgetNamesItsPeriodAndAsksForTouchID() async {
+        let (m, svc, host) = await make()
+        let budget = BudgetItem(
+            id: 7, kind: "account", subject: "1", company: nil, period: "day", periodKey: "2026-11-06", tokenCap: 0,
+            usdCap: 1_000_000, spent: 0, usdSpent: 1_000_000, held: 0, raised: 0, raisedUSD: 0, warnAt: 80,
+            hardStop: true, exhausted: true)
+        #expect(m.budgetName(budget) == "claude-main")
+        #expect(await m.raiseBudget(budget, tokens: nil, usdMicros: 500_000))
+        #expect(svc.log.contains("raiseBudget 7 2026-11-06 0 500000"))
+        #expect(host.reasons.count == 1)
+    }
+
+    @Test func modelIdsMustBeExactAndUnpricedTokensAreCounted() async {
+        #expect(CostWords.modelIssue("claude-sonnet-4-5") == nil)
+        #expect(CostWords.modelIssue("claude-latest-latest") != nil)
+        #expect(CostWords.modelIssue("x/y:online") != nil)
+        #expect(CostWords.modelIssue("two words") != nil)
+        let (m, svc, host) = await make()
+        svc.costList = [
+            CostItem(
+                id: 1, at: Date(), accountID: 1, provider: "anthropic", model: "m", session: "s", input: 10, output: 5,
+                cache: 0, costMicros: nil, basis: "unpriced", approximate: false),
+            CostItem(
+                id: 2, at: Date(), accountID: 1, provider: "anthropic", model: "m", session: "s", input: 100, output: 0,
+                cache: 0, costMicros: 9, basis: "list_price", approximate: false),
+        ]
+        await m.reloadCosts()
+        #expect(m.costsLoad == .ready && m.unpricedTokens == 15)
+        #expect(
+            await m.savePrice(
+                PriceDraft(provider: "anthropic", model: "m", input: 3, output: 15, cache: 0, pricedAt: Date())))
+        #expect(svc.log.contains("setPrice anthropic m 3 15 0"))
+        #expect(host.reasons.count == 1)
+    }
+
+    @Test func providerRulesMatchCores() async {
+        #expect(ProviderRules.id(from: "OpenRouter EU") == "openrouter-eu")
+        #expect(ProviderRules.id(from: "42 Labs") == "labs")
+        #expect(ProviderRules.urlIssue("https://openrouter.ai/api") == nil)
+        #expect(ProviderRules.urlIssue("https://openrouter.ai:443/api") == nil)
+        #expect(ProviderRules.urlIssue("http://openrouter.ai") != nil)
+        #expect(ProviderRules.urlIssue("https://openrouter.ai:8443") != nil)
+        #expect(ProviderRules.urlIssue("https://10.0.0.1") != nil)
+        #expect(ProviderRules.urlIssue("https://xn--e1afmkfd.xn--p1ai") != nil)
+        #expect(ProviderRules.urlIssue("https://localhost") != nil)
+        #expect(ProviderRules.urlIssue("https://user@openrouter.ai") != nil)
+        #expect(ProviderRules.prefixIssue("sk-or-v1-") == nil)
+        #expect(ProviderRules.prefixIssue("sk-") != nil)
+        #expect(ProviderRules.testPathIssue("/key") == nil)
+        #expect(ProviderRules.testPathIssue("/../x") != nil)
+        let (m, svc, host) = await make()
+        let d = ProviderDraft(
+            id: "openrouter", name: "OpenRouter", harness: "codex", baseURL: "https://openrouter.ai/api",
+            keyPrefix: "sk-or-v1-", testPath: nil, models: [])
+        #expect(await m.saveProvider(d, replacing: false))
+        #expect(svc.log.contains("saveProvider openrouter codex OPENAI_API_KEY sk-or-v1- false"))
+        #expect(host.reasons.count == 1)
+    }
+
     @Test func stateWordsKeepUnknownRawAndNeverAlarm() {
         #expect(AccountPhase("active").label == "Ready")
         #expect(AccountPhase("weird").label == "weird")

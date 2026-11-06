@@ -36,11 +36,12 @@ final class TerminalsLiveUITests: XCTestCase {
         defer { app.terminate() }
         try LivePairing.pair(app, env: env)
 
-        // ⌘K, "new terminal", Return: the sheet lists the runner; Open terminal.
+        // ⌘K, "new terminal advanced", Return: the advanced sheet lists the runner; Open terminal. (Plain New terminal
+        // opens one at once with the defaults.)
         app.typeKey("k", modifierFlags: .command)
         let launcher = app.textFields["Launcher"]
         XCTAssertTrue(launcher.waitForExistence(timeout: 10))
-        launcher.typeText("new terminal")
+        launcher.typeText("new terminal advanced")
         launcher.typeKey(.return, modifierFlags: [])
         let open = app.buttons["Open terminal"]
         XCTAssertTrue(open.waitForExistence(timeout: 10), "the New terminal sheet opens")
@@ -58,8 +59,10 @@ final class TerminalsLiveUITests: XCTestCase {
         screen.typeText("echo live-$((40+2))-ok\n")
         waitForScreen(containing: "live-42-ok", "the echo came back")
 
-        // Detach: the terminal keeps running and says so.
-        app.buttons["Detach"].click()
+        // Detach from the pane's tab menu: the terminal keeps running and says so.
+        // ⇧⌘A lists the pane's actions; type and Return.
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        app.textFields["Launcher"].typeText("detach\n")
         XCTAssertTrue(element("Still running").waitForExistence(timeout: 10), "detached: still running, not attached")
         XCTAssertTrue(app.buttons["Attach here"].exists || app.buttons["Attach"].exists)
 
@@ -71,9 +74,10 @@ final class TerminalsLiveUITests: XCTestCase {
         screen.typeText("echo again-$((50+5))-ok\n")
         waitForScreen(containing: "again-55-ok", "typing works after reattach")
 
-        // End it: confirm, then the pane says it ended.
-        app.buttons["End terminal"].click()
-        let confirm = app.buttons.matching(NSPredicate(format: "label == 'End terminal'")).element(boundBy: 1)
+        // End it from the tab menu: confirm, then the pane says it ended.
+        app.typeKey("a", modifierFlags: [.command, .shift])
+        app.textFields["Launcher"].typeText("end terminal\n")
+        let confirm = app.buttons["End terminal"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10), "the confirm sheet asks")
         confirm.click()
         // The Core drops an ended terminal's output at once when a client closes it ("reaped"): the pane says so.

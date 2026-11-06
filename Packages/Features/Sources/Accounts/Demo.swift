@@ -1,5 +1,6 @@
 #if DEBUG
 import Admin
+import AppKit
 import CoreKit
 import Foundation
 import Shell
@@ -31,17 +32,31 @@ public final class AccountsDemo {
                 p(
                     "google", "Gemini API", "agy", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com",
                     [("gemini-pro", 1_250_000, 10_000_000)]),
+                ProviderItem(
+                    id: "openrouter", name: "OpenRouter", harness: "claude", authVar: "ANTHROPIC_API_KEY",
+                    baseURL: "https://openrouter.ai/api", delivery: ["gateway"], loginMethods: ["paste"],
+                    models: [
+                        ModelPriceItem(
+                            id: "anthropic/claude-sonnet-4.5", inputMicro: 3_000_000, outputMicro: 15_000_000)
+                    ], pricedAt: "2026-11-05", builtin: false, keyPrefix: "sk-or-v1-", testPath: "/key"),
+                ProviderItem(
+                    id: "claude-sub", name: "Claude subscription", harness: "claude",
+                    authVar: "CLAUDE_CODE_OAUTH_TOKEN",
+                    baseURL: "https://api.anthropic.com", delivery: ["env"], loginMethods: ["browser_code"], models: [],
+                    pricedAt: nil, builtin: true),
             ]
         }
         lazy var accountList: [AccountItem] = [
-            a(1, "claude-api-metered", "anthropic", "active", "x9Lm", 4, used: 7_200),
+            a(
+                1, "claude-api-metered", "anthropic", "active", "x9Lm", 4, used: 7_200, test: (10_800, "ok"),
+                limits: (2_000_000, 5_000_000)),
             a(
                 2, "claude-api-batch", "anthropic", "cooling", "k2Tq", 4, used: 1_100,
                 reason: "Rate limit from the provider", until: 2_460),
-            a(3, "codex-api", "openai", "active", "b2Rt", 0, used: 660),
+            a(3, "codex-api", "openai", "active", "b2Rt", 0, used: 660, test: (240, "auth_failed")),
             a(
                 4, "codex-api-ci", "openai", "unhealthy", "r7Vd", 2, used: 86_400,
-                reason: "The provider refused the key"),
+                reason: "The provider refused the key", test: (3_600, "auth_failed")),
             a(5, "gemini-key", "google", "active", "Qp0s", 4, used: 10_800),
             a(
                 6, "gemini-spare", "google", "disabled", "d1Zn", 4, used: 777_600,
@@ -49,13 +64,16 @@ public final class AccountsDemo {
         ]
         func a(
             _ id: Int64, _ label: String, _ provider: String, _ state: String, _ tail: String, _ cap: Int64,
-            used: TimeInterval, reason: String? = nil, until: TimeInterval? = nil
+            used: TimeInterval, reason: String? = nil, until: TimeInterval? = nil,
+            test: (TimeInterval, String)? = nil, limits: (Int64?, Int64?) = (nil, nil)
         ) -> AccountItem {
             AccountItem(
                 id: id, provider: provider, label: label, maskedTail: tail, baseURL: "https://api.example.com",
                 state: state,
                 stateReason: reason, stateUntil: until.map { now.addingTimeInterval($0) }, cap: cap,
-                lastUsedAt: now.addingTimeInterval(-used), createdAt: now.addingTimeInterval(-9_000_000))
+                lastUsedAt: now.addingTimeInterval(-used), createdAt: now.addingTimeInterval(-9_000_000),
+                lastTest: test.map { (now.addingTimeInterval(-$0.0), $0.1) }, maxTokens: limits.0,
+                maxUSDMicros: limits.1)
         }
         var poolList = [
             PoolItem(id: 1, name: "Default", provider: "anthropic", isDefault: true, members: [1, 2]),
@@ -122,9 +140,183 @@ public final class AccountsDemo {
             let new = AccountItem(
                 id: old.id, provider: old.provider, label: label, maskedTail: old.maskedTail, baseURL: old.baseURL,
                 state: state, stateReason: nil, stateUntil: nil, cap: cap, lastUsedAt: old.lastUsedAt,
-                createdAt: old.createdAt)
+                createdAt: old.createdAt, lastTest: old.lastTest, maxTokens: old.maxTokens,
+                maxUSDMicros: old.maxUSDMicros)
             accountList = accountList.map { $0.id == id ? new : $0 }
             return new
+        }
+        // A stand-in sign-in: the URL comes after a beat, the code takes another, then a new account appears.
+        var loginStart: Date?
+        var codeAt: Date?
+        var loginLabel = "claude-plan"
+        var loginFails = false
+        func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
+            if loginFails { throw CoreError.http(status: 409, code: "no_runner", message: "no runner can sign in") }
+            loginStart = Date()
+            codeAt = nil
+            loginLabel = label
+            return try await login("lg_demo")
+        }
+        func login(_ id: String) async throws -> LoginItem {
+            let t = Date()
+            var state = "starting"
+            var account: Int64?
+            if let c = codeAt {
+                state = t.timeIntervalSince(c) > 1.5 ? "done" : "storing"
+                if state == "done" {
+                    if !accountList.contains(where: { $0.label == loginLabel }) {
+                        accountList.append(a(7, loginLabel, "claude-sub", "active", "oat1", 1, used: 0))
+                    }
+                    account = 7
+                }
+            } else if let s = loginStart, t.timeIntervalSince(s) > 1.2 {
+                state = "open_url"
+            }
+            return LoginItem(
+                id: id, provider: "claude-sub", label: loginLabel, runner: "linux-01", state: state,
+                url: state == "open_url" ? "https://claude.ai/login" : nil, reason: nil,
+                accountID: account)
+        }
+        func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
+            codeAt = Date()
+            return try await login(id)
+        }
+        func cancelLogin(_ id: String) async throws { loginStart = nil }
+        func b(
+            _ id: Int64, _ kind: String, _ subject: String, _ period: String, cap: Int64, usd: Int64?, spent: Int64,
+            usdSpent: Int64, stop: Bool = true, held: Int64 = 0
+        ) -> BudgetItem {
+            let ex = (cap > 0 && spent >= cap) || (usd.map { usdSpent >= $0 } ?? false)
+            return BudgetItem(
+                id: id, kind: kind, subject: subject, company: nil, period: period,
+                periodKey: period == "day" ? "2026-11-06" : period == "month" ? "2026-11" : "total", tokenCap: cap,
+                usdCap: usd, spent: spent, usdSpent: usdSpent, held: held, raised: 0, raisedUSD: 0, warnAt: 80,
+                hardStop: stop, exhausted: ex)
+        }
+        lazy var budgetList: [BudgetItem] = [
+            b(1, "account", "1", "day", cap: 0, usd: 25_000_000, spent: 210_000, usdSpent: 1_240_000),
+            b(2, "account", "3", "day", cap: 0, usd: 20_000_000, spent: 1_240_000, usdSpent: 20_000_000),
+            b(3, "pool", "2", "month", cap: 80_000_000, usd: 400_000_000, spent: 52_000_000, usdSpent: 182_000_000),
+            b(4, "agent", "atlas", "week", cap: 12_000_000, usd: nil, spent: 10_400_000, usdSpent: 0, held: 320_000),
+            b(
+                5, "project", "kan-ainkrad", "month", cap: 40_000_000, usd: 150_000_000, spent: 9_100_000,
+                usdSpent: 31_000_000, stop: false),
+        ]
+        func budgets() async throws -> [BudgetItem] { budgetList }
+        func setBudget(_ d: BudgetDraft) async throws {
+            budgetList.removeAll { $0.kind == d.kind && $0.subject == d.subject && $0.period == d.period }
+            budgetList.append(
+                b(
+                    Int64(budgetList.count + 10), d.kind, d.subject, d.period, cap: d.tokenCap, usd: d.usdCap, spent: 0,
+                    usdSpent: 0, stop: d.hardStop))
+        }
+        func deleteBudget(_ id: Int64) async throws { budgetList.removeAll { $0.id == id } }
+        func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {
+            budgetList = budgetList.map {
+                guard $0.id == id else { return $0 }
+                return BudgetItem(
+                    id: $0.id, kind: $0.kind, subject: $0.subject, company: nil, period: $0.period,
+                    periodKey: $0.periodKey, tokenCap: $0.tokenCap, usdCap: $0.usdCap, spent: $0.spent,
+                    usdSpent: $0.usdSpent, held: $0.held, raised: tokens ?? 0, raisedUSD: usdMicros ?? 0,
+                    warnAt: $0.warnAt, hardStop: $0.hardStop, exhausted: false)
+            }
+        }
+        func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws {}
+        func deleteProvider(_ id: String) async throws {}
+        func usage() async throws -> [UsageItem] {
+            func w(_ t: Int64, _ m: Int64, _ c: Int64) -> UsageWindowItem {
+                UsageWindowItem(tokens: t, messages: m, costMicros: c)
+            }
+            return [
+                UsageItem(
+                    accountID: 1, fiveHours: w(210_000, 14, 1_240_000), sevenDays: w(3_100_000, 212, 18_420_000),
+                    limitShare: 0.38, limitsExhausted: false, hasLimits: true, drops: 0,
+                    companies: [
+                        CompanyUsage(
+                            company: "Ainkrad", fiveHours: w(200_000, 0, 1_100_000),
+                            sevenDays: w(2_400_000, 0, 14_000_000)),
+                        CompanyUsage(
+                            company: "Client work", fiveHours: w(10_000, 0, 140_000),
+                            sevenDays: w(700_000, 0, 4_420_000)),
+                    ]),
+                UsageItem(
+                    accountID: 3, fiveHours: w(980_000, 88, 4_100_000), sevenDays: w(1_240_000, 120, 6_900_000),
+                    limitShare: 0.93, limitsExhausted: false, hasLimits: true, drops: 2,
+                    companies: [
+                        CompanyUsage(
+                            company: "Ainkrad", fiveHours: w(980_000, 0, 4_100_000),
+                            sevenDays: w(1_240_000, 0, 6_900_000))
+                    ]),
+                UsageItem(
+                    accountID: 5, fiveHours: w(0, 0, 0), sevenDays: w(420_000, 31, 910_000), limitShare: 0,
+                    limitsExhausted: false, hasLimits: false, drops: 0, companies: []),
+            ]
+        }
+        func costs(account: Int64?) async throws -> [CostItem] {
+            let models = [
+                ("anthropic", "claude-sonnet-4-5", 1), ("openai", "gpt-5-codex", 3), ("google", "gemini-2.5-pro", 5),
+            ]
+            return (0..<18).map { i in
+                let m = models[i % 3]
+                let unpriced = i % 7 == 6
+                return CostItem(
+                    id: Int64(100 - i), at: now.addingTimeInterval(-Double(i) * 5_400), accountID: Int64(m.2),
+                    provider: m.0, model: unpriced ? "gemini-2.5-flash" : m.1, session: "as_\(4_100 + i)",
+                    input: Int64(12_000 + i * 900), output: Int64(1_800 + i * 70), cache: i % 2 == 0 ? 48_000 : 0,
+                    costMicros: unpriced ? nil : Int64(41_000 + i * 2_300), basis: unpriced ? "unpriced" : "list_price",
+                    approximate: i == 4)
+            }
+            .filter { account == nil || $0.accountID == account }
+        }
+        lazy var priceList: [PriceItem] = [
+            PriceItem(
+                provider: "anthropic", model: "claude-sonnet-4-5", input: 3_000_000, output: 15_000_000, cache: 300_000,
+                version: 2, pricedAt: now.addingTimeInterval(-86_400 * 4)),
+            PriceItem(
+                provider: "anthropic", model: "claude-opus-4-1", input: 15_000_000, output: 75_000_000,
+                cache: 1_500_000, version: 1, pricedAt: now.addingTimeInterval(-86_400 * 4)),
+            PriceItem(
+                provider: "openai", model: "gpt-5-codex", input: 1_250_000, output: 10_000_000, cache: 125_000,
+                version: 1, pricedAt: now.addingTimeInterval(-86_400 * 9)),
+            PriceItem(
+                provider: "google", model: "gemini-2.5-pro", input: 1_250_000, output: 10_000_000, cache: 310_000,
+                version: 3, pricedAt: now.addingTimeInterval(-86_400 * 2)),
+        ]
+        func prices() async throws -> [PriceItem] { priceList }
+        func setPrice(_ p: PriceDraft) async throws {
+            let v = (priceList.first { $0.provider == p.provider && $0.model == p.model }?.version ?? 0) + 1
+            priceList.removeAll { $0.provider == p.provider && $0.model == p.model }
+            priceList.append(
+                PriceItem(
+                    provider: p.provider, model: p.model, input: p.input, output: p.output, cache: p.cache, version: v,
+                    pricedAt: p.pricedAt))
+        }
+        func runners() async throws -> [AccountRunner] {
+            [
+                AccountRunner(id: "r_linux01", name: "linux-01", online: true),
+                AccountRunner(id: "r_mac", name: "studio-mac", online: true),
+                AccountRunner(id: "r_old", name: "old-box", online: false),
+            ]
+        }
+        func test(account: Int64) async throws -> TestedItem {
+            try await Task.sleep(for: .seconds(1))
+            let r = account == 4 ? "auth_failed" : "ok"
+            accountList = accountList.map {
+                guard $0.id == account else { return $0 }
+                var n = $0
+                n.lastTest = (Date(), r)
+                return n
+            }
+            return TestedItem(result: r, latencyMs: 412)
+        }
+        func setSessionLimits(account: Int64, maxTokens: Int64?, maxUSDMicros: Int64?) async throws {
+            accountList = accountList.map {
+                guard $0.id == account else { return $0 }
+                var n = $0
+                n.maxTokens = maxTokens
+                n.maxUSDMicros = maxUSDMicros
+                return n
+            }
         }
         func deleteAccount(_ id: Int64) async throws {
             accountList.removeAll { $0.id == id }
@@ -139,11 +331,14 @@ public final class AccountsDemo {
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
         "account-ready",
-        "account-cooling", "account-unhealthy", "account-disabled", "pools", "pools-second", "bindings",
+        "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
+        "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
+        "limits", "pools", "pools-second", "bindings",
         "bindings-empty",
         "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
         "add-member",
-        "delete-pool", "touchid-cancelled", "read-only", "state-loading", "state-error", "state-scope", "launcher",
+        "delete-pool", "signin-intro", "signin-url", "signin-working", "signin-done", "signin-failed",
+        "touchid-cancelled", "read-only", "state-loading", "state-error", "state-scope", "launcher",
         "settings-gate",
     ]
 
@@ -152,6 +347,12 @@ public final class AccountsDemo {
     public init(model: AccountsModel, setNotice: @escaping @MainActor (AdminNotice?) -> Void) {
         self.model = model
         self.setNotice = setNotice
+    }
+
+    /// For clicking through by hand: links really open in the browser (the snapshot runs never do).
+    public func showInteractive(_ scene: String) async {
+        await show(scene)
+        model.opener = { NSWorkspace.shared.open($0) }
     }
 
     public func show(_ scene: String) async {
@@ -167,6 +368,7 @@ public final class AccountsDemo {
         model.filter = .all
         model.poolSelection = nil
         model.opener = { _ in }
+        model.signIn = nil
         switch scene {
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
@@ -176,6 +378,7 @@ public final class AccountsDemo {
                 PoolItem(id: $0.id, name: $0.name, provider: $0.provider, isDefault: $0.isDefault, members: [])
             }
         case "bindings-empty": svc.bindingList = []
+        case "budgets-empty": svc.budgetList = []
         default: break
         }
         model.use(svc)
@@ -183,16 +386,23 @@ public final class AccountsDemo {
         let page: AccountsPage =
             switch scene {
             case "accounts", "accounts-need", "account-ready", "account-cooling", "account-unhealthy",
-                "account-disabled", "connect", "delete-account", "cap":
+                "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
+                "cap",
+                "signin-intro", "signin-url", "signin-working",
+                "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
             case "bindings", "bindings-empty", "bind": .bindings
             case "budgets", "costs", "ledger", "prices", "activity": AccountsPage(rawValue: scene)!
+            case "price-new": .prices
+            case "provider-new", "provider-edit": .accounts
+            case "budget-new", "budget-edit", "budget-raise", "budgets-empty": .budgets
             default: .overview
             }
         let detail: Int64? =
             switch scene {
-            case "account-ready", "delete-account", "cap": 1
+            case "account-ready", "delete-account", "cap", "limits", "account-testing": 1
+            case "account-confirming": 3
             case "account-cooling": 2
             case "account-unhealthy": 4
             case "account-disabled": 6
@@ -203,8 +413,30 @@ public final class AccountsDemo {
         if scene == "accounts-need" { model.filter = .need }
         switch scene {
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
+        case "signin-intro": AccountDialogs.openConnect(model, provider: "claude-sub")
+        case "signin-url", "signin-working", "signin-done", "signin-failed":
+            AccountDialogs.openConnect(model, provider: "claude-sub")
+            model.signIn = SignInFlow(
+                stage: scene == "signin-url"
+                    ? .open(URL(string: "https://claude.ai/login")!)
+                    : scene == "signin-working"
+                        ? .working
+                        : scene == "signin-done"
+                            ? .done(account: 1)
+                            : .failed(
+                                "No runner can sign in yet. A runner needs the newest ainkrad-runner, with Claude's own app installed."
+                            ), login: "lg_demo", runner: "linux-01", label: "claude-plan", opened: true)
         case "delete-account": AccountDialogs.openDelete(model, model.account(1)!)
         case "cap": AccountDialogs.openCap(model, model.account(1)!)
+        case "limits": AccountDialogs.openLimits(model, model.account(1)!)
+        case "budget-new": AccountDialogs.openBudget(model, editing: nil)
+        case "price-new": AccountDialogs.openPrice(model, editing: nil)
+        case "provider-new": AccountDialogs.openProvider(model, editing: nil)
+        case "provider-edit": AccountDialogs.openProvider(model, editing: model.provider("openrouter"))
+        case "budget-edit": AccountDialogs.openBudget(model, editing: model.budgets.first { $0.id == 3 })
+        case "budget-raise": AccountDialogs.openRaise(model, model.budgets.first { $0.id == 2 }!)
+        case "budgets": model.cursor = "g-3"
+        case "account-testing": Task { await model.test(model.account(1)!) }
         case "new-pool": AccountDialogs.openNewPool(model)
         case "bind": AccountDialogs.openBind(model, pool: nil)
         case "add-member": AccountDialogs.openAddMember(model, pool: model.pool(2)!)

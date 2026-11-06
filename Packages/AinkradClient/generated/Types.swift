@@ -11,6 +11,18 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/v1/accounts`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/post(createAccount)`.
     func createAccount(_ input: Operations.CreateAccount.Input) async throws -> Operations.CreateAccount.Output
+    /// - Remark: HTTP `POST /api/v1/accounts/logins`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/post(startAccountLogin)`.
+    func startAccountLogin(_ input: Operations.StartAccountLogin.Input) async throws -> Operations.StartAccountLogin.Output
+    /// - Remark: HTTP `GET /api/v1/accounts/logins/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/{id}/get(getAccountLogin)`.
+    func getAccountLogin(_ input: Operations.GetAccountLogin.Input) async throws -> Operations.GetAccountLogin.Output
+    /// - Remark: HTTP `DELETE /api/v1/accounts/logins/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/{id}/delete(cancelAccountLogin)`.
+    func cancelAccountLogin(_ input: Operations.CancelAccountLogin.Input) async throws -> Operations.CancelAccountLogin.Output
+    /// - Remark: HTTP `POST /api/v1/accounts/logins/{id}/code`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/{id}/code/post(sendAccountLoginCode)`.
+    func sendAccountLoginCode(_ input: Operations.SendAccountLoginCode.Input) async throws -> Operations.SendAccountLoginCode.Output
     /// - Remark: HTTP `GET /api/v1/accounts/providers`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/providers/get(listProviders)`.
     func listProviders(_ input: Operations.ListProviders.Input) async throws -> Operations.ListProviders.Output
@@ -23,6 +35,9 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /api/v1/accounts/providers/{id}`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/providers/{id}/delete(deleteProvider)`.
     func deleteProvider(_ input: Operations.DeleteProvider.Input) async throws -> Operations.DeleteProvider.Output
+    /// - Remark: HTTP `GET /api/v1/accounts/usage`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/usage/get(accountsUsage)`.
+    func accountsUsage(_ input: Operations.AccountsUsage.Input) async throws -> Operations.AccountsUsage.Output
     /// - Remark: HTTP `GET /api/v1/accounts/{id}`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/get(getAccount)`.
     func getAccount(_ input: Operations.GetAccount.Input) async throws -> Operations.GetAccount.Output
@@ -32,12 +47,24 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/cap`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/cap/put(setAccountCap)`.
     func setAccountCap(_ input: Operations.SetAccountCap.Input) async throws -> Operations.SetAccountCap.Output
+    /// - Remark: HTTP `PUT /api/v1/accounts/{id}/limits`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/limits/put(setAccountLimit)`.
+    func setAccountLimit(_ input: Operations.SetAccountLimit.Input) async throws -> Operations.SetAccountLimit.Output
+    /// - Remark: HTTP `DELETE /api/v1/accounts/{id}/limits/{unit}/{window_secs}`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/limits/{unit}/{window_secs}/delete(clearAccountLimit)`.
+    func clearAccountLimit(_ input: Operations.ClearAccountLimit.Input) async throws -> Operations.ClearAccountLimit.Output
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/secret`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/secret/put(replaceAccountSecret)`.
     func replaceAccountSecret(_ input: Operations.ReplaceAccountSecret.Input) async throws -> Operations.ReplaceAccountSecret.Output
+    /// - Remark: HTTP `PUT /api/v1/accounts/{id}/session-limits`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/session-limits/put(setAccountSessionLimits)`.
+    func setAccountSessionLimits(_ input: Operations.SetAccountSessionLimits.Input) async throws -> Operations.SetAccountSessionLimits.Output
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/state`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/state/put(setAccountState)`.
     func setAccountState(_ input: Operations.SetAccountState.Input) async throws -> Operations.SetAccountState.Output
+    /// - Remark: HTTP `POST /api/v1/accounts/{id}/test`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/test/post(testAccount)`.
+    func testAccount(_ input: Operations.TestAccount.Input) async throws -> Operations.TestAccount.Output
     /// - Remark: HTTP `GET /api/v1/agent-sessions`.
     /// - Remark: Generated from `#/paths//api/v1/agent-sessions/get(listAgentSessions)`.
     func listAgentSessions(_ input: Operations.ListAgentSessions.Input) async throws -> Operations.ListAgentSessions.Output
@@ -92,6 +119,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /api/v1/bindings/{agent}/{provider}`.
     /// - Remark: Generated from `#/paths//api/v1/bindings/{agent}/{provider}/delete(unbindAgent)`.
     func unbindAgent(_ input: Operations.UnbindAgent.Input) async throws -> Operations.UnbindAgent.Output
+    /// - Remark: HTTP `GET /api/v1/budgets`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/get(listBudgets)`.
+    func listBudgets(_ input: Operations.ListBudgets.Input) async throws -> Operations.ListBudgets.Output
+    /// - Remark: HTTP `PUT /api/v1/budgets`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/put(setBudget)`.
+    func setBudget(_ input: Operations.SetBudget.Input) async throws -> Operations.SetBudget.Output
+    /// - Remark: HTTP `DELETE /api/v1/budgets/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/{id}/delete(deleteBudget)`.
+    func deleteBudget(_ input: Operations.DeleteBudget.Input) async throws -> Operations.DeleteBudget.Output
+    /// - Remark: HTTP `POST /api/v1/budgets/{id}/raise`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/{id}/raise/post(raiseBudget)`.
+    func raiseBudget(_ input: Operations.RaiseBudget.Input) async throws -> Operations.RaiseBudget.Output
+    /// - Remark: HTTP `GET /api/v1/costs`.
+    /// - Remark: Generated from `#/paths//api/v1/costs/get(listCosts)`.
+    func listCosts(_ input: Operations.ListCosts.Input) async throws -> Operations.ListCosts.Output
     /// - Remark: HTTP `GET /api/v1/devices`.
     /// - Remark: Generated from `#/paths//api/v1/devices/get(listDevices)`.
     func listDevices(_ input: Operations.ListDevices.Input) async throws -> Operations.ListDevices.Output
@@ -154,6 +196,12 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /api/v1/pools/{id}/members/{account}`.
     /// - Remark: Generated from `#/paths//api/v1/pools/{id}/members/{account}/delete(removePoolMember)`.
     func removePoolMember(_ input: Operations.RemovePoolMember.Input) async throws -> Operations.RemovePoolMember.Output
+    /// - Remark: HTTP `GET /api/v1/prices`.
+    /// - Remark: Generated from `#/paths//api/v1/prices/get(listPrices)`.
+    func listPrices(_ input: Operations.ListPrices.Input) async throws -> Operations.ListPrices.Output
+    /// - Remark: HTTP `PUT /api/v1/prices`.
+    /// - Remark: Generated from `#/paths//api/v1/prices/put(setPrice)`.
+    func setPrice(_ input: Operations.SetPrice.Input) async throws -> Operations.SetPrice.Output
     /// - Remark: HTTP `PUT /api/v1/push-token`.
     /// - Remark: Generated from `#/paths//api/v1/push-token/put(setPushToken)`.
     func setPushToken(_ input: Operations.SetPushToken.Input) async throws -> Operations.SetPushToken.Output
@@ -282,6 +330,52 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// - Remark: HTTP `POST /api/v1/accounts/logins`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/post(startAccountLogin)`.
+    public func startAccountLogin(
+        headers: Operations.StartAccountLogin.Input.Headers = .init(),
+        body: Operations.StartAccountLogin.Input.Body
+    ) async throws -> Operations.StartAccountLogin.Output {
+        try await startAccountLogin(Operations.StartAccountLogin.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `GET /api/v1/accounts/logins/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/{id}/get(getAccountLogin)`.
+    public func getAccountLogin(
+        path: Operations.GetAccountLogin.Input.Path,
+        headers: Operations.GetAccountLogin.Input.Headers = .init()
+    ) async throws -> Operations.GetAccountLogin.Output {
+        try await getAccountLogin(Operations.GetAccountLogin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `DELETE /api/v1/accounts/logins/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/{id}/delete(cancelAccountLogin)`.
+    public func cancelAccountLogin(
+        path: Operations.CancelAccountLogin.Input.Path,
+        headers: Operations.CancelAccountLogin.Input.Headers = .init()
+    ) async throws -> Operations.CancelAccountLogin.Output {
+        try await cancelAccountLogin(Operations.CancelAccountLogin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `POST /api/v1/accounts/logins/{id}/code`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/logins/{id}/code/post(sendAccountLoginCode)`.
+    public func sendAccountLoginCode(
+        path: Operations.SendAccountLoginCode.Input.Path,
+        headers: Operations.SendAccountLoginCode.Input.Headers = .init(),
+        body: Operations.SendAccountLoginCode.Input.Body
+    ) async throws -> Operations.SendAccountLoginCode.Output {
+        try await sendAccountLoginCode(Operations.SendAccountLoginCode.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// - Remark: HTTP `GET /api/v1/accounts/providers`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/providers/get(listProviders)`.
     public func listProviders(headers: Operations.ListProviders.Input.Headers = .init()) async throws -> Operations.ListProviders.Output {
@@ -322,6 +416,11 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// - Remark: HTTP `GET /api/v1/accounts/usage`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/usage/get(accountsUsage)`.
+    public func accountsUsage(headers: Operations.AccountsUsage.Input.Headers = .init()) async throws -> Operations.AccountsUsage.Output {
+        try await accountsUsage(Operations.AccountsUsage.Input(headers: headers))
+    }
     /// - Remark: HTTP `GET /api/v1/accounts/{id}`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/get(getAccount)`.
     public func getAccount(
@@ -357,6 +456,30 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// - Remark: HTTP `PUT /api/v1/accounts/{id}/limits`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/limits/put(setAccountLimit)`.
+    public func setAccountLimit(
+        path: Operations.SetAccountLimit.Input.Path,
+        headers: Operations.SetAccountLimit.Input.Headers = .init(),
+        body: Operations.SetAccountLimit.Input.Body
+    ) async throws -> Operations.SetAccountLimit.Output {
+        try await setAccountLimit(Operations.SetAccountLimit.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `DELETE /api/v1/accounts/{id}/limits/{unit}/{window_secs}`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/limits/{unit}/{window_secs}/delete(clearAccountLimit)`.
+    public func clearAccountLimit(
+        path: Operations.ClearAccountLimit.Input.Path,
+        headers: Operations.ClearAccountLimit.Input.Headers = .init()
+    ) async throws -> Operations.ClearAccountLimit.Output {
+        try await clearAccountLimit(Operations.ClearAccountLimit.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/secret`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/secret/put(replaceAccountSecret)`.
     public func replaceAccountSecret(
@@ -365,6 +488,19 @@ extension APIProtocol {
         body: Operations.ReplaceAccountSecret.Input.Body
     ) async throws -> Operations.ReplaceAccountSecret.Output {
         try await replaceAccountSecret(Operations.ReplaceAccountSecret.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `PUT /api/v1/accounts/{id}/session-limits`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/session-limits/put(setAccountSessionLimits)`.
+    public func setAccountSessionLimits(
+        path: Operations.SetAccountSessionLimits.Input.Path,
+        headers: Operations.SetAccountSessionLimits.Input.Headers = .init(),
+        body: Operations.SetAccountSessionLimits.Input.Body
+    ) async throws -> Operations.SetAccountSessionLimits.Output {
+        try await setAccountSessionLimits(Operations.SetAccountSessionLimits.Input(
             path: path,
             headers: headers,
             body: body
@@ -381,6 +517,17 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// - Remark: HTTP `POST /api/v1/accounts/{id}/test`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/test/post(testAccount)`.
+    public func testAccount(
+        path: Operations.TestAccount.Input.Path,
+        headers: Operations.TestAccount.Input.Headers = .init()
+    ) async throws -> Operations.TestAccount.Output {
+        try await testAccount(Operations.TestAccount.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// - Remark: HTTP `GET /api/v1/agent-sessions`.
@@ -568,6 +715,63 @@ extension APIProtocol {
     ) async throws -> Operations.UnbindAgent.Output {
         try await unbindAgent(Operations.UnbindAgent.Input(
             path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `GET /api/v1/budgets`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/get(listBudgets)`.
+    public func listBudgets(
+        query: Operations.ListBudgets.Input.Query = .init(),
+        headers: Operations.ListBudgets.Input.Headers = .init()
+    ) async throws -> Operations.ListBudgets.Output {
+        try await listBudgets(Operations.ListBudgets.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `PUT /api/v1/budgets`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/put(setBudget)`.
+    public func setBudget(
+        headers: Operations.SetBudget.Input.Headers = .init(),
+        body: Operations.SetBudget.Input.Body
+    ) async throws -> Operations.SetBudget.Output {
+        try await setBudget(Operations.SetBudget.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `DELETE /api/v1/budgets/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/{id}/delete(deleteBudget)`.
+    public func deleteBudget(
+        path: Operations.DeleteBudget.Input.Path,
+        headers: Operations.DeleteBudget.Input.Headers = .init()
+    ) async throws -> Operations.DeleteBudget.Output {
+        try await deleteBudget(Operations.DeleteBudget.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `POST /api/v1/budgets/{id}/raise`.
+    /// - Remark: Generated from `#/paths//api/v1/budgets/{id}/raise/post(raiseBudget)`.
+    public func raiseBudget(
+        path: Operations.RaiseBudget.Input.Path,
+        headers: Operations.RaiseBudget.Input.Headers = .init(),
+        body: Operations.RaiseBudget.Input.Body
+    ) async throws -> Operations.RaiseBudget.Output {
+        try await raiseBudget(Operations.RaiseBudget.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `GET /api/v1/costs`.
+    /// - Remark: Generated from `#/paths//api/v1/costs/get(listCosts)`.
+    public func listCosts(
+        query: Operations.ListCosts.Input.Query = .init(),
+        headers: Operations.ListCosts.Input.Headers = .init()
+    ) async throws -> Operations.ListCosts.Output {
+        try await listCosts(Operations.ListCosts.Input(
+            query: query,
             headers: headers
         ))
     }
@@ -761,6 +965,22 @@ extension APIProtocol {
         try await removePoolMember(Operations.RemovePoolMember.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// - Remark: HTTP `GET /api/v1/prices`.
+    /// - Remark: Generated from `#/paths//api/v1/prices/get(listPrices)`.
+    public func listPrices(headers: Operations.ListPrices.Input.Headers = .init()) async throws -> Operations.ListPrices.Output {
+        try await listPrices(Operations.ListPrices.Input(headers: headers))
+    }
+    /// - Remark: HTTP `PUT /api/v1/prices`.
+    /// - Remark: Generated from `#/paths//api/v1/prices/put(setPrice)`.
+    public func setPrice(
+        headers: Operations.SetPrice.Input.Headers = .init(),
+        body: Operations.SetPrice.Input.Body
+    ) async throws -> Operations.SetPrice.Output {
+        try await setPrice(Operations.SetPrice.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// - Remark: HTTP `PUT /api/v1/push-token`.

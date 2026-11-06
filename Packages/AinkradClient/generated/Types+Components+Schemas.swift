@@ -33,6 +33,193 @@ extension Components {
                 case runners
             }
         }
+        /// Where a sign-in has got to. Never a token or a code.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AccountLogin`.
+        public struct AccountLogin: Codable, Hashable, Sendable {
+            /// The new account, once `done`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/account_id`.
+            public var accountId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// Ten minutes after it began; a sign-in open past it fails.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/expires_at`.
+            public var expiresAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/label`.
+            public var label: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/provider`.
+            public var provider: Swift.String
+            /// Why it `failed` or was `cancelled`; provider text passes the redactor.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/reason`.
+            public var reason: Swift.String?
+            /// The runner doing the sign-in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/runner`.
+            public var runner: Swift.String
+            /// `starting`, `open_url` (open `url`, then send the code), `waiting_code` (the code is with
+            /// the runner), `storing`, `done` (see `account_id`), `failed` (see `reason`) or `cancelled`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/state`.
+            public var state: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/updated_at`.
+            public var updatedAt: Components.Schemas.Timestamp
+            /// The sign-in URL, from `open_url` on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountLogin/url`.
+            public var url: Swift.String?
+            /// Creates a new `AccountLogin`.
+            ///
+            /// - Parameters:
+            ///   - accountId: The new account, once `done`.
+            ///   - createdAt:
+            ///   - expiresAt: Ten minutes after it began; a sign-in open past it fails.
+            ///   - id:
+            ///   - label:
+            ///   - provider:
+            ///   - reason: Why it `failed` or was `cancelled`; provider text passes the redactor.
+            ///   - runner: The runner doing the sign-in.
+            ///   - state: `starting`, `open_url` (open `url`, then send the code), `waiting_code` (the code is with
+            ///   - updatedAt:
+            ///   - url: The sign-in URL, from `open_url` on.
+            public init(
+                accountId: Swift.Int64? = nil,
+                createdAt: Components.Schemas.Timestamp,
+                expiresAt: Components.Schemas.Timestamp,
+                id: Swift.String,
+                label: Swift.String,
+                provider: Swift.String,
+                reason: Swift.String? = nil,
+                runner: Swift.String,
+                state: Swift.String,
+                updatedAt: Components.Schemas.Timestamp,
+                url: Swift.String? = nil
+            ) {
+                self.accountId = accountId
+                self.createdAt = createdAt
+                self.expiresAt = expiresAt
+                self.id = id
+                self.label = label
+                self.provider = provider
+                self.reason = reason
+                self.runner = runner
+                self.state = state
+                self.updatedAt = updatedAt
+                self.url = url
+            }
+            public enum CodingKeys: String, CodingKey {
+                case accountId = "account_id"
+                case createdAt = "created_at"
+                case expiresAt = "expires_at"
+                case id
+                case label
+                case provider
+                case reason
+                case runner
+                case state
+                case updatedAt = "updated_at"
+                case url
+            }
+        }
+        /// One account's usage. No key, secret name, delivery or runner: it is for a `read` device.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AccountSpend`.
+        public struct AccountSpend: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/account_id`.
+            public var accountId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/by_company`.
+            public var byCompany: [Components.Schemas.UsageByCompany]
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/five_hours`.
+            public var fiveHours: Components.Schemas.UsageWindow
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/limits`.
+            public var limits: [Components.Schemas.LimitStanding]
+            /// The highest used/cap of any limit, in basis points (10000 is at the cap).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/max_utilisation_bps`.
+            public var maxUtilisationBps: Swift.Int64
+            /// Provider drops in the last hour.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/recent_drops`.
+            public var recentDrops: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/AccountSpend/seven_days`.
+            public var sevenDays: Components.Schemas.UsageWindow
+            /// Creates a new `AccountSpend`.
+            ///
+            /// - Parameters:
+            ///   - accountId:
+            ///   - byCompany:
+            ///   - fiveHours:
+            ///   - limits:
+            ///   - maxUtilisationBps: The highest used/cap of any limit, in basis points (10000 is at the cap).
+            ///   - recentDrops: Provider drops in the last hour.
+            ///   - sevenDays:
+            public init(
+                accountId: Swift.Int64,
+                byCompany: [Components.Schemas.UsageByCompany],
+                fiveHours: Components.Schemas.UsageWindow,
+                limits: [Components.Schemas.LimitStanding],
+                maxUtilisationBps: Swift.Int64,
+                recentDrops: Swift.Int64,
+                sevenDays: Components.Schemas.UsageWindow
+            ) {
+                self.accountId = accountId
+                self.byCompany = byCompany
+                self.fiveHours = fiveHours
+                self.limits = limits
+                self.maxUtilisationBps = maxUtilisationBps
+                self.recentDrops = recentDrops
+                self.sevenDays = sevenDays
+            }
+            public enum CodingKeys: String, CodingKey {
+                case accountId = "account_id"
+                case byCompany = "by_company"
+                case fiveHours = "five_hours"
+                case limits
+                case maxUtilisationBps = "max_utilisation_bps"
+                case recentDrops = "recent_drops"
+                case sevenDays = "seven_days"
+            }
+        }
+        /// What `POST /accounts/{id}/test` answers: a status class and a latency, never a response body.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AccountTested`.
+        public struct AccountTested: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AccountTested/latency_ms`.
+            public var latencyMs: Swift.Int64
+            /// As [`LastTest::result`], or `inconclusive`: the provider's model list needs no key and its
+            /// definition declares no `test_path`, so nothing was sent and nothing is known of the key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountTested/result`.
+            public var result: Swift.String
+            /// The runner device that made the request (empty when `result` is `inconclusive`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountTested/runner`.
+            public var runner: Swift.String
+            /// Creates a new `AccountTested`.
+            ///
+            /// - Parameters:
+            ///   - latencyMs:
+            ///   - result: As [`LastTest::result`], or `inconclusive`: the provider's model list needs no key and its
+            ///   - runner: The runner device that made the request (empty when `result` is `inconclusive`).
+            public init(
+                latencyMs: Swift.Int64,
+                result: Swift.String,
+                runner: Swift.String
+            ) {
+                self.latencyMs = latencyMs
+                self.result = result
+                self.runner = runner
+            }
+            public enum CodingKeys: String, CodingKey {
+                case latencyMs = "latency_ms"
+                case result
+                case runner
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/AccountsDeleted`.
         public struct AccountsDeleted: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/AccountsDeleted/deleted`.
@@ -619,6 +806,21 @@ extension Components {
                 case provider
             }
         }
+        /// - Remark: Generated from `#/components/schemas/BudgetDeleted`.
+        public struct BudgetDeleted: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/BudgetDeleted/deleted`.
+            public var deleted: Swift.Bool
+            /// Creates a new `BudgetDeleted`.
+            ///
+            /// - Parameters:
+            ///   - deleted:
+            public init(deleted: Swift.Bool) {
+                self.deleted = deleted
+            }
+            public enum CodingKeys: String, CodingKey {
+                case deleted
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Challenge`.
         public struct Challenge: Codable, Hashable, Sendable {
             /// 32 bytes, base64url (43 characters), opaque to the client; spend it once within
@@ -893,6 +1095,127 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case key
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/CostEvent`.
+        public struct CostEvent: Codable, Hashable, Sendable {
+            /// The Core account the attempt used, if it was one of Core's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/account_id`.
+            public var accountId: Swift.Int64?
+            /// The turn was interrupted: the tokens are the meter's last reading.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/approximate`.
+            public var approximate: Swift.Bool
+            /// `list_price`, `provider_reported`, `billing_corrected` or `unpriced`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/basis`.
+            public var basis: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CostEvent/cache_tokens`.
+            public var cacheTokens: Swift.Int64
+            /// The event a `billing_corrected` row corrects.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/corrects_id`.
+            public var correctsId: Swift.Int64?
+            /// Millionths of a dollar; absent when the event is `unpriced` (never 0).
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/cost_usd_micros`.
+            public var costUsdMicros: Swift.Int64?
+            /// The attempt of the session (a restart or a failover starts a new epoch).
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/epoch`.
+            public var epoch: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/CostEvent/harness`.
+            public var harness: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CostEvent/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/CostEvent/input_tokens`.
+            public var inputTokens: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/CostEvent/model`.
+            public var model: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CostEvent/occurred_at`.
+            public var occurredAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/CostEvent/output_tokens`.
+            public var outputTokens: Swift.Int64
+            /// When the list price that priced a `list_price` event was read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CostEvent/priced_at`.
+            public var pricedAt: Components.Schemas.Timestamp?
+            /// - Remark: Generated from `#/components/schemas/CostEvent/provider`.
+            public var provider: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CostEvent/session`.
+            public var session: Swift.String
+            /// Creates a new `CostEvent`.
+            ///
+            /// - Parameters:
+            ///   - accountId: The Core account the attempt used, if it was one of Core's.
+            ///   - approximate: The turn was interrupted: the tokens are the meter's last reading.
+            ///   - basis: `list_price`, `provider_reported`, `billing_corrected` or `unpriced`.
+            ///   - cacheTokens:
+            ///   - correctsId: The event a `billing_corrected` row corrects.
+            ///   - costUsdMicros: Millionths of a dollar; absent when the event is `unpriced` (never 0).
+            ///   - epoch: The attempt of the session (a restart or a failover starts a new epoch).
+            ///   - harness:
+            ///   - id:
+            ///   - inputTokens:
+            ///   - model:
+            ///   - occurredAt:
+            ///   - outputTokens:
+            ///   - pricedAt: When the list price that priced a `list_price` event was read.
+            ///   - provider:
+            ///   - session:
+            public init(
+                accountId: Swift.Int64? = nil,
+                approximate: Swift.Bool,
+                basis: Swift.String,
+                cacheTokens: Swift.Int64,
+                correctsId: Swift.Int64? = nil,
+                costUsdMicros: Swift.Int64? = nil,
+                epoch: Swift.Int64,
+                harness: Swift.String,
+                id: Swift.Int64,
+                inputTokens: Swift.Int64,
+                model: Swift.String,
+                occurredAt: Components.Schemas.Timestamp,
+                outputTokens: Swift.Int64,
+                pricedAt: Components.Schemas.Timestamp? = nil,
+                provider: Swift.String,
+                session: Swift.String
+            ) {
+                self.accountId = accountId
+                self.approximate = approximate
+                self.basis = basis
+                self.cacheTokens = cacheTokens
+                self.correctsId = correctsId
+                self.costUsdMicros = costUsdMicros
+                self.epoch = epoch
+                self.harness = harness
+                self.id = id
+                self.inputTokens = inputTokens
+                self.model = model
+                self.occurredAt = occurredAt
+                self.outputTokens = outputTokens
+                self.pricedAt = pricedAt
+                self.provider = provider
+                self.session = session
+            }
+            public enum CodingKeys: String, CodingKey {
+                case accountId = "account_id"
+                case approximate
+                case basis
+                case cacheTokens = "cache_tokens"
+                case correctsId = "corrects_id"
+                case costUsdMicros = "cost_usd_micros"
+                case epoch
+                case harness
+                case id
+                case inputTokens = "input_tokens"
+                case model
+                case occurredAt = "occurred_at"
+                case outputTokens = "output_tokens"
+                case pricedAt = "priced_at"
+                case provider
+                case session
             }
         }
         /// A device: who it is and what it may do. Never a key's private half: the Core has none.
@@ -1349,6 +1672,35 @@ extension Components {
                 case supportedMinors = "supported_minors"
             }
         }
+        /// The last one-shot test of an account's key.
+        ///
+        /// - Remark: Generated from `#/components/schemas/LastTest`.
+        public struct LastTest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LastTest/at`.
+            public var at: Components.Schemas.Timestamp
+            /// The status class the provider answered: `ok`, `rate_limited`, `quota`, `auth_failed`,
+            /// `server_error`, `unreachable`, `refused_address`, `tls_failed`, `inconclusive` (see
+            /// [`AccountTested`]) or `failed` (the runner did not answer). Never provider text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LastTest/result`.
+            public var result: Swift.String
+            /// Creates a new `LastTest`.
+            ///
+            /// - Parameters:
+            ///   - at:
+            ///   - result: The status class the provider answered: `ok`, `rate_limited`, `quota`, `auth_failed`,
+            public init(
+                at: Components.Schemas.Timestamp,
+                result: Swift.String
+            ) {
+                self.at = at
+                self.result = result
+            }
+            public enum CodingKeys: String, CodingKey {
+                case at
+                case result
+            }
+        }
         /// The newest event's seq a client would be shown: the catch-up target.
         ///
         /// - Remark: Generated from `#/components/schemas/LatestEvent`.
@@ -1452,6 +1804,113 @@ extension Components {
                 case version
             }
         }
+        /// - Remark: Generated from `#/components/schemas/LimitCleared`.
+        public struct LimitCleared: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LimitCleared/cleared`.
+            public var cleared: Swift.Bool
+            /// Creates a new `LimitCleared`.
+            ///
+            /// - Parameters:
+            ///   - cleared:
+            public init(cleared: Swift.Bool) {
+                self.cleared = cleared
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cleared
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LimitSet`.
+        public struct LimitSet: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LimitSet/account_id`.
+            public var accountId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LimitSet/cap`.
+            public var cap: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LimitSet/unit`.
+            public var unit: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LimitSet/warn_percent`.
+            public var warnPercent: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/LimitSet/window_secs`.
+            public var windowSecs: Swift.Int64
+            /// Creates a new `LimitSet`.
+            ///
+            /// - Parameters:
+            ///   - accountId:
+            ///   - cap:
+            ///   - unit:
+            ///   - warnPercent:
+            ///   - windowSecs:
+            public init(
+                accountId: Swift.Int64,
+                cap: Swift.Int64,
+                unit: Swift.String,
+                warnPercent: Swift.Int64? = nil,
+                windowSecs: Swift.Int64
+            ) {
+                self.accountId = accountId
+                self.cap = cap
+                self.unit = unit
+                self.warnPercent = warnPercent
+                self.windowSecs = windowSecs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case accountId = "account_id"
+                case cap
+                case unit
+                case warnPercent = "warn_percent"
+                case windowSecs = "window_secs"
+            }
+        }
+        /// A limit and how much of it is used.
+        ///
+        /// - Remark: Generated from `#/components/schemas/LimitStanding`.
+        public struct LimitStanding: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LimitStanding/cap`.
+            public var cap: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LimitStanding/exhausted`.
+            public var exhausted: Swift.Bool
+            /// `tokens` or `messages`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LimitStanding/unit`.
+            public var unit: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LimitStanding/used`.
+            public var used: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LimitStanding/warn_percent`.
+            public var warnPercent: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LimitStanding/window_secs`.
+            public var windowSecs: Swift.Int64
+            /// Creates a new `LimitStanding`.
+            ///
+            /// - Parameters:
+            ///   - cap:
+            ///   - exhausted:
+            ///   - unit: `tokens` or `messages`.
+            ///   - used:
+            ///   - warnPercent:
+            ///   - windowSecs:
+            public init(
+                cap: Swift.Int64,
+                exhausted: Swift.Bool,
+                unit: Swift.String,
+                used: Swift.Int64,
+                warnPercent: Swift.Int64,
+                windowSecs: Swift.Int64
+            ) {
+                self.cap = cap
+                self.exhausted = exhausted
+                self.unit = unit
+                self.used = used
+                self.warnPercent = warnPercent
+                self.windowSecs = windowSecs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cap
+                case exhausted
+                case unit
+                case used
+                case warnPercent = "warn_percent"
+                case windowSecs = "window_secs"
+            }
+        }
         /// A key that is locked now.
         ///
         /// - Remark: Generated from `#/components/schemas/Lockout`.
@@ -1485,6 +1944,35 @@ extension Components {
                 case key
                 case lockedUntil = "locked_until"
                 case strikes
+            }
+        }
+        /// The approval code the user pasted. No `Debug`: it is a one-time secret.
+        ///
+        /// - Remark: Generated from `#/components/schemas/LoginCode`.
+        public struct LoginCode: Codable, Hashable, Sendable {
+            /// 8 to 512 of letters, digits and `-_.~#:+/=`; passed to the runner and dropped.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LoginCode/code`.
+            public var code: Swift.String
+            /// Creates a new `LoginCode`.
+            ///
+            /// - Parameters:
+            ///   - code: 8 to 512 of letters, digits and `-_.~#:+/=`; passed to the runner and dropped.
+            public init(code: Swift.String) {
+                self.code = code
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.code = try container.decode(
+                    Swift.String.self,
+                    forKey: .code
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "code"
+                ])
             }
         }
         /// The calling device and what the server speaks.
@@ -1578,6 +2066,9 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NewAgentSession/harness`.
             public var harness: Swift.String
+            /// The model id as the provider names it. For a session served by the auth gateway it must be
+            /// one of the ids priced for its provider, exactly: the gateway resolves no alias.
+            ///
             /// - Remark: Generated from `#/components/schemas/NewAgentSession/model`.
             public var model: Swift.String?
             /// `{"mode": "ask" | "accept_edits" | "sandboxed", "allow": […]}`; default `ask`.
@@ -1603,7 +2094,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - harness: `claude`, `codex`, `opencode`, `agy` (what the runner's `agent` driver takes).
-            ///   - model:
+            ///   - model: The model id as the provider names it. For a session served by the auth gateway it must be
             ///   - policy: `{"mode": "ask" | "accept_edits" | "sandboxed", "allow": […]}`; default `ask`.
             ///   - prompt:
             ///   - runner: The runner's device id, `d_…`.
@@ -1688,6 +2179,63 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case runner
                 case ttlSecs = "ttl_secs"
+            }
+        }
+        /// Starts a sign-in.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NewLogin`.
+        public struct NewLogin: Codable, Hashable, Sendable {
+            /// The new account's label.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewLogin/label`.
+            public var label: Swift.String
+            /// A subscription provider: `claude-sub`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewLogin/provider`.
+            public var provider: Swift.String
+            /// A runner device id; absent, the best ready runner that has the provider's harness.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewLogin/runner`.
+            public var runner: Swift.String?
+            /// Creates a new `NewLogin`.
+            ///
+            /// - Parameters:
+            ///   - label: The new account's label.
+            ///   - provider: A subscription provider: `claude-sub`.
+            ///   - runner: A runner device id; absent, the best ready runner that has the provider's harness.
+            public init(
+                label: Swift.String,
+                provider: Swift.String,
+                runner: Swift.String? = nil
+            ) {
+                self.label = label
+                self.provider = provider
+                self.runner = runner
+            }
+            public enum CodingKeys: String, CodingKey {
+                case label
+                case provider
+                case runner
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.label = try container.decode(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.provider = try container.decode(
+                    Swift.String.self,
+                    forKey: .provider
+                )
+                self.runner = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .runner
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "label",
+                    "provider",
+                    "runner"
+                ])
             }
         }
         /// - Remark: Generated from `#/components/schemas/NewPairingBody`.
@@ -2364,6 +2912,67 @@ extension Components {
                 case updatedAt = "updated_at"
             }
         }
+        /// A price: millionths of a dollar per million tokens, and when the provider's list price was read.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PriceBookEntry`.
+        public struct PriceBookEntry: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/cache_per_mtok_micro`.
+            public var cachePerMtokMicro: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/input_per_mtok_micro`.
+            public var inputPerMtokMicro: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/model`.
+            public var model: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/output_per_mtok_micro`.
+            public var outputPerMtokMicro: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/priced_at`.
+            public var pricedAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/provider`.
+            public var provider: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PriceBookEntry/version`.
+            public var version: Swift.Int64
+            /// Creates a new `PriceBookEntry`.
+            ///
+            /// - Parameters:
+            ///   - cachePerMtokMicro:
+            ///   - createdAt:
+            ///   - inputPerMtokMicro:
+            ///   - model:
+            ///   - outputPerMtokMicro:
+            ///   - pricedAt:
+            ///   - provider:
+            ///   - version:
+            public init(
+                cachePerMtokMicro: Swift.Int64,
+                createdAt: Components.Schemas.Timestamp,
+                inputPerMtokMicro: Swift.Int64,
+                model: Swift.String,
+                outputPerMtokMicro: Swift.Int64,
+                pricedAt: Components.Schemas.Timestamp,
+                provider: Swift.String,
+                version: Swift.Int64
+            ) {
+                self.cachePerMtokMicro = cachePerMtokMicro
+                self.createdAt = createdAt
+                self.inputPerMtokMicro = inputPerMtokMicro
+                self.model = model
+                self.outputPerMtokMicro = outputPerMtokMicro
+                self.pricedAt = pricedAt
+                self.provider = provider
+                self.version = version
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cachePerMtokMicro = "cache_per_mtok_micro"
+                case createdAt = "created_at"
+                case inputPerMtokMicro = "input_per_mtok_micro"
+                case model
+                case outputPerMtokMicro = "output_per_mtok_micro"
+                case pricedAt = "priced_at"
+                case provider
+                case version
+            }
+        }
         /// A provider definition: a built-in, or user data validated before it is stored.
         ///
         /// - Remark: Generated from `#/components/schemas/Provider`.
@@ -2390,10 +2999,19 @@ extension Components {
             public var harness: Swift.String
             /// - Remark: Generated from `#/components/schemas/Provider/id`.
             public var id: Swift.String
+            /// The shape this provider's keys start with (6 to 16 characters, never a built-in's, such
+            /// as `sk-or-v1-`). A definition that sets it holds keys, and then only through the gateway
+            /// (`delivery` is `["gateway"]`): the broker binds each key to the account's host by it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Provider/key_prefix`.
+            public var keyPrefix: Swift.String?
             /// `paste`.
             ///
             /// - Remark: Generated from `#/components/schemas/Provider/login_methods`.
             public var loginMethods: [Swift.String]
+            /// Model ids exactly as the provider names them: the gateway compares a request's model with
+            /// the ids it was granted, as they are, and resolves no alias (`-latest`). `:online` is refused.
+            ///
             /// - Remark: Generated from `#/components/schemas/Provider/models`.
             public var models: [Components.Schemas.ModelPrice]
             /// - Remark: Generated from `#/components/schemas/Provider/name`.
@@ -2402,10 +3020,23 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Provider/priced_at`.
             public var pricedAt: Swift.String?
+            /// The authenticated path (under the base URL, such as `/key`) of the one-shot account test,
+            /// for a provider whose model list needs no key (OpenRouter's is public: a revoked key would
+            /// read as `ok`). A user definition without one cannot be tested: the answer is
+            /// `inconclusive`. Built-ins use their wire's own model list.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Provider/test_path`.
+            public var testPath: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Provider/usage_parser`.
             public var usageParser: Swift.String
             /// - Remark: Generated from `#/components/schemas/Provider/version`.
             public var version: Swift.Int64?
+            /// The API dialect the gateway speaks to this provider: `anthropic-messages` (claude),
+            /// `openai-responses` (codex) or `gemini-generate` (agy). Optional on write: it is its
+            /// harness's own, and any other is refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Provider/wire`.
+            public var wire: Swift.String?
             /// Creates a new `Provider`.
             ///
             /// - Parameters:
@@ -2415,12 +3046,15 @@ extension Components {
             ///   - delivery: `env` and/or `gateway`.
             ///   - harness: `claude`, `codex` or `agy`.
             ///   - id:
+            ///   - keyPrefix: The shape this provider's keys start with (6 to 16 characters, never a built-in's, such
             ///   - loginMethods: `paste`.
-            ///   - models:
+            ///   - models: Model ids exactly as the provider names them: the gateway compares a request's model with
             ///   - name:
             ///   - pricedAt: When the models' list prices were read.
+            ///   - testPath: The authenticated path (under the base URL, such as `/key`) of the one-shot account test,
             ///   - usageParser:
             ///   - version:
+            ///   - wire: The API dialect the gateway speaks to this provider: `anthropic-messages` (claude),
             public init(
                 authVar: Swift.String,
                 baseUrl: Swift.String,
@@ -2428,12 +3062,15 @@ extension Components {
                 delivery: [Swift.String],
                 harness: Swift.String,
                 id: Swift.String,
+                keyPrefix: Swift.String? = nil,
                 loginMethods: [Swift.String],
                 models: [Components.Schemas.ModelPrice],
                 name: Swift.String,
                 pricedAt: Swift.String? = nil,
+                testPath: Swift.String? = nil,
                 usageParser: Swift.String,
-                version: Swift.Int64? = nil
+                version: Swift.Int64? = nil,
+                wire: Swift.String? = nil
             ) {
                 self.authVar = authVar
                 self.baseUrl = baseUrl
@@ -2441,12 +3078,15 @@ extension Components {
                 self.delivery = delivery
                 self.harness = harness
                 self.id = id
+                self.keyPrefix = keyPrefix
                 self.loginMethods = loginMethods
                 self.models = models
                 self.name = name
                 self.pricedAt = pricedAt
+                self.testPath = testPath
                 self.usageParser = usageParser
                 self.version = version
+                self.wire = wire
             }
             public enum CodingKeys: String, CodingKey {
                 case authVar = "auth_var"
@@ -2455,12 +3095,15 @@ extension Components {
                 case delivery
                 case harness
                 case id
+                case keyPrefix = "key_prefix"
                 case loginMethods = "login_methods"
                 case models
                 case name
                 case pricedAt = "priced_at"
+                case testPath = "test_path"
                 case usageParser = "usage_parser"
                 case version
+                case wire
             }
         }
         /// An account as a `read` device sees it: its key's last four characters, never the key, the
@@ -2482,16 +3125,24 @@ extension Components {
             public var id: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/label`.
             public var label: Swift.String
+            /// The last one-shot test of the key; absent when it was never tested.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProviderAccount/last_test`.
+            public var lastTest: Components.Schemas.LastTest?
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/last_used_at`.
             public var lastUsedAt: Components.Schemas.Timestamp?
             /// The key's last four characters; empty for a key too short to show any.
             ///
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/masked_tail`.
             public var maskedTail: Swift.String
-            /// `anthropic`, `openai` or `google`.
+            /// `anthropic`, `openai`, `google` or a user definition's id.
             ///
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/provider`.
             public var provider: Swift.String
+            /// What one session may spend through this account; absent when only the budgets limit it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProviderAccount/session_limits`.
+            public var sessionLimits: Components.Schemas.SessionLimits?
             /// `active`, `cooling`, `limited`, `unhealthy` or `disabled`.
             ///
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/state`.
@@ -2510,9 +3161,11 @@ extension Components {
             ///   - createdAt:
             ///   - id:
             ///   - label:
+            ///   - lastTest: The last one-shot test of the key; absent when it was never tested.
             ///   - lastUsedAt:
             ///   - maskedTail: The key's last four characters; empty for a key too short to show any.
-            ///   - provider: `anthropic`, `openai` or `google`.
+            ///   - provider: `anthropic`, `openai`, `google` or a user definition's id.
+            ///   - sessionLimits: What one session may spend through this account; absent when only the budgets limit it.
             ///   - state: `active`, `cooling`, `limited`, `unhealthy` or `disabled`.
             ///   - stateReason:
             ///   - stateUntil:
@@ -2523,9 +3176,11 @@ extension Components {
                 createdAt: Components.Schemas.Timestamp,
                 id: Swift.Int64,
                 label: Swift.String,
+                lastTest: Components.Schemas.LastTest? = nil,
                 lastUsedAt: Components.Schemas.Timestamp? = nil,
                 maskedTail: Swift.String,
                 provider: Swift.String,
+                sessionLimits: Components.Schemas.SessionLimits? = nil,
                 state: Swift.String,
                 stateReason: Swift.String? = nil,
                 stateUntil: Components.Schemas.Timestamp? = nil,
@@ -2536,9 +3191,11 @@ extension Components {
                 self.createdAt = createdAt
                 self.id = id
                 self.label = label
+                self.lastTest = lastTest
                 self.lastUsedAt = lastUsedAt
                 self.maskedTail = maskedTail
                 self.provider = provider
+                self.sessionLimits = sessionLimits
                 self.state = state
                 self.stateReason = stateReason
                 self.stateUntil = stateUntil
@@ -2550,9 +3207,11 @@ extension Components {
                 case createdAt = "created_at"
                 case id
                 case label
+                case lastTest = "last_test"
                 case lastUsedAt = "last_used_at"
                 case maskedTail = "masked_tail"
                 case provider
+                case sessionLimits = "session_limits"
                 case state
                 case stateReason = "state_reason"
                 case stateUntil = "state_until"
@@ -2606,6 +3265,41 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case sandbox
                 case token
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RaiseBudget`.
+        public struct RaiseBudget: Codable, Hashable, Sendable {
+            /// The period that ran out: `2026-10-22`, a week's Monday, `2026-10` or `total`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RaiseBudget/period_key`.
+            public var periodKey: Swift.String
+            /// Tokens to add (0 when raising dollars).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RaiseBudget/tokens`.
+            public var tokens: Swift.Int64?
+            /// Millionths of a dollar to add.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RaiseBudget/usd_micros`.
+            public var usdMicros: Swift.Int64?
+            /// Creates a new `RaiseBudget`.
+            ///
+            /// - Parameters:
+            ///   - periodKey: The period that ran out: `2026-10-22`, a week's Monday, `2026-10` or `total`.
+            ///   - tokens: Tokens to add (0 when raising dollars).
+            ///   - usdMicros: Millionths of a dollar to add.
+            public init(
+                periodKey: Swift.String,
+                tokens: Swift.Int64? = nil,
+                usdMicros: Swift.Int64? = nil
+            ) {
+                self.periodKey = periodKey
+                self.tokens = tokens
+                self.usdMicros = usdMicros
+            }
+            public enum CodingKeys: String, CodingKey {
+                case periodKey = "period_key"
+                case tokens
+                case usdMicros = "usd_micros"
             }
         }
         /// A lease to redeem. No `Debug` (review L4).
@@ -3080,6 +3774,36 @@ extension Components {
                 case sessionId = "session_id"
             }
         }
+        /// What one session may spend through an account. A dimension left out is not limited by the
+        /// account (only by the budgets).
+        ///
+        /// - Remark: Generated from `#/components/schemas/SessionLimits`.
+        public struct SessionLimits: Codable, Hashable, Sendable {
+            /// Input, output and cache tokens; at least 328000 (one turn needs that much room).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SessionLimits/max_tokens`.
+            public var maxTokens: Swift.Int64?
+            /// Millionths of a dollar.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SessionLimits/max_usd_micros`.
+            public var maxUsdMicros: Swift.Int64?
+            /// Creates a new `SessionLimits`.
+            ///
+            /// - Parameters:
+            ///   - maxTokens: Input, output and cache tokens; at least 328000 (one turn needs that much room).
+            ///   - maxUsdMicros: Millionths of a dollar.
+            public init(
+                maxTokens: Swift.Int64? = nil,
+                maxUsdMicros: Swift.Int64? = nil
+            ) {
+                self.maxTokens = maxTokens
+                self.maxUsdMicros = maxUsdMicros
+            }
+            public enum CodingKeys: String, CodingKey {
+                case maxTokens = "max_tokens"
+                case maxUsdMicros = "max_usd_micros"
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/SessionRequest`.
         public struct SessionRequest: Codable, Hashable, Sendable {
             /// A live challenge issued for the signing device.
@@ -3120,6 +3844,100 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case cap
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SetLimit`.
+        public struct SetLimit: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SetLimit/cap`.
+            public var cap: Swift.Int64
+            /// `tokens` or `messages`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetLimit/unit`.
+            public var unit: Swift.String
+            /// Warn at this percent of the cap (1 to 100); default 80.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetLimit/warn_percent`.
+            public var warnPercent: Swift.Int64?
+            /// 1 to 31622400 seconds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetLimit/window_secs`.
+            public var windowSecs: Swift.Int64
+            /// Creates a new `SetLimit`.
+            ///
+            /// - Parameters:
+            ///   - cap:
+            ///   - unit: `tokens` or `messages`.
+            ///   - warnPercent: Warn at this percent of the cap (1 to 100); default 80.
+            ///   - windowSecs: 1 to 31622400 seconds.
+            public init(
+                cap: Swift.Int64,
+                unit: Swift.String,
+                warnPercent: Swift.Int64? = nil,
+                windowSecs: Swift.Int64
+            ) {
+                self.cap = cap
+                self.unit = unit
+                self.warnPercent = warnPercent
+                self.windowSecs = windowSecs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cap
+                case unit
+                case warnPercent = "warn_percent"
+                case windowSecs = "window_secs"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SetPrice`.
+        public struct SetPrice: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SetPrice/cache_per_mtok_micro`.
+            public var cachePerMtokMicro: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SetPrice/input_per_mtok_micro`.
+            public var inputPerMtokMicro: Swift.Int64
+            /// The model id exactly as the provider names it: the auth gateway grants a session the ids
+            /// priced here and compares a request's model with them as they are. It resolves no alias
+            /// (`-latest`, a family name), and an id ending in `:online` is refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetPrice/model`.
+            public var model: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SetPrice/output_per_mtok_micro`.
+            public var outputPerMtokMicro: Swift.Int64
+            /// When the provider's list price was read: a UTC timestamp.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetPrice/priced_at`.
+            public var pricedAt: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SetPrice/provider`.
+            public var provider: Swift.String
+            /// Creates a new `SetPrice`.
+            ///
+            /// - Parameters:
+            ///   - cachePerMtokMicro:
+            ///   - inputPerMtokMicro:
+            ///   - model: The model id exactly as the provider names it: the auth gateway grants a session the ids
+            ///   - outputPerMtokMicro:
+            ///   - pricedAt: When the provider's list price was read: a UTC timestamp.
+            ///   - provider:
+            public init(
+                cachePerMtokMicro: Swift.Int64,
+                inputPerMtokMicro: Swift.Int64,
+                model: Swift.String,
+                outputPerMtokMicro: Swift.Int64,
+                pricedAt: Swift.String,
+                provider: Swift.String
+            ) {
+                self.cachePerMtokMicro = cachePerMtokMicro
+                self.inputPerMtokMicro = inputPerMtokMicro
+                self.model = model
+                self.outputPerMtokMicro = outputPerMtokMicro
+                self.pricedAt = pricedAt
+                self.provider = provider
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cachePerMtokMicro = "cache_per_mtok_micro"
+                case inputPerMtokMicro = "input_per_mtok_micro"
+                case model
+                case outputPerMtokMicro = "output_per_mtok_micro"
+                case pricedAt = "priced_at"
+                case provider
             }
         }
         /// A device's new scopes.
@@ -3197,6 +4015,71 @@ extension Components {
                 case reason
                 case state
                 case until
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SetSubjectBudget`.
+        public struct SetSubjectBudget: Codable, Hashable, Sendable {
+            /// The owner's company binding; for a company budget it must be the subject (or absent).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/company`.
+            public var company: Swift.String?
+            /// Default true.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/hard_stop`.
+            public var hardStop: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/kind`.
+            public var kind: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/period`.
+            public var period: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/subject`.
+            public var subject: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/token_cap`.
+            public var tokenCap: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/usd_cap_micros`.
+            public var usdCapMicros: Swift.Int64?
+            /// Default 80.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubjectBudget/warn_at_percent`.
+            public var warnAtPercent: Swift.Int64?
+            /// Creates a new `SetSubjectBudget`.
+            ///
+            /// - Parameters:
+            ///   - company: The owner's company binding; for a company budget it must be the subject (or absent).
+            ///   - hardStop: Default true.
+            ///   - kind:
+            ///   - period:
+            ///   - subject:
+            ///   - tokenCap:
+            ///   - usdCapMicros:
+            ///   - warnAtPercent: Default 80.
+            public init(
+                company: Swift.String? = nil,
+                hardStop: Swift.Bool? = nil,
+                kind: Swift.String,
+                period: Swift.String,
+                subject: Swift.String,
+                tokenCap: Swift.Int64,
+                usdCapMicros: Swift.Int64? = nil,
+                warnAtPercent: Swift.Int64? = nil
+            ) {
+                self.company = company
+                self.hardStop = hardStop
+                self.kind = kind
+                self.period = period
+                self.subject = subject
+                self.tokenCap = tokenCap
+                self.usdCapMicros = usdCapMicros
+                self.warnAtPercent = warnAtPercent
+            }
+            public enum CodingKeys: String, CodingKey {
+                case company
+                case hardStop = "hard_stop"
+                case kind
+                case period
+                case subject
+                case tokenCap = "token_cap"
+                case usdCapMicros = "usd_cap_micros"
+                case warnAtPercent = "warn_at_percent"
             }
         }
         /// One setting and its effective value at the scope asked about.
@@ -3493,6 +4376,155 @@ extension Components {
                 ])
             }
         }
+        /// A budget and where it stands in the period containing now.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SubjectBudget`.
+        public struct SubjectBudget: Codable, Hashable, Sendable {
+            /// The owner's company binding (a company budget's is its subject).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/company`.
+            public var company: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// Nothing left in tokens or dollars.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/exhausted`.
+            public var exhausted: Swift.Bool
+            /// Stops new sessions, and a running one, at the cap; else it only warns.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/hard_stop`.
+            public var hardStop: Swift.Bool
+            /// Tokens held by sessions that reserved them and have not spent them yet.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/held`.
+            public var held: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/held_usd`.
+            public var heldUsd: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/id`.
+            public var id: Swift.Int64
+            /// `account`, `pool`, `agent`, `company`, `department`, `project`, `sprint` or `issue`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/kind`.
+            public var kind: Swift.String
+            /// `day`, `week` (from Monday), `month` or `total`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/period`.
+            public var period: Swift.String
+            /// The period this standing is for: `2026-10-22`, a week's Monday, `2026-10` or `total`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/period_key`.
+            public var periodKey: Swift.String
+            /// Tokens added for the period by approved overruns.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/raised`.
+            public var raised: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/raised_usd`.
+            public var raisedUsd: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/spent`.
+            public var spent: Swift.Int64
+            /// The subject's id: an account or pool id, or the owning module's opaque id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/subject`.
+            public var subject: Swift.String
+            /// Tokens per period; 0 with a dollar cap is a dollars-only budget.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/token_cap`.
+            public var tokenCap: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/updated_at`.
+            public var updatedAt: Components.Schemas.Timestamp
+            /// Millionths of a dollar per period.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/usd_cap_micros`.
+            public var usdCapMicros: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/usd_spent`.
+            public var usdSpent: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/SubjectBudget/warn_at_percent`.
+            public var warnAtPercent: Swift.Int64
+            /// Creates a new `SubjectBudget`.
+            ///
+            /// - Parameters:
+            ///   - company: The owner's company binding (a company budget's is its subject).
+            ///   - createdAt:
+            ///   - exhausted: Nothing left in tokens or dollars.
+            ///   - hardStop: Stops new sessions, and a running one, at the cap; else it only warns.
+            ///   - held: Tokens held by sessions that reserved them and have not spent them yet.
+            ///   - heldUsd:
+            ///   - id:
+            ///   - kind: `account`, `pool`, `agent`, `company`, `department`, `project`, `sprint` or `issue`.
+            ///   - period: `day`, `week` (from Monday), `month` or `total`.
+            ///   - periodKey: The period this standing is for: `2026-10-22`, a week's Monday, `2026-10` or `total`.
+            ///   - raised: Tokens added for the period by approved overruns.
+            ///   - raisedUsd:
+            ///   - spent:
+            ///   - subject: The subject's id: an account or pool id, or the owning module's opaque id.
+            ///   - tokenCap: Tokens per period; 0 with a dollar cap is a dollars-only budget.
+            ///   - updatedAt:
+            ///   - usdCapMicros: Millionths of a dollar per period.
+            ///   - usdSpent:
+            ///   - warnAtPercent:
+            public init(
+                company: Swift.String? = nil,
+                createdAt: Components.Schemas.Timestamp,
+                exhausted: Swift.Bool,
+                hardStop: Swift.Bool,
+                held: Swift.Int64,
+                heldUsd: Swift.Int64,
+                id: Swift.Int64,
+                kind: Swift.String,
+                period: Swift.String,
+                periodKey: Swift.String,
+                raised: Swift.Int64,
+                raisedUsd: Swift.Int64,
+                spent: Swift.Int64,
+                subject: Swift.String,
+                tokenCap: Swift.Int64,
+                updatedAt: Components.Schemas.Timestamp,
+                usdCapMicros: Swift.Int64? = nil,
+                usdSpent: Swift.Int64,
+                warnAtPercent: Swift.Int64
+            ) {
+                self.company = company
+                self.createdAt = createdAt
+                self.exhausted = exhausted
+                self.hardStop = hardStop
+                self.held = held
+                self.heldUsd = heldUsd
+                self.id = id
+                self.kind = kind
+                self.period = period
+                self.periodKey = periodKey
+                self.raised = raised
+                self.raisedUsd = raisedUsd
+                self.spent = spent
+                self.subject = subject
+                self.tokenCap = tokenCap
+                self.updatedAt = updatedAt
+                self.usdCapMicros = usdCapMicros
+                self.usdSpent = usdSpent
+                self.warnAtPercent = warnAtPercent
+            }
+            public enum CodingKeys: String, CodingKey {
+                case company
+                case createdAt = "created_at"
+                case exhausted
+                case hardStop = "hard_stop"
+                case held
+                case heldUsd = "held_usd"
+                case id
+                case kind
+                case period
+                case periodKey = "period_key"
+                case raised
+                case raisedUsd = "raised_usd"
+                case spent
+                case subject
+                case tokenCap = "token_cap"
+                case updatedAt = "updated_at"
+                case usdCapMicros = "usd_cap_micros"
+                case usdSpent = "usd_spent"
+                case warnAtPercent = "warn_at_percent"
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Terminal`.
         public struct Terminal: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/Terminal/attached`.
@@ -3669,6 +4701,84 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/Timestamp`.
         public typealias Timestamp = Foundation.Date
+        /// - Remark: Generated from `#/components/schemas/UsageByCompany`.
+        public struct UsageByCompany: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/UsageByCompany/company`.
+            public var company: Swift.String
+            /// - Remark: Generated from `#/components/schemas/UsageByCompany/five_hours`.
+            public var fiveHours: Components.Schemas.UsageWindow
+            /// - Remark: Generated from `#/components/schemas/UsageByCompany/seven_days`.
+            public var sevenDays: Components.Schemas.UsageWindow
+            /// Creates a new `UsageByCompany`.
+            ///
+            /// - Parameters:
+            ///   - company:
+            ///   - fiveHours:
+            ///   - sevenDays:
+            public init(
+                company: Swift.String,
+                fiveHours: Components.Schemas.UsageWindow,
+                sevenDays: Components.Schemas.UsageWindow
+            ) {
+                self.company = company
+                self.fiveHours = fiveHours
+                self.sevenDays = sevenDays
+            }
+            public enum CodingKeys: String, CodingKey {
+                case company
+                case fiveHours = "five_hours"
+                case sevenDays = "seven_days"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/UsageWindow`.
+        public struct UsageWindow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/UsageWindow/cache_tokens`.
+            public var cacheTokens: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/UsageWindow/cost_usd_micros`.
+            public var costUsdMicros: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/UsageWindow/input_tokens`.
+            public var inputTokens: Swift.Int64
+            /// Messages counted in the window (an account-wide figure; 0 in a company's slice).
+            ///
+            /// - Remark: Generated from `#/components/schemas/UsageWindow/messages`.
+            public var messages: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/UsageWindow/output_tokens`.
+            public var outputTokens: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/UsageWindow/total_tokens`.
+            public var totalTokens: Swift.Int64
+            /// Creates a new `UsageWindow`.
+            ///
+            /// - Parameters:
+            ///   - cacheTokens:
+            ///   - costUsdMicros:
+            ///   - inputTokens:
+            ///   - messages: Messages counted in the window (an account-wide figure; 0 in a company's slice).
+            ///   - outputTokens:
+            ///   - totalTokens:
+            public init(
+                cacheTokens: Swift.Int64,
+                costUsdMicros: Swift.Int64,
+                inputTokens: Swift.Int64,
+                messages: Swift.Int64,
+                outputTokens: Swift.Int64,
+                totalTokens: Swift.Int64
+            ) {
+                self.cacheTokens = cacheTokens
+                self.costUsdMicros = costUsdMicros
+                self.inputTokens = inputTokens
+                self.messages = messages
+                self.outputTokens = outputTokens
+                self.totalTokens = totalTokens
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cacheTokens = "cache_tokens"
+                case costUsdMicros = "cost_usd_micros"
+                case inputTokens = "input_tokens"
+                case messages
+                case outputTokens = "output_tokens"
+                case totalTokens = "total_tokens"
+            }
+        }
         /// What the server is and speaks.
         ///
         /// - Remark: Generated from `#/components/schemas/Versions`.

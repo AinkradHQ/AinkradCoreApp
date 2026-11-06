@@ -29,8 +29,8 @@ final class PairingLiveUITests: XCTestCase {
         XCTAssertTrue(me.waitForExistence(timeout: 20), "Devices lists this Mac from the Core")
         XCTAssertTrue(app.buttons["Add device…"].exists)
         me.click()
-        XCTAssertTrue(app.buttons["Rename…"].waitForExistence(timeout: 10), "the device page has its actions")
-        XCTAssertTrue(app.buttons["Revoke…"].exists)
+        XCTAssertTrue(app.buttons["Rename"].waitForExistence(timeout: 10), "the device page has its actions")
+        XCTAssertTrue(app.buttons["Revoke device"].exists)
         app.buttons["Back to Devices"].click()
         XCTAssertTrue(app.buttons["Add device…"].waitForExistence(timeout: 10), "Back returns to the list")
 

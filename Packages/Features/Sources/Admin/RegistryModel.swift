@@ -18,7 +18,7 @@ enum HistoryLoad: Equatable {
 @MainActor @Observable
 final class RegistryModel {
     /// Settings that gate a feature, in the order the screen shows them.
-    static let switchKeys = ["secrets.mode", "auth.passkey_admin", "secrets.provider_accounts"]
+    nonisolated static let switchKeys = ["secrets.mode", "auth.passkey_admin", "secrets.provider_accounts"]
 
     private(set) var items: [SettingItem] = []
     var state: SectionState = .loading
@@ -29,6 +29,8 @@ final class RegistryModel {
     private(set) var writeError: [String: String] = [:]
     private(set) var busy: String?
     var openHistory: String?
+    /// The row the keyboard is on in Core settings.
+    var cursor: String?
     private(set) var history: [String: HistoryLoad] = [:]
     private(set) var runners: [RunnerChoice] = []
     @ObservationIgnored private weak var hub: AdminModel?
@@ -81,6 +83,7 @@ final class RegistryModel {
     // MARK: editing
 
     func beginEdit(_ s: SettingItem) {
+        cursor = s.key
         editing = s.key
         draft = String(s.value)
         issue = nil
@@ -102,12 +105,16 @@ final class RegistryModel {
         if n < s.min {
             return FieldIssue(
                 code: "out_of_bounds",
-                message: "\(n) is below the minimum \(s.min). Nothing was saved and the value was not changed to fit.")
+                message:
+                    "\(SettingWords.value(s, n)) is below the lowest allowed, \(SettingWords.value(s, s.min)). Nothing was saved."
+            )
         }
         if n > s.max {
             return FieldIssue(
                 code: "out_of_bounds",
-                message: "\(n) is above the maximum \(s.max). Nothing was saved and the value was not changed to fit.")
+                message:
+                    "\(SettingWords.value(s, n)) is above the highest allowed, \(SettingWords.value(s, s.max)). Nothing was saved."
+            )
         }
         return nil
     }
@@ -123,7 +130,7 @@ final class RegistryModel {
         guard let n = draftValue() else { return }
         if await set(
             s, to: n,
-            reason: "Change \(s.key) to \(n) \(s.unitLabel). Settings can weaken security, so this needs you.",
+            reason: "Change \(SettingWords.title(s)) to \(SettingWords.value(s, n)).",
             keepsEdit: true)
         {
             editing = nil
@@ -144,13 +151,19 @@ final class RegistryModel {
             }
             replace(updated)
             await refreshHistory(s.key)
-            hub.host.shell.showToast("\(s.key) is now \(n)\(s.unitLabel.isEmpty ? "" : " \(s.unitLabel)")") {
+            hub.host.shell.showToast("\(SettingWords.title(s)): \(SettingWords.value(s, n))") {
                 [weak self] in
                 Task { @MainActor in
                     if s.isOverride {
-                        await self?.set(updated, to: s.value, reason: "Put \(s.key) back to \(s.value).")
+                        await self?.set(
+                            updated, to: s.value,
+                            reason: "Put \(SettingWords.title(s)) back to \(SettingWords.value(s, s.value)).")
                     } else {
-                        await self?.reset(updated, reason: "Put \(s.key) back to its default (\(s.defaultValue)).")
+                        await self?.reset(
+                            updated,
+                            reason:
+                                "Put \(SettingWords.title(s)) back to its default, \(SettingWords.value(s, s.defaultValue))."
+                        )
                     }
                 }
             }
@@ -174,13 +187,17 @@ final class RegistryModel {
         defer { busy = nil }
         do {
             let updated = try await hub.host.elevated(
-                reason ?? "Reset \(s.key) to its default (\(s.defaultValue)).", done: "reset", keepsEdit: false
+                reason ?? "Put \(SettingWords.title(s)) back to its default, \(SettingWords.value(s, s.defaultValue)).",
+                done: "reset", keepsEdit: false
             ) { try await service.resetSetting(s.key) }
             replace(updated)
             await refreshHistory(s.key)
-            hub.host.shell.showToast("\(s.key) is back to its default") { [weak self] in
+            hub.host.shell.showToast("\(SettingWords.title(s)) is back to \(SettingWords.value(s, s.defaultValue))") {
+                [weak self] in
                 Task { @MainActor in
-                    await self?.set(updated, to: s.value, reason: "Put \(s.key) back to \(s.value).")
+                    await self?.set(
+                        updated, to: s.value,
+                        reason: "Put \(SettingWords.title(s)) back to \(SettingWords.value(s, s.value)).")
                 }
             }
         } catch is AdminDeclined {
@@ -199,6 +216,7 @@ final class RegistryModel {
             return
         }
         openHistory = key
+        cursor = key
         await refreshHistory(key, showLoading: true)
     }
 

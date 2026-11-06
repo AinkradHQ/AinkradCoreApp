@@ -25,6 +25,7 @@ extension Failure {
         case .oldApp: "This app and the Core do not speak the same version"
         case .revokedHere: "This Mac was revoked"
         case .cancelledAfterApproval: "Pairing cancelled"
+        case .keychain(let m) where m.contains("-25244"): "macOS won't let Ainkrad delete its old keys"
         case .keychain: "The keychain refused"
         case .other: "Something went wrong"
         }
@@ -79,6 +80,8 @@ extension Failure {
             "Another admin device removed this Mac from the Core. Its keys are gone from here. Pair again to come back."
         case .cancelledAfterApproval(let id):
             "The approver had already approved this Mac, so it is still listed on their side. Ask them to revoke device \(id) in Settings, Devices."
+        case .keychain(let m) where m.contains("-25244"):
+            "An earlier build of Ainkrad saved them, and macOS only lets that build delete them. Open Keychain Access, search for com.ainkrad.core.corekit, delete what it finds, then choose Forget again."
         case .keychain(let m): m
         case .other(let m): m
         }
@@ -108,29 +111,25 @@ struct FailureView: View {
     var retryAt: Date?
     let actions: [FailureAction]
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in card(now: context.date) }
+            // Arrives with a short rise; Reduce Motion keeps the fade and drops the travel.
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : Space.s4)
+            .onAppear { withAnimation(.spring(duration: 0.45, bounce: 0.2)) { shown = true } }
     }
 
     private func card(now: Date) -> some View {
         let wait = max(0, Int((retryAt ?? now).timeIntervalSince(now).rounded(.up)))
         return VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: failure.symbol).font(.system(size: MacTextSize.large))
-                    .foregroundStyle(palette.tone(failure.tone).ink)
-                    .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                    .background(palette.tone(failure.tone).fill, in: coreShape(Radius.control))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(failure.title).font(.system(size: MacTextSize.large, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
-                    if let code = failure.code {
-                        Text(code).font(.system(size: MacTextSize.meta, design: .monospaced))
-                            .foregroundStyle(palette.text2)
-                    }
-                }
-            }
+            FailureDiagram(failure: failure).frame(maxWidth: .infinity)
+            // The error code is for support, so it sits in the tooltip, not on the card.
+            Text(failure.title).font(.system(size: MacTextSize.large, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+                .help(failure.code ?? "")
             Text(failure.text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             if !failure.reasons.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s1) {
@@ -148,15 +147,15 @@ struct FailureView: View {
                 Label("Stopped. There is no way to continue from here.", systemImage: "hand.raised")
                     .font(.system(size: MacTextSize.body, weight: .semibold))
             }
+            // Secondary actions sit at the left edge, the primary one at the right.
             HStack(spacing: Space.s2) {
+                ForEach(Array(actions.filter { $0.style != .primary }.enumerated()), id: \.element.id) { i, a in
+                    Button(a.label, action: a.run).coreGlassButton().coreShortcut(.number(i + 1)).disabled(a.disabled)
+                }
                 Spacer(minLength: 0)
-                ForEach(actions) { a in
-                    if a.style == .primary {
-                        Button(a.label, action: a.run).buttonStyle(.coreProminent).keyboardShortcut(.defaultAction)
-                            .disabled(a.disabled || wait > 0)
-                    } else {
-                        Button(a.label, action: a.run).buttonStyle(.coreSecondary).disabled(a.disabled)
-                    }
+                ForEach(actions.filter { $0.style == .primary }) { a in
+                    Button(a.label, action: a.run).coreGlassButton(prominent: true).coreShortcut(.primary)
+                        .disabled(a.disabled || wait > 0)
                 }
             }
         }

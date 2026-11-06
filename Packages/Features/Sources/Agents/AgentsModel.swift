@@ -44,6 +44,8 @@ public final class AgentsModel {
     public var filter: AgentFilter = .all
     /// What is typed in each session's composer.
     public var drafts: [String: String] = [:]
+    /// The quick popup's prompt, carried into the advanced sheet.
+    public var draftPrompt = ""
     public internal(set) var sending: Set<String> = []
     /// Sessions asked to stop that have not ended yet: the Core answers a cancel at once but the agent only stops after its tool
     /// call in flight (or the runner's grace), so the session reads as still running until then. Shown as "Cancelling".
@@ -57,6 +59,8 @@ public final class AgentsModel {
     public var selected: String?
 
     var api: (any AgentsAPI)?
+    /// Each open session's spend from Core's ledger (`SessionSpend.swift`).
+    var ledgers: [String: SessionLedger] = [:]
     weak var host: (any AgentsHost)?
     let notifier: any ApprovalNotifier
     let defaults: UserDefaults

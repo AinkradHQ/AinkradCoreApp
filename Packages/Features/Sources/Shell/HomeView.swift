@@ -52,7 +52,12 @@ struct HomeView: View {
                 .allowsHitTesting(true)
             ghost
             ForEach(sorted) { item in card(item) }
-            controls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s2)
+            // Hidden at rest: Add Widget and Edit Widgets live in the right-click menu on the sky. The bar shows only
+            // while editing or adding, so there is a Done to press.
+            if shell.editingWidgets || shell.addingWidget {
+                controls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s2)
+                    .transition(.opacity.combined(with: .offset(y: coreMove(reduce, 12))))
+            }
             if shell.addingWidget {
                 WidgetGallery(shell: shell, begin: beginFromGallery, move: moveDrag, end: endDrag)
                     .frame(width: 340).frame(maxHeight: .infinity)
@@ -177,8 +182,7 @@ struct HomeView: View {
             }
             .buttonStyle(CoreButtonStyle(shell.editingWidgets ? .prominent : .secondary, size: .small))
         }
-        .padding(Space.s1)
-        .coreGlass(radius: Radius.cardMac, interactive: false)
+        // The two buttons are glass themselves; no second glass behind them.
     }
 }
 
@@ -192,7 +196,9 @@ struct GreetingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
-    private var ink: Color { scheme == .dark ? .white : Color(red: 0.055, green: 0.106, blue: 0.18) }
+    /// White on both skies: the day sky is a mid blue, where navy text sinks (Ahmed, 2026-11-05). A deep-blue shadow keeps it
+    /// readable over the bright clouds.
+    private var ink: Color { .white }
     private var dayPart: String {
         let h = Calendar.current.component(.hour, from: Date())
         return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
@@ -212,8 +218,8 @@ struct GreetingView: View {
         }
         .foregroundStyle(ink)
         .shadow(
-            color: scheme == .dark ? Color(red: 0, green: 0.03, blue: 0.09).opacity(0.65) : .white.opacity(0.7),
-            radius: 14, y: 1
+            color: Color(red: 0, green: 0.05, blue: 0.18).opacity(scheme == .dark ? 0.65 : 0.45),
+            radius: 12, y: 1
         )
         .opacity(shown ? 1 : 0)
         .offset(y: shown ? 0 : coreMove(reduce, 10))

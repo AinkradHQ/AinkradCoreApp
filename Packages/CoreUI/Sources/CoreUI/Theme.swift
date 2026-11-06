@@ -22,10 +22,11 @@ public struct Palette: Sendable {
     public var btnPrimaryHover: Color { theme["btnPrimaryHover"] }
     public var btnPrimaryPress: Color { theme["btnPrimaryPress"] }
     public var btnInk: Color { theme["btnInk"] }
-    public var navActive: Color { theme["navActive"] }
-    public var navActiveEdge: Color { theme["navActiveEdge"] }
-    public var navActiveInk: Color { theme["navActiveInk"] }
-    public var rowHover: Color { theme["mRowHover"] }
+    /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
+    public var navActive: Color { .white.opacity(0.18) }
+    public var navActiveEdge: Color { .white.opacity(0.3) }
+    public var navActiveInk: Color { .white }
+    public var rowHover: Color { .white.opacity(0.1) }
     public var edge: Color { theme["edge"] }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
@@ -35,15 +36,18 @@ public struct Palette: Sendable {
     public var surface: Color { theme["surface"] }
 
     /// The one focus ring: blue at night, white over the deep day glass.
-    public var focusRing: Color { pick("focusRing", fallback: theme["primary"]) }
+    /// No blue focus rings anywhere (Ahmed, 2026-11-05): views that still outline the focused control get the quiet edge.
+    public var focusRing: Color { glassCardEdge }
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
-    public var glassCard: Color { pick("glassCard", fallback: theme["mRow"]) }
-    public var glassCardEdge: Color { pick("glassCardEdge", fallback: theme["edge"]) }
+    /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
+    /// soft white well with a light edge, not a dark slab, in both themes.
+    public var glassCard: Color { .white.opacity(0.08) }
+    public var glassCardEdge: Color { .white.opacity(0.14) }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
-    public var uDim: Color { pick("uDim", fallback: theme["text"].opacity(0.08)) }
-    public var uDimHover: Color { pick("uDimHover", fallback: theme["text"].opacity(0.14)) }
+    public var uDim: Color { .white.opacity(0.1) }
+    public var uDimHover: Color { .white.opacity(0.16) }
 
     public func tone(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {
@@ -82,6 +86,9 @@ private struct CoreThemeModifier: ViewModifier {
             // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
             .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
             .font(.system(size: MacTextSize.body))
+            // No focus rings anywhere (Ahmed, 2026-11-05): the system ring and our own both stay off. Keyboard focus
+            // still moves; the focused control is the one that answers Space and Return.
+            .focusEffectDisabled()
     }
 }
 
@@ -98,16 +105,8 @@ extension View {
     public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
 
     /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
-    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
-        overlay {
-            if show {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .inset(by: -Space.s1 / 2)
-                    .strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
+    /// Draws nothing in the app: focus rings are off everywhere (Ahmed, 2026-11-05). Kept so callers need no change.
+    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View { self }
 }
 
 private struct CoreAnimationModifier<V: Equatable>: ViewModifier {

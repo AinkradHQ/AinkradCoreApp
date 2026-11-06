@@ -101,44 +101,6 @@ struct AdminLink: View {
     }
 }
 
-/// A switch drawn as a rounded rectangle with a square-cornered thumb, with its state in words beside it.
-struct AdminSwitch: View {
-    let label: String
-    @Binding var on: Bool
-    var busy = false
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        Button {
-            on.toggle()
-        } label: {
-            HStack(spacing: Space.s2) {
-                Text(on ? "On" : "Off").font(.system(size: MacTextSize.meta, weight: .semibold))
-                    .foregroundStyle(palette.text2).frame(minWidth: Space.s5, alignment: .trailing)
-                ZStack(alignment: on ? .trailing : .leading) {
-                    coreShape(Radius.control).fill(on ? palette.btnPrimary : palette.track)
-                        .frame(width: Space.s8 + Space.s2, height: Space.s5 + Space.s1)
-                    coreShape(Radius.chip).fill(on ? palette.btnInk : palette.text2)
-                        .frame(width: Space.s4, height: Space.s4).padding(Space.s1)
-                }
-                .animation(reduce ? nil : Motion.out(Motion.hover), value: on)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .focused($focused).focusEffectDisabled()
-        .coreFocusRing(focused, radius: Radius.control, palette: palette)
-        .coreDimWhenDisabled(enabled)
-        .accessibilityLabel(label)
-        .accessibilityValue(on ? "On" : "Off")
-        .accessibilityAddTraits(.isToggle)
-        .accessibilityIdentifier("switch-\(label)")
-    }
-}
-
 /// The inline outcome of a Touch ID that did not elevate, in the panel that asked.
 struct AdminNoticeBanner: View {
     let notice: AdminNotice?
@@ -298,50 +260,4 @@ enum AdminWords {
     static func time(_ d: Date) -> String { d.formatted(date: .omitted, time: .standard) }
     static func bytes(_ n: Int64) -> String { "\(n) B" }
     static func number(_ n: Int64) -> String { n.formatted(.number.grouping(.never)) }
-}
-
-/// The states of a gate as nodes with what each step needs between them: met or not met, in words, a symbol and a bar.
-struct AdminFlow: View {
-    struct Node {
-        let title: String
-        let sub: String
-    }
-    struct Edge {
-        let label: String
-        let met: Bool
-    }
-    let nodes: [Node]
-    let current: Int
-    let edges: [Edge]
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        HStack(alignment: .center, spacing: Space.s2) {
-            ForEach(Array(nodes.enumerated()), id: \.offset) { i, n in
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(n.sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(1)
-                }
-                .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-                .background(i == current ? palette.navActive : palette.uDim, in: coreShape(Radius.control))
-                .overlay {
-                    if i == current { coreShape(Radius.control).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(n.title), \(n.sub)\(i == current ? ", current" : "")")
-                if i < edges.count {
-                    let e = edges[i]
-                    VStack(spacing: Space.s1) {
-                        coreShape(Space.s1 / 2).fill(e.met ? palette.primary : palette.tone(.warn).ink.opacity(0.6))
-                            .frame(height: Space.s1)
-                        Label(e.label + " · " + (e.met ? "met" : "not met"), systemImage: e.met ? "checkmark" : "lock")
-                            .font(.system(size: MacTextSize.meta)).labelStyle(.titleAndIcon)
-                            .foregroundStyle(e.met ? palette.text2 : palette.tone(.warn).ink).lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityElement(children: .combine)
-                }
-            }
-        }
-    }
 }

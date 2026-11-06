@@ -26,9 +26,25 @@ public final class AccountsModel {
     /// The account whose page is open in Accounts (nil: the list).
     var detail: Int64?
     var poolSelection: Int64?
+    /// A subscription sign-in in the Connect sheet, while it runs (`SignIn.swift`).
+    var signIn: SignInFlow?
+    /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
+    var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
     private(set) var writeError: [String: String] = [:]
     private(set) var busy: String?
+    /// The account whose key is being tested now, and what the last test of each answered when it could not run.
+    var testing: Int64?
+    var testNote: [Int64: String] = [:]
+    /// Budgets (Spend), read when the Spend pages open.
+    var budgets: [BudgetItem] = []
+    var spendLoad: AccountsLoad = .loading
+    /// Costs and usage, the ledger and prices (Spend), read when their pages open.
+    var usage: [UsageItem] = []
+    var costs: [CostItem] = []
+    var prices: [PriceItem] = []
+    var costsLoad: AccountsLoad = .loading
+    var pricesLoad: AccountsLoad = .loading
     /// Opens a provider's own page. Tests and the demo replace it: they must never open a browser.
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var now: () -> Date = { Date() }
@@ -54,6 +70,7 @@ public final class AccountsModel {
         load = .loading
         readOnly = false
         detail = nil
+        signIn = nil
     }
 
     public var isConnected: Bool { service != nil }
@@ -370,7 +387,7 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .core, title: "Accounts and budgets", symbol: "creditcard", order: 4
+                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
             ) {
                 AccountsLinkSection(model: self)
             })

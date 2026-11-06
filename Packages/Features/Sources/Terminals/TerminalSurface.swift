@@ -20,21 +20,42 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         term = TerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
         super.init()
         term.terminalDelegate = self
-        term.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        // The prototype's terminal: deep blue glass with cool text, the same in night and day.
-        term.nativeBackgroundColor = NSColor(red: 3 / 255, green: 8 / 255, blue: 16 / 255, alpha: 0.78)
-        term.nativeForegroundColor = NSColor(red: 0xCF / 255, green: 0xE0 / 255, blue: 0xF5 / 255, alpha: 1)
-        term.caretColor = NSColor(red: 0x7F / 255, green: 0xB8 / 255, blue: 0xFF / 255, alpha: 1)
         term.optionAsMetaKey = true
-        // Reduce Motion: the cursor does not blink.
-        let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        term.getTerminal().setCursorStyle(still ? .steadyBlock : .blinkBlock)
+        applyPrefs()
+        // Settings, Terminal: every open terminal follows a change at once.
+        NotificationCenter.default.addObserver(forName: TerminalPrefs.changed, object: nil, queue: .main) {
+            [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPrefs() }
+        }
         container.addSubview(term)
         container.term = term
         container.surface = self
         container.wantsLayer = true
         container.layer?.cornerRadius = 12
         container.layer?.masksToBounds = true
+    }
+
+    /// Font, theme, cursor and background from Settings, Terminal. Reduce Motion: the cursor does not blink.
+    func applyPrefs() {
+        let p = TerminalPrefs.shared
+        let t = p.theme
+        term.font = p.font
+        term.nativeBackgroundColor = p.screenColor
+        // SwiftTerm paints its own layer opaque when it is made (and again on every resize); keep it clear so only the
+        // themed background, at the chosen transparency, is drawn (SurfaceContainer.layout re-applies after a resize).
+        term.layer?.backgroundColor = NSColor.clear.cgColor
+        term.nativeForegroundColor = t.foreground
+        term.caretColor = t.caret
+        term.installColors(
+            t.ansi.map { c in
+                let rgb = c.usingColorSpace(.sRGB) ?? c
+                return SwiftTerm.Color(
+                    red: UInt16(rgb.redComponent * 65535), green: UInt16(rgb.greenComponent * 65535),
+                    blue: UInt16(rgb.blueComponent * 65535))
+            })
+        term.getTerminal().setCursorStyle(
+            p.cursorStyle(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))
+        container.needsLayout = true
     }
 
     // MARK: output
@@ -75,7 +96,9 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         let bytes = Data(data)
         MainActor.assumeIsolated { onInput?(bytes) }
     }
-    nonisolated func scrolled(source: TerminalView, position: Double) {}
+    nonisolated func scrolled(source: TerminalView, position: Double) {
+        MainActor.assumeIsolated { container.showThumb() }
+    }
     nonisolated func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
         if let url = URL(string: link), ["http", "https"].contains(url.scheme?.lowercased()) {
             NSWorkspace.shared.open(url)
@@ -103,19 +126,58 @@ final class SurfaceContainer: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
+    /// The terminal's own grey scroller is hidden and its reserved strip pushed past the right edge, so the screen has
+    /// the same margin on every side; a thin glass thumb stands in for it, fading in while the output scrolls
+    /// (Ahmed, 2026-11-05).
+    private let thumb = CALayer()
+    private var fade: DispatchWorkItem?
+
     override func layout() {
         super.layout()
         guard let term else { return }
+        let strip = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+        for case let s as NSScroller in term.subviews { s.isHidden = true }
         switch mode {
         case .fill:
             layer?.backgroundColor = nil
-            term.frame = bounds
+            term.frame = CGRect(x: 0, y: 0, width: bounds.width + strip, height: bounds.height)
         case .letterbox:
             layer?.backgroundColor = NSColor(red: 2 / 255, green: 6 / 255, blue: 12 / 255, alpha: 0.92).cgColor
             let want = term.getOptimalFrameSize().size
             term.frame = CGRect(
-                x: 0, y: 0, width: min(want.width, bounds.width), height: min(want.height, bounds.height))
+                x: 0, y: 0, width: min(want.width, bounds.width + strip), height: min(want.height, bounds.height))
         }
+        term.layer?.backgroundColor = NSColor.clear.cgColor
+        placeThumb()
+    }
+
+    private func placeThumb() {
+        guard let term, let layer else { return }
+        if thumb.superlayer == nil {
+            thumb.backgroundColor = NSColor.white.withAlphaComponent(0.42).cgColor
+            thumb.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
+            thumb.borderWidth = 0.5
+            thumb.cornerRadius = 2.5
+            thumb.opacity = 0
+            layer.addSublayer(thumb)
+        }
+        let size = max(0.05, min(1, term.scrollThumbsize))
+        let height = max(28, bounds.height * size)
+        let y = (bounds.height - height) * CGFloat(term.scrollPosition)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        thumb.frame = CGRect(x: bounds.width - 8, y: y, width: 5, height: height)
+        CATransaction.commit()
+        thumb.isHidden = !term.canScroll
+    }
+
+    func showThumb() {
+        placeThumb()
+        thumb.opacity = 1
+        fade?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.thumb.opacity = 0 }
+        fade = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
     }
 
     override func isAccessibilityElement() -> Bool { true }

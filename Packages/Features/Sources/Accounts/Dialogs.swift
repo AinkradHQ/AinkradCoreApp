@@ -25,6 +25,27 @@ enum AccountDialogs {
     static func openCap(_ m: AccountsModel, _ a: AccountItem) {
         present(m, "account-cap") { close in CapDialog(model: m, account: a, close: close) }
     }
+    static func openLimits(_ m: AccountsModel, _ a: AccountItem) {
+        present(m, "account-limits") { close in LimitsDialog(model: m, account: a, close: close) }
+    }
+    static func openBudget(_ m: AccountsModel, editing: BudgetItem?) {
+        present(m, "budget") { close in BudgetDialog(model: m, editing: editing, close: close) }
+    }
+    static func openRaise(_ m: AccountsModel, _ b: BudgetItem) {
+        present(m, "budget-raise") { close in RaiseDialog(model: m, budget: b, close: close) }
+    }
+    static func openDeleteBudget(_ m: AccountsModel, _ b: BudgetItem) {
+        present(m, "budget-delete") { close in DeleteBudgetDialog(model: m, budget: b, close: close) }
+    }
+    static func openPrice(_ m: AccountsModel, editing: PriceItem?) {
+        present(m, "price") { close in PriceDialog(model: m, editing: editing, close: close) }
+    }
+    static func openProvider(_ m: AccountsModel, editing: ProviderItem?) {
+        present(m, "provider") { close in ProviderDialog(model: m, editing: editing, close: close) }
+    }
+    static func openDeleteProvider(_ m: AccountsModel, _ p: ProviderItem) {
+        present(m, "provider-delete") { close in DeleteProviderDialog(model: m, provider: p, close: close) }
+    }
     static func openNewPool(_ m: AccountsModel) {
         present(m, "pool-new") { close in NewPoolDialog(model: m, close: close) }
     }
@@ -36,78 +57,6 @@ enum AccountDialogs {
     }
     static func openBind(_ m: AccountsModel, pool: PoolItem?) {
         present(m, "binding-new") { close in BindDialog(model: m, pool: pool, close: close) }
-    }
-}
-
-/// Connect an account, or use a new key. Sign-in happens on the provider's own page: this dialog opens it and never holds a
-/// key, a token or a field to type one in.
-private struct ConnectDialog: View {
-    let model: AccountsModel
-    let replacing: AccountItem?
-    let close: () -> Void
-    @State private var provider: String
-    @Environment(\.corePalette) private var palette
-
-    init(model: AccountsModel, provider: String?, replacing: AccountItem?, close: @escaping () -> Void) {
-        self.model = model
-        self.replacing = replacing
-        self.close = close
-        _provider = State(
-            initialValue: provider ?? model.providers.first { ProviderSites.page($0.id) != nil }?.id ?? model.providers
-                .first?.id ?? "")
-    }
-
-    var body: some View {
-        let site = ProviderSites.page(provider)
-        CoreDialogPanel(replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                if replacing == nil {
-                    CoreFieldLabel("Provider")
-                    CoreSegmented(
-                        "Provider", segments: model.providers.map { CoreSegment($0.id, $0.name) }, selection: $provider)
-                }
-                step(
-                    1, "Get a key on the provider's own page",
-                    detail: site.map { "Create a key in \($0.name). Ainkrad never sees your password." }
-                        ?? "Open this provider's own site and create a key there."
-                ) {
-                    if let site {
-                        Button {
-                            model.opener(site.url)
-                        } label: {
-                            Label("Open \(site.name)", systemImage: "arrow.up.right.square")
-                        }
-                        .buttonStyle(.coreProminent).help(site.url.absoluteString)
-                    } else {
-                        Text("No page is known for \(model.providerName(provider)).").foregroundStyle(palette.text2)
-                    }
-                }
-                step(
-                    2, "Add it to Core from an admin device",
-                    detail:
-                        "Core stores a key only when an admin device sends it. This app has no field for a key or a token, on purpose, so it cannot finish this step."
-                ) {
-                    EmptyView()
-                }
-                AccDialogButtons(confirm: "Done", cancel: close, run: close)
-            }
-        }
-        .accessibilityIdentifier("account-connect")
-    }
-
-    private func step<C: View>(_ n: Int, _ title: String, detail: String, @ViewBuilder _ action: () -> C) -> some View {
-        HStack(alignment: .top, spacing: Space.s3) {
-            Text("\(n)").font(.system(size: MacTextSize.meta, weight: .semibold)).frame(
-                width: Space.s5, height: Space.s5
-            )
-            .background(palette.uDim, in: coreShape(Radius.chip)).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                action()
-            }
-        }
-        .accessibilityElement(children: .contain)
     }
 }
 
@@ -202,7 +151,8 @@ private struct NewPoolDialog: View {
                 CoreTextField("Name", placeholder: "client-work", text: $name, autofocus: true) { go(chosen) }
                 CoreFieldLabel("Provider")
                 CoreSegmented(
-                    "Provider", segments: model.providers.map { CoreSegment($0.id, $0.name) },
+                    "Provider",
+                    segments: model.providers.map { CoreSegment($0.id, $0.name, symbol: ProviderLook.symbol($0.id)) },
                     selection: Binding(get: { chosen }, set: { provider = $0 }))
                 Text("A pool holds accounts of one provider. It starts empty.").font(.system(size: MacTextSize.meta))
                 let typed = name.trimmingCharacters(in: .whitespaces)
@@ -328,7 +278,10 @@ private struct BindDialog: View {
                 ) { go(target) }
                 CoreFieldLabel("Provider")
                 CoreSegmented(
-                    "Provider", segments: providers.map { CoreSegment($0, model.providerName($0)) },
+                    "Provider",
+                    segments: providers.map {
+                        CoreSegment($0, model.providerName($0), symbol: ProviderLook.symbol($0))
+                    },
                     selection: Binding(
                         get: { chosen },
                         set: {
@@ -337,7 +290,10 @@ private struct BindDialog: View {
                         }))
                 CoreFieldLabel("Pool")
                 CoreSegmented(
-                    "Pool", segments: pools.map { CoreSegment($0.id, $0.name) },
+                    "Pool",
+                    segments: pools.map {
+                        CoreSegment($0.id, $0.name, symbol: $0.isDefault ? "star.fill" : "square.grid.2x2")
+                    },
                     selection: Binding(get: { target?.id ?? -1 }, set: { poolID = $0 }))
                 Text("It replaces an earlier binding of this agent for the same provider.").font(
                     .system(size: MacTextSize.meta))
@@ -365,39 +321,156 @@ private struct BindDialog: View {
 /// Settings, Core: a way into the Core app.
 struct AccountsLinkSection: View {
     let model: AccountsModel
-    @Environment(\.corePalette) private var palette
+    @Bindable private var prefs = AccountsPrefs.shared
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text(
-                "Accounts, pools and bindings have their own Core app, because agents, Citadel and every device share them."
-            )
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            Button("Open Core") {
-                model.host.shell.overlay = nil
-                model.show(.overview)
+        VStack(alignment: .leading, spacing: Space.s4) {
+            GlassSection(
+                "Look", sub: "The Core app's surface: accounts, pools and bindings.", symbol: "circle.lefthalf.filled",
+                hue: GlassInk.slate
+            ) {
+                SurfaceModeTabs(mode: prefs.mode)
+            } content: {
+                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
-            .buttonStyle(.coreProminent)
+            GlassSection(
+                "The Core app", sub: "Accounts, pools and bindings, shared by agents, Citadel and every device.",
+                symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
+            ) {
+                AppActionTile(
+                    title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
+                ) {
+                    model.host.shell.overlay = nil
+                    model.show(.overview)
+                }
+            } content: {
+                EmptyView()
+            }
         }
-        .font(.system(size: MacTextSize.body)).frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(GlassInk.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 /// Settings, Security: where the real-accounts gate stands.
+/// Settings, Security, Real accounts: the way from no keys to real provider keys, as three steps in plain words. The next
+/// step to take glows and has the tile that opens it.
 struct AccountsGateSection: View {
     let model: AccountsModel
-    @Environment(\.corePalette) private var palette
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text("This gate is only for provider keys. Other secrets stay throwaway until the external review ends.")
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            CoreNotice(
-                symbol: model.gate.symbol, title: model.gate.title, text: model.gate.detail, tone: model.gate.tone
-            ) {
-                Button("Feature switches") { model.openSwitches() }.buttonStyle(.coreSecondary)
+        let g = model.gate
+        let done = [(g.mode ?? 0) >= 1, (g.providerAccounts ?? 0) >= 1 && g.kind == .real]
+        let next = done.firstIndex(of: false)
+        VStack(alignment: .leading, spacing: Space.s4) {
+            Text(
+                "Real accounts hold a real API key from Anthropic, OpenAI or Google. Two switches stand in the way, on purpose."
+            )
+            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            verdict(g)
+            VStack(spacing: Space.s3) {
+                step(
+                    1, "Keys and secrets", "Your Core may keep keys and secrets.",
+                    off: "Your Core keeps no keys at all yet.", symbol: "testtube.2", done: done[0], next: next == 0)
+                step(
+                    2, "Real provider keys", "Accounts may hold a real key. Agents can use it.",
+                    off: "Only test keys are accepted for accounts.", symbol: "key.fill", done: done[1],
+                    next: next == 1)
+                step(
+                    3, "Add a real account", "Connect Claude, OpenAI or Gemini in Accounts.",
+                    off: next == nil
+                        ? "Connect Claude, OpenAI or Gemini in Accounts." : "Opens once the two steps above are done.",
+                    symbol: "person.crop.circle.badge.plus",
+                    done: false, next: next == nil,
+                    open: (
+                        "Open Accounts",
+                        {
+                            model.host.shell.overlay = nil
+                            model.show(.accounts)
+                        }
+                    ))
+            }
+            HStack(spacing: Space.s3) {
+                fact("eye.slash.fill", "Never shown again", "A key goes in and can't be read back.")
+                fact("server.rack", "Only runners use it", "Your Mac never holds it.")
+                fact("doc.text.fill", "Every use is logged", "See it in Audit.")
             }
         }
-        .font(.system(size: MacTextSize.body)).frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(GlassInk.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(g.technical)
+        .animation(.smooth(duration: 0.35), value: g)
         .task { await model.reload() }
+    }
+
+    private func verdict(_ g: GateState) -> some View {
+        let hue = g.kind == .real ? GlassInk.green : g.kind == .off ? GlassInk.orange : GlassInk.blue
+        return HStack(spacing: Space.s4) {
+            IconTile(
+                g.kind == .real ? "checkmark.shield.fill" : g.kind == .off ? "lock.fill" : "testtube.2", hue: hue,
+                size: 56, bounce: g.step ?? -1
+            )
+            .shadow(color: hue.opacity(0.5), radius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(g.title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Space.s3)
+            if let s = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: s, hue: hue) }
+        }
+        .padding(Space.s4)
+        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+    }
+
+    private func step(
+        _ n: Int, _ title: String, _ on: String, off: String, symbol: String, done: Bool, next: Bool,
+        open: (String, () -> Void)? = nil
+    ) -> some View {
+        let hue = done ? GlassInk.green : next ? GlassInk.blue : GlassInk.slate
+        return HStack(spacing: Space.s3) {
+            IconTile(done ? "checkmark" : symbol, hue: hue, size: 40, bounce: done)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(n). \(title)").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(done ? on : off).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: Space.s3)
+            if done {
+                Label("Done", systemImage: "checkmark.circle.fill").font(
+                    .system(size: MacTextSize.meta, weight: .semibold)
+                )
+                .foregroundStyle(GlassInk.green)
+            } else if next {
+                let o = open ?? ("Open Feature switches", { model.openSwitches() })
+                AppActionTile(
+                    title: o.0, symbol: "arrow.right", key: "↩", hue: GlassInk.blue, prominent: true, run: o.1
+                )
+                .keyboardShortcut(.defaultAction)
+            } else {
+                Label("Waiting", systemImage: "lock.fill").font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(GlassInk.secondary)
+            }
+        }
+        .padding(Space.s3)
+        .background(next ? GlassInk.blue.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                next ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: next ? 1.5 : 1)
+        }
+        .shadow(color: GlassInk.blue.opacity(next ? 0.25 : 0), radius: 12)
+        .opacity(done || next ? 1 : 0.7)
+    }
+
+    private func fact(_ symbol: String, _ title: String, _ line: String) -> some View {
+        HStack(spacing: Space.s2) {
+            IconTile(symbol, hue: GlassInk.slate, size: 28)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(line).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
     }
 }
 

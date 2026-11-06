@@ -58,22 +58,27 @@ public struct ConnectionBanner: View {
                     Image(systemName: state.symbol)
                 }
             }
-            .foregroundStyle(colours.ink)
-            .frame(width: Space.s4, height: Space.s4)
+            .foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            // The state in a coloured tile, like every other icon on glass.
+            .background(
+                LinearGradient(colors: [colours.ink, colours.ink.opacity(0.6)], startPoint: .top, endPoint: .bottom),
+                in: coreShape(Radius.control)
+            )
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(state.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(state.detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                Text(state.detail).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let retry, state != .loading {
                 Button("Retry", action: retry).buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
         }
+        .foregroundStyle(GlassInk.primary)
         .padding(.horizontal, Space.s3)
         .padding(.vertical, Space.s2 + Space.s1 / 2)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .background(colours.fill, in: coreShape(Radius.cardMac))
+        .coreGlass(radius: Radius.cardMac, interactive: false)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(state.title). \(state.detail)")
         .accessibilityAddTraits(state == .loading || state == .reconnecting ? .updatesFrequently : [])

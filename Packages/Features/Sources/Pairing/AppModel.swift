@@ -297,6 +297,12 @@ public final class AppModel {
         stepUp.set(.asking(reason))
         shell.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { StepUpSheet(model: stepUp) })
         defer { shell.closeTopDialog() }
+        // Touch ID is asked in the sheet first (Apple's embedded view), so the key then signs with no system panel and the
+        // full-screen Space never jumps. A miss keeps the sheet up with Try again / Cancel instead of closing it.
+        guard await stepUp.confirm(reason) else {
+            stepUpNotice = StepUpNotice(phase: .cancelled, done: done, keepsEdit: keepsEdit)
+            return false
+        }
         do {
             setElevated(try await service.stepUp(reason: reason))
             stepUp.set(.done)
@@ -350,7 +356,11 @@ public final class AppModel {
         agents.detach()
         await service?.close()
         service = nil
-        try? keyStore.wipe()
+        // A key that stays behind would pin the old Core again on the next launch, so a refused delete stops here.
+        do { try keyStore.wipe() } catch {
+            phase = .blocked(Failure.from(error))
+            return
+        }
         shell.elevatedUntil = nil
         shell.coreLink = .none
         shell.bell.removeAll()
@@ -361,7 +371,8 @@ public final class AppModel {
         admin.detach()
         accounts.detach()
         shell.linkNotice = nil
-        firstRun.reset()
+        shell.resetToFresh()
+        firstRun.resetAll()
         phase = .firstRun
     }
 
