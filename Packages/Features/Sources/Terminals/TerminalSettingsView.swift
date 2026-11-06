@@ -13,20 +13,20 @@ struct TerminalSettingsView: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             TerminalPreview(prefs: prefs).coreRise(true, 0)
             GlassSection(
-                "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.violet, index: 1
+                "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.blue, index: 1
             ) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: Space.s8 * 5), spacing: Space.s2)], spacing: Space.s2) {
                     ForEach(TermTheme.all) { t in
                         ThemeTile(theme: t, on: prefs.themeID == t.id, lens: pick) { prefs.themeID = t.id }
                     }
                 }
             }
-            GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.blue, index: 2) {
+            GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.slate, index: 2) {
                 HStack(spacing: Space.s3) {
                     Picker("Family", selection: $prefs.fontName) {
                         ForEach(TerminalPrefs.families, id: \.self) { f in Text(f).tag(f) }
                     }
-                    .pickerStyle(.menu).frame(maxWidth: 260)
+                    .pickerStyle(.menu).frame(maxWidth: Space.s8 * 8)
                     Spacer()
                     Text("\(Int(prefs.fontSize)) pt").font(.system(size: MacTextSize.body, weight: .semibold))
                         .monospacedDigit().contentTransition(.numericText())
@@ -37,7 +37,7 @@ struct TerminalSettingsView: View {
                 }
             }
             GlassSection(
-                "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.green,
+                "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.blue,
                 index: 3
             ) {
                 GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
@@ -50,21 +50,26 @@ struct TerminalSettingsView: View {
             }
             GlassSection(
                 "Look", sub: "The terminals and the Terminals app, as one.",
-                symbol: "circle.lefthalf.filled",
+                symbol: "square.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
-                SurfaceModeTabs(mode: prefs.screenMode)
+                AppLookTabs(follow: $prefs.followLook, mode: prefs.screenMode)
             } content: {
-                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                if prefs.followLook {
+                    Text("Same as Settings, Appearance. Each terminal keeps its theme's colour.")
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                } else {
+                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                }
             }
             GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
-                hue: GlassInk.green, index: 5
+                hue: GlassInk.blue, index: 5
             ) {
                 SettingRow("Runner", symbol: "server.rack") {
                     CoreSegmented(
                         "Runner",
-                        segments: [CoreSegment("", "Best ready", symbol: "sparkles")]
+                        segments: [CoreSegment("", "Best ready", symbol: "wand.and.stars")]
                             + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
                         selection: $prefs.defaultRunner, fill: true)
                 }
@@ -90,7 +95,7 @@ struct TerminalSettingsView: View {
             }
         }
         .foregroundStyle(GlassInk.primary)
-        .animation(.spring(duration: 0.3, bounce: 0.2), value: prefs.themeID)
+        .animation(Motion.out(Motion.ui), value: prefs.themeID)
     }
 }
 
@@ -100,7 +105,7 @@ private struct TerminalPreview: View {
     var body: some View {
         let t = prefs.theme
         let font = Font(prefs.font)
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Space.s1) {
             Text("~/AinkradCore $ cargo test -p citadel").foregroundStyle(Color(nsColor: t.foreground))
             Text("test result: ok. 412 passed; 0 failed").foregroundStyle(Color(nsColor: t.ansi[2]))
             Text("warning: 2 unused imports").foregroundStyle(Color(nsColor: t.ansi[3]))
@@ -115,11 +120,11 @@ private struct TerminalPreview: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: prefs.screenColor), in: coreShape(Radius.cardMac))
         .background {
-            if prefs.blur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
+            if prefs.lookBlur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
         }
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .animation(.easeOut(duration: 0.2), value: prefs.fontSize)
-        .animation(.easeOut(duration: 0.2), value: prefs.opacity)
+        .animation(Motion.out(Motion.ui), value: prefs.fontSize)
+        .animation(Motion.out(Motion.hover), value: prefs.lookOpacity)
         .accessibilityLabel("Preview of the terminal")
     }
 }
@@ -133,22 +138,22 @@ private struct ThemeTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(alignment: .leading, spacing: Space.s2) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Space.s1) {
                     Text("$ ls").foregroundStyle(Color(nsColor: theme.foreground))
-                    HStack(spacing: 3) {
+                    HStack(spacing: Space.s1) {
                         ForEach(1..<7, id: \.self) { i in
                             coreShape(2).fill(Color(nsColor: theme.ansi[i])).frame(width: 12, height: 8)
                         }
                     }
                 }
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: MacTextSize.meta, design: .monospaced))
                 .padding(Space.s2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(nsColor: theme.background), in: coreShape(Radius.control))
                 HStack {
                     Text(theme.title).font(.system(size: MacTextSize.body, weight: .semibold))
                     Spacer()
-                    Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    Image(systemName: on ? "checkmark.square.fill" : "square")
                         .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
                 }
             }
@@ -165,9 +170,8 @@ private struct ThemeTile: View {
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
-        .scaleEffect(hovering ? 1.02 : 1)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityLabel("\(theme.title) theme")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
@@ -178,6 +182,7 @@ private struct CursorTile: View {
     let on: Bool
     let blink: Bool
     let pick: () -> Void
+    @State private var hovering = false
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
@@ -186,13 +191,18 @@ private struct CursorTile: View {
                 Text(shape.rawValue.capitalized).font(.system(size: MacTextSize.meta, weight: .medium))
             }
             .frame(maxWidth: .infinity, minHeight: 64)
-            .background(on ? GlassInk.blue.opacity(0.18) : GlassInk.well, in: coreShape(Radius.row))
+            .background(
+                on ? GlassInk.blue.opacity(0.18) : hovering ? GlassInk.wellHover : GlassInk.well,
+                in: coreShape(Radius.row)
+            )
             .overlay {
                 coreShape(Radius.row).strokeBorder(on ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
             }
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityLabel("\(shape.rawValue) cursor")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
@@ -217,7 +227,7 @@ private struct PreviewCursor: View {
         }
         .foregroundStyle(color)
         .opacity(blink && dim ? 0.15 : 1)
-        .animation(blink ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : .default, value: dim)
+        .animation(blink ? Motion.out(Motion.tick / 2).repeatForever(autoreverses: true) : .default, value: dim)
         .onAppear { dim = true }
         .accessibilityHidden(true)
     }

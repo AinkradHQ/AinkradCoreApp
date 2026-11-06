@@ -2,7 +2,7 @@ import CoreUI
 import Observation
 import SwiftUI
 
-/// How the Agents app looks and what the quick New session (⌘N) uses (Settings, Agents; the Appearance popover).
+/// How the Agents app looks and what the quick New session (⌘N) uses (Settings, Agents).
 @MainActor @Observable
 final class AgentPrefs {
     static let shared = AgentPrefs()
@@ -12,6 +12,8 @@ final class AgentPrefs {
     /// How solid the surface is, 0 (see-through) to 1.
     var opacity: Double { didSet { save() } }
     var blur: Bool { didSet { save() } }
+    /// Use Settings, Appearance's content background (the default) instead of the app's own.
+    var followLook: Bool { didSet { save() } }
     var harness: String { didSet { save() } }
     var mode: String { didSet { save() } }
     var runner: String { didSet { save() } }  // "" = the best ready runner
@@ -23,6 +25,7 @@ final class AgentPrefs {
             Surface(rawValue: d.string(forKey: "agents.surface") ?? "").map { $0 == .frosted ? .clear : $0 } ?? .clear
         opacity = d.object(forKey: "agents.opacity") as? Double ?? 0.55
         blur = d.object(forKey: "agents.blur") as? Bool ?? true
+        followLook = d.object(forKey: "agents.followLook") as? Bool ?? true
         harness = d.string(forKey: "agents.harness") ?? "claude"
         mode = d.string(forKey: "agents.mode") ?? "ask"
         runner = d.string(forKey: "agents.runner") ?? ""
@@ -33,6 +36,7 @@ final class AgentPrefs {
         d.set(surface.rawValue, forKey: "agents.surface")
         d.set(opacity, forKey: "agents.opacity")
         d.set(blur, forKey: "agents.blur")
+        d.set(followLook, forKey: "agents.followLook")
         d.set(harness, forKey: "agents.harness")
         d.set(mode, forKey: "agents.mode")
         d.set(runner, forKey: "agents.runner")
@@ -40,17 +44,19 @@ final class AgentPrefs {
     }
 }
 
-/// The Agents app's surface inside the pane's glass rim: the same fill and tint as every other app.
-struct AgentSurface: View {
-    @Bindable var prefs = AgentPrefs.shared
-    var body: some View {
-        AppSurfaceFill(
-            style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted, opacity: prefs.opacity,
-            blur: prefs.blur)
+extension AgentPrefs {
+    /// The app's own Look, or nil to follow Settings, Appearance.
+    var look: CoreLook? { followLook ? nil : CoreLook(mode: modeChoice, opacity: opacity) }
+    var modeChoice: SurfaceMode {
+        get { SurfaceMode(style: AppSurfaceStyle(rawValue: surface.rawValue) ?? .tinted, blur: blur) }
+        set {
+            surface = Surface(rawValue: newValue.style.rawValue) ?? .tinted
+            blur = newValue.blur
+        }
     }
 }
 
-/// The Agents settings: surface and defaults. Used in Settings and in the Appearance popover.
+/// The Agents settings: surface and defaults.
 struct AgentSettingsView: View {
     @Bindable var prefs = AgentPrefs.shared
     weak var model: AgentsModel?
@@ -60,42 +66,38 @@ struct AgentSettingsView: View {
         VStack(alignment: .leading, spacing: compact ? Space.s3 : Space.s4) {
             GlassSection(
                 "Look", sub: "The Agents app and its sessions, as one.", symbol: "square.on.square",
-                hue: GlassInk.violet
+                hue: GlassInk.blue
             ) {
-                SurfaceModeTabs(
-                    mode: Binding(
-                        get: {
-                            SurfaceMode(
-                                style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .tinted, blur: prefs.blur)
-                        },
-                        set: {
-                            prefs.surface = AgentPrefs.Surface(rawValue: $0.style.rawValue) ?? .tinted
-                            prefs.blur = $0.blur
-                        }))
+                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
             } content: {
-                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                if prefs.followLook {
+                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
+                        .foregroundStyle(GlassInk.secondary)
+                } else {
+                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                }
             }
             GlassSection(
-                "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,
+                "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.slate,
                 index: 1
             ) {
                 SettingRow("Harness", symbol: "cpu") {
                     CoreSegmented(
                         "Harness",
-                        segments: [
-                            CoreSegment("claude", "claude", symbol: "sparkles"),
-                            CoreSegment("codex", "codex", symbol: "chevron.left.forwardslash.chevron.right"),
-                            CoreSegment("opencode", "opencode", symbol: "curlybraces"),
-                            CoreSegment("agy", "agy", symbol: "atom"),
-                        ], selection: $prefs.harness, fill: true)
+                        segments: ["claude", "codex", "opencode", "agy"].map {
+                            CoreSegment($0, AgentWords.harness($0), symbol: AgentsModel.harnessSymbol($0))
+                        }, selection: $prefs.harness, fill: true
+                    )
+                    .help("Harness id: \(prefs.harness)")
                 }
                 SettingRow("Mode", symbol: "hand.raised") {
                     CoreSegmented(
                         "Mode",
                         segments: [
-                            CoreSegment("ask", "Asks first", symbol: "questionmark.bubble"),
-                            CoreSegment("accept_edits", "Accepts edits", symbol: "pencil.and.list.clipboard"),
-                            CoreSegment("sandboxed", "Sandboxed", symbol: "shippingbox"),
+                            CoreSegment("ask", AgentWords.mode("ask"), symbol: "questionmark.bubble"),
+                            CoreSegment(
+                                "accept_edits", AgentWords.mode("accept_edits"), symbol: "pencil.and.list.clipboard"),
+                            CoreSegment("sandboxed", AgentWords.mode("sandboxed"), symbol: "shippingbox"),
                         ], selection: $prefs.mode, fill: true)
                 }
                 SettingRow("Runner", symbol: "server.rack") {
@@ -114,37 +116,31 @@ struct AgentSettingsView: View {
     }
 }
 
-/// The model name as a glass field: a sparkle that bounces while typing, a clear tile once something is set.
+/// The model name as a glass field: a clear button once something is set.
 private struct ModelField: View {
     @Binding var text: String
-    @FocusState private var focused: Bool
+    @State private var hovering = false
     var body: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: text.isEmpty ? "sparkles" : "brain.head.profile")
-                .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.violet)
-                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: text.count)
-            TextField("The harness default", text: $text).textFieldStyle(.plain).focused($focused)
-                .autocorrectionDisabled()
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).frame(width: 22, height: 22)
-                        .background(GlassInk.well, in: coreShape(6))
-                }
-                .buttonStyle(.plain).help("Use the harness default").transition(.scale.combined(with: .opacity))
+            Image(systemName: "brain").foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.blue)
+            TextField("The harness default", text: $text).textFieldStyle(.plain).autocorrectionDisabled()
+                .focusEffectDisabled()
+            Button {
+                text = ""
+            } label: {
+                Image(systemName: "xmark").font(.system(size: MacTextSize.meta, weight: .semibold))
+                    .frame(width: MacSize.controlSm, height: MacSize.controlSm)
+                    .background(GlassInk.well, in: coreShape(Radius.chip))
             }
+            .buttonStyle(.plain).help("Use the harness default").accessibilityLabel("Use the harness default")
+            .opacity(text.isEmpty ? 0 : 1).allowsHitTesting(!text.isEmpty)
         }
         .padding(.horizontal, Space.s3)
-        .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + 4)
-        .background(focused ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-        .overlay {
-            coreShape(Radius.control).strokeBorder(
-                focused ? GlassInk.violet.opacity(0.6) : .white.opacity(0.15), lineWidth: 1)
-        }
-        .shadow(color: GlassInk.violet.opacity(focused ? 0.35 : 0), radius: 10)
-        .focusEffectDisabled()
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: focused)
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: text.isEmpty)
+        .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + Space.s1)
+        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+        .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.hover), value: text.isEmpty)
     }
 }

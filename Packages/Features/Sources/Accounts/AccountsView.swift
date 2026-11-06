@@ -52,7 +52,7 @@ struct AccountsView: View {
             }
             footer
         }
-        .background { AccountsSurface() }
+        .paneLook(AccountsPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts-pane")
@@ -60,8 +60,7 @@ struct AccountsView: View {
 
     /// The pages as tiles. Spend holds Budgets, Costs, Ledger and Prices, which the Core does not fill yet.
     static let tabs: [(title: String, page: AccountsPage)] = [
-        ("Overview", .overview), ("Accounts", .accounts), ("Pools", .pools), ("Bindings", .bindings),
-        ("Spend", .budgets),
+        ("Overview", .overview), ("Accounts", .accounts), ("Pools", .pools), ("Spend", .budgets),
     ]
 
     private func on(_ page: AccountsPage) -> Bool {
@@ -73,14 +72,13 @@ struct AccountsView: View {
         case .overview: model.needLook.count
         case .accounts: model.accounts.count
         case .pools: model.pools.count
-        case .bindings: model.bindings.count
         case .budgets: model.budgets.filter { $0.standing == .stopped }.count.nonZero ?? -1
         default: -1
         }
     }
 
     private func go(_ page: AccountsPage) {
-        withAnimation(.smooth(duration: 0.3)) {
+        withAnimation(Motion.out(Motion.ui)) {
             model.page = page
             model.detail = nil
             model.cursor = nil
@@ -111,11 +109,6 @@ struct AccountsView: View {
                 Task { await model.reloadCosts() }
             }
             .keyboardShortcut("r", modifiers: .command)
-        case .bindings:
-            AppActionTile(title: "Bind", symbol: "link", key: "⌘N", hue: GlassInk.blue, prominent: true) {
-                AccountDialogs.openBind(model, pool: nil)
-            }
-            .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly || model.pools.isEmpty)
         default:
             AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 AccountDialogs.openConnect(model, provider: nil)
@@ -142,7 +135,7 @@ struct AccountsView: View {
         if !model.isConnected {
             AccStateCard(
                 symbol: "wifi.slash", title: "Not connected",
-                text: "Accounts, pools and bindings come from your Core. This Mac is not connected to one right now.")
+                text: "Accounts and pools come from your Core. This Mac is not connected to one right now.")
         } else if model.page.isSpend {
             Group {
                 switch model.page {
@@ -153,8 +146,6 @@ struct AccountsView: View {
                 }
             }
             .transition(.opacity)
-        } else if model.page.notYet {
-            NotYetPage(model: model, page: model.page)
         } else {
             switch model.load {
             case .loading: AccSkeleton()
@@ -165,8 +156,7 @@ struct AccountsView: View {
                     switch model.page {
                     case .overview: OverviewPage(model: model)
                     case .accounts: AccountsPageView(model: model)
-                    case .pools: PoolsPage(model: model)
-                    default: BindingsPage(model: model)
+                    default: PoolsPage(model: model)
                     }
                 }
                 .transition(.opacity)
@@ -175,43 +165,21 @@ struct AccountsView: View {
             case .failed(let code, let message):
                 AccStateCard(
                     symbol: "exclamationmark.triangle", title: "Could not load this",
-                    text: "The Core answered with an error. \(message) Nothing was changed.", tone: .fail, code: code
+                    text: "Your Core couldn't answer that. Nothing was changed.", tone: .fail
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
                         Task { await model.reload() }
                     }
+                    .keyboardShortcut("r", modifiers: .command)
                 }
+                .help("\(message) (\(code))")
             case .forbidden:
                 AccStateCard(
                     symbol: "lock", title: "This device is not allowed to read this",
-                    text: "Accounts need the read scope (forbidden_scope). Use a device that holds it.",
-                    code: "forbidden_scope")
+                    text: "Accounts need a device that can see everything. Use one that can."
+                )
+                .help("forbidden_scope")
             }
-        }
-    }
-}
-
-/// Budgets, Costs and usage, Ledger, Prices and Activity: what the Core has not got yet, said plainly.
-struct NotYetPage: View {
-    let model: AccountsModel
-    let page: AccountsPage
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            if page.isSpend {
-                SpendHeader(model: model, title: page.title, detail: Self.detail(page), symbol: page.symbol)
-            }
-            NotYetCard(title: "Coming next", text: "This page is being built. Nothing here is estimated.")
-        }
-        .accessibilityIdentifier("not-yet-\(page.rawValue)")
-    }
-
-    static func detail(_ page: AccountsPage) -> String {
-        switch page {
-        case .budgets: "What each key may spend per day and month."
-        case .costs: "Tokens and cost, by account and by agent."
-        case .ledger: "Every charge, one line each."
-        default: "List prices behind the cost figures."
         }
     }
 }

@@ -12,8 +12,6 @@ final class TerminalSession {
     private(set) var runner: RunnerItem?
     private(set) var link: Link = .none
     private(set) var note: ResumeNote?
-    /// Set when a refetch found the terminal gone from the list.
-    var signalsOpen = false
     let surface: TerminalSurface
 
     @ObservationIgnored private let service: any TerminalService
@@ -225,10 +223,10 @@ final class TerminalSession {
         case .stepUpRequired?: link = .stepUp
         case .http(_, let code, let message)?: link = .failed(code: code, message: message)
         case .forbiddenScope?:
-            link = .failed(code: "forbidden_scope", message: "This device may not use terminals.")
-        case .rateLimited?: link = .failed(code: "rate_limited", message: "Too many requests. Try again shortly.")
-        case let c?: link = .failed(code: "error", message: c.localizedDescription)
-        case nil: link = .failed(code: "error", message: error.localizedDescription)
+            link = .failed(code: "forbidden_scope", message: "This device may not use terminals")
+        case .rateLimited?: link = .failed(code: "rate_limited", message: "Too many requests. Try again shortly")
+        case let c?: link = .failed(code: c.localizedDescription, message: "The terminal could not be reached")
+        case nil: link = .failed(code: error.localizedDescription, message: "The terminal could not be reached")
         }
         Task { await refresh() }
     }
@@ -309,14 +307,15 @@ final class TerminalSession {
     func signal(_ name: String) async -> Bool {
         do {
             try await host.elevated(
-                "Send SIG\(name) to the terminal on \(machine). This covers this action only.", done: "sent"
+                "Send “\(TerminalSignals.title(name))” to the terminal on \(machine). This covers this action only.",
+                done: "sent"
             ) {
                 try await self.service.signal(self.id, name)
             }
-            host.shell.showToast("Sent SIG\(name) to the terminal on \(machine)")
+            host.shell.showToast("Sent “\(TerminalSignals.title(name))” to the terminal on \(machine)")
             return true
         } catch is ElevationDeclined { return false } catch {
-            host.shell.showToast(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription)
+            host.shell.showToast("Could not send “\(TerminalSignals.title(name))” to the terminal on \(machine)")
             return false
         }
     }
@@ -335,7 +334,7 @@ final class TerminalSession {
             onChange?()
             return true
         } catch is ElevationDeclined { return false } catch {
-            host.shell.showToast(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription)
+            host.shell.showToast("Could not end the terminal on \(machine)")
             return false
         }
     }

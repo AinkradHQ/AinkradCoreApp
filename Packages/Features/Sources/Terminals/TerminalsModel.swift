@@ -90,7 +90,11 @@ public final class TerminalsModel {
     }
 
     func reload() async {
-        if items.isEmpty && runners.isEmpty { load = .loading }
+        if items.isEmpty && runners.isEmpty {
+            load = .loading
+        } else if case .failed = load {
+            load = .loading  // the list says "Reconnecting" until this answer
+        }
         do {
             async let t = service.terminals()
             async let r = service.runners()
@@ -159,7 +163,7 @@ public final class TerminalsModel {
             })
         l.register(
             LauncherEntry(
-                id: "terminals", title: "Terminals", sub: "Rune terminals on your runners", symbol: "terminal",
+                id: "terminals", title: "Terminals", sub: "terminals on your runners", symbol: "terminal",
                 keywords: ["rune", "shell", "zsh", "bash"]
             ) { [weak self] in self?.openList() })
         // Quick by default, advanced on request (Ahmed, 2026-11-05): New terminal opens one at once with the defaults;
@@ -203,13 +207,13 @@ public final class TerminalsModel {
                 shell.bell.add(
                     BellItem(
                         id: id, kind: .runner, title: "\(r.name) disconnected",
-                        sub: "runner.disconnected · its terminals answer runner_offline", time: "now",
+                        sub: "Its terminals can't be reached until it is back", time: "now",
                         actions: [BellAction("View runner", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
             case .degraded:
                 shell.bell.add(
                     BellItem(
                         id: id, kind: .runner, title: "\(r.name) is slow to answer",
-                        sub: "runner.degraded · missed two heartbeats", time: "now",
+                        sub: "It missed two heartbeats", time: "now",
                         actions: [BellAction("View runner", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
             default: shell.bell.remove(id)
             }
@@ -230,8 +234,8 @@ public final class TerminalsModel {
     func openList() {
         shell.openPane(
             PaneSpec(
-                id: "terminals", title: "Terminals", sub: "Rune", symbol: "terminal",
-                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
+                id: "terminals", title: "Terminals", sub: "Your Core", symbol: "terminal",
+                chip: PaneChip("Your Core", tone: .queue, symbol: "server.rack"), minWidth: 560
             ) { TerminalsListView(model: self) })
         Task { await reload() }
     }
@@ -239,7 +243,7 @@ public final class TerminalsModel {
     func openRunners(_ id: String? = nil) {
         runnerDetail = id
         shell.openPane(
-            PaneSpec(id: "runners", title: "Runners", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
+            PaneSpec(id: "runners", title: "Runners", sub: "Your Core", symbol: "server.rack", minWidth: 480) {
                 RunnersView(model: self)
             })
         Task { await reload() }
@@ -261,8 +265,9 @@ public final class TerminalsModel {
         }
         let pane = "terminal-\(id)"
         shell.openPane(
-            PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 560) {
-                TerminalPaneView(model: self, session: session)
+            PaneSpec(id: pane, title: "Terminal", sub: name(of: item.runner), symbol: "terminal", minWidth: 560) {
+                // The screen draws its own background in its theme's colour: the pane gives the rim only.
+                TerminalPaneView(model: self, session: session).paneLook(nil, own: true)
             })
         shell.setPaneMenu(pane) { [weak self, weak session] in
             guard let self, let session else { return [] }
@@ -281,20 +286,23 @@ public final class TerminalsModel {
         let v = session.view
         let live = v.controls == .running
         let canEnd = v.controls == .running || v.controls == .endOnly
-        var items = [PaneMenuItem(v.info, symbol: "info.circle", enabled: false)]
+        var items = [PaneMenuItem(v.info, symbol: "info.square", enabled: false)]
         if v.controls == .ended {
             items.append(PaneMenuItem("Close Pane", symbol: "xmark") { [weak self] in self?.closePane(session.id) })
             return items
         }
+        // A signal goes through the Core, so it works without this window attached.
         items.append(
             PaneMenuItem(
-                "Send Signal", symbol: "bolt", enabled: live,
+                "Send Signal", symbol: "bolt", enabled: canEnd,
                 children: TerminalSignals.all.map { name in
-                    PaneMenuItem("SIG\(name)", symbol: "bolt") { Task { _ = await session.signal(name) } }
+                    PaneMenuItem(TerminalSignals.title(name), symbol: "bolt") {
+                        Task { _ = await session.signal(name) }
+                    }
                 }))
         items.append(PaneMenuItem("Detach", symbol: "eject", enabled: live) { session.detach() })
         items.append(
-            PaneMenuItem("End Terminal…", symbol: "stop.circle", destructive: true, enabled: canEnd) { [weak self] in
+            PaneMenuItem("End Terminal…", symbol: "stop.fill", destructive: true, enabled: canEnd) { [weak self] in
                 self?.confirmEnd(session)
             })
         return items
@@ -318,7 +326,7 @@ public final class TerminalsModel {
             actions: [
                 ShellSheetAction("Keep it"),
                 ShellSheetAction("End terminal", destructive: true) { Task { _ = await session.end() } },
-            ], symbol: "stop.circle")
+            ], symbol: "stop.fill")
     }
 
     func paneChanged(_ id: String) {
@@ -347,7 +355,8 @@ public final class TerminalsModel {
         let name = name(of: items.first { $0.id == id }?.runner ?? "")
         shell.bell.add(
             BellItem(
-                id: "terminal-bell-\(id)", kind: .event, title: "Bell in a terminal on \(name)", sub: "terminal bell",
+                id: "terminal-bell-\(id)", kind: .event, title: "Bell in a terminal on \(name)",
+                sub: "The terminal rang its bell",
                 time: "now", actions: [BellAction("Open", primary: true) { [weak self] in self?.openFromBell(id) }]))
     }
 
@@ -443,7 +452,7 @@ enum RunnerStatus: Equatable {
     }
     var symbol: String {
         switch self {
-        case .ok: "checkmark.circle"
+        case .ok: "checkmark.square"
         case .degraded: "exclamationmark.triangle"
         case .busy: "gauge.with.dots.needle.100percent"
         case .off: "wifi.slash"
@@ -506,32 +515,34 @@ final class NewTerminalModel {
         case .http(let status, let code, let message)?:
             switch code {
             case "limit_reached":
-                return Refusal(title: "Too many terminals.", text: message, code: code, http: status)
+                return Refusal(title: "Too many terminals", text: message, code: code, http: status)
             case "runner_offline":
                 return Refusal(
-                    title: "\(runner) is not connected.",
+                    title: "\(runner) is not connected",
                     text:
                         "It dropped off after this list was loaded. Pick another runner, or wait for it to reconnect.",
                     code: code, http: status)
             case "runner_busy":
                 return Refusal(
-                    title: "\(runner) is too busy right now.",
+                    title: "\(runner) is too busy right now",
                     text:
                         "New work is refused while its load is over the limit. Try again in a moment or use another runner.",
                     code: code, http: status)
             case "unsupported_command":
                 return Refusal(
-                    title: "\(runner) doesn’t offer that.", text: message, code: code, http: status)
+                    title: "\(runner) doesn’t offer that", text: message, code: code, http: status)
             default: return Refusal(title: message, text: "", code: code, http: status)
             }
         case .forbiddenScope?:
             return Refusal(
-                title: "This device may not open terminals.", text: "It needs the terminal scope.",
+                title: "This device may not open terminals", text: "It needs the terminal scope.",
                 code: "forbidden_scope",
                 http: 403)
         case let other?:
-            return Refusal(title: other.localizedDescription, text: "", code: "error", http: 0)
-        case nil: return Refusal(title: "The terminal was not opened.", text: "", code: "error", http: 0)
+            return Refusal(
+                title: "The terminal was not opened", text: "Try again in a moment.", code: other.localizedDescription,
+                http: 0)
+        case nil: return Refusal(title: "The terminal was not opened", text: "", code: "error", http: 0)
         }
     }
 }

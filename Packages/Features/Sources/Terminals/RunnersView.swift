@@ -31,7 +31,11 @@ struct RunnersView: View {
 
     @ViewBuilder private var fleet: some View {
         switch model.load {
-        case .failed(let m): ConnectionBanner(.error(m), retry: { Task { await model.reload() } })
+        case .failed(let m):
+            ConnectionBanner(
+                .error("Check that your Core is reachable, then try again."), retry: { Task { await model.reload() } }
+            )
+            .help(m)
         default:
             if model.runners.isEmpty {
                 if model.load == .ready {
@@ -45,8 +49,9 @@ struct RunnersView: View {
                 }
             }
             ForEach(model.runners) { r in RunnerTile(model: model, runner: r) }
-            Text("Runners report work slots and load per core; memory and disk are not reported.")
+            Text("Runners report work slots and load per core.")
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .help("Memory and disk are not reported.")
         }
     }
 }
@@ -80,12 +85,12 @@ private struct RunnerTile: View {
                 }
                 if let p = runner.perCore {
                     labelled("Host load per core", String(format: "%.2f", p)) {
-                        Meter(value: p, max: 6, limit: RunnerStatus.busyPerCore, warn: p > RunnerStatus.busyPerCore)
+                        CoreMeter(p / 6, low: p > RunnerStatus.busyPerCore, label: "Host load per core")
                     }
                     if let s = model.loadSamples[runner.id], s.count >= 2 {
                         CoreSpark(s, tone: st == .busy ? .warn : .run, ceiling: max(0.5, s.max() ?? 0.5))
-                        Text("Load sampled on this Mac while it watched.").font(.system(size: MacTextSize.meta))
-                            .foregroundStyle(palette.text2)
+                        Text("Load seen on this Mac").font(.system(size: MacTextSize.meta))
+                            .foregroundStyle(palette.text2).help("Sampled on this Mac while it watched.")
                     }
                 }
                 HStack(spacing: Space.s2) {
@@ -153,20 +158,21 @@ private struct RunnerDetail: View {
         case .degraded:
             TermBanner(
                 tone: .warn, title: "Not answering heartbeats",
-                detail:
-                    "The Core has not heard from \(runner.name) for two heartbeats (runner.degraded). It is still listed as connected, but treat the figures below as possibly stale. If it stays silent it shows as disconnected."
+                detail: "It is still listed as connected, but its figures may be stale.",
+                help: "The Core has not heard from \(runner.name) for two heartbeats (runner.degraded)."
             )
         case .off:
             TermBanner(
                 tone: .fail, title: "Disconnected",
-                detail:
-                    "The Core can’t reach \(runner.name), so nothing can start there and its terminals answer runner_offline. Figures below are the last the Core saw. Everything resumes when the runner reconnects."
+                detail: "Nothing can start there until it is back. Figures are the last the Core saw.",
+                help: "runner_offline: its terminals answer that until the runner reconnects."
             )
         case .busy:
             TermBanner(
                 tone: .warn, title: "Too busy for new work",
-                detail:
-                    "Host load is \(String(format: "%.1f", runner.perCore ?? 0)) per core and the default limit is \(Int(RunnerStatus.busyPerCore)), so new terminals and sessions are refused with runner_busy (503). Work already running is not touched. It clears by itself when the load drops."
+                detail: "New terminals and sessions are refused until the load drops.",
+                help:
+                    "runner_busy (503): host load is \(String(format: "%.1f", runner.perCore ?? 0)) per core, over the limit of \(Int(RunnerStatus.busyPerCore)). Work already running is not touched."
             )
         case .ok: EmptyView()
         }
@@ -176,11 +182,9 @@ private struct RunnerDetail: View {
             if let a = runner.avg1, let c = runner.cores {
                 fact("Host load, 1 min average", "\(String(format: "%.1f", a)) on \(c) cores")
                 fact("Per core", String(format: "%.2f", runner.perCore ?? 0))
-                Meter(value: runner.perCore ?? 0, max: 6, limit: RunnerStatus.busyPerCore, warn: st == .busy)
-                Text(
-                    "The marker is the limit: above \(Int(RunnerStatus.busyPerCore)) per core the runner refuses new work (default)."
-                )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                CoreMeter((runner.perCore ?? 0) / 6, low: st == .busy, label: "Host load per core")
+                Text("Above \(Int(RunnerStatus.busyPerCore)) per core the runner refuses new work.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             } else {
                 Text("This runner has not reported host load.").foregroundStyle(palette.text2)
             }
@@ -201,22 +205,19 @@ private struct RunnerDetail: View {
                 }
             }
             if !runner.hasPty && !runner.drivers.isEmpty {
-                Text("Terminals are off here. Start the runner with --enable-pty to use them.")
+                Text("Terminals are off on this runner.")
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .help("Start the runner with --enable-pty to use them.")
             }
         }
         card("Isolation") {
             if let tiers = runner.isolationTiers, !tiers.isEmpty {
                 fact("Isolation tiers", tiers.joined(separator: ", "))
             } else {
-                note(
-                    "Isolation tier: not reported",
-                    "This Core does not tell clients this runner’s isolation tier yet, so this app can’t say what \(runner.name) can or can’t meet."
-                )
+                note("Isolation tier: not reported", "This Core does not report it yet.")
             }
             note(
-                "Shells and the runner share one user",
-                "That is why the terminal scope counts as admin-level today. Don’t read “sandboxed” as “isolated”.")
+                "Shells and the runner share one user", "Don’t read “sandboxed” as “isolated”.")
         }
         let here = model.items.filter { $0.runner == runner.id && !$0.isEnded }
         card("\(off ? "Was running" : "Running here") · \(here.count) \(here.count == 1 ? "item" : "items")") {
@@ -226,40 +227,38 @@ private struct RunnerDetail: View {
                     model.openTerminal(t.id, attach: false)
                 } label: {
                     HStack {
-                        Text("Terminal").font(.system(size: MacTextSize.meta, weight: .medium))
-                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-                            .background(palette.uDim, in: coreShape(Radius.chip))
-                        Text(t.id).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
+                        Text(model.shell.tabNames["terminal-\(t.id)"] ?? "Terminal opened \(ago(t.createdAt))")
+                            .font(.system(size: MacTextSize.body)).lineLimit(1)
                         Spacer()
                         Text(t.attached == 0 ? "not attached" : "\(t.attached) attached").foregroundStyle(palette.text2)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help("Terminal \(t.id)")
             }
         }
         card("Check it") {
             let n = model.noop[runner.id]
             HStack(spacing: Space.s3) {
-                Button("Run no-op test") { Task { await model.runNoop(runner.id) } }
+                Button("Test the runner") { Task { await model.runNoop(runner.id) } }
                     .buttonStyle(CoreButtonStyle(.secondary)).disabled(off || n == .running)
+                    .help("Needs the read and agent scopes")
                 Group {
                     switch n {
                     case .running: Text("Waiting for the runner…")
                     case .answered(let ms)?: Text("The runner answered in \(ms) ms. No work was started.")
-                    case .failed(let m)?: Text(m)
+                    case .failed(let m)?: Text("The runner did not answer").help(m)
                     case nil:
                         Text(
                             off
-                                ? "Disconnected, so the test would fail with runner_offline."
+                                ? "Disconnected, so the test would fail."
                                 : "Sends an empty round trip to the runner. No work is started.")
                     }
                 }
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             }
             if n == .running { BusyBar() }
-            Text("Needs the read and agent scopes.").font(.system(size: MacTextSize.meta)).foregroundStyle(
-                palette.text2)
             HStack(spacing: Space.s3) {
                 Button("Open a terminal here") { model.openNew(runner: runner.id) }
                     .buttonStyle(CoreButtonStyle(.secondary)).disabled(off || st == .busy || !runner.hasPty)
@@ -282,7 +281,7 @@ private struct RunnerDetail: View {
         }
         .font(.system(size: MacTextSize.body))
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .coreWell()
         .accessibilityElement(children: .contain)
     }
 

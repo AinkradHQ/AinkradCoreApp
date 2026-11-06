@@ -11,9 +11,11 @@ extension View {
         modifier(GlassModifier(radius: radius, interactive: interactive, tinted: tinted, frosted: frosted))
     }
 
-    /// The content surface: the shared overlay glass (see PanelModifier).
-    public func corePanel(radius: CGFloat = Radius.pane, padding: CGFloat = Space.s4) -> some View {
-        modifier(PanelModifier(radius: radius, padding: padding))
+    /// The content surface of dialogs, sheets and pop-ups: the one frame (see `coreFrame`).
+    public func corePanel(radius: CGFloat = Radius.pane, padding: CGFloat = Space.s4, part: LookPart = .dialogs)
+        -> some View
+    {
+        modifier(PanelModifier(radius: radius, padding: padding, part: part))
     }
 
     /// An input's well: clear Liquid Glass on macOS 26 / iOS 26 (the field reads as cut into the glass card), the
@@ -38,17 +40,14 @@ private struct PanelModifier: ViewModifier {
     @Environment(\.corePalette) private var palette
     let radius: CGFloat
     let padding: CGFloat
-    /// Every panel, dialog and sheet is the launcher's glass (Ahmed, 2026-11-05: consistent, everything Liquid Glass): a
-    /// dark layer on Apple's glass, frosted at night, clear by day, white ink. Reduce Transparency keeps a solid panel.
+    let part: LookPart
+    /// Every panel, dialog, sheet and pop-up is the one frame (Ahmed, 2026-11-06): a clear glass rim holding the content
+    /// on the Look's background (Settings, Appearance). Reduce Transparency keeps a solid panel.
     func body(content: Content) -> some View {
-        let shape = coreShape(radius)
         if solid {
-            content.padding(padding).background(palette.panelStrong, in: shape)
+            content.padding(padding).background(palette.panelStrong, in: coreShape(radius))
         } else {
-            content.padding(padding)
-                .foregroundStyle(GlassInk.primary)
-                .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: shape)
-                .coreGlass(radius: radius, interactive: false, tinted: false, frosted: !palette.isDay)
+            content.padding(padding).coreFrame(radius: radius, rim: Space.s2, part: part)
         }
     }
 }

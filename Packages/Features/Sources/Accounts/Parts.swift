@@ -3,19 +3,15 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// The glass card content sits in: a quiet well that lifts a touch on hover.
+/// The glass card content sits in.
 struct AccPanel<Content: View>: View {
     var spacing: CGFloat = Space.s3
     @ViewBuilder let content: Content
-    @State private var hovering = false
     var body: some View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-            .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.2), value: hovering)
+            .coreWell()
     }
 }
 
@@ -29,9 +25,9 @@ struct AccHeader<Action: View>: View {
     @State private var shown = false
     var body: some View {
         HStack(alignment: .center, spacing: Space.s3) {
-            IconTile(symbol, hue: hue, size: 48, bounce: shown).shadow(color: hue.opacity(0.45), radius: 12)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
+            IconTile(symbol, hue: hue, size: 48, bounce: shown)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
                     .contentTransition(.numericText())
                 Text(detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -51,14 +47,17 @@ struct AccTile: View {
         let hue = provider.map(ProviderLook.hue) ?? GlassInk.slate
         let size = large ? 56.0 : 36.0
         Image(systemName: symbol ?? provider.map(ProviderLook.symbol) ?? "key.fill")
-            .font(.system(size: large ? 24 : 15, weight: .semibold)).foregroundStyle(.white)
+            .font(.system(size: large ? MacTextSize.large : MacTextSize.title, weight: .semibold)).foregroundStyle(
+                .white
+            )
             .frame(width: size, height: size)
             .background(
                 LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(large ? 13 : 9)
+                in: coreShape(large ? Radius.cardMac : Radius.control)
             )
-            .overlay { coreShape(large ? 13 : 9).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-            .shadow(color: hue.opacity(0.4), radius: large ? 14 : 6)
+            .overlay {
+                coreShape(large ? Radius.cardMac : Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1)
+            }
             .accessibilityHidden(true)
     }
 }
@@ -69,7 +68,7 @@ struct PhaseBadge: View {
     var body: some View { StateBadge(phase.label, tone: phase.tone, symbol: phase.symbol) }
 }
 
-/// A small glass action: icon and words, lifting and lighting in its colour on hover (red when it removes something).
+/// A small glass action: icon and words, lighting in its colour on hover (red when it removes something).
 struct AccLink: View {
     let title: String
     var symbol: String?
@@ -88,16 +87,15 @@ struct AccLink: View {
                 Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).lineLimit(1)
             }
             .foregroundStyle(hovering ? .white : hue)
-            .padding(.horizontal, Space.s2).frame(minHeight: 26)
-            .background(hovering ? hue.opacity(0.7) : hue.opacity(0.12), in: coreShape(7))
-            .overlay { coreShape(7).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
-            .contentShape(coreShape(7))
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm + Space.s1)
+            .background(hovering ? hue.opacity(0.7) : hue.opacity(0.12), in: coreShape(Radius.chip))
+            .overlay { coreShape(Radius.chip).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
+            .contentShape(coreShape(Radius.chip))
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 && enabled }
-        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(Motion.out(Motion.ui), value: hovering)
         .coreDimWhenDisabled(enabled)
         .help(help ?? title)
     }
@@ -126,7 +124,7 @@ struct AccBar: View {
     }
 }
 
-/// A refusal from the Core under a control: the words, with the code the Core gave.
+/// A refusal from the Core under a control, in words.
 struct AccIssue: View {
     let text: String
     @Environment(\.corePalette) private var palette
@@ -144,54 +142,30 @@ struct AccStateCard<Actions: View>: View {
     let title: String
     let text: String
     var tone: Tone = .queue
-    var code: String?
     @ViewBuilder let actions: Actions
     @State private var shown = false
     var body: some View {
         let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.orange : GlassInk.blue
         VStack(spacing: Space.s3) {
-            IconTile(symbol, hue: hue, size: 64, bounce: shown).shadow(color: hue.opacity(0.5), radius: 18)
+            IconTile(symbol, hue: hue, size: 64, bounce: shown)
                 .scaleEffect(shown ? 1 : 0.6)
-            Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
-            if let code {
-                Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)).padding(.horizontal, Space.s2)
-                    .frame(minHeight: 22).background(GlassInk.well, in: coreShape(6))
-            }
             HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(tone == .queue ? 0.15 : 0.45), lineWidth: 1) }
-        .animation(.smooth(duration: 0.45), value: shown)
+        .coreWell()
+        .animation(Motion.out(Motion.move), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
     }
 }
 
 extension AccStateCard where Actions == EmptyView {
-    init(symbol: String, title: String, text: String, tone: Tone = .queue, code: String? = nil) {
-        self.init(symbol: symbol, title: title, text: text, tone: tone, code: code) { EmptyView() }
-    }
-}
-
-/// A figure the Core does not report yet: a quiet card with an hourglass that turns, so nothing is ever estimated.
-struct NotYetCard: View {
-    let title: String
-    var text = "Not available yet. Core does not report this."
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        AccPanel(spacing: Space.s2) {
-            HStack(spacing: Space.s2) {
-                Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
-                    .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-            }
-            Text(text).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .combine)
+    init(symbol: String, title: String, text: String, tone: Tone = .queue) {
+        self.init(symbol: symbol, title: title, text: text, tone: tone) { EmptyView() }
     }
 }
 
@@ -238,8 +212,7 @@ struct GateBanner: View {
                     g.kind == .off ? "lock.fill" : g.kind == .throwaway ? "testtube.2" : "questionmark", hue: hue,
                     size: 44, bounce: shown
                 )
-                .shadow(color: hue.opacity(0.45), radius: 10)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     Text(g.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                     Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
@@ -251,8 +224,8 @@ struct GateBanner: View {
                 .help("Settings → Core → Feature switches")
             }
             .padding(Space.s3)
-            .background(hue.opacity(0.12), in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+            .background(hue.opacity(0.12))
+            .coreWell()
             .help(g.technical)
             .onAppear { shown = true }
             .accessibilityElement(children: .combine)
@@ -261,54 +234,18 @@ struct GateBanner: View {
     }
 }
 
-/// The "can only read" notice, shown once a write came back `forbidden_scope`.
+/// The "can only read" notice, shown once the Core refused a write for lack of access.
 struct ReadOnlyBanner: View {
     let model: AccountsModel
     var body: some View {
         if model.readOnly {
             CoreNotice(
                 symbol: "lock", title: "This device can only read",
-                text: "Changes are refused (forbidden_scope). Use a device that holds the admin scope."
+                text: "Changes are refused. Use an admin device."
             )
+            .help("forbidden_scope")
             .accessibilityIdentifier("read-only-banner")
         }
-    }
-}
-
-/// Cancel and the one action of a dialog, as glass tiles with their keys: Cancel at the left (esc), the action at the
-/// right (↩, or ⌘↩ when it removes something, so Return alone never destroys).
-struct AccDialogButtons: View {
-    let confirm: String
-    var cancelTitle = "Cancel"
-    var danger = false
-    var busy = false
-    var enabled = true
-    let cancel: () -> Void
-    let run: () -> Void
-    @State private var hovered: Int?
-    var body: some View {
-        HStack(spacing: Space.s2) {
-            ChoiceTile(
-                choice: ConfirmChoice(cancelTitle, symbol: cancelTitle == "Cancel" ? "arrow.uturn.backward" : "xmark"),
-                on: hovered == 0, keys: "esc",
-                run: cancel
-            )
-            .keyboardShortcut(.cancelAction)
-            .onHover { hovered = $0 ? 0 : nil }
-            .frame(maxWidth: Space.s8 * 5)
-            Spacer(minLength: Space.s2)
-            ChoiceTile(
-                choice: ConfirmChoice(
-                    busy ? "\(confirm)…" : confirm, symbol: danger ? "trash" : "checkmark", destructive: danger),
-                on: hovered != 0 && enabled && !busy, keys: danger ? "⌘↩" : "↩", run: run
-            )
-            .keyboardShortcut(.return, modifiers: danger ? .command : [])
-            .disabled(!enabled || busy)
-            .opacity(enabled ? 1 : 0.5)
-            .onHover { hovered = $0 ? 1 : nil }
-            .frame(maxWidth: Space.s8 * 7)
-        }
-        .animation(.smooth(duration: 0.25), value: hovered)
     }
 }
 
@@ -318,9 +255,9 @@ struct AccChip: View {
     var mono = false
     var body: some View {
         Text(text).font(.system(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default))
-            .padding(.horizontal, Space.s2).frame(minHeight: 22)
-            .background(GlassInk.well, in: coreShape(6))
-            .overlay { coreShape(6).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm)
+            .background(GlassInk.well, in: coreShape(Radius.chip))
+            .overlay { coreShape(Radius.chip).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }
 
@@ -352,11 +289,12 @@ struct AccPick: View {
 
     var body: some View {
         Button {
-            withAnimation(.smooth(duration: 0.25)) { pick() }
+            withAnimation(Motion.out(Motion.ui)) { pick() }
         } label: {
             HStack(spacing: Space.s2) {
                 Image(systemName: on ? "checkmark" : symbol).foregroundStyle(on ? .white : hue)
-                    .frame(width: 26, height: 26).background(on ? hue : hue.opacity(0.15), in: coreShape(7))
+                    .frame(width: Space.s6 + Space.s1, height: Space.s6 + Space.s1)
+                    .background(on ? hue : hue.opacity(0.15), in: coreShape(Radius.chip))
                     .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
@@ -367,15 +305,13 @@ struct AccPick: View {
             .padding(Space.s2)
             .background(
                 on ? hue.opacity(0.14) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.control + 2)
+                in: coreShape(Radius.control)
             )
-            .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
-            }
-            .contentShape(coreShape(Radius.control + 2))
+            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain).focusEffectDisabled().disabled(!enabled).opacity(enabled ? 1 : 0.45)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(Motion.out(Motion.ui), value: hovering)
     }
 }

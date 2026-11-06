@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// The Terminals app: its own surface (Settings, Terminal, App surface), the filter, a mini-terminal tile per terminal,
-/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S signal, R rename, ⌥⌘N new.
+/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S signal, R rename, ⌘T new.
 /// The Core keeps no output, so a tile shows the shell, not its screen.
 struct TerminalsListView: View {
     let model: TerminalsModel
@@ -12,19 +12,18 @@ struct TerminalsListView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            banner
             content
             footer
         }
-        // Like a terminal pane: the pane's glass is a rim, and the app's chosen background sits inside it, rounded.
-        .background {
-            AppSurfaceFill(
-                style: AppSurfaceStyle(rawValue: prefs.surface == .theme ? "tinted" : prefs.surface.rawValue)
-                    ?? .frosted,
-                opacity: prefs.surfaceOpacity, blur: prefs.surfaceBlur)
-        }
+        // The pane's frame draws the background: Settings, Appearance's Look, or the app's own.
+        .paneLook(prefs.look)
         .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }
     }
+
+    /// ⌘1 to ⌘3 belong to whichever pane is in front: the Agents list has the same keys.
+    private var keysHere: Bool { model.shell.activePane == "terminals" }
 
     private var header: some View {
         AppHeader {
@@ -32,13 +31,37 @@ struct TerminalsListView: View {
                 AppFilterTile(title: f.rawValue, count: count(f), on: model.filter == f, key: "⌘\(i + 1)") {
                     model.filter = f
                 }
-                .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                .keyboardShortcut(
+                    keysHere ? KeyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command) : nil)
             }
         } actions: {
-            AppActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.blue, prominent: true) {
+            // ⌘T is the app menu's New Terminal (the same quick path); the tile only shows it.
+            AppActionTile(title: "New", symbol: "plus", key: "⌘T", hue: GlassInk.blue, prominent: true) {
                 model.quickNew()
             }
-            .keyboardShortcut("n", modifiers: [.command, .option])
+        }
+    }
+
+    /// The list stays on screen when the Core cannot be reached; this says so, like the Agents list.
+    @ViewBuilder private var banner: some View {
+        if !model.items.isEmpty {
+            switch model.load {
+            case .failed(let why):
+                TermBanner(
+                    tone: .warn, title: "You are offline",
+                    detail: "Showing the last list. It updates when your Core is back.", symbol: "wifi.slash",
+                    actionTitle: "Try again"
+                ) { Task { await model.reload() } }
+                .help(why).padding([.horizontal, .bottom], Space.s3)
+            case .loading:
+                TermBanner(
+                    tone: .warn, title: "Reconnecting", detail: "Resuming from where you were. Nothing is lost.",
+                    busy: true,
+                    symbol: "arrow.triangle.2.circlepath"
+                )
+                .padding([.horizontal, .bottom], Space.s3)
+            default: EmptyView()
+            }
         }
     }
 
@@ -52,8 +75,11 @@ struct TerminalsListView: View {
 
     @ViewBuilder private var content: some View {
         switch model.load {
-        case .failed(let message):
-            ConnectionBanner(.error(message), retry: { Task { await model.reload() } }).padding(.horizontal, Space.s3)
+        case .failed(let message) where model.items.isEmpty:
+            ConnectionBanner(
+                .error("Check that your Core is reachable, then try again."), retry: { Task { await model.reload() } }
+            )
+            .help(message).padding(.horizontal, Space.s3)
             Spacer(minLength: 0)
         case .idle where model.items.isEmpty, .loading where model.items.isEmpty:
             BusyBar().padding(Space.s4)
@@ -111,7 +137,7 @@ struct TerminalsListView: View {
         guard !rows.isEmpty else { return .ignored }
         let i = rows.firstIndex { $0.id == model.selected } ?? (step > 0 ? -1 : rows.count)
         let next = rows[min(max(i + step, 0), rows.count - 1)].id
-        withAnimation(.spring(duration: 0.25)) { model.selected = next }
+        withAnimation(Motion.out(Motion.ui)) { model.selected = next }
         proxy.scrollTo(next)
         return .handled
     }
@@ -152,7 +178,8 @@ enum TileAction {
         case .detach: model.sessions[id]?.detach()
         case .end: if let s = model.session(for: id) { model.confirmEnd(s) }
         case .signal:
-            model.openTerminal(id)
+            // Opens the pane's actions without attaching: no Touch ID until a signal is picked.
+            model.openTerminal(id, attach: false)
             model.shell.toggleActions()
         case .rename:
             model.openTerminal(id, attach: false)
@@ -161,12 +188,9 @@ enum TileAction {
     }
 }
 
-/// A runner's own colour, so tiles from different machines tell apart at a glance.
+/// A runner's colour: blue or slate, by name, so tiles from different machines still tell apart.
 enum RunnerHue {
     static func of(_ name: String) -> Color {
-        let hues = [
-            GlassInk.blue, GlassInk.violet, GlassInk.green, GlassInk.orange, Color(red: 0.3, green: 0.82, blue: 0.9),
-        ]
-        return hues[abs(name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }) % hues.count]
+        abs(name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }) % 2 == 0 ? GlassInk.blue : GlassInk.slate
     }
 }

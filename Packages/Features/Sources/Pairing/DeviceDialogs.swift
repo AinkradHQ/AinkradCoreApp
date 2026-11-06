@@ -2,29 +2,6 @@ import CoreUI
 import Shell
 import SwiftUI
 
-private struct DialogButtons: View {
-    let app: AppModel
-    let confirm: String
-    var destructive = false
-    var busy: Bool
-    var enabled = true
-    let run: () -> Void
-
-    var body: some View {
-        // Cancel at the left edge, the confirm at the right, as in every dialog.
-        HStack(spacing: Space.s2) {
-            Button("Cancel") { app.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
-            Spacer(minLength: 0)
-            if destructive {
-                Button(confirm, action: run).buttonStyle(DangerButtonStyle()).disabled(!enabled || busy)
-            } else {
-                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
-                    .coreShortcut(.primary).disabled(!enabled)
-            }
-        }
-    }
-}
-
 struct ErrorLine: View {
     let text: String?
     @Environment(\.corePalette) private var palette
@@ -48,12 +25,12 @@ struct ScopesDialog: View {
     }
 
     var body: some View {
-        DialogCard(title: "What \(device.name) may do", width: Space.s8 * 16, close: { app.shell.closeDialog() }) {
+        CoreDialogPanel("What \(device.name) may do", width: Space.s8 * 16) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("You can take scopes away here. To give more, pair the device again.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if device.kind == "runner" {
-                    Text("A runner holds exactly runner. Revoke it to remove its access.")
+                    Text("A runner can only use secrets lent to it. Revoke it to remove its access.")
                 } else {
                     LazyVGrid(
                         columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
@@ -71,9 +48,10 @@ struct ScopesDialog: View {
                 ScopeWarnings(app: app, device: device, kept: on)
                 StepUpBanner(app: app)
                 ErrorLine(text: app.devices.dialogError)
-                DialogButtons(
-                    app: app, confirm: "Save", busy: app.devices.busy,
-                    enabled: device.kind != "runner" && on != Set(device.scopes) && !on.isEmpty
+                CoreDialogFooter(
+                    confirm: "Save", busy: app.devices.busy,
+                    enabled: device.kind != "runner" && on != Set(device.scopes) && !on.isEmpty,
+                    cancel: { app.shell.closeDialog() }
                 ) {
                     Task {
                         if await app.devices.setScopes(device, ScopeText.all.filter(on.contains)) {
@@ -102,7 +80,7 @@ struct ScopeWarnings: View {
                 out.append(
                     (
                         .fail, "xmark.octagon",
-                        "\(device.name) is the last admin. The Core will refuse this (409 conflict)."
+                        "\(device.name) is the last admin. The Core will refuse this."
                     ))
             } else {
                 out.append((.warn, "exclamationmark.triangle", "It can no longer manage devices, secrets or settings."))
@@ -117,13 +95,16 @@ struct ScopeWarnings: View {
         }
         if gone.contains("read") {
             out.append(
-                (.warn, "exclamationmark.triangle", "Without read it can't load anything, not even its own session."))
+                (
+                    .warn, "exclamationmark.triangle",
+                    "Without seeing everything it can't load anything, not even its own session."
+                ))
         }
         if !gone.isEmpty {
             out.append(
                 (
                     .queue, "clock",
-                    "Open connections from this device close right away (4003) and reconnect with the new access."
+                    "Open connections from this device close right away and reconnect with the new access."
                 ))
         }
         if kept.isEmpty {
@@ -155,7 +136,7 @@ struct RevokeDialog: View {
 
     var body: some View {
         let me = app.devices.isMe(device)
-        DialogCard(title: me ? "Revoke this Mac?" : "Revoke \(device.name)?", width: Space.s8 * 13) {
+        CoreDialogPanel(me ? "Revoke this Mac?" : "Revoke \(device.name)?", width: Space.s8 * 13) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
                     me
@@ -177,7 +158,9 @@ struct RevokeDialog: View {
                 }
                 StepUpBanner(app: app)
                 ErrorLine(text: app.devices.dialogError)
-                DialogButtons(app: app, confirm: "Revoke", destructive: true, busy: app.devices.busy) {
+                CoreDialogFooter(
+                    confirm: "Revoke", danger: true, busy: app.devices.busy, cancel: { app.shell.closeDialog() }
+                ) {
                     Task { if await app.devices.revoke(device) { app.shell.closeDialog() } }
                 }
             }

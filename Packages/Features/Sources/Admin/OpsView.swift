@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Settings, Core, Ops: how your Core is doing, in plain words. One verdict at the top, the three warnings (backup,
 /// certificate, disk) with how close each is to its limit, then the figures the Core reports about itself. It reads the
-/// metrics again every 15 seconds while shown; R reads now, M shows the raw metrics.
+/// metrics again every 15 seconds while shown; ⌘R reads now, M shows the raw metrics.
 struct OpsSection: View {
     let admin: AdminModel
 
@@ -13,7 +13,7 @@ struct OpsSection: View {
         AdminScreen(
             admin: admin, what: "Ops",
             intro: "How your Core is doing, from its own figures. Updates by itself while you look.",
-            state: model.state, empty: ("All clear", "Your Core reported no figures.", "checkmark.circle"),
+            state: model.state, empty: ("No figures yet", "Your Core reported no figures.", "tray"),
             retry: { Task { await model.reload() } }
         ) {
             VStack(alignment: .leading, spacing: Space.s4) {
@@ -63,10 +63,10 @@ struct OpsSection: View {
 enum OpsWords {
     static let figure: [String: (symbol: String, hue: Color)] = [
         "ainkrad_uptime_seconds": ("clock.fill", GlassInk.blue),
-        "ainkrad_devices_active": ("laptopcomputer.and.iphone", GlassInk.violet),
-        "ainkrad_runners": ("server.rack", GlassInk.green),
-        "ainkrad_terminals": ("terminal.fill", GlassInk.green),
-        "ainkrad_agent_sessions": ("sparkles", GlassInk.violet),
+        "ainkrad_devices_active": ("laptopcomputer.and.iphone", GlassInk.blue),
+        "ainkrad_runners": ("server.rack", GlassInk.blue),
+        "ainkrad_terminals": ("terminal.fill", GlassInk.blue),
+        "ainkrad_agent_sessions": ("play.fill", GlassInk.blue),
         "ainkrad_db_size_bytes": ("cylinder.fill", GlassInk.slate),
     ]
 
@@ -120,19 +120,18 @@ private struct Verdict: View {
         let names = raised.map { OpsWords.warning[$0.name]?.title ?? $0.name }
         HStack(spacing: Space.s4) {
             Image(systemName: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 28, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 60, height: 60)
+                .font(.system(size: MacTextSize.large * 1.5, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: Space.s8 * 2, height: Space.s8 * 2)
                 .background(
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(14)
+                    in: coreShape(Radius.cardMac)
                 )
-                .overlay { coreShape(14).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                .shadow(color: hue.opacity(0.55), radius: 14)
+                .overlay { coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                 .contentTransition(.symbolEffect(.replace))
-                .symbolEffect(.pulse, options: .repeating, isActive: !ok && !reduce)
+                .symbolEffect(.pulse, options: .nonRepeating, value: reduce ? true : ok)
             VStack(alignment: .leading, spacing: 3) {
                 Text(ok ? "Your Core is doing well" : "\(names.joined(separator: " and ")) needs a look")
-                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(hue)
                 Text(
                     ok
                         ? "Nothing needs you. Last read \(model.readAt.map { AdminWords.time($0) } ?? "just now")."
@@ -141,15 +140,14 @@ private struct Verdict: View {
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
-            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
                 Task { await model.reload() }
             }
-            .keyboardShortcut("r", modifiers: [])
+            .keyboardShortcut("r", modifiers: .command)
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
-        .animation(.smooth(duration: 0.4), value: ok)
+        .coreWell()
+        .animation(Motion.out(Motion.move), value: ok)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ops-health")
     }
@@ -168,11 +166,11 @@ private struct WarningCard: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
                 IconTile(w?.symbol ?? "bell.fill", hue: hue, size: 36, bounce: a.raised)
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     Text(w?.title ?? a.name).font(.system(size: MacTextSize.headline, weight: .semibold))
                     Label(
                         a.raised ? "Needs a look" : "Fine",
-                        systemImage: a.raised ? "exclamationmark.circle.fill" : "checkmark.circle.fill"
+                        systemImage: a.raised ? "exclamationmark.square.fill" : "checkmark.square.fill"
                     )
                     .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
                 }
@@ -180,7 +178,7 @@ private struct WarningCard: View {
             }
             if let r = detail.reading {
                 Text(OpsWords.reading(a.name, r)).font(
-                    .system(size: MacTextSize.large, weight: .bold, design: .rounded)
+                    .system(size: MacTextSize.large, weight: .semibold, design: .rounded)
                 )
                 .contentTransition(.numericText())
                 if let l = detail.limit { Meter(reading: r, limit: l, hue: hue) }
@@ -193,22 +191,18 @@ private struct WarningCard: View {
                     admin.registry.cursor = key
                     admin.host.shell.settings.selected = "core"
                 }
-                .help("Change this limit in Core settings (\(key))")
+                .help("Change this limit in Core settings. Setting: \(key)")
             }
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(a.raised ? GlassInk.orange.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                a.raised ? GlassInk.orange.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
-        }
-        .shadow(color: GlassInk.orange.opacity(a.raised ? 0.25 : 0), radius: 12)
+        .background(a.raised ? GlassInk.orange.opacity(0.1) : .clear)
+        .coreWell()
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A reading against the point where it warns: a glowing fill and a tick at the limit.
+/// A reading against the point where it warns: a fill and a tick at the limit.
 private struct Meter: View {
     let reading: Double
     let limit: Double
@@ -222,14 +216,13 @@ private struct Meter: View {
                     LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
                 )
                 .frame(width: max(g.size.width * reading / top, 6), height: 6)
-                .shadow(color: hue.opacity(0.6), radius: 6)
                 coreShape(1).fill(.white).frame(width: 2, height: 14)
                     .offset(x: g.size.width * limit / top - 1)  // grid: ok tick
             }
             .frame(height: 14)
         }
         .frame(height: 14)
-        .animation(.smooth(duration: 0.5), value: reading)
+        .animation(Motion.out(Motion.move), value: reading)
         .accessibilityHidden(true)
     }
 }
@@ -248,14 +241,13 @@ private struct FigureTile: View {
                     GlassInk.secondary)
                 Spacer(minLength: 0)
             }
-            Text(value).font(.system(size: MacTextSize.large, weight: .bold, design: .rounded)).lineLimit(1)
+            Text(value).font(.system(size: MacTextSize.large, weight: .semibold, design: .rounded)).lineLimit(1)
                 .minimumScaleFactor(0.7).contentTransition(.numericText())
             if let h = model.history[tile.name], h.count >= 2 { CoreSpark(h).frame(height: 24) }
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .help(tile.help.isEmpty ? tile.name : tile.help)
         .accessibilityElement(children: .combine)
     }
@@ -282,7 +274,7 @@ private struct RawMetrics: View {
 
     var body: some View {
         GlassSection(
-            "Raw metrics", sub: "\(model.samples.count) figures in Prometheus text, for tools and debugging.",
+            "Raw metrics", sub: "\(model.samples.count) figures exactly as your Core sends them, for tools.",
             symbol: "chevron.left.forwardslash.chevron.right", hue: GlassInk.slate, index: 3
         ) {
             AppActionTile(
@@ -299,10 +291,10 @@ private struct RawMetrics: View {
                         .textSelection(.enabled).padding(Space.s3)
                 }
                 .frame(maxHeight: Space.s8 * 10)
-                .background(GlassInk.well, in: coreShape(Radius.control + 2))
+                .background(GlassInk.well, in: coreShape(Radius.control))
                 .transition(.opacity)
             }
         }
-        .animation(.smooth(duration: 0.3), value: model.showRaw)
+        .animation(Motion.out(Motion.ui), value: model.showRaw)
     }
 }

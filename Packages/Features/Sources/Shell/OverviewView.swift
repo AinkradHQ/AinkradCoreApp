@@ -9,6 +9,10 @@ struct OverviewView: View {
     @State private var selected = 0
     @State private var shown = false
     @State private var monitor: Any?
+    /// The pointer only tints a card; the highlight (and Return) follows the keyboard.
+    @State private var hovered: Int?
+    /// The grid and the ↑ ↓ keys share this, so a row down is always the card below.
+    private static let columns = 4
     @Namespace private var lens
 
     var body: some View {
@@ -17,28 +21,36 @@ struct OverviewView: View {
             HStack(spacing: Space.s3) {
                 IconTile("square.grid.2x2", hue: GlassInk.blue, size: 40, bounce: shown)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Overview").font(.system(size: MacTextSize.large + 2, weight: .bold))
-                    Text("\(panes.count) apps open · ← → ↑ ↓ choose · ↩ or 1–9 open · esc close")
+                    Text("Overview").font(.system(size: MacTextSize.large, weight: .semibold))
+                    Text(panes.count == 1 ? "1 app open" : "\(panes.count) apps open")
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 }
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: Space.s3)], spacing: Space.s3) {
-                ForEach(Array(panes.enumerated()), id: \.element.id) { i, p in
-                    card(p, index: i, on: i == selected)
-                        .onTapGesture { open(i) }
-                        .onHover { if $0 { selected = i } }
-                        .coreRise(shown, i)
+            .help("← → ↑ ↓ choose · ↩ or 1–9 open · esc close")
+            if panes.isEmpty {
+                Text("No app is open").foregroundStyle(GlassInk.secondary)
+                    .frame(maxWidth: .infinity, minHeight: Space.s8 * 4)
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: Self.columns),
+                    spacing: Space.s3
+                ) {
+                    ForEach(Array(panes.enumerated()), id: \.element.id) { i, p in
+                        card(p, index: i, on: i == selected, hover: hovered == i)
+                            .onTapGesture { open(i) }
+                            .onHover { hovered = $0 ? i : (hovered == i ? nil : hovered) }
+                            .coreRise(shown, i)
+                    }
                 }
             }
         }
         .foregroundStyle(GlassInk.primary)
-        .padding(Space.s6)
-        .frame(maxWidth: Space.s8 * 34)
-        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .frame(maxWidth: Space.s8 * 34 - Space.s6 * 2)
+        .corePanel(radius: Radius.panel, padding: Space.s6, part: .popups)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         .scaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: shown)
-        .animation(.spring(duration: 0.25), value: selected)
+        .animation(Motion.out(Motion.move), value: shown)
+        .animation(Motion.out(Motion.ui), value: selected)
         .onAppear {
             selected = panes.firstIndex { $0.id == shell.activePane } ?? 0
             shown = true
@@ -49,7 +61,7 @@ struct OverviewView: View {
         .accessibilityLabel("Overview")
     }
 
-    private func card(_ p: PaneSpec, index: Int, on: Bool) -> some View {
+    private func card(_ p: PaneSpec, index: Int, on: Bool, hover: Bool) -> some View {
         let state: Color? = p.chip.map {
             $0.tone == .fail
                 ? GlassInk.red
@@ -60,14 +72,15 @@ struct OverviewView: View {
                 IconTile(p.symbol, hue: on ? GlassInk.blue : GlassInk.slate, size: 44, bounce: on)
                 Spacer()
                 if index < 9 {
-                    Text("\(index + 1)").font(.system(size: MacTextSize.meta, weight: .bold, design: .rounded))
-                        .frame(width: 22, height: 22).background(.white.opacity(0.14), in: coreShape(6))
+                    Text("\(index + 1)").font(.system(size: MacTextSize.meta, weight: .semibold, design: .rounded))
+                        .frame(width: MacSize.controlSm, height: MacSize.controlSm)
+                        .background(.white.opacity(0.14), in: coreShape(Radius.chip))
                 }
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(shell.tabName(p)).font(.system(size: MacTextSize.headline + 1, weight: .semibold)).lineLimit(1)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(shell.tabName(p)).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                 HStack(spacing: Space.s1) {
-                    if let state { Circle().fill(state).frame(width: 6, height: 6) }
+                    if let state { coreShape(2).fill(state).frame(width: 6, height: 6) }
                     Text([p.title, p.chip?.label].compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
@@ -78,15 +91,14 @@ struct OverviewView: View {
         .background {
             if on {
                 coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.22))
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.6), lineWidth: 1.5) }
-                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 16)
+                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.6), lineWidth: 1) }
                     .matchedGeometryEffect(id: "pick", in: lens)
             } else {
-                coreShape(Radius.cardMac).fill(GlassInk.well)
+                coreShape(Radius.cardMac).fill(hover ? GlassInk.wellHover : GlassInk.well)
                     .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
         }
-        .scaleEffect(on ? 1.03 : 1)
+        .animation(Motion.out(Motion.hover), value: hover)
         .contentShape(coreShape(Radius.cardMac))
         .accessibilityLabel(shell.tabName(p))
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -103,7 +115,7 @@ struct OverviewView: View {
 
     private func listen(count: Int) {
         guard monitor == nil else { return }
-        let cols = 4
+        let cols = Self.columns
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
             switch e.keyCode {
             case 123: selected = max(selected - 1, 0)

@@ -6,6 +6,9 @@ import SwiftUI
 /// what is showing right now, and one line about motion. ← → choose a theme.
 struct AppearanceSection: View {
     @Bindable var shell: ShellModel
+    @Bindable private var look = LookPrefs.shared
+    /// Advanced: each part's own Look. Open by default once a part has one.
+    @State private var advanced = !LookPrefs.shared.custom.isEmpty
     @FocusState private var focus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -13,7 +16,7 @@ struct AppearanceSection: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
                 "Theme", sub: "The desktop sky and the glass follow it.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.violet
+                hue: GlassInk.blue
             ) {
                 Text(now).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
                     .contentTransition(.opacity)
@@ -22,6 +25,30 @@ struct AppearanceSection: View {
                     ForEach(ThemeChoice.allCases, id: \.self) { c in
                         ThemeTile(choice: c, selected: shell.theme == c) { pick(c) }
                     }
+                }
+            }
+            GlassSection(
+                "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",
+                symbol: "square.on.square", hue: GlassInk.blue, index: 1
+            ) {
+                SurfaceModeTabs(mode: $look.mode)
+            } content: {
+                GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+            }
+            GlassSection(
+                "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
+                hue: GlassInk.slate, index: 2
+            ) {
+                AppActionTile(
+                    title: advanced ? "Hide" : "Show", symbol: advanced ? "chevron.up" : "chevron.down", key: "",
+                    hue: GlassInk.slate
+                ) { withAnimation(Motion.out(Motion.ui)) { advanced.toggle() } }
+            } content: {
+                if advanced {
+                    VStack(spacing: Space.s2) {
+                        ForEach(LookPart.allCases, id: \.self) { part in LookPartRow(part: part, prefs: look) }
+                    }
+                    .transition(.opacity)
                 }
             }
             HStack(spacing: Space.s3) {
@@ -70,7 +97,7 @@ struct AppearanceSection: View {
     }
 
     private func pick(_ c: ThemeChoice) {
-        withAnimation(.smooth(duration: 0.35)) { shell.theme = c }
+        withAnimation(Motion.out(Motion.ui)) { shell.theme = c }
         shell.settings.saved()
     }
 
@@ -82,7 +109,7 @@ struct AppearanceSection: View {
     }
 }
 
-/// One theme as a sky tile with its name and a line under it; the chosen one glows and carries a check.
+/// One theme as a sky tile with its name and a line under it; the chosen one carries a blue edge and a check.
 private struct ThemeTile: View {
     let choice: ThemeChoice
     let selected: Bool
@@ -97,18 +124,17 @@ private struct ThemeTile: View {
                     .clipShape(coreShape(Radius.cardMac))
                     .overlay(alignment: .topTrailing) {
                         if selected {
-                            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(
+                            Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(
                                 .white
                             )
-                            .frame(width: 24, height: 24).background(GlassInk.violet, in: coreShape(7))
+                            .frame(width: 24, height: 24).background(GlassInk.blue, in: coreShape(Radius.chip))
                             .padding(Space.s2).transition(.scale.combined(with: .opacity))
                         }
                     }
                     .overlay {
                         coreShape(Radius.cardMac).strokeBorder(
-                            selected ? GlassInk.violet : GlassInk.wellEdge, lineWidth: selected ? 2 : 1)
+                            selected ? GlassInk.blue : GlassInk.wellEdge, lineWidth: selected ? 2 : 1)
                     }
-                    .shadow(color: GlassInk.violet.opacity(selected ? 0.5 : 0), radius: 14)
                 Text(choice.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text(line).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -119,8 +145,8 @@ private struct ThemeTile: View {
         }
         .buttonStyle(.plain).focusable(false)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: selected)
-        .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(Motion.out(Motion.ui), value: selected)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityLabel(choice.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
@@ -158,5 +184,50 @@ private struct ThemeTile: View {
 
     private func sky(_ name: String) -> some View {
         Image(name, bundle: .main).resizable().scaledToFill()
+    }
+}
+
+/// One part in Appearance, Advanced: its name, Same (follows the content background) or its own look, and a slider when
+/// it has its own.
+private struct LookPartRow: View {
+    let part: LookPart
+    @Bindable var prefs: LookPrefs
+
+    var body: some View {
+        let own = prefs.custom[part]
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s3) {
+                IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.blue, size: 28)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(part.title).font(.system(size: MacTextSize.body, weight: .semibold))
+                    Text(part.sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                }
+                Spacer(minLength: Space.s3)
+                AppLookTabs(follow: follow, mode: mode, followTitle: "Same")
+            }
+            if own != nil {
+                GlassSlider(value: opacity, in: 0.05...1, low: "See-through", high: "Solid")
+            }
+        }
+        .padding(Space.s3)
+        .coreWell()
+        .animation(Motion.out(Motion.ui), value: own == nil)
+        .help("Same follows the content background above")
+    }
+
+    private var follow: Binding<Bool> {
+        Binding(
+            get: { prefs.custom[part] == nil },
+            set: { prefs.setCustom(part, $0 ? nil : prefs.look) })
+    }
+    private var mode: Binding<SurfaceMode> {
+        Binding(
+            get: { prefs.custom[part]?.mode ?? prefs.mode },
+            set: { prefs.setCustom(part, CoreLook(mode: $0, opacity: prefs.custom[part]?.opacity ?? prefs.opacity)) })
+    }
+    private var opacity: Binding<Double> {
+        Binding(
+            get: { prefs.custom[part]?.opacity ?? prefs.opacity },
+            set: { prefs.setCustom(part, CoreLook(mode: prefs.custom[part]?.mode ?? prefs.mode, opacity: $0)) })
     }
 }

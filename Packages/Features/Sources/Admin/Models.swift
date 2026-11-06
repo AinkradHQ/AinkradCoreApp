@@ -47,7 +47,7 @@ enum ActorInfo: Equatable, Sendable {
     var label: String {
         switch self {
         case .user(let n): "User \(n)"
-        case .system: "The Core itself"
+        case .system: "Your Core"
         }
     }
     /// The word the audit `actor` filter takes.

@@ -21,13 +21,15 @@ struct ApprovalCardView: View {
                 case .expired: expired
                 }
             }
-            .animation(.smooth(duration: 0.35), value: status)
+            .animation(Motion.out(Motion.move), value: status)
         }
         .accessibilityElement(children: .contain)
     }
 
     private var elevated: Bool { model.shell.elevatedUntil.map { $0 > Date() } ?? false }
-    private var who: String { (model.sessions.session(request.session)?.harness ?? "An agent").capitalized }
+    private var who: String {
+        model.sessions.session(request.session).map { AgentWords.harness($0.harness) } ?? "An agent"
+    }
     private var ask: ApprovalWords.Ask { ApprovalWords.ask(request.tool) }
 
     private func card(now: Date) -> some View {
@@ -38,10 +40,9 @@ struct ApprovalCardView: View {
         let session = model.sessions.session(request.session)
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                IconTile(ask.symbol, hue: GlassInk.orange, size: 44, bounce: request.id)
-                    .shadow(color: GlassInk.orange.opacity(0.45), radius: 12)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("\(who) wants to \(ask.verb)").font(.system(size: MacTextSize.title, weight: .bold))
+                IconTile(ask.symbol, hue: GlassInk.orange, size: Space.s8 + Space.s3, bounce: request.id)
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                    Text("\(who) wants to \(ask.verb)").font(.system(size: MacTextSize.title, weight: .semibold))
                     Text(
                         "On \(session.map { model.runnerName($0.runner) } ?? "a runner") · asked \(AgentWords.ago(request.requestedAt, now: now))"
                     )
@@ -52,9 +53,7 @@ struct ApprovalCardView: View {
                 if let left {
                     VStack(alignment: .trailing, spacing: 0) {
                         Text(AgentWords.clock(left))
-                            .font(
-                                .system(size: MacTextSize.large + 2, weight: .bold, design: .rounded).monospacedDigit()
-                            )
+                            .font(.system(size: MacTextSize.large, weight: .semibold).monospacedDigit())
                             .foregroundStyle(hue).contentTransition(.numericText(countsDown: true))
                         Text("to answer").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     }
@@ -68,24 +67,11 @@ struct ApprovalCardView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(Space.s3)
-                .background(Color.black.opacity(0.25), in: coreShape(Radius.control + 2))
-                .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .background(GlassInk.well, in: coreShape(Radius.cardMac))
+                .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
             if request.timeoutSecs != nil {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3)
-                            .fill(
-                                LinearGradient(
-                                    colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .frame(width: g.size.width * min(1, max(0, ratio)))
-                            .shadow(color: hue.opacity(0.5), radius: 5)
-                    }
-                }
-                .frame(height: 6)
-                .animation(reduce ? nil : .linear(duration: 1), value: ratio)
+                CoreMeter(ratio, low: (left ?? 999) <= 60, label: "Time left to answer")
             }
             if let n = model.approvalNotices[request.id] { NoticeBanner(notice: n) }
             HStack(spacing: Space.s2) {
@@ -100,11 +86,7 @@ struct ApprovalCardView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
-        .background(GlassInk.orange.opacity(0.08), in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                GlassInk.orange.opacity(keys ? 0.6 : 0.35), lineWidth: keys ? 1.5 : 1)
-        }
+        .coreWell(active: keys)
         .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s2))))
     }
 
@@ -112,7 +94,7 @@ struct ApprovalCardView: View {
         let tile = AppActionTile(
             title: approve ? (elevated ? "Approve" : "Approve with Touch ID") : "Deny",
             symbol: approve ? (elevated ? "checkmark" : "touchid") : "xmark", key: approve ? "⌘↩" : "⌘⌫",
-            hue: approve ? GlassInk.green : GlassInk.slate, prominent: approve
+            hue: approve ? GlassInk.blue : GlassInk.slate, prominent: approve
         ) { Task { await model.decide(request, approved: approve) } }
         .disabled(busy)
         .help(
@@ -120,7 +102,7 @@ struct ApprovalCardView: View {
                 ? "Let \(who) \(ask.verb) (⌘Return). Asks for Touch ID when this Mac is locked."
                 : "Tell \(who) no (⌘Delete). It carries on without it."
         )
-        .accessibilityLabel(approve ? "Approve \(request.tool)" : "Deny \(request.tool)")
+        .accessibilityLabel(approve ? "Approve: \(ask.verb)" : "Deny: \(ask.verb)")
         return Group {
             if keys {
                 if approve {
@@ -138,7 +120,7 @@ struct ApprovalCardView: View {
         let ok = status == .approved
         let hue = ok ? GlassInk.green : GlassInk.slate
         return HStack(spacing: Space.s3) {
-            IconTile(ok ? "checkmark" : "xmark", hue: hue, size: 26)
+            IconTile(ok ? "checkmark" : "xmark", hue: hue, size: MacSize.controlMd)
             Text("\(ok ? "Approved" : "Denied"): \(ask.verb)").font(.system(size: MacTextSize.body, weight: .semibold))
             Text(request.input).font(.system(size: MacTextSize.body, design: .monospaced)).foregroundStyle(
                 GlassInk.secondary
@@ -147,13 +129,13 @@ struct ApprovalCardView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s3).frame(minHeight: 40)
-        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .background(GlassInk.well, in: coreShape(Radius.control))
         .accessibilityElement(children: .combine)
     }
 
     private var expired: some View {
         HStack(alignment: .top, spacing: Space.s3) {
-            IconTile("clock.badge.xmark", hue: GlassInk.slate, size: 26)
+            IconTile("clock.badge.xmark", hue: GlassInk.slate, size: MacSize.controlMd)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Nobody answered in time: \(ask.verb)").font(.system(size: MacTextSize.body, weight: .semibold))
                 Text(request.input).font(.system(size: MacTextSize.body, design: .monospaced))

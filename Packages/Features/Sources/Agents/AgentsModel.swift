@@ -40,6 +40,8 @@ public final class AgentsModel {
     public let sessions = SessionsStore()
     public internal(set) var transcripts: [String: TranscriptStore] = [:]
     public internal(set) var runners: [RunnerInfo] = []
+    /// True once the runners were asked for (even if none came back): "no runner" is only said after this.
+    public internal(set) var runnersLoaded = false
     public internal(set) var link: AgentsLink = .live
     public var filter: AgentFilter = .all
     /// What is typed in each session's composer.
@@ -162,6 +164,7 @@ public final class AgentsModel {
         guard let api else { return }
         await sessions.reload(api)
         if let r = try? await api.runners() { runners = r }
+        runnersLoaded = true
         for s in sessions.items where s.live && transcripts[s.id] == nil { _ = store(s.id) }
         for (id, t) in transcripts { await t.refresh(api, knownLast: sessions.session(id)?.lastSeq ?? 0) }
         syncDerived()

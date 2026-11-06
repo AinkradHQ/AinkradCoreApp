@@ -63,7 +63,7 @@ struct SessionView: View {
                 return .handled
             }
             // The same look as the Agents app: its surface inside the pane's glass rim.
-            .background { AgentSurface() }
+            .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {
@@ -105,15 +105,16 @@ struct StateBanner: View {
         let r = model.runnerName(session.runner)
         switch session.state {
         case .lost:
+            // Resume lives in the hero above; one place to press it.
             row(
                 "wifi.exclamationmark", .fail, "Session lost",
-                "\(r) dropped it and could not resume it. The transcript up to seq \(session.lastSeq) is kept."
-            ) {
-                Button("Resume") { model.resume(session.id) }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
-            }
+                "\(r) dropped it and could not resume it. The transcript is kept."
+            )
+            .help("The transcript is kept up to entry \(session.lastSeq)")
         default:
-            if session.state.unknownRaw != nil {
-                row("questionmark.circle", .queue, session.state.rawValue, "This state is newer than this app.")
+            if let raw = session.state.unknownRaw {
+                row("questionmark.square", .queue, "A newer state", "This state is newer than this app.")
+                    .help("State: \(raw)")
             }
         }
     }

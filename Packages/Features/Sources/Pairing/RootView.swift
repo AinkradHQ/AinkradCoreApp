@@ -23,7 +23,7 @@ public struct RootView: View {
         .coreConfirm(
             "Forget this Core?", isPresented: $app.confirmForget,
             message: "This Mac's keys for it are deleted. You will need a new pairing code to connect again.",
-            confirmTitle: "Forget Core", destructive: true
+            confirmTitle: "Forget this Core", destructive: true
         ) { Task { await app.forgetCore() } }
     }
 
@@ -57,7 +57,7 @@ private struct BlockedView: View {
         .foregroundStyle(palette.text)
         .font(.system(size: MacTextSize.body))
         .padding(Space.s6)
-        .coreGlass(radius: Radius.panel, interactive: false)
+        .coreFrame(radius: Radius.panel, part: .dialogs)
         .frame(width: Space.s8 * 17)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .background {

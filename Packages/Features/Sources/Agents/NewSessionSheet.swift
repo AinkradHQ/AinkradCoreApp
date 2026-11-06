@@ -5,10 +5,10 @@ import SwiftUI
 /// cannot run it, and the refusal shows here in place.
 struct NewSessionSheet: View {
     @Bindable var model: AgentsModel
-    @State private var harness = "claude"
-    @State private var mode = "ask"
-    @State private var runnerID: String?
-    @State private var llm = ""
+    @State private var harness = AgentPrefs.shared.harness
+    @State private var mode = AgentPrefs.shared.mode
+    @State private var runnerID: String? = AgentPrefs.shared.runner.isEmpty ? nil : AgentPrefs.shared.runner
+    @State private var llm = AgentPrefs.shared.model
     @State private var prompt = ""
     @State private var secrets: [String] = []
     @State private var secretDraft = ""
@@ -16,7 +16,6 @@ struct NewSessionSheet: View {
     @State private var busy = false
     @Environment(\.corePalette) private var palette
     @FocusState private var promptFocus: Bool
-    @FocusState private var runnerFocus: String?
 
     private var runner: RunnerInfo? { model.runners.first { $0.id == (runnerID ?? "") } }
     private var ready: Bool {
@@ -28,42 +27,45 @@ struct NewSessionSheet: View {
         CoreDialogPanel("New agent session", width: Space.s8 * 17) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    Text("It runs on a runner of the Home Core. You can close this Mac and it keeps going.")
+                    Text("It runs on a runner of your Core. You can close this Mac and it keeps going.")
                         .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                     if let notice { NoticeBanner(notice: notice) }
                     VStack(alignment: .leading, spacing: Space.s3) {
                         field("Harness") {
                             CoreSegmented(
                                 "Harness",
-                                segments: ["claude", "codex", "opencode", "agy"].map { CoreSegment($0, $0) },
-                                selection: $harness)
+                                segments: ["claude", "codex", "opencode", "agy"].map {
+                                    CoreSegment($0, AgentWords.harness($0), symbol: AgentsModel.harnessSymbol($0))
+                                },
+                                selection: $harness
+                            )
+                            .help("Harness id: \(harness)")
                         }
-                        field("Policy mode") {
+                        field("Mode") {
                             CoreSegmented(
-                                "Policy mode",
-                                segments: ["ask", "accept_edits", "sandboxed"].map { CoreSegment($0, $0) },
-                                selection: $mode)
+                                "Mode",
+                                segments: ["ask", "accept_edits", "sandboxed"].map {
+                                    CoreSegment($0, AgentWords.mode($0))
+                                },
+                                selection: $mode
+                            )
+                            .help("Mode: \(mode). Sandboxed needs the admin scope; the Core refuses it otherwise.")
                         }
-                    }
-                    if mode == "sandboxed" {
-                        Text("Sandboxed needs the admin scope; the Core refuses it otherwise.").foregroundStyle(
-                            palette.text2)
                     }
                     field("Runner") { runnerList }
+                    // KAN-475: a "Pool" choice (CoreSegmented) lands here once the agents API exposes runner pools.
                     CoreTextField("Model (optional)", placeholder: "the harness default", text: $llm, mono: true)
                     field("Prompt") { promptField }
-                    Text("Isolation (microVM, memory, disk, network egress): not available yet.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
-                    field("Secrets to pass  \(secrets.count) of 16") { secretsField }
+                    field("Secrets to pass (\(secrets.count) of 16)") { secretsField }
                 }
                 .padding(.bottom, Space.s1)
             }
             .frame(maxHeight: Space.s8 * 20)
             preview
             HStack(spacing: Space.s2) {
-                Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
-                Spacer(minLength: 0)
                 Button("Cancel") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
+                Spacer(minLength: 0)
+                Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
                 Button(busy ? "Starting…" : "Start session") { start() }
                     .buttonStyle(.coreProminent).keyboardShortcut(.return, modifiers: .command).environment(
                         \.coreKeycap, "⌘↩"
@@ -101,12 +103,14 @@ struct NewSessionSheet: View {
 
     @ViewBuilder
     private var runnerList: some View {
-        if model.runners.isEmpty {
+        if !model.runnersLoaded && model.runners.isEmpty {
+            BusyBar()
+        } else if model.runners.isEmpty {
             Text("No runner is paired yet. Add one from Settings, Devices.").foregroundStyle(palette.text2)
         } else {
             VStack(spacing: Space.s1) {
                 ForEach(model.runners) { r in
-                    AgentRowButton(id: r.id, focus: $runnerFocus, selected: runnerID == r.id) {
+                    AgentRowButton(selected: runnerID == r.id) {
                         runnerID = r.id
                         notice = nil
                     } label: {
@@ -122,9 +126,9 @@ struct NewSessionSheet: View {
     /// What pressing Start will do, in one line, from what is chosen. No number here is invented: it is the harness, the runner
     /// and the options picked.
     private var preview: some View {
-        let words = runner.map { "\(harness) on \($0.name)" } ?? "Choose a runner to start on"
+        let words = runner.map { "\(AgentWords.harness(harness)) on \($0.name)" } ?? "Choose a runner to start on"
         let options = [
-            mode, llm.isEmpty ? nil : llm,
+            AgentWords.mode(mode), llm.isEmpty ? nil : llm,
             secrets.isEmpty ? nil : "\(secrets.count) secret\(secrets.count == 1 ? "" : "s")",
         ]
         .compactMap { $0 }
@@ -140,7 +144,7 @@ struct NewSessionSheet: View {
             }
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .combine)
     }
 
@@ -156,10 +160,8 @@ struct NewSessionSheet: View {
         TextEditor(text: $prompt).font(.system(size: MacTextSize.body)).scrollContentBackground(.hidden)
             .focused($promptFocus).frame(minHeight: Space.s8 * 3).padding(Space.s2)
             .background(palette.glassCard, in: coreShape(Radius.control))
-            .overlay {
-                coreShape(Radius.control).strokeBorder(
-                    promptFocus ? palette.focusRing : palette.glassCardEdge, lineWidth: promptFocus ? 2 : 1)
-            }
+            .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .focusEffectDisabled()
             .accessibilityLabel("Prompt")
     }
 
@@ -175,7 +177,7 @@ struct NewSessionSheet: View {
                             } label: {
                                 Image(systemName: "xmark")
                             }
-                            .buttonStyle(.plain).accessibilityLabel("Remove \(s)")
+                            .buttonStyle(.plain).help("Remove \(s)").accessibilityLabel("Remove \(s)")
                         }
                         .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
                         .background(palette.uDim, in: coreShape(Radius.chip))
@@ -242,7 +244,7 @@ private struct RunnerRow: View {
 
     private var label: String { runner.online ? (runner.degraded ? "Degraded" : "Online") : "Offline" }
     private var tone: Tone { runner.online ? (runner.degraded ? .warn : .run) : .queue }
-    private var symbol: String { runner.online ? "checkmark.circle" : "wifi.slash" }
+    private var symbol: String { runner.online ? "checkmark.square" : "wifi.slash" }
 
     private var detail: String {
         var parts = ["\(runner.load) of \(runner.capacity.map(String.init) ?? "?") in use"]

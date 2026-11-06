@@ -333,9 +333,8 @@ public final class AccountsDemo {
         "account-ready",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
-        "limits", "pools", "pools-second", "bindings",
-        "bindings-empty",
-        "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
+        "limits", "pools", "pools-second",
+        "budgets", "costs", "ledger", "prices", "connect", "delete-account", "cap", "new-pool",
         "add-member",
         "delete-pool", "signin-intro", "signin-url", "signin-working", "signin-done", "signin-failed",
         "touchid-cancelled", "read-only", "state-loading", "state-error", "state-scope", "launcher",
@@ -377,7 +376,6 @@ public final class AccountsDemo {
             svc.poolList = svc.poolList.map {
                 PoolItem(id: $0.id, name: $0.name, provider: $0.provider, isDefault: $0.isDefault, members: [])
             }
-        case "bindings-empty": svc.bindingList = []
         case "budgets-empty": svc.budgetList = []
         default: break
         }
@@ -392,8 +390,7 @@ public final class AccountsDemo {
                 "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
-            case "bindings", "bindings-empty", "bind": .bindings
-            case "budgets", "costs", "ledger", "prices", "activity": AccountsPage(rawValue: scene)!
+            case "budgets", "costs", "ledger", "prices": AccountsPage(rawValue: scene)!
             case "price-new": .prices
             case "provider-new", "provider-edit": .accounts
             case "budget-new", "budget-edit", "budget-raise", "budgets-empty": .budgets
@@ -438,7 +435,6 @@ public final class AccountsDemo {
         case "budgets": model.cursor = "g-3"
         case "account-testing": Task { await model.test(model.account(1)!) }
         case "new-pool": AccountDialogs.openNewPool(model)
-        case "bind": AccountDialogs.openBind(model, pool: nil)
         case "add-member": AccountDialogs.openAddMember(model, pool: model.pool(2)!)
         case "delete-pool": AccountDialogs.openDeletePool(model, model.pool(2)!)
         case "touchid-cancelled":

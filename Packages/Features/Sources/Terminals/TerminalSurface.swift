@@ -1,4 +1,5 @@
 import AppKit
+import CoreUI
 import SwiftTerm
 import SwiftUI
 
@@ -27,11 +28,16 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
             [weak self] _ in
             MainActor.assumeIsolated { self?.applyPrefs() }
         }
+        // Settings, Appearance: a terminal that follows it changes with it.
+        NotificationCenter.default.addObserver(forName: LookPrefs.changed, object: nil, queue: .main) {
+            [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPrefs() }
+        }
         container.addSubview(term)
         container.term = term
         container.surface = self
         container.wantsLayer = true
-        container.layer?.cornerRadius = 12
+        container.layer?.cornerRadius = Radius.cardMac
         container.layer?.masksToBounds = true
     }
 
@@ -142,7 +148,7 @@ final class SurfaceContainer: NSView {
             layer?.backgroundColor = nil
             term.frame = CGRect(x: 0, y: 0, width: bounds.width + strip, height: bounds.height)
         case .letterbox:
-            layer?.backgroundColor = NSColor(red: 2 / 255, green: 6 / 255, blue: 12 / 255, alpha: 0.92).cgColor
+            layer?.backgroundColor = TerminalInk.letterbox.cgColor
             let want = term.getOptimalFrameSize().size
             term.frame = CGRect(
                 x: 0, y: 0, width: min(want.width, bounds.width + strip), height: min(want.height, bounds.height))

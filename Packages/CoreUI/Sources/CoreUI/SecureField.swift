@@ -37,7 +37,7 @@ public struct CoreSecureField: View {
                 .onSubmit(onSubmit)
                 .padding(.horizontal, Space.s3)
                 .frame(minHeight: MacSize.controlLg)
-                .background(palette.glassCard, in: coreShape(Radius.control))
+                .coreGlassField(fallback: palette.glassCard)
                 .overlay {
                     coreShape(Radius.control).strokeBorder(
                         error == nil ? palette.glassCardEdge : palette.tone(.fail).ink, lineWidth: 1)

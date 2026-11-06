@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import CoreUI
 import Pairing
 import Shell
 import SwiftUI
@@ -122,6 +123,13 @@ enum SnapshotRunner {
         shell.settings.selected = "notifications"
         await shot("09b-settings-activity")
         shell.settings.selected = "appearance"
+        // Advanced opens once a part has its own look: give the launcher one for the shot, then put it back.
+        LookPrefs.shared.setCustom(.launcher, CoreLook(mode: .solid, opacity: 0.9))
+        shell.closeTopmost()
+        shell.open(.settings)
+        shell.settings.selected = "appearance"
+        await shot("09c-settings-appearance")
+        LookPrefs.shared.setCustom(.launcher, nil)
         shell.open(.shortcuts)
         await shot("10-shortcuts")
         shell.overlay = nil

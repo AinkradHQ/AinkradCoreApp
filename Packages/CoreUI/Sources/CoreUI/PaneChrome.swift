@@ -24,20 +24,40 @@ public struct CorePaneChrome<Content: View>: View {
         self.content = content()
     }
 
-    /// No head and no footer (Ahmed, 2026-11-05): the pane is clear glass holding its content; its title and actions
-    /// live in its tab in the top bar. The active pane's edge is a touch brighter.
+    /// No head and no footer (Ahmed, 2026-11-05): the pane is the one frame, a clear glass rim holding its content on
+    /// the Look's background; its title and actions live in its tab in the top bar. The active pane's edge is a touch
+    /// brighter. The content may replace the Look for its app, or draw its own background (`paneLook`).
     public var body: some View {
-        // Content takes exactly the pane's frame and never spills over a neighbour.
-        content.frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
-            .clipped()
-            .padding(Space.s2)
-            .coreGlass(radius: Radius.pane, interactive: false, tinted: false)
-            .clipShape(coreShape(Radius.pane))
-            .overlay {
-                coreShape(Radius.pane).strokeBorder(.white.opacity(active ? 0.3 : 0.12), lineWidth: 1)
+        PaneFrame(active: active) {
+            // Content takes exactly the pane's frame and never spills over a neighbour.
+            content.frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(sub.map { "\(title), \($0)" } ?? title)
+    }
+}
+
+/// The pane's frame, following what its content asks for (`PaneLookKey`).
+private struct PaneFrame<Content: View>: View {
+    let active: Bool
+    let content: Content
+    @State private var ask: PaneLook = .inherit
+    @Environment(\.coreLook) private var appearance
+    init(active: Bool, @ViewBuilder content: () -> Content) {
+        self.active = active
+        self.content = content()
+    }
+    var body: some View {
+        let look: CoreLook =
+            switch ask {
+            case .look(let l): l
+            default: LookPrefs.shared.custom[.panes] ?? appearance
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(sub.map { "\(title), \($0)" } ?? title)
+        // One structure whatever the content asks for: a branch here would rebuild the content (and tear down a
+        // terminal's AppKit view) when its preference arrives.
+        content.coreFrame(radius: Radius.pane, rim: Space.s2, active: active, fill: ask != .own)
+            .environment(\.coreLook, look)
+            .onPreferenceChange(PaneLookKey.self) { ask = $0 }
     }
 }
 

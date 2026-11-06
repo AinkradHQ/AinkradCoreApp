@@ -14,7 +14,7 @@ struct SecretsSection: View {
         AdminScreen(
             admin: admin, what: "Secrets",
             intro:
-                "Values go in and never come back: nobody can show or copy them, not even you. Runners borrow them for a short time.",
+                "Values go in and never come back: nobody can show or copy them, not even you. Runners get them on loan for a short time.",
             state: model.state,
             empty: ("No secrets yet", "Add a test value, then lend it to a runner.", "key"),
             emptyAction: ("New secret…", { SecretDialogs.openNew(admin) }),
@@ -25,10 +25,9 @@ struct SecretsSection: View {
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
                 GlassSection(
                     "Your secrets", sub: "\(model.items.count) kept. Each asks for Touch ID to change.",
-                    symbol: "key.fill", hue: GlassInk.orange, index: 1
+                    symbol: "key.fill", hue: GlassInk.blue, index: 1
                 ) {
-                    AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.orange, prominent: true)
-                    {
+                    AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                         SecretDialogs.openNew(admin)
                     }
                     .keyboardShortcut("n", modifiers: .command)
@@ -74,7 +73,7 @@ struct SecretsSection: View {
             }
         if let step {
             let i = at + step
-            if list.indices.contains(i) { withAnimation(.smooth(duration: 0.25)) { cursor = list[i].name } }
+            if list.indices.contains(i) { withAnimation(Motion.out(Motion.ui)) { cursor = list[i].name } }
             return .handled
         }
         let s = list[at]
@@ -102,13 +101,12 @@ private struct ModePanel: View {
     let mode: Int
 
     var body: some View {
-        let hue = mode == 0 ? GlassInk.orange : GlassInk.blue
+        let hue = mode == 0 ? GlassInk.slate : GlassInk.blue
         HStack(spacing: Space.s3) {
             IconTile(mode == 0 ? "lock.fill" : "testtube.2", hue: hue, size: 44, bounce: mode)
-                .shadow(color: hue.opacity(0.45), radius: 12)
             VStack(alignment: .leading, spacing: 2) {
                 Text(mode == 0 ? "Secrets are off" : mode == 1 ? "Test values only" : "Real values")
-                    .font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.headline, weight: .semibold)).foregroundStyle(hue)
                 Text(
                     mode == 0
                         ? "Nothing can be added or lent until you turn on Test keys."
@@ -125,8 +123,8 @@ private struct ModePanel: View {
             .help("Keys and secrets in Feature switches (secrets.mode = \(mode))")
         }
         .padding(Space.s3)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
+        .background(hue.opacity(0.1))
+        .coreWell()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("secrets-mode")
     }
@@ -138,8 +136,8 @@ enum Delivery {
     static func look(_ d: String) -> (title: String, line: String, symbol: String, hue: Color) {
         switch d {
         case "env": ("Variable", "As an environment variable", "terminal.fill", GlassInk.blue)
-        case "file": ("File", "As a file only it can read", "doc.fill", GlassInk.green)
-        case "askpass": ("Prompt", "Answers git's password prompt", "key.horizontal.fill", GlassInk.violet)
+        case "file": ("File", "As a file only it can read", "doc.fill", GlassInk.blue)
+        case "askpass": ("Prompt", "Answers git's password prompt", "key.horizontal.fill", GlassInk.slate)
         default: (d, d, "questionmark", GlassInk.slate)
         }
     }
@@ -157,8 +155,8 @@ private struct SecretCard: View {
         let look = Delivery.look(secret.delivery)
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                IconTile("key.fill", hue: GlassInk.orange, size: 36)
-                VStack(alignment: .leading, spacing: 1) {
+                IconTile("key.fill", hue: GlassInk.blue, size: 36)
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     Text(secret.name).font(.system(size: MacTextSize.headline, weight: .semibold))
                         .lineLimit(1).truncationMode(.middle)
                     Text(
@@ -168,18 +166,20 @@ private struct SecretCard: View {
                 }
                 Spacer(minLength: 0)
             }
-            SealedValue(size: secret.size, hue: GlassInk.orange)
+            SealedValue(size: secret.size, hue: GlassInk.blue)
             VStack(alignment: .leading, spacing: Space.s2) {
                 fact(look.symbol, look.hue, look.line)
                 if secret.runners.isEmpty {
-                    fact("server.rack", GlassInk.slate, "No runner may borrow it yet")
+                    fact("server.rack", GlassInk.slate, "No runner may be lent it yet")
                 } else {
                     fact(
-                        "server.rack", GlassInk.green,
-                        "May borrow: \(secret.runners.map(model.runnerName).joined(separator: ", "))")
+                        "server.rack", GlassInk.blue,
+                        "May be lent to: \(secret.runners.map(model.runnerName).joined(separator: ", "))")
                 }
             }
-            if let lease = model.leases.first(where: { $0.secret == secret.name }) { LeaseLine(lease: lease) }
+            if let lease = model.leases.first(where: { $0.secret == secret.name }) {
+                LeaseLine(lease: lease, runner: model.runnerName(lease.runner))
+            }
             if let e = model.rowError[secret.name] { IssueLine(code: nil, text: e) }
             HStack(spacing: Space.s2) {
                 AppActionTile(title: "", symbol: "trash", key: selected ? "⌫" : "", hue: GlassInk.red) {
@@ -196,31 +196,23 @@ private struct SecretCard: View {
                 }
                 .accessibilityLabel("Replace the value of \(secret.name)")
                 AppActionTile(
-                    title: "Lend", symbol: "arrow.up.forward", key: selected ? "L" : "", hue: GlassInk.orange,
+                    title: "Lend", symbol: "arrow.up.forward", key: selected ? "L" : "", hue: GlassInk.blue,
                     prominent: selected
                 ) {
                     SecretDialogs.openLease(admin, secret)
                 }
-                .accessibilityLabel("Lease \(secret.name)")
+                .accessibilityLabel("Lend \(secret.name)")
             }
             .opacity(selected || hovering ? 1 : 0.55)
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            selected ? GlassInk.orange.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
-            in: coreShape(Radius.cardMac)
-        )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                selected ? GlassInk.orange.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-        }
-        .shadow(color: GlassInk.orange.opacity(selected ? 0.3 : 0), radius: 12)
+        .coreWell(active: selected || hovering)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: selected)
-        .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(Motion.out(Motion.ui), value: selected)
+        .animation(Motion.out(Motion.ui), value: hovering)
         .help("Key \(secret.keyID) · stored by \(secret.owner)")
         .contextMenu {
             Button("Lend…") { SecretDialogs.openLease(admin, secret) }
@@ -237,8 +229,9 @@ private struct SecretCard: View {
 
     private func fact(_ symbol: String, _ hue: Color, _ text: String) -> some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(hue)
-                .frame(width: 22, height: 22).background(hue.opacity(0.16), in: coreShape(6))
+            Image(systemName: symbol).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                .frame(width: MacSize.controlSm, height: MacSize.controlSm)
+                .background(hue.opacity(0.16), in: coreShape(Radius.chip))
             Text(text).lineLimit(2)
         }
         .font(.system(size: MacTextSize.body))
@@ -260,7 +253,7 @@ private struct SealedValue: View {
             Spacer(minLength: 0)
             Text("\(size) bytes · hidden").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
-        .padding(.horizontal, Space.s3).frame(height: 34)
+        .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg + Space.s1)
         .background(.black.opacity(0.22), in: coreShape(Radius.control))
         .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .accessibilityElement(children: .ignore)
@@ -271,6 +264,7 @@ private struct SealedValue: View {
 /// A loan from this Mac: to which runner, and the time left as a shrinking bar and a countdown.
 private struct LeaseLine: View {
     let lease: LeaseItem
+    let runner: String
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let total = max(lease.expiresAt.timeIntervalSince(lease.grantedAt), 1)
@@ -278,18 +272,17 @@ private struct LeaseLine: View {
             let hue = left > 0 ? GlassInk.green : GlassInk.slate
             VStack(alignment: .leading, spacing: Space.s1) {
                 HStack {
-                    Label("Lent to \(lease.runner)", systemImage: "arrow.up.forward.circle.fill")
+                    Label("Lent to \(runner)", systemImage: "arrow.up.forward.square.fill")
                         .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
                     Spacer()
                     Text(left > 0 ? Countdown.text(Int(left.rounded(.up))) : "Returned")
-                        .font(.system(size: MacTextSize.body, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: MacTextSize.body, weight: .semibold, design: .rounded).monospacedDigit())
                         .foregroundStyle(hue).contentTransition(.numericText(countsDown: true))
                 }
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         coreShape(3).fill(GlassInk.track.opacity(0.6))
                         coreShape(3).fill(hue).frame(width: g.size.width * left / total)
-                            .shadow(color: hue.opacity(0.6), radius: 5)
                     }
                 }
                 .frame(height: 5)
@@ -300,7 +293,7 @@ private struct LeaseLine: View {
             .help(lease.lease)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "Lent to \(lease.runner), \(left > 0 ? "\(Int(left.rounded(.up))) seconds left" : "returned")")
+                "Lent to \(runner), \(left > 0 ? "\(Int(left.rounded(.up))) seconds left" : "returned")")
         }
     }
 }

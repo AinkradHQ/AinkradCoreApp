@@ -10,15 +10,18 @@ enum AccountsKeys {
         switch m.page {
         case .overview:
             var seen = Set<Int64>()
-            return (m.needLook + m.accounts.filter { $0.phase != .disabled }.prefix(6))
+            let cards = (m.needLook + m.accounts.filter { $0.phase != .disabled }.prefix(6))
                 .filter { seen.insert($0.id).inserted }.map { "a-\($0.id)" }
+            let first = m.providers.filter { m.defaultPool($0.id).flatMap { m.firstReady(in: $0) } != nil }
+            return cards + first.map { "t-\($0.id)" }
         case .accounts where m.detail == nil:
             return m.providersByUse.flatMap { $0.1 }.map { "a-\($0.id)" }
         case .pools: return m.selectedPool.map { $0.members.map { "m-\($0)" } } ?? []
-        case .bindings: return m.bindings.map { "b-\($0.id)" }
         case .budgets:
             let mine = m.budgets.filter { ["account", "pool"].contains($0.kind) }
             return (mine + m.budgets.filter { !["account", "pool"].contains($0.kind) }).map { "g-\($0.id)" }
+        case .prices:
+            return m.prices.sorted { ($0.provider, $0.model) < ($1.provider, $1.model) }.map { "p-\($0.id)" }
         default: return []
         }
     }
@@ -28,8 +31,8 @@ enum AccountsKeys {
         guard !list.isEmpty else { return .ignored }
         let i = list.firstIndex { $0 == m.cursor } ?? (step > 0 ? -1 : list.count)
         let next = list[min(max(i + step, 0), list.count - 1)]
-        withAnimation(.smooth(duration: 0.25)) { m.cursor = next }
-        withAnimation(.smooth(duration: 0.3)) { proxy.scrollTo(next, anchor: .center) }
+        withAnimation(Motion.out(Motion.ui)) { m.cursor = next }
+        withAnimation(Motion.out(Motion.ui)) { proxy.scrollTo(next, anchor: .center) }
         return .handled
     }
 
@@ -37,7 +40,7 @@ enum AccountsKeys {
     static func side(_ m: AccountsModel, _ step: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
         guard m.page == .pools, !m.pools.isEmpty else { return move(m, step, proxy) }
         let i = m.pools.firstIndex { $0.id == m.selectedPool?.id } ?? 0
-        withAnimation(.smooth(duration: 0.3)) {
+        withAnimation(Motion.out(Motion.ui)) {
             m.poolSelection = m.pools[min(max(i + step, 0), m.pools.count - 1)].id
             m.cursor = nil
         }
@@ -45,6 +48,22 @@ enum AccountsKeys {
     }
 
     static func open(_ m: AccountsModel) -> KeyPress.Result {
+        if let c = m.cursor, c.hasPrefix("t-"),
+            let a = m.defaultPool(String(c.dropFirst(2))).flatMap({ m.firstReady(in: $0) })
+        {
+            withAnimation(Motion.out(Motion.move)) {
+                m.page = .accounts
+                m.detail = a.id
+                m.cursor = nil
+            }
+            return .handled
+        }
+        if let c = m.cursor, c.hasPrefix("p-"), !m.readOnly,
+            let p = m.prices.first(where: { "p-\($0.id)" == c })
+        {
+            AccountDialogs.openPrice(m, editing: p)
+            return .handled
+        }
         guard let c = m.cursor, let id = Int64(c.dropFirst(2)) else {
             return .ignored
         }
@@ -53,7 +72,7 @@ enum AccountsKeys {
             return .handled
         }
         if c.hasPrefix("a-") || c.hasPrefix("m-") {
-            withAnimation(.smooth(duration: 0.35)) {
+            withAnimation(Motion.out(Motion.move)) {
                 m.page = .accounts
                 m.detail = id
                 m.cursor = nil
@@ -64,7 +83,7 @@ enum AccountsKeys {
 
     static func back(_ m: AccountsModel) -> KeyPress.Result {
         guard m.detail != nil else { return .ignored }
-        withAnimation(.smooth(duration: 0.35)) {
+        withAnimation(Motion.out(Motion.move)) {
             m.cursor = m.detail.map { "a-\($0)" }
             m.detail = nil
         }
@@ -104,7 +123,7 @@ enum AccountsKeys {
         }
         if m.page == .accounts, key == "f" {
             let all = AccountFilter.allCases
-            withAnimation(.smooth(duration: 0.3)) {
+            withAnimation(Motion.out(Motion.ui)) {
                 m.filter = all[((all.firstIndex(of: m.filter) ?? 0) + 1) % all.count]
             }
             return .handled
@@ -113,7 +132,6 @@ enum AccountsKeys {
             switch key {
             case "d" where !p.isDefault: Task { await m.makeDefault(p) }
             case "a": AccountDialogs.openAddMember(m, pool: p)
-            case "b": AccountDialogs.openBind(m, pool: p)
             case "⌫", "x":
                 guard let c = m.cursor, c.hasPrefix("m-"), let id = Int64(c.dropFirst(2)), let a = m.account(id)
                 else { return .ignored }
@@ -122,26 +140,20 @@ enum AccountsKeys {
             }
             return .handled
         }
-        if m.page == .bindings, !ro, key == "u" || key == "⌫",
-            let c = m.cursor, let b = m.bindings.first(where: { "b-\($0.id)" == c })
-        {
-            Task { await m.unbind(b) }
-            return .handled
-        }
         return .ignored
     }
 
     /// The keys this page answers, for the foot of the app.
     static func hint(_ m: AccountsModel) -> String {
         switch m.page {
-        case .overview: "⌘1–5 pages · ↑↓ move · ↩ open · ⌘N connect"
+        case .overview: "⌘1–4 pages · ↑↓ move · ↩ open · ⌘N connect"
         case .accounts where m.detail != nil:
             "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
         case .accounts: "↑↓ move · ↩ open · F filter · ⌘N connect"
-        case .pools: "← → pool · ↑↓ account · D default · A add · B bind · ⌫ remove"
-        case .bindings: "↑↓ move · U unbind · ⌘N bind"
+        case .pools: "← → pool · ↑↓ account · D default · A add · ⌫ remove"
         case .budgets: "↑↓ move · E edit · R raise · ⌫ remove · ⌘N new budget"
-        default: "⌘1–5 pages · ⌘J audit"
+        case .prices: "↑↓ move · ↩ change · ⌘N new price"
+        default: "⌘1–4 pages · ⌘J audit"
         }
     }
 }

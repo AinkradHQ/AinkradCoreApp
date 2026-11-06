@@ -182,7 +182,7 @@ struct ModelTests {
         let (m, svc, _) = await make()
         svc.failure = CoreError.http(status: 409, code: "conflict", message: "The default pool cannot be deleted.")
         #expect(await m.delete(m.pools[0]) == false)
-        #expect(m.writeError["delete-pool-1"] == "The default pool cannot be deleted. (conflict)")
+        #expect(m.writeError["delete-pool-1"] == "The default pool cannot be deleted.")
         #expect(m.readOnly == false)
     }
 

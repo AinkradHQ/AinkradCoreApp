@@ -32,7 +32,7 @@ import Testing
         // The Core flags every running terminal with no client as orphaned: it is the same state, with the idle rule in words.
         let o = view(item(orphaned: true))
         #expect(o.chip.label == "Running, not attached" && o.card?.actions == [.attach])
-        #expect(o.card?.note?.contains("terminal.idle_secs") == true && o.info.contains("closes when idle"))
+        #expect(o.card?.note?.contains("idle for too long") == true && o.info.contains("closes when idle"))
     }
 
     @Test func endedStatesAreReadOnlyOrGone() {
@@ -43,7 +43,7 @@ import Testing
         let gone = view(item(status: "reaped"))
         #expect(gone.card?.title == "Output is gone" && !gone.screenVisible)
         let lost = view(item(status: "exited", signal: "host_lost"))
-        #expect(lost.banner?.title == "Ended: host_lost" && lost.card?.actions == [.closePane, .newTerminal])
+        #expect(lost.banner?.title == "Ended: the runner lost it" && lost.card?.actions == [.closePane, .newTerminal])
     }
 
     @Test func runnerOfflineBeatsNotAttached() {
@@ -65,12 +65,12 @@ import Testing
         )
         #expect(view(item(), .attaching).banner?.busy == true)
         let f = view(item(), .failed(code: "too_many_attaches", message: "Too many clients."))
-        #expect(f.banner?.title == "Too many clients." && f.banner?.detail == "too_many_attaches")
+        #expect(f.banner?.title == "Too many clients." && f.banner?.help == "too_many_attaches")
     }
 
     @Test func resumedAndRepaintedBannersDismiss() {
         let a = view(item(attached: 1), .attached(letterbox: false), note: .resumed(from: 4_182_913, to: 4_190_000))
-        #expect(a.banner?.title == "Resumed. Nothing was lost." && a.banner?.action == .dismiss)
+        #expect(a.banner?.title == "Resumed. Nothing was lost" && a.banner?.action == .dismiss)
         #expect(a.banner?.detail.contains("4,182,913") == true)
         let b = view(item(attached: 1), .attached(letterbox: false), note: .repainted)
         #expect(b.banner?.title == "Screen repainted from a snapshot")
@@ -78,7 +78,7 @@ import Testing
 
     @Test func anUnknownStatusShowsItsRawWord() {
         let v = view(item(status: "frozen"))
-        #expect(v.chip.label == "frozen" && v.banner?.title == "frozen")
+        #expect(v.chip.label == "Newer state" && v.banner?.title == "A newer state")
     }
 
     @Test func runnerStatusAndRefusals() {
@@ -87,7 +87,7 @@ import Testing
         #expect(RunnerStatus(runner(online: false)) == .off)
         #expect(RunnerStatus(runner(avg1: 36.8)) == .busy)
         let busy = NewTerminalModel.refusal(.http(status: 503, code: "runner_busy", message: "m"), runner: "r")
-        #expect(busy.title == "r is too busy right now." && busy.http == 503)
+        #expect(busy.title == "r is too busy right now" && busy.http == 503)
         let other = NewTerminalModel.refusal(.http(status: 409, code: "something_new", message: "Words."), runner: "r")
         #expect(other.title == "Words." && other.code == "something_new")
     }

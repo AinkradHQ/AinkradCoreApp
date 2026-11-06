@@ -79,7 +79,6 @@ struct SessionSpendStrip: View {
     var body: some View {
         let share = ledger.share
         let capped = session.outcome == .tokenCap
-        let hue = capped || (share ?? 0) >= 1 ? GlassInk.red : (share ?? 0) >= 0.8 ? GlassInk.orange : GlassInk.green
         HStack(spacing: Space.s3) {
             if let a = ledger.account {
                 Label("\(a) · key held by the runner", systemImage: "lock.shield.fill")
@@ -96,15 +95,10 @@ struct SessionSpendStrip: View {
                     ledger.unpriced
                         ? "Some calls had no price: their tokens count, their cost doesn't." : "From Core's ledger")
             if let share {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3).fill(hue.gradient).frame(width: g.size.width * min(1, share))
-                            .shadow(color: hue.opacity(0.5), radius: 4)
-                    }
-                }
-                .frame(width: 140, height: 6)
-                .animation(.smooth(duration: 0.6), value: share)
+                CoreMeter(
+                    share, low: capped || share >= 0.8, height: Space.s1, label: "Spend against the session limit"
+                )
+                .frame(width: Space.s8 * 4)
             }
         }
         .font(.system(size: MacTextSize.meta))

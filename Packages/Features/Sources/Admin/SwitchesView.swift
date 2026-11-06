@@ -28,13 +28,13 @@ struct SwitchesSection: View {
                         onLine: "Accounts can hold real provider keys. Your agents can use them.",
                         needs: model.secretsMode < 1 ? "Set Keys and secrets to Test keys first." : nil,
                         reason: {
-                            $0 ? "Turn on secrets.provider_accounts." : "Turn off secrets.provider_accounts."
+                            $0 ? "Allow real provider keys." : "Stop allowing real provider keys."
                         })
                 }
                 if let p = model.item("auth.passkey_admin") {
                     FlagCard(
                         model: model, setting: p, index: 2, title: "Admin from a browser", symbol: "globe",
-                        hue: GlassInk.violet,
+                        hue: GlassInk.blue,
                         sub: "Let a device that signs in with a passkey in a web browser become an admin.",
                         offLine: "Browser devices can read and approve, but not change your Core. Safer.",
                         onLine:
@@ -42,22 +42,22 @@ struct SwitchesSection: View {
                         needs: nil,
                         reason: {
                             $0
-                                ? "Turn on auth.passkey_admin. A stolen passkey session could then hold admin."
-                                : "Turn off auth.passkey_admin."
+                                ? "Let browser devices become admin. A stolen passkey session could then hold admin."
+                                : "Stop browser devices from becoming admin."
                         })
                 }
                 if !model.runners.isEmpty {
                     GlassSection(
                         "Terminals on your runners",
                         sub: "Set on each runner when it starts. Shown here, changed there.",
-                        symbol: "terminal.fill", hue: GlassInk.green, index: 3
+                        symbol: "terminal.fill", hue: GlassInk.blue, index: 3
                     ) {
                         ForEach(model.runners) { r in
                             let pty = r.drivers.contains("pty")
                             HStack(spacing: Space.s3) {
                                 IconTile("server.rack", hue: pty ? GlassInk.green : GlassInk.slate, size: 32)
                                     .overlay(alignment: .topTrailing) { if pty { LiveDot().offset(x: 3, y: -3) } }
-                                VStack(alignment: .leading, spacing: 1) {
+                                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                                     Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold))
                                     Text(
                                         pty
@@ -67,11 +67,13 @@ struct SwitchesSection: View {
                                     .foregroundStyle(GlassInk.secondary)
                                 }
                                 Spacer()
-                                Label(pty ? "On" : "Off", systemImage: pty ? "checkmark.circle.fill" : "minus.circle")
+                                Label(pty ? "On" : "Off", systemImage: pty ? "checkmark.square.fill" : "minus.square")
                                     .font(.system(size: MacTextSize.meta, weight: .semibold))
                                     .foregroundStyle(pty ? GlassInk.green : GlassInk.secondary)
-                                    .padding(.horizontal, 8).frame(height: 24)
-                                    .background((pty ? GlassInk.green : GlassInk.slate).opacity(0.16), in: coreShape(6))
+                                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
+                                    .background(
+                                        (pty ? GlassInk.green : GlassInk.slate).opacity(0.16),
+                                        in: coreShape(Radius.chip))
                             }
                             .help("Drivers: \(r.drivers.isEmpty ? "none reported" : r.drivers.joined(separator: ", "))")
                             .accessibilityElement(children: .combine)
@@ -106,7 +108,7 @@ private struct SecretsModeCard: View {
             hue: GlassInk.blue
         ) {
             HStack(spacing: Space.s2) {
-                if model.busy == setting.key { ProgressView().controlSize(.small) }
+                if model.busy == setting.key { BusyBar().frame(width: Space.s6) }
                 CoreSegmented(
                     "Keys and secrets",
                     segments: [
@@ -125,12 +127,12 @@ private struct SecretsModeCard: View {
                 trigger: mode
             ) {
                 StepTrack(["Off", "Test keys", "Real keys"], at: min(mode, 2), hue: hue, locked: [2])
-                    .help("Real keys open after the external security review (G-SEC).")
+                    .help("Real keys open after the external security review.")
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }
         .help("secrets.mode = \(mode)")
-        .animation(.spring(duration: 0.35), value: mode)
+        .animation(Motion.out(Motion.move), value: mode)
     }
 
     private func pick(_ m: Int) {
@@ -139,7 +141,9 @@ private struct SecretsModeCard: View {
             await model.set(
                 setting, to: Int64(m),
                 reason:
-                    "Set secrets.mode to \(m). \(m == 0 ? "This refuses every store and lease." : "Throwaway values only.")"
+                    m == 0
+                    ? "Set Keys and secrets to Off. Your Core will refuse every store and loan."
+                    : "Set Keys and secrets to Test keys."
             )
         }
     }
@@ -168,7 +172,7 @@ private struct FlagCard: View {
             HStack(spacing: Space.s2) {
                 Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orange)
-                if model.busy == setting.key { ProgressView().controlSize(.small) }
+                if model.busy == setting.key { BusyBar().frame(width: Space.s6) }
                 GlassToggleTile(
                     isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
                     isOn: Binding(
@@ -193,7 +197,7 @@ private struct FlagCard: View {
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }
         .help(setting.key)
-        .animation(.spring(duration: 0.35), value: isOn)
+        .animation(Motion.out(Motion.move), value: isOn)
     }
 }
 
@@ -223,18 +227,17 @@ private struct StatePanel<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: symbol).font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 48, height: 48)
+            Image(systemName: symbol).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: Space.s8 + Space.s4, height: Space.s8 + Space.s4)
                 .background(
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(12)
+                    in: coreShape(Radius.cardMac)
                 )
-                .overlay { coreShape(12).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                .shadow(color: hue.opacity(0.5), radius: 12)
+                .overlay { coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                 .contentTransition(.symbolEffect(.replace))
                 .symbolEffect(.bounce, value: trigger)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(hue)
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).foregroundStyle(hue)
                     .contentTransition(.opacity)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -255,25 +258,25 @@ private struct StatePanel<Trailing: View>: View {
             .clipShape(coreShape(Radius.cardMac))
             .allowsHitTesting(false)
         }
-        .animation(.spring(duration: 0.4, bounce: 0.25), value: hue)
+        .animation(Motion.out(Motion.move), value: hue)
         .onChange(of: trigger) { _, _ in
             guard !reduce else { return }
             sweep = false
-            withAnimation(.easeInOut(duration: 0.9)) { sweep = true }
+            withAnimation(Motion.out(Motion.move)) { sweep = true }
         }
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A small green light that breathes: this runner's terminals are live.
+/// A small green light that breathes: this runner's terminals are live (a running state, so it keeps looping).
 private struct LiveDot: View {
     @State private var on = false
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         coreShape(3).fill(GlassInk.green).frame(width: 9, height: 9)
             .overlay { coreShape(3).strokeBorder(.black.opacity(0.4), lineWidth: 1) }
-            .shadow(color: GlassInk.green.opacity(on ? 0.9 : 0.3), radius: on ? 6 : 2)
-            .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(), value: on)
+            .opacity(on ? 1 : 0.45)
+            .animation(reduce ? nil : Motion.out(Motion.tick).repeatForever(), value: on)
             .onAppear { on = true }
     }
 }
