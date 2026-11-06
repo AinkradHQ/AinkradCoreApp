@@ -8,6 +8,8 @@ public struct ShellView: View {
     @FocusState private var calm: Bool
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
+    /// Settings, Appearance, Content background: the Look inside every glass rim, unless an app replaces it.
+    @Bindable private var look = LookPrefs.shared
 
     public init(shell: ShellModel) { self.shell = shell }
 
@@ -21,6 +23,7 @@ public struct ShellView: View {
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
         .coreToast($shell.toast)
+        .environment(\.coreLook, look.look)
         // The window opens calm: focus rests on the root, so no control shows a ring until the keyboard moves it.
         .focusable()
         .focused($calm)

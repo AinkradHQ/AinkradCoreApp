@@ -1,4 +1,5 @@
 import AppKit
+import CoreUI
 import SwiftTerm
 import SwiftUI
 
@@ -24,6 +25,11 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         applyPrefs()
         // Settings, Terminal: every open terminal follows a change at once.
         NotificationCenter.default.addObserver(forName: TerminalPrefs.changed, object: nil, queue: .main) {
+            [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPrefs() }
+        }
+        // Settings, Appearance: a terminal that follows it changes with it.
+        NotificationCenter.default.addObserver(forName: LookPrefs.changed, object: nil, queue: .main) {
             [weak self] _ in
             MainActor.assumeIsolated { self?.applyPrefs() }
         }

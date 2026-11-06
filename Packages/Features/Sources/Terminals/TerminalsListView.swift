@@ -15,13 +15,8 @@ struct TerminalsListView: View {
             content
             footer
         }
-        // Like a terminal pane: the pane's glass is a rim, and the app's chosen background sits inside it, rounded.
-        .background {
-            AppSurfaceFill(
-                style: AppSurfaceStyle(rawValue: prefs.surface == .theme ? "tinted" : prefs.surface.rawValue)
-                    ?? .frosted,
-                opacity: prefs.surfaceOpacity, blur: prefs.surfaceBlur)
-        }
+        // The pane's frame draws the background: Settings, Appearance's Look, or the app's own.
+        .paneLook(prefs.look)
         .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }
     }

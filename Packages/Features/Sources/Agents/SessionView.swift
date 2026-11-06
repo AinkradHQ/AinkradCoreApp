@@ -63,7 +63,7 @@ struct SessionView: View {
                 return .handled
             }
             // The same look as the Agents app: its surface inside the pane's glass rim.
-            .background { AgentSurface() }
+            .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {

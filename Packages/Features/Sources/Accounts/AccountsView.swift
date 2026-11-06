@@ -52,7 +52,7 @@ struct AccountsView: View {
             }
             footer
         }
-        .background { AccountsSurface() }
+        .paneLook(AccountsPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts-pane")

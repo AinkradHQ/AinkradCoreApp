@@ -172,7 +172,7 @@ private struct TileScreen: View {
         .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
         .background {
             ZStack {
-                if prefs.blur { coreShape(Radius.row).fill(.ultraThinMaterial).environment(\.colorScheme, .dark) }
+                if prefs.lookBlur { coreShape(Radius.row).fill(.ultraThinMaterial).environment(\.colorScheme, .dark) }
                 coreShape(Radius.row).fill(Color(nsColor: prefs.screenColor))
             }
         }

@@ -22,7 +22,7 @@ public struct CoreSheet<Content: View, Footer: View>: View {
         }
         .padding(Space.s5)
         .frame(width: Space.s8 * 11)
-        .coreGlass(radius: Radius.panel, interactive: false)
+        .coreFrame(radius: Radius.panel)
         .coreModalEntrance()
         .presentationBackground(.clear)
         .coreTheme()

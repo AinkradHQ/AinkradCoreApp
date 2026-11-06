@@ -325,12 +325,17 @@ struct AccountsLinkSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Look", sub: "The Core app's surface: accounts, pools and bindings.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.slate
+                "Look", sub: "The Core app's content background.", symbol: "circle.lefthalf.filled",
+                hue: GlassInk.blue
             ) {
-                SurfaceModeTabs(mode: prefs.mode)
+                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
             } content: {
-                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                if prefs.followLook {
+                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
+                        .foregroundStyle(GlassInk.secondary)
+                } else {
+                    GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+                }
             }
             GlassSection(
                 "The Core app", sub: "Accounts, pools and bindings, shared by agents, Citadel and every device.",
