@@ -228,7 +228,7 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         }
     }
     /// Pages the Core has nothing for yet (KAN-448 to KAN-450).
-    var notYet: Bool { [.costs, .ledger, .prices, .activity].contains(self) }
+    var notYet: Bool { self == .activity }
     var isSpend: Bool { [.budgets, .costs, .ledger, .prices].contains(self) }
     static let groups: [(String?, [AccountsPage])] = [
         (nil, [.overview]), ("Accounts", [.accounts, .pools, .bindings]),

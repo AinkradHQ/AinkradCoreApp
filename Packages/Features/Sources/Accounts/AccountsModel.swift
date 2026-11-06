@@ -39,6 +39,12 @@ public final class AccountsModel {
     /// Budgets (Spend), read when the Spend pages open.
     var budgets: [BudgetItem] = []
     var spendLoad: AccountsLoad = .loading
+    /// Costs and usage, the ledger and prices (Spend), read when their pages open.
+    var usage: [UsageItem] = []
+    var costs: [CostItem] = []
+    var prices: [PriceItem] = []
+    var costsLoad: AccountsLoad = .loading
+    var pricesLoad: AccountsLoad = .loading
     /// Opens a provider's own page. Tests and the demo replace it: they must never open a browser.
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var now: () -> Date = { Date() }

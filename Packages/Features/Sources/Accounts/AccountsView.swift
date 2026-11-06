@@ -74,7 +74,7 @@ struct AccountsView: View {
         case .accounts: model.accounts.count
         case .pools: model.pools.count
         case .bindings: model.bindings.count
-        case .budgets: model.budgets.filter { $0.standing == .stopped }.count
+        case .budgets: model.budgets.filter { $0.standing == .stopped }.count.nonZero ?? -1
         default: -1
         }
     }
@@ -101,6 +101,16 @@ struct AccountsView: View {
                 AccountDialogs.openBudget(model, editing: nil)
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
+        case .prices:
+            AppActionTile(title: "New price", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                AccountDialogs.openPrice(model, editing: nil)
+            }
+            .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
+        case .costs, .ledger:
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
+                Task { await model.reloadCosts() }
+            }
+            .keyboardShortcut("r", modifiers: .command)
         case .bindings:
             AppActionTile(title: "Bind", symbol: "link", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 AccountDialogs.openBind(model, pool: nil)
@@ -133,8 +143,16 @@ struct AccountsView: View {
             AccStateCard(
                 symbol: "wifi.slash", title: "Not connected",
                 text: "Accounts, pools and bindings come from your Core. This Mac is not connected to one right now.")
-        } else if model.page == .budgets {
-            BudgetsPage(model: model).transition(.opacity)
+        } else if model.page.isSpend {
+            Group {
+                switch model.page {
+                case .costs: CostsPage(model: model)
+                case .ledger: LedgerPage(model: model)
+                case .prices: PricesPage(model: model)
+                default: BudgetsPage(model: model)
+                }
+            }
+            .transition(.opacity)
         } else if model.page.notYet {
             NotYetPage(model: model, page: model.page)
         } else {
@@ -196,4 +214,9 @@ struct NotYetPage: View {
         default: "List prices behind the cost figures."
         }
     }
+}
+
+extension Int {
+    /// Nil for 0, so a count of nothing shows no badge.
+    var nonZero: Int? { self == 0 ? nil : self }
 }

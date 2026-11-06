@@ -214,6 +214,74 @@ public final class AccountsDemo {
                     warnAt: $0.warnAt, hardStop: $0.hardStop, exhausted: false)
             }
         }
+        func usage() async throws -> [UsageItem] {
+            func w(_ t: Int64, _ m: Int64, _ c: Int64) -> UsageWindowItem {
+                UsageWindowItem(tokens: t, messages: m, costMicros: c)
+            }
+            return [
+                UsageItem(
+                    accountID: 1, fiveHours: w(210_000, 14, 1_240_000), sevenDays: w(3_100_000, 212, 18_420_000),
+                    limitShare: 0.38, limitsExhausted: false, hasLimits: true, drops: 0,
+                    companies: [
+                        CompanyUsage(
+                            company: "Ainkrad", fiveHours: w(200_000, 0, 1_100_000),
+                            sevenDays: w(2_400_000, 0, 14_000_000)),
+                        CompanyUsage(
+                            company: "Client work", fiveHours: w(10_000, 0, 140_000),
+                            sevenDays: w(700_000, 0, 4_420_000)),
+                    ]),
+                UsageItem(
+                    accountID: 3, fiveHours: w(980_000, 88, 4_100_000), sevenDays: w(1_240_000, 120, 6_900_000),
+                    limitShare: 0.93, limitsExhausted: false, hasLimits: true, drops: 2,
+                    companies: [
+                        CompanyUsage(
+                            company: "Ainkrad", fiveHours: w(980_000, 0, 4_100_000),
+                            sevenDays: w(1_240_000, 0, 6_900_000))
+                    ]),
+                UsageItem(
+                    accountID: 5, fiveHours: w(0, 0, 0), sevenDays: w(420_000, 31, 910_000), limitShare: 0,
+                    limitsExhausted: false, hasLimits: false, drops: 0, companies: []),
+            ]
+        }
+        func costs(account: Int64?) async throws -> [CostItem] {
+            let models = [
+                ("anthropic", "claude-sonnet-4-5", 1), ("openai", "gpt-5-codex", 3), ("google", "gemini-2.5-pro", 5),
+            ]
+            return (0..<18).map { i in
+                let m = models[i % 3]
+                let unpriced = i % 7 == 6
+                return CostItem(
+                    id: Int64(100 - i), at: now.addingTimeInterval(-Double(i) * 5_400), accountID: Int64(m.2),
+                    provider: m.0, model: unpriced ? "gemini-2.5-flash" : m.1, session: "as_\(4_100 + i)",
+                    input: Int64(12_000 + i * 900), output: Int64(1_800 + i * 70), cache: i % 2 == 0 ? 48_000 : 0,
+                    costMicros: unpriced ? nil : Int64(41_000 + i * 2_300), basis: unpriced ? "unpriced" : "list_price",
+                    approximate: i == 4)
+            }
+            .filter { account == nil || $0.accountID == account }
+        }
+        lazy var priceList: [PriceItem] = [
+            PriceItem(
+                provider: "anthropic", model: "claude-sonnet-4-5", input: 3_000_000, output: 15_000_000, cache: 300_000,
+                version: 2, pricedAt: now.addingTimeInterval(-86_400 * 4)),
+            PriceItem(
+                provider: "anthropic", model: "claude-opus-4-1", input: 15_000_000, output: 75_000_000,
+                cache: 1_500_000, version: 1, pricedAt: now.addingTimeInterval(-86_400 * 4)),
+            PriceItem(
+                provider: "openai", model: "gpt-5-codex", input: 1_250_000, output: 10_000_000, cache: 125_000,
+                version: 1, pricedAt: now.addingTimeInterval(-86_400 * 9)),
+            PriceItem(
+                provider: "google", model: "gemini-2.5-pro", input: 1_250_000, output: 10_000_000, cache: 310_000,
+                version: 3, pricedAt: now.addingTimeInterval(-86_400 * 2)),
+        ]
+        func prices() async throws -> [PriceItem] { priceList }
+        func setPrice(_ p: PriceDraft) async throws {
+            let v = (priceList.first { $0.provider == p.provider && $0.model == p.model }?.version ?? 0) + 1
+            priceList.removeAll { $0.provider == p.provider && $0.model == p.model }
+            priceList.append(
+                PriceItem(
+                    provider: p.provider, model: p.model, input: p.input, output: p.output, cache: p.cache, version: v,
+                    pricedAt: p.pricedAt))
+        }
         func runners() async throws -> [AccountRunner] {
             [
                 AccountRunner(id: "r_linux01", name: "linux-01", online: true),
@@ -255,7 +323,7 @@ public final class AccountsDemo {
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
         "account-ready",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
-        "budget-new", "budget-edit", "budget-raise", "budgets-empty",
+        "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "bindings",
         "bindings-empty",
         "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
@@ -317,6 +385,7 @@ public final class AccountsDemo {
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
             case "bindings", "bindings-empty", "bind": .bindings
             case "budgets", "costs", "ledger", "prices", "activity": AccountsPage(rawValue: scene)!
+            case "price-new": .prices
             case "budget-new", "budget-edit", "budget-raise", "budgets-empty": .budgets
             default: .overview
             }
@@ -351,6 +420,7 @@ public final class AccountsDemo {
         case "cap": AccountDialogs.openCap(model, model.account(1)!)
         case "limits": AccountDialogs.openLimits(model, model.account(1)!)
         case "budget-new": AccountDialogs.openBudget(model, editing: nil)
+        case "price-new": AccountDialogs.openPrice(model, editing: nil)
         case "budget-edit": AccountDialogs.openBudget(model, editing: model.budgets.first { $0.id == 3 })
         case "budget-raise": AccountDialogs.openRaise(model, model.budgets.first { $0.id == 2 }!)
         case "budgets": model.cursor = "g-3"

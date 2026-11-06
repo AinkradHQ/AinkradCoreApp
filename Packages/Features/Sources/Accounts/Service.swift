@@ -38,6 +38,13 @@ protocol AccountsService: Sendable {
     func setBudget(_ b: BudgetDraft) async throws
     func deleteBudget(_ id: Int64) async throws
     func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws
+    /// Each account's use over 5 hours and 7 days (`admin`).
+    func usage() async throws -> [UsageItem]
+    /// Cost events, newest first, at most 100 (`admin`).
+    func costs(account: Int64?) async throws -> [CostItem]
+    func prices() async throws -> [PriceItem]
+    /// The next version of a model's price, from now on (`admin`, Touch ID).
+    func setPrice(_ p: PriceDraft) async throws
 }
 
 struct AccountRunner: Identifiable, Equatable, Sendable {
@@ -190,6 +197,53 @@ struct LiveAccountsService: AccountsService {
                 body: .json(.init(periodKey: periodKey, tokens: tokens, usdMicros: usdMicros))
             ).ok
         }
+    }
+
+    func usage() async throws -> [UsageItem] {
+        try await run { try await client.accountsUsage().ok.body.json.map(Self.usage) }
+    }
+    func costs(account: Int64?) async throws -> [CostItem] {
+        try await run {
+            try await client.listCosts(query: .init(account: account, limit: 100)).ok.body.json.map {
+                CostItem(
+                    id: $0.id, at: $0.occurredAt, accountID: $0.accountId, provider: $0.provider, model: $0.model,
+                    session: $0.session, input: $0.inputTokens, output: $0.outputTokens, cache: $0.cacheTokens,
+                    costMicros: $0.costUsdMicros, basis: $0.basis, approximate: $0.approximate)
+            }
+        }
+    }
+    func prices() async throws -> [PriceItem] {
+        try await run {
+            try await client.listPrices().ok.body.json.map {
+                PriceItem(
+                    provider: $0.provider, model: $0.model, input: $0.inputPerMtokMicro, output: $0.outputPerMtokMicro,
+                    cache: $0.cachePerMtokMicro, version: $0.version, pricedAt: $0.pricedAt)
+            }
+        }
+    }
+    func setPrice(_ p: PriceDraft) async throws {
+        try await run {
+            _ = try await client.setPrice(
+                body: .json(
+                    .init(
+                        cachePerMtokMicro: p.cache, inputPerMtokMicro: p.input, model: p.model,
+                        outputPerMtokMicro: p.output, pricedAt: ISO8601DateFormatter().string(from: p.pricedAt),
+                        provider: p.provider))
+            ).ok
+        }
+    }
+
+    static func usage(_ u: Components.Schemas.AccountSpend) -> UsageItem {
+        func w(_ x: Components.Schemas.UsageWindow) -> UsageWindowItem {
+            UsageWindowItem(tokens: x.totalTokens, messages: x.messages, costMicros: x.costUsdMicros)
+        }
+        return UsageItem(
+            accountID: u.accountId, fiveHours: w(u.fiveHours), sevenDays: w(u.sevenDays),
+            limitShare: Double(u.maxUtilisationBps) / 10_000, limitsExhausted: u.limits.contains { $0.exhausted },
+            hasLimits: !u.limits.isEmpty, drops: u.recentDrops,
+            companies: u.byCompany.map {
+                CompanyUsage(company: $0.company, fiveHours: w($0.fiveHours), sevenDays: w($0.sevenDays))
+            })
     }
 
     static func budget(_ b: Components.Schemas.SubjectBudget) -> BudgetItem {

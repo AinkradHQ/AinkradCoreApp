@@ -96,6 +96,29 @@ struct ModelTests {
         #expect(host.reasons.count == 1)
     }
 
+    @Test func modelIdsMustBeExactAndUnpricedTokensAreCounted() async {
+        #expect(CostWords.modelIssue("claude-sonnet-4-5") == nil)
+        #expect(CostWords.modelIssue("claude-latest-latest") != nil)
+        #expect(CostWords.modelIssue("x/y:online") != nil)
+        #expect(CostWords.modelIssue("two words") != nil)
+        let (m, svc, host) = await make()
+        svc.costList = [
+            CostItem(
+                id: 1, at: Date(), accountID: 1, provider: "anthropic", model: "m", session: "s", input: 10, output: 5,
+                cache: 0, costMicros: nil, basis: "unpriced", approximate: false),
+            CostItem(
+                id: 2, at: Date(), accountID: 1, provider: "anthropic", model: "m", session: "s", input: 100, output: 0,
+                cache: 0, costMicros: 9, basis: "list_price", approximate: false),
+        ]
+        await m.reloadCosts()
+        #expect(m.costsLoad == .ready && m.unpricedTokens == 15)
+        #expect(
+            await m.savePrice(
+                PriceDraft(provider: "anthropic", model: "m", input: 3, output: 15, cache: 0, pricedAt: Date())))
+        #expect(svc.log.contains("setPrice anthropic m 3 15 0"))
+        #expect(host.reasons.count == 1)
+    }
+
     @Test func stateWordsKeepUnknownRawAndNeverAlarm() {
         #expect(AccountPhase("active").label == "Ready")
         #expect(AccountPhase("weird").label == "weird")

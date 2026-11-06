@@ -37,6 +37,9 @@ enum AccountDialogs {
     static func openDeleteBudget(_ m: AccountsModel, _ b: BudgetItem) {
         present(m, "budget-delete") { close in DeleteBudgetDialog(model: m, budget: b, close: close) }
     }
+    static func openPrice(_ m: AccountsModel, editing: PriceItem?) {
+        present(m, "price") { close in PriceDialog(model: m, editing: editing, close: close) }
+    }
     static func openNewPool(_ m: AccountsModel) {
         present(m, "pool-new") { close in NewPoolDialog(model: m, close: close) }
     }
