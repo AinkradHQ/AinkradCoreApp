@@ -6,13 +6,12 @@ import SwiftUI
 struct AgentMark: View {
     let harness: String
     var size: CGFloat = MacSize.controlLg
-    @Environment(\.corePalette) private var palette
     var body: some View {
         Image(systemName: AgentsModel.harnessSymbol(harness))
             .font(.system(size: MacTextSize.title, weight: .medium))
-            .foregroundStyle(palette.btnInk)
+            .foregroundStyle(GlassInk.primary)
             .frame(width: size, height: size)
-            .background(harness == "claude" ? palette.btnPrimary : palette.navActive, in: coreShape(Radius.control))
+            .background(GlassInk.blue.opacity(0.6), in: coreShape(Radius.control))
             .accessibilityHidden(true)
     }
 }
@@ -25,30 +24,11 @@ struct NoticeBanner: View {
     }
 }
 
-/// A progress bar (the system uses bars, never spinners). `value` is 0 to 1.
-struct MeterBar: View {
-    let value: Double
-    var tone: Tone = .run
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                coreShape(Radius.chip / 2).fill(palette.track)
-                coreShape(Radius.chip / 2).fill(palette.tone(tone).ink)
-                    .frame(width: max(0, min(1, value)) * g.size.width)
-            }
-        }
-        .frame(height: Space.s1)
-        .accessibilityHidden(true)
-    }
-}
-
-/// A loading row: bars that rest at a low light, and breathe while Reduce Motion is off.
+/// A loading row: bars at rest, fading in once. Reduce Motion keeps the fade.
 struct SkeletonRows: View {
     var count = 6
     @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var dim = false
+    @State private var shown = false
     var body: some View {
         VStack(spacing: Space.s2) {
             ForEach(0..<count, id: \.self) { _ in
@@ -56,8 +36,8 @@ struct SkeletonRows: View {
                     coreShape(Radius.control).fill(palette.uDim).frame(
                         width: MacSize.controlLg, height: MacSize.controlLg)
                     VStack(alignment: .leading, spacing: Space.s2) {
-                        coreShape(Radius.chip).fill(palette.uDim).frame(width: 180, height: Space.s3)
-                        coreShape(Radius.chip).fill(palette.uDim).frame(width: 110, height: Space.s3 - 2)
+                        coreShape(Radius.chip).fill(palette.uDim).frame(width: Space.s8 * 6, height: Space.s3)
+                        coreShape(Radius.chip).fill(palette.uDim).frame(width: Space.s8 * 3, height: Space.s3)
                     }
                     Spacer(minLength: 0)
                 }
@@ -65,54 +45,35 @@ struct SkeletonRows: View {
                 .background(palette.glassCard, in: coreShape(Radius.row))
             }
         }
-        .opacity(reduce ? 0.7 : dim ? 0.5 : 0.9)
-        .animation(reduce ? nil : .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true), value: dim)
-        .onAppear { dim = true }
+        .opacity(shown ? 0.8 : 0)
+        .animation(Motion.out(Motion.ui), value: shown)
+        .onAppear { shown = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading sessions")
         .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
-/// A row that is a button: the card tint at rest, lighter on hover, the nav colour when selected, and the one focus ring, drawn
-/// from this row's own focus (a row never shows the ring because another control has it).
+/// A row that is a button: the well at rest, lighter on hover, a blue edge when selected. No focus ring, no resize.
 struct AgentRowButton<Label: View>: View {
-    let id: String
-    var focus: FocusState<String?>.Binding
     var selected = false
-    var waiting = false
     let action: () -> Void
     @ViewBuilder let label: Label
-    @Environment(\.corePalette) private var palette
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) { label }
             .buttonStyle(.plain)
-            // Focusable even with the system's keyboard navigation off, so the arrows always reach the tiles.
-            .focusable()
-            .focused(focus, equals: id)
             .focusEffectDisabled()
             .background(
-                selected || focus.wrappedValue == id
-                    ? .white.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                selected ? GlassInk.blue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )
             .overlay {
-                // Waiting on you: an orange edge that stands out in a long list; selected: a white one.
-                if waiting {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.6), lineWidth: 1.5)
-                } else if selected || focus.wrappedValue == id {
-                    coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                } else {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1)
-                }
+                coreShape(Radius.cardMac).strokeBorder(
+                    selected ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
             }
-            .shadow(
-                color: (waiting ? GlassInk.orange : GlassInk.violet).opacity(hovering || waiting ? 0.3 : 0), radius: 14
-            )
-            .scaleEffect(hovering ? 1.015 : 1)
-            .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
+            .animation(Motion.out(Motion.hover), value: hovering)
             .onHover { hovering = $0 }
     }
 }
@@ -120,17 +81,6 @@ struct AgentRowButton<Label: View>: View {
 extension View {
     /// The head of a pane section: a label that screen readers announce as a heading.
     func agentHeading() -> some View { accessibilityAddTraits(.isHeader) }
-}
-
-/// A shortcut beside a button's words, on one line (the shared keycap wraps a two-key shortcut in a narrow button).
-struct AgentKeyHint: View {
-    let keys: String
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        Text(keys).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
-            .fixedSize().padding(.horizontal, Space.s1).background(palette.uDim, in: coreShape(Radius.chip / 2))
-            .accessibilityHidden(true)
-    }
 }
 
 extension View {
@@ -143,5 +93,30 @@ extension View {
                 NSPasteboard.general.setString(text, forType: .string)
             }
         }
+    }
+}
+
+/// A moving bar for "working, length unknown". Reduce Motion: the bar rests in the middle.
+/// (The same bar as the Terminals module's; both belong in CoreUI, a proposal in the lane report.)
+struct BusyBar: View {
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        TimelineView(.animation(paused: reduce)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
+            let phase = reduce ? 0.5 : t - t.rounded(.down)
+            GeometryReader { geo in
+                let seg = geo.size.width * 0.3
+                ZStack(alignment: .leading) {
+                    coreShape(Space.s1 / 2).fill(palette.track)
+                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
+                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
+                }
+                .clipShape(coreShape(Space.s1 / 2))
+            }
+        }
+        .frame(height: Space.s1)
+        .accessibilityHidden(true)
     }
 }

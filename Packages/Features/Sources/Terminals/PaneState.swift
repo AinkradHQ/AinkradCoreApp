@@ -37,6 +37,8 @@ struct PaneView: Equatable {
         var detail: String
         var busy = false
         var action: PaneAction?
+        /// The raw code behind the words, for hover help.
+        var help = ""
     }
     struct Card: Equatable {
         var title: String
@@ -80,7 +82,7 @@ struct PaneView: Equatable {
         switch t.status {
         case "reaped":
             return PaneView(
-                chip: .init(label: "Output gone", tone: .queue, symbol: "xmark.circle"),
+                chip: .init(label: "Output gone", tone: .queue, symbol: "xmark.square"),
                 card: .init(
                     title: "Output is gone",
                     body: "This terminal ended and its output is no longer kept, so there is nothing left to show.",
@@ -89,11 +91,12 @@ struct PaneView: Equatable {
         case "exited":
             if t.hostLost {
                 return PaneView(
-                    chip: .init(label: "Exited · host_lost", tone: .fail, symbol: "wifi.exclamationmark"),
+                    chip: .init(label: "Exited · runner lost it", tone: .fail, symbol: "wifi.exclamationmark"),
                     banner: .init(
-                        tone: .fail, title: "Ended: host_lost",
+                        tone: .fail, title: "Ended: the runner lost it",
                         detail:
-                            "The terminal host process on \(machine) was killed, so the shell ended without an exit code. It cannot be recovered."
+                            "The terminal host process on \(machine) was killed, so the shell ended without an exit code. It cannot be recovered.",
+                        help: "host_lost"
                     ),
                     card: .init(
                         title: "Terminal lost",
@@ -111,7 +114,7 @@ struct PaneView: Equatable {
                 how = "no exit code"
             }
             return PaneView(
-                chip: .init(label: "Exited · \(how)", tone: .queue, symbol: "checkmark.circle"),
+                chip: .init(label: "Exited · \(how)", tone: .queue, symbol: "checkmark.square"),
                 banner: .init(
                     tone: .queue, title: "Exited with \(how)",
                     detail: "Output stays readable for a while after exit. Nothing can be typed here."),
@@ -125,8 +128,8 @@ struct PaneView: Equatable {
                 banner: .init(
                     tone: .fail, title: "\(machine) is not connected",
                     detail:
-                        "The Core can’t reach this terminal while its runner is disconnected (runner_offline). Terminal output only ever lives on the runner.",
-                    action: .runner),
+                        "The Core can’t reach this terminal while its runner is disconnected. Terminal output only ever lives on the runner.",
+                    action: .runner, help: "runner_offline"),
                 card: .init(
                     title: "Can’t attach right now", body: "Attach again once \(machine) reconnects.", note: nil,
                     actions: [.retry]),
@@ -155,9 +158,10 @@ struct PaneView: Equatable {
             return PaneView(
                 chip: .init(label: "Verification expired", tone: .warn, symbol: "touchid"),
                 banner: .init(
-                    tone: .warn, title: "Verification expired. Your terminal is still running.",
+                    tone: .warn, title: "Verification expired. Your terminal is still running",
                     detail:
-                        "Elevation lasts 5 minutes. The connection was closed (4003 step-up expired) but the terminal keeps running. What you see is the last screen this window had."
+                        "Verification lasts 5 minutes. The connection was closed but the terminal keeps running. What you see is the last screen this window had.",
+                    help: "Step-up expired (close code 4003)"
                 ),
                 card: .init(
                     title: "Verify to reattach",
@@ -168,7 +172,9 @@ struct PaneView: Equatable {
         case .failed(let code, let message):
             return PaneView(
                 chip: .init(label: "Can’t attach", tone: .fail, symbol: "exclamationmark.triangle"),
-                banner: .init(tone: .fail, title: message.isEmpty ? "The Core refused that." : message, detail: code),
+                banner: .init(
+                    tone: .fail, title: message.isEmpty ? "The Core refused that" : message,
+                    detail: "Try again in a moment.", help: code),
                 card: .init(
                     title: "Can’t attach right now", body: "The terminal is not changed by this. Try again.", note: nil,
                     actions: [.retry]),
@@ -190,7 +196,7 @@ struct PaneView: Equatable {
             switch note {
             case .resumed(let from, let to)?:
                 v.banner = .init(
-                    tone: .run, title: "Resumed. Nothing was lost.",
+                    tone: .run, title: "Resumed. Nothing was lost",
                     detail: "Replayed from byte \(from.formatted()) to \(to.formatted()) while you were away.",
                     action: .dismiss)
             case .repainted?:
@@ -214,13 +220,13 @@ struct PaneView: Equatable {
                     info: "Not attached here · \(sizeText) · \(others)", controls: .endOnly, screenVisible: false)
             }
             return PaneView(
-                chip: .init(label: "Running, not attached", tone: .queue, symbol: "pause.circle"),
+                chip: .init(label: "Running, not attached", tone: .queue, symbol: "pause.rectangle"),
                 card: .init(
                     title: "Still running",
                     body:
                         "This terminal is running on \(machine) with no one attached. Detaching never stops it. Attach to see it again.",
                     note: t.orphaned
-                        ? "Needs Touch ID. The Core closes a terminal nobody attaches to once it has been idle past terminal.idle_secs."
+                        ? "Needs Touch ID. The Core closes a terminal nobody attaches to once it has been idle for too long."
                         : "Needs Touch ID.",
                     actions: [.attach]),
                 info: t.orphaned ? "Nobody is attached · closes when idle" : "Nobody is attached",
@@ -236,8 +242,8 @@ struct PaneView: Equatable {
     static func unknown(item t: TerminalItem) -> PaneView? {
         guard !["created", "running", "exited", "reaped"].contains(t.status) else { return nil }
         return PaneView(
-            chip: .init(label: t.status, tone: .queue, symbol: "questionmark.circle"),
-            banner: .init(tone: .queue, title: t.status, detail: "This app does not know that state yet."),
+            chip: .init(label: "Newer state", tone: .queue, symbol: "questionmark.square"),
+            banner: .init(tone: .queue, title: "A newer state", detail: "This app does not know that state yet."),
             info: t.status, controls: .endOnly, dim: true, showsCursor: false, screenVisible: false)
     }
 }
@@ -245,4 +251,22 @@ struct PaneView: Equatable {
 /// The signals the protocol takes (spec §2).
 enum TerminalSignals {
     static let all = ["HUP", "INT", "QUIT", "TERM", "KILL", "USR1", "USR2", "CONT", "STOP", "TSTP", "WINCH"]
+
+    /// What each signal does, in words (the signal name stays a help text where there is room for one).
+    static func title(_ name: String) -> String {
+        switch name {
+        case "HUP": "Hang up"
+        case "INT": "Interrupt (Ctrl-C)"
+        case "QUIT": "Quit"
+        case "TERM": "Stop"
+        case "KILL": "Kill"
+        case "USR1": "User signal 1"
+        case "USR2": "User signal 2"
+        case "CONT": "Continue"
+        case "STOP": "Freeze"
+        case "TSTP": "Suspend (Ctrl-Z)"
+        case "WINCH": "Window resized"
+        default: name
+        }
+    }
 }

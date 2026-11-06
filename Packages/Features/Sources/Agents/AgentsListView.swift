@@ -9,13 +9,16 @@ struct AgentsListView: View {
 
     var body: some View {
         let waitingIDs = Set(model.pending.map(\.session))
+        // ⌘1 to ⌘4 belong to whichever pane is in front: the Terminals list has the same keys.
+        let keysHere = model.shell.activePane == AgentsModel.listPane
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
                 ForEach(Array(filters(waitingIDs.count).enumerated()), id: \.offset) { i, f in
                     AppFilterTile(title: f.1, count: f.2, on: model.filter == f.0, key: "⌘\(i + 1)") {
-                        withAnimation(.spring(duration: 0.3)) { model.filter = f.0 }
+                        withAnimation(Motion.out(Motion.ui)) { model.filter = f.0 }
                     }
-                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                    .keyboardShortcut(
+                        keysHere ? KeyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command) : nil)
                 }
             } actions: {
                 buttons(waitingIDs.count)
@@ -31,8 +34,11 @@ struct AgentsListView: View {
                 ).padding([.horizontal, .bottom], Space.s3)
             }
             if case .ended(let why) = model.link {
-                NoticeBanner(notice: InlineNotice(title: "Live updates stopped", detail: why, tone: .fail))
-                    .padding([.horizontal, .bottom], Space.s3)
+                NoticeBanner(
+                    notice: InlineNotice(
+                        title: "Live updates stopped", detail: "Updates from your Core stopped coming in.", tone: .fail)
+                )
+                .help(why).padding([.horizontal, .bottom], Space.s3)
             }
             content(waitingIDs)
             footer(waitingIDs.count)
@@ -61,11 +67,11 @@ struct AgentsListView: View {
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
     }
 
-    private func filters(_ waiting: Int) -> [(AgentFilter, String, Int, Color)] {
+    private func filters(_ waiting: Int) -> [(AgentFilter, String, Int)] {
         [
-            (.all, "All", model.count(.all), GlassInk.blue), (.needsYou, "Needs you", waiting, GlassInk.orange),
-            (.active, "Active", model.count(.active), GlassInk.green),
-            (.ended, "Ended", model.count(.ended), GlassInk.slate),
+            (.all, "All", model.count(.all)), (.needsYou, "Needs you", waiting),
+            (.active, "Active", model.count(.active)),
+            (.ended, "Ended", model.count(.ended)),
         ]
     }
 
@@ -73,7 +79,7 @@ struct AgentsListView: View {
     private func buttons(_ waiting: Int) -> some View {
         AppActionTile(
             title: waiting > 0 ? "Approvals \(waiting)" : "Approvals", symbol: "lock.shield", key: "A",
-            hue: waiting > 0 ? GlassInk.orange : GlassInk.slate, pulse: waiting > 0
+            hue: waiting > 0 ? GlassInk.orange : GlassInk.slate, prominent: waiting > 0
         ) { model.openInbox() }
         .accessibilityLabel(waiting > 0 ? "Approvals, \(waiting) waiting" : "Approvals")
         AppActionTile(title: "New", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
@@ -88,26 +94,30 @@ struct AgentsListView: View {
             ScrollView { SkeletonRows().padding(.horizontal, Space.s3) }
         case .failed(let why):
             Message(
-                title: "Could not load sessions", text: why, action: "Try again", prominent: false
+                symbol: "wifi.exclamationmark", title: "Could not load sessions",
+                text: "Check that your Core is reachable, then try again.", help: why, action: "Try again",
+                prominent: false
             ) { model.retryList() }
         case .ready:
             let rows = model.shown()
             if model.sessions.items.isEmpty {
                 Message(
-                    title: "No agent sessions yet",
+                    symbol: "play.fill", title: "No agent sessions yet",
                     text: "Start one and it runs on a runner of the Home Core. You can close this Mac; it keeps going.",
                     action: "New session", prominent: true
                 ) { model.openNewSession() }
             } else if rows.isEmpty {
-                Message(title: "Nothing here", text: "No sessions match this filter.", action: nil, prominent: false) {}
+                Message(
+                    symbol: "line.3.horizontal.decrease", title: "Nothing here", text: "No sessions match this filter.",
+                    action: nil, prominent: false
+                ) {}
             } else {
                 list(rows, waitingIDs)
             }
         }
     }
 
-    /// The Terminals list's keyboard model: the grid itself holds focus (taken on arrival), one tile is the cursor and
-    /// glows, arrows move it and scroll, Return or Space opens, C K R act on it, A opens approvals.
+    /// The Terminals list's keyboard model: the grid itself holds focus (taken on arrival), one tile is the cursor, arrows move it and scroll, Return or Space opens, C K R act on it, A opens approvals.
     private func list(_ rows: [AgentSessionInfo], _ waitingIDs: Set<String>) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -122,7 +132,7 @@ struct AgentsListView: View {
                         ) { key in act(key, s.id) }
                         .onTapGesture(count: 2) { model.openSession(s.id) }
                         .onTapGesture {
-                            withAnimation(.spring(duration: 0.25)) { model.selected = s.id }
+                            withAnimation(Motion.out(Motion.ui)) { model.selected = s.id }
                             listFocus = true
                         }
                         .accessibilityLabel(label(s, waiting: waitingIDs.contains(s.id)))
@@ -134,7 +144,7 @@ struct AgentsListView: View {
                     }
                 }
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s1)
-                if model.sessions.hasMore {
+                if model.sessions.hasMore && model.filter == .all {
                     Label("Older sessions load as you scroll", systemImage: "arrow.down")
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                         .padding(Space.s4).frame(maxWidth: .infinity)
@@ -191,31 +201,33 @@ struct AgentsListView: View {
         guard !rows.isEmpty else { return .ignored }
         let i = rows.firstIndex { $0.id == model.selected } ?? (step > 0 ? -1 : rows.count)
         let next = rows[min(max(i + step, 0), rows.count - 1)].id
-        withAnimation(.spring(duration: 0.25)) { model.selected = next }
-        withAnimation(.spring(duration: 0.3)) { proxy.scrollTo(next) }
+        withAnimation(Motion.out(Motion.ui)) { model.selected = next }
+        withAnimation(Motion.out(Motion.move)) { proxy.scrollTo(next) }
         return .handled
     }
 
     private func label(_ s: AgentSessionInfo, waiting: Bool) -> String {
         let st = AgentWords.status(s, waiting: waiting).label
-        return "\(s.harness) on \(model.runnerName(s.runner)), \(st)"
+        return "\(AgentWords.harness(s.harness)) on \(model.runnerName(s.runner)), \(st)"
     }
 }
 
 private struct Message: View {
+    let symbol: String
     let title: String
     let text: String
+    var help: String?
     let action: String?
     let prominent: Bool
     let run: () -> Void
     @Environment(\.corePalette) private var palette
     var body: some View {
-        VStack(spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-            Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
+        VStack(spacing: Space.s3) {
+            IconTile(symbol, hue: GlassInk.slate, size: 64)
+            Text(title).font(.system(size: MacTextSize.title, weight: .semibold))
+            Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center).help(help ?? "")
             if let action {
                 Button(action, action: run).buttonStyle(CoreButtonStyle(prominent ? .prominent : .secondary))
-                    .padding(.top, Space.s2)
             }
         }
         .frame(maxWidth: Space.s8 * 10).padding(Space.s4)
@@ -235,16 +247,15 @@ struct NotificationAsk: View {
             Text("Ainkrad can show a macOS banner for each new approval. macOS will ask you to allow it once.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Space.s2) {
-                Spacer(minLength: 0)
                 Button("Not now") { model.declineNotificationsForNow() }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                Spacer(minLength: 0)
                 Button("Turn on") { Task { await model.turnOnNotifications() } }
                     .buttonStyle(CoreButtonStyle(.prominent, size: .small))
             }
         }
         .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
         .accessibilityElement(children: .contain)
     }
 }

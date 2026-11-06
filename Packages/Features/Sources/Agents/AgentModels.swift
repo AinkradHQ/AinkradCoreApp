@@ -217,6 +217,33 @@ public enum AgentWords {
         return "\(s / 86400) d ago"
     }
 
+    /// A harness as people say it; the id stays in help text.
+    public static func harness(_ id: String) -> String {
+        switch id {
+        case "claude": "Claude"
+        case "codex": "Codex"
+        case "opencode": "OpenCode"
+        case "agy": "Antigravity"
+        default: id.capitalized
+        }
+    }
+
+    /// How a session mode reads (the Settings words); the raw value stays in help text.
+    public static func mode(_ raw: String) -> String {
+        switch raw {
+        case "ask": "Asks first"
+        case "accept_edits": "Accepts edits"
+        case "sandboxed": "Sandboxed"
+        default: raw
+        }
+    }
+
+    /// A finished tool call in words: "Done in 1.2 s" or "Failed (code 1)". The code also goes in help text.
+    public static func toolFacts(ok: Bool, code: Int?, ms: Int?) -> String {
+        if ok { return "Done" + (ms.map { String(format: " in %.1f s", Double($0) / 1000) } ?? "") }
+        return "Failed" + (code.map { " (code \($0))" } ?? "")
+    }
+
     /// The word for a session in a list or head: a pending approval wins over the state.
     public static func status(_ s: AgentSessionInfo, waiting: Bool) -> (label: String, tone: Tone, symbol: String) {
         if waiting { return ("Waiting on you", .warn, "hand.raised") }

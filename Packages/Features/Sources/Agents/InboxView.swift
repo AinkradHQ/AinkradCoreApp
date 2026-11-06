@@ -49,25 +49,23 @@ struct InboxView: View {
     private func verdict(_ n: Int) -> some View {
         let hue = n == 0 ? GlassInk.green : GlassInk.orange
         return HStack(spacing: Space.s4) {
-            IconTile(n == 0 ? "checkmark.seal.fill" : "hand.raised.fill", hue: hue, size: 52, bounce: n)
-                .shadow(color: hue.opacity(0.5), radius: 14)
-            VStack(alignment: .leading, spacing: 3) {
+            IconTile(
+                n == 0 ? "checkmark.square.fill" : "hand.raised.fill", hue: hue, size: Space.s8 + Space.s5, bounce: n)
+            VStack(alignment: .leading, spacing: Space.s1) {
                 Text(
                     n == 0
                         ? "Nothing is waiting on you"
                         : n == 1 ? "1 agent is waiting on you" : "\(n) agents are waiting on you"
                 )
-                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
-                .contentTransition(.numericText())
+                .font(.system(size: MacTextSize.large, weight: .semibold)).contentTransition(.numericText())
                 Label(touchNote, systemImage: elevatedUntil == nil ? "touchid" : "checkmark.shield")
                     .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: 0)
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
-        .animation(.smooth(duration: 0.4), value: n)
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .animation(Motion.out(Motion.move), value: n)
     }
 
     /// Words follow the elevation: before Touch ID it says it is needed, after it says until when it is not.
@@ -80,13 +78,14 @@ struct InboxView: View {
 
     private func who(_ r: ApprovalRequest) -> some View {
         let s = model.sessions.session(r.session)
-        let hue = SessionTile.hue(s?.harness ?? "")
         return HStack(spacing: Space.s2) {
-            IconTile(AgentsModel.harnessSymbol(s?.harness ?? ""), hue: hue, size: 26)
-            Text("\((s?.harness ?? "agent").capitalized) on \(s.map { model.runnerName($0.runner) } ?? "a runner")")
-                .font(.system(size: MacTextSize.body, weight: .semibold))
+            IconTile(AgentsModel.harnessSymbol(s?.harness ?? ""), hue: GlassInk.blue, size: MacSize.controlMd)
+            Text(
+                "\(s.map { AgentWords.harness($0.harness) } ?? "An agent") on \(s.map { model.runnerName($0.runner) } ?? "a runner")"
+            )
+            .font(.system(size: MacTextSize.body, weight: .semibold))
             Spacer(minLength: 0)
-            AppActionTile(title: "Open session", symbol: "arrow.up.right", key: "", hue: hue) {
+            AppActionTile(title: "Open session", symbol: "arrow.up.right", key: "", hue: GlassInk.slate) {
                 model.openSession(r.session)
             }
         }
@@ -104,7 +103,7 @@ struct NotificationsSection: View {
             permission
             GlassSection(
                 "Tell me when", sub: "Banners show while Ainkrad is open.", symbol: "bell.badge.fill",
-                hue: GlassInk.red, index: 1
+                hue: GlassInk.blue, index: 1
             ) {
                 LazyVGrid(
                     columns: [GridItem(.flexible(), spacing: Space.s3), GridItem(.flexible())], spacing: Space.s3
@@ -117,8 +116,8 @@ struct NotificationsSection: View {
                     .disabled(!allowed)
                     ForEach(
                         [
-                            ("A session fails", "xmark.octagon"), ("A session finishes", "checkmark.circle"),
-                            ("A session stalls", "pause.circle"),
+                            ("A session fails", "xmark.square"), ("A session finishes", "checkmark.square"),
+                            ("A session stalls", "pause.rectangle"),
                         ],
                         id: \.0
                     ) { title, symbol in
@@ -133,7 +132,7 @@ struct NotificationsSection: View {
             }
             GlassSection(
                 "Inside Ainkrad", sub: "What is running and what needs you.", symbol: "waveform.path.ecg",
-                hue: GlassInk.blue, index: 2
+                hue: GlassInk.slate, index: 2
             ) {
                 LazyVGrid(
                     columns: [GridItem(.flexible(), spacing: Space.s3), GridItem(.flexible())], spacing: Space.s3
@@ -144,8 +143,8 @@ struct NotificationsSection: View {
                     )
                     .disabled(true)
                     GlassToggleTile(
-                        "Status bar chip", sub: "“2 running · 1 waiting” next to the bell.", symbol: "capsule",
-                        onSymbol: "capsule.fill",
+                        "Status bar chip", sub: "“2 running · 1 waiting” next to the bell.", symbol: "rectangle",
+                        onSymbol: "rectangle.fill",
                         isOn: Binding(
                             get: { model.shell.showActivityChip },
                             set: {
@@ -163,14 +162,15 @@ struct NotificationsSection: View {
         let p = model.notifierPermission
         let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.blue : GlassInk.orange
         return HStack(spacing: Space.s4) {
-            IconTile(p == .allowed ? "bell.fill" : "bell.slash.fill", hue: hue, size: 56, bounce: p == .allowed)
-                .shadow(color: hue.opacity(0.5), radius: 14)
-            VStack(alignment: .leading, spacing: 3) {
+            IconTile(
+                p == .allowed ? "bell.fill" : "bell.slash.fill", hue: hue, size: Space.s8 + Space.s6,
+                bounce: p == .allowed)
+            VStack(alignment: .leading, spacing: Space.s1) {
                 Text(
                     p == .allowed
                         ? "Banners are on" : p == .notAsked ? "Banners aren't set up yet" : "macOS has banners off"
                 )
-                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                .font(.system(size: MacTextSize.large, weight: .semibold))
                 Text(
                     p == .allowed
                         ? "macOS shows Ainkrad's banners."
@@ -194,9 +194,8 @@ struct NotificationsSection: View {
             }
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
-        .animation(.smooth(duration: 0.35), value: p)
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .animation(Motion.out(Motion.move), value: p)
         .accessibilityElement(children: .contain)
     }
 }
@@ -208,16 +207,16 @@ private struct BannerPreview: View {
         HStack(alignment: .top, spacing: Space.s3) {
             AgentMark(harness: "claude")
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text("claude is waiting on you").font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text("It wants to use Bash on mac-studio.").foregroundStyle(palette.text2)
+                Text("Claude wants to run a command").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("On mac-studio.").foregroundStyle(palette.text2)
             }
             Spacer(minLength: 0)
             Text("now").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
         }
         .padding(Space.s3).frame(maxWidth: Space.s8 * 12, alignment: .leading)
-        .background(.black.opacity(0.25), in: coreShape(Radius.cardMac))
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .help("What an approval banner looks like")
-        .accessibilityElement(children: .combine).accessibilityLabel("Preview: claude is waiting on you")
+        .accessibilityElement(children: .combine).accessibilityLabel("Preview: Claude wants to run a command")
     }
 }
