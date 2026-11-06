@@ -1,4 +1,5 @@
 import AinkradClient
+import AppKit
 import CoreKit
 import CoreUI
 import Pairing
@@ -29,6 +30,7 @@ struct AinkradCoreApp: App {
                 closedCount: shell.closedPanes.count, chipOn: shell.showActivityChip,
                 coreOffline: shell.coreLink == .offline,
                 paneTitles: shell.panes.map { ($0.id, $0.title) })
+            QuitCommands(shell: shell)
             #if DEBUG
             DemoCommands(shell: shell)
             #endif
@@ -60,6 +62,40 @@ struct AinkradCoreApp: App {
         #else
         return AppModel()
         #endif
+    }
+}
+
+/// Quit asks twice, like a browser: the first ⌘Q shows "Press ⌘Q again to quit", a second one within two seconds quits.
+/// Only the menu item and its key go through this; logging out or an app update still quits at once.
+private struct QuitCommands: Commands {
+    let shell: ShellModel
+    var body: some Commands {
+        CommandGroup(replacing: .appTermination) {
+            Button("Quit Ainkrad") { QuitGuard.press(shell) }
+                .keyboardShortcut("q", modifiers: .command)
+        }
+    }
+}
+
+@MainActor
+enum QuitGuard {
+    private static var armedAt: Date?
+    static let window: TimeInterval = 2
+
+    static func press(_ shell: ShellModel) {
+        if let at = armedAt, Date().timeIntervalSince(at) < window {
+            NSApp.terminate(nil)
+            return
+        }
+        armedAt = Date()
+        shell.showToast("Press ⌘Q again to quit", kind: .warn)
+        Task {
+            try? await Task.sleep(for: .seconds(window))
+            if let at = armedAt, Date().timeIntervalSince(at) >= window {
+                armedAt = nil
+                if shell.toast?.message == "Press ⌘Q again to quit" { shell.toast = nil }
+            }
+        }
     }
 }
 
