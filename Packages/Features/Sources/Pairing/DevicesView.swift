@@ -290,7 +290,7 @@ struct LastSeenLine: View {
             if fresh {
                 coreShape(2).fill(palette.tone(.done).ink).frame(width: 7, height: 7)
                     .opacity(on && !reduce ? 0.35 : 1)
-                    .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: on)
+                    .animation(reduce ? nil : Motion.out(Motion.tick).repeatForever(autoreverses: true), value: on)
                     .onAppear { on = true }
                     .accessibilityHidden(true)
             }

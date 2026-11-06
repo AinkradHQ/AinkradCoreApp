@@ -108,7 +108,7 @@ private struct SecretsModeCard: View {
             hue: GlassInk.blue
         ) {
             HStack(spacing: Space.s2) {
-                if model.busy == setting.key { ProgressView().controlSize(.small) }
+                if model.busy == setting.key { BusyBar().frame(width: Space.s6) }
                 CoreSegmented(
                     "Keys and secrets",
                     segments: [
@@ -172,7 +172,7 @@ private struct FlagCard: View {
             HStack(spacing: Space.s2) {
                 Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orange)
-                if model.busy == setting.key { ProgressView().controlSize(.small) }
+                if model.busy == setting.key { BusyBar().frame(width: Space.s6) }
                 GlassToggleTile(
                     isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
                     isOn: Binding(
@@ -276,7 +276,7 @@ private struct LiveDot: View {
         coreShape(3).fill(GlassInk.green).frame(width: 9, height: 9)
             .overlay { coreShape(3).strokeBorder(.black.opacity(0.4), lineWidth: 1) }
             .opacity(on ? 1 : 0.45)
-            .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(), value: on)
+            .animation(reduce ? nil : Motion.out(Motion.tick).repeatForever(), value: on)
             .onAppear { on = true }
     }
 }

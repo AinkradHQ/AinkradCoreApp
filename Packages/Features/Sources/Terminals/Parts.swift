@@ -47,30 +47,6 @@ struct TermBanner: View {
     }
 }
 
-/// A moving bar for "working, length unknown". Reduce Motion: the bar rests in the middle.
-struct BusyBar: View {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        TimelineView(.animation(paused: reduce)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
-            let phase = reduce ? 0.5 : t - t.rounded(.down)
-            GeometryReader { geo in
-                let seg = geo.size.width * 0.3
-                ZStack(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(palette.track)
-                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
-                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
-                }
-                .clipShape(coreShape(Space.s1 / 2))
-            }
-        }
-        .frame(height: Space.s1)
-        .accessibilityHidden(true)
-    }
-}
-
 /// The card over a terminal that is not showing a screen: a title, what it means, the actions.
 struct TermCard: View {
     let title: String

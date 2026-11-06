@@ -69,7 +69,7 @@ private struct CoreButtonBody: View {
         HStack(spacing: Space.s2) {
             ZStack {
                 configuration.label.opacity(busy ? 0 : 1)
-                if busy { ProgressView().controlSize(.small).tint(ink) }
+                if busy { BusyBar().frame(width: Space.s6) }
             }
             // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
             if let keycap {
