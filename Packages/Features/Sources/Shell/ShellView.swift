@@ -99,7 +99,7 @@ public struct ShellView: View {
                 .scaleEffect(ws && !reduce ? 1.03 : 1)
         }
         .clipped()
-        .animation(reduce ? nil : Motion.out(0.5), value: ws)
+        .animation(reduce ? nil : Motion.out(Motion.reveal), value: ws)
         .accessibilityHidden(true)
     }
 
@@ -155,23 +155,30 @@ public struct ShellView: View {
     /// `Mac.sheet`: every confirmation is the one ConfirmCard (visual, animated, keyboard driven), over the scrim. The safe
     /// choice comes first and starts highlighted.
     private func sheetLayer(_ sheet: ShellSheet) -> some View {
-        let ordered =
-            sheet.actions.filter { !$0.primary && !$0.destructive }
-            + sheet.actions.filter { $0.primary || $0.destructive }
+        let safe = sheet.actions.filter { !$0.primary && !$0.destructive }
+        let rest = sheet.actions.filter { $0.primary || $0.destructive }
+        // Choice 0 is the one Esc and a bare Return run, so it must never destroy: with no safe action of its own the
+        // sheet gets a plain Cancel in front.
+        let cancel = ConfirmChoice("Cancel", symbol: "arrow.uturn.backward") { shell.sheet = nil }
+        let choices: [ConfirmChoice] =
+            (safe.isEmpty ? [cancel] : [])
+            + (safe + rest).map { a in
+                let isSafe = !a.primary && !a.destructive
+                return ConfirmChoice(
+                    a.label,
+                    symbol: isSafe && a.id == safe.first?.id
+                        ? "arrow.uturn.backward" : a.destructive ? "trash" : "checkmark",
+                    destructive: a.destructive
+                ) {
+                    shell.sheet = nil
+                    a.run()
+                }
+            }
         return ZStack {
             Self.scrim.onTapGesture { shell.sheet = nil }.accessibilityHidden(true)
             ConfirmCard(
                 title: sheet.title, message: sheet.message, symbol: sheet.symbol,
-                choices: ordered.enumerated().map { i, a in
-                    ConfirmChoice(
-                        a.label, symbol: i == 0 ? "arrow.uturn.backward" : a.destructive ? "trash" : "checkmark",
-                        destructive: a.destructive
-                    ) {
-                        shell.sheet = nil
-                        a.run()
-                    }
-                },
-                cancel: { shell.sheet = nil })
+                choices: choices, cancel: { shell.sheet = nil })
         }
         .id("sheet-\(sheet.id)")
         .transition(.opacity)

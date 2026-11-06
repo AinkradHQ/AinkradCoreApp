@@ -82,7 +82,6 @@ private struct Segment<ID: Hashable & Sendable>: View {
                 if let symbol = segment.symbol {
                     Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
                         .symbolEffect(.bounce, value: selected)
-                        .symbolEffect(.bounce, value: hovering)
                         .accessibilityHidden(true)
                 }
                 Text(segment.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
@@ -93,10 +92,9 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .background {
                 if selected {
                     coreShape(Radius.control).fill(GlassInk.blue.opacity(0.8))
-                        .shadow(color: GlassInk.blue.opacity(0.45), radius: 10)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
-                    coreShape(Radius.control).fill(hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
+                    coreShape(Radius.control).fill(hovering ? GlassInk.wellHover : GlassInk.well)
                 }
             }
             .overlay {
@@ -106,20 +104,20 @@ private struct Segment<ID: Hashable & Sendable>: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(pressed ? 0.96 : hovering ? 1.04 : 1)
+        .scaleEffect(pressed ? 0.97 : 1)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
         )
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
-        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
-        .animation(.spring(duration: 0.35, bounce: 0.25), value: selected)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.press(Motion.press), value: pressed)
+        .animation(Motion.out(Motion.move), value: selected)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
 /// An on/off setting as a glass tile in the segment look (Ahmed, 2026-11-05): its icon swaps and bounces, a small
-/// rounded switch slides inside, and it lights blue when on. Hover lifts it; a press springs.
+/// rounded switch slides inside, and it lights blue when on. Hover changes the fill; a press dips it.
 public struct GlassToggleTile: View {
     let title: String
     let sub: String?
@@ -129,8 +127,6 @@ public struct GlassToggleTile: View {
     @Binding var isOn: Bool
     @State private var hovering = false
     @State private var pressed = false
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
     public init(
         _ title: String, sub: String? = nil, symbol: String, onSymbol: String? = nil, isOn: Binding<Bool>,
         fill: Bool = false
@@ -149,13 +145,12 @@ public struct GlassToggleTile: View {
         } label: {
             HStack(spacing: Space.s3) {
                 Image(systemName: isOn ? onSymbol : symbol)
-                    .font(.system(size: sub == nil ? MacTextSize.body : MacTextSize.headline + 2, weight: .semibold))
+                    .font(.system(size: sub == nil ? MacTextSize.body : MacTextSize.title, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
                     .symbolEffect(.bounce, value: isOn)
-                    .symbolEffect(.pulse, options: .repeating, isActive: isOn && !reduce && sub == nil)
                     .frame(width: sub == nil ? nil : 28)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
                     if let sub {
                         Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(.white.opacity(0.7))
@@ -170,22 +165,21 @@ public struct GlassToggleTile: View {
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
                 coreShape(Radius.control)
-                    .fill(isOn ? GlassInk.blue.opacity(0.8) : hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
-                    .shadow(color: GlassInk.blue.opacity(isOn ? 0.45 : 0), radius: 10)
+                    .fill(isOn ? GlassInk.blue.opacity(0.8) : hovering ? GlassInk.wellHover : GlassInk.well)
             }
             .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(isOn ? 0.3 : 0.15), lineWidth: 1) }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(pressed ? 0.96 : hovering ? 1.03 : 1)
+        .scaleEffect(pressed ? 0.97 : 1)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
         )
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
-        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
-        .animation(.spring(duration: 0.35, bounce: 0.35), value: isOn)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.press(Motion.press), value: pressed)
+        .animation(Motion.out(Motion.move), value: isOn)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
@@ -193,10 +187,10 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(5).fill(.white.opacity(isOn ? 0.35 : 0.12))
+        coreShape(Radius.chip).fill(.white.opacity(isOn ? 0.35 : 0.12))
             .frame(width: 30, height: 18)
             .overlay(alignment: isOn ? .trailing : .leading) {
-                coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)
+                coreShape(Radius.chip).fill(.white).frame(width: 14, height: 14).padding(2)
                     .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
             }
             .accessibilityHidden(true)

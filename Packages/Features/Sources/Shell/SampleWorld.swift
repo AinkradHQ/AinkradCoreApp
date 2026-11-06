@@ -47,7 +47,7 @@ public enum SampleWorld {
             BellItem(
                 id: "alarm-backup", kind: .alarm, title: "Backup age 31 h, limit 26 h", sub: "alarm.raised · Home Core",
                 time: "2 min",
-                actions: [BellAction("Open Ops", primary: true) { shell.showToast("Sample: Ops opens here.") }]))
+                actions: [BellAction("Open Ops", primary: true) { shell.showToast("Sample: Ops opens here") }]))
         shell.bell.add(
             BellItem(
                 id: "runner-cooling", kind: .runner, title: "codex-plus is cooling down",
@@ -72,11 +72,11 @@ public enum SampleWorld {
             actions: [
                 BellAction("Deny") {
                     shell.bell.remove(id)
-                    shell.showToast("Denied.")
+                    shell.showToast("Denied")
                 },
                 BellAction("Approve", primary: true) {
                     shell.bell.remove(id)
-                    shell.showToast("Approved (sample).") { shell.bell.add(approval(shell, id: id, title, sub, time)) }
+                    shell.showToast("Approved (sample)") { shell.bell.add(approval(shell, id: id, title, sub, time)) }
                 },
             ])
     }
@@ -112,7 +112,7 @@ public enum SampleWorld {
         switch id {
         case "agents":
             PaneSpec(
-                id: id, title: "Agents", sub: "Home Core", symbol: "sparkles",
+                id: id, title: "Agents", sub: "Home Core", symbol: "play.fill",
                 chip: PaneChip("Waiting on you", tone: .warn, symbol: "hourglass")
             ) {
                 SampleList(
@@ -197,13 +197,11 @@ public struct DemoCommands: Commands {
                 shell.bell.removeAll()
                 SampleWorld.install(into: shell)
             }
-            Divider()
             ForEach(["agents", "terminals", "runners", "core", "citadel"], id: \.self) { id in
                 Button("Open \(id.capitalized) Pane") { shell.openPane(SampleWorld.samplePane(id, shell)) }
             }
             Button("Close All Panes") { shell.closeAllPanes() }
-            Divider()
-            Button("Toast with Undo") { shell.showToast("Sample toast.") {} }
+            Button("Toast with Undo") { shell.showToast("Sample toast") {} }
             Button("Confirm Sheet") {
                 shell.presentSheet(
                     title: "Remove device?", message: "Sample sheet.",

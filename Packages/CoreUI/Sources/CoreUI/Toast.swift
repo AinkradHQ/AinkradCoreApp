@@ -5,8 +5,8 @@ public enum ToastKind: Sendable {
     case ok, info, warn, error
     var symbol: String {
         switch self {
-        case .ok: "checkmark.circle"
-        case .info: "info.circle"
+        case .ok: "checkmark.square"
+        case .info: "info.square"
         case .warn: "exclamationmark.triangle"
         case .error: "xmark.octagon"
         }

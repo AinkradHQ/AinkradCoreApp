@@ -37,10 +37,10 @@ extension OfficialGlassSection {
             }
         } core: {
             item(".coreGlass() (Glass.regular.tint(deep blue).interactive(), dark scheme forced)") {
-                Label("Glass control", systemImage: "sparkles").padding(Space.s3).coreGlass()
+                Label("Glass control", systemImage: "square.dashed").padding(Space.s3).coreGlass()
             }
             item(".coreGlass(interactive: false)") {
-                Label("Static glass", systemImage: "sparkles").padding(Space.s3).coreGlass(interactive: false)
+                Label("Static glass", systemImage: "square.dashed").padding(Space.s3).coreGlass(interactive: false)
             }
             item(".corePanel() regular material, content surface") {
                 Text("Panel content").corePanel()
@@ -60,7 +60,7 @@ extension OfficialGlassSection {
     private var morph: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Button(morphed ? "Collapse" : "Expand") {
-                withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .smooth) { morphed.toggle() }
+                withAnimation(reduceMotion ? Motion.out(Motion.hover) : .smooth) { morphed.toggle() }
             }
             .buttonStyle(.glass).buttonBorderShape(.roundedRectangle(radius: 8))
             GlassEffectContainer(spacing: Space.s4) {
@@ -86,7 +86,7 @@ extension OfficialGlassSection {
     private var unionDemo: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Button(union ? "Split" : "Merge") {
-                withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .smooth) { union.toggle() }
+                withAnimation(reduceMotion ? Motion.out(Motion.hover) : .smooth) { union.toggle() }
             }
             .buttonStyle(.glass).buttonBorderShape(.roundedRectangle(radius: 8))
             GlassEffectContainer(spacing: Space.s4) {
