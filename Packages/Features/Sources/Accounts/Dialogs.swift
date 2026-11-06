@@ -46,7 +46,8 @@ enum AccountDialogs {
     static func openDeleteProvider(_ m: AccountsModel, _ p: ProviderItem) {
         present(m, "provider-delete") { close in DeleteProviderDialog(model: m, provider: p, close: close) }
     }
-    static func openNewPool(_ m: AccountsModel) {
+    static func openNewPool(_ m: AccountsModel, reason: String? = nil) {
+        m.note("new-pool", reason)
         present(m, "pool-new") { close in NewPoolDialog(model: m, close: close) }
     }
     static func openDeletePool(_ m: AccountsModel, _ p: PoolItem) {

@@ -27,7 +27,7 @@ struct AddDeviceView: View {
             }
             .font(.system(size: MacTextSize.body))
         }
-        .task { await model.prepare() }
+        .task { if model.quickMode { await model.quick() } else { await model.prepare() } }
         .task(id: model.pairingID) {
             // The Core's events refresh this at once; the poll covers a dropped event stream.
             while !Task.isCancelled, model.pairingID != nil {

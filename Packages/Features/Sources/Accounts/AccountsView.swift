@@ -90,8 +90,12 @@ struct AccountsView: View {
     @ViewBuilder private var primary: some View {
         switch model.page {
         case .pools:
-            AppActionTile(title: "New pool", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
                 AccountDialogs.openNewPool(model)
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
+            AppActionTile(title: "New pool", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                Task { await model.quickPool() }
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .budgets:

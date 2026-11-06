@@ -170,6 +170,47 @@ struct ModelTests {
         #expect(host.reasons.count == 2)
     }
 
+    @Test func quickPoolMakesAnEmptyPoolWithGeneratedNameAndSelectsIt() async {
+        let (m, svc, host) = await make()
+        #expect(m.nextPoolName() == "pool-3")
+        #expect(PoolName.isValid(m.nextPoolName()))
+        await m.quickPool()
+        #expect(svc.log == ["createPool pool-3 anthropic"])
+        #expect(m.selectedPool?.name == "pool-3" && m.selectedPool?.members.isEmpty == true)
+        #expect(host.reasons.count == 1 && host.shell.dialog == nil)
+        // The next one is free again.
+        #expect(m.nextPoolName() == "pool-4")
+    }
+
+    @Test func quickPoolOpensTheSheetWithTheReasonWhenItCannot() async {
+        let (m, svc, host) = await make()
+        svc.failure = CoreError.http(status: 409, code: "conflict", message: "That name is taken.")
+        await m.quickPool()
+        #expect(host.shell.dialog?.id == "pool-new")
+        #expect(m.writeError["new-pool"] == "That name is taken.")
+        // No provider at all: no write is tried.
+        let (n, s2, h2) = await make()
+        s2.providerList = []
+        await n.reload()
+        await n.quickPool()
+        #expect(s2.log.isEmpty && h2.shell.dialog?.id == "pool-new")
+        #expect(n.writeError["new-pool"] == "No provider yet. Connect an account first.")
+    }
+
+    @Test func quickPoolWithADeclinedTouchIDChangesNothingAndOpensNothing() async {
+        let (m, svc, host) = await make()
+        host.declines = true
+        await m.quickPool()
+        #expect(svc.log.isEmpty && host.shell.dialog == nil)
+    }
+
+    @Test func aPoolEntryPairInTheLauncher() async {
+        let (m, _, host) = await make()
+        m.install()
+        #expect(host.shell.launcher.entry("new-pool")?.isAction == true)
+        #expect(host.shell.launcher.entry("new-pool-advanced")?.title == "New pool (advanced)…")
+    }
+
     @Test func aDeclinedTouchIDChangesNothingAndSaysNoError() async {
         let (m, svc, host) = await make()
         host.declines = true
