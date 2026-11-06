@@ -45,6 +45,9 @@ protocol AccountsService: Sendable {
     func prices() async throws -> [PriceItem]
     /// The next version of a model's price, from now on (`admin`, Touch ID).
     func setPrice(_ p: PriceDraft) async throws
+    /// A provider definition of your own (`admin`, Touch ID); replacing makes a new version, deleting refuses one in use.
+    func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws
+    func deleteProvider(_ id: String) async throws
 }
 
 struct AccountRunner: Identifiable, Equatable, Sendable {
@@ -199,6 +202,25 @@ struct LiveAccountsService: AccountsService {
         }
     }
 
+    func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws {
+        let body = Components.Schemas.Provider(
+            authVar: p.authVar, baseUrl: p.baseURL, delivery: ["gateway"], harness: p.harness, id: p.id,
+            keyPrefix: p.keyPrefix, loginMethods: ["paste"],
+            models: p.models.map { .init(id: $0.id, inputPerMtokMicro: $0.input, outputPerMtokMicro: $0.output) },
+            name: p.name, pricedAt: p.models.isEmpty ? nil : ISO8601DateFormatter().string(from: Date()),
+            testPath: p.testPath, usageParser: p.usageParser)
+        try await run {
+            if replacing {
+                _ = try await client.replaceProvider(path: .init(id: p.id), body: .json(body)).ok
+            } else {
+                _ = try await client.createProvider(body: .json(body)).ok
+            }
+        }
+    }
+    func deleteProvider(_ id: String) async throws {
+        try await run { _ = try await client.deleteProvider(path: .init(id: id)).ok }
+    }
+
     func usage() async throws -> [UsageItem] {
         try await run { try await client.accountsUsage().ok.body.json.map(Self.usage) }
     }
@@ -275,7 +297,8 @@ struct LiveAccountsService: AccountsService {
             loginMethods: p.loginMethods,
             models: p.models.map {
                 ModelPriceItem(id: $0.id, inputMicro: $0.inputPerMtokMicro, outputMicro: $0.outputPerMtokMicro)
-            }, pricedAt: p.pricedAt, builtin: p.builtin ?? false)
+            }, pricedAt: p.pricedAt, builtin: p.builtin ?? false, keyPrefix: p.keyPrefix, testPath: p.testPath,
+            version: p.version ?? 1)
     }
 
     static func account(_ a: Components.Schemas.ProviderAccount) -> AccountItem {

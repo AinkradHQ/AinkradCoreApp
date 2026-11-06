@@ -119,6 +119,30 @@ struct ModelTests {
         #expect(host.reasons.count == 1)
     }
 
+    @Test func providerRulesMatchCores() async {
+        #expect(ProviderRules.id(from: "OpenRouter EU") == "openrouter-eu")
+        #expect(ProviderRules.id(from: "42 Labs") == "labs")
+        #expect(ProviderRules.urlIssue("https://openrouter.ai/api") == nil)
+        #expect(ProviderRules.urlIssue("https://openrouter.ai:443/api") == nil)
+        #expect(ProviderRules.urlIssue("http://openrouter.ai") != nil)
+        #expect(ProviderRules.urlIssue("https://openrouter.ai:8443") != nil)
+        #expect(ProviderRules.urlIssue("https://10.0.0.1") != nil)
+        #expect(ProviderRules.urlIssue("https://xn--e1afmkfd.xn--p1ai") != nil)
+        #expect(ProviderRules.urlIssue("https://localhost") != nil)
+        #expect(ProviderRules.urlIssue("https://user@openrouter.ai") != nil)
+        #expect(ProviderRules.prefixIssue("sk-or-v1-") == nil)
+        #expect(ProviderRules.prefixIssue("sk-") != nil)
+        #expect(ProviderRules.testPathIssue("/key") == nil)
+        #expect(ProviderRules.testPathIssue("/../x") != nil)
+        let (m, svc, host) = await make()
+        let d = ProviderDraft(
+            id: "openrouter", name: "OpenRouter", harness: "codex", baseURL: "https://openrouter.ai/api",
+            keyPrefix: "sk-or-v1-", testPath: nil, models: [])
+        #expect(await m.saveProvider(d, replacing: false))
+        #expect(svc.log.contains("saveProvider openrouter codex OPENAI_API_KEY sk-or-v1- false"))
+        #expect(host.reasons.count == 1)
+    }
+
     @Test func stateWordsKeepUnknownRawAndNeverAlarm() {
         #expect(AccountPhase("active").label == "Ready")
         #expect(AccountPhase("weird").label == "weird")

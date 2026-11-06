@@ -23,6 +23,10 @@ struct ProviderItem: Identifiable, Equatable, Sendable {
     let models: [ModelPriceItem]
     let pricedAt: String?
     let builtin: Bool
+    /// A user definition's key shape (it holds keys through the gateway only), its key-test path, and its version.
+    var keyPrefix: String? = nil
+    var testPath: String? = nil
+    var version: Int64 = 1
 }
 
 /// An account as a `read` device sees it: its key's last four characters, never the key.

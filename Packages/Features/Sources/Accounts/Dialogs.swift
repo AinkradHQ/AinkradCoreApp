@@ -40,6 +40,12 @@ enum AccountDialogs {
     static func openPrice(_ m: AccountsModel, editing: PriceItem?) {
         present(m, "price") { close in PriceDialog(model: m, editing: editing, close: close) }
     }
+    static func openProvider(_ m: AccountsModel, editing: ProviderItem?) {
+        present(m, "provider") { close in ProviderDialog(model: m, editing: editing, close: close) }
+    }
+    static func openDeleteProvider(_ m: AccountsModel, _ p: ProviderItem) {
+        present(m, "provider-delete") { close in DeleteProviderDialog(model: m, provider: p, close: close) }
+    }
     static func openNewPool(_ m: AccountsModel) {
         present(m, "pool-new") { close in NewPoolDialog(model: m, close: close) }
     }

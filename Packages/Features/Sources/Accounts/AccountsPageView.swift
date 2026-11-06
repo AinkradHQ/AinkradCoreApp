@@ -49,11 +49,12 @@ private struct AccountsList: View {
                 ForEach(model.providersByUse, id: \.0.id) { p, group in
                     ProviderSection(model: model, provider: p, accounts: group)
                 }
-                if model.filter == .all, !model.spareProviders.isEmpty {
+                if model.filter == .all {
                     Text("More you can connect").font(.system(size: MacTextSize.title, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: cardColumns, spacing: Space.s3) {
                         ForEach(model.spareProviders) { p in SpareCard(model: model, provider: p) }
+                        AddProviderCard(model: model)
                     }
                 }
             }
@@ -121,6 +122,12 @@ private struct ProviderSection: View {
                 AccLink(title: open ? "Hide details" : "About", symbol: open ? "chevron.up" : "info.circle") {
                     withAnimation(.smooth(duration: 0.35)) { open.toggle() }
                 }
+                if !provider.builtin {
+                    AccLink(title: "Edit", symbol: "slider.horizontal.3") {
+                        AccountDialogs.openProvider(model, editing: provider)
+                    }
+                    .disabled(model.readOnly)
+                }
                 AccLink(title: "Connect another", symbol: "plus") {
                     AccountDialogs.openConnect(model, provider: provider.id)
                 }
@@ -185,10 +192,26 @@ private struct SpareCard: View {
             HStack(spacing: Space.s3) {
                 AccTile(provider: provider.id)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(provider.name).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text("Add an API key").foregroundStyle(GlassInk.secondary)
+                    Text(provider.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                    Text(
+                        provider.loginMethods.contains("browser_code")
+                            ? "Sign in with your Claude plan"
+                            : provider.builtin ? "Add an API key" : "Your provider · no accounts yet"
+                    )
+                    .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
-                Spacer(minLength: Space.s2)
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: Space.s2) {
+                Spacer(minLength: 0)
+                if !provider.builtin {
+                    AccLink(title: "Remove", symbol: "trash") { AccountDialogs.openDeleteProvider(model, provider) }
+                        .disabled(model.readOnly)
+                    AccLink(title: "Edit", symbol: "slider.horizontal.3") {
+                        AccountDialogs.openProvider(model, editing: provider)
+                    }
+                    .disabled(model.readOnly)
+                }
                 AccLink(title: "Connect", symbol: "plus") { AccountDialogs.openConnect(model, provider: provider.id) }
                     .disabled(model.readOnly)
             }
@@ -216,5 +239,36 @@ struct BackTile: View {
         .animation(.smooth(duration: 0.25), value: hovering)
         .help("All accounts (esc)")
         .accessibilityLabel("All accounts")
+    }
+}
+
+/// Your own provider, such as OpenRouter: a definition Core checks, whose keys go through its gateway only.
+private struct AddProviderCard: View {
+    let model: AccountsModel
+    @State private var hovering = false
+    var body: some View {
+        Button {
+            AccountDialogs.openProvider(model, editing: nil)
+        } label: {
+            HStack(spacing: Space.s3) {
+                IconTile("plus", hue: GlassInk.slate, size: 32)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Add a provider").font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text("OpenRouter, or any API like Anthropic, OpenAI or Gemini").foregroundStyle(GlassInk.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s3)
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .overlay {
+                coreShape(Radius.cardMac).strokeBorder(
+                    GlassInk.wellEdge, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            }
+            .contentShape(coreShape(Radius.cardMac))
+        }
+        .buttonStyle(.plain).focusEffectDisabled().disabled(model.readOnly)
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.2), value: hovering)
     }
 }

@@ -33,6 +33,13 @@ public final class AccountsDemo {
                     "google", "Gemini API", "agy", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com",
                     [("gemini-pro", 1_250_000, 10_000_000)]),
                 ProviderItem(
+                    id: "openrouter", name: "OpenRouter", harness: "claude", authVar: "ANTHROPIC_API_KEY",
+                    baseURL: "https://openrouter.ai/api", delivery: ["gateway"], loginMethods: ["paste"],
+                    models: [
+                        ModelPriceItem(
+                            id: "anthropic/claude-sonnet-4.5", inputMicro: 3_000_000, outputMicro: 15_000_000)
+                    ], pricedAt: "2026-11-05", builtin: false, keyPrefix: "sk-or-v1-", testPath: "/key"),
+                ProviderItem(
                     id: "claude-sub", name: "Claude subscription", harness: "claude",
                     authVar: "CLAUDE_CODE_OAUTH_TOKEN",
                     baseURL: "https://api.anthropic.com", delivery: ["env"], loginMethods: ["browser_code"], models: [],
@@ -214,6 +221,8 @@ public final class AccountsDemo {
                     warnAt: $0.warnAt, hardStop: $0.hardStop, exhausted: false)
             }
         }
+        func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws {}
+        func deleteProvider(_ id: String) async throws {}
         func usage() async throws -> [UsageItem] {
             func w(_ t: Int64, _ m: Int64, _ c: Int64) -> UsageWindowItem {
                 UsageWindowItem(tokens: t, messages: m, costMicros: c)
@@ -323,7 +332,7 @@ public final class AccountsDemo {
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
         "account-ready",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
-        "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
+        "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "bindings",
         "bindings-empty",
         "budgets", "costs", "ledger", "prices", "activity", "connect", "delete-account", "cap", "new-pool", "bind",
@@ -386,6 +395,7 @@ public final class AccountsDemo {
             case "bindings", "bindings-empty", "bind": .bindings
             case "budgets", "costs", "ledger", "prices", "activity": AccountsPage(rawValue: scene)!
             case "price-new": .prices
+            case "provider-new", "provider-edit": .accounts
             case "budget-new", "budget-edit", "budget-raise", "budgets-empty": .budgets
             default: .overview
             }
@@ -421,6 +431,8 @@ public final class AccountsDemo {
         case "limits": AccountDialogs.openLimits(model, model.account(1)!)
         case "budget-new": AccountDialogs.openBudget(model, editing: nil)
         case "price-new": AccountDialogs.openPrice(model, editing: nil)
+        case "provider-new": AccountDialogs.openProvider(model, editing: nil)
+        case "provider-edit": AccountDialogs.openProvider(model, editing: model.provider("openrouter"))
         case "budget-edit": AccountDialogs.openBudget(model, editing: model.budgets.first { $0.id == 3 })
         case "budget-raise": AccountDialogs.openRaise(model, model.budgets.first { $0.id == 2 }!)
         case "budgets": model.cursor = "g-3"
