@@ -49,11 +49,20 @@ public final class AccountsModel {
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var now: () -> Date = { Date() }
 
-    public init(host: any AdminHost) { self.host = host }
+    /// Connections (GitHub, Jira…): its own pane, driven alongside the accounts.
+    public let connections: ConnectionsModel
+
+    public init(host: any AdminHost) {
+        self.host = host
+        connections = ConnectionsModel(host: host)
+    }
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveAccountsService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        use(LiveAccountsService(connection: connection))
+        connections.attach()
+    }
 
     func use(_ service: any AccountsService) {
         self.service = service
@@ -61,6 +70,7 @@ public final class AccountsModel {
     }
 
     public func detach() {
+        connections.detach()
         service = nil
         providers = []
         accounts = []
@@ -77,6 +87,7 @@ public final class AccountsModel {
     public func resync() { if service != nil { Task { await reload() } } }
     /// An event from the Core that may change what these screens show.
     public func event(kind: String) {
+        connections.event(kind: kind)
         if kind.hasPrefix("account.") || kind.hasPrefix("pool.") || kind.hasPrefix("setting.") { resync() }
     }
 
@@ -367,6 +378,7 @@ public final class AccountsModel {
 
     /// Launcher entries and the two Settings sections. Ids match the shell's own sample entries, so Demo mode keeps its own.
     public func install() {
+        connections.install()
         let shell = host.shell
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
