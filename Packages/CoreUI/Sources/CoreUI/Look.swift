@@ -114,7 +114,13 @@ extension View {
     public func coreFrame(
         radius: CGFloat = Radius.pane, rim: CGFloat = Space.s2, active: Bool = false, part: LookPart? = nil
     ) -> some View {
-        modifier(FrameModifier(radius: radius, rim: rim, active: active, part: part))
+        modifier(FrameModifier(radius: radius, rim: rim, active: active, part: part, fill: true))
+    }
+
+    /// The frame without its background, for content that draws its own (the terminal screen). Same structure as
+    /// `coreFrame`, so switching between the two never rebuilds the content.
+    func coreFrame(radius: CGFloat, rim: CGFloat, active: Bool, fill: Bool) -> some View {
+        modifier(FrameModifier(radius: radius, rim: rim, active: active, part: nil, fill: fill))
     }
 }
 
@@ -123,13 +129,14 @@ private struct FrameModifier: ViewModifier {
     let rim: CGFloat
     let active: Bool
     let part: LookPart?
+    let fill: Bool
     @Environment(\.coreLook) private var inForce
     func body(content: Content) -> some View {
         let prefs = LookPrefs.shared
         let look = part.flatMap { prefs.custom[$0] } ?? inForce
         content
             .foregroundStyle(GlassInk.primary)
-            .background { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) }
+            .background { if fill { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) } }
             .clipShape(coreShape(max(radius - rim, Radius.chip)))
             .padding(rim)
             .coreGlass(radius: radius, interactive: false, tinted: false)

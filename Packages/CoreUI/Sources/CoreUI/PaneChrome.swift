@@ -53,21 +53,11 @@ private struct PaneFrame<Content: View>: View {
             case .look(let l): l
             default: LookPrefs.shared.custom[.panes] ?? appearance
             }
-        Group {
-            if ask == .own {
-                // The content draws its own background: the rim only.
-                content.clipShape(coreShape(Radius.pane - Space.s2))
-                    .padding(Space.s2)
-                    .coreGlass(radius: Radius.pane, interactive: false, tinted: false)
-                    .overlay {
-                        coreShape(Radius.pane).strokeBorder(.white.opacity(active ? 0.3 : 0.12), lineWidth: 1)
-                    }
-            } else {
-                content.coreFrame(radius: Radius.pane, rim: Space.s2, active: active)
-            }
-        }
-        .environment(\.coreLook, look)
-        .onPreferenceChange(PaneLookKey.self) { ask = $0 }
+        // One structure whatever the content asks for: a branch here would rebuild the content (and tear down a
+        // terminal's AppKit view) when its preference arrives.
+        content.coreFrame(radius: Radius.pane, rim: Space.s2, active: active, fill: ask != .own)
+            .environment(\.coreLook, look)
+            .onPreferenceChange(PaneLookKey.self) { ask = $0 }
     }
 }
 
