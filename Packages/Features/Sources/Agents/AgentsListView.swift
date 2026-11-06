@@ -103,7 +103,7 @@ struct AgentsListView: View {
             if model.sessions.items.isEmpty {
                 Message(
                     symbol: "play.fill", title: "No agent sessions yet",
-                    text: "Start one and it runs on a runner of the Home Core. You can close this Mac; it keeps going.",
+                    text: "Start one and it runs on a runner of your Core. You can close this Mac; it keeps going.",
                     action: "New session", prominent: true
                 ) { model.openNewSession() }
             } else if rows.isEmpty {

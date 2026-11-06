@@ -16,7 +16,7 @@ final class AdminHostAdapter: AdminHost {
         }
         switch app.shell.coreLink {
         case .offline, .reconnecting:
-            return "Changes are paused while Home Core is unreachable. They resume when it is back."
+            return "Changes are paused while your Core is unreachable. They resume when it is back."
         default: return nil
         }
     }

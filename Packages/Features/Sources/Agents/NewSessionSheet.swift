@@ -27,7 +27,7 @@ struct NewSessionSheet: View {
         CoreDialogPanel("New agent session", width: Space.s8 * 17) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    Text("It runs on a runner of the Home Core. You can close this Mac and it keeps going.")
+                    Text("It runs on a runner of your Core. You can close this Mac and it keeps going.")
                         .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                     if let notice { NoticeBanner(notice: notice) }
                     VStack(alignment: .leading, spacing: Space.s3) {

@@ -234,8 +234,8 @@ public final class TerminalsModel {
     func openList() {
         shell.openPane(
             PaneSpec(
-                id: "terminals", title: "Terminals", sub: "Home Core", symbol: "terminal",
-                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
+                id: "terminals", title: "Terminals", sub: "Your Core", symbol: "terminal",
+                chip: PaneChip("Your Core", tone: .queue, symbol: "server.rack"), minWidth: 560
             ) { TerminalsListView(model: self) })
         Task { await reload() }
     }
@@ -243,7 +243,7 @@ public final class TerminalsModel {
     func openRunners(_ id: String? = nil) {
         runnerDetail = id
         shell.openPane(
-            PaneSpec(id: "runners", title: "Runners", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
+            PaneSpec(id: "runners", title: "Runners", sub: "Your Core", symbol: "server.rack", minWidth: 480) {
                 RunnersView(model: self)
             })
         Task { await reload() }

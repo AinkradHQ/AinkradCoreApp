@@ -22,7 +22,7 @@ extension AgentsModel {
 
     public func openList() {
         shell.openPane(
-            PaneSpec(id: Self.listPane, title: "Agents", sub: "Home Core", symbol: "play.fill", chip: listChip) {
+            PaneSpec(id: Self.listPane, title: "Agents", sub: "Your Core", symbol: "play.fill", chip: listChip) {
                 AgentsListView(model: self)
             })
     }
@@ -92,7 +92,7 @@ extension AgentsModel {
     func registerBase() {
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.list", title: "Agents", sub: "sessions on the Home Core", symbol: "play.fill",
+                id: "agents.list", title: "Agents", sub: "Sessions on your Core", symbol: "play.fill",
                 keywords: ["sessions", "claude", "codex", "agent"]
             ) { [weak self] in self?.openList() })
         shell.launcher.register(

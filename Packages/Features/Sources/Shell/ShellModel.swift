@@ -234,7 +234,7 @@ public final class ShellModel {
             ) { [weak self] in self?.open(.settings) })
         launcher.register(
             LauncherEntry(
-                id: "shortcuts", title: "Keyboard Shortcuts", sub: "every key the app answers to",
+                id: "shortcuts", title: "Keyboard Shortcuts", sub: "Every key the app answers to",
                 symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
             ) { [weak self] in self?.open(.shortcuts) })
         launcher.register(

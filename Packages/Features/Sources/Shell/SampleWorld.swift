@@ -45,7 +45,7 @@ public enum SampleWorld {
         approvals(shell)
         shell.bell.add(
             BellItem(
-                id: "alarm-backup", kind: .alarm, title: "Backup age 31 h, limit 26 h", sub: "alarm.raised · Home Core",
+                id: "alarm-backup", kind: .alarm, title: "Backup age 31 h, limit 26 h", sub: "Raised by your Core",
                 time: "2 min",
                 actions: [BellAction("Open Ops", primary: true) { shell.showToast("Sample: Ops opens here") }]))
         shell.bell.add(
@@ -99,7 +99,7 @@ public enum SampleWorld {
         }
         return [
             pane("core", "Core", "Accounts, pools, budgets and costs", "creditcard"),
-            pane("terminals", "Terminals", "Rune terminals on your runners", "terminal"),
+            pane("terminals", "Terminals", "Terminals on your runners", "terminal"),
             pane("runners", "Runners", "machines and their slots", "server.rack"),
             action(
                 "new-terminal", "New terminal", "Open a shell on a runner · needs Touch ID", "terminal",
