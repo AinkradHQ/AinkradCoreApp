@@ -35,9 +35,9 @@ struct CostsPage: View {
             .fixedSize()
         }
         HStack(spacing: Space.s3) {
-            figure("Spent", CostWords.usd(total.costMicros), "dollarsign.circle.fill", GlassInk.green)
+            figure("Spent", CostWords.usd(total.costMicros), "dollarsign.square.fill", GlassInk.blue)
             figure("Tokens", CostWords.tokens(total.tokens), "text.word.spacing", GlassInk.blue)
-            figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.violet)
+            figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.blue)
         }
         if model.unpricedTokens > 0 { unpriced }
         if model.usage.isEmpty {
@@ -56,23 +56,23 @@ struct CostsPage: View {
                 IconTile(symbol, hue: hue, size: 28)
                 Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(GlassInk.secondary)
             }
-            Text(value).font(.system(size: 30, weight: .bold, design: .rounded)).contentTransition(.numericText())
-                .lineLimit(1).minimumScaleFactor(0.7)
+            Text(value).font(.system(size: MacTextSize.large, weight: .semibold, design: .rounded)).monospacedDigit()
+                .contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.7)
             Text(window.rawValue.lowercased()).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .animation(.smooth(duration: 0.4), value: value)
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .animation(Motion.out(Motion.move), value: value)
         .accessibilityElement(children: .combine)
     }
 
     private var unpriced: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: "tag.slash.fill").font(.system(size: 18, weight: .semibold)).foregroundStyle(
-                GlassInk.orange)
-            VStack(alignment: .leading, spacing: 2) {
+            Image(systemName: "tag.slash.fill").font(.system(size: MacTextSize.title, weight: .semibold))
+                .foregroundStyle(
+                    GlassInk.orange)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text("\(CostWords.tokens(model.unpricedTokens)) tokens had no price")
                     .font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text("They count as tokens but not as spend. Set a price for their model to count them from now on.")
@@ -80,12 +80,12 @@ struct CostsPage: View {
             }
             Spacer(minLength: Space.s3)
             AppActionTile(title: "Open prices", symbol: "tag", key: "", hue: GlassInk.orange) {
-                withAnimation(.smooth(duration: 0.3)) { model.page = .prices }
+                withAnimation(Motion.out(Motion.ui)) { model.page = .prices }
             }
         }
         .padding(Space.s3)
-        .background(GlassInk.orange.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.4), lineWidth: 1) }
+        .background(GlassInk.orange.opacity(0.1))
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 
     private func accounts(_ total: UsageWindowItem) -> some View {
@@ -110,13 +110,13 @@ struct CostsPage: View {
         if !all.isEmpty {
             let top = max(1, all.first?.1.costMicros ?? 1)
             GlassSection(
-                "By company", sub: "Who the spend was for", symbol: "building.2.fill", hue: GlassInk.violet, index: 1
+                "By company", sub: "Who the spend was for", symbol: "building.2.fill", hue: GlassInk.blue, index: 1
             ) {
                 VStack(spacing: Space.s2) {
                     ForEach(all, id: \.0) { c, w in
                         SpendBarRow(
                             title: c, sub: "\(CostWords.tokens(w.tokens)) tokens", value: CostWords.usd(w.costMicros),
-                            share: Double(w.costMicros) / Double(top), hue: GlassInk.violet, symbol: "building.2")
+                            share: Double(w.costMicros) / Double(top), hue: GlassInk.blue, symbol: "building.2")
                     }
                 }
             }
@@ -150,7 +150,7 @@ private struct AccountSpendRow: View {
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture {
             guard a != nil else { return }
-            withAnimation(.smooth(duration: 0.35)) {
+            withAnimation(Motion.out(Motion.move)) {
                 model.page = .accounts
                 model.detail = usage.accountID
             }
@@ -175,7 +175,7 @@ struct SpendBarRow: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
                 IconTile(symbol, hue: hue, size: 30)
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                     Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(
                         warn ? GlassInk.orange : GlassInk.secondary
@@ -183,8 +183,10 @@ struct SpendBarRow: View {
                     .lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
-                Text(value).font(.system(size: MacTextSize.title, weight: .bold, design: .rounded).monospacedDigit())
-                    .contentTransition(.numericText())
+                Text(value).font(
+                    .system(size: MacTextSize.title, weight: .semibold, design: .rounded).monospacedDigit()
+                )
+                .contentTransition(.numericText())
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -194,7 +196,6 @@ struct SpendBarRow: View {
                             LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: max(4, g.size.width * min(1, share) * (shown ? 1 : 0)))
-                        .shadow(color: hue.opacity(0.5), radius: 5)
                 }
             }
             .frame(height: 6)
@@ -203,8 +204,8 @@ struct SpendBarRow: View {
         .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .onHover { hovering = $0 }
-        .onAppear { withAnimation(.smooth(duration: 0.7)) { shown = true } }
-        .animation(.smooth(duration: 0.4), value: share)
+        .onAppear { withAnimation(Motion.out(Motion.move)) { shown = true } }
+        .animation(Motion.out(Motion.move), value: share)
         .accessibilityElement(children: .combine)
     }
 }

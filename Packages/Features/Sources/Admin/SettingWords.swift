@@ -19,16 +19,16 @@ enum SettingWords {
             symbol: "person.badge.key.fill", hue: GlassInk.blue),
         Group(
             id: "requests", title: "Requests", sub: "How much one device may ask of your Core.",
-            symbol: "speedometer", hue: GlassInk.violet),
+            symbol: "speedometer", hue: GlassInk.blue),
         Group(
             id: "secrets", title: "Secrets", sub: "How many secrets your Core keeps, and how big.",
-            symbol: "key.fill", hue: GlassInk.orange),
+            symbol: "key.fill", hue: GlassInk.blue),
         Group(
             id: "terminals", title: "Terminals", sub: "How many terminals run, and when idle ones close.",
-            symbol: "terminal.fill", hue: GlassInk.green),
+            symbol: "terminal.fill", hue: GlassInk.blue),
         Group(
             id: "alerts", title: "Warnings", sub: "When your Core warns you about backups, certificates and disk.",
-            symbol: "exclamationmark.triangle.fill", hue: GlassInk.red),
+            symbol: "exclamationmark.triangle.fill", hue: GlassInk.orange),
         Group(
             id: "background", title: "Background work", sub: "How often your Core does its routine work.",
             symbol: "gearshape.2.fill", hue: GlassInk.slate),

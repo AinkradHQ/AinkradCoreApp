@@ -39,14 +39,12 @@ extension AccountsPrefs {
     }
 }
 
-/// Each provider in its own colour and mark, so its accounts tell apart at a glance.
+/// Each provider in its own mark (blue for the known ones, slate for the rest), so its accounts tell apart at a glance.
 enum ProviderLook {
     static func hue(_ provider: String) -> Color {
         switch provider {
-        case "anthropic", "claude-sub": GlassInk.orange
-        case "openai": GlassInk.green
-        case "google", "gemini": GlassInk.blue
-        default: GlassInk.violet
+        case "anthropic", "claude-sub", "openai", "google", "gemini": GlassInk.blue
+        default: GlassInk.slate
         }
     }
     /// The brand on a choice card; how it signs in is the line under it.
@@ -68,8 +66,8 @@ enum ProviderLook {
     }
     static func symbol(_ provider: String) -> String {
         switch provider {
-        case "anthropic": "sparkles"
-        case "claude-sub": "person.crop.circle.badge.checkmark"
+        case "anthropic": "text.bubble"
+        case "claude-sub": "person.badge.key"
         case "openai": "chevron.left.forwardslash.chevron.right"
         case "google", "gemini": "diamond"
         default: "key.fill"

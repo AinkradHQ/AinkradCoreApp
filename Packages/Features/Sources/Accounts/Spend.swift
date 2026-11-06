@@ -90,10 +90,10 @@ enum BudgetWords {
 
     static func standing(_ b: BudgetItem) -> (title: String, hue: Color, symbol: String) {
         switch b.standing {
-        case .fine: ("Within budget", GlassInk.green, "checkmark.circle.fill")
+        case .fine: ("Within budget", GlassInk.green, "checkmark.square.fill")
         case .warning: ("Past \(b.warnAt)%", GlassInk.orange, "exclamationmark.triangle.fill")
         case .over: ("Over, warning only", GlassInk.orange, "exclamationmark.octagon.fill")
-        case .stopped: ("Stopped", GlassInk.red, "stop.circle.fill")
+        case .stopped: ("Stopped", GlassInk.red, "stop.fill")
         }
     }
 

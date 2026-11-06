@@ -31,7 +31,7 @@ struct LockoutsSection: View {
                         .transition(.opacity)
                     }
                 }
-                .animation(.smooth(duration: 0.35), value: model.items.map(\.key))
+                .animation(Motion.out(Motion.move), value: model.items.map(\.key))
                 .onChange(of: model.items.map(\.key), initial: true) { _, keys in
                     if !keys.contains(cursor ?? "") { cursor = keys.first }
                 }
@@ -53,10 +53,9 @@ struct LockoutsSection: View {
         let hue = n == 0 ? GlassInk.green : GlassInk.orange
         return HStack(spacing: Space.s4) {
             IconTile(n == 0 ? "lock.open.fill" : "lock.fill", hue: hue, size: 56, bounce: n)
-                .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
                 Text(n == 0 ? "Nothing is locked" : n == 1 ? "1 lock right now" : "\(n) locks right now")
-                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(hue)
                     .contentTransition(.numericText())
                 Text(
                     n == 0
@@ -66,14 +65,14 @@ struct LockoutsSection: View {
                 .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s3)
-            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
                 Task { await model.reload() }
             }
+            .keyboardShortcut("r", modifiers: .command)
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
-        .animation(.smooth(duration: 0.4), value: n)
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .animation(Motion.out(Motion.move), value: n)
     }
 
     private func keys(_ press: KeyPress, _ model: LockoutsModel) -> KeyPress.Result {
@@ -82,13 +81,13 @@ struct LockoutsSection: View {
         switch press.key {
         case .downArrow, .upArrow:
             let i = at + (press.key == .downArrow ? 1 : -1)
-            if list.indices.contains(i) { withAnimation(.smooth(duration: 0.25)) { cursor = list[i].key } }
+            if list.indices.contains(i) { withAnimation(Motion.out(Motion.ui)) { cursor = list[i].key } }
             return .handled
         case .delete, .deleteForward:
             if list.indices.contains(at) { Task { await model.clear(list[at]) } }
             return .handled
         default:
-            guard press.characters.lowercased() == "r" else { return .ignored }
+            guard press.characters.lowercased() == "r", press.modifiers.isEmpty else { return .ignored }
             Task { await model.reload() }
             return .handled
         }
@@ -113,16 +112,16 @@ private struct LockCard: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 HStack(spacing: Space.s3) {
                     IconTile(left == 0 ? "lock.open.fill" : who.symbol, hue: hue, size: 40, bounce: left == 0)
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: Space.s1 / 2) {
                         Text(who.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                         Text(who.sub).foregroundStyle(GlassInk.secondary)
                     }
                     Spacer(minLength: Space.s3)
                     Text(left == 0 ? "Ended" : Countdown.text(left))
-                        .font(.system(size: MacTextSize.large + 4, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: MacTextSize.large, weight: .semibold, design: .rounded).monospacedDigit())
                         .foregroundStyle(hue).contentTransition(.numericText(countsDown: true))
                     AppActionTile(
-                        title: "Clear", symbol: "lock.open", key: selected ? "⌫" : "", hue: GlassInk.orange,
+                        title: "Clear", symbol: "lock.open", key: selected ? "⌫" : "", hue: GlassInk.blue,
                         prominent: selected
                     ) { Task { await model.clear(lock) } }
                     .disabled(left == 0)
@@ -138,7 +137,6 @@ private struct LockCard: View {
                                     colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
                             )
                             .frame(width: g.size.width * Double(left) / LockMeter.total(left))
-                            .shadow(color: hue.opacity(0.6), radius: 6)
                     }
                 }
                 .frame(height: 6)
@@ -157,19 +155,11 @@ private struct LockCard: View {
                 }
             }
             .padding(Space.s3)
-            .background(
-                selected ? hue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.cardMac)
-            )
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    selected ? hue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-            }
-            .shadow(color: hue.opacity(selected ? 0.3 : 0), radius: 12)
+            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: selected || hovering)
             .contentShape(coreShape(Radius.cardMac))
             .onTapGesture(perform: pick)
             .onHover { hovering = $0 }
-            .animation(.smooth(duration: 0.3), value: selected)
+            .animation(Motion.out(Motion.ui), value: selected)
             .help(lock.key)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(who.title), \(left == 0 ? "ended" : "\(Countdown.text(left)) left")")
@@ -181,10 +171,10 @@ private struct LockCard: View {
         let p = key.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
         switch (p.first, p.count) {
         case ("ipdev", 3):
-            return (p[1], "This address, with device \(p[2])", "laptopcomputer.trianglebadge.exclamationmark")
+            return (p[1], "This address, on one device", "laptopcomputer.trianglebadge.exclamationmark")
         case ("ip", 2...):
             return (p.dropFirst().joined(separator: ":"), "An internet address", "network.badge.shield.half.filled")
-        case ("stepup", 2...): return ("Touch ID", "On device \(p.dropFirst().joined(separator: ":"))", "touchid")
+        case ("stepup", 2...): return ("Touch ID", "On one device", "touchid")
         default: return (key, "Locked", "lock.fill")
         }
     }

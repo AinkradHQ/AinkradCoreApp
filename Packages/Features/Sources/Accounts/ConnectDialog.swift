@@ -27,7 +27,7 @@ struct ConnectDialog: View {
                     HStack(spacing: Space.s2) {
                         ForEach(ProviderLook.ordered(model.providers)) { p in
                             ProviderChoice(provider: p, on: p.id == provider, lens: lens) {
-                                withAnimation(.smooth(duration: 0.35)) { provider = p.id }
+                                withAnimation(Motion.out(Motion.move)) { provider = p.id }
                             }
                         }
                     }
@@ -66,7 +66,7 @@ struct ConnectDialog: View {
                     }
                     .id(provider)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    AccDialogButtons(confirm: "Done", cancel: close, run: close)
+                    CoreDialogFooter(confirm: "Close", cancel: nil, run: close)
                 }
             }
         }
@@ -79,7 +79,7 @@ struct ConnectDialog: View {
     private func move(_ step: Int) -> KeyPress.Result {
         let ids = ProviderLook.ordered(model.providers).map(\.id)
         guard let i = ids.firstIndex(of: provider) else { return .ignored }
-        withAnimation(.smooth(duration: 0.35)) { provider = ids[min(max(i + step, 0), ids.count - 1)] }
+        withAnimation(Motion.out(Motion.move)) { provider = ids[min(max(i + step, 0), ids.count - 1)] }
         return .handled
     }
 
@@ -91,15 +91,14 @@ struct ConnectDialog: View {
         HStack(alignment: .top, spacing: Space.s3) {
             VStack(spacing: 0) {
                 Image(systemName: on ? "\(n).square.fill" : "lock.square.fill")
-                    .font(.system(size: 26, weight: .semibold))
+                    .font(.system(size: MacTextSize.large, weight: .semibold))
                     .foregroundStyle(on ? hue : GlassInk.slate)
-                    .shadow(color: hue.opacity(on ? 0.5 : 0), radius: 8)
                     .symbolEffect(.bounce, value: provider)
                 if !last {
                     coreShape(1).fill(
                         LinearGradient(colors: [hue, GlassInk.track], startPoint: .top, endPoint: .bottom)
                     )
-                    .frame(width: 2).frame(minHeight: 24).padding(.vertical, 4)
+                    .frame(width: 2).frame(minHeight: Space.s6).padding(.vertical, Space.s1)
                 }
             }
             .frame(width: 30)
@@ -117,7 +116,7 @@ struct ConnectDialog: View {
     }
 }
 
-/// A provider as a choice card: its tile in its colour, the name and how it signs in. The picked one glows in the
+/// A provider as a choice card: its tile in its colour, the name and how it signs in. The picked one is lit in the
 /// provider's colour and the light glides between cards; ← → move it.
 private struct ProviderChoice: View {
     let provider: ProviderItem
@@ -141,7 +140,6 @@ private struct ProviderChoice: View {
             .background {
                 if on {
                     coreShape(Radius.cardMac).fill(hue.opacity(0.22))
-                        .shadow(color: hue.opacity(0.45), radius: 14)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
                     coreShape(Radius.cardMac).fill(hovering ? GlassInk.wellHover : GlassInk.well)
@@ -155,9 +153,8 @@ private struct ProviderChoice: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(on ? 1.03 : hovering ? 1.02 : 1)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: hovering)
+        .animation(Motion.out(Motion.ui), value: hovering)
         .accessibilityLabel(provider.name)
         .accessibilityAddTraits(on ? .isSelected : [])
     }

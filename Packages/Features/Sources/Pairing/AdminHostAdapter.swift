@@ -12,7 +12,7 @@ final class AdminHostAdapter: AdminHost {
 
     var pausedReason: String? {
         if case .rateLimited? = app.shell.linkNotice {
-            return "Slow down (rate_limited). Changes are paused until the limit lifts."
+            return "Too many requests. Changes are paused until the limit lifts."
         }
         switch app.shell.coreLink {
         case .offline, .reconnecting:

@@ -42,7 +42,7 @@ struct CoreSettingsSection: View {
                 }
                 .onChange(of: model.cursor) { _, key in
                     guard let key else { return }
-                    withAnimation(.smooth(duration: 0.3)) { proxy.scrollTo(key, anchor: .center) }
+                    withAnimation(Motion.out(Motion.ui)) { proxy.scrollTo(key, anchor: .center) }
                 }
             }
             .focusable().focused($listFocus).focusEffectDisabled()
@@ -74,7 +74,7 @@ struct CoreSettingsSection: View {
         let at = list.firstIndex { $0.key == model.cursor } ?? 0
         func go(_ i: Int) -> KeyPress.Result {
             guard list.indices.contains(i) else { return .handled }
-            withAnimation(.smooth(duration: 0.25)) { model.cursor = list[i].key }
+            withAnimation(Motion.out(Motion.ui)) { model.cursor = list[i].key }
             return .handled
         }
         guard let s = list.indices.contains(at) ? list[at] : nil else { return .ignored }
@@ -103,7 +103,7 @@ struct CoreSettingsSection: View {
 }
 
 /// One limit: its plain name and what it does, the value as people say it, and where it sits between the limits. The
-/// cursor row glows in its group's colour and shows its actions: History, Reset (when changed) and Change.
+/// cursor row is lit and shows its actions: History, Reset (when changed) and Change.
 private struct LimitRow: View {
     @Bindable var model: RegistryModel
     let setting: SettingItem
@@ -118,7 +118,7 @@ private struct LimitRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Space.s1 / 2) {
                     HStack(spacing: Space.s2) {
                         Text(SettingWords.title(setting)).font(.system(size: MacTextSize.headline, weight: .semibold))
                         if setting.isOverride {
@@ -136,7 +136,7 @@ private struct LimitRow: View {
                 // Always laid out, only faded: showing them never changes the row's size under the pointer.
                 actions.opacity(showsActions ? 1 : 0).allowsHitTesting(showsActions)
                 Text(SettingWords.value(setting, setting.value))
-                    .font(.system(size: MacTextSize.large, weight: .bold, design: .rounded))
+                    .font(.system(size: MacTextSize.large, weight: .semibold, design: .rounded))
                     .foregroundStyle(selected ? hue : GlassInk.primary)
                     .contentTransition(.numericText())
             }
@@ -150,18 +150,15 @@ private struct LimitRow: View {
             }
         }
         .padding(Space.s3)
-        .background(selected ? hue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well, in: rowShape)
-        .overlay {
-            rowShape.strokeBorder(selected ? hue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-        }
-        .shadow(color: hue.opacity(selected ? 0.3 : 0), radius: 12)
+        .background(selected ? hue.opacity(0.14) : hovering ? GlassInk.wellHover : GlassInk.well, in: rowShape)
+        .overlay { rowShape.strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .contentShape(rowShape)
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: showsActions)
-        .animation(.smooth(duration: 0.3), value: selected)
-        .animation(.smooth(duration: 0.3), value: model.openHistory)
-        .animation(.smooth(duration: 0.35), value: setting.value)
+        .animation(Motion.out(Motion.ui), value: showsActions)
+        .animation(Motion.out(Motion.ui), value: selected)
+        .animation(Motion.out(Motion.ui), value: model.openHistory)
+        .animation(Motion.out(Motion.move), value: setting.value)
         .help("\(setting.key): \(setting.detail)")
         .contextMenu {
             Button("Change…") { model.beginEdit(setting) }
@@ -190,7 +187,7 @@ private struct LimitRow: View {
                 AppActionTile(
                     title: "Back to \(SettingWords.value(setting, setting.defaultValue))",
                     symbol: "arrow.uturn.backward",
-                    key: selected ? "⌫" : "", hue: GlassInk.orange
+                    key: selected ? "⌫" : "", hue: GlassInk.slate
                 ) { Task { await model.reset(setting) } }
             }
             AppActionTile(
@@ -213,6 +210,7 @@ private struct LimitEditor: View {
         let typed = model.draftValue()
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
+                AppActionTile(title: "Cancel", symbol: "xmark", key: "esc", hue: GlassInk.slate) { model.cancelEdit() }
                 CoreTextField(
                     "New value", placeholder: String(setting.value), text: $model.draft, error: nil, mono: true,
                     suffix: unitWord, autofocus: true, onSubmit: { Task { await model.saveEdit(setting) } }
@@ -226,7 +224,6 @@ private struct LimitEditor: View {
                 Spacer(minLength: Space.s3)
                 Label("Asks for Touch ID", systemImage: "touchid").font(.system(size: MacTextSize.meta))
                     .foregroundStyle(GlassInk.secondary)
-                AppActionTile(title: "Cancel", symbol: "xmark", key: "esc", hue: GlassInk.slate) { model.cancelEdit() }
                 AppActionTile(title: "Save", symbol: "checkmark", key: "↩", hue: hue, prominent: true) {
                     Task { await model.saveEdit(setting) }
                 }
@@ -235,8 +232,8 @@ private struct LimitEditor: View {
             if let issue = model.issue { IssueLine(code: nil, text: issue.message) }
         }
         .padding(Space.s3)
-        .background(hue.opacity(0.08), in: coreShape(Radius.control + 2))
-        .animation(.smooth(duration: 0.25), value: typed)
+        .background(hue.opacity(0.08), in: coreShape(Radius.control))
+        .animation(Motion.out(Motion.ui), value: typed)
         .onKeyPress(.escape) {
             model.cancelEdit()
             return .handled
@@ -263,12 +260,12 @@ struct SettingsChip: View {
     var body: some View {
         Label(text, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
             .foregroundStyle(hue == GlassInk.slate ? GlassInk.secondary : hue)
-            .padding(.horizontal, 8).frame(height: 22)
-            .background(hue.opacity(0.16), in: coreShape(6))
+            .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
+            .background(hue.opacity(0.16), in: coreShape(Radius.chip))
     }
 }
 
-/// Where the value sits between the limits: a glowing fill up to the value, a tick at the default and, while typing, a
+/// Where the value sits between the limits: a fill up to the value, a tick at the default and, while typing, a
 /// ghost marker for the draft (red with the words when it would be refused).
 struct RangeBar: View {
     let setting: SettingItem
@@ -289,12 +286,10 @@ struct RangeBar: View {
                             LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: max(x, 6), height: 6)
-                        .shadow(color: hue.opacity(0.6), radius: 6)
                     coreShape(1).fill(GlassInk.secondary).frame(width: 2, height: 12)
                         .offset(x: dx - 1)  // grid: ok tick
                     coreShape(4).fill(.white).frame(width: 8, height: 18)
                         .overlay { coreShape(4).strokeBorder(hue, lineWidth: 2) }
-                        .shadow(color: hue.opacity(0.7), radius: 6)
                         .offset(x: min(max(x - 4, 0), w - 8))  // grid: ok marker
                     if let ghost {
                         coreShape(3).fill(refused ? GlassInk.red : GlassInk.primary.opacity(0.8))
@@ -369,11 +364,11 @@ private struct HistoryTimeline: View {
         HStack(alignment: .top, spacing: Space.s3) {
             VStack(spacing: 0) {
                 coreShape(3).fill(current ? hue : GlassInk.track).frame(width: 10, height: 10)
-                    .shadow(color: hue.opacity(current ? 0.7 : 0), radius: 5).padding(.top, 5)
+                    .padding(.top, Space.s1)
                 if !last { Rectangle().fill(GlassInk.track).frame(width: 2).frame(maxHeight: .infinity) }
             }
             .frame(width: 10)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 HStack(spacing: Space.s2) {
                     Text(change).font(.system(size: MacTextSize.body, weight: .semibold))
                     if current { SettingsChip(text: "Now", symbol: "checkmark", hue: GlassInk.green) }

@@ -55,9 +55,6 @@ enum AccountDialogs {
     static func openAddMember(_ m: AccountsModel, pool: PoolItem) {
         present(m, "pool-member") { close in AddMemberDialog(model: m, pool: pool, close: close) }
     }
-    static func openBind(_ m: AccountsModel, pool: PoolItem?) {
-        present(m, "binding-new") { close in BindDialog(model: m, pool: pool, close: close) }
-    }
 }
 
 private struct DeleteAccountDialog: View {
@@ -77,7 +74,7 @@ private struct DeleteAccountDialog: View {
                     .system(size: MacTextSize.meta))
                 if let e = model.writeError["delete-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Delete account", danger: true, busy: busy, cancel: close) {
+                CoreDialogFooter(confirm: "Delete account", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.delete(account)
@@ -122,7 +119,7 @@ private struct CapDialog: View {
                 Text("Over the limit, new sessions take another account or wait.").font(.system(size: MacTextSize.meta))
                 if let e = model.writeError["cap-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Save", busy: busy, enabled: issue == nil, cancel: close) { go() }
+                CoreDialogFooter(confirm: "Save", busy: busy, enabled: issue == nil, cancel: close) { go() }
             }
         }
         .accessibilityIdentifier("account-cap")
@@ -161,7 +158,7 @@ private struct NewPoolDialog: View {
                 }
                 if let e = model.writeError["new-pool"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(
+                CoreDialogFooter(
                     confirm: "Create pool", busy: busy,
                     enabled: PoolName.isValid(name.trimmingCharacters(in: .whitespaces)) && !chosen.isEmpty,
                     cancel: close
@@ -196,7 +193,7 @@ private struct DeletePoolDialog: View {
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["delete-pool-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Delete pool", danger: true, busy: busy, cancel: close) {
+                CoreDialogFooter(confirm: "Delete pool", danger: true, busy: busy, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.delete(pool)
@@ -234,7 +231,7 @@ private struct AddMemberDialog: View {
                 }
                 if let e = model.writeError["member-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Add account", busy: busy, enabled: !rest.isEmpty, cancel: close) {
+                CoreDialogFooter(confirm: "Add account", busy: busy, enabled: !rest.isEmpty, cancel: close) {
                     guard let a = rest.first(where: { $0.id == (pick ?? rest[0].id) }) else { return }
                     busy = true
                     Task {
@@ -249,75 +246,6 @@ private struct AddMemberDialog: View {
     }
 }
 
-private struct BindDialog: View {
-    let model: AccountsModel
-    let close: () -> Void
-    @State private var agent = ""
-    @State private var provider: String
-    @State private var poolID: Int64?
-    @State private var busy = false
-    init(model: AccountsModel, pool: PoolItem?, close: @escaping () -> Void) {
-        self.model = model
-        self.close = close
-        let first = pool ?? model.selectedPool
-        _provider = State(initialValue: first?.provider ?? "")
-        _poolID = State(initialValue: pool?.id)
-    }
-    var body: some View {
-        let providers = Array(Set(model.pools.map(\.provider))).sorted()
-        let chosen = providers.contains(provider) ? provider : (providers.first ?? "")
-        let pools = model.pools(for: chosen)
-        let target = pools.first { $0.id == poolID } ?? model.defaultPool(chosen) ?? pools.first
-        let t = agent.trimmingCharacters(in: .whitespaces)
-        CoreDialogPanel("Bind an agent", width: Space.s8 * 15) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                CoreTextField(
-                    "Agent", placeholder: "agent id", text: $agent,
-                    error: t.isEmpty || AccountsModel.validAgent(t) ? nil : "1 to 64 letters, digits or . _ : -",
-                    mono: true, autofocus: true
-                ) { go(target) }
-                CoreFieldLabel("Provider")
-                CoreSegmented(
-                    "Provider",
-                    segments: providers.map {
-                        CoreSegment($0, model.providerName($0), symbol: ProviderLook.symbol($0))
-                    },
-                    selection: Binding(
-                        get: { chosen },
-                        set: {
-                            provider = $0
-                            poolID = nil
-                        }))
-                CoreFieldLabel("Pool")
-                CoreSegmented(
-                    "Pool",
-                    segments: pools.map {
-                        CoreSegment($0.id, $0.name, symbol: $0.isDefault ? "star.fill" : "square.grid.2x2")
-                    },
-                    selection: Binding(get: { target?.id ?? -1 }, set: { poolID = $0 }))
-                Text("It replaces an earlier binding of this agent for the same provider.").font(
-                    .system(size: MacTextSize.meta))
-                if let e = model.writeError["bind"] { AccIssue(text: e) }
-                AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(
-                    confirm: "Bind agent", busy: busy, enabled: AccountsModel.validAgent(t) && target != nil,
-                    cancel: close
-                ) { go(target) }
-            }
-        }
-        .accessibilityIdentifier("binding-new")
-    }
-    private func go(_ p: PoolItem?) {
-        guard let p, AccountsModel.validAgent(agent.trimmingCharacters(in: .whitespaces)) else { return }
-        busy = true
-        Task {
-            let ok = await model.bind(agent: agent, to: p)
-            busy = false
-            if ok { close() }
-        }
-    }
-}
-
 /// Settings, Core: a way into the Core app.
 struct AccountsLinkSection: View {
     let model: AccountsModel
@@ -325,7 +253,7 @@ struct AccountsLinkSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Look", sub: "The Core app's content background.", symbol: "circle.lefthalf.filled",
+                "Look", sub: "The Core app's content background.", symbol: "square.lefthalf.filled",
                 hue: GlassInk.blue
             ) {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
@@ -338,7 +266,7 @@ struct AccountsLinkSection: View {
                 }
             }
             GlassSection(
-                "The Core app", sub: "Accounts, pools and bindings, shared by agents, Citadel and every device.",
+                "The Core app", sub: "Accounts and pools, shared by agents, Citadel and every device.",
                 symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
             ) {
                 AppActionTile(
@@ -358,7 +286,7 @@ struct AccountsLinkSection: View {
 
 /// Settings, Security: where the real-accounts gate stands.
 /// Settings, Security, Real accounts: the way from no keys to real provider keys, as three steps in plain words. The next
-/// step to take glows and has the tile that opens it.
+/// step to take is lit and has the tile that opens it.
 struct AccountsGateSection: View {
     let model: AccountsModel
 
@@ -384,7 +312,7 @@ struct AccountsGateSection: View {
                     3, "Add a real account", "Connect Claude, OpenAI or Gemini in Accounts.",
                     off: next == nil
                         ? "Connect Claude, OpenAI or Gemini in Accounts." : "Opens once the two steps above are done.",
-                    symbol: "person.crop.circle.badge.plus",
+                    symbol: "person.badge.plus",
                     done: false, next: next == nil,
                     open: (
                         "Open Accounts",
@@ -403,7 +331,7 @@ struct AccountsGateSection: View {
         .foregroundStyle(GlassInk.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .help(g.technical)
-        .animation(.smooth(duration: 0.35), value: g)
+        .animation(Motion.out(Motion.move), value: g)
         .task { await model.reload() }
     }
 
@@ -414,17 +342,15 @@ struct AccountsGateSection: View {
                 g.kind == .real ? "checkmark.shield.fill" : g.kind == .off ? "lock.fill" : "testtube.2", hue: hue,
                 size: 56, bounce: g.step ?? -1
             )
-            .shadow(color: hue.opacity(0.5), radius: 14)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(g.title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(g.title).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(hue)
                 Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
             if let s = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: s, hue: hue) }
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 
     private func step(
@@ -440,7 +366,7 @@ struct AccountsGateSection: View {
             }
             Spacer(minLength: Space.s3)
             if done {
-                Label("Done", systemImage: "checkmark.circle.fill").font(
+                Label("Done", systemImage: "checkmark.square.fill").font(
                     .system(size: MacTextSize.meta, weight: .semibold)
                 )
                 .foregroundStyle(GlassInk.green)
@@ -456,12 +382,7 @@ struct AccountsGateSection: View {
             }
         }
         .padding(Space.s3)
-        .background(next ? GlassInk.blue.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                next ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: next ? 1.5 : 1)
-        }
-        .shadow(color: GlassInk.blue.opacity(next ? 0.25 : 0), radius: 12)
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: next)
         .opacity(done || next ? 1 : 0.7)
     }
 
@@ -475,7 +396,7 @@ struct AccountsGateSection: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3).frame(maxWidth: .infinity)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
     }
 }
 

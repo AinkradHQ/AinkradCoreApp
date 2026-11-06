@@ -1,30 +1,6 @@
 import CoreUI
 import SwiftUI
 
-/// Panel for a dialog over the shell (add device, scopes, revoke, Touch ID).
-struct DialogCard<Content: View>: View {
-    let title: String
-    var width: CGFloat = Space.s8 * 15
-    /// When set, a close button sits at the top right (the prototype's dialogs have one).
-    var close: (() -> Void)?
-    @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            ModalHeader(title, close: close)
-            content
-        }
-        .foregroundStyle(palette.text)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
-        .frame(width: width)
-        .shadow(color: .black.opacity(0.3), radius: 34, y: 14)
-        .coreModalEntrance()
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
-    }
-}
-
 /// The check code (SAS): four large keycaps of four characters across the panel, read letter by letter.
 struct SASView: View {
     let sas: String
@@ -36,7 +12,7 @@ struct SASView: View {
         HStack(spacing: Space.s3) {
             ForEach(Array(sas.split(separator: "-").enumerated()), id: \.offset) { i, group in
                 Text(String(group))
-                    .font(.system(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced))
+                    .font(.system(size: MacTextSize.large * 1.5, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, minHeight: MacSize.controlLg * 2)
                     .background(palette.glassCard, in: coreShape(Radius.cardMac))
                     .overlay {
@@ -45,7 +21,7 @@ struct SASView: View {
                     }
                     .overlay(alignment: .topTrailing) {
                         if let matched, i < matched {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.tone(.done).ink)
+                            Image(systemName: "checkmark.square.fill").foregroundStyle(palette.tone(.done).ink)
                                 .padding(Space.s1)
                         }
                     }
@@ -108,13 +84,14 @@ struct ScopeToggle: View {
             on.toggle()
         } label: {
             ScopeTile(
-                symbol: ScopeText.symbol(scope), name: scope, detail: locked ?? ScopeText.text(scope),
+                symbol: ScopeText.symbol(scope), name: ScopeText.name(scope), detail: locked ?? ScopeText.text(scope),
                 hue: ScopeText.hue(scope), on: on)
         }
         .buttonStyle(.plain)
         .modifier(TileKey(index: index))
         .disabled(locked != nil)
-        .accessibilityLabel("\(scope), \(ScopeText.text(scope))")
+        .help(scope)
+        .accessibilityLabel("\(ScopeText.name(scope)), \(ScopeText.text(scope))")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
@@ -127,7 +104,7 @@ enum ScopeText {
         case "read": "eye"
         case "approve": "checkmark.seal"
         case "terminal": "terminal"
-        case "agent": "sparkles"
+        case "agent": "play.fill"
         case "admin": "key"
         case "runner": "server.rack"
         default: "questionmark"
@@ -136,11 +113,21 @@ enum ScopeText {
     static func hue(_ s: String) -> Color {
         switch s {
         case "read": GlassInk.blue
-        case "approve": GlassInk.green
+        case "approve", "agent", "admin": GlassInk.blue
         case "terminal": GlassInk.slate
-        case "agent": GlassInk.violet
-        case "admin": GlassInk.orange
         default: GlassInk.slate
+        }
+    }
+    /// The scope as a person would say it; the raw name goes in `.help`.
+    static func name(_ s: String) -> String {
+        switch s {
+        case "read": "See everything"
+        case "approve": "Approve"
+        case "terminal": "Use terminals"
+        case "agent": "Run agents"
+        case "admin": "Admin"
+        case "runner": "Run for the Core"
+        default: s
         }
     }
     static func text(_ s: String) -> String {
@@ -219,40 +206,6 @@ struct IndBar: View {
         }
         .frame(height: Space.s1)
         .accessibilityHidden(true)
-    }
-}
-
-/// A destructive-leaning secondary button: the fail tone on a quiet fill. Used for "It doesn't match" and revoke.
-struct DangerButtonStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        let t = palette.tone(.fail)
-        configuration.label
-            .font(.system(size: MacTextSize.body, weight: .medium))
-            .foregroundStyle(t.ink)
-            .frame(minHeight: MacSize.controlMd)
-            .padding(.horizontal, Space.s3)
-            .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
-            .coreDimWhenDisabled(enabled)
-    }
-}
-
-/// A text link in the primary colour, with the one focus ring (never the system accent's).
-struct LinkButton: View {
-    let title: String
-    var hint: String?
-    let action: () -> Void
-    @Environment(\.corePalette) private var palette
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        Button(action: action) { Text(title) }
-            .buttonStyle(.plain).foregroundStyle(palette.primary)
-            .focused($focused).focusEffectDisabled()
-            .coreFocusRing(focused, radius: Radius.chip, palette: palette)
-            .accessibilityHint(hint ?? "")
     }
 }
 
