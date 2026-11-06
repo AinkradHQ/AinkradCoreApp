@@ -220,7 +220,7 @@ struct ElevationPanel: View {
         }
         .padding(Space.s4)
         .frame(width: Space.s8 * 10)
-        .corePanel(radius: Radius.panel, padding: 0)
+        .corePanel(radius: Radius.panel, padding: 0, part: .popups)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Admin unlock")
     }

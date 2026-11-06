@@ -46,7 +46,7 @@ struct OverviewView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .frame(maxWidth: Space.s8 * 34 - Space.s6 * 2)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .corePanel(radius: Radius.panel, padding: Space.s6, part: .popups)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         .scaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
         .animation(Motion.out(Motion.move), value: shown)

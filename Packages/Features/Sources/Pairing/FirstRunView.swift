@@ -48,7 +48,7 @@ struct FirstRunView: View {
             .foregroundStyle(palette.text)
             .font(.system(size: MacTextSize.body))
             .padding(Space.s6)
-            .coreFrame(radius: Radius.panel)
+            .coreFrame(radius: Radius.panel, part: .dialogs)
             .frame(width: Space.s8 * 17)
             .accessibilityElement(children: .contain)
             cluster

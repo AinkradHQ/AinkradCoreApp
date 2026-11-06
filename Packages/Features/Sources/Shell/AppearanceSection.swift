@@ -7,6 +7,8 @@ import SwiftUI
 struct AppearanceSection: View {
     @Bindable var shell: ShellModel
     @Bindable private var look = LookPrefs.shared
+    /// Advanced: each part's own Look. Open by default once a part has one.
+    @State private var advanced = !LookPrefs.shared.custom.isEmpty
     @FocusState private var focus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -26,12 +28,28 @@ struct AppearanceSection: View {
                 }
             }
             GlassSection(
-                "Content background", sub: "Inside every pane, card, dialog and menu. An app can set its own.",
+                "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",
                 symbol: "square.on.square", hue: GlassInk.blue, index: 1
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
                 GlassSlider(value: $look.opacity, in: 0.4...1, low: "See-through", high: "Solid")
+            }
+            GlassSection(
+                "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
+                hue: GlassInk.slate, index: 2
+            ) {
+                AppActionTile(
+                    title: advanced ? "Hide" : "Show", symbol: advanced ? "chevron.up" : "chevron.down", key: "",
+                    hue: GlassInk.slate
+                ) { withAnimation(Motion.out(Motion.ui)) { advanced.toggle() } }
+            } content: {
+                if advanced {
+                    VStack(spacing: Space.s2) {
+                        ForEach(LookPart.allCases, id: \.self) { part in LookPartRow(part: part, prefs: look) }
+                    }
+                    .transition(.opacity)
+                }
             }
             HStack(spacing: Space.s3) {
                 IconTile(reduce ? "figure.walk" : "figure.run", hue: GlassInk.slate, size: 32)
@@ -166,5 +184,50 @@ private struct ThemeTile: View {
 
     private func sky(_ name: String) -> some View {
         Image(name, bundle: .main).resizable().scaledToFill()
+    }
+}
+
+/// One part in Appearance, Advanced: its name, Same (follows the content background) or its own look, and a slider when
+/// it has its own.
+private struct LookPartRow: View {
+    let part: LookPart
+    @Bindable var prefs: LookPrefs
+
+    var body: some View {
+        let own = prefs.custom[part]
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s3) {
+                IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.blue, size: 28)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(part.title).font(.system(size: MacTextSize.body, weight: .semibold))
+                    Text(part.sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                }
+                Spacer(minLength: Space.s3)
+                AppLookTabs(follow: follow, mode: mode, followTitle: "Same")
+            }
+            if own != nil {
+                GlassSlider(value: opacity, in: 0.4...1, low: "See-through", high: "Solid")
+            }
+        }
+        .padding(Space.s3)
+        .coreWell()
+        .animation(Motion.out(Motion.ui), value: own == nil)
+        .help("Same follows the content background above")
+    }
+
+    private var follow: Binding<Bool> {
+        Binding(
+            get: { prefs.custom[part] == nil },
+            set: { prefs.setCustom(part, $0 ? nil : prefs.look) })
+    }
+    private var mode: Binding<SurfaceMode> {
+        Binding(
+            get: { prefs.custom[part]?.mode ?? prefs.mode },
+            set: { prefs.setCustom(part, CoreLook(mode: $0, opacity: prefs.custom[part]?.opacity ?? prefs.opacity)) })
+    }
+    private var opacity: Binding<Double> {
+        Binding(
+            get: { prefs.custom[part]?.opacity ?? prefs.opacity },
+            set: { prefs.setCustom(part, CoreLook(mode: prefs.custom[part]?.mode ?? prefs.mode, opacity: $0)) })
     }
 }
