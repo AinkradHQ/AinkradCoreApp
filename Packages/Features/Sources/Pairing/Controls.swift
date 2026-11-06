@@ -160,10 +160,10 @@ enum ScopeText {
 enum DeviceWords {
     static func storage(_ s: String?) -> String {
         switch s {
-        case "secure_enclave": "Secure Enclave (claimed)"
-        case "software": "Software key (claimed)"
-        case .some(let o): "\(o) (claimed)"
-        case nil: "Not reported"
+        case "secure_enclave": "In a chip"
+        case "software": "In a file"
+        case .some(let o): o
+        case nil: "Didn't say"
         }
     }
     static func kind(_ k: String) -> String {
