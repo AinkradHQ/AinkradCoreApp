@@ -144,7 +144,9 @@ private struct FrameModifier: ViewModifier {
             .background { if fill { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) } }
             .clipShape(coreShape(max(radius - rim, Radius.chip)))
             .padding(rim)
-            .background(Color.white.opacity(lift), in: coreShape(radius))
+            // The lift lights the rim only: under the content it washed the blurred background out to grey (Ahmed,
+            // 2026-11-06: "darker and gray", compared side by side with the build before the frame).
+            .background { coreShape(radius).strokeBorder(Color.white.opacity(lift), lineWidth: rim) }
             .coreGlass(radius: radius, interactive: false, tinted: false)
             .overlay { coreShape(radius).strokeBorder(.white.opacity(edge), lineWidth: 1) }
     }
