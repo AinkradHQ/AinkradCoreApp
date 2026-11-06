@@ -89,8 +89,9 @@ struct LauncherView: View {
         .frame(width: ShellMetrics.launcherWidth)
         .frame(maxHeight: Space.s8 * 18)
         .fixedSize(horizontal: false, vertical: true)
-        // The one frame: a glass rim around the Look's background (Settings, Appearance).
-        .coreFrame(radius: Radius.panel + Space.s1)
+        // The widgets' glass, darker since it is an input; frosted at night, clear by day (Ahmed, 2026-11-05).
+        .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: coreShape(Radius.panel + Space.s1))
+        .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false, frosted: !palette.isDay)
         .background { numberShortcuts(rows) }
         .task {
             // The root holds focus while the window is calm; take it once the overlay is in place.

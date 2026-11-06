@@ -11,7 +11,7 @@ struct AccPanel<Content: View>: View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+            .coreWell()
     }
 }
 
@@ -156,7 +156,7 @@ struct AccStateCard<Actions: View>: View {
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .animation(Motion.out(Motion.move), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
@@ -225,7 +225,7 @@ struct GateBanner: View {
             }
             .padding(Space.s3)
             .background(hue.opacity(0.12))
-            .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+            .coreWell()
             .help(g.technical)
             .onAppear { shown = true }
             .accessibilityElement(children: .combine)

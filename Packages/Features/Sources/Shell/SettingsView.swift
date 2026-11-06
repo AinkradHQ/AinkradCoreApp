@@ -175,10 +175,13 @@ struct SettingsView: View {
             .animation(Motion.out(reduce ? Motion.hover : Motion.move), value: current?.id)
             .clipped()
         }
-        // Most of the screen (Ahmed, 2026-11-05: larger), in the one frame: a glass rim around the Look's background.
+        // Most of the screen (Ahmed, 2026-11-05: larger), on the launcher's glass: darker than a widget, frosted at
+        // night, clear by day, with white ink.
         .foregroundStyle(GlassInk.primary)
         .containerRelativeFrame([.horizontal, .vertical]) { length, _ in length * 0.86 }
-        .coreFrame(radius: Radius.panel + Space.s1)
+        .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: coreShape(Radius.panel + Space.s1))
+        .clipShape(coreShape(Radius.panel + Space.s1))
+        .coreGlass(radius: Radius.panel + Space.s1, interactive: false, tinted: false, frosted: !palette.isDay)
         .shadow(color: .black.opacity(0.3), radius: 40, y: 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")

@@ -45,7 +45,7 @@ struct AgentsListView: View {
         }
         .foregroundStyle(GlassInk.primary)
         // The Terminals app's frame: the pane's glass is a rim, the app's surface sits inside it, rounded.
-        .paneLook(AgentPrefs.shared.look)
+        .background { AgentSurface() }
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
     }
@@ -255,7 +255,7 @@ struct NotificationAsk: View {
             }
         }
         .padding(Space.s3)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .accessibilityElement(children: .contain)
     }
 }

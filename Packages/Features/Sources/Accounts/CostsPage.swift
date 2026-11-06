@@ -62,7 +62,7 @@ struct CostsPage: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .animation(Motion.out(Motion.move), value: value)
         .accessibilityElement(children: .combine)
     }
@@ -85,7 +85,7 @@ struct CostsPage: View {
         }
         .padding(Space.s3)
         .background(GlassInk.orange.opacity(0.1))
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
     }
 
     private func accounts(_ total: UsageWindowItem) -> some View {

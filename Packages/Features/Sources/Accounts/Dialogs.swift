@@ -254,17 +254,12 @@ struct AccountsLinkSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Look", sub: "The Core app's content background.", symbol: "square.lefthalf.filled",
-                hue: GlassInk.blue
+                "Look", sub: "The Core app's surface: accounts, pools and bindings.", symbol: "square.lefthalf.filled",
+                hue: GlassInk.slate
             ) {
-                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
+                SurfaceModeTabs(mode: prefs.mode)
             } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
-                        .foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
-                }
+                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "The Core app", sub: "Accounts and pools, shared by agents, Citadel and every device.",
@@ -351,7 +346,7 @@ struct AccountsGateSection: View {
             if let s = g.step { StepTrack(["Off", "Test keys", "Real keys"], at: s, hue: hue) }
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
     }
 
     private func step(
@@ -383,7 +378,7 @@ struct AccountsGateSection: View {
             }
         }
         .padding(Space.s3)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: next)
+        .coreWell(active: next)
         .opacity(done || next ? 1 : 0.7)
     }
 
@@ -397,7 +392,7 @@ struct AccountsGateSection: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3).frame(maxWidth: .infinity)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
     }
 }
 

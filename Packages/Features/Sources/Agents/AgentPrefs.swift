@@ -12,8 +12,6 @@ final class AgentPrefs {
     /// How solid the surface is, 0 (see-through) to 1.
     var opacity: Double { didSet { save() } }
     var blur: Bool { didSet { save() } }
-    /// Use Settings, Appearance's content background (the default) instead of the app's own.
-    var followLook: Bool { didSet { save() } }
     var harness: String { didSet { save() } }
     var mode: String { didSet { save() } }
     var runner: String { didSet { save() } }  // "" = the best ready runner
@@ -25,7 +23,6 @@ final class AgentPrefs {
             Surface(rawValue: d.string(forKey: "agents.surface") ?? "").map { $0 == .frosted ? .clear : $0 } ?? .clear
         opacity = d.object(forKey: "agents.opacity") as? Double ?? 0.55
         blur = d.object(forKey: "agents.blur") as? Bool ?? true
-        followLook = d.object(forKey: "agents.followLook") as? Bool ?? true
         harness = d.string(forKey: "agents.harness") ?? "claude"
         mode = d.string(forKey: "agents.mode") ?? "ask"
         runner = d.string(forKey: "agents.runner") ?? ""
@@ -36,7 +33,6 @@ final class AgentPrefs {
         d.set(surface.rawValue, forKey: "agents.surface")
         d.set(opacity, forKey: "agents.opacity")
         d.set(blur, forKey: "agents.blur")
-        d.set(followLook, forKey: "agents.followLook")
         d.set(harness, forKey: "agents.harness")
         d.set(mode, forKey: "agents.mode")
         d.set(runner, forKey: "agents.runner")
@@ -44,15 +40,13 @@ final class AgentPrefs {
     }
 }
 
-extension AgentPrefs {
-    /// The app's own Look, or nil to follow Settings, Appearance.
-    var look: CoreLook? { followLook ? nil : CoreLook(mode: modeChoice, opacity: opacity) }
-    var modeChoice: SurfaceMode {
-        get { SurfaceMode(style: AppSurfaceStyle(rawValue: surface.rawValue) ?? .tinted, blur: blur) }
-        set {
-            surface = Surface(rawValue: newValue.style.rawValue) ?? .tinted
-            blur = newValue.blur
-        }
+/// The Agents app's surface inside the pane's glass rim: the same fill and tint as every other app.
+struct AgentSurface: View {
+    @Bindable var prefs = AgentPrefs.shared
+    var body: some View {
+        AppSurfaceFill(
+            style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .frosted, opacity: prefs.opacity,
+            blur: prefs.blur)
     }
 }
 
@@ -68,14 +62,18 @@ struct AgentSettingsView: View {
                 "Look", sub: "The Agents app and its sessions, as one.", symbol: "square.on.square",
                 hue: GlassInk.blue
             ) {
-                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
+                SurfaceModeTabs(
+                    mode: Binding(
+                        get: {
+                            SurfaceMode(
+                                style: AppSurfaceStyle(rawValue: prefs.surface.rawValue) ?? .tinted, blur: prefs.blur)
+                        },
+                        set: {
+                            prefs.surface = AgentPrefs.Surface(rawValue: $0.style.rawValue) ?? .tinted
+                            prefs.blur = $0.blur
+                        }))
             } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
-                        .foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
-                }
+                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.slate,

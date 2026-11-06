@@ -19,21 +19,14 @@ final class TerminalPrefs {
     var opacity: Double { didSet { save() } }
     /// Frosts what shows through a see-through terminal, so text stays readable over a busy sky.
     var blur: Bool { didSet { save() } }
-    /// Use Settings, Appearance's content background (the default) instead of the app's own.
-    var followLook: Bool { didSet { save() } }
 
     /// The Terminals app's own surface (the list): glass clear or frosted, the theme's colour, or a solid dark.
     enum Surface: String, CaseIterable { case clear, frosted, theme, solid }
     /// The terminal screen's style. The app surface shares it, its blur and its opacity: one look for both (Ahmed, 2026-11-05).
     var screen: Surface { didSet { save() } }
-    /// What is drawn: Settings, Appearance's Look, or the app's own (the terminal keeps its theme's colour either way).
-    var lookScreen: Surface { followLook ? (LookPrefs.shared.mode == .solid ? .solid : .theme) : screen }
-    var lookBlur: Bool { followLook ? LookPrefs.shared.mode.blur : blur }
-    var lookOpacity: Double { followLook ? LookPrefs.shared.opacity : opacity }
-    /// The app's own Look for the list, or nil to follow Settings, Appearance.
-    var look: CoreLook? {
-        followLook ? nil : CoreLook(mode: SurfaceMode(style: Self.app(screen), blur: blur), opacity: opacity)
-    }
+    var surface: Surface { screen }
+    var surfaceBlur: Bool { blur }
+    var surfaceOpacity: Double { opacity }
 
     /// Defaults for the quick New terminal and for what opening one does.
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
@@ -52,7 +45,6 @@ final class TerminalPrefs {
         blink = defaults.object(forKey: "terminal.blink") as? Bool ?? true
         opacity = defaults.object(forKey: "terminal.opacity") as? Double ?? 0.78
         blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
-        followLook = defaults.object(forKey: "terminal.followLook") as? Bool ?? true
         screen =
             Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "").map { $0 == .frosted ? .clear : $0 }
             ?? .theme
@@ -87,13 +79,9 @@ final class TerminalPrefs {
 
     /// The terminal screen's background colour for its style, at its transparency.
     var screenColor: NSColor {
-        let a = CGFloat(lookOpacity)
+        let a = CGFloat(opacity)
         // As the app surface: a stored clear or frosted from before draws as the theme colour.
-        if lookScreen == .solid {
-            return NSColor(
-                red: TerminalInk.solid.red, green: TerminalInk.solid.green, blue: TerminalInk.solid.blue,
-                alpha: 0.5 + a * 0.5)
-        }
+        if screen == .solid { return NSColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.5 + a * 0.5) }
         return theme.background.withAlphaComponent(a)
     }
 
@@ -129,7 +117,6 @@ final class TerminalPrefs {
         defaults.set(blink, forKey: "terminal.blink")
         defaults.set(opacity, forKey: "terminal.opacity")
         defaults.set(blur, forKey: "terminal.blur")
-        defaults.set(followLook, forKey: "terminal.followLook")
         defaults.set(screen.rawValue, forKey: "terminal.screen")
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
         defaults.set(defaultShell, forKey: "terminal.defaultShell")

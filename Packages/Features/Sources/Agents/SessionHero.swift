@@ -68,7 +68,7 @@ struct SessionHero: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .padding([.horizontal, .top], Space.s3).padding(.bottom, Space.s2)
         .animation(Motion.out(Motion.move), value: shown)
         .onAppear { shown = true }

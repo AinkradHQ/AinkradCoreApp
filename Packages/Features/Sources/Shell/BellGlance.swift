@@ -135,8 +135,8 @@ struct BellGlance: View {
             }
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.panel)
         .frame(width: ShellMetrics.bellWidth)
+        .coreGlass(radius: Radius.panel, interactive: false)
         .coreAnimation(Motion.out(Motion.ui), value: all.map(\.id))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Notifications")

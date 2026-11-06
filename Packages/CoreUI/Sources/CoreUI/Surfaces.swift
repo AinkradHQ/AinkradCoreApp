@@ -11,7 +11,7 @@ extension View {
         modifier(GlassModifier(radius: radius, interactive: interactive, tinted: tinted, frosted: frosted))
     }
 
-    /// The content surface of dialogs, sheets and pop-ups: the one frame (see `coreFrame`).
+    /// The content surface: the shared overlay glass (see PanelModifier).
     public func corePanel(radius: CGFloat = Radius.pane, padding: CGFloat = Space.s4) -> some View {
         modifier(PanelModifier(radius: radius, padding: padding))
     }
@@ -38,13 +38,17 @@ private struct PanelModifier: ViewModifier {
     @Environment(\.corePalette) private var palette
     let radius: CGFloat
     let padding: CGFloat
-    /// Every panel, dialog, sheet and pop-up is the one frame (Ahmed, 2026-11-06): a clear glass rim holding the content
-    /// on the Look's background (Settings, Appearance). Reduce Transparency keeps a solid panel.
+    /// Every panel, dialog and sheet is the launcher's glass (Ahmed, 2026-11-05: consistent, everything Liquid Glass): a
+    /// dark layer on Apple's glass, frosted at night, clear by day, white ink. Reduce Transparency keeps a solid panel.
     func body(content: Content) -> some View {
+        let shape = coreShape(radius)
         if solid {
-            content.padding(padding).background(palette.panelStrong, in: coreShape(radius))
+            content.padding(padding).background(palette.panelStrong, in: shape)
         } else {
-            content.padding(padding).coreFrame(radius: radius, rim: Space.s2)
+            content.padding(padding)
+                .foregroundStyle(GlassInk.primary)
+                .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: shape)
+                .coreGlass(radius: radius, interactive: false, tinted: false, frosted: !palette.isDay)
         }
     }
 }
@@ -79,5 +83,16 @@ private struct GlassModifier: ViewModifier {
             content.background(shape.fill(.regularMaterial).environment(\.colorScheme, .dark))
                 .background(palette.glassTint, in: shape)
         }
+    }
+}
+
+extension View {
+    /// A card or component inside content (Ahmed, 2026-11-06: no frame on what sits inside a pane or dialog): a plain
+    /// well with a hairline edge, lit when active.
+    public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
+        background(active ? GlassInk.wellHover : GlassInk.well, in: coreShape(radius))
+            .overlay {
+                coreShape(radius).strokeBorder(active ? Color.white.opacity(0.28) : GlassInk.wellEdge, lineWidth: 1)
+            }
     }
 }

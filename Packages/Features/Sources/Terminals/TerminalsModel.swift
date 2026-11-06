@@ -266,8 +266,7 @@ public final class TerminalsModel {
         let pane = "terminal-\(id)"
         shell.openPane(
             PaneSpec(id: pane, title: "Terminal", sub: name(of: item.runner), symbol: "terminal", minWidth: 560) {
-                // The screen draws its own background in its theme's colour: the pane gives the rim only.
-                TerminalPaneView(model: self, session: session).paneLook(nil, own: true)
+                TerminalPaneView(model: self, session: session)
             })
         shell.setPaneMenu(pane) { [weak self, weak session] in
             guard let self, let session else { return [] }

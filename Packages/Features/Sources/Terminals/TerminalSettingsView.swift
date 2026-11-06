@@ -53,14 +53,9 @@ struct TerminalSettingsView: View {
                 symbol: "square.lefthalf.filled",
                 hue: GlassInk.slate, index: 4
             ) {
-                AppLookTabs(follow: $prefs.followLook, mode: prefs.screenMode)
+                SurfaceModeTabs(mode: prefs.screenMode)
             } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance. Each terminal keeps its theme's colour.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
-                }
+                GlassSlider(value: $prefs.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
@@ -120,11 +115,11 @@ private struct TerminalPreview: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: prefs.screenColor), in: coreShape(Radius.cardMac))
         .background {
-            if prefs.lookBlur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
+            if prefs.blur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
         }
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .animation(Motion.out(Motion.ui), value: prefs.fontSize)
-        .animation(Motion.out(Motion.hover), value: prefs.lookOpacity)
+        .animation(Motion.out(Motion.hover), value: prefs.opacity)
         .accessibilityLabel("Preview of the terminal")
     }
 }

@@ -121,7 +121,7 @@ private struct AlertRow: View {
         }
         .padding(Space.s3)
         .background(hue.opacity(on || hovering ? 0.2 : 0.12))
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: on || hovering)
+        .coreWell(active: on || hovering)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture {
             withAnimation(Motion.out(Motion.ui)) {
@@ -174,7 +174,7 @@ private struct StatTile: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .animation(Motion.out(Motion.move), value: shown)
         .animation(Motion.out(Motion.move), value: value)
         .onAppear { shown = true }
@@ -296,7 +296,7 @@ struct AccountCard: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s3)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: on || hovering)
+        .coreWell(active: on || hovering)
         .opacity(a.phase == .disabled ? 0.7 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }

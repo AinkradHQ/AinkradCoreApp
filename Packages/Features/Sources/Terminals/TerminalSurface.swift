@@ -28,11 +28,6 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
             [weak self] _ in
             MainActor.assumeIsolated { self?.applyPrefs() }
         }
-        // Settings, Appearance: a terminal that follows it changes with it.
-        NotificationCenter.default.addObserver(forName: LookPrefs.changed, object: nil, queue: .main) {
-            [weak self] _ in
-            MainActor.assumeIsolated { self?.applyPrefs() }
-        }
         container.addSubview(term)
         container.term = term
         container.surface = self

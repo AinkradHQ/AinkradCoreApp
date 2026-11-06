@@ -86,7 +86,7 @@ struct ApprovalCardView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, active: keys)
+        .coreWell(active: keys)
         .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s2))))
     }
 

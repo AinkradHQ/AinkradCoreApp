@@ -6,7 +6,6 @@ import SwiftUI
 /// what is showing right now, and one line about motion. ← → choose a theme.
 struct AppearanceSection: View {
     @Bindable var shell: ShellModel
-    @Bindable private var look = LookPrefs.shared
     @FocusState private var focus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -14,7 +13,7 @@ struct AppearanceSection: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
                 "Theme", sub: "The desktop sky and the glass follow it.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.blue
+                hue: GlassInk.violet
             ) {
                 Text(now).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
                     .contentTransition(.opacity)
@@ -24,14 +23,6 @@ struct AppearanceSection: View {
                         ThemeTile(choice: c, selected: shell.theme == c) { pick(c) }
                     }
                 }
-            }
-            GlassSection(
-                "Content background", sub: "Inside every pane, card, dialog and menu. An app can set its own.",
-                symbol: "square.on.square", hue: GlassInk.blue, index: 1
-            ) {
-                SurfaceModeTabs(mode: $look.mode)
-            } content: {
-                GlassSlider(value: $look.opacity, in: 0.4...1, low: "See-through", high: "Solid")
             }
             HStack(spacing: Space.s3) {
                 IconTile(reduce ? "figure.walk" : "figure.run", hue: GlassInk.slate, size: 32)
@@ -79,7 +70,7 @@ struct AppearanceSection: View {
     }
 
     private func pick(_ c: ThemeChoice) {
-        withAnimation(Motion.out(Motion.ui)) { shell.theme = c }
+        withAnimation(.smooth(duration: 0.35)) { shell.theme = c }
         shell.settings.saved()
     }
 
@@ -91,7 +82,7 @@ struct AppearanceSection: View {
     }
 }
 
-/// One theme as a sky tile with its name and a line under it; the chosen one carries a blue edge and a check.
+/// One theme as a sky tile with its name and a line under it; the chosen one glows and carries a check.
 private struct ThemeTile: View {
     let choice: ThemeChoice
     let selected: Bool
@@ -106,17 +97,18 @@ private struct ThemeTile: View {
                     .clipShape(coreShape(Radius.cardMac))
                     .overlay(alignment: .topTrailing) {
                         if selected {
-                            Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(
+                            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(
                                 .white
                             )
-                            .frame(width: 24, height: 24).background(GlassInk.blue, in: coreShape(Radius.chip))
+                            .frame(width: 24, height: 24).background(GlassInk.violet, in: coreShape(7))
                             .padding(Space.s2).transition(.scale.combined(with: .opacity))
                         }
                     }
                     .overlay {
                         coreShape(Radius.cardMac).strokeBorder(
-                            selected ? GlassInk.blue : GlassInk.wellEdge, lineWidth: selected ? 2 : 1)
+                            selected ? GlassInk.violet : GlassInk.wellEdge, lineWidth: selected ? 2 : 1)
                     }
+                    .shadow(color: GlassInk.violet.opacity(selected ? 0.5 : 0), radius: 14)
                 Text(choice.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text(line).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -127,8 +119,8 @@ private struct ThemeTile: View {
         }
         .buttonStyle(.plain).focusable(false)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.ui), value: selected)
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(.smooth(duration: 0.3), value: selected)
+        .animation(.smooth(duration: 0.2), value: hovering)
         .accessibilityLabel(choice.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }

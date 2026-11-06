@@ -91,7 +91,7 @@ public struct CoreDropdown<Label: View>: View {
         .padding(Space.s1)
         .frame(minWidth: Space.s8 * 6, alignment: .leading)
         .fixedSize()
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreGlass(radius: Radius.cardMac + Space.s1, interactive: false)
         .shadow(color: .black.opacity(0.3), radius: 24, y: 8)
         .background(
             GeometryReader { g in

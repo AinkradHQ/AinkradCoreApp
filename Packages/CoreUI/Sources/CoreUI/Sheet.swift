@@ -20,8 +20,9 @@ public struct CoreSheet<Content: View, Footer: View>: View {
             // Right-aligned by default; a footer that holds a Spacer spreads its buttons to both edges.
             HStack(spacing: Space.s2) { footer }.frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .frame(width: Space.s8 * 11 - Space.s6 * 2)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .padding(Space.s5)
+        .frame(width: Space.s8 * 11)
+        .coreGlass(radius: Radius.panel, interactive: false)
         .coreModalEntrance()
         .presentationBackground(.clear)
         .coreTheme()

@@ -288,7 +288,7 @@ private struct RunnerDetail: View {
         }
         .font(.system(size: MacTextSize.body))
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1)
+        .coreWell()
         .accessibilityElement(children: .contain)
     }
 

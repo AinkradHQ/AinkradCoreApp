@@ -14,48 +14,32 @@ public struct AppSurfaceFill: View {
     let opacity: Double
     let tint: Color
     let blur: Bool
-    let radius: CGFloat
-    @Environment(\.accessibilityReduceTransparency) private var solidOnly
     /// The one tint every app's surface uses (Ahmed, 2026-11-05: the same settings must look the same in every app).
     /// The Terminals app's Deep Blue.
     public static let tint = Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255)
-    /// The Solid look's colour.
-    public static let solid = Color(red: 0.05, green: 0.06, blue: 0.09)
-    public init(
-        style: AppSurfaceStyle, opacity: Double, tint: Color = AppSurfaceFill.tint, blur: Bool = true,
-        radius: CGFloat = Radius.cardMac
-    ) {
+    public init(style: AppSurfaceStyle, opacity: Double, tint: Color = AppSurfaceFill.tint, blur: Bool = true) {
         self.style = style
         self.opacity = opacity
         self.tint = tint
         self.blur = blur
-        self.radius = radius
-    }
-    /// One Look (Settings, Appearance, or an app's own) as a fill.
-    public init(_ look: CoreLook, tint: Color = AppSurfaceFill.tint, radius: CGFloat = Radius.cardMac) {
-        self.init(style: look.mode.style, opacity: look.opacity, tint: tint, blur: look.mode.blur, radius: radius)
     }
     public var body: some View {
-        let shape = coreShape(radius)
-        // Blur is its own choice: any style can sit on frosted glass (Blurred) or over the sky as it is (Clear).
+        let shape = coreShape(Radius.cardMac)
+        // Blur is its own choice: any style can sit on frosted glass (Blurred) or over the sky as it is (Sharp).
         ZStack {
-            if solidOnly {
-                shape.fill(Self.solid)
+            if blur { shape.fill(.ultraThinMaterial) }
+            // Only three looks are offered (Blurred, Clear, Solid); a stored clear or frosted from before draws as the
+            // tint, so the same choice looks the same in every app.
+            if style == .solid {
+                shape.fill(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.5 + opacity * 0.5))
             } else {
-                if blur { shape.fill(.ultraThinMaterial) }
-                // Only three looks are offered (Blurred, Clear, Solid); a stored clear or frosted from before draws as
-                // the tint, so the same choice looks the same in every app.
-                if style == .solid {
-                    shape.fill(Self.solid.opacity(0.5 + opacity * 0.5))
-                } else {
-                    shape.fill(tint.opacity(opacity))
-                }
+                shape.fill(tint.opacity(opacity))
             }
         }
         .environment(\.colorScheme, .dark)
-        .animation(Motion.out(Motion.ui), value: style)
-        .animation(Motion.out(Motion.ui), value: opacity)
-        .animation(Motion.out(Motion.ui), value: blur)
+        .animation(.easeOut(duration: 0.25), value: style)
+        .animation(.easeOut(duration: 0.25), value: opacity)
+        .animation(.easeOut(duration: 0.25), value: blur)
     }
 }
 
