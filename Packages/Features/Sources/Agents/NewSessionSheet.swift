@@ -157,12 +157,11 @@ struct NewSessionSheet: View {
     }
 
     private var promptEditor: some View {
-        TextEditor(text: $prompt).font(.system(size: MacTextSize.body)).scrollContentBackground(.hidden)
-            .focused($promptFocus).frame(minHeight: Space.s8 * 3).padding(Space.s2)
-            .background(palette.glassCard, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-            .focusEffectDisabled()
-            .accessibilityLabel("Prompt")
+        CoreTextArea(
+            nil, placeholder: "What should the agent do?", text: $prompt, minHeight: Space.s8 * 3,
+            focus: $promptFocus
+        )
+        .accessibilityLabel("Prompt")
     }
 
     private var secretsField: some View {

@@ -269,7 +269,7 @@ private struct PriceField: View {
             Text("\(label) per million").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s2).frame(height: 28)
-        .background(GlassInk.well, in: coreShape(Radius.control))
+        .coreFieldSurface()
         .onAppear { text = micros == 0 ? "" : String(format: "%.2f", Double(micros) / 1_000_000) }
     }
 }

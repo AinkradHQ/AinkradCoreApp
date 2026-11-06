@@ -23,10 +23,12 @@ struct TerminalSettingsView: View {
             }
             GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.slate, index: 2) {
                 HStack(spacing: Space.s3) {
-                    Picker("Family", selection: $prefs.fontName) {
-                        ForEach(TerminalPrefs.families, id: \.self) { f in Text(f).tag(f) }
-                    }
-                    .pickerStyle(.menu).frame(maxWidth: Space.s8 * 8)
+                    CoreSelect(
+                        nil, selection: $prefs.fontName,
+                        options: TerminalPrefs.families.map { CoreSelectOption($0, $0) }
+                    )
+                    .frame(maxWidth: Space.s8 * 8)
+                    .accessibilityLabel("Family")
                     Spacer()
                     Text("\(Int(prefs.fontSize)) pt").font(.system(size: MacTextSize.body, weight: .semibold))
                         .monospacedDigit().contentTransition(.numericText())

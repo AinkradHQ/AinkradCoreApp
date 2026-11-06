@@ -119,12 +119,12 @@ struct AgentSettingsView: View {
 /// The model name as a glass field: a clear button once something is set.
 private struct ModelField: View {
     @Binding var text: String
-    @State private var hovering = false
+    @FocusState private var focused: Bool
     var body: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: "brain").foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.blue)
             TextField("The harness default", text: $text).textFieldStyle(.plain).autocorrectionDisabled()
-                .focusEffectDisabled()
+                .focused($focused).focusEffectDisabled()
             Button {
                 text = ""
             } label: {
@@ -137,10 +137,7 @@ private struct ModelField: View {
         }
         .padding(.horizontal, Space.s3)
         .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + Space.s1)
-        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-        .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .coreFieldSurface(focused: focused)
         .animation(Motion.out(Motion.hover), value: text.isEmpty)
     }
 }

@@ -57,7 +57,7 @@ struct NewTerminalView: View {
                     .textFieldStyle(.plain).font(.system(size: MacTextSize.body, design: .monospaced))
                     .autocorrectionDisabled()
                     .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
-                    .coreGlassField(fallback: GlassInk.well)
+                    .coreFieldSurface()
                     .onSubmit { Task { await form.submit() } }
                     .accessibilityLabel("Program to start")
             }

@@ -31,21 +31,11 @@ struct QuickSessionView: View {
                 }
             }
             .coreRise(shown, 0)
-            TextEditor(text: $prompt)
-                .font(.system(size: MacTextSize.headline)).scrollContentBackground(.hidden)
-                .focused($focus)
-                .padding(Space.s3)
-                .frame(minHeight: 110, maxHeight: 220)
-                .background(GlassInk.well, in: coreShape(Radius.row))
-                .overlay(alignment: .topLeading) {
-                    if prompt.isEmpty {
-                        Text("Fix the failing tests in the citadel module…").foregroundStyle(GlassInk.secondary)
-                            .padding(Space.s3).padding(.leading, Space.s1).allowsHitTesting(false)
-                    }
-                }
-                .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-                .focusEffectDisabled()
-                .coreRise(shown, 1)
+            CoreTextArea(
+                nil, placeholder: "Fix the failing tests in the citadel module…", text: $prompt,
+                size: MacTextSize.headline, minHeight: 110, maxHeight: 220, focus: $focus
+            )
+            .coreRise(shown, 1)
             HStack(spacing: Space.s2) {
                 chip(AgentsModel.harnessSymbol(prefs.harness), AgentWords.harness(prefs.harness), GlassInk.blue)
                     .help("Harness: \(prefs.harness)")

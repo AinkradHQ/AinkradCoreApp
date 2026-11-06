@@ -259,14 +259,7 @@ struct CodeBoxes: View {
                 Text(i < chars.count ? String(chars[i]) : "")
                     .font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .coreGlassField(fallback: palette.glassCard)
-                    .overlay {
-                        coreShape(Radius.control).strokeBorder(
-                            active
-                                ? palette.text.opacity(0.55)
-                                : error != nil ? palette.tone(.fail).ink : palette.glassCardEdge,
-                            lineWidth: active ? 2 : 1)
-                    }
+                    .coreFieldSurface(focused: active, error: error != nil)
             }
         }
         .accessibilityHidden(true)
