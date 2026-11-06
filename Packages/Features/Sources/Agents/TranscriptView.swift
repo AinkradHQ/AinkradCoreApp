@@ -161,7 +161,9 @@ struct EntryRow: View, Equatable {
                 name: name ?? "Result", summary: "", status: ok ? .ok(facts(code, ms)) : .failed(facts(code, ms)),
                 output: output, expanded: $expanded)
         case .approvalRequest(_, let tool, let input, _):
-            chip("lock.shield.fill", "Asked to use \(tool)\(input.isEmpty ? "" : ": \(input)")", GlassInk.orange)
+            chip(
+                "lock.shield.fill", "Asked to \(ApprovalWords.ask(tool).verb)\(input.isEmpty ? "" : ": \(input)")",
+                GlassInk.orange)
         case .approvalDecided(_, let approved):
             chip(
                 approved ? "checkmark.shield.fill" : "xmark.shield.fill", approved ? "Approved" : "Denied",
