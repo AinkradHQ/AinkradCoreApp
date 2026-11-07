@@ -39,7 +39,7 @@ struct AccessSheet: View {
                                     }
                                 })
                         )
-                        .frame(width: Space.s8 * 3)
+                        .frame(width: Space.s8 * 4)
                     }
                     .padding(Space.s3)
                     .background(GlassInk.well, in: coreShape(Radius.cardMac))
@@ -94,6 +94,11 @@ struct AccessSheet: View {
 /// CN6: what each agent or feature did with which connection, the result and when. Never contents, never secrets.
 struct ConnActivityPage: View {
     let model: ConnectionsModel
+    private static let ago: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
 
     var body: some View {
         let rows = model.activity.filter { model.activityFilter == nil || $0.connection == model.activityFilter }
@@ -129,8 +134,10 @@ struct ConnActivityPage: View {
                             .frame(width: Space.s8 * 6, alignment: .leading)
                         StateBadge(r.result, tone: r.ok ? .done : .warn, symbol: r.ok ? "checkmark.circle" : "nosign")
                             .frame(width: Space.s8 * 4, alignment: .leading)
-                        Text(r.at, style: .relative).font(.system(size: MacTextSize.meta))
-                            .foregroundStyle(GlassInk.secondary).frame(width: Space.s8 * 3, alignment: .trailing)
+                        Text(Self.ago.localizedString(for: r.at, relativeTo: Date())).font(
+                            .system(size: MacTextSize.meta)
+                        )
+                        .foregroundStyle(GlassInk.secondary).frame(width: Space.s8 * 3, alignment: .trailing)
                     }
                 }
                 .accessibilityElement(children: .combine)

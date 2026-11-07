@@ -202,18 +202,6 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                 let f = files[i % 4]
                 switch i % 4 {
                 case 0:
-                    if i == 0 {
-                        out += [
-                            .toolUse(id: "g0", name: "github.get_issue", summary: "#142"),
-                            .toolResult(
-                                id: "g0", name: "github.get_issue", ok: true, exitCode: nil, output: "", durationMs: 300
-                            ),
-                            .toolUse(id: "g1", name: "github.create_pull_request", summary: ""),
-                            .toolResult(
-                                id: "g1", name: "github.create_pull_request", ok: false, exitCode: nil,
-                                output: "Personal GitHub may only read.", durationMs: 200),
-                        ]
-                    }
                     out += [
                         .assistant("Reading how the module mounts its routes before I change anything."),
                         .toolUse(id: "t\(i)", name: "Read", summary: f),
@@ -256,6 +244,12 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         api.add(
             a1,
             entries: head("claude") + work(12) + [
+                .toolUse(id: "g0", name: "github.get_issue", summary: "#142"),
+                .toolResult(id: "g0", name: "github.get_issue", ok: true, exitCode: nil, output: "", durationMs: 300),
+                .toolUse(id: "g1", name: "github.create_pull_request", summary: ""),
+                .toolResult(
+                    id: "g1", name: "github.create_pull_request", ok: false, exitCode: nil,
+                    output: "Personal GitHub may only read.", durationMs: 200),
                 .assistant("Ready to push the branch. That leaves this machine, so I need your approval."),
                 ask("req_push", "Bash", "git push -u origin feat/e2-14-citadel-bootstrap"),
             ], endsAt: ago(8))
