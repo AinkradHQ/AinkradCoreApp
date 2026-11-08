@@ -61,7 +61,7 @@ public final class AccountsModel {
 
     public func attach(connection: CoreConnection) {
         use(LiveAccountsService(connection: connection))
-        connections.attach()
+        connections.attach(connection: connection)
     }
 
     func use(_ service: any AccountsService) {

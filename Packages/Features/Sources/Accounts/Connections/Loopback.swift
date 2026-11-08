@@ -9,10 +9,12 @@ final class LoopbackCatcher: Sendable {
     // ponytail: one fixed port, as the OAuth registration needs; a busy port fails the sign-in with a plain message.
     static let port: UInt16 = 47613
     private let listener: NWListener
-    private let state: String
+    private let state: String?
     private let onCode: @Sendable (String) -> Void
 
-    init(state: String, onCode: @escaping @Sendable (String) -> Void) throws {
+    /// With a `state`: catches a sign-in's `code`. Without: catches GitHub's app setup redirect and hands on its
+    /// `installation_id`.
+    init(state: String?, onCode: @escaping @Sendable (String) -> Void) throws {
         self.state = state
         self.onCode = onCode
         let p = NWParameters.tcp
@@ -38,13 +40,14 @@ final class LoopbackCatcher: Sendable {
     func stop() { listener.cancel() }
 
     /// The code from the request's first line, only for `/callback` with a matching state.
-    static func code(in request: String, state: String) -> String? {
+    static func code(in request: String, state: String?) -> String? {
         let parts = request.split(separator: "\r\n", maxSplits: 1).first?.split(separator: " ") ?? []
         guard parts.count >= 2, parts[0] == "GET", let url = URLComponents(string: String(parts[1])),
             url.path == "/callback"
         else { return nil }
         let q = Dictionary(
             (url.queryItems ?? []).compactMap { i in i.value.map { (i.name, $0) } }, uniquingKeysWith: { a, _ in a })
+        guard let state else { return q["installation_id"].flatMap { Int64($0) != nil ? $0 : nil } }
         guard q["state"] == state, let code = q["code"], !code.isEmpty else { return nil }
         return code
     }
@@ -52,7 +55,7 @@ final class LoopbackCatcher: Sendable {
     static func page(ok: Bool) -> Data {
         let (title, line) =
             ok
-            ? ("You're signed in to Atlassian", "You can close this tab and go back to Ainkrad.")
+            ? ("You're all set", "You can close this tab and go back to Ainkrad.")
             : ("This sign-in didn't match", "Go back to Ainkrad and try again.")
         let html = """
             <!doctype html><meta charset="utf-8"><title>Ainkrad</title>

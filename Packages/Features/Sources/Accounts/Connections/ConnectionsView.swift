@@ -37,7 +37,7 @@ struct ConnectionsView: View {
                         CoreNotice(
                             symbol: "info.circle", title: "Sample connections",
                             text:
-                                "Your Core doesn't serve connections yet, so this page shows made-up ones to try things on."
+                                "This page shows made-up connections to try things on. Nothing here reaches your Core."
                         )
                     }
                     content
@@ -90,8 +90,8 @@ struct ConnectionsView: View {
     @ViewBuilder private var content: some View {
         if model.service == nil {
             AccStateCard(
-                symbol: "link", title: "Not on your Core yet",
-                text: "Your Core doesn't serve connections yet. Once it does, you sign in to GitHub and Jira here.")
+                symbol: "link", title: "Not connected to a Core",
+                text: "Connect this Mac to your Core first. Then you sign in to GitHub, Jira and others here.")
         } else {
             switch model.load {
             case .loading: AccSkeleton()
@@ -250,7 +250,7 @@ struct ConnCard: View {
             HStack(spacing: Space.s1) {
                 if need {
                     AccLink(title: "Sign in again", symbol: "arrow.clockwise") {
-                        ConnDialogs.openConnect(model, kind: item.kind)
+                        ConnDialogs.openConnect(model, kind: item.kind, again: item.id)
                     }
                 }
                 AccLink(title: model.testing == item.id ? "Testing…" : "Test", symbol: "play") {

@@ -1,5 +1,6 @@
 import Admin
 import AppKit
+import CoreKit
 import CoreUI
 import Foundation
 import Observation
@@ -12,7 +13,7 @@ import SwiftUI
 public final class ConnectionsModel {
     let host: any AdminHost
     private(set) var service: (any ConnectionsService)?
-    /// True while the screens run on stand-in data (Debug, until the Core serves connections): a banner says so.
+    /// True while the screens run on stand-in data (Debug demo scenes only): a banner says so.
     private(set) var sample = false
 
     private(set) var kinds: [ConnKind] = []
@@ -24,6 +25,8 @@ public final class ConnectionsModel {
     var activityFilter: Int64?
     /// The sign-in running in the Connect sheet.
     var flow: ConnFlow?
+    /// The connection being signed in to again (its "Sign in again" button), instead of a new one.
+    var again: Int64?
     /// GitHub's repository page is open; waiting for GitHub to say which were chosen.
     var installing = false
     /// The card the keyboard is on.
@@ -44,11 +47,8 @@ public final class ConnectionsModel {
 
     // MARK: connection
 
-    /// The Core does not serve connections yet (C5). Debug builds show stand-in data, labelled; Release shows that.
-    public func attach() {
-        #if DEBUG
-        use(SampleConnections(), sample: true)
-        #endif
+    public func attach(connection: CoreConnection) {
+        use(LiveConnectionsService(connection: connection))
     }
 
     func use(_ s: any ConnectionsService, sample: Bool = false) {
@@ -101,7 +101,12 @@ public final class ConnectionsModel {
     func key(_ k: String) -> Bool {
         guard let c = cursor.flatMap(item) else { return false }
         switch k {
-        case "↩": c.status == .needsLook ? ConnDialogs.openConnect(self, kind: c.kind) : ConnDialogs.openAccess(self, c)
+        case "↩":
+            if c.status == .needsLook {
+                ConnDialogs.openConnect(self, kind: c.kind, again: c.id)
+            } else {
+                ConnDialogs.openAccess(self, c)
+            }
         case "t": Task { await test(c) }
         case "r": ConnDialogs.openRename(self, c)
         case "d": Task { await makeDefault(c) }
@@ -138,7 +143,7 @@ public final class ConnectionsModel {
             (kinds, items, activity) = try await (k, i, a)
             load = .ready
         } catch {
-            load = .failed(code: "error", message: "The Core couldn't list connections. Nothing was changed.")
+            load = .failed(code: "error", message: ConnSay.plain(error))
         }
     }
 
@@ -147,17 +152,28 @@ public final class ConnectionsModel {
     func startFlow(_ kind: String) async {
         guard let service else { return }
         stopFlow()
-        do {
-            let f = try await service.start(kind: kind)
-            flow = f
-            if self.kind(kind)?.signIn == .browser { startCatcher(for: f) }
-        } catch {
-            flow = ConnFlow(
-                id: "", kind: kind, userCode: nil, url: URL(string: "about:blank")!,
-                step: .failed(
-                    title: "Couldn't start the sign-in.",
-                    fix: "Check that this Mac can reach your Core, then try again."))
+        if let why = host.pausedReason {
+            host.shell.showToast(why)
+            return
         }
+        let name = self.kind(kind)?.name ?? kind
+        do {
+            let again = again
+            let f = try await host.elevated("Sign in to \(name).", done: "changed", keepsEdit: false) {
+                try await service.start(kind: kind, again: again)
+            }
+            flow = f
+            if f.callbackState != nil || self.kind(kind)?.signIn == .browser { startCatcher(for: f) }
+        } catch is AdminDeclined {
+            failFlow(kind, "Nothing was started.", "Press Try again and confirm with Touch ID.")
+        } catch {
+            failFlow(kind, "Couldn't start the sign-in.", ConnSay.plain(error))
+        }
+    }
+
+    private func failFlow(_ kind: String, _ title: String, _ fix: String) {
+        flow = ConnFlow(
+            id: "", kind: kind, userCode: nil, url: URL(string: "about:blank")!, step: .failed(title: title, fix: fix))
     }
 
     /// Opens the service's page and follows the sign-in until it needs the person again or ends.
@@ -180,6 +196,7 @@ public final class ConnectionsModel {
                 try? await Task.sleep(for: self.pollEvery)
                 guard let next = try? await service.flow(f.id), self.flow?.id == f.id else { continue }
                 self.flow = next
+                if next.step != f.step { await self.reload() }  // the connection exists now: the sheet shows it
             }
         }
     }
@@ -187,9 +204,41 @@ public final class ConnectionsModel {
     /// GitHub's page for the Ainkrad app, where the person picks repositories; the sheet then waits for GitHub.
     func openInstall() {
         guard case .chooseResources(_, let install)? = flow?.step else { return }
+        // GitHub sends the person back to this Mac with the installation's number; the connection is made from it.
+        do {
+            let c = try LoopbackCatcher(state: nil) { [weak self] number in
+                Task { @MainActor in await self?.installed(number) }
+            }
+            c.start()
+            catcher = c
+        } catch {
+            flow?.step = .failed(
+                title: "This Mac couldn't wait for GitHub's answer.",
+                fix: "Another app may be using the same address. Quit it or try again in a minute.")
+            return
+        }
         opener(install)
         installing = true
         poll()
+    }
+
+    private func installed(_ number: String) async {
+        guard let f = flow, let service, let n = Int64(number) else { return }
+        do {
+            let why = "Let Core reach the repositories you chose."
+            let c = try await host.elevated(why, done: "changed", keepsEdit: false) {
+                try await service.install(kind: f.kind, installation: n)
+            }
+            await reload()
+            if flow?.id == f.id { flow?.step = .connected(c.id) }
+            catcher?.stop()
+            catcher = nil
+            installing = false
+        } catch is AdminDeclined {
+            installing = false
+        } catch {
+            flow?.step = .failed(title: "Couldn't use the repositories you chose.", fix: ConnSay.plain(error))
+        }
     }
 
     /// GitHub: done choosing repositories on GitHub, or skipped. Jira: the site picked.
@@ -209,6 +258,7 @@ public final class ConnectionsModel {
         catcher?.stop()
         catcher = nil
         installing = false
+        again = nil
         if let f = flow, !f.id.isEmpty, let service, !f.isConnected { Task { try? await service.cancel(f.id) } }
         flow = nil
     }
@@ -216,10 +266,17 @@ public final class ConnectionsModel {
     /// CN7: listen on this Mac's loopback address only while an Atlassian sign-in is open, then hand the code to Core.
     private func startCatcher(for f: ConnFlow) {
         do {
-            let c = try LoopbackCatcher(state: f.id) { [weak self] code in
+            // The redirect carries the Core's `state`, which is not the flow's id.
+            let state = f.callbackState ?? f.id
+            let c = try LoopbackCatcher(state: state) { [weak self] code in
                 Task { @MainActor in
                     guard let self, let service = self.service, self.flow?.id == f.id else { return }
-                    if let next = try? await service.deliver(f.id, code: code, state: f.id) { self.flow = next }
+                    do {
+                        self.flow = try await service.deliver(f.id, code: code, state: state)
+                        await self.reload()
+                    } catch {
+                        self.flow?.step = .failed(title: "Couldn't finish the sign-in.", fix: ConnSay.plain(error))
+                    }
                 }
             }
             c.start()
@@ -243,7 +300,7 @@ public final class ConnectionsModel {
         guard let service else { return }
         testing = c.id
         defer { testing = nil }
-        tested[c.id] = (try? await service.test(c.id)) ?? "Couldn't reach your Core to test it."
+        do { tested[c.id] = try await service.test(c.id) } catch { tested[c.id] = ConnSay.plain(error) }
     }
 
     func rename(_ c: ConnItem, to name: String) async -> Bool {
@@ -296,7 +353,7 @@ public final class ConnectionsModel {
         } catch is AdminDeclined {
             return false
         } catch {
-            writeError[key] = "Your Core didn't take that. Nothing was changed; try again."
+            writeError[key] = ConnSay.plain(error)
             return false
         }
     }

@@ -21,7 +21,8 @@ enum ConnDialogs {
     }
 
     /// CN2. With a kind, its sign-in starts at once; without, the person picks one first.
-    static func openConnect(_ m: ConnectionsModel, kind: String?) {
+    static func openConnect(_ m: ConnectionsModel, kind: String?, again: Int64? = nil) {
+        m.again = again
         present(m, "connection-connect", onClose: { [weak m] in m?.stopFlow() }) { close in
             ConnectSheet(model: m, close: close, picked: kind)
         }
@@ -145,13 +146,13 @@ struct ConnectSheet: View {
         let steps =
             gh
             ? ["Waiting for you on github.com", "Approved", "Choose which repositories Core can reach", "Connected"]
-            : ["Waiting for you in your browser", "Approved", "Pick your Jira site", "Connected"]
+            : ["Waiting for you in your browser", "Approved", "Pick your site", "Connected"]
         let at: Int =
             switch f?.step {
             case .chooseResources, .pickSite: 2
             default: 0
             }
-        return CoreDialogPanel(gh ? "Sign in with GitHub" : "Sign in with Atlassian") {
+        return CoreDialogPanel("Sign in with \(k.name)") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 switch f?.step {
                 case .chooseResources(let login, _):
@@ -164,7 +165,7 @@ struct ConnectSheet: View {
                     Text(
                         gh
                             ? "Enter this code on github.com. It works for 15 minutes."
-                            : "Your browser opens Atlassian. Sign in and press Accept, then come back here."
+                            : "Your browser opens \(k.name). Sign in and press Accept, then come back here."
                     ).foregroundStyle(GlassInk.secondary)
                 }
                 if gh, case .waiting? = f?.step, let code = f?.userCode {
@@ -229,7 +230,7 @@ struct ConnectSheet: View {
                 if !k.tokenTitle.isEmpty { AccLink(title: "(advanced)…") { advanced = true } }
                 Spacer()
                 AppActionTile(
-                    title: k.signIn == .deviceCode ? "Open github.com" : "Open Atlassian",
+                    title: k.signIn == .deviceCode ? "Open github.com" : "Open \(k.name)",
                     symbol: "arrow.up.right.square",
                     key: "↩", hue: GlassInk.blue, prominent: true
                 ) { model.openSignIn() }
