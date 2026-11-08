@@ -6,7 +6,7 @@ import Observation
 import Shell
 import SwiftUI
 
-/// The Core app: provider accounts, pools and bindings. It owns the lists, the Core service and the writes (each behind
+/// The Core app: provider accounts, pools and fallback chains. It owns the lists, the Core service and the writes (each behind
 /// Touch ID through the host), registers the launcher entries and Settings sections, and turns a failure into words.
 @MainActor @Observable
 public final class AccountsModel {
@@ -16,7 +16,11 @@ public final class AccountsModel {
     private(set) var providers: [ProviderItem] = []
     private(set) var accounts: [AccountItem] = []
     private(set) var pools: [PoolItem] = []
-    private(set) var bindings: [BindingItem] = []
+    private(set) var chains: [ChainItem] = []
+    private(set) var chainBindings: [ChainBindingItem] = []
+    /// False when the Core refused to list chains: they are for admins, so a device without that scope sees none of them.
+    private(set) var chainsAllowed = true
+    var chainSelection: Int64?
     private(set) var gate = GateState()
     var load: AccountsLoad = .loading
     /// A write came back `forbidden_scope`: this device can read but not change.
@@ -65,7 +69,9 @@ public final class AccountsModel {
         providers = []
         accounts = []
         pools = []
-        bindings = []
+        chains = []
+        chainBindings = []
+        chainsAllowed = true
         gate = GateState()
         load = .loading
         readOnly = false
@@ -77,7 +83,8 @@ public final class AccountsModel {
     public func resync() { if service != nil { Task { await reload() } } }
     /// An event from the Core that may change what these screens show.
     public func event(kind: String) {
-        if kind.hasPrefix("account.") || kind.hasPrefix("pool.") || kind.hasPrefix("setting.") { resync() }
+        let kinds = ["account.", "pool.", "chain.", "setting."]
+        if kinds.contains(where: kind.hasPrefix) { resync() }
     }
 
     // MARK: derived
@@ -90,7 +97,10 @@ public final class AccountsModel {
     var readyCount: Int { accounts.filter { $0.phase == .active }.count }
     var selectedPool: PoolItem? { pool(poolSelection ?? -1) ?? pools.first { $0.isDefault } ?? pools.first }
     func members(of pool: PoolItem) -> [AccountItem] { pool.members.compactMap { account($0) } }
-    func bindings(of pool: PoolItem) -> [BindingItem] { bindings.filter { $0.poolID == pool.id } }
+    func chain(_ id: Int64) -> ChainItem? { chains.first { $0.id == id } }
+    var selectedChain: ChainItem? { chain(chainSelection ?? -1) ?? chains.first { $0.isDefault } ?? chains.first }
+    func chains(using pool: PoolItem) -> [ChainItem] { chains.filter { $0.entries.contains { $0.pool == pool.id } } }
+    func agents(of chain: ChainItem) -> [ChainBindingItem] { chainBindings.filter { $0.chain == chain.id } }
     func pools(of account: AccountItem) -> [PoolItem] { pools.filter { $0.members.contains(account.id) } }
     func pools(for provider: String) -> [PoolItem] { pools.filter { $0.provider == provider } }
     func defaultPool(_ provider: String) -> PoolItem? { pools.first { $0.provider == provider && $0.isDefault } }
@@ -118,9 +128,9 @@ public final class AccountsModel {
             async let p = service.providers()
             async let a = service.accounts()
             async let o = service.pools()
-            async let b = service.bindings()
-            (providers, accounts, pools, bindings) = try await (p, a, o, b)
+            (providers, accounts, pools) = try await (p, a, o)
             load = .ready
+            await reloadChains(service)
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
         gate = (try? await service.gate()) ?? GateState()
@@ -130,6 +140,21 @@ public final class AccountsModel {
             default: PaneChip("Not loaded", tone: .queue, symbol: "exclamationmark.circle")
             }
         host.shell.updatePane("accounts", chip: chip)
+    }
+
+    /// Chains and their agents are admin only: a refusal hides them, it is not an error of the page.
+    private func reloadChains(_ service: any AccountsService) async {
+        do {
+            async let c = service.chains()
+            async let b = service.chainBindings()
+            (chains, chainBindings) = try await (c, b)
+            chainsAllowed = true
+        } catch {
+            chains = []
+            chainBindings = []
+            chainsAllowed = CoreError.unwrapping(error) != .forbiddenScope
+        }
+        if page == .chains && !chainsAllowed { page = .pools }
     }
 
     func state(for error: any Error) -> AccountsLoad {
@@ -264,7 +289,7 @@ public final class AccountsModel {
     func delete(_ p: PoolItem) async -> Bool {
         let ok = await write(
             "delete-pool-\(p.id)",
-            reason: "Delete the pool \(p.name). Agents bound to it fall back to the default pool.",
+            reason: "Delete the pool \(p.name).",
             done: "\(p.name) deleted"
         ) { try await $0.deletePool(p.id) }
         if ok { poolSelection = nil }
@@ -305,33 +330,95 @@ public final class AccountsModel {
         }
     }
 
-    func bind(agent: String, to p: PoolItem) async -> Bool {
-        let a = agent.trimmingCharacters(in: .whitespaces)
-        let before = bindings.first { $0.agent == a && $0.provider == p.provider }
-        return await write(
-            "bind", reason: "Bind \(a) to \(p.name). It draws \(providerName(p.provider)) accounts from there.",
-            done: "\(a) is bound to \(p.name)", keepsEdit: true,
-            undo: { [weak self] in
-                guard let self else { return }
-                if let before, let old = self.pool(before.poolID) {
-                    _ = await self.bind(agent: a, to: old)
-                } else {
-                    await self.unbind(BindingItem(agent: a, provider: p.provider, poolID: p.id), undoable: false)
-                }
-            }
-        ) { _ = try await $0.bind(agent: a, pool: p.id) }
+    // MARK: chains
+
+    /// The next free `chain-N`.
+    func nextChainName() -> String {
+        var n = chains.count + 1
+        while chains.contains(where: { $0.name == "chain-\(n)" }) { n += 1 }
+        return "chain-\(n)"
     }
 
-    func unbind(_ b: BindingItem, undoable: Bool = true) async {
-        let was = pool(b.poolID)
+    /// New chain, the quick way: a generated name and the first pool of each provider, up to the default pool, then
+    /// selected. With no pool, or when the Core refuses, the sheet opens and says why.
+    func quickChain() async {
+        guard let first = pools.first(where: { $0.isDefault }) ?? pools.first else {
+            return AccountDialogs.openChain(
+                self, editing: nil, reason: "No pool yet. Make a pool with an account first.")
+        }
+        if await createChain(name: nextChainName(), entries: [ChainEntryDraft(pool: first.id, model: nil)]) { return }
+        if let why = writeError["chain"] { AccountDialogs.openChain(self, editing: nil, reason: why) }
+    }
+
+    func createChain(name: String, entries: [ChainEntryDraft]) async -> Bool {
+        let t = name.trimmingCharacters(in: .whitespaces)
+        let ok = await write(
+            "chain", reason: "Create the chain \(t) with \(entries.count) pool\(entries.count == 1 ? "" : "s").",
+            done: "\(t) chain created", keepsEdit: true
+        ) { _ = try await $0.createChain(name: t, entries: entries) }
+        if ok, let made = chains.first(where: { $0.name == t }) { chainSelection = made.id }
+        return ok
+    }
+
+    func replace(_ c: ChainItem, name: String, entries: [ChainEntryDraft]) async -> Bool {
+        let t = name.trimmingCharacters(in: .whitespaces)
+        let was = c.entries.map { ChainEntryDraft(pool: $0.pool, model: $0.model) }
+        return await write(
+            "chain", reason: "Change the chain \(c.name). Running sessions keep the chain they started with.",
+            done: "\(t) saved", keepsEdit: true,
+            undo: { [weak self] in
+                guard let self, let now = self.chain(c.id) else { return }
+                _ = await self.replace(now, name: c.name, entries: was)
+            }
+        ) { _ = try await $0.replaceChain(c.id, name: t, entries: entries) }
+    }
+
+    func delete(_ c: ChainItem) async -> Bool {
+        let ok = await write(
+            "delete-chain-\(c.id)",
+            reason: "Delete the chain \(c.name). Agents bound to it fall back to the default chain.",
+            done: "\(c.name) deleted"
+        ) { try await $0.deleteChain(c.id) }
+        if ok { chainSelection = nil }
+        return ok
+    }
+
+    func makeDefault(_ c: ChainItem) async {
+        let before = chains.first { $0.isDefault }
         var back: (@MainActor () async -> Void)?
-        if undoable, let was { back = { [weak self] in _ = await self?.bind(agent: b.agent, to: was) } }
+        if let old = before { back = { [weak self] in await self?.makeDefault(old) } }
         await write(
-            "unbind-\(b.id)",
-            reason: "Unbind \(b.agent) from \(was?.name ?? "its pool"). It falls back to the default pool.",
-            done: "\(b.agent) is unbound",
-            undo: back
-        ) { try await $0.unbind(agent: b.agent, provider: b.provider) }
+            "chain-default-\(c.id)", reason: "Make \(c.name) the default chain.",
+            done: "\(c.name) is now the default", undo: back
+        ) { try await $0.setDefaultChain(c.id) }
+    }
+
+    func bind(agent: String, to c: ChainItem) async -> Bool {
+        let a = agent.trimmingCharacters(in: .whitespaces)
+        let before = chainBindings.first { $0.agent == a }.flatMap { chain($0.chain) }
+        return await write(
+            "bind-chain", reason: "Bind \(a) to \(c.name). Its sessions draw accounts from that chain.",
+            done: "\(a) is bound to \(c.name)", keepsEdit: true,
+            undo: { [weak self] in
+                guard let self else { return }
+                if let before {
+                    _ = await self.bind(agent: a, to: before)
+                } else {
+                    await self.unbind(a, undoable: false)
+                }
+            }
+        ) { _ = try await $0.bindAgent(a, chain: c.id) }
+    }
+
+    func unbind(_ agent: String, undoable: Bool = true) async {
+        let was = chainBindings.first { $0.agent == agent }.flatMap { chain($0.chain) }
+        var back: (@MainActor () async -> Void)?
+        if undoable, let was { back = { [weak self] in _ = await self?.bind(agent: agent, to: was) } }
+        await write(
+            "unbind-\(agent)",
+            reason: "Unbind \(agent) from \(was?.name ?? "its chain"). It falls back to the default chain.",
+            done: "\(agent) is unbound", undo: back
+        ) { try await $0.unbindAgent(agent) }
     }
 
     // MARK: opening things
@@ -378,7 +465,7 @@ public final class AccountsModel {
                 })
         }
         entry(
-            "core", "Core", "Accounts, pools and bindings", "creditcard",
+            "core", "Core", "Accounts, pools and chains", "creditcard",
             ["provider", "claude", "codex", "gemini", "budget"]
         ) {
             $0.show(.overview)
@@ -402,6 +489,20 @@ public final class AccountsModel {
             "new-pool-advanced", "New pool (advanced)…", "Name it and choose the provider", "slider.horizontal.3",
             ["create", "pool", "provider"], action: true
         ) { AccountDialogs.openNewPool($0) }
+        entry(
+            "new-chain", "New chain", "Makes a chain from your default pool at once · needs Touch ID", "plus",
+            ["create", "chain", "fallback"], action: true
+        ) { m in Task { await m.quickChain() } }
+        entry(
+            "new-chain-advanced", "New chain (advanced)…", "Name it and choose its pools and models",
+            "slider.horizontal.3", ["create", "chain", "fallback", "pool"], action: true
+        ) { AccountDialogs.openChain($0, editing: nil) }
+        entry(
+            "accounts-chains", "Fallback chains", "Which pools a session tries, in order", "link",
+            ["chain", "default", "fallback", "failover"]
+        ) {
+            $0.show(.chains)
+        }
         entry(
             "accounts-pools", "Account pools", "Which accounts serve which agents", "square.grid.2x2",
             ["pool", "default", "fallback"]

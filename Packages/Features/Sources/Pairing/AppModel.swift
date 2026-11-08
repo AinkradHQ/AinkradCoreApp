@@ -33,7 +33,7 @@ public final class AppModel {
     public private(set) var terminals: TerminalsModel?
     /// Core settings, Feature switches, Secrets, Audit and Ops (E5-07); its screens say "not connected" until a Core is open.
     public private(set) var admin: AdminModel!
-    /// Provider accounts, pools and bindings (E5-08); its screens say "not connected" until a Core is open.
+    /// Provider accounts, pools and chains (E5-08); its screens say "not connected" until a Core is open.
     public private(set) var accounts: AccountsModel!
     private var rateLimitEnd: Task<Void, Never>?
     private var restartedEnd: Task<Void, Never>?

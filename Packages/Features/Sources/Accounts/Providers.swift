@@ -179,7 +179,7 @@ struct ProviderDialog: View {
                 .fixedSize(horizontal: false, vertical: true)
                 modelsList
                 Label(
-                    "Its accounts can't join pools or bindings yet. Models need a price to count as spend.",
+                    "Its accounts can't join pools or chains yet. Models need a price to count as spend.",
                     systemImage: "info.circle"
                 )
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)

@@ -45,9 +45,12 @@ final class FakeService: AccountsService, @unchecked Sendable {
     ]
     var accountList: [AccountItem] = []
     var poolList: [PoolItem] = []
-    var bindingList: [BindingItem] = []
+    var chainList: [ChainItem] = []
+    var chainBindingList: [ChainBindingItem] = []
     var gateState = GateState(mode: 1, providerAccounts: 0)
     var failure: (any Error)?
+    /// What listing chains throws (a device without `admin`), apart from `failure`.
+    var chainsFailure: (any Error)?
     private var calls: [String] = []
     var log: [String] { lock.withLock { calls } }
     private func note(_ s: String) throws {
@@ -57,7 +60,6 @@ final class FakeService: AccountsService, @unchecked Sendable {
     func providers() async throws -> [ProviderItem] { providerList }
     func accounts() async throws -> [AccountItem] { accountList }
     func pools() async throws -> [PoolItem] { poolList }
-    func bindings() async throws -> [BindingItem] { bindingList }
     func gate() async throws -> GateState { gateState }
     func createPool(name: String, provider: String) async throws -> PoolItem {
         try note("createPool \(name) \(provider)")
@@ -87,17 +89,55 @@ final class FakeService: AccountsService, @unchecked Sendable {
                 : $0
         }
     }
-    func bind(agent: String, pool p: Int64) async throws -> BindingItem {
-        try note("bind \(agent) \(p)")
-        let provider = poolList.first { $0.id == p }?.provider ?? "?"
-        let b = BindingItem(agent: agent, provider: provider, poolID: p)
-        bindingList.removeAll { $0.agent == agent && $0.provider == provider }
-        bindingList.append(b)
+    func chains() async throws -> [ChainItem] {
+        if let chainsFailure { throw chainsFailure }
+        return chainList
+    }
+    private func entries(_ drafts: [ChainEntryDraft]) -> [ChainEntryItem] {
+        drafts.map { d in
+            ChainEntryItem(
+                pool: d.pool, provider: poolList.first { $0.id == d.pool }?.provider ?? "?", harness: "claude",
+                model: d.model)
+        }
+    }
+    func createChain(name: String, entries drafts: [ChainEntryDraft]) async throws -> ChainItem {
+        try note("createChain \(name) \(drafts.map { "\($0.pool):\($0.model ?? "-")" }.joined(separator: ","))")
+        let c = ChainItem(
+            id: Int64(chainList.count + 10), name: name, isDefault: chainList.isEmpty, entries: entries(drafts))
+        chainList.append(c)
+        return c
+    }
+    func replaceChain(_ id: Int64, name: String, entries drafts: [ChainEntryDraft]) async throws -> ChainItem {
+        try note("replaceChain \(id) \(name) \(drafts.count)")
+        let c = ChainItem(
+            id: id, name: name, isDefault: chainList.first { $0.id == id }?.isDefault ?? false,
+            entries: entries(drafts))
+        chainList = chainList.map { $0.id == id ? c : $0 }
+        return c
+    }
+    func deleteChain(_ id: Int64) async throws {
+        try note("deleteChain \(id)")
+        chainList.removeAll { $0.id == id }
+        chainBindingList.removeAll { $0.chain == id }
+    }
+    func setDefaultChain(_ id: Int64) async throws {
+        try note("defaultChain \(id)")
+        chainList = chainList.map { ChainItem(id: $0.id, name: $0.name, isDefault: $0.id == id, entries: $0.entries) }
+    }
+    func chainBindings() async throws -> [ChainBindingItem] {
+        if let chainsFailure { throw chainsFailure }
+        return chainBindingList
+    }
+    func bindAgent(_ agent: String, chain: Int64) async throws -> ChainBindingItem {
+        try note("bindAgent \(agent) \(chain)")
+        let b = ChainBindingItem(agent: agent, chain: chain)
+        chainBindingList.removeAll { $0.agent == agent }
+        chainBindingList.append(b)
         return b
     }
-    func unbind(agent: String, provider: String) async throws {
-        try note("unbind \(agent) \(provider)")
-        bindingList.removeAll { $0.agent == agent && $0.provider == provider }
+    func unbindAgent(_ agent: String) async throws {
+        try note("unbindAgent \(agent)")
+        chainBindingList.removeAll { $0.agent == agent }
     }
     func setState(account id: Int64, state: String) async throws -> AccountItem {
         try note("state \(id) \(state)")

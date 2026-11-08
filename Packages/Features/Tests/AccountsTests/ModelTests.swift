@@ -15,7 +15,15 @@ struct ModelTests {
             account(3, "old", state: "disabled"),
         ]
         svc.poolList = [pool(1, "Default", def: true, members: [1, 2]), pool(2, "Client", members: [])]
-        svc.bindingList = [BindingItem(agent: "atlas", provider: "anthropic", poolID: 2)]
+        svc.chainList = [
+            ChainItem(
+                id: 1, name: "daily", isDefault: true,
+                entries: [ChainEntryItem(pool: 1, provider: "anthropic", harness: "claude", model: nil)]),
+            ChainItem(
+                id: 2, name: "careful", isDefault: false,
+                entries: [ChainEntryItem(pool: 2, provider: "anthropic", harness: "claude", model: "claude-opus")]),
+        ]
+        svc.chainBindingList = [ChainBindingItem(agent: "atlas", chain: 2)]
         model.use(svc)
         await model.reload()
         return (model, svc, host)
@@ -28,7 +36,8 @@ struct ModelTests {
         #expect(m.needLook.map(\.label) == ["claude-spare"])
         #expect(m.firstReady(in: m.pools[0])?.label == "claude-main")
         #expect(m.candidates(for: m.pools[1]).count == 3)
-        #expect(m.bindings(of: m.pools[1]).map(\.agent) == ["atlas"])
+        #expect(m.chains(using: m.pools[1]).map(\.name) == ["careful"])
+        #expect(m.agents(of: m.chains[1]).map(\.agent) == ["atlas"])
     }
 
     @Test func testingAKeyNeedsNoTouchIDAndSaysWhyWhenRefused() async {
@@ -252,11 +261,72 @@ struct ModelTests {
         #expect(!AccountsModel.validAgent(""))
         #expect(!AccountsModel.validAgent("has space"))
         #expect(!AccountsModel.validAgent(String(repeating: "a", count: 65)))
+        let (m, svc, _) = await make()
+        #expect(await m.bind(agent: "atlas", to: m.chain(1)!))
+        #expect(m.chainBindings.map(\.chain) == [1])
+        await m.unbind("atlas")
+        #expect(m.chainBindings.isEmpty)
+        #expect(svc.log.contains("bindAgent atlas 1") && svc.log.contains("unbindAgent atlas"))
+    }
+
+    @Test func chainsLoadAndNeverCallTheDeprecatedBindings() async {
         let (m, _, _) = await make()
-        #expect(await m.bind(agent: "atlas", to: m.pool(1)!))
-        #expect(m.bindings.map(\.poolID) == [1])
-        await m.unbind(m.bindings[0])
-        #expect(m.bindings.isEmpty)
+        #expect(m.chains.map(\.name) == ["daily", "careful"])
+        #expect(m.selectedChain?.name == "daily")
+        #expect(m.chainsAllowed)
+    }
+
+    @Test func aDeviceWithoutAdminSeesNoChainsAndTheRestStillLoads() async {
+        let host = FakeHost()
+        let m = AccountsModel(host: host)
+        let svc = FakeService()
+        svc.poolList = [pool(1, "Default", def: true)]
+        svc.chainsFailure = CoreError.forbiddenScope
+        m.use(svc)
+        await m.reload()
+        #expect(m.load == .ready)
+        #expect(!m.chainsAllowed && m.chains.isEmpty && m.chainBindings.isEmpty)
+        #expect(m.pools.count == 1)
+    }
+
+    @Test func creatingAndEditingAChainAsksForTouchID() async {
+        let (m, svc, host) = await make()
+        let two = [ChainEntryDraft(pool: 1, model: "m1"), ChainEntryDraft(pool: 2, model: nil)]
+        #expect(await m.createChain(name: " work ", entries: two))
+        #expect(svc.log.contains("createChain work 1:m1,2:-"))
+        #expect(host.reasons.last?.contains("work") == true)
+        let work = m.chains.first { $0.name == "work" }!
+        #expect(m.chainSelection == work.id)
+        #expect(await m.replace(work, name: "work2", entries: [ChainEntryDraft(pool: 2, model: nil)]))
+        #expect(m.chains.first { $0.id == work.id }?.entries.count == 1)
+        host.declines = true
+        #expect(!(await m.createChain(name: "nope", entries: [ChainEntryDraft(pool: 1, model: nil)])))
+        #expect(!m.chains.contains { $0.name == "nope" })
+    }
+
+    @Test func settingTheDefaultDeletingAndTheCoreRefusing() async {
+        let (m, svc, _) = await make()
+        await m.makeDefault(m.chain(2)!)
+        #expect(m.chains.first { $0.isDefault }?.id == 2)
+        m.host.shell.toast?.undo?()
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(m.chains.first { $0.isDefault }?.id == 1)
+        #expect(await m.delete(m.chain(2)!))
+        #expect(m.chainBindings.isEmpty)
+        svc.failure = CoreError.http(status: 409, code: "conflict", message: "pool in use")
+        #expect(!(await m.createChain(name: "x", entries: [ChainEntryDraft(pool: 1, model: nil)])))
+        #expect(m.writeError["chain"]?.contains("conflict") == true)
+    }
+
+    @Test func chainRulesCheckNameCountAndDuplicates() {
+        let one = [ChainEntryDraft(pool: 1, model: nil)]
+        #expect(ChainRules.issue(name: "daily", entries: one) == nil)
+        #expect(ChainRules.issue(name: "Daily", entries: one) != nil)
+        #expect(ChainRules.issue(name: "daily", entries: []) != nil)
+        func pools(_ n: Int) -> [ChainEntryDraft] { (1...n).map { ChainEntryDraft(pool: Int64($0), model: nil) } }
+        #expect(ChainRules.issue(name: "daily", entries: pools(5)) != nil)
+        #expect(ChainRules.issue(name: "daily", entries: one + one) != nil)
+        #expect(ChainRules.issue(name: "daily", entries: pools(4)) == nil)
     }
 
     @Test func turnOffAndCapAndDelete() async {

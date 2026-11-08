@@ -34,6 +34,12 @@ enum AccountsKeys {
 
     /// ← → switch pools on Pools, and move like ↑ ↓ everywhere else.
     static func side(_ m: AccountsModel, _ step: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
+        if m.page == .chains, !m.chains.isEmpty {
+            let i = m.chains.firstIndex { $0.id == m.selectedChain?.id } ?? 0
+            let next = m.chains[min(max(i + step, 0), m.chains.count - 1)].id
+            withAnimation(.smooth(duration: 0.3)) { m.chainSelection = next }
+            return .handled
+        }
         guard m.page == .pools, !m.pools.isEmpty else { return move(m, step, proxy) }
         let i = m.pools.firstIndex { $0.id == m.selectedPool?.id } ?? 0
         withAnimation(.smooth(duration: 0.3)) {
@@ -108,6 +114,14 @@ enum AccountsKeys {
             }
             return .handled
         }
+        if m.page == .chains, let c = m.selectedChain, !ro {
+            switch key {
+            case "d" where !c.isDefault: Task { await m.makeDefault(c) }
+            case "e": AccountDialogs.openChain(m, editing: c)
+            default: return .ignored
+            }
+            return .handled
+        }
         if m.page == .pools, let p = m.selectedPool, !ro {
             switch key {
             case "d" where !p.isDefault: Task { await m.makeDefault(p) }
@@ -131,6 +145,7 @@ enum AccountsKeys {
             "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
         case .accounts: "↑↓ move · ↩ open · F filter · ⌘N connect"
         case .pools: "← → pool · ↑↓ account · D default · A add · ⌫ remove"
+        case .chains: "← → chain · D default · E edit · ⌘N new chain"
         case .budgets: "↑↓ move · E edit · R raise · ⌫ remove · ⌘N new budget"
         default: "⌘1–5 pages · ⌘J audit"
         }

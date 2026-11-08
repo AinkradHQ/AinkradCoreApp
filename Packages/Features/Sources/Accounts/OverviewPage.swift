@@ -29,9 +29,11 @@ struct OverviewPage: View {
                         "Need a look", value: need.count, of: total, symbol: "exclamationmark.triangle.fill",
                         hue: need.isEmpty ? GlassInk.slate : GlassInk.orange)
                     StatTile("In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue)
-                    StatTile(
-                        "Agents bound", value: model.bindings.count, of: max(model.bindings.count, 1),
-                        symbol: "link", hue: GlassInk.violet)
+                    if model.chainsAllowed {
+                        StatTile(
+                            "Agents bound", value: model.chainBindings.count, of: max(model.chainBindings.count, 1),
+                            symbol: "link", hue: GlassInk.violet)
+                    }
                 }
                 if !need.isEmpty {
                     section("Needs you", "hand.raised.fill", GlassInk.orange)

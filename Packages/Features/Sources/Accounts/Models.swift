@@ -68,11 +68,34 @@ struct PoolItem: Identifiable, Equatable, Sendable {
     let members: [Int64]
 }
 
-struct BindingItem: Identifiable, Equatable, Sendable {
-    var id: String { "\(agent)/\(provider)" }
-    let agent: String
+/// One step of a chain: the pool tried at this position and the model its accounts run (nil: the harness's default).
+struct ChainEntryItem: Equatable, Sendable {
+    let pool: Int64
     let provider: String
-    let poolID: Int64
+    let harness: String
+    let model: String?
+}
+
+/// An ordered fallback chain of 1 to 4 pools. A new session draws its account from the first entry that has one to give.
+struct ChainItem: Identifiable, Equatable, Sendable {
+    static let maxEntries = 4
+    let id: Int64
+    let name: String
+    let isDefault: Bool
+    let entries: [ChainEntryItem]
+}
+
+/// An agent's chain: its sessions get this chain.
+struct ChainBindingItem: Identifiable, Equatable, Sendable {
+    var id: String { agent }
+    let agent: String
+    let chain: Int64
+}
+
+/// One entry being written: a pool and a model (nil: the harness's default).
+struct ChainEntryDraft: Equatable, Sendable {
+    var pool: Int64
+    var model: String?
 }
 
 /// An account's state word. The Core says `active`, `cooling`, `limited`, `unhealthy` or `disabled`; any other word shows
@@ -203,13 +226,14 @@ enum AccountsLoad: Equatable {
 }
 
 enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
-    case overview, accounts, pools, budgets, costs, ledger, prices
+    case overview, accounts, pools, chains, budgets, costs, ledger, prices
     var id: String { rawValue }
     var title: String {
         switch self {
         case .overview: "Overview"
         case .accounts: "Accounts"
         case .pools: "Pools"
+        case .chains: "Chains"
         case .budgets: "Budgets"
         case .costs: "Costs and usage"
         case .ledger: "Ledger"
@@ -221,6 +245,7 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .overview: "waveform.path.ecg"
         case .accounts: "creditcard"
         case .pools: "square.grid.2x2"
+        case .chains: "link"
         case .budgets: "dollarsign.circle"
         case .costs: "chart.bar"
         case .ledger: "list.bullet"

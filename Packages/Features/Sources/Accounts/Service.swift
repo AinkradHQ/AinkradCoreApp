@@ -9,7 +9,6 @@ protocol AccountsService: Sendable {
     func providers() async throws -> [ProviderItem]
     func accounts() async throws -> [AccountItem]
     func pools() async throws -> [PoolItem]
-    func bindings() async throws -> [BindingItem]
     /// `secrets.mode` and `secrets.provider_accounts`.
     func gate() async throws -> GateState
     func createPool(name: String, provider: String) async throws -> PoolItem
@@ -17,8 +16,15 @@ protocol AccountsService: Sendable {
     func setDefaultPool(_ id: Int64) async throws
     func addMember(pool: Int64, account: Int64) async throws
     func removeMember(pool: Int64, account: Int64) async throws
-    func bind(agent: String, pool: Int64) async throws -> BindingItem
-    func unbind(agent: String, provider: String) async throws
+    /// Fallback chains (`admin`; writes need Touch ID): a name and 1 to 4 entries, each a pool and a model.
+    func chains() async throws -> [ChainItem]
+    func createChain(name: String, entries: [ChainEntryDraft]) async throws -> ChainItem
+    func replaceChain(_ id: Int64, name: String, entries: [ChainEntryDraft]) async throws -> ChainItem
+    func deleteChain(_ id: Int64) async throws
+    func setDefaultChain(_ id: Int64) async throws
+    func chainBindings() async throws -> [ChainBindingItem]
+    func bindAgent(_ agent: String, chain: Int64) async throws -> ChainBindingItem
+    func unbindAgent(_ agent: String) async throws
     func setState(account: Int64, state: String) async throws -> AccountItem
     func setCap(account: Int64, cap: Int64) async throws -> AccountItem
     func deleteAccount(_ id: Int64) async throws
@@ -75,13 +81,6 @@ struct LiveAccountsService: AccountsService {
     func pools() async throws -> [PoolItem] {
         try await run { try await client.listPools().ok.body.json.map(Self.pool) }
     }
-    func bindings() async throws -> [BindingItem] {
-        try await run {
-            try await client.listBindings().ok.body.json.map {
-                BindingItem(agent: $0.agent, provider: $0.provider, poolID: $0.poolId)
-            }
-        }
-    }
     func gate() async throws -> GateState {
         try await run {
             let all = try await client.listServerSettings().ok.body.json
@@ -108,14 +107,41 @@ struct LiveAccountsService: AccountsService {
             _ = try await client.removePoolMember(path: .init(id: String(pool), account: String(account))).ok
         }
     }
-    func bind(agent: String, pool: Int64) async throws -> BindingItem {
+    func chains() async throws -> [ChainItem] {
+        try await run { try await client.listChains().ok.body.json.map(Self.chain) }
+    }
+    func createChain(name: String, entries: [ChainEntryDraft]) async throws -> ChainItem {
         try await run {
-            let b = try await client.bindAgent(body: .json(.init(agent: agent, poolId: pool))).ok.body.json
-            return BindingItem(agent: b.agent, provider: b.provider, poolID: b.poolId)
+            Self.chain(try await client.createChain(body: .json(Self.newChain(name, entries))).ok.body.json)
         }
     }
-    func unbind(agent: String, provider: String) async throws {
-        try await run { _ = try await client.unbindAgent(path: .init(agent: agent, provider: provider)).ok }
+    func replaceChain(_ id: Int64, name: String, entries: [ChainEntryDraft]) async throws -> ChainItem {
+        try await run {
+            Self.chain(
+                try await client.replaceChain(path: .init(id: String(id)), body: .json(Self.newChain(name, entries)))
+                    .ok.body.json)
+        }
+    }
+    func deleteChain(_ id: Int64) async throws {
+        try await run { _ = try await client.deleteChain(path: .init(id: String(id))).ok }
+    }
+    func setDefaultChain(_ id: Int64) async throws {
+        try await run { _ = try await client.setDefaultChain(path: .init(id: String(id))).ok }
+    }
+    func chainBindings() async throws -> [ChainBindingItem] {
+        try await run {
+            try await client.listChainBindings().ok.body.json.map { ChainBindingItem(agent: $0.agent, chain: $0.chain) }
+        }
+    }
+    func bindAgent(_ agent: String, chain: Int64) async throws -> ChainBindingItem {
+        try await run {
+            let b = try await client.bindAgentChain(path: .init(agent: agent), body: .json(.init(chain: chain))).ok.body
+                .json
+            return ChainBindingItem(agent: b.agent, chain: b.chain)
+        }
+    }
+    func unbindAgent(_ agent: String) async throws {
+        try await run { _ = try await client.unbindAgentChain(path: .init(agent: agent)).ok }
     }
     func setState(account: Int64, state: String) async throws -> AccountItem {
         try await run {
@@ -307,6 +333,18 @@ struct LiveAccountsService: AccountsService {
             state: a.state, stateReason: a.stateReason, stateUntil: a.stateUntil, cap: a.cap,
             lastUsedAt: a.lastUsedAt, createdAt: a.createdAt, lastTest: a.lastTest.map { ($0.at, $0.result) },
             maxTokens: a.sessionLimits?.maxTokens, maxUSDMicros: a.sessionLimits?.maxUsdMicros)
+    }
+
+    static func chain(_ c: Components.Schemas.Chain) -> ChainItem {
+        ChainItem(
+            id: c.id, name: c.name, isDefault: c.isDefault,
+            entries: c.entries.map {
+                ChainEntryItem(pool: $0.pool, provider: $0.provider, harness: $0.harness, model: $0.model)
+            })
+    }
+
+    static func newChain(_ name: String, _ entries: [ChainEntryDraft]) -> Components.Schemas.NewChain {
+        .init(entries: entries.map { .init(model: $0.model, pool: $0.pool) }, name: name)
     }
 
     static func pool(_ p: Components.Schemas.Pool) -> PoolItem {
