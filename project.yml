@@ -48,6 +48,8 @@ targets:
         product: Accounts
       - package: Features
         product: Agents
+      - package: Features
+        product: Brain
     settings:
       base:
         PRODUCT_NAME: Ainkrad

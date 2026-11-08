@@ -1,4 +1,5 @@
 import Accounts
+import Brain
 import Shell
 import SwiftUI
 
@@ -9,6 +10,7 @@ enum Registration {
         let shell = app.shell
         app.admin.install()
         app.accounts.install()
+        app.brain.install()
         shell.settings.section(
             SettingsSection(
                 id: "devices", group: .core, title: "Devices", sub: "Paired Macs, phones, runners and passkeys",

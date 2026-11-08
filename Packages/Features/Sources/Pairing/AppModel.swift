@@ -1,6 +1,7 @@
 import Accounts
 import Admin
 import Agents
+import Brain
 import CoreKit
 import CoreUI
 import Foundation
@@ -35,6 +36,8 @@ public final class AppModel {
     public private(set) var admin: AdminModel!
     /// Provider accounts, pools and bindings (E5-08); its screens say "not connected" until a Core is open.
     public private(set) var accounts: AccountsModel!
+    /// The Brain (memory rooms and health). Core does not serve it yet: Release says so; Debug demo shows sample data.
+    public private(set) var brain: BrainModel!
     private var rateLimitEnd: Task<Void, Never>?
     private var restartedEnd: Task<Void, Never>?
     var confirmForget = false
@@ -75,6 +78,7 @@ public final class AppModel {
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
+        brain = BrainModel(host: AdminHostAdapter(app: self))
         shell.elevate = { [weak self] in
             guard let self else { return }
             Task {
@@ -104,6 +108,7 @@ public final class AppModel {
             shell.coreLink = .live
             #if DEBUG
             agents.attach(FakeAgentsAPI.prototypeWorld())
+            brain.use(SampleBrainService())
             #endif
             return
         }
@@ -371,6 +376,7 @@ public final class AppModel {
         terminals = nil
         admin.detach()
         accounts.detach()
+        brain.detach()
         shell.linkNotice = nil
         shell.resetToFresh()
         firstRun.resetAll()
