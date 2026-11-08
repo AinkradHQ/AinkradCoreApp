@@ -133,6 +133,17 @@ struct ModelTests {
         #expect(n.posted.count == 1 && m.pending.count == 5)
     }
 
+    @Test func accountBannersAreForAdminsAndFollowTheirTile() async {
+        let (m, _, _, n) = await make()
+        m.postAccountBanner("account_health", "a1", "Work is not working", "")
+        #expect(n.posted.isEmpty, "a device without admin gets no account banners")
+        m.isAdmin = true
+        m.postAccountBanner("account_health", "a1", "Work is not working", "")
+        m.setNotifies("account_expired", false)
+        m.postAccountBanner("account_expired", "a2", "Work was turned off", "")
+        #expect(n.posted == ["a1"] && m.notifies("account_health") && !m.notifies("account_expired"))
+    }
+
     @Test func aGapRefetchesTheListAndTheTranscripts() async {
         let (m, api, _, _) = await make()
         api.add(
