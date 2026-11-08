@@ -189,6 +189,14 @@ nonisolated enum DemoData {
         s(
             "alarm.disk_min_free_pct", 10, 10, 1, 90, "percent",
             "The disk_free alarm raises when less than this share is free."),
+        s(
+            "scheduler.wait_max_secs", 600, 600, 0, 86_400, "seconds",
+            "The longest a chain session waits for an account."),
+        s("scheduler.max_hops", 3, 3, 0, 20, "count", "Most failovers one run may make; 0 turns failover off."),
+        s("scheduler.failovers_per_10min", 10, 10, 1, 1_000, "count", "Most failovers per user in 10 minutes."),
+        s(
+            "scheduler.quota_cooldown_secs", 3_600, 3_600, 60, 86_400, "seconds",
+            "How long an account rests after its quota runs out."),
     ].enumerated().map { i, item in
         var x = item
         if i == 0 {
