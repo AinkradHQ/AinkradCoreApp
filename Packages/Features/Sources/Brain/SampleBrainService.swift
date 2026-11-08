@@ -12,6 +12,9 @@ public actor SampleBrainService: BrainService {
         public var empty = false
         public var error = false
         public var healthy = false
+        /// Activity shows its empty state; a failing Activity shows its error card.
+        public var noActivity = false
+        public var activityError = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false
@@ -27,13 +30,22 @@ public actor SampleBrainService: BrainService {
     }
 
     public nonisolated let isSample = true
-    private var scenario: Scenario
+    var scenario: Scenario
     private var list: [RoomSummary]
     private var pausedRooms = ["automotive-ai", "optimus"]
+    // Activity and Checks (SampleBrainService+Activity.swift).
+    var checkList: [CheckItem]
+    var failing: Set<String> = []
+    var liveRows: [ActivityEvent] = []
+    var watchers: [AsyncStream<ActivityEvent>.Continuation] = []
+    /// How long each of the eight steps of a check takes. Tests use zero.
+    let pace: Duration
 
-    public init(_ scenario: Scenario = Scenario()) {
+    public init(_ scenario: Scenario = Scenario(), pace: Duration = .milliseconds(250)) {
         self.scenario = scenario
         self.list = scenario.empty ? [] : Self.world()
+        self.pace = pace
+        self.checkList = Self.initialChecks(scenario)
     }
 
     public func rooms() async throws -> [RoomSummary] {
@@ -117,7 +129,10 @@ public actor SampleBrainService: BrainService {
         return r
     }
 
-    public func clearPaused() async throws { scenario.paused = false }
+    public func clearPaused() async throws {
+        scenario.paused = false
+        if let i = checkList.firstIndex(where: { $0.id == "leakage" }) { checkList[i].clearedAfter = true }
+    }
 
     // MARK: sample world
 

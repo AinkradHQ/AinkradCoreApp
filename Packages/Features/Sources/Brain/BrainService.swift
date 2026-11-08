@@ -18,6 +18,20 @@ public protocol BrainService: Sendable {
     func createRoom(_ draft: NewRoomDraft) async throws -> RoomSummary
     /// Clears a failed leakage check so cross-room search resumes (the caller has already asked for Touch ID).
     func clearPaused() async throws
+
+    // MARK: Activity and Checks
+
+    /// The newest `limit` events across every mounted room, newest first. Ids and codes only.
+    func activity(limit: Int) async throws -> ActivityPage
+    /// Events as they happen. Ends when the caller stops reading.
+    func liveActivity() async -> AsyncStream<ActivityEvent>
+    /// Every model call from one mounted room, allowed or blocked, newest first.
+    func egress(room: String) async throws -> [EgressCall]
+    func checks() async throws -> ChecksReport
+    /// Runs one check and reports progress from 0 to 1. The service decides the result, Paused included.
+    func runCheck(
+        _ id: String, options: CheckRunOptions, progress: @escaping @Sendable (Double) -> Void
+    ) async throws -> CheckItem
 }
 
 /// A failure the screens can word.
