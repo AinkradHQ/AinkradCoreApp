@@ -30,7 +30,15 @@ public final class BrainModel {
     @ObservationIgnored private var bellIDs: Set<String> = []
     @ObservationIgnored private var lockWatch: (any NSObjectProtocol)?
 
-    public init(host: any AdminHost) { self.host = host }
+    /// Activity and Checks keep their own state; both read this model for rooms, Paused and the service.
+    @ObservationIgnored public private(set) var activity: ActivityModel!
+    @ObservationIgnored public private(set) var checks: ChecksModel!
+
+    public init(host: any AdminHost) {
+        self.host = host
+        activity = ActivityModel(brain: self)
+        checks = ChecksModel(brain: self)
+    }
 
     // MARK: connection
 
@@ -43,6 +51,8 @@ public final class BrainModel {
 
     public func detach() {
         service = nil
+        activity.reset()
+        checks.reset()
         clearRoomView()
         rooms = []
         overview = nil
@@ -127,6 +137,7 @@ public final class BrainModel {
 
     /// Drops everything a room view held. Called before any switch, seal or lock, not after.
     func clearRoomView() {
+        activity?.clear()
         inspected = nil
         inspectingID = nil
     }
