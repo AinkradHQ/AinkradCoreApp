@@ -12,9 +12,16 @@ public actor SampleBrainService: BrainService {
         public var empty = false
         public var error = false
         public var healthy = false
+        /// Rooms exist but nothing waits in any Inbox list.
+        public var emptyInbox = false
+        /// The viewing room's provider rule refuses the Inbox.
+        public var refused = false
+        /// The Inbox itself did not load.
+        public var inboxError = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
-            empty: Bool = false, error: Bool = false, healthy: Bool = false
+            empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
+            refused: Bool = false, inboxError: Bool = false
         ) {
             self.paused = paused
             self.offline = offline
@@ -23,6 +30,9 @@ public actor SampleBrainService: BrainService {
             self.empty = empty
             self.error = error
             self.healthy = healthy
+            self.emptyInbox = emptyInbox
+            self.refused = refused
+            self.inboxError = inboxError
         }
     }
 
@@ -30,10 +40,13 @@ public actor SampleBrainService: BrainService {
     private var scenario: Scenario
     private var list: [RoomSummary]
     private var pausedRooms = ["automotive-ai", "optimus"]
+    private var box: SampleInbox
+    private var failNext = false
 
     public init(_ scenario: Scenario = Scenario()) {
         self.scenario = scenario
         self.list = scenario.empty ? [] : Self.world()
+        self.box = SampleInbox(empty: scenario.empty || scenario.emptyInbox)
     }
 
     public func rooms() async throws -> [RoomSummary] {
@@ -49,7 +62,11 @@ public actor SampleBrainService: BrainService {
         }
         let s = scenario
         var tiles = Self.tiles
-        var needs = s.healthy || s.empty ? [] : Self.needs
+        var needs =
+            s.healthy || s.empty
+            ? []
+            : box.needs.filter { $0.kind != .unclassified } + Self.checkNeeds
+                + box.needs.filter { $0.kind == .unclassified }
         if s.paused {
             tiles[0] = HealthTile(
                 "isolation", "Isolation", .bad, meter: 0, "A test found a leak. Search is stopped for 2 rooms.")
@@ -119,6 +136,52 @@ public actor SampleBrainService: BrainService {
 
     public func clearPaused() async throws { scenario.paused = false }
 
+    public func inbox(room id: String) async throws -> RoomInbox {
+        guard let r = list.first(where: { $0.id == id }), r.mounted else {
+            throw BrainFailure("This room is sealed. Open it to see its memories.", code: "sealed")
+        }
+        if scenario.inboxError || scenario.error {
+            throw BrainFailure("Core did not answer. Nothing was changed.", code: "sample_unreachable")
+        }
+        if scenario.refused {
+            throw BrainFailure(
+                "\(r.name) is \(r.mode.label.lowercased()) with \(r.provider.label.lowercased()). Its provider rule blocks this, and nothing was sent anywhere.",
+                code: "refused")
+        }
+        return box.inbox(room: id)
+    }
+
+    public func captures() async throws -> [Capture] {
+        if scenario.inboxError || scenario.error {
+            throw BrainFailure("Core did not answer. Nothing was changed.", code: "sample_unreachable")
+        }
+        return box.captures
+    }
+
+    /// The next `perform` fails once, like a Core that did not answer.
+    public func failNextAction() { failNext = true }
+
+    public func perform(_ action: InboxAction) async throws {
+        if failNext {
+            failNext = false
+            throw BrainFailure(
+                "That did not save. The local Core did not answer, and nothing changed.", code: "sample_unreachable")
+        }
+        if scenario.paused, case .assign = action {
+            throw BrainFailure("Paused. Moving memories between rooms waits until you clear the check.", code: "paused")
+        }
+        box.apply(action)
+        for i in list.indices where list[i].mounted {
+            let r = list[i]
+            guard var c = r.counts else { continue }
+            c.waiting = box.candidates.filter { $0.room == r.id }.count
+            c.conflicts = box.conflicts.filter { $0.room == r.id }.count
+            list[i] = RoomSummary(
+                id: r.id, name: r.name, kind: r.kind, mode: r.mode, provider: r.provider, mounted: true,
+                lease: r.lease, counts: c)
+        }
+    }
+
     // MARK: sample world
 
     private static func types(_ n: Int) -> [TypeShare] {
@@ -173,13 +236,6 @@ public actor SampleBrainService: BrainService {
         HealthTile("providers", "Provider rules", .ok, meter: 100, "All cloud approvals in date"),
     ]
 
-    private static let needs: [NeedItem] = [
-        NeedItem(.waiting, room: "ainkrad", n: 3, "memories wait for you"),
-        NeedItem(.waiting, room: "automotive-ai", n: 1, "memories wait for you"),
-        NeedItem(.conflict, room: "workan-space", n: 1, "conflict to settle"),
-        NeedItem(.blocked, room: "automotive-ai", n: 1, "note blocked: a secret was found"),
-        NeedItem(.check, n: 1, "check is due: restore drill"),
-        NeedItem(.unclassified, n: 4, "captures have no room yet"),
-    ]
+    private static let checkNeeds: [NeedItem] = [NeedItem(.check, n: 1, "check is due: restore drill")]
 }
 #endif

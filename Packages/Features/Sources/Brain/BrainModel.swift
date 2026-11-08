@@ -25,8 +25,10 @@ public final class BrainModel {
     public private(set) var inspected: RoomDetail?
     public private(set) var inspectingID: String?
     /// A refusal or failure for the action just taken, in words.
-    public private(set) var notice: String?
-    public private(set) var busy: String?
+    public internal(set) var notice: String?
+    public internal(set) var busy: String?
+    /// The Inbox tab's content: the viewing room's lists and the unclassified captures. Cleared with the room view.
+    public let inboxState = InboxState()
     @ObservationIgnored private var bellIDs: Set<String> = []
     @ObservationIgnored private var lockWatch: (any NSObjectProtocol)?
 
@@ -127,6 +129,7 @@ public final class BrainModel {
 
     /// Drops everything a room view held. Called before any switch, seal or lock, not after.
     func clearRoomView() {
+        inboxState.clear()
         inspected = nil
         inspectingID = nil
     }

@@ -18,6 +18,12 @@ public protocol BrainService: Sendable {
     func createRoom(_ draft: NewRoomDraft) async throws -> RoomSummary
     /// Clears a failed leakage check so cross-room search resumes (the caller has already asked for Touch ID).
     func clearPaused() async throws
+    /// One room's Inbox: waiting memories, conflicts and blocked notes. Only for a mounted room.
+    func inbox(room: String) async throws -> RoomInbox
+    /// The unclassified inbox. It is not a room, so it needs no mounted room.
+    func captures() async throws -> [Capture]
+    /// Applies one Inbox change (the caller has already asked for Touch ID where it is needed).
+    func perform(_ action: InboxAction) async throws
 }
 
 /// A failure the screens can word.
