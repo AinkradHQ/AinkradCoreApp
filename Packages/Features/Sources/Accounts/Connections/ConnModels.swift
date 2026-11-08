@@ -20,6 +20,10 @@ struct ConnKind: Identifiable, Equatable, Sendable {
     let tokenHelp: [String]
     let tokenFields: [String]
     var available = true
+    /// The key of the resource limit a grant carries (`repos`, `projects`); nil when the kind has none.
+    var limitKey: String?
+    /// Where the person installs the kind's app to choose resources (GitHub App), when the Core has it set up.
+    var installURL: URL?
 }
 
 struct ConnCapability: Identifiable, Equatable, Sendable {
@@ -72,6 +76,8 @@ struct ConnFlow: Equatable, Sendable {
     let userCode: String?
     let url: URL
     var step: Step
+    /// The `state` an OAuth redirect must carry back with its code (not the flow id); nil for a device-code sign-in.
+    var callbackState: String?
     var isConnected: Bool {
         if case .connected = step { return true }
         return false

@@ -1,21 +1,23 @@
 import Foundation
 
 /// The Core's connection routes (C5) as these screens use them. A credential only ever goes in on the Core's side: nothing
-/// here returns one. Until C5 lands the app has no live service: Debug builds use `SampleConnections`, Release says
-/// the Core doesn't serve connections yet.
+/// here returns one. `LiveConnectionsService` is the real one; `SampleConnections` is Debug only, for screenshots and tests.
 protocol ConnectionsService: Sendable {
     func kinds() async throws -> [ConnKind]
     func connections() async throws -> [ConnItem]
     func activity(connection: Int64?) async throws -> [ConnActivity]
     /// The repositories or projects a connection can reach, for the "Only these" picker.
     func resources(_ id: Int64) async throws -> [String]
-    func start(kind: String) async throws -> ConnFlow
+    /// `again`: sign in again to that connection instead of making a new one.
+    func start(kind: String, again: Int64?) async throws -> ConnFlow
     func flow(_ id: String) async throws -> ConnFlow
     /// GitHub: done choosing repositories (or skipped). Jira: the site picked.
     func choose(_ id: String, site: String?) async throws -> ConnFlow
     /// The Atlassian redirect the Mac caught on its loopback address (CN7).
     func deliver(_ id: String, code: String, state: String) async throws -> ConnFlow
     func cancel(_ id: String) async throws
+    /// GitHub: the app was installed on GitHub (the Mac caught its setup redirect), so the chosen repositories are reachable.
+    func install(kind: String, installation: Int64) async throws -> ConnItem
     /// Advanced: a token pasted by the person, sent once and never read back.
     func addToken(kind: String, name: String, fields: [String: String], token: String) async throws -> ConnItem
     /// One cheap call with the sign-in: a sentence, never a body.
@@ -135,7 +137,7 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
             : ["sample/core", "sample/app", "sample/site", "sample/docs", "sample/infra", "sample/tap"]
     }
 
-    func start(kind: String) async throws -> ConnFlow {
+    func start(kind: String, again: Int64?) async throws -> ConnFlow {
         let f = ConnFlow(
             id: UUID().uuidString, kind: kind, userCode: kind == "github" ? "WDJB-MJHT" : nil,
             url: URL(string: kind == "github" ? "https://github.com/login/device" : "https://auth.atlassian.com")!,
@@ -198,6 +200,10 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
 
     func deliver(_ id: String, code: String, state: String) async throws -> ConnFlow { try await flow(id) }
     func cancel(_ id: String) async throws { _ = lock.withLock { flows.removeValue(forKey: id) } }
+
+    func install(kind: String, installation: Int64) async throws -> ConnItem {
+        try await addToken(kind: kind, name: "GitHub App", fields: [:], token: "")
+    }
 
     func addToken(kind: String, name: String, fields: [String: String], token: String) async throws -> ConnItem {
         lock.withLock {
