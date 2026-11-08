@@ -129,6 +129,18 @@ enum AgentsSnapshots {
         // New session.
         a.openNewSession()
         await shot("new-session")
+        // New session from a chain, an agent, and a busy runner (admin only: a device with no chains sees none of this).
+        a.debugChains([
+            ChainOption(id: 1, name: "daily", isDefault: true, steps: ["claude · sonnet", "codex · default model"]),
+            ChainOption(id: 2, name: "careful", isDefault: false, steps: ["claude · opus"]),
+        ])
+        for source in ["chain", "agent", "busy"] {
+            a.debugSource = source
+            only { a.openNewSession() }
+            await shot("new-session-\(source)")
+        }
+        a.debugSource = nil
+        a.debugChains([])
         shell.closeDialog()
         shell.toggleLauncher()
         await shot("launcher")

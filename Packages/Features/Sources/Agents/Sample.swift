@@ -12,6 +12,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
     private var entries: [String: [TranscriptEntry]] = [:]
     private var feed: AsyncStream<AgentFeed>.Continuation?
     public var runnerList: [RunnerInfo] = []
+    public var chainList: [ChainOption] = []
     /// What the next action throws, once.
     public var failNext: (any Error)?
     public private(set) var calls: [String] = []
@@ -66,6 +67,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
     // MARK: AgentsAPI
 
     public func runners() async throws -> [RunnerInfo] { runnerList }
+    public func chains() async throws -> [ChainOption] { chainList }
 
     public func sessions(before: Int64?, limit: Int) async throws -> [AgentSessionInfo] {
         try record("sessions")
@@ -97,7 +99,8 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
             return "as_new\(counter)"
         }
         let s = AgentSessionInfo(
-            id: id, runner: new.runner, harness: new.harness, state: .starting, createdAt: Date(), updatedAt: Date(),
+            id: id, runner: new.runner, harness: new.chain == nil && new.agent == nil ? new.harness : "claude",
+            state: .starting, createdAt: Date(), updatedAt: Date(),
             index: Int64(counter))
         add(s, entries: [.started(harness: new.harness, resumed: false), .user(new.prompt)])
         return s
