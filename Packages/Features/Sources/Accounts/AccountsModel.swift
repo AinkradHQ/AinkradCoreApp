@@ -89,6 +89,11 @@ public final class AccountsModel {
 
     // MARK: derived
 
+    /// "Claude account Work": how an event names an account. Nil until the account is known.
+    public func accountName(_ id: Int64) -> String? {
+        account(id).map { "\(providerName($0.provider)) account \($0.label)" }
+    }
+    public func poolName(_ id: Int64) -> String? { pool(id)?.name }
     func provider(_ id: String) -> ProviderItem? { providers.first { $0.id == id } }
     func providerName(_ id: String) -> String { provider(id)?.name ?? id }
     func account(_ id: Int64) -> AccountItem? { accounts.first { $0.id == id } }
