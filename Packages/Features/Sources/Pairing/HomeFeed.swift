@@ -77,7 +77,7 @@ struct LiveHomeSource: HomeSource {
     }
 
     private func run<T>(_ body: () async throws -> T) async throws -> T {
-        do { return try await body() } catch { throw CoreError.unwrapping(error) ?? error }
+        do { return try await body() } catch { throw CoreFailure.of(error) ?? error }
     }
 }
 
