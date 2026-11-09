@@ -215,8 +215,8 @@ enum AgentsSnapshots {
         shell.open(.settings)
         await shot("settings-notifications-admin")
         shell.overlay = nil
-        let accounts = app.debugAccountsDemo()
-        await accounts.show(AccountsDemo.scenes[0])
+        let accountsDemo = app.debugAccountsDemo()
+        await accountsDemo.show(AccountsDemo.scenes[0])
         let later = ISO8601DateFormatter().string(from: Date().addingTimeInterval(1_800))
         app.accountNotice("account.limited", ["account": "1", "class": "rate_limited", "until": later])
         app.accountNotice(
