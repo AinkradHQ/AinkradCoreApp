@@ -4,7 +4,7 @@
     "" : {
 
     },
-    "$ ainkrad bootstrap" : {
+    "ainkrad-core-server bootstrap <db>" : {
 
     },
     "%@ come from your Core. This Mac is not connected to one right now." : {
@@ -13,7 +13,7 @@
     "%@ is paired." : {
 
     },
-    "%@ is the only device that can manage this Core. If you lose it, getting back in needs SSH to the host. Add a second admin device, such as your iPhone." : {
+    "%@ is the only device that can manage this Core. If you lose it, you would be locked out. Add a second admin device, such as your iPhone." : {
 
     },
     "%@ loses access at once and its open connections close. It must be paired again to return. Revoking cannot be undone." : {
@@ -100,7 +100,7 @@
     "2. Compare the check code on this Mac with the one the host prints, and type y there." : {
 
     },
-    "3. Add a second admin device (your iPhone) afterwards, so losing one never needs SSH." : {
+    "3. Add a second admin device (your iPhone) afterwards, so losing one never locks you out." : {
 
     },
     "A pairing lasts 5 minutes from when the approver made the code. This Mac isn't told the exact time." : {
@@ -341,7 +341,7 @@
     "The pairing was rejected. Its keys were never enrolled." : {
 
     },
-    "The very first device is created on the host itself, never over the network. Open a terminal on the machine that runs the Core." : {
+    "The very first device can only be created on the machine that runs the Core, never over the network. Until this can be done from here, run this once on that machine, with the path of your Core's database." : {
 
     },
     "This Mac creates a one-time code. Whoever enters it still needs your approval." : {

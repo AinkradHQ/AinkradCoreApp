@@ -207,7 +207,7 @@
     "Terminals" : {
 
     },
-    "Terminals are off here. Start the runner with --enable-pty to use them." : {
+    "Terminals are off here. Turn them on on the machine that runs this runner." : {
 
     },
     "Terminals are off on this runner." : {

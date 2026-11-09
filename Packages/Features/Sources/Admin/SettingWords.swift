@@ -117,6 +117,7 @@ enum SettingWords {
             line: "How often the audit log's fingerprint is saved off this machine, when backups are set up."),
         "secrets.mode": Entry(group: "secrets", title: "Keys and secrets", line: ""),
         "secrets.provider_accounts": Entry(group: "secrets", title: "Real provider keys", line: ""),
+        "secrets.connections": Entry(group: "secrets", title: "Real connection tokens", line: ""),
         "auth.passkey_admin": Entry(group: "sign-in", title: "Admin from a browser", line: ""),
     ]
 

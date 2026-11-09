@@ -18,7 +18,9 @@ enum HistoryLoad: Equatable {
 @MainActor @Observable
 final class RegistryModel {
     /// Settings that gate a feature, in the order the screen shows them.
-    nonisolated static let switchKeys = ["secrets.mode", "auth.passkey_admin", "secrets.provider_accounts"]
+    nonisolated static let switchKeys = [
+        "secrets.mode", "secrets.provider_accounts", "secrets.connections", "auth.passkey_admin",
+    ]
 
     private(set) var items: [SettingItem] = []
     var state: SectionState = .loading
@@ -50,6 +52,10 @@ final class RegistryModel {
         return order.map { ($0, by[$0] ?? []) }
     }
     func item(_ key: String) -> SettingItem? { items.first { $0.key == key } }
+    /// Why the connection-tokens switch can't be touched yet, in words; nil when it can.
+    nonisolated static func connectionsNeeds(mode: Int) -> String? {
+        mode < 1 ? "Set Keys and secrets to Test keys first." : nil
+    }
     var secretsMode: Int { Int(item("secrets.mode")?.value ?? 0) }
 
     func reset() {
