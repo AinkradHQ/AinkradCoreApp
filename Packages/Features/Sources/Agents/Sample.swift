@@ -68,6 +68,15 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
 
     public func runners() async throws -> [RunnerInfo] { runnerList }
     public func chains() async throws -> [ChainOption] { chainList }
+    public func attempts(run: String) async throws -> [AgentSessionInfo] {
+        lock.withLock {
+            runAttempts[run] ?? order.compactMap { sessionsByID[$0] }.filter { $0.route?.run == run }
+        }
+    }
+    /// A run's attempts as the demo wants them listed (the walk's stand-in for `?run=`).
+    public var runAttempts: [String: [AgentSessionInfo]] = [:]
+    public var accountNames: [Int64: String] = [:]
+    public func accountName(_ id: Int64) async throws -> String? { accountNames[id] }
 
     public func sessions(before: Int64?, limit: Int) async throws -> [AgentSessionInfo] {
         try record("sessions")

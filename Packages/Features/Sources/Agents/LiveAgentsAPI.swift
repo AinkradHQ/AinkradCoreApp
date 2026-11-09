@@ -40,6 +40,17 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
     }
 
+    public func attempts(run: String) async throws -> [AgentSessionInfo] {
+        try await self.run {
+            let q = Operations.ListAgentSessions.Input.Query(limit: 20, run: run)
+            return try await client.listAgentSessions(query: q).ok.body.json.map(Self.session)
+        }
+    }
+
+    public func accountName(_ id: Int64) async throws -> String? {
+        try await run { try await client.getAccount(path: .init(id: String(id))).ok.body.json.label }
+    }
+
     public func session(_ id: String) async throws -> AgentSessionInfo {
         try await run {
             switch try await client.getAgentSession(path: .init(id: id)) {
@@ -209,7 +220,25 @@ public struct LiveAgentsAPI: AgentsAPI {
                 AgentUsageInfo(
                     input: $0.input, output: $0.output, cacheRead: $0.cacheRead, cacheWrite: $0.cacheWrite,
                     costMicros: $0.costUsdMicros)
-            }, resumes: s.resumes.map(Int.init), index: s.index)
+            }, resumes: s.resumes.map(Int.init), index: s.index, route: route(s, outcome))
+    }
+
+    /// Everything the scheduler adds to a session; nil when the Core gave none of it (not an admin, or no chain).
+    static func route(_ s: Components.Schemas.AgentSession, _ outcome: [String: (any Sendable)?]?) -> SessionRoute? {
+        let f = outcome?["failover"] as? [String: Any]
+        let r = SessionRoute(
+            agent: s.agent, chainID: s.chainId, chainPos: s.chainPos.map(Int.init),
+            steps: (s.chain ?? []).map { "\($0.harness) · \($0.model ?? "default model")" }, account: s.account,
+            repicked: s.repicked.map(Int.init), upstreamClass: s.upstreamClass,
+            waiting: s.waiting.map { SessionWaiting(since: $0.since, until: $0.until, why: $0.why) }, run: s.run,
+            attempt: s.attempt.map(Int.init), failoverOf: s.failoverOf, failedOverTo: s.failedOverTo,
+            failoverClass: s.failoverClass,
+            ended: f.map {
+                FailoverEnd(
+                    result: $0["result"] as? String ?? "", why: $0["why"] as? String,
+                    reasons: $0["reasons"] as? [String] ?? [])
+            })
+        return r == SessionRoute() ? nil : r
     }
 
     static func entry(_ e: Components.Schemas.AgentTranscriptEntry) -> TranscriptEntry {

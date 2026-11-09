@@ -44,6 +44,15 @@ struct SessionHero: View {
             HStack(spacing: Space.s2) {
                 AppStatChip("server.rack", model.runnerName(session.runner), hue)
                 if let m = session.model { AppStatChip("brain", m, GlassInk.violet) }
+                if let r = session.route {
+                    if let c = SessionCues.chain(r, name: model.chainName(r)) {
+                        AppStatChip("link", c, GlassInk.blue).help(SessionCues.step(r).map { "Now on \($0)" } ?? "")
+                    }
+                    if let a = r.account {
+                        AppStatChip("key", model.accountNames[a] ?? "an account", GlassInk.orange)
+                            .help(SessionCues.repicked(r.repicked) ?? "The account this session holds")
+                    }
+                }
                 AppStatChip(
                     "arrow.down.circle", "\(session.usage.map { AgentWords.tokens($0.input) } ?? "0") in", GlassInk.blue
                 )
@@ -94,6 +103,7 @@ struct SessionHero: View {
         .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
         .onAppear { shown = true }
         .task(id: session.id) { await model.followLedger(session.id) }
+        .task(id: session.id) { await model.followRoute(session.id) }
         .accessibilityElement(children: .contain)
     }
 
@@ -106,6 +116,9 @@ struct SessionHero: View {
         case .interrupted: return "\(r) restarted. It resumes by itself."
         case .lost: return "\(r) dropped it and could not resume it. The transcript is kept."
         case .ended:
+            if session.stoppedByBudget {
+                return "A budget ran out, so Core stopped it. Raise the budget, then resume to continue."
+            }
             if let why = session.outcomeReason, !why.isEmpty { return why }
             switch session.outcome {
             case .succeeded?: return "It finished what it was asked."

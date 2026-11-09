@@ -36,12 +36,17 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var resumes: Int?
     /// Its row, for paging the list with `before`.
     public var index: Int64?
+    /// Its chain, account, run and attempts (admins only; nil for any other device).
+    public var route: SessionRoute?
 
     public init(
         id: String, runner: String, harness: String, model: String? = nil, state: SessionState,
         outcome: SessionOutcome? = nil, outcomeReason: String? = nil, createdAt: Date, updatedAt: Date,
-        endedAt: Date? = nil, lastSeq: Int64 = 0, usage: AgentUsageInfo? = nil, resumes: Int? = nil, index: Int64? = nil
+        endedAt: Date? = nil, lastSeq: Int64 = 0, usage: AgentUsageInfo? = nil, resumes: Int? = nil,
+        index: Int64? = nil,
+        route: SessionRoute? = nil
     ) {
+        self.route = route
         self.id = id
         self.runner = runner
         self.harness = harness
@@ -64,6 +69,12 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
         case .starting, .running, .interrupted: true
         default: false
         }
+    }
+    /// Ended because a budget ran out. Core reports it as `budget`, or as a cancel whose reason names the budget (KAN-474).
+    public var stoppedByBudget: Bool {
+        if outcome?.unknownRaw == "budget" { return true }
+        if case .cancelled? = outcome { return outcomeReason?.lowercased().contains("budget") == true }
+        return false
     }
     public var over: Bool {
         switch state {
@@ -241,6 +252,9 @@ public enum AgentWords {
     /// The word for a session in a list or head: a pending approval wins over the state.
     public static func status(_ s: AgentSessionInfo, waiting: Bool) -> (label: String, tone: Tone, symbol: String) {
         if waiting { return ("Waiting on you", .warn, "hand.raised") }
+        if case .ended = s.state, s.stoppedByBudget {
+            return ("Stopped: budget reached", .warn, "gauge.with.dots.needle.100percent")
+        }
         if case .ended = s.state, let o = s.outcome { return (o.label, o.tone, o.symbol) }
         return (s.state.label, s.state.tone, s.state.symbol)
     }

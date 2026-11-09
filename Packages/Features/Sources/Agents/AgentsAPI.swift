@@ -51,11 +51,17 @@ public protocol AgentsAPI: Sendable {
     func ledger(_ session: String) async throws -> SessionLedger?
     /// The chains a session can start from (`admin`). A device without it gets none, not an error.
     func chains() async throws -> [ChainOption]
+    /// Every session of a run (its attempts), `?run=`.
+    func attempts(run: String) async throws -> [AgentSessionInfo]
+    /// An account's label, for a route; nil when the device may not read it.
+    func accountName(_ id: Int64) async throws -> String?
 }
 
 extension AgentsAPI {
     public func chains() async throws -> [ChainOption] { [] }
     public func ledger(_ session: String) async throws -> SessionLedger? { nil }
+    public func attempts(run: String) async throws -> [AgentSessionInfo] { [] }
+    public func accountName(_ id: Int64) async throws -> String? { nil }
 }
 
 /// Reading a transcript entry body (the runner's JSON) into words. Pure, so it is tested without a Core.
