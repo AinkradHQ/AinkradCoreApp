@@ -17,7 +17,7 @@ final class KeyEntryFlow {
     }
 
     var key = ""
-    var label = "Work"
+    var label = "work"
     var runner: String?
     var stage = Stage.form
     var gate: GateState?
@@ -31,9 +31,17 @@ final class KeyEntryFlow {
 
     /// Keys are refused until `secrets.mode` and `secrets.provider_accounts` are both on.
     var needsGate: Bool { gate.map { $0.mode == 0 || $0.providerAccounts == 0 } ?? false }
+    /// What the Core takes as a name: `[a-z][a-z0-9._-]{0,63}`. A typed name is lowercased, spaces become dashes and
+    /// anything else outside the set is dropped.
+    static func slug(_ s: String) -> String {
+        let t = s.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "-")
+        let ok = Set("abcdefghijklmnopqrstuvwxyz0123456789._-")
+        return String(t.filter { ok.contains($0) })
+    }
+    var slugged: String { Self.slug(label) }
     var labelOK: Bool {
-        let t = label.trimmingCharacters(in: .whitespaces)
-        return !t.isEmpty && t.count <= 64
+        let t = slugged
+        return t.count <= 64 && t.first.map { "a"..."z" ~= $0 } == true
     }
     func ready(rotating: Bool) -> Bool {
         !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !needsGate
@@ -80,7 +88,7 @@ final class KeyEntryFlow {
     func connect(_ m: AccountsModel, provider: String) async {
         guard let svc = m.service, m.mayWrite(), ready(rotating: target != nil) else { return }
         let name = m.providerName(provider)
-        let who = target?.label ?? label.trimmingCharacters(in: .whitespaces)
+        let who = target?.label ?? slugged
         stage = .working("Saving the key…")
         let id: Int64
         do {
@@ -150,12 +158,14 @@ final class KeyEntryFlow {
 
     static func testWords(_ error: any Error) -> String {
         switch CoreError.unwrapping(error).map(AccountsModel.code) {
-        case "no_runner": "The key is saved, but no runner is online to check it. Start a runner, then test it."
+        case "no_runner": "The key is saved. \(AccountsModel.noRunnerWords)"
         case "runner_failed": "The key is saved, but the runner didn't answer the check."
         case "rate_limited": "The key is saved. It was checked a moment ago; test it again in a minute."
         default: "The key is saved, but the check failed. \(keyWords(error))"
         }
     }
+
+    static let labelRule = "Names use lowercase letters, digits, dot, dash and underscore, and start with a letter."
 
     /// A refusal at add or replace time, in plain words with what to do.
     static func keyWords(_ error: any Error) -> String {
@@ -170,7 +180,11 @@ final class KeyEntryFlow {
         case "secrets_unavailable": return "Your Core can't store keys right now. Try again in a moment."
         case "forbidden_scope": return "This device can't add keys. It needs admin access."
         case "rate_limited": return "Too many tries just now. Wait a minute, then try again."
-        case "bad_request": return "Your Core didn't accept that. Check the name and the key, then try again."
+        case "no_runner": return AccountsModel.noRunnerWords
+        case "credential_rejected": return AccountsModel.credentialWords
+        case "bad_request":
+            if e.localizedDescription.contains("label") { return labelRule }
+            return "Your Core didn't accept that. Check the name and the key, then try again."
         default:
             if case .http(400, _, _) = e {
                 return "Your Core didn't accept that. Check the name and the key, then try again."

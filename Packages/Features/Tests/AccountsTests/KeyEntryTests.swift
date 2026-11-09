@@ -1,3 +1,4 @@
+import AinkradClient
 import CoreKit
 import Foundation
 import Testing
@@ -35,7 +36,7 @@ struct KeyEntryTests {
         #expect(ms == 300)
         #expect(f.key.isEmpty)
         #expect(svc.lastKey == "sk-secret-1234")
-        #expect(svc.log.contains("createAccount anthropic Work r_1"))
+        #expect(svc.log.contains("createAccount anthropic work r_1"))
         #expect(svc.log.last?.hasPrefix("test ") == true)
         #expect(host.reasons.count == 1)
     }
@@ -85,6 +86,59 @@ struct KeyEntryTests {
 
     @Test func aBadInputIsExplained() {
         #expect(KeyEntryFlow.keyWords(CoreError.badRequest(message: "x")).contains("didn't accept"))
+    }
+
+    @Test func theDefaultNameIsValidAndTypedNamesAreNormalised() async {
+        let (m, svc, _) = await make()
+        let f = await filled(m)
+        #expect(f.label == "work" && f.labelOK)
+        f.label = "  My Work Key! "
+        #expect(f.slugged == "my-work-key" && f.labelOK)
+        await f.connect(m, provider: "anthropic")
+        #expect(svc.log.contains("createAccount anthropic my-work-key r_1"))
+        for bad in ["", "   ", "123", "-a", "!!!", String(repeating: "a", count: 65)] {
+            f.label = bad
+            #expect(!f.labelOK, "\(bad)")
+            #expect(!f.ready(rotating: false))
+        }
+    }
+
+    @Test func theCoresInvalidLabelAnswerIsInPlainWords() {
+        let e = CoreError.http(status: 400, code: "bad_request", message: "a label is [a-z][a-z0-9._-]{0,63}")
+        #expect(KeyEntryFlow.keyWords(e).contains("lowercase letters"))
+    }
+
+    @Test(arguments: [
+        ("no_runner", 409, "No runner can check this key yet. Pick a runner that is online and has the gateway on."),
+        ("credential_rejected", 400, "The provider said no to that token. Check it and try again."),
+    ])
+    func keyAndTestRefusalsHavePlainWords(code: String, status: Int, words: String) {
+        let e = CoreError.http(status: status, code: code, message: "raw")
+        #expect(KeyEntryFlow.keyWords(e) == words)
+        #expect(KeyEntryFlow.testWords(e).contains(words) || code == "credential_rejected")
+    }
+
+    @Test func aTypedRefusalOfTheGeneratedClientIsReadBackAsTheCoresAnswer() {
+        let body = Components.Schemas.ErrorBody(code: "bad_request", errorId: "err_1", message: "a label is x")
+        let out = Operations.CreateAccount.Output.badRequest(.init(body: .json(body)))
+        do {
+            _ = try out.ok
+            Issue.record("did not throw")
+        } catch {
+            #expect(CoreFailure.of(error) == .http(status: 400, code: "bad_request", message: "a label is x"))
+        }
+        let conflict = Operations.CreateAccount.Output.conflict(
+            .init(body: .json(.init(code: "no_runner", errorId: "err_2", message: "m"))))
+        do {
+            _ = try conflict.ok
+        } catch {
+            #expect(CoreFailure.of(error) == .http(status: 409, code: "no_runner", message: "m"))
+        }
+    }
+
+    @Test func rotatingTitlesTheDialogEvenWhenOpenedOnATarget() {
+        let f = KeyEntryFlow(target: account(1, "main"))
+        #expect(f.target?.label == "main")
     }
 
     @Test func theGateCardTurnsKeysOnInOneTouch() async {

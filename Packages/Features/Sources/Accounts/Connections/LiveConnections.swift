@@ -251,7 +251,7 @@ struct LiveConnectionsService: ConnectionsService {
 
     /// The Core's transport already turns 401, 403 and 429 into a `CoreError`; the rest are read from the answer.
     private func run<T>(_ body: () async throws -> T) async throws -> T {
-        do { return try await body() } catch { throw CoreError.unwrapping(error) ?? error }
+        do { return try await body() } catch { throw CoreFailure.of(error) ?? error }
     }
 
     /// The sheet is drawn from this: a kind the app has never heard of renders the same way.
@@ -371,6 +371,7 @@ struct LiveConnectionsService: ConnectionsService {
 
 /// Every failure in plain words with what to do, never a code.
 enum ConnSay {
+    static let notConfigured = "This service isn't set up yet. Use App registration on this page to set it up."
     static let turnedOff = "Press Turn on connections. This Mac does it for you."
 
     /// The Core's two refusals that mean "connections are off": the broker is off, or a real token isn't admitted yet.
@@ -406,6 +407,14 @@ enum ConnSay {
             return "That was tried a moment ago. Try again in \(max(Int((s ?? 5).rounded(.up)), 1)) seconds."
         case .http(let status, let code, let message):
             if isGate(code: code) { return "Connections are turned off on this Core. \(turnedOff)" }
+            switch code {
+            case "no_runner": return AccountsModel.noRunnerWords
+            case "credential_rejected": return AccountsModel.credentialWords
+            case "not_configured": return ConnSay.notConfigured
+            case "upstream_failed": return "That service couldn't be reached from your Core. Try again in a moment."
+            case "limit_reached": return "Your Core has as many connections as it allows. Remove one, then try again."
+            default: break
+            }
             if status == 409 {
                 return
                     "This is still the default for its service. Make another one the default first, then disconnect it."

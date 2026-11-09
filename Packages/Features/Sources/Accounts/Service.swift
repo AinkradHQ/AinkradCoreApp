@@ -363,7 +363,7 @@ struct LiveAccountsService: AccountsService {
 
     /// Whatever the generated client threw, as the `CoreError` inside it.
     private func run<T>(_ body: () async throws -> T) async throws -> T {
-        do { return try await body() } catch { throw CoreError.unwrapping(error) ?? Self.unknown }
+        do { return try await body() } catch { throw CoreFailure.of(error) ?? Self.unknown }
     }
 
     static func provider(_ p: Components.Schemas.Provider) -> ProviderItem {

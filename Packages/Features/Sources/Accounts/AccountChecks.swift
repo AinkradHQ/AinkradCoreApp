@@ -20,7 +20,7 @@ extension AccountsModel {
             testNote[a.id] =
                 switch code {
                 case "rate_limited": "It was tested less than a minute ago. Try again in a minute."
-                case "no_runner": "No runner is online to test it. Start a runner that offers this provider."
+                case "no_runner": Self.noRunnerWords
                 case "runner_failed": "The runner didn't answer the test, so it counts as failed."
                 default: words(error)
                 }

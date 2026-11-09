@@ -198,6 +198,10 @@ public final class AccountsModel {
         }
     }
 
+    nonisolated static let noRunnerWords =
+        "No runner can check this key yet. Pick a runner that is online and has the gateway on."
+    nonisolated static let credentialWords = "The provider said no to that token. Check it and try again."
+
     static func code(_ e: CoreError) -> String {
         switch e {
         case .forbiddenScope: "forbidden_scope"
