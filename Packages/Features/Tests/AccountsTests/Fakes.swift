@@ -166,8 +166,22 @@ final class FakeService: AccountsService, @unchecked Sendable {
         return loginItem
     }
     func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
+    var runnerList = [AccountRunner(id: "r_1", name: "linux-01", online: true)]
+    var lastKey = ""
+    func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {
+        try note("createAccount \(provider) \(label) \(runners.joined(separator: ","))")
+        lastKey = key
+        let a = account(Int64(accountList.count + 50), label, provider: provider)
+        accountList.append(a)
+        return a
+    }
+    func replaceSecret(account id: Int64, key: String, runners: [String]?) async throws {
+        try note("replaceSecret \(id) \(runners == nil ? "keep" : "set")")
+        lastKey = key
+    }
+    func setSecretsSwitch(_ key: String, _ value: Int64) async throws { try note("switch \(key) \(value)") }
     var tested = TestedItem(result: "ok", latencyMs: 300)
-    func runners() async throws -> [AccountRunner] { [] }
+    func runners() async throws -> [AccountRunner] { runnerList }
     func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws {
         try note("saveProvider \(p.id) \(p.harness) \(p.authVar) \(p.keyPrefix) \(replacing)")
     }

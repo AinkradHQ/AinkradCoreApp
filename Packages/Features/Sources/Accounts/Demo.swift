@@ -395,6 +395,25 @@ public final class AccountsDemo {
                 return n
             }
         }
+        var keyFails: String?
+        func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem
+        {
+            try await Task.sleep(for: .seconds(1))
+            if let keyFails { throw CoreError.http(status: 409, code: keyFails, message: keyFails) }
+            let a = AccountItem(
+                id: Int64(accountList.count + 20), provider: provider, label: label,
+                maskedTail: String(key.suffix(4)), baseURL: "", state: "active", stateReason: nil, stateUntil: nil,
+                cap: 4, lastUsedAt: nil, createdAt: Date())
+            accountList.append(a)
+            return a
+        }
+        func replaceSecret(account: Int64, key: String, runners: [String]?) async throws {
+            try await Task.sleep(for: .seconds(1))
+            if let keyFails { throw CoreError.http(status: 409, code: keyFails, message: keyFails) }
+        }
+        func setSecretsSwitch(_ key: String, _ value: Int64) async throws {
+            if key == "secrets.mode" { gateState.mode = value } else { gateState.providerAccounts = value }
+        }
         func deleteAccount(_ id: Int64) async throws {
             accountList.removeAll { $0.id == id }
             poolList = poolList.map {
@@ -407,7 +426,8 @@ public final class AccountsDemo {
 
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
-        "account-ready", "account-at-limit", "connect-arrived", "accounts-not-admin",
+        "account-ready", "account-at-limit", "connect-arrived", "key-add", "key-filled", "key-gate", "key-working",
+        "key-done", "key-failed", "key-test-failed", "key-rotate", "accounts-not-admin",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "chains", "chains-second", "chain-new", "chain-edit", "chain-delete",
@@ -451,6 +471,7 @@ public final class AccountsDemo {
         model.opener = { _ in }
         model.signIn = nil
         switch scene {
+        case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
         case "overview-empty":
@@ -480,7 +501,8 @@ public final class AccountsDemo {
                 "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
                 "cap", "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit",
                 "usage-limit-clear", "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
-                "signin-intro", "signin-url", "signin-working",
+                "signin-intro", "signin-url", "signin-working", "key-add", "key-filled", "key-gate", "key-working",
+                "key-done", "key-failed", "key-test-failed", "key-rotate",
                 "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
@@ -519,6 +541,22 @@ public final class AccountsDemo {
                     baseURL: "https://api.example.com", state: "active", stateReason: nil, stateUntil: nil, cap: 4,
                     lastUsedAt: nil, createdAt: Date()))
             await model.reload()
+        case "key-add", "key-gate": AccountDialogs.openConnect(model, provider: "anthropic")
+        case "key-filled", "key-working", "key-done", "key-failed", "key-test-failed":
+            let f = KeyEntryFlow()
+            f.key = "sk-ant-demo-0000"
+            f.runner = "r_linux01"
+            switch scene {
+            case "key-working": f.stage = .working("Checking the key…")
+            case "key-done": f.stage = .done(account: 1, latencyMs: 412, note: "The provider took the key.")
+            case "key-failed":
+                f.stage = .failed(
+                    KeyEntryFlow.keyWords(CoreError.http(status: 409, code: "conflict", message: "")), account: nil)
+            case "key-test-failed": f.stage = .failed("Key refused. The provider said no to this key.", account: 7)
+            default: break
+            }
+            AccountDialogs.openConnect(model, provider: "anthropic", flow: f)
+        case "key-rotate": AccountDialogs.openConnect(model, provider: "anthropic", replacing: model.account(1)!)
         case "signin-intro": AccountDialogs.openConnect(model, provider: "claude-sub")
         case "signin-url", "signin-working", "signin-done", "signin-failed":
             AccountDialogs.openConnect(model, provider: "claude-sub")
