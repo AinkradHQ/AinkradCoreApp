@@ -4,6 +4,9 @@ import Testing
 @testable import Shell
 
 struct WidgetLayoutTests {
+    /// The Board widget is the sample world's (`CORE_DEMO=1`); these tests lay out the full set.
+    init() { setenv("CORE_DEMO", "1", 1) }
+
     private func noOverlap(_ l: [WidgetItem]) -> Bool {
         for (i, a) in l.enumerated() {
             guard WidgetLayout.fits(a) else { return false }
@@ -130,6 +133,8 @@ struct WidgetLayoutTests {
 
 @MainActor
 struct HomePrefsTests {
+    init() { setenv("CORE_DEMO", "1", 1) }
+
     private func suite() -> UserDefaults {
         let name = "test.home.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: name)!
