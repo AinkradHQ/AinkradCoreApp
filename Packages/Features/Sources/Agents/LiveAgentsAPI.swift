@@ -210,7 +210,7 @@ public struct LiveAgentsAPI: AgentsAPI {
                     case .gap: out.yield(.gap)
                     case .ended(let e): out.yield(.ended(e.localizedDescription))
                     case .event(let e):
-                        guard e.kind.hasPrefix("agent.") else { continue }
+                        guard e.kind.hasPrefix("agent.") || e.kind.hasPrefix("runner.") else { continue }
                         let p = e.payload.value
                         out.yield(
                             .event(

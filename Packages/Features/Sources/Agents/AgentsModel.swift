@@ -280,7 +280,12 @@ public final class AgentsModel {
     }
 
     func apply(_ e: AgentEvent) async {
-        guard let api, let id = e.session else { return }
+        guard let api else { return }
+        if e.kind.hasPrefix("runner.") {  // a runner came or went: its chip and slots must follow
+            if let r = try? await api.runners() { runners = r }
+            return
+        }
+        guard let id = e.session else { return }
         switch e.kind {
         case "agent.created", "agent.state", "agent.ended", "agent.message":
             await refreshSession(id)
