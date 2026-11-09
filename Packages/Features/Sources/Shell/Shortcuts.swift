@@ -57,10 +57,6 @@ struct ShortcutsView: View {
                     if focused { coreShape(Radius.control).strokeBorder(palette.focusRing, lineWidth: Space.s1 / 2) }
                 }
                 .focused($focused)
-                .onKeyPress(.escape) {
-                    shell.overlay = nil
-                    return .handled
-                }
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     ForEach(ShortcutCatalog.groups, id: \.name) { g in

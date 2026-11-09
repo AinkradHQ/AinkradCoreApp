@@ -1,9 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// The Apple widget gauge (the macOS Batteries widget): a thick ring on a faint track, an SF Symbol in the middle and one
-/// short value under it. The ring fills from empty when it appears. Rings are allowed inside widgets only (Ahmed,
-/// 2026-11-05); everywhere else stays rounded rectangles.
+/// The widget gauge: an SF Symbol, one short value and a progress bar on a faint track (rounded rectangles only; no rings,
+/// Ahmed 2026-11-09). The bar fills from empty when it appears. The type keeps its old name; every widget already calls it.
 struct RingGauge: View {
     let value: Double
     let symbol: String
@@ -16,23 +15,9 @@ struct RingGauge: View {
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            GeometryReader { g in
-                let side = min(g.size.width, g.size.height)
-                let line = max(5, side * 0.1)
-                ZStack {
-                    Circle().stroke(WidgetInk.track, lineWidth: line)
-                    Circle().trim(from: 0, to: min(max(shown, 0), 1))
-                        .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Image(systemName: symbol).font(.system(size: side * 0.3, weight: .medium))
-                        .foregroundStyle(WidgetInk.primary)
-                        .symbolEffect(.bounce, value: shown > 0)
-                }
-                .padding(line / 2)
-                .frame(width: side, height: side)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .aspectRatio(1, contentMode: .fit)
+            Spacer(minLength: 0)
+            Image(systemName: symbol).font(.system(size: MacTextSize.large + 6, weight: .medium))
+                .foregroundStyle(tint).coreBounce(shown > 0)
             if let caption {
                 VStack(spacing: 0) {
                     Text(caption).font(.system(size: MacTextSize.headline + 2, weight: .semibold)).monospacedDigit()
@@ -46,11 +31,21 @@ struct RingGauge: View {
                     }
                 }
             }
+            GeometryReader { g in
+                coreShape(Radius.chip / 2).fill(WidgetInk.track)
+                    .overlay(alignment: .leading) {
+                        coreShape(Radius.chip / 2).fill(tint).frame(width: g.size.width * min(max(shown, 0), 1))
+                    }
+            }
+            .frame(height: Space.s2)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, Space.s2)
         .onAppear { fill() }
         .onChange(of: value) { _, _ in fill() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([caption, sub].compactMap(\.self).joined(separator: ", "))
+        .accessibilityValue("\(Int((min(max(value, 0), 1) * 100).rounded())) percent")
     }
 
     private func fill() {

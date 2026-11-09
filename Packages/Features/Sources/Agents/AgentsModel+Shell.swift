@@ -19,10 +19,11 @@ extension AgentsModel {
     // MARK: panes
 
     public func openList() {
-        shell.openPane(
-            PaneSpec(id: Self.listPane, title: "Agents", sub: "Home Core", symbol: "sparkles", chip: listChip) {
-                AgentsListView(model: self)
-            })
+        var spec = PaneSpec(id: Self.listPane, title: "Agents", sub: "Home Core", symbol: "sparkles", chip: listChip) {
+            AgentsListView(model: self)
+        }
+        spec.tab = "Agents"
+        shell.openPane(spec)
     }
 
     public func openSession(_ id: String) {
@@ -134,7 +135,7 @@ extension AgentsModel {
     func registerBase() {
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.list", title: "Agents", sub: "sessions on the Home Core", symbol: "sparkles",
+                id: "agents.list", title: "Agents", sub: "Your agent sessions", symbol: "sparkles",
                 keywords: ["sessions", "claude", "codex", "agent"]
             ) { [weak self] in self?.openList() })
         shell.launcher.register(

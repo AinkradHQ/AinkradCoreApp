@@ -81,6 +81,10 @@ public struct ConfirmCard: View {
             listen()
         }
         .onDisappear { if let monitor { NSEvent.removeMonitor(monitor) } }
+        .coreEscape {
+            cancel()
+            return true
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }
@@ -99,7 +103,6 @@ public struct ConfirmCard: View {
             case 124, 48: selected = min(selected + 1, choices.count - 1)  // → or Tab
             case 36, 76:  // Return, Enter
                 run(e.modifierFlags.contains(.command) ? choices.count - 1 : selected)
-            case 53: cancel()  // Esc
             default: return e
             }
             return nil

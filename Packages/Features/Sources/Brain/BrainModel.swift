@@ -264,10 +264,11 @@ public final class BrainModel {
     /// Opens the pane on a tab.
     public func show(_ tab: BrainTab = .overview) {
         self.tab = tab
-        host.shell.openPane(
-            PaneSpec(
-                id: "brain", title: "Brain", sub: viewing?.name, symbol: "brain", chip: chip, minWidth: 720
-            ) { BrainPane(model: self) })
+        var spec = PaneSpec(
+            id: "brain", title: "Brain", sub: viewing?.name, symbol: "brain", chip: chip, minWidth: 720
+        ) { BrainPane(model: self) }
+        spec.tab = "Brain"
+        host.shell.openPane(spec)
         if load == .loading || (service != nil && overview == nil) { Task { await reload() } }
     }
 

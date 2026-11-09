@@ -202,7 +202,7 @@ private struct ShellTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s1) {
-                Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).symbolEffect(.bounce, value: on)
+                Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).coreBounce(on)
                 Text(title).font(.system(size: MacTextSize.meta, weight: .medium, design: .monospaced)).lineLimit(1)
             }
             .foregroundStyle(GlassInk.primary)

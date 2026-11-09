@@ -405,11 +405,12 @@ public final class ConnectionsModel {
 
     func show(_ page: ConnPage = .list) {
         self.page = page
-        host.shell.openPane(
-            PaneSpec(
-                id: "connections", title: "Core", sub: "Connections", symbol: "link",
-                chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
-            ) { ConnectionsView(model: self) })
+        var spec = PaneSpec(
+            id: "connections", title: "Connections", sub: "Home Core", symbol: "link",
+            chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
+        ) { ConnectionsView(model: self) }
+        spec.tab = "Connections"
+        host.shell.openPane(spec)
         Task { await reload() }
     }
 

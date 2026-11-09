@@ -157,7 +157,7 @@ struct PaneView: Equatable {
                 banner: .init(
                     tone: .warn, title: "Verification expired. Your terminal is still running.",
                     detail:
-                        "Elevation lasts 5 minutes. The connection was closed (4003 step-up expired) but the terminal keeps running. What you see is the last screen this window had."
+                        "Verification lasts 5 minutes. The connection was closed (4003 step-up expired) but the terminal keeps running. What you see is the last screen this window had."
                 ),
                 card: .init(
                     title: "Verify to reattach",

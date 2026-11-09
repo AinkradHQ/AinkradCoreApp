@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Top right: Home/Workspace, layout, what is running, the Touch ID elevation chip (placeholder), the bell, the Core's state when it is not connected, and the emblem.
+/// Top right: Home/Workspace, layout, what is running, the admin-unlocked chip (only while unlocked), the bell, the Core's state when it is not connected, and the emblem.
 struct StatusCluster: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
@@ -78,7 +78,7 @@ struct StatusCluster: View {
     /// "2 running · 1 waiting" (Settings → Activity can hide it). A click opens the bell, where the waiting items are.
     @ViewBuilder private var activity: some View {
         let running = shell.home.runningAgents
-        let waiting = shell.bell.waiting
+        let waiting = shell.waitingOnYou
         if shell.showActivityChip && (running > 0 || waiting > 0) {
             Button {
                 shell.toggleBell()
@@ -131,7 +131,7 @@ private struct StatusButton: View {
                 }
                 if let title { Text(title).lineLimit(1).contentTransition(.numericText()) }
                 if let meter {
-                    CoreMeter(meter.value, low: meter.low, label: "Elevation time left").frame(width: Space.s6)
+                    CoreMeter(meter.value, low: meter.low, label: "Time left").frame(width: Space.s6)
                 }
             }
             .font(.system(size: MacTextSize.body))
@@ -151,28 +151,21 @@ private struct StatusButton: View {
     }
 }
 
-/// Locked, unlocked with the time left, or locking soon. The chip says it in words and a symbol; the bar only shows the time.
+/// Shown only while admin actions are unlocked: "Admin unlocked · 4 min". Minutes change slowly, so it looks twice a minute;
+/// the panel it opens has the live m:ss.
 private struct ElevationChip: View {
     @Bindable var shell: ShellModel
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         if let until = shell.elevatedUntil, until > Date() {
-            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            TimelineView(.periodic(from: .now, by: 15)) { ctx in
                 let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
-                let soon = left <= 60
                 StatusButton(
-                    title: "\(soon ? "Locks in" : "Unlocked") \(Countdown.text(left))",
-                    symbol: soon ? "lock.badge.clock" : "lock.open",
-                    label: "Touch ID elevation: admin actions unlocked for \(Countdown.text(left))",
-                    on: shell.elevationPanelOpen, meter: (Double(left) / shell.elevationSpan, soon)
+                    title: "Admin unlocked · \(coreUnit("\((left + 59) / 60)", "min"))", symbol: "lock.open",
+                    label: "Admin actions are unlocked, no Touch ID needed until then",
+                    on: shell.elevationPanelOpen, meter: (Double(left) / shell.elevationSpan, left <= 60)
                 ) { shell.elevationPanelOpen.toggle() }
             }
-        } else {
-            StatusButton(
-                title: "Locked", symbol: "lock", label: "Touch ID elevation: admin actions are locked",
-                on: shell.elevationPanelOpen
-            ) { shell.elevationPanelOpen.toggle() }
         }
     }
 }
@@ -190,13 +183,18 @@ struct ElevationPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             if let until = shell.elevatedUntil, until > Date() {
-                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                // The words count down on their own (`.timer`); only the bar needs a clock, and 5 s moves it a pixel at most.
+                TimelineView(.periodic(from: .now, by: 5)) { ctx in
                     let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
                     VStack(alignment: .leading, spacing: Space.s3) {
-                        header(
-                            left <= 60 ? "Locks in \(Countdown.text(left))" : "Unlocked for \(Countdown.text(left))",
-                            "lock.open")
-                        CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Elevation time left")
+                        HStack(spacing: Space.s2) {
+                            Image(systemName: "lock.open").accessibilityHidden(true)
+                            (Text(left <= 60 ? "Locks in " : "Unlocked for ")
+                                + Text(timerInterval: Date.now...max(until, .now), countsDown: true))
+                                .font(.system(size: MacTextSize.title, weight: .semibold)).monospacedDigit()
+                        }
+                        .accessibilityElement(children: .combine)
+                        CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Time left")
                     }
                 }
                 text(
@@ -207,7 +205,7 @@ struct ElevationPanel: View {
                     "Adding, renaming or revoking a device, changing scopes and clearing lockouts ask for Touch ID. Once confirmed they stay unlocked for 5 minutes."
                 )
             }
-            Text("Elevation ends early if the Core restarts or this device is revoked.")
+            Text("Admin unlock ends early if the Core restarts or this device is revoked.")
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
             let on = shell.elevatedUntil.map { $0 > Date() } ?? false
@@ -223,7 +221,7 @@ struct ElevationPanel: View {
         .corePanel(radius: Radius.panel, padding: 0, part: .popups)
         .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Touch ID elevation")
+        .accessibilityLabel("Admin unlock")
     }
 
     private func header(_ title: String, _ symbol: String) -> some View {

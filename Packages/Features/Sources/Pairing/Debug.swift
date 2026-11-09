@@ -68,7 +68,7 @@ extension AppModel {
     public func debugNotice(_ scene: String, done: String) {
         let phase: StepUpPhase =
             scene == "cancelled"
-            ? .cancelled : scene == "failed" ? .failed("The Secure Enclave could not sign the request.") : .noKey
+            ? .cancelled : scene == "failed" ? .failed("Touch ID didn't match. Try again.") : .noKey
         stepUpNotice = StepUpNotice(phase: phase, done: done)
     }
 
@@ -202,7 +202,7 @@ extension AppModel {
             self.about.debugSet(.loading)
             debugOpenSettings("about")
         case "about-error":
-            self.about.debugSet(.failed("Core did not answer. Try again in a moment."))
+            self.about.debugSet(.failed("The Core did not answer. Try again in a moment."))
             debugOpenSettings("about")
         case "bell-alarm", "bell-alarm-cleared":
             accountNotice("alarm.raised", ["alarm": "failover_storm"])

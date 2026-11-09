@@ -258,7 +258,7 @@ private struct PaneTab: View {
                     .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
             }
             if let c = stateColor {
-                Circle().fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
+                coreShape(1.5).fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
             }
             // Always laid out in a fixed 24 pt slot and shown by opacity, so hover never moves the tab.
             Button {
@@ -374,7 +374,7 @@ private struct PaneHost: View {
         }
         .overlay(alignment: .top) {
             if canDrag && (dragging || (hovering && !scrolling)) {
-                Capsule().fill(.white.opacity(gripHover ? 0.75 : 0.4))
+                coreShape(2.5).fill(.white.opacity(gripHover ? 0.75 : 0.4))
                     .frame(width: gripHover ? 64 : 44, height: 5)
                     .padding(.vertical, 6).padding(.horizontal, 24)
                     .contentShape(Rectangle())
@@ -422,14 +422,8 @@ private struct SeamHandle: View {
             }
             .contentShape(Rectangle())
             .offset(x: seam.frame.minX, y: seam.frame.minY)
-            .onHover { inside in
-                hovering = inside
-                if inside {
-                    (horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
+            .onHover { hovering = $0 }
+            .modifier(SeamCursor(horizontal: horizontal, hovering: hovering))
             .gesture(
                 DragGesture(minimumDistance: 1, coordinateSpace: .named("ws"))
                     .onChanged { v in
@@ -457,5 +451,35 @@ private struct GrabPointer: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// The resize cursor over a seam: the system pointer style where it exists, otherwise a push/pop kept balanced even if the
+/// seam disappears (a pane closing under the pointer) while hovered.
+private struct SeamCursor: ViewModifier {
+    let horizontal: Bool
+    let hovering: Bool
+    @State private var pushed = false
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content.pointerStyle(horizontal ? .columnResize : .rowResize)
+        } else {
+            content
+                .onChange(of: hovering) { _, now in
+                    if now, !pushed {
+                        (horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
+                        pushed = true
+                    } else if !now {
+                        release()
+                    }
+                }
+                .onDisappear { release() }
+        }
+    }
+
+    private func release() {
+        if pushed { NSCursor.pop() }
+        pushed = false
     }
 }

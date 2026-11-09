@@ -7,7 +7,7 @@ struct SwitchesSection: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        let model = admin.registry!
+        let model = admin.registry
         AdminScreen(
             admin: admin, what: "Feature switches",
             intro:
@@ -232,7 +232,7 @@ private struct StatePanel<Trailing: View>: View {
                 .overlay { coreShape(12).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                 .shadow(color: hue.opacity(0.5), radius: 12)
                 .contentTransition(.symbolEffect(.replace))
-                .symbolEffect(.bounce, value: trigger)
+                .coreBounce(trigger)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(hue)
                     .contentTransition(.opacity)

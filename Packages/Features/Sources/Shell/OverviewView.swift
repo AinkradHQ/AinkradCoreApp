@@ -67,7 +67,7 @@ struct OverviewView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(shell.tabName(p)).font(.system(size: MacTextSize.headline + 1, weight: .semibold)).lineLimit(1)
                 HStack(spacing: Space.s1) {
-                    if let state { Circle().fill(state).frame(width: 6, height: 6) }
+                    if let state { coreShape(1.5).fill(state).frame(width: 6, height: 6) }
                     Text([p.title, p.chip?.label].compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
@@ -111,7 +111,6 @@ struct OverviewView: View {
             case 125: selected = min(selected + cols, count - 1)
             case 126: selected = max(selected - cols, 0)
             case 36, 76: open(selected)
-            case 53: shell.overviewOpen = false
             default:
                 if let c = e.charactersIgnoringModifiers, let n = Int(c), n >= 1, n <= 9 {
                     open(n - 1)

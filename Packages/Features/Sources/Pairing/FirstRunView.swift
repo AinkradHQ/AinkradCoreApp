@@ -227,7 +227,7 @@ struct FirstRunView: View {
     private func foundLocalCore(_ address: String) -> some View {
         HStack(spacing: Space.s3) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: MacTextSize.large))
-                .foregroundStyle(palette.tone(.run).ink).symbolEffect(.bounce, value: address)
+                .foregroundStyle(palette.tone(.run).ink).coreBounce(address)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Found a Core on this Mac").font(.system(size: MacTextSize.body, weight: .semibold))
@@ -334,8 +334,10 @@ struct FirstRunView: View {
 
     private var sas: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Compare this with the approver").font(.system(size: MacTextSize.large, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
+            Text("Check it matches the code on your Core's screen").font(
+                .system(size: MacTextSize.large, weight: .semibold)
+            )
+            .accessibilityAddTraits(.isHeader)
             Text("It has to match the code on their screen, every character. If it doesn't, don't go on.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             if let claim = model.claim { SASView(sas: claim.sas) }

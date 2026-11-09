@@ -53,8 +53,8 @@ extension ShellModel {
         return out
     }
 
-    /// The name a tab shows: the person's own, else the pane's sub (runner-1), else its title.
-    public func tabName(_ spec: PaneSpec) -> String { tabNames[spec.id] ?? spec.sub ?? spec.title }
+    /// The name a tab shows: the person's own, else the pane's sub (runner-1), else the app's name, else its title.
+    public func tabName(_ spec: PaneSpec) -> String { tabNames[spec.id] ?? spec.tab ?? spec.sub ?? spec.title }
 
     /// Rename a tab; an empty name goes back to the pane's own.
     public func renameTab(_ id: String, to name: String) {
