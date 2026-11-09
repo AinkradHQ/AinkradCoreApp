@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension MacTextSize {
-    /// UserDefaults key for the text-size factor. No Settings UI yet (lane L5 adds it).
+    /// UserDefaults key for the text-size factor (Settings, Mac, Appearance, Text size).
     public static let scaleKey = "core.textScale"
     /// The smallest text the app draws, whatever the factor.
     public static let floor: CGFloat = 10
@@ -12,8 +12,53 @@ extension MacTextSize {
         return min(max(v, 0.8), 2)
     }
 
-    /// A token size with the factor applied and the 10 pt floor. Call sites adopt it as the app lanes touch them.
-    public static func scaled(_ size: CGFloat) -> CGFloat { max(floor, (size * scale).rounded()) }
+    /// A token size with the factor applied and the 10 pt floor. At 100 % the size is untouched; a size already under the
+    /// floor (a tiny key cap) is never grown by the floor, only by a factor above 1.
+    public static func scaled(_ size: CGFloat, by factor: Double? = nil) -> CGFloat {
+        let f = factor.map { min(max($0, 0.8), 2) } ?? scale
+        if f == 1 { return size }
+        return max(min(size, floor), (size * f).rounded())
+    }
+}
+
+private struct TextScaleKey: EnvironmentKey {
+    static var defaultValue: Double { MacTextSize.scale }
+}
+
+extension EnvironmentValues {
+    /// The text-size factor; `coreTheme()` keeps it in step with the setting so text redraws when it changes.
+    public var coreTextScale: Double {
+        get { self[TextScaleKey.self] }
+        set { self[TextScaleKey.self] = newValue }
+    }
+}
+
+private struct CoreFontModifier: ViewModifier {
+    let size: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design
+    @Environment(\.coreTextScale) private var scale
+    func body(content: Content) -> some View {
+        content.coreFont(size: MacTextSize.scaled(size, by: scale), weight: weight, design: design)
+    }
+}
+
+extension View {
+    /// The one way to set a point size: the size times the Text size setting, with the 10 pt floor.
+    public func coreFont(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default)
+        -> some View
+    {
+        modifier(CoreFontModifier(size: size, weight: weight, design: design))
+    }
+}
+
+extension Font {
+    /// For a `Font` value that cannot be a modifier (an argument). Pass the scale from `@Environment(\.coreTextScale)`.
+    public static func core(
+        size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, scale: Double
+    ) -> Font {
+        .system(size: MacTextSize.scaled(size, by: scale), weight: weight, design: design)
+    }
 }
 
 /// A number and its unit joined by a no-break space, so a wrapped line never leaves "12" alone above "ms".
@@ -34,9 +79,9 @@ public struct CoreChip: View {
     public var body: some View {
         HStack(spacing: Space.s1) {
             if let symbol {
-                Image(systemName: symbol).font(.system(size: MacTextSize.meta - 1)).accessibilityHidden(true)
+                Image(systemName: symbol).coreFont(size: MacTextSize.meta - 1).accessibilityHidden(true)
             }
-            Text(text).font(.system(size: MacTextSize.meta, weight: .medium)).lineLimit(1)
+            Text(text).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1)
         }
         .foregroundStyle(palette.text)
         .padding(.horizontal, Space.s2)

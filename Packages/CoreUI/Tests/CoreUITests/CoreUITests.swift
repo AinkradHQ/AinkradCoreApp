@@ -73,6 +73,13 @@ struct SurfaceTests {
         UserDefaults.standard.removeObject(forKey: MacTextSize.scaleKey)
     }
 
+    @Test func textScaleLeavesOneHundredPercentAndTinyTextAlone() {
+        #expect(MacTextSize.scaled(8, by: 1) == 8 && MacTextSize.scaled(13, by: 1) == 13)
+        #expect(MacTextSize.scaled(8, by: 0.8) == 8)  // already under the floor: never shrunk further
+        #expect(MacTextSize.scaled(13, by: 1.5) == 20 && MacTextSize.scaled(11, by: 1.25) == 14)
+        #expect(MacTextSize.scaled(20, by: 9) == 40)  // the factor is kept at 2
+    }
+
     @Test func increaseContrastStrengthensEdgeAndSecondaryInk() {
         #expect(Palette.day.contrast(.increased).increased && !Palette.day.increased)
         #expect(Palette.night.contrast(.standard).increased == false)
