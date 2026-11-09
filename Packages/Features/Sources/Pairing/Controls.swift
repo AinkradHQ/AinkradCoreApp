@@ -36,7 +36,7 @@ struct SASView: View {
         HStack(spacing: Space.s3) {
             ForEach(Array(sas.split(separator: "-").enumerated()), id: \.offset) { i, group in
                 Text(String(group))
-                    .font(.system(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced))
+                    .coreFont(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced)
                     .frame(maxWidth: .infinity, minHeight: MacSize.controlLg * 2)
                     .background(palette.glassCard, in: coreShape(Radius.cardMac))
                     .overlay {

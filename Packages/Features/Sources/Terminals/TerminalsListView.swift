@@ -8,6 +8,7 @@ struct TerminalsListView: View {
     let model: TerminalsModel
     @Bindable private var prefs = TerminalPrefs.shared
     @FocusState private var listFocus: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         VStack(spacing: 0) {
@@ -105,7 +106,7 @@ struct TerminalsListView: View {
         guard !rows.isEmpty else { return .ignored }
         let i = rows.firstIndex { $0.id == model.selected } ?? (step > 0 ? -1 : rows.count)
         let next = rows[min(max(i + step, 0), rows.count - 1)].id
-        withAnimation(.spring(duration: 0.25)) { model.selected = next }
+        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { model.selected = next }
         proxy.scrollTo(next)
         return .handled
     }

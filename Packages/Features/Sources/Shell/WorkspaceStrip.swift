@@ -147,6 +147,6 @@ struct StackBadge: View {
         .frame(width: slot.width, height: slot.height, alignment: .bottomTrailing)
         .offset(x: slot.minX, y: slot.minY)
         .allowsHitTesting(false)
-        .animation(.spring(duration: 0.3), value: index)
+        .coreAnimation(Motion.out(Motion.ui), value: index)
     }
 }

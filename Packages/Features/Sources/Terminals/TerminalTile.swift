@@ -10,6 +10,7 @@ struct TerminalTile: View {
     var index = 0
     @State private var hovering = false
     @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         let session = model.sessions[item.id]
@@ -73,7 +74,7 @@ struct TerminalTile: View {
         .opacity(item.isEnded ? 0.7 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(count: 2) { TileAction.run(.open, item.id, model) }
-        .onTapGesture { withAnimation(.spring(duration: 0.25)) { model.selected = item.id } }
+        .onTapGesture { withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { model.selected = item.id } }
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .animation(Motion.out(Motion.hover), value: selected)
@@ -111,7 +112,7 @@ struct TerminalTile: View {
     private func mini(_ symbol: String, _ key: String, _ hue: Color, run: @escaping () -> Void) -> some View {
         Button(action: run) {
             VStack(spacing: 1) {
-                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).coreBounce(hovering)
+                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).coreEnterBounce(hovering)
                 Text(key).coreFont(size: 8, weight: .bold, design: .rounded).opacity(0.85)
             }
             .foregroundStyle(.white)

@@ -136,7 +136,7 @@ struct SubscriptionSignIn: View {
                 }, run: send)
         }
         .onAppear { codeFocus = true }
-        .animation(.smooth(duration: 0.3), value: codeFocus)
+        .coreAnimation(Motion.smooth(0.3), value: codeFocus)
     }
 
     private func send() { Task { await model.sendSignInCode(code) } }
