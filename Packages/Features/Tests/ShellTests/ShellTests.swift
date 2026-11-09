@@ -188,3 +188,22 @@ struct UndoShortcutTests {
         #expect(shell.panes.map(\.id) == ["a"])
     }
 }
+
+@MainActor
+struct WidgetCountAndCaptionTests {
+    @Test func aJoinRequestCountsAsWaitingOnYou() {
+        let m = ShellModel(defaults: UserDefaults(suiteName: "q-\(UUID().uuidString)")!)
+        m.waitingSource = { 0 }
+        #expect(m.waitingOnYou == 0)
+        m.bell.add(BellItem(id: "pairing-p_1", kind: .approval, title: "A new device wants to join"))
+        #expect(m.waitingOnYou == 1)
+        m.waitingSource = { 2 }
+        #expect(m.waitingOnYou == 3)
+    }
+
+    @Test func theThemeCaptionFollowsWhatIsReallyShown() {
+        #expect(AppearanceSection.caption(chosen: .night, isDay: false) == "Showing night now")
+        #expect(AppearanceSection.caption(chosen: .system, isDay: false) == "Following your Mac: showing night now")
+        #expect(AppearanceSection.caption(chosen: .system, isDay: true) == "Following your Mac: showing day now")
+    }
+}

@@ -107,7 +107,7 @@ public struct AppFilterTile: View {
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: on)
         .animation(Motion.out(Motion.hover), value: hovering)
-        .accessibilityLabel("\(title), \(count)")
+        .accessibilityLabel(count >= 0 ? "\(title), \(count)" : title)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
