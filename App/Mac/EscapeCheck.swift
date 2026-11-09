@@ -93,6 +93,20 @@ enum EscapeCheck {
         await settle(1.2)
         await shot("pane-detail-launcher-esc-2-closed")
         state("E done")
+        log(
+            "E after launcher esc 2: accountDetailOpen=\(app.debugAccountsDetailOpen) (must be false: the pane took focus back)"
+        )
+
+        // F. the same through a dialog and Settings: the pane answers Esc once they are gone.
+        await app.debugAccountsDemo().show("account-ready")
+        await settle(1.0)
+        shell.open(.settings)
+        await settle()
+        esc()  // Settings closes
+        await settle()
+        esc()  // the pane's own back
+        await settle(1.2)
+        log("F after settings esc 1 and pane esc: accountDetailOpen=\(app.debugAccountsDetailOpen) (must be false)")
         NSApp.terminate(nil)
     }
 

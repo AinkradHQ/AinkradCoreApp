@@ -45,6 +45,7 @@ struct BrainPane: View {
             }
             .focusable().focused($paneFocus).focusEffectDisabled()
             .onAppear { paneFocus = true }
+            .retakeFocus(after: model.host.shell) { paneFocus = true }
             .onKeyPress(.escape) {
                 guard model.inspectingID != nil else { return .ignored }
                 withAnimation(.smooth(duration: 0.25)) { model.closeInspect() }

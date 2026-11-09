@@ -143,9 +143,6 @@ private struct FeedView: View {
     private func filters(_ a: ActivityModel) -> some View {
         @Bindable var a = a
         let kinds = ActivityKind.allCases.map { CoreSegment($0, $0.title) }
-        let rooms =
-            [CoreSelectOption(ActivityFilter.RoomChoice.all, "All open rooms")]
-            + model.mountedRooms.map { CoreSelectOption(.room($0.id), $0.name) } + [CoreSelectOption(.none, "No room")]
         let who = [CoreSelectOption("", "Anyone")] + a.people.map { CoreSelectOption($0, $0) }
         let results =
             [CoreSelectOption(ActivityResult?.none, "Any result")]
@@ -153,7 +150,6 @@ private struct FeedView: View {
         return VStack(alignment: .leading, spacing: Space.s2) {
             CoreSegmented("Kind", segments: kinds, selection: $a.filter.kind)
             HStack(alignment: .bottom, spacing: Space.s2) {
-                CoreSelect("Room", selection: $a.filter.room, options: rooms)
                 CoreSelect("Who", selection: $a.filter.who, options: who)
                 CoreSelect("Result", selection: $a.filter.result, options: results)
                 if a.filter.isActive {

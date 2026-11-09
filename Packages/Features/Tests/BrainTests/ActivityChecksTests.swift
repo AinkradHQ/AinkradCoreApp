@@ -25,12 +25,15 @@ struct ActivityChecksTests {
 
     // MARK: Activity
 
-    @Test func startsOnTheViewingRoomAndAllRoomsIsAChoice() async {
+    @Test func startsOnTheViewingRoomAndFollowsThePicker() async {
         let (m, _) = await loaded()
         #expect(m.activity.filter.room == .room("ainkrad"))
         #expect(m.activity.visible.allSatisfy { $0.room == "ainkrad" })
-        m.activity.filter.room = .all
-        #expect(m.activity.visible.contains { $0.room == "optimus" })
+        // Clearing the filters keeps the room picker's room.
+        m.activity.filter.result = .blocked
+        #expect(m.activity.filter.isActive)
+        m.activity.clearFilters()
+        #expect(m.activity.filter.room == .room("ainkrad") && !m.activity.filter.isActive)
         // Switching the viewing room moves the starting filter with it.
         m.view("voutra")
         m.activity.enter()
