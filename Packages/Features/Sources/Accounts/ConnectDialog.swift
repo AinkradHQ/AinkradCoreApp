@@ -2,23 +2,25 @@ import AppKit
 import CoreUI
 import SwiftUI
 
-/// Connect an account, or use a new key. Sign-in happens on the provider's own page: this dialog opens it and never holds a
-/// key, a token or a field to type one in.
+/// Connect an account, or use a new key. An API key is pasted here and goes straight to the Core (see `KeyEntryFlow`);
+/// a subscription signs in on the provider's own page.
 struct ConnectDialog: View {
     let model: AccountsModel
     let replacing: AccountItem?
     let close: () -> Void
     @State private var provider: String
     /// The accounts that were there when the dialog opened: one that is not in it has arrived.
-    @State private var known: Set<Int64>
-    @State private var copied = false
+    @State private var flow: KeyEntryFlow
     @Environment(\.corePalette) private var palette
 
-    init(model: AccountsModel, provider: String?, replacing: AccountItem?, close: @escaping () -> Void) {
+    init(
+        model: AccountsModel, provider: String?, replacing: AccountItem?, flow: KeyEntryFlow? = nil,
+        close: @escaping () -> Void
+    ) {
         self.model = model
         self.replacing = replacing
         self.close = close
-        _known = State(initialValue: Set(model.accounts.map(\.id)))
+        _flow = State(initialValue: flow ?? KeyEntryFlow(target: replacing))
         _provider = State(
             initialValue: provider ?? model.providers.first { ProviderSites.page($0.id) != nil }?.id ?? model.providers
                 .first?.id ?? "")
@@ -29,7 +31,7 @@ struct ConnectDialog: View {
         let hue = GlassInk.blue
         CoreDialogPanel(replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
             VStack(alignment: .leading, spacing: Space.s4) {
-                if replacing == nil && model.signIn == nil {
+                if replacing == nil && model.signIn == nil && flow.stage == .form && flow.target == nil {
                     HStack(spacing: Space.s2) {
                         ForEach(ProviderLook.ordered(model.providers)) { p in
                             ProviderChoice(provider: p, on: p.id == provider, lens: lens) {
@@ -46,103 +48,156 @@ struct ConnectDialog: View {
                 if let p = model.provider(provider), p.loginMethods.contains("browser_code") {
                     SubscriptionSignIn(model: model, provider: p, close: close).id(provider)
                 } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        step(
-                            1, "Get a key", hue: hue, on: true,
-                            detail: site.map { "Create an API key in \($0.name). Ainkrad never sees your password." }
-                                ?? "Open this provider's own site and create a key there."
-                        ) {
-                            if let site {
-                                AppActionTile(
-                                    title: "Open \(site.name)", symbol: "arrow.up.right.square", key: "⌘O", hue: hue,
-                                    prominent: true
-                                ) {
-                                    model.opener(site.url)
+                    if flow.stage == .form {
+                        VStack(alignment: .leading, spacing: 0) {
+                            step(
+                                1, "Get a key", hue: hue, on: true,
+                                detail: site.map {
+                                    "Create an API key in \($0.name). Ainkrad never sees your password."
                                 }
-                                .keyboardShortcut("o", modifiers: .command)
-                                .help(site.url.absoluteString)
+                                    ?? "Open this provider's own site and create a key there."
+                            ) {
+                                if let site {
+                                    AppActionTile(
+                                        title: "Open \(site.name)", symbol: "arrow.up.right.square", key: "⌘O",
+                                        hue: hue, prominent: true
+                                    ) {
+                                        model.opener(site.url)
+                                    }
+                                    .keyboardShortcut("o", modifiers: .command)
+                                    .help(site.url.absoluteString)
+                                }
                             }
+                            step(
+                                2, "Add it to your Core", hue: hue, on: true, last: true,
+                                detail: "The key goes straight to your Core and is never shown again."
+                            ) { keyStep }
                         }
-                        step(
-                            2, "Add it to your Core", hue: hue, on: arrived == nil, last: true,
-                            detail:
-                                "Keys are added from an admin computer, not from this app: there is no place here to type one, so a key can't leak from this Mac. Run this there, with your own admin token and the key."
-                        ) {
-                            command
-                            waiting
-                        }
-                    }
-                    .id(provider)
-                    .transition(.opacity)
-                    if let arrived {
-                        AccDialogButtons(
-                            confirm: "Open \(arrived.label)", cancelTitle: "Close", cancel: close
-                        ) {
-                            close()
-                            model.show(.accounts, account: arrived.id)
-                        }
+                        .id(provider)
+                        .transition(.opacity)
                     } else {
-                        AccDialogButtons(cancelTitle: "Close", cancel: close)
+                        outcome
                     }
                 }
             }
         }
         .accessibilityIdentifier("account-connect")
+        .task { await flow.load(model) }
+        .onDisappear { flow.wipe() }
     }
 
-    /// The new account of this provider that showed up since the dialog opened.
-    private var arrived: AccountItem? {
-        model.accounts.first { !known.contains($0.id) && $0.provider == provider }
-    }
+    private var rotating: Bool { flow.target != nil }
 
-    /// The `ainkradctl` command for this dialog. The key is read by ainkradctl from a file or stdin, never typed on the
-    /// command line, so it never reaches shell history or this app.
-    static func addCommand(provider: String, label: String, replacing id: Int64?) -> String {
-        if let id { return "ainkradctl account rotate \(id) --key-file <file with the new key>" }
-        let quoted = "'" + label.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        return "ainkradctl account add \(provider) --label \(quoted) --key-file <file with the key>"
-    }
-
-    private var addCommand: String {
-        Self.addCommand(provider: provider, label: replacing?.label ?? "Work", replacing: replacing?.id)
-    }
-
-    private var command: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text(addCommand).coreFont(size: MacTextSize.meta, design: .monospaced).textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-                .background(GlassInk.well, in: coreShape(Radius.control))
-                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-            AccLink(title: copied ? "Copied" : "Copy command", symbol: copied ? "checkmark" : "doc.on.doc") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(addCommand, forType: .string)
-                copied = true
-                CoreAnnounce.post("Command copied")
+    @ViewBuilder private var keyStep: some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            if flow.needsGate { gateCard }
+            if !rotating {
+                CoreTextField("Name", placeholder: "Work", text: $flow.label, error: nil)
             }
-            .help("Copies the command. It has no key in it.")
+            HStack(alignment: .bottom, spacing: Space.s2) {
+                CoreSecureField("Key", placeholder: "Paste your key", text: $flow.key, autofocus: true)
+                    .accessibilityIdentifier("account-key")
+                AccLink(title: "Paste", symbol: "doc.on.clipboard") { flow.paste() }
+            }
+            if !rotating { runnerStep }
+            if let n = flow.gateNote { AccIssue(text: n) }
+            AccDialogButtons(
+                confirm: rotating ? "Save key" : "Connect", enabled: flow.ready(rotating: rotating), cancel: close
+            ) {
+                Task { await flow.connect(model, provider: provider) }
+            }
         }
     }
 
-    /// Live: turns into the new account when the list changes (events drive it; a slow re-read covers a missed one).
-    @ViewBuilder private var waiting: some View {
-        if let arrived {
-            Label("\(arrived.label) arrived and is in your Core.", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(palette.tone(.run).ink)
-                .accessibilityIdentifier("connect-arrived")
-        } else {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                Text("Waiting for the key to arrive").coreFont(size: MacTextSize.meta, weight: .semibold)
-                CoreBusyBar().frame(maxWidth: Space.s8 * 5)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("connect-waiting")
-            .task {
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(8))
-                    model.resync()
+    /// The runner that checks the key. Required: with none online there is nothing to check it with.
+    @ViewBuilder private var runnerStep: some View {
+        if flow.runners.contains(where: \.online) {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Text("Check the key on").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Space.s2)], spacing: Space.s2) {
+                    ForEach(flow.runners) { r in
+                        AccPick(
+                            title: r.name, sub: r.online ? "Online" : "Offline", symbol: "server.rack",
+                            hue: GlassInk.blue, on: flow.runner == r.id, enabled: r.online
+                        ) { flow.runner = r.id }
+                    }
                 }
             }
+        } else {
+            HStack(spacing: Space.s2) {
+                Label("No runner is online to check the key.", systemImage: "server.rack")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                Spacer(minLength: 0)
+                AccLink(title: "Open runners", symbol: "arrow.up.right") {
+                    close()
+                    model.openRunners()
+                }
+            }
+        }
+    }
+
+    private var gateCard: some View {
+        HStack(spacing: Space.s3) {
+            IconTile("key.fill", hue: GlassInk.blue, size: 36, bounce: false)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Turn on keys for accounts").coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text("Your Core is set to keep no provider keys. This turns that on.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Space.s3)
+            Button(flow.enabling ? "Turning on…" : "Turn on") { Task { await flow.enableKeys(model) } }
+                .buttonStyle(CoreButtonStyle(.prominent)).disabled(flow.enabling)
+        }
+        .padding(Space.s3)
+        .background(GlassInk.blue.opacity(0.12), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.4), lineWidth: 1) }
+        .accessibilityIdentifier("key-gate")
+    }
+
+    @ViewBuilder private var outcome: some View {
+        switch flow.stage {
+        case .form: EmptyView()
+        case .working(let line):
+            VStack(spacing: Space.s3) {
+                Text(line).coreFont(size: MacTextSize.headline, weight: .semibold)
+                CoreBusyBar().frame(maxWidth: Space.s8 * 6)
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, Space.s4)
+            .accessibilityIdentifier("key-working")
+        case .done(let id, let ms, let note):
+            VStack(spacing: Space.s3) {
+                IconTile("checkmark.seal.fill", hue: GlassInk.green, size: 64, bounce: true)
+                Text("Connected").coreFont(size: MacTextSize.large, weight: .bold)
+                Text("\(note) It answered in \(ms) ms.").foregroundStyle(GlassInk.secondary)
+                    .multilineTextAlignment(.center)
+                AccDialogButtons(confirm: "Open account", cancelTitle: "Close", cancel: close) {
+                    close()
+                    model.show(.accounts, account: id)
+                }
+            }
+            .frame(maxWidth: .infinity).accessibilityIdentifier("key-done")
+        case .failed(let why, let id):
+            VStack(spacing: Space.s3) {
+                IconTile("exclamationmark.triangle.fill", hue: GlassInk.red, size: 64, bounce: false)
+                Text("Couldn't connect").coreFont(size: MacTextSize.large, weight: .bold)
+                Text(why).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                if id != nil {
+                    HStack(spacing: Space.s2) {
+                        Button("Remove account") { Task { await flow.remove(model) } }
+                            .buttonStyle(CoreButtonStyle(.secondary))
+                        Spacer(minLength: Space.s3)
+                        Button("Try another key") { flow.tryAnother() }.buttonStyle(CoreButtonStyle(.prominent))
+                    }
+                } else {
+                    HStack(spacing: Space.s2) {
+                        Button("Close", action: close).buttonStyle(CoreButtonStyle(.secondary))
+                        Spacer(minLength: Space.s3)
+                        Button("Try again") { flow.stage = .form }.buttonStyle(CoreButtonStyle(.prominent))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity).accessibilityIdentifier("key-failed")
         }
     }
 

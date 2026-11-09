@@ -28,6 +28,12 @@ protocol AccountsService: Sendable {
     func setState(account: Int64, state: String) async throws -> AccountItem
     func setCap(account: Int64, cap: Int64) async throws -> AccountItem
     func deleteAccount(_ id: Int64) async throws
+    /// Adds an account with its key (`admin`, step-up). The key goes to the Core and is never read back.
+    func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem
+    /// Replaces an account's key; `runners` nil keeps the ones it has (`admin`, step-up).
+    func replaceSecret(account: Int64, key: String, runners: [String]?) async throws
+    /// Sets one of the two `secrets.*` switches (`admin`, step-up).
+    func setSecretsSwitch(_ key: String, _ value: Int64) async throws
     /// Subscription sign-in (KAN-441): start one on a runner, read where it is, hand it the approval code, stop it.
     func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem
     func login(_ id: String) async throws -> LoginItem
@@ -162,6 +168,26 @@ struct LiveAccountsService: AccountsService {
     }
     func deleteAccount(_ id: Int64) async throws {
         try await run { _ = try await client.deleteAccount(path: .init(id: String(id))).ok }
+    }
+    func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {
+        try await run {
+            Self.account(
+                try await client.createAccount(
+                    body: .json(.init(label: label, provider: provider, runners: runners, value: key))
+                ).ok.body.json.account)
+        }
+    }
+    func replaceSecret(account: Int64, key: String, runners: [String]?) async throws {
+        try await run {
+            _ = try await client.replaceAccountSecret(
+                path: .init(id: String(account)), body: .json(.init(runners: runners, value: key))
+            ).ok
+        }
+    }
+    func setSecretsSwitch(_ key: String, _ value: Int64) async throws {
+        try await run {
+            _ = try await client.setSetting(path: .init(scope: "server", key: key), body: .json(.init(value: value))).ok
+        }
     }
 
     func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {

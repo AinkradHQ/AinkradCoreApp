@@ -20,9 +20,11 @@ enum AccountDialogs {
             ) { v { shell.closeDialog() } })
     }
 
-    static func openConnect(_ m: AccountsModel, provider: String?, replacing: AccountItem? = nil) {
+    static func openConnect(
+        _ m: AccountsModel, provider: String?, replacing: AccountItem? = nil, flow: KeyEntryFlow? = nil
+    ) {
         present(m, "account-connect") { close in
-            ConnectDialog(model: m, provider: provider, replacing: replacing, close: close)
+            ConnectDialog(model: m, provider: provider, replacing: replacing, flow: flow, close: close)
         }
     }
     static func openDelete(_ m: AccountsModel, _ a: AccountItem) {
