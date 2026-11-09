@@ -41,7 +41,9 @@ struct VerdictTests {
 
     @Test func budgetsAreReadForTheirOwnAccountOnly() {
         #expect(AccountVerdict.of(account(1, "a"), budgets: [budget(spent: 100)]).kind == .budgetStopped)
-        #expect(AccountVerdict.of(account(1, "a"), budgets: [budget(spent: 100, hardStop: false)]).kind == .budgetNear)
+        #expect(AccountVerdict.of(account(1, "a"), budgets: [budget(spent: 100, hardStop: false)]).kind == .budgetOver)
+        #expect(
+            AccountVerdict.of(account(1, "a"), budgets: [budget(spent: 100, hardStop: false)]).label == "Over budget")
         #expect(AccountVerdict.of(account(1, "a"), budgets: [budget(spent: 85)]).kind == .budgetNear)
         #expect(AccountVerdict.of(account(1, "a"), budgets: [budget(spent: 100, subject: "2")]).isReady)
     }
@@ -79,6 +81,15 @@ struct VerdictTests {
         #expect(AccountsNumbers.parseWhole(AccountsNumbers.grouped(80_000_000)) == 80_000_000)
         #expect(AccountsNumbers.parseWhole("80 000 000") == 80_000_000)
         #expect(AccountsNumbers.parseDecimal("2.50") == 2.5)
+        let en = Locale(identifier: "en_US")
+        let de = Locale(identifier: "de_DE")
+        func p(_ s: String, _ l: Locale) -> Double? { AccountsNumbers.parseDecimal(s, locale: l) }
+        #expect(p("2,50", en) == 2.5 && p("2.50", en) == 2.5 && p("1,234.50", en) == 1234.5)
+        #expect(p("2,50", de) == 2.5 && p("2.50", de) == 2.5 && p("1.234,50", de) == 1234.5)
+        #expect(p("2.500", en) == 2.5 && p("2.500", de) == 2500 && p("1,234", en) == 1234 && p("1,234", de) == 1.234)
+        #expect(p("1,234,567", en) == 1_234_567 && p("1.234.567", de) == 1_234_567)
+        #expect(p("1.2.3", en) == nil && p("1,2,3", de) == nil && p("2.50,3", de) == nil && p("1,23.4", en) == nil)
+        #expect(p("12", en) == 12 && p("abc", en) == nil && p("", en) == nil && p("nan", en) == nil)
         #expect(AccountsNumbers.parseDecimal(AccountsNumbers.dollarsField(2_500_000)) == 2.5)
     }
 }
