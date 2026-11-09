@@ -16,7 +16,9 @@ struct BrainChip: View {
             .foregroundStyle(GlassInk.primary)
             .padding(.horizontal, Space.s2).frame(height: MacSize.chip)
             .background(hue.opacity(0.28), in: coreShape(Radius.chip))
-            .help(help ?? "")
+            // A tag keeps its whole word: its neighbours shrink first (same rule as StateBadge and CoreChip).
+            .fixedSize().layoutPriority(2)
+            .help(help ?? text)
     }
 }
 
@@ -24,9 +26,11 @@ struct BrainChip: View {
 struct RoomChips: View {
     let room: RoomSummary
     var body: some View {
-        HStack(spacing: Space.s2) {
+        ChipFlow(spacing: Space.s2) {
             BrainChip(room.mode.label, room.mode == .localOnly ? GlassInk.blue : GlassInk.slate, help: room.mode.story)
-            BrainChip(room.provider.label, room.provider == .approvedCloud ? GlassInk.blue : GlassInk.slate)
+            BrainChip(
+                room.provider.label, room.provider == .approvedCloud ? GlassInk.blue : GlassInk.slate,
+                help: room.provider.help)
             if let k = room.kind.chipLabel {
                 BrainChip(k, GlassInk.blue, help: "\(k) room: kept apart from every other.")
             }
@@ -82,24 +86,91 @@ struct BrainBar: View {
     }
 }
 
-/// A full-width state: a symbol, a plain sentence, and the next step. Used for loading, empty, unavailable, error.
-struct BrainStateCard<Actions: View>: View {
+/// A full-width state (empty, offline, unavailable, error): the one CoreUI state card, centred, with the way back on the
+/// left and the one next step on the right. A failed load has only "Try again": a Cancel there does nothing.
+struct BrainStateCard: View {
     let symbol: String
     let title: String
     let text: String
-    var tone: Tone = .queue
-    @ViewBuilder var actions: Actions
+    var secondary: CoreAction?
+    var primary: CoreAction?
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            CoreNotice(symbol: symbol, title: title, text: text, tone: tone)
-            HStack(spacing: Space.s2) { actions }.frame(maxWidth: .infinity, alignment: .trailing)
-        }
+        CoreStateCard(symbol: symbol, title: title, line: text, secondary: secondary, primary: primary)
+            .frame(maxWidth: .infinity, minHeight: Space.s8 * 7)
+            // Centred in the pane instead of a card with an empty band under it.
+            .containerRelativeFrame(.vertical, alignment: .center) { h, _ in max(h * 0.7, Space.s8 * 7) }
     }
 }
 
-extension BrainStateCard where Actions == EmptyView {
-    init(symbol: String, title: String, text: String, tone: Tone = .queue) {
+/// A banner for an outcome or a condition: a tinted glyph (never a white glyph on a light tile, which drew as an empty
+/// square), a bold line, a quiet line and an optional action.
+struct BrainNotice<Action: View>: View {
+    let symbol: String
+    let title: String
+    let text: String
+    let tone: Tone
+    let action: Action
+    @Environment(\.corePalette) private var palette
+    init(symbol: String, title: String, text: String = "", tone: Tone = .queue, @ViewBuilder action: () -> Action) {
+        self.symbol = symbol
+        self.title = title
+        self.text = text
+        self.tone = tone
+        self.action = action()
+    }
+    var body: some View {
+        let c = palette.tone(tone)
+        HStack(alignment: .top, spacing: Space.s3) {
+            Image(systemName: symbol).font(.system(size: MacTextSize.headline, weight: .semibold)).foregroundStyle(
+                c.ink
+            )
+            .frame(width: Space.s5).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if !text.isEmpty {
+                    Text(text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: Space.s3)
+            action
+        }
+        .padding(Space.s3)
+        .background(c.ink.opacity(0.14), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.35), lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(text.isEmpty ? title : "\(title). \(text)")
+    }
+}
+
+extension BrainNotice where Action == EmptyView {
+    init(symbol: String, title: String, text: String = "", tone: Tone = .queue) {
         self.init(symbol: symbol, title: title, text: text, tone: tone) { EmptyView() }
+    }
+}
+
+/// What a screen looks like while it loads: soft blocks in the shape of the content that is coming.
+struct BrainSkeleton: View {
+    enum Shape { case page, list }
+    let shape: Shape
+    private let card = coreShape(Radius.cardMac)
+    var body: some View {
+        VStack(spacing: Space.s3) {
+            switch shape {
+            case .page:
+                CoreSkeleton(card).frame(height: Space.s8 * 2)
+                HStack(spacing: Space.s3) {
+                    ForEach(0..<4, id: \.self) { _ in CoreSkeleton(card).frame(height: Space.s8 * 3) }
+                }
+                HStack(spacing: Space.s3) {
+                    ForEach(0..<2, id: \.self) { _ in CoreSkeleton(card).frame(height: Space.s8 * 5) }
+                }
+            case .list:
+                ForEach(0..<4, id: \.self) { _ in CoreSkeleton(card).frame(height: Space.s8 * 2) }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading")
     }
 }
 
@@ -119,17 +190,17 @@ struct BrainConditions: View {
         if let f = model.overview?.flags {
             VStack(spacing: Space.s2) {
                 if let q = f.offlineQueued {
-                    CoreNotice(
+                    BrainNotice(
                         symbol: "wifi.slash", title: "Offline, \(q) queued",
                         text: "This Mac's own Core answers. Changes wait and go when the remote Core is reachable.")
                 }
                 if f.indexRebuilding {
-                    CoreNotice(
+                    BrainNotice(
                         symbol: "arrow.triangle.2.circlepath", title: "The search index is rebuilding",
                         text: "Results can be incomplete until it finishes. Nothing is lost.", tone: .warn)
                 }
                 if f.embeddingDown {
-                    CoreNotice(
+                    BrainNotice(
                         symbol: "text.magnifyingglass", title: "Meaning search is off",
                         text: "Exact search still works.", tone: .warn)
                 }

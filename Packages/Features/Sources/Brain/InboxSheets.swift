@@ -147,7 +147,7 @@ private struct EditSheet: View {
     }
 }
 
-/// Approve (advanced): who it applies to, who said so, when it ends, when to review.
+/// Approve with options: who it applies to, who said so, when it ends, when to review.
 private struct AdvancedApproveSheet: View {
     let model: BrainModel
     let c: Candidate
@@ -156,7 +156,7 @@ private struct AdvancedApproveSheet: View {
     private static let said: [Authority] = [.projectOwner, .userExplicit, .teamMember, .imported]
     private func pick(_ v: [String]) -> [CoreSelectOption<String>] { v.map { CoreSelectOption($0, $0) } }
     var body: some View {
-        CoreDialogPanel("Approve (advanced)", width: Space.s8 * 17) {
+        CoreDialogPanel("Approve with options", width: Space.s8 * 17) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("Approve this memory with settings you choose. The plain Approve uses the room defaults.")
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)

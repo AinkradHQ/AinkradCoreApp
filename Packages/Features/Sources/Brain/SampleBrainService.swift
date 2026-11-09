@@ -21,6 +21,8 @@ public actor SampleBrainService: BrainService {
         public var refused = false
         /// The Inbox itself did not load.
         public var inboxError = false
+        /// Worst-case data for screenshots: very long and non-Latin room names, a thousand captures.
+        public var worst = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
@@ -55,10 +57,11 @@ public actor SampleBrainService: BrainService {
 
     public init(_ scenario: Scenario = Scenario(), pace: Duration = .milliseconds(250)) {
         self.scenario = scenario
-        self.list = scenario.empty ? [] : Self.world()
+        self.list = scenario.empty ? [] : Self.world(worst: scenario.worst)
         self.pace = pace
         self.checkList = Self.initialChecks(scenario)
         self.box = SampleInbox(empty: scenario.empty || scenario.emptyInbox)
+        if scenario.worst { box.inflate() }
     }
 
     public func rooms() async throws -> [RoomSummary] {
@@ -219,11 +222,15 @@ public actor SampleBrainService: BrainService {
                 byType: types(records)))
     }
 
-    private static func world() -> [RoomSummary] {
+    private static func world(worst: Bool = false) -> [RoomSummary] {
         [
             room(
-                "ainkrad", "Ainkrad", .product, .synced, .approvedCloud, records: 1900, waiting: 3, models: 2),
-            room("global-safe", "Global safe", .shared, .synced, .local, records: 14),
+                "ainkrad",
+                worst ? "Employer engagement programme for the second quarter, all regions" : "Ainkrad", .product,
+                .synced, .approvedCloud, records: 1900, waiting: 3, models: 2),
+            room(
+                "global-safe", worst ? "غرفة المشاريع العربية الطويلة جداً" : "Global safe", .shared, .synced, .local,
+                records: 14),
             room("personal", "Personal", .personal, .localOnly, .local, records: 240, sync: "now"),
             room(
                 "workan-space", "Workan space", .product, .synced, .approvedCloud, records: 820, conflicts: 1,
@@ -241,16 +248,18 @@ public actor SampleBrainService: BrainService {
     }
 
     private static let tiles: [HealthTile] = [
-        HealthTile("isolation", "Isolation", .ok, meter: 100, "0 leaks in 1,000 test queries"),
+        HealthTile(
+            "isolation", "Isolation", .ok, meter: 100,
+            "No room showed another room\u{2019}s memories in 1,000 test searches"),
         HealthTile("speed", "Speed", .ok, meter: 78, "Local search 212 ms, target 300 ms"),
         HealthTile("sync", "Sync", .ok, meter: 92, "Two devices agree, last 2 s ago"),
         HealthTile("freshness", "Freshness", .warn, meter: 64, "9% of memories are past their review date"),
         HealthTile("index", "Search index", .ok, meter: 100, "Up to date, 8 min ago"),
-        HealthTile("restore", "Restore drill", .warn, meter: 55, "Last drill 41 days ago, due now"),
+        HealthTile("restore", "Restore drill", .warn, meter: 55, "Last test 41 days ago, due now"),
         HealthTile("keys", "Key rotation", .ok, meter: 88, "Rotated 12 days ago"),
         HealthTile("providers", "Provider rules", .ok, meter: 100, "All cloud approvals in date"),
     ]
 
-    private static let checkNeeds: [NeedItem] = [NeedItem(.check, n: 1, "check is due: restore drill")]
+    private static let checkNeeds: [NeedItem] = [NeedItem(.check, n: 1, "check is due: backup test")]
 }
 #endif

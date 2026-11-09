@@ -13,15 +13,13 @@ struct ActivityTab: View {
             PausedBanner(model: model, full: false)
             switch a.phase {
             case .loading:
-                BrainStateCard(
-                    symbol: "hourglass", title: "Loading activity", text: "Reading what happened in your rooms.")
+                BrainSkeleton(shape: .list)
             case .failed(let why, let code):
                 BrainStateCard(
-                    symbol: "exclamationmark.triangle", title: "Activity could not load", text: why, tone: .fail
-                ) {
-                    Button("Cancel") { a.cancelError() }.buttonStyle(CoreButtonStyle(.secondary))
-                    Button("Retry") { a.retry() }.buttonStyle(CoreButtonStyle(.prominent)).help("Code: \(code)")
-                }
+                    symbol: "exclamationmark.triangle", title: "Activity could not load", text: why,
+                    primary: CoreAction("Try again") { a.retry() }
+                )
+                .help("Code: \(code)")
             case .ready:
                 HStack(alignment: .top, spacing: Space.s3) {
                     VStack(alignment: .leading, spacing: Space.s3) {
@@ -44,7 +42,7 @@ struct ActivityTab: View {
         return HStack(alignment: .top, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: Space.s1) {
                 BrainTitle("Activity")
-                Text("Who touched which room, and what was refused. Ids and decisions only, never memory text.")
+                Text("Who touched which room, and what was refused. Never any memory text.")
                     .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s3)
@@ -59,8 +57,11 @@ struct ActivityTab: View {
             }
             .help("New rows arrive within seconds.")
             CoreSegmented(
-                "View", segments: [CoreSegment(ActivityView.feed, "Activity"), CoreSegment(.egress, "Egress log")],
-                selection: $a.view)
+                "View",
+                segments: [CoreSegment(ActivityView.feed, "Activity"), CoreSegment(.egress, "Sent out of this Mac")],
+                selection: $a.view
+            )
+            .help("Egress log: everything a model ever received from a room.")
         }
     }
 
@@ -70,7 +71,9 @@ struct ActivityTab: View {
                 title: e.action, chip: chip(e.result), sub: "\(e.at) · \(e.actor)",
                 rule: e.result == .blocked
                     ? e.rule.map { .init(name: $0.name, code: $0.code, text: e.reason, fix: $0.fix) } : nil,
-                why: e.result == .blocked ? nil : e.reason, lines: e.details, note: BrainWords.activityIdsOnly)
+                why: e.result == .blocked ? nil : e.reason,
+                sentence: BrainWords.sentence(e, room: model.room(e.room)?.name), lines: e.details,
+                note: BrainWords.activityIdsOnly)
         } else if a.view == .egress, let c = a.selectedCall {
             ActivityDetail(
                 title: c.kind.label, chip: c.sent ? ("Sent", GlassInk.blue) : ("Blocked", GlassInk.red),
@@ -78,7 +81,8 @@ struct ActivityTab: View {
                 rule: c.block.map {
                     .init(name: $0.ruleName, code: $0.rawValue, text: $0.sentence, fix: "Nothing was sent.")
                 },
-                why: nil, lines: c.details, note: "Ids and codes only. No memory text was kept.")
+                why: nil, sentence: BrainWords.sentence(c), lines: c.details,
+                note: "Ids and codes only. No memory text was kept.")
         } else {
             BrainCard(
                 "Details",
@@ -100,7 +104,7 @@ private struct FeedView: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             filters(a)
             if a.isOffline {
-                CoreNotice(
+                BrainNotice(
                     symbol: "wifi.slash", title: "Showing what this Mac has",
                     text: "Activity from your other devices arrives when you are back online.")
             }
@@ -111,10 +115,7 @@ private struct FeedView: View {
             } else if a.visible.isEmpty {
                 BrainStateCard(
                     symbol: "line.3.horizontal.decrease", title: "No activity matches",
-                    text: "Nothing fits these filters."
-                ) {
-                    Button("Clear filters") { a.clearFilters() }.buttonStyle(CoreButtonStyle(.secondary))
-                }
+                    text: "Nothing fits these filters.", primary: CoreAction("Clear filters") { a.clearFilters() })
             } else {
                 LazyVStack(spacing: Space.s2) {
                     ForEach(a.visible) { e in
@@ -143,7 +144,7 @@ private struct FeedView: View {
         @Bindable var a = a
         let kinds = ActivityKind.allCases.map { CoreSegment($0, $0.title) }
         let rooms =
-            [CoreSelectOption(ActivityFilter.RoomChoice.all, "All mounted rooms")]
+            [CoreSelectOption(ActivityFilter.RoomChoice.all, "All open rooms")]
             + model.mountedRooms.map { CoreSelectOption(.room($0.id), $0.name) } + [CoreSelectOption(.none, "No room")]
         let who = [CoreSelectOption("", "Anyone")] + a.people.map { CoreSelectOption($0, $0) }
         let results =
@@ -178,17 +179,15 @@ private struct EgressView: View {
                 )
                 .frame(width: Space.s8 * 6)
                 Text(
-                    "Everything a model ever received from this room, one row per try. A provider revocation report is made from this list."
+                    "Everything a model ever received from this room, one row per try. Used for a provider revocation report."
                 )
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
             if let why = a.egressFailed {
                 BrainStateCard(
-                    symbol: "exclamationmark.triangle", title: "The egress log could not load", text: why, tone: .fail
-                ) {
-                    Button("Retry") { Task { await a.loadEgress() } }.buttonStyle(CoreButtonStyle(.prominent))
-                }
+                    symbol: "exclamationmark.triangle", title: "This list could not load", text: why,
+                    primary: CoreAction("Try again") { Task { await a.loadEgress() } })
             } else if a.egress.isEmpty, let room {
                 if room.mode == .localOnly {
                     BrainStateCard(

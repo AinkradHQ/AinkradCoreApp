@@ -17,7 +17,7 @@ public final class BrainDemo {
         "checks-offline",
         "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
         "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
-        "inbox-offline",
+        "inbox-offline", "loading", "inbox-noroom-selected", "worst-overview", "worst-rooms", "worst-inbox",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -53,9 +53,10 @@ public final class BrainDemo {
         case "inbox-empty": s.emptyInbox = true
         case "inbox-error": s.inboxError = true
         case "inbox-offline": s.offline = true
+        case "worst-overview", "worst-rooms", "worst-inbox": s.worst = true
         default: break
         }
-        if scene != "unavailable" {
+        if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))
             await model.reload()
         }
@@ -104,6 +105,15 @@ public final class BrainDemo {
             BrainSheets.assign(model, ["u1"])
         case "inbox-empty", "inbox-error", "inbox-offline": await inbox(.waiting)
         case "inbox-sealed": await inbox(.waiting, room: "althaqeel")
+        case "inbox-noroom-selected":
+            await inbox(.noRoom)
+            model.inboxState.selected = ["u1", "u2"]
+        case "loading":
+            model.load = .loading
+            model.show(.overview)
+        case "worst-overview": model.show(.overview)
+        case "worst-rooms": model.show(.rooms)
+        case "worst-inbox": await inbox(.noRoom)
         default: model.show(.overview)
         }
     }

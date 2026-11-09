@@ -14,14 +14,11 @@ struct ChecksTab: View {
             PausedBanner(model: model, full: true)
             switch c.phase {
             case .loading:
-                BrainStateCard(symbol: "hourglass", title: "Loading checks", text: "Reading the latest results.")
+                BrainSkeleton(shape: .list)
             case .failed(let why):
                 BrainStateCard(
-                    symbol: "exclamationmark.triangle", title: "Checks could not load", text: why, tone: .fail
-                ) {
-                    Button("Cancel") { model.host.shell.closePane("brain") }.buttonStyle(CoreButtonStyle(.secondary))
-                    Button("Retry") { c.retry() }.buttonStyle(CoreButtonStyle(.prominent))
-                }
+                    symbol: "exclamationmark.triangle", title: "Checks could not load", text: why,
+                    primary: CoreAction("Try again") { c.retry() })
             case .ready:
                 HStack(alignment: .top, spacing: Space.s3) {
                     VStack(alignment: .leading, spacing: Space.s3) {
@@ -60,7 +57,7 @@ struct ChecksTab: View {
                     help: "The local Core answers; the remote server is unreachable.")
             }
             if c.phase == .ready {
-                Button("Run all (advanced)…") { ChecksSheets.open(model, only: nil) }
+                Button("Run all with options…") { ChecksSheets.open(model, only: nil) }
                     .buttonStyle(CoreButtonStyle(.secondary))
                 Button {
                     Task { await c.runAll() }
@@ -204,11 +201,11 @@ private struct CheckDetail: View {
                 small("Target is under \(Int(item.trendLimit ?? 0)) ms.")
             }
             if item.skippedOffline {
-                CoreNotice(
+                BrainNotice(
                     symbol: "wifi.slash", title: "Skipped because this Mac is offline", text: "Nothing was measured.")
             }
             if item.clearedAfter {
-                CoreNotice(
+                BrainNotice(
                     symbol: "info.circle", title: "You cleared Paused after this result",
                     text: "Run the check again to confirm.")
             }
@@ -217,7 +214,7 @@ private struct CheckDetail: View {
                 .help("chk.\(item.id), run-\(item.id)-\(item.history.count)")
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
-                Button("Run (advanced)…") { ChecksSheets.open(model, only: item.id) }
+                Button("Run with options…") { ChecksSheets.open(model, only: item.id) }
                     .buttonStyle(CoreButtonStyle(.secondary))
                 Button {
                     Task { await c.run(item.id) }
@@ -272,8 +269,6 @@ private struct PilotTargets: View {
             VStack(spacing: 0) {
                 ForEach(targets) { t in
                     HStack(spacing: Space.s3) {
-                        Text(t.code).font(.system(size: MacTextSize.meta, design: .monospaced))
-                            .foregroundStyle(GlassInk.secondary).frame(width: Space.s8, alignment: .leading)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(t.title)
                             Text("Target: \(t.target)").font(.system(size: MacTextSize.meta))
@@ -288,6 +283,8 @@ private struct PilotTargets: View {
                         .frame(width: Space.s8 * 3, alignment: .leading)
                     }
                     .padding(.vertical, Space.s2)
+                    .help("Pilot target \(t.code)")
+                    .accessibilityElement(children: .combine)
                 }
             }
         }

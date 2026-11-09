@@ -53,10 +53,13 @@ private struct RoomCard: View {
             Task { await model.inspect(room.id) }
         } label: {
             VStack(alignment: .leading, spacing: Space.s3) {
-                HStack(spacing: Space.s2) {
-                    Text(room.name).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(1)
-                    if room.id == model.viewingID { BrainChip("Viewing", GlassInk.blue) }
-                    Spacer(minLength: Space.s2)
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    HStack(spacing: Space.s2) {
+                        Text(room.name).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: Space.s2)
+                        if room.id == model.viewingID { BrainChip("Viewing", GlassInk.blue) }
+                    }
                     RoomChips(room: room)
                 }
                 Grid(alignment: .leading, horizontalSpacing: Space.s3, verticalSpacing: Space.s2) {
@@ -68,7 +71,9 @@ private struct RoomCard: View {
                     GridRow {
                         stat("Models", room.provider == .local ? "Local" : "\(c?.models ?? 0)")
                         stat("Last sync", c?.lastSync ?? "—")
-                        stat("Lease", room.lease.left, hue: room.lease.state == .ok ? nil : GlassInk.blue)
+                        stat(
+                            "Key renews in", BrainWords.unit(room.lease.left),
+                            hue: room.lease.state == .ok ? nil : GlassInk.blue)
                     }
                 }
             }
@@ -132,9 +137,9 @@ private struct RoomView: View {
                 detail(d)
             } else if let r = model.room(id), let lock = r.lock {
                 header(r)
-                CoreNotice(symbol: "lock", title: lock.sentence, tone: .queue)
+                BrainNotice(symbol: "lock", title: lock.sentence, tone: .queue)
             } else {
-                BrainStateCard(symbol: "hourglass", title: "Loading this room", text: "Reading its numbers.")
+                BrainSkeleton(shape: .page)
             }
         }
         .transition(.opacity)
@@ -169,12 +174,13 @@ private struct RoomView: View {
     @ViewBuilder private func detail(_ d: RoomDetail) -> some View {
         header(d.room)
         if d.room.lease.state == .expiring {
-            CoreNotice(
+            BrainNotice(
                 symbol: "clock",
-                title: "The key lease ends in \(d.room.lease.left). Renew it before then, or the room seals.")
+                title:
+                    "The key renews in \(BrainWords.unit(d.room.lease.left)). Renew it before then, or the room seals.")
         }
         if let c = d.cost, c.capReached {
-            CoreNotice(
+            BrainNotice(
                 symbol: "dollarsign.circle",
                 title: "Monthly cost cap reached. Meaning search is paused for this room; exact search still works.")
         }
@@ -193,8 +199,11 @@ private struct RoomView: View {
                     .padding(.vertical, 2)
                 }
             }
-            BrainCard("Key lease", sub: "Without renewal the saved copy on a device cannot be read.") {
-                Text(d.room.lease.left).font(.system(size: MacTextSize.large, weight: .semibold))
+            BrainCard(
+                "Key renewal",
+                sub: "Without renewal the saved copy on a device cannot be read. The technical word is lease."
+            ) {
+                Text(BrainWords.unit(d.room.lease.left)).font(.system(size: MacTextSize.large, weight: .semibold))
                     + Text(" left").foregroundStyle(GlassInk.secondary)
                 BrainBar(
                     fraction: d.room.lease.fraction, hue: d.room.lease.state == .ok ? GlassInk.blue : GlassInk.orange)

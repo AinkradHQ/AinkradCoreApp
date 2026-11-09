@@ -25,8 +25,8 @@ struct RunChecksSheet: View {
 
     private var items: [CheckItem] { model.checks.report.items }
     private var title: String {
-        only.flatMap { id in items.first { $0.id == id }?.name.lowercased() }.map { "Run \($0) (advanced)" }
-            ?? "Run all checks (advanced)"
+        only.flatMap { id in items.first { $0.id == id }?.name.lowercased() }.map { "Run \($0) with options" }
+            ?? "Run all checks with options"
     }
 
     var body: some View {
