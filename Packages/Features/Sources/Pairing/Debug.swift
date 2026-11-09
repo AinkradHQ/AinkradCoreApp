@@ -171,6 +171,48 @@ extension AppModel {
     public func debugCloseDialog() { shell.closeDialog() }
     /// Snapshots: leave a first-run scene for the (sample) desktop.
     public func debugShowDesktop() { phase = .desktop }
+    /// Settings > About, the admin pages for a read-only device, the bell clearing an alarm and the terminal toast, on
+    /// sample data (no Core is reached).
+    public static let gapScenes = [
+        "about-admin", "about-read-only", "about-loading", "about-error", "bell-alarm", "bell-alarm-cleared",
+        "toast-reap-warning",
+    ]
+
+    public func debugGap(_ scene: String) {
+        shell.overlay = nil
+        shell.dialog = nil
+        shell.bellOpen = false
+        shell.toast = nil
+        shell.bell.removeAll()
+        shell.settings.hidden = []
+        func about(_ scopes: [String]) -> CoreAbout {
+            CoreAbout(
+                server: "0.47.1", apiMajor: "v1", apiMinor: 47, build: "3f9c2ab", device: "Ahmed's MacBook Pro",
+                scopes: scopes)
+        }
+        switch scene {
+        case "about-admin":
+            self.about.debugSet(.ready(about(["read", "approve", "terminal", "agent", "admin"])))
+            debugOpenSettings("about")
+        case "about-read-only":
+            self.about.debugSet(.ready(about(["read", "terminal"])))
+            shell.settings.hidden = Set(Self.adminOnly)
+            debugOpenSettings("about")
+        case "about-loading":
+            self.about.debugSet(.loading)
+            debugOpenSettings("about")
+        case "about-error":
+            self.about.debugSet(.failed("Core did not answer. Try again in a moment."))
+            debugOpenSettings("about")
+        case "bell-alarm", "bell-alarm-cleared":
+            accountNotice("alarm.raised", ["alarm": "failover_storm"])
+            accountNotice("account.expired", ["account": "1"])
+            if scene == "bell-alarm-cleared" { accountNotice("alarm.cleared", ["alarm": "failover_storm"]) }
+            shell.bellOpen = true
+        default: accountNotice("terminal.reap_warning", ["terminal": "t_demo"])
+        }
+    }
+
     public func debugOpenSettings(_ id: String) {
         shell.settings.selected = id
         shell.open(.settings)

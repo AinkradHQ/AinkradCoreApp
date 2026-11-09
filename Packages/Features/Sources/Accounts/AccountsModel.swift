@@ -48,6 +48,8 @@ public final class AccountsModel {
     var costs: [CostItem] = []
     var prices: [PriceItem] = []
     var costsLoad: AccountsLoad = .loading
+    /// The usage limits on an account page, read when it opens.
+    var limitsLoad: AccountsLoad = .loading
     var pricesLoad: AccountsLoad = .loading
     /// Opens a provider's own page. Tests and the demo replace it: they must never open a browser.
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
@@ -70,6 +72,8 @@ public final class AccountsModel {
 
     func use(_ service: any AccountsService) {
         self.service = service
+        usage = []
+        limitsLoad = .loading
         Task { await reload() }
     }
 
@@ -87,6 +91,8 @@ public final class AccountsModel {
         readOnly = false
         detail = nil
         signIn = nil
+        usage = []
+        limitsLoad = .loading
     }
 
     public var isConnected: Bool { service != nil }
@@ -149,6 +155,7 @@ public final class AccountsModel {
             await reloadChains(service)
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
+        if detail != nil { await reloadLimits() }
         gate = (try? await service.gate()) ?? GateState()
         let chip: PaneChip =
             switch load {

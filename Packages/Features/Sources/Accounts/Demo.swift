@@ -274,7 +274,28 @@ public final class AccountsDemo {
         }
         func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws {}
         func deleteProvider(_ id: String) async throws {}
+        var usageError: (any Error)?
+        var limitRows: [LimitItem] = [
+            LimitItem(
+                unit: "tokens", windowSecs: 86_400, cap: 5_000_000, used: 1_900_000, warnPercent: 80, exhausted: false),
+            LimitItem(
+                unit: "tokens", windowSecs: 604_800, cap: 20_000_000, used: 17_400_000, warnPercent: 85,
+                exhausted: false),
+            LimitItem(
+                unit: "messages", windowSecs: 18_000, cap: 200, used: 200, warnPercent: 75, exhausted: true),
+        ]
+        func setLimit(account: Int64, _ d: LimitDraft) async throws {
+            limitRows.removeAll { $0.unit == d.unit && $0.windowSecs == d.windowSecs }
+            limitRows.append(
+                LimitItem(
+                    unit: d.unit, windowSecs: d.windowSecs, cap: d.cap, used: 0, warnPercent: d.warnPercent,
+                    exhausted: false))
+        }
+        func clearLimit(account: Int64, unit: String, windowSecs: Int64) async throws {
+            limitRows.removeAll { $0.unit == unit && $0.windowSecs == windowSecs }
+        }
         func usage() async throws -> [UsageItem] {
+            if let usageError { throw usageError }
             func w(_ t: Int64, _ m: Int64, _ c: Int64) -> UsageWindowItem {
                 UsageWindowItem(tokens: t, messages: m, costMicros: c)
             }
@@ -289,7 +310,7 @@ public final class AccountsDemo {
                         CompanyUsage(
                             company: "Client work", fiveHours: w(10_000, 0, 140_000),
                             sevenDays: w(700_000, 0, 4_420_000)),
-                    ]),
+                    ], limits: limitRows),
                 UsageItem(
                     accountID: 3, fiveHours: w(980_000, 88, 4_100_000), sevenDays: w(1_240_000, 120, 6_900_000),
                     limitShare: 0.93, limitsExhausted: false, hasLimits: true, drops: 2,
@@ -391,6 +412,8 @@ public final class AccountsDemo {
         "delete-pool", "signin-intro", "signin-url", "signin-working", "signin-done", "signin-failed",
         "touchid-cancelled", "read-only", "state-loading", "state-error", "state-scope", "launcher",
         "settings-gate",
+        "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit", "usage-limit-clear",
+        "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
     ]
 
     let model: AccountsModel
@@ -431,6 +454,9 @@ public final class AccountsDemo {
                 PoolItem(id: $0.id, name: $0.name, provider: $0.provider, isDefault: $0.isDefault, members: [])
             }
         case "budgets-empty": svc.budgetList = []
+        case "usage-limits-error":
+            svc.usageError = CoreError.http(status: 500, code: "internal", message: "Core could not read usage.")
+        case "usage-limits-no-admin": svc.usageError = CoreError.forbiddenScope
         case "accounts-not-admin":
             svc.accountList = svc.accountList.map {
                 var x = $0
@@ -447,7 +473,8 @@ public final class AccountsDemo {
             case "accounts", "accounts-need", "accounts-not-admin", "account-ready", "account-cooling",
                 "account-unhealthy",
                 "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
-                "cap",
+                "cap", "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit",
+                "usage-limit-clear", "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
                 "signin-intro", "signin-url", "signin-working",
                 "signin-done", "signin-failed":
                 .accounts
@@ -462,7 +489,11 @@ public final class AccountsDemo {
             }
         let detail: Int64? =
             switch scene {
-            case "account-ready", "delete-account", "cap", "limits", "account-testing": 1
+            case "account-ready", "delete-account", "cap", "limits", "account-testing", "usage-limits",
+                "usage-limit-new", "usage-limit-edit", "usage-limit-clear", "usage-limits-error",
+                "usage-limits-no-admin", "usage-limits-read-only":
+                1
+            case "usage-limits-empty": 5
             case "account-confirming": 3
             case "account-cooling": 2
             case "account-unhealthy": 4
@@ -490,6 +521,14 @@ public final class AccountsDemo {
         case "delete-account": AccountDialogs.openDelete(model, model.account(1)!)
         case "cap": AccountDialogs.openCap(model, model.account(1)!)
         case "limits": AccountDialogs.openLimits(model, model.account(1)!)
+        case "usage-limit-new": AccountDialogs.openLimit(model, model.account(1)!, editing: nil)
+        case "usage-limit-edit":
+            await model.reloadLimits()
+            AccountDialogs.openLimit(model, model.account(1)!, editing: model.limits(of: model.account(1)!)[1])
+        case "usage-limit-clear":
+            await model.reloadLimits()
+            AccountDialogs.openClearLimit(model, model.account(1)!, model.limits(of: model.account(1)!)[0])
+        case "usage-limits-read-only": model.readOnly = true
         case "budget-new": AccountDialogs.openBudget(model, editing: nil)
         case "price-new": AccountDialogs.openPrice(model, editing: nil)
         case "provider-new": AccountDialogs.openProvider(model, editing: nil)

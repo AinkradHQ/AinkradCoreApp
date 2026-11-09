@@ -67,6 +67,7 @@ struct AccountDetailView: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            AccountLimitsSection(model: model, account: a, hue: hue)
             HStack(spacing: Space.s2) {
                 Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
                 Text("Spend and usage over time appear here once Core reports them.")

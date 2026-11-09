@@ -16,9 +16,14 @@ enum AccountsSnapshots {
         }
         let demo = app.debugAccountsDemo()
         let only = env["CORE_ACC_SCENES"].flatMap { $0.isEmpty ? nil : $0 }?.split(separator: ",").map(String.init)
-        for (i, scene) in (AccountsDemo.scenes + AccountsDemo.connScenes).enumerated()
+        for (i, scene) in (AccountsDemo.scenes + AccountsDemo.connScenes + AppModel.gapScenes).enumerated()
         where only?.contains(scene) ?? true {
-            await demo.show(scene)
+            if AppModel.gapScenes.contains(scene) {
+                await demo.show("overview")  // back to a clean Accounts state first
+                app.debugGap(scene)
+            } else {
+                await demo.show(scene)
+            }
             try? await Task.sleep(for: .seconds(1.6))
             let file = "\(dir)/\(String(format: "%02d", i + 1))-\(scene)-\(theme)-app.png"
             log("shot \(scene) \(capture(window, to: file) ? "ok" : "FAILED")")

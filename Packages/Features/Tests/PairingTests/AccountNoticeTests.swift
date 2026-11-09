@@ -61,4 +61,22 @@ struct AccountNoticeTests {
         for i in 0..<25 { m.accountNotice("account.expired", ["account": "\(i)"]) }
         #expect(m.shell.bell.items.count == 20)
     }
+
+    @Test func aClearedAlarmTakesItsEntryOutOfTheBell() {
+        let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
+        m.accountNotice("alarm.raised", ["alarm": "failover_storm"])
+        m.accountNotice("account.expired", ["account": "1"])
+        #expect(m.shell.bell.items.count == 2)
+        m.accountNotice("alarm.cleared", ["alarm": "disk_free"])
+        #expect(m.shell.bell.items.count == 2)
+        m.accountNotice("alarm.cleared", ["alarm": "failover_storm"])
+        #expect(m.shell.bell.items.map(\.id) == ["account-expired-1"])
+    }
+
+    @Test func aTerminalAboutToCloseIsAToastNotABellEntry() {
+        let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
+        m.accountNotice("terminal.reap_warning", ["terminal": "t_1"])
+        #expect(m.shell.toast?.message == "A terminal is about to close.")
+        #expect(m.shell.bell.items.isEmpty)
+    }
 }

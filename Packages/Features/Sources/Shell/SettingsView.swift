@@ -58,6 +58,8 @@ public struct SettingsBack {
 @MainActor @Observable
 public final class SettingsRegistry {
     public private(set) var sections: [SettingsSection] = []
+    /// Sections this device may not use (no `admin` scope): out of the nav until it can.
+    public var hidden: Set<String> = []
     public var selected = "appearance" {
         didSet {
             let ids = grouped().flatMap { $0.1.map(\.id) }
@@ -78,7 +80,7 @@ public final class SettingsRegistry {
     }
     func grouped() -> [(SettingsGroup, [SettingsSection])] {
         SettingsGroup.allCases.compactMap { g in
-            let list = sections.filter { $0.group == g }.sorted { $0.order < $1.order }
+            let list = sections.filter { $0.group == g && !hidden.contains($0.id) }.sorted { $0.order < $1.order }
             return list.isEmpty ? nil : (g, list)
         }
     }
@@ -95,7 +97,8 @@ struct SettingsView: View {
 
     var body: some View {
         let current =
-            shell.settings.sections.first { $0.id == shell.settings.selected } ?? shell.settings.sections.first
+            shell.settings.sections.first { $0.id == shell.settings.selected && !shell.settings.hidden.contains($0.id) }
+            ?? shell.settings.sections.first { !shell.settings.hidden.contains($0.id) }
         let dir = shell.settings.direction
         HStack(alignment: .top, spacing: 0) {
             GlassScroll {

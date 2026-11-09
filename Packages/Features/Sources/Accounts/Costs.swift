@@ -31,6 +31,8 @@ struct UsageItem: Equatable, Sendable {
     let hasLimits: Bool
     let drops: Int64
     let companies: [CompanyUsage]
+    /// Where each usage limit of the account stands (`PUT /accounts/{id}/limits`).
+    var limits: [LimitItem] = []
 }
 
 /// One cost event: one attempt of a session, a delta. No cost when nothing priced it.
