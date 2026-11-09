@@ -552,7 +552,7 @@ public final class AccountsDemo {
         case "chain-bind": AccountDialogs.openBindAgent(model, chain: model.chain(1)!)
         case "chain-error":
             AccountDialogs.openChain(model, editing: model.chain(1))
-            model.note("chain", "The Core refused: a chain may hold only one subscription pool.")
+            model.note("chain", "The Core refused: a chain may hold only one subscription pool.", rule: true)
         case "new-pool": AccountDialogs.openNewPool(model)
         case "add-member": AccountDialogs.openAddMember(model, pool: model.pool(2)!)
         case "delete-pool": AccountDialogs.openDeletePool(model, model.pool(2)!)

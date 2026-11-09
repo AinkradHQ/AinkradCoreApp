@@ -57,7 +57,7 @@ struct InboxView: View {
                         ? "Nothing is waiting on you"
                         : n == 1 ? "1 approval is waiting on you" : "\(n) approvals are waiting on you"
                 )
-                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 .contentTransition(.numericText())
                 Label(touchNote, systemImage: elevatedUntil == nil ? "touchid" : "checkmark.shield")
                     .foregroundStyle(GlassInk.secondary)
@@ -200,7 +200,7 @@ struct NotificationsSection: View {
                     p == .allowed
                         ? "Banners are on" : p == .notAsked ? "Banners aren't set up yet" : "macOS has banners off"
                 )
-                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 Text(
                     p == .allowed
                         ? "macOS shows Ainkrad's banners."

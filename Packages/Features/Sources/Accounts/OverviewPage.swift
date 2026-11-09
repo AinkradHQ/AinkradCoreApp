@@ -256,6 +256,8 @@ struct AccountCard: View {
         let on = model.cursor == "a-\(a.id)"
         let verdict = model.verdict(a)
         let usable = verdict.usable
+        // Turned off dims the tile, the bar and the badge, not the words: the helper text keeps its full contrast.
+        let dim = verdict.kind == .turnedOff ? 0.7 : 1.0
         // The bar says whether agents can use it: full green only when ready and in a pool, part-filled in its tone
         // otherwise. The same verdict as the badge, the account page and Overview.
         let state =
@@ -264,14 +266,14 @@ struct AccountCard: View {
             : verdict.tone == .fail ? GlassInk.red : verdict.tone == .queue ? GlassInk.slate : GlassInk.orange
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                AccTile(provider: a.provider)
+                AccTile(provider: a.provider).opacity(dim)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(a.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                     Text(model.providerName(a.provider)).font(.system(size: MacTextSize.meta))
                         .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
-                VerdictBadge(verdict: verdict)
+                VerdictBadge(verdict: verdict).opacity(dim)
             }
             // Readiness as a bar (see `state`).
             GeometryReader { g in
@@ -287,7 +289,7 @@ struct AccountCard: View {
                         )
                 }
             }
-            .frame(height: 4)
+            .frame(height: 4).opacity(dim)
             Text(
                 usable
                     ? "Ready for your agents."
@@ -329,7 +331,6 @@ struct AccountCard: View {
             coreShape(Radius.cardMac).strokeBorder(
                 on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
         }
-        .opacity(verdict.kind == .turnedOff ? 0.7 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }
         .onHover { hovering = $0 }

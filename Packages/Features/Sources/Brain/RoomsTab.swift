@@ -137,7 +137,7 @@ private struct RoomView: View {
                 detail(d)
             } else if let r = model.room(id), let lock = r.lock {
                 header(r)
-                BrainNotice(symbol: "lock", title: lock.sentence, tone: .queue)
+                CoreNotice(symbol: "lock", title: lock.sentence, tone: .queue)
             } else {
                 BrainSkeleton(shape: .page)
             }
@@ -174,13 +174,13 @@ private struct RoomView: View {
     @ViewBuilder private func detail(_ d: RoomDetail) -> some View {
         header(d.room)
         if d.room.lease.state == .expiring {
-            BrainNotice(
+            CoreNotice(
                 symbol: "clock",
                 title:
                     "The key renews in \(BrainWords.unit(d.room.lease.left)). Renew it before then, or the room seals.")
         }
         if let c = d.cost, c.capReached {
-            BrainNotice(
+            CoreNotice(
                 symbol: "dollarsign.circle",
                 title: "Monthly cost cap reached. Meaning search is paused for this room; exact search still works.")
         }

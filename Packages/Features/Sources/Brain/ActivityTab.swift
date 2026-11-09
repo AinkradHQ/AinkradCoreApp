@@ -104,7 +104,7 @@ private struct FeedView: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             filters(a)
             if a.isOffline {
-                BrainNotice(
+                CoreNotice(
                     symbol: "wifi.slash", title: "Showing what this Mac has",
                     text: "Activity from your other devices arrives when you are back online.")
             }

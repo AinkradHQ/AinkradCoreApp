@@ -62,15 +62,12 @@ struct NewRoomSheet: View {
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 }
                 if let n = model.host.elevationNotice {
-                    BrainNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
+                    CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
                 }
-                HStack(spacing: Space.s2) {
-                    Spacer()
-                    Button("Cancel", action: close).buttonStyle(CoreButtonStyle(.secondary)).keyboardShortcut(
-                        .cancelAction)
-                    Button("Create room") { go() }.buttonStyle(CoreButtonStyle(.prominent, busy: busy))
-                        .disabled(typed.isEmpty || taken || busy).keyboardShortcut(.defaultAction)
-                }
+                CoreDialogFooter(
+                    cancel: CoreAction("Cancel", key: .cancel, run: close),
+                    primary: CoreAction("Create room", key: .primary) { go() }, busy: busy,
+                    enabled: !(typed.isEmpty || taken))
             }
         }
         .accessibilityIdentifier("brain-new-room")

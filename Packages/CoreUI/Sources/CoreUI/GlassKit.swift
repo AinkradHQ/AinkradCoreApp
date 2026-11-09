@@ -21,6 +21,12 @@ public enum GlassInk {
     public static let redInk = Color(red: 1, green: 0.64, blue: 0.62)
     public static let violet = Color(red: 0.62, green: 0.45, blue: 1)
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
+
+    /// The text colour for a fill hue: red, orange and blue have lighter inks that pass contrast; slate reads as secondary
+    /// text; any other hue keeps its colour.
+    public static func ink(_ hue: Color) -> Color {
+        hue == red ? redInk : hue == orange ? orangeInk : hue == blue ? blueInk : hue == slate ? secondary : hue
+    }
 }
 
 /// A white glyph on a gradient tile in a subject's hue. It bounces when `bounce` changes.
