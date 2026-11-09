@@ -25,8 +25,8 @@ struct AccountNotice: Equatable {
     }
 
     /// A short toast for events that are not an account's, not kept in the bell. `reap_warning` is `{terminal, reason, grace_secs,
-    /// reap_at}`; it names the terminal when the app knows it. There is no "Keep it" button: the client has no operation that
-    /// keeps a terminal alive (using it does).
+    /// reap_at}`; it names the terminal when the app knows it. The toast's "Keep it" opens the terminal: attaching is what
+    /// keeps it alive.
     static func toast(kind: String, fields f: [String: String] = [:], terminal: (String) -> String? = { _ in nil })
         -> String?
     {

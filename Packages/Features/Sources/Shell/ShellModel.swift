@@ -225,6 +225,7 @@ public final class ShellModel {
         profile = UserProfile(defaults: defaults)
         tabNames = defaults.dictionary(forKey: Self.tabNamesKey) as? [String: String] ?? [:]
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
+        if !WidgetKind.boardShown { widgets.items.removeAll { $0.kind == .board } }
         showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
@@ -471,9 +472,10 @@ public final class ShellModel {
     }
 
     public func showToast(
-        _ message: String, kind: ToastKind = .ok, undo: (@Sendable @MainActor () -> Void)? = nil
+        _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo",
+        undo: (@Sendable @MainActor () -> Void)? = nil
     ) {
-        toast = ToastItem(message, kind: kind, undo: undo)
+        toast = ToastItem(message, kind: kind, actionTitle: actionTitle, undo: undo)
     }
 
     public func presentSheet(title: String, message: String, actions: [ShellSheetAction], symbol: String? = nil) {

@@ -1,0 +1,79 @@
+import Agents
+import CoreUI
+import Foundation
+import Shell
+import Testing
+
+@testable import Pairing
+
+private struct FakeHome: HomeSource {
+    var sessionList: [AgentSessionInfo] = []
+    var runnerList: [HomeRunner] = []
+    var costList: [(at: Date, micros: Int64)] = []
+    var share = 0.0
+    var auditList: [HomeAudit] = []
+    var denied = false
+
+    func sessions() async throws -> [AgentSessionInfo] { sessionList }
+    func runners() async throws -> [HomeRunner] { runnerList }
+    func costs() async throws -> [(at: Date, micros: Int64)] {
+        if denied { throw URLError(.userAuthenticationRequired) }
+        return costList
+    }
+    func utilisation() async throws -> Double { share }
+    func audit() async throws -> [HomeAudit] { auditList }
+}
+
+@MainActor @Suite struct HomeFeedTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func session(_ id: String, _ state: SessionState, ago: TimeInterval) -> AgentSessionInfo {
+        AgentSessionInfo(
+            id: id, runner: "r", harness: "claude-code", model: "opus", state: state,
+            createdAt: now.addingTimeInterval(-ago), updatedAt: now)
+    }
+
+    @Test func coreAnswersBecomeTheSnapshot() async {
+        let shell = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
+        let src = FakeHome(
+            sessionList: [session("a", .running, ago: 600), session("b", .ended, ago: 60)],
+            runnerList: [HomeRunner(name: "mini", arch: "arm64", online: true, capacity: 4, load: 2, perCore: 0.25)],
+            costList: [(now, 1_500_000), (now.addingTimeInterval(-3 * 86_400), 9_000_000)],
+            share: 0.4,
+            auditList: [HomeAudit(seq: 7, at: now.addingTimeInterval(-300), action: "device.revoked", actor: "Core")])
+        let feed = HomeFeed(shell: shell, source: src, now: { [now] in now })
+        await feed.refresh()
+        let h = shell.home
+        #expect(h.running.map(\.id) == ["a"])
+        #expect(h.running.first?.minutes == 10)
+        #expect(h.machines.first?.id == "mini")
+        #expect(h.machines.first?.slots == 4)
+        #expect(h.machines.first?.loadPercent == 25)
+        #expect(h.spendToday == 1.5)
+        #expect(h.monthTokensUsed == 0.4)
+        #expect(h.events.first?.text == "Device revoked")
+        #expect(h.events.first?.minutesAgo == 5)
+    }
+
+    @Test func aRefusedReadLeavesTheRestShowing() async {
+        let shell = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
+        var src = FakeHome(sessionList: [session("a", .running, ago: 60)])
+        src.denied = true
+        await HomeFeed(shell: shell, source: src, now: { [now] in now }).refresh()
+        #expect(shell.home.runningAgents == 1)
+        #expect(shell.home.spendToday == 0)
+    }
+
+    @Test func onlyHomeEventsRefreshAfterAQuietMoment() async throws {
+        let shell = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
+        let feed = HomeFeed(
+            shell: shell, source: FakeHome(sessionList: [session("a", .running, ago: 60)]), quiet: .milliseconds(20))
+        feed.event(kind: "device.added")
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(shell.home.runningAgents == 0)
+        feed.event(kind: "agent.session.started")
+        feed.event(kind: "agent.session.updated")
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(shell.home.runningAgents == 1)
+    }
+}

@@ -25,7 +25,9 @@ struct WidgetGallery: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(Self.cats, id: \.self) { cat in
-                        let kinds = WidgetKind.allCases.filter { $0.category == cat }
+                        let kinds = WidgetKind.allCases.filter {
+                            $0.category == cat && ($0 != .board || WidgetKind.boardShown)
+                        }
                         if !kinds.isEmpty {
                             Text(cat).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                                 palette.text2

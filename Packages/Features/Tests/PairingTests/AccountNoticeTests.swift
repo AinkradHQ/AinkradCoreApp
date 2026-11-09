@@ -78,5 +78,7 @@ struct AccountNoticeTests {
         m.accountNotice("terminal.reap_warning", ["terminal": "t_1"])
         #expect(m.shell.toast?.message == "A terminal will close soon: nobody has used it for a while.")
         #expect(m.shell.bell.items.isEmpty)
+        #expect(m.shell.toast?.actionTitle == "Keep it")
+        #expect(m.shell.toast?.undo != nil)
     }
 }
