@@ -493,9 +493,9 @@ public final class ShellModel {
 
     public func showToast(
         _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo",
-        undo: (@Sendable @MainActor () -> Void)? = nil
+        id: UUID = UUID(), lifetime: TimeInterval? = nil, undo: (@Sendable @MainActor () -> Void)? = nil
     ) {
-        toast = ToastItem(message, kind: kind, actionTitle: actionTitle, undo: undo)
+        toast = ToastItem(message, kind: kind, actionTitle: actionTitle, id: id, lifetime: lifetime, undo: undo)
     }
 
     /// ⌘Z: runs the showing toast's Undo and clears it. False (nothing run) when there is none, its button is not an Undo, or
