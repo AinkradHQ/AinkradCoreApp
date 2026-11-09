@@ -214,3 +214,39 @@ struct LiveConnectionsTests {
         #expect(LoopbackCatcher.code(in: "GET /callback?code=c&state=other HTTP/1.1\r\n", state: "s") == nil)
     }
 }
+
+struct LiveConnectionsGapTests {
+    @Test func defaultsAreReadByKindAndCleared() async throws {
+        let core = StubCore([
+            "listConnectionDefaults": #"[{"kind":"github","connection":2},{"kind":"jira","connection":3}]"#,
+            "clearConnectionDefault": #"{"deleted":true}"#,
+        ])
+        let svc = live(core)
+        #expect(try await svc.defaults() == ["github": 2, "jira": 3])
+        try await svc.clearDefault(kind: "github")
+        #expect(core.bodies("clearConnectionDefault").count == 1)
+    }
+
+    @Test func theAppNeverHoldsASecretAndSavesOnlyTheGivenFields() async throws {
+        let app = """
+            {"kind":"jira","configured":true,"app_install_configured":false,"redirect_uri":"http://127.0.0.1:47613/callback",
+             "fields":[{"name":"client_id","title":"Client ID","secret":false,"set":true,"value":"abc"},
+                       {"name":"client_secret","title":"Client secret","secret":true,"set":true}]}
+            """
+        let core = StubCore(["getConnectionApp": app, "setConnectionApp": app])
+        let svc = live(core)
+        let got = try await svc.app(kind: "jira")
+        #expect(got.configured && got.redirect == "http://127.0.0.1:47613/callback")
+        #expect(got.fields.map(\.isSet) == [true, true] && got.fields[1].value == nil)
+        _ = try await svc.setApp(kind: "jira", fields: ["client_id": "abc"])
+        let sent = try #require(core.bodies("setConnectionApp").first)
+        #expect(sent.contains("client_id") && !sent.contains("client_secret"))
+    }
+
+    @Test func replacingACredentialSendsTheTokenInTheBody() async throws {
+        let core = StubCore(["replaceConnectionCredential": conn(1)])
+        try await live(core).replaceCredential(1, token: "tok-1", fields: ["Site": "a.atlassian.net"])
+        let sent = try #require(core.bodies("replaceConnectionCredential").first)
+        #expect(sent.contains("tok-1") && sent.contains("a.atlassian.net"))
+    }
+}

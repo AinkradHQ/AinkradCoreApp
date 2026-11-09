@@ -30,6 +30,12 @@ enum ConnDialogs {
     static func openAccess(_ m: ConnectionsModel, _ c: ConnItem) {
         present(m, "connection-access") { close in AccessSheet(model: m, item: c, close: close) }
     }
+    static func openApp(_ m: ConnectionsModel, _ k: ConnKind) {
+        present(m, "connection-app") { close in AppRegistrationSheet(model: m, kind: k, close: close) }
+    }
+    static func openReplace(_ m: ConnectionsModel, _ c: ConnItem, done: Bool = false) {
+        present(m, "connection-replace") { close in ReplaceTokenSheet(model: m, item: c, close: close, done: done) }
+    }
     static func openRename(_ m: ConnectionsModel, _ c: ConnItem) {
         present(m, "connection-rename") { close in RenameSheet(model: m, item: c, close: close) }
     }

@@ -151,6 +151,10 @@ struct ConnListPage: View {
                                     .foregroundStyle(GlassInk.secondary)
                             }
                             Spacer()
+                            AccLink(
+                                title: "App registration", symbol: "gearshape",
+                                help: "The \(k.name) app Ainkrad signs in with. Admins only."
+                            ) { ConnDialogs.openApp(model, k) }
                             AccLink(title: "Connect another", symbol: "plus") {
                                 ConnDialogs.openConnect(model, kind: k.id)
                             }
@@ -199,6 +203,9 @@ struct ConnListPage: View {
                 ) {
                     ConnDialogs.openConnect(model, kind: k.id)
                 }
+            }
+            ForEach(model.liveKinds) { k in
+                AccLink(title: "\(k.name) app registration", symbol: "gearshape") { ConnDialogs.openApp(model, k) }
             }
         }
     }
@@ -258,13 +265,27 @@ struct ConnCard: View {
                 }
                 if !need {
                     AccLink(title: "Rename", symbol: "pencil") { ConnDialogs.openRename(model, item) }
-                    if !item.isDefault {
+                    if item.isDefault {
+                        AccLink(title: "Clear default", symbol: "star.slash") {
+                            Task { await model.clearDefault(item) }
+                        }
+                    } else {
                         AccLink(title: "Use by default", symbol: "star") { Task { await model.makeDefault(item) } }
                     }
                     AccLink(title: "Who can use it", symbol: "lock.shield") { ConnDialogs.openAccess(model, item) }
                 }
                 Spacer(minLength: 0)
                 AccLink(title: "Disconnect", symbol: "trash", danger: true) { ConnDialogs.openDisconnect(model, item) }
+            }
+            .opacity(need || hovering || on ? 1 : 0)
+            .allowsHitTesting(need || hovering || on)
+            .animation(.smooth(duration: 0.2), value: hovering)
+            HStack {
+                AccLink(
+                    title: "Replace token", symbol: "key",
+                    help: "Paste a new token if this one was changed or ran out."
+                ) { ConnDialogs.openReplace(model, item) }
+                Spacer(minLength: 0)
             }
             .opacity(need || hovering || on ? 1 : 0)
             .allowsHitTesting(need || hovering || on)

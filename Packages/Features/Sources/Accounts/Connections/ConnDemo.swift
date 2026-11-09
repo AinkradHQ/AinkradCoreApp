@@ -1,4 +1,5 @@
 #if DEBUG
+import CoreKit
 import Foundation
 import Shell
 import SwiftUI
@@ -9,7 +10,9 @@ extension AccountsDemo {
     public static let connScenes = [
         "conn-list", "conn-empty", "conn-pick", "conn-github-code", "conn-github-repos", "conn-jira-sites",
         "conn-failed", "conn-done", "conn-token", "conn-access", "conn-access-write", "conn-rename",
-        "conn-disconnect", "conn-activity", "conn-off",
+        "conn-disconnect", "conn-activity", "conn-off", "conn-app-notset", "conn-app-set", "conn-app-saving",
+        "conn-app-error", "conn-app-readonly", "conn-default-menu", "conn-default-cleared", "conn-replace",
+        "conn-replace-working", "conn-replace-error", "conn-replace-done",
     ]
 
     func showConnections(_ scene: String) async {
@@ -17,6 +20,8 @@ extension AccountsDemo {
         let shell = m.host.shell
         shell.dialog = nil
         m.stopFlow()
+        m.busy = nil
+        m.writeError = [:]
         m.filter = .all
         m.page = scene == "conn-activity" ? .activity : .list
         m.opener = { _ in }
@@ -59,6 +64,28 @@ extension AccountsDemo {
             if let c = m.item(1) { ConnDialogs.openAccess(m, c) }
         case "conn-rename": if let c = m.item(1) { ConnDialogs.openRename(m, c) }
         case "conn-disconnect": if let c = m.item(2) { ConnDialogs.openDisconnect(m, c) }
+        case "conn-app-notset", "conn-app-set", "conn-app-saving", "conn-app-error", "conn-app-readonly":
+            svc.appReadOnly = scene == "conn-app-readonly"
+            if let k = m.kind(scene == "conn-app-notset" ? "jira" : "github") {
+                ConnDialogs.openApp(m, k)
+                try? await Task.sleep(for: .milliseconds(500))
+                // Saving needs Touch ID, which a scene can't do: show the model state it would be in.
+                if scene == "conn-app-saving" { m.busy = "app-\(k.id)" }
+                if scene == "conn-app-error" {
+                    m.writeError["app-\(k.id)"] = ConnSay.plain(CoreError.http(status: 500, code: "x", message: ""))
+                }
+            }
+        case "conn-default-menu", "conn-default-cleared":
+            if scene == "conn-default-cleared", let c = m.item(1) { await m.clearDefault(c) }
+            m.cursor = 1
+        case "conn-replace", "conn-replace-working", "conn-replace-error", "conn-replace-done":
+            guard let c = m.item(2) else { break }
+            ConnDialogs.openReplace(m, c, done: scene == "conn-replace-done")
+            try? await Task.sleep(for: .milliseconds(400))
+            if scene == "conn-replace-working" { m.busy = "replace-\(c.id)" }
+            if scene == "conn-replace-error" {
+                m.writeError["replace-\(c.id)"] = ConnSay.plain(CoreError.http(status: 400, code: "x", message: ""))
+            }
         default: break
         }
     }

@@ -193,6 +193,47 @@ struct LiveConnectionsService: ConnectionsService {
         try await run { _ = try await client.deleteConnection(path: .init(id: String(id))).ok }
     }
 
+    func defaults() async throws -> [String: Int64] {
+        try await run {
+            Dictionary(
+                try await client.listConnectionDefaults().ok.body.json.map { ($0.kind, $0.connection) },
+                uniquingKeysWith: { a, _ in a })
+        }
+    }
+
+    func clearDefault(kind: String) async throws {
+        try await run { _ = try await client.clearConnectionDefault(path: .init(kind: kind)).ok }
+    }
+
+    func app(kind: String) async throws -> ConnApp {
+        try await run { Self.app(try await client.getConnectionApp(path: .init(kind: kind)).ok.body.json) }
+    }
+
+    func setApp(kind: String, fields: [String: String]) async throws -> ConnApp {
+        try await run {
+            let body = Components.Schemas.SetConnectionApp(
+                fields: .init(additionalProperties: fields.mapValues { $0 as String? }))
+            return Self.app(try await client.setConnectionApp(path: .init(kind: kind), body: .json(body)).ok.body.json)
+        }
+    }
+
+    func replaceCredential(_ id: Int64, token: String, fields: [String: String]) async throws {
+        try await run {
+            let body = Components.Schemas.NewConnectionCredential(
+                email: fields[Self.emailField], site: fields[Self.siteField], token: token)
+            _ = try await client.replaceConnectionCredential(path: .init(id: String(id)), body: .json(body)).ok
+        }
+    }
+
+    static func app(_ a: Components.Schemas.ConnectionApp) -> ConnApp {
+        ConnApp(
+            kind: a.kind, configured: a.configured,
+            fields: a.fields.map {
+                ConnApp.Field(
+                    id: $0.name, title: $0.title, secret: $0.secret, isSet: $0.set, value: $0.secret ? nil : $0.value)
+            }, redirect: a.redirectUri)
+    }
+
     // MARK: mapping
 
     static let siteField = "Site"

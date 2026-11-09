@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 
 /// The Core's connection routes (C5) as these screens use them. A credential only ever goes in on the Core's side: nothing
@@ -26,6 +27,15 @@ protocol ConnectionsService: Sendable {
     func setDefault(_ id: Int64) async throws
     func setAccess(_ id: Int64, allowed: Set<String>, only: [String]?) async throws
     func delete(_ id: Int64) async throws
+    /// Each kind's default connection, by kind. Admin only.
+    func defaults() async throws -> [String: Int64]
+    func clearDefault(kind: String) async throws
+    /// Ainkrad's OAuth app registration for a kind. Admin only; a secret is never returned.
+    func app(kind: String) async throws -> ConnApp
+    /// Only the fields given change. A secret goes in once and is never read back.
+    func setApp(kind: String, fields: [String: String]) async throws -> ConnApp
+    /// A new token for an existing connection, sent once and never read back.
+    func replaceCredential(_ id: Int64, token: String, fields: [String: String]) async throws
 }
 
 #if DEBUG
@@ -34,6 +44,14 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
     // ponytail: one lock around plain vars; this is sample data, not a store.
     private let lock = NSLock()
     private var list: [ConnItem]
+    private var appFields: [String: [String: String]] = ["github": ["client_id": "Iv1.sample1234"]]
+    /// App registration: the next read says "admins only" / the next save fails (tests).
+    var appReadOnly = false
+    var failApp = false
+    /// The next replaced token is refused.
+    var failReplace = false
+    /// Every token and secret sent in, for tests to check it arrived. Sample only.
+    private(set) var sent: [String] = []
     private var flows: [String: (ConnFlow, Int)] = [:]
     private var nextID: Int64 = 10
     /// The next sign-in fails (the error scene).
@@ -242,6 +260,48 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         }
     }
     func delete(_ id: Int64) async throws { lock.withLock { list.removeAll { $0.id == id } } }
+
+    func defaults() async throws -> [String: Int64] {
+        lock.withLock { Dictionary(list.filter(\.isDefault).map { ($0.kind, $0.id) }, uniquingKeysWith: { a, _ in a }) }
+    }
+    func clearDefault(kind: String) async throws {
+        lock.withLock { for i in list.indices where list[i].kind == kind { list[i].isDefault = false } }
+    }
+
+    func app(kind: String) async throws -> ConnApp {
+        if appReadOnly { throw CoreError.forbiddenScope }
+        return lock.withLock { Self.app(kind, appFields[kind] ?? [:]) }
+    }
+    func setApp(kind: String, fields: [String: String]) async throws -> ConnApp {
+        if failApp { throw CoreError.http(status: 500, code: "internal_error", message: "") }
+        return lock.withLock {
+            sent += fields.values
+            appFields[kind, default: [:]].merge(fields) { _, new in new }
+            return Self.app(kind, appFields[kind] ?? [:])
+        }
+    }
+    func replaceCredential(_ id: Int64, token: String, fields: [String: String]) async throws {
+        if failReplace {
+            failReplace = false
+            throw CoreError.http(status: 400, code: "bad_request", message: "")
+        }
+        lock.withLock { sent.append(token) }
+        edit(id) {
+            $0.status = .connected
+            $0.reason = nil
+        }
+    }
+    private static func app(_ kind: String, _ set: [String: String]) -> ConnApp {
+        let rows: [(String, String, Bool)] =
+            kind == "jira"
+            ? [("client_id", "Client ID", false), ("client_secret", "Client secret", true)]
+            : [("client_id", "Client ID", false), ("app_id", "App ID", false), ("app_key", "App private key", true)]
+        return ConnApp(
+            kind: kind, configured: set["client_id"] != nil,
+            fields: rows.map { r in
+                ConnApp.Field(id: r.0, title: r.1, secret: r.2, isSet: set[r.0] != nil, value: r.2 ? nil : set[r.0])
+            }, redirect: kind == "jira" ? "http://127.0.0.1:47613/callback" : nil)
+    }
     private func edit(_ id: Int64, _ f: (inout ConnItem) -> Void) {
         lock.withLock { if let i = list.firstIndex(where: { $0.id == id }) { f(&list[i]) } }
     }
