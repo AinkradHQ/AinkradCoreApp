@@ -73,13 +73,13 @@ private struct CoreButtonBody: View {
             }
             // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
             if let keycap {
-                Text(keycap).font(.system(size: 10, weight: .medium, design: .rounded))
+                Text(keycap).coreFont(size: 10, weight: .medium, design: .rounded)
                     .padding(.horizontal, 5).frame(minHeight: 16)
                     .background(.white.opacity(0.16), in: coreShape(5))
                     .accessibilityHidden(true)
             }
         }
-        .font(.system(size: size.text, weight: .semibold))
+        .coreFont(size: size.text, weight: .semibold)
         .foregroundStyle(ink)
         .frame(minHeight: size.height)
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
@@ -213,7 +213,7 @@ extension View {
     public func coreTileKey(_ label: String, key: Character, modifiers: EventModifiers = .command) -> some View {
         keyboardShortcut(KeyEquivalent(key), modifiers: modifiers)
             .overlay(alignment: .topTrailing) {
-                Text(label).font(.system(size: 10, weight: .semibold, design: .rounded))
+                Text(label).coreFont(size: 10, weight: .semibold, design: .rounded)
                     .foregroundStyle(.white.opacity(0.85))
                     .padding(.horizontal, 5).frame(minHeight: 16)
                     .background(.black.opacity(0.35), in: coreShape(4))

@@ -55,7 +55,7 @@ private struct BlockedView: View {
                 ]
         )
         .foregroundStyle(palette.text)
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .padding(Space.s6)
         .coreFrame(radius: Radius.panel, part: .dialogs)
         .frame(width: Space.s8 * 17)

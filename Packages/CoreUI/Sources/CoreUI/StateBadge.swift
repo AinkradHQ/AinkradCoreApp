@@ -18,8 +18,8 @@ public struct StateBadge: View {
     public var body: some View {
         let colours = palette.tone(tone)
         HStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.meta - 1)).accessibilityHidden(true)
-            Text(label).font(.system(size: MacTextSize.meta, weight: .medium))
+            Image(systemName: symbol).coreFont(size: MacTextSize.meta - 1).accessibilityHidden(true)
+            Text(label).coreFont(size: MacTextSize.meta, weight: .medium)
         }
         .foregroundStyle(colours.ink)
         .padding(.horizontal, Space.s2)

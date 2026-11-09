@@ -47,7 +47,7 @@ struct OverviewTab: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s2) {
-                        Text("Paused").font(.system(size: MacTextSize.large, weight: .semibold))
+                        Text("Paused").coreFont(size: MacTextSize.large, weight: .semibold)
                             .foregroundStyle(GlassInk.redInk)
                         count(n, GlassInk.red)
                     }
@@ -72,7 +72,7 @@ struct OverviewTab: View {
     private func head(_ title: String, _ hue: Color, _ n: Int?, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
+                Text(title).coreFont(size: MacTextSize.large, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
                 if let n { count(n, hue) }
             }
             Text(text).foregroundStyle(GlassInk.secondary)
@@ -82,7 +82,7 @@ struct OverviewTab: View {
     }
 
     private func count(_ n: Int, _ hue: Color) -> some View {
-        Text("\(n)").font(.system(size: MacTextSize.meta, weight: .bold)).monospacedDigit()
+        Text("\(n)").coreFont(size: MacTextSize.meta, weight: .bold).monospacedDigit()
             .padding(.horizontal, 6).frame(minHeight: 18).background(hue, in: coreShape(5))
     }
 }
@@ -97,12 +97,12 @@ private struct NeedTile: View {
             withAnimation(.smooth(duration: 0.3)) { model.tab = need.tab }
         } label: {
             HStack(spacing: Space.s3) {
-                Text("\(need.n)").font(.system(size: MacTextSize.large, weight: .bold)).monospacedDigit()
+                Text("\(need.n)").coreFont(size: MacTextSize.large, weight: .bold).monospacedDigit()
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(BrainWords.glue(need.text)).font(.system(size: MacTextSize.body)).fixedSize(
+                    Text(BrainWords.glue(need.text)).coreFont(size: MacTextSize.body).fixedSize(
                         horizontal: false, vertical: true)
                     if let name = model.roomName(need) {
-                        Text(name).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        Text(name).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     }
                 }
                 Spacer(minLength: 0)
@@ -148,7 +148,7 @@ private struct HealthTileView: View {
         .accessibilityLabel("\(plain.name), \(label). \(tile.text). \(plain.help)")
     }
     private func title(_ t: String) -> some View {
-        Text(t).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+        Text(t).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
     }
     /// Words and colour together: nothing is only a colour.
     private var style: (String, Color) {
@@ -175,7 +175,7 @@ private struct RecordsPerRoom: View {
                     HStack(spacing: Space.s3) {
                         Text(row.room.name).frame(width: Space.s8 * 4, alignment: .leading).lineLimit(1)
                         TypeBar(shares: row.counts.byType, total: top)
-                        Text(BrainWords.mostly(row.counts.byType)).font(.system(size: MacTextSize.meta))
+                        Text(BrainWords.mostly(row.counts.byType)).coreFont(size: MacTextSize.meta)
                             .foregroundStyle(GlassInk.secondary).lineLimit(1)
                             .frame(width: Space.s8 * 3.5, alignment: .leading)
                         Text(row.counts.records.formatted()).monospacedDigit()
@@ -187,7 +187,7 @@ private struct RecordsPerRoom: View {
                 }
             }
             Text("The darkest part is the most common kind. Hover a row for the full breakdown.")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).padding(.top, Space.s1)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).padding(.top, Space.s1)
         }
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -230,9 +230,7 @@ private struct SpeedChart: View {
                 "Slowest 5 in 100 searches, last \(speed.count) days, against the \(coreUnit("\(Int(target))", "ms")) target."
         ) {
             HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
-                Text(coreUnit("\(Int(speed.last ?? 0))", "ms")).font(
-                    .system(size: MacTextSize.large, weight: .semibold)
-                )
+                Text(coreUnit("\(Int(speed.last ?? 0))", "ms")).coreFont(size: MacTextSize.large, weight: .semibold)
                 .monospacedDigit()
                 Text("today").foregroundStyle(GlassInk.secondary)
             }
@@ -254,7 +252,7 @@ private struct SpeedChart: View {
                     axisLabel(coreUnit("\(Int(top))", "ms")).offset(y: 0)
                     axisLabel(coreUnit("\(Int(target))", "ms")).offset(y: y - Space.s2)
                     axisLabel("0").offset(y: g.size.height - Space.s3)
-                    Text("Target \(coreUnit("\(Int(target))", "ms"))").font(.system(size: MacTextSize.meta))
+                    Text("Target \(coreUnit("\(Int(target))", "ms"))").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.primary).padding(.horizontal, Space.s2)
                         .background(GlassInk.well, in: coreShape(Radius.chip))
                         .frame(maxWidth: .infinity, alignment: .trailing).offset(y: y - Space.s4 - 2)
@@ -266,7 +264,7 @@ private struct SpeedChart: View {
                 Spacer()
                 Text("Today")
             }
-            .padding(.leading, axis).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .padding(.leading, axis).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .onAppear { withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = true } }
@@ -276,7 +274,7 @@ private struct SpeedChart: View {
         )
     }
     private func axisLabel(_ t: String) -> some View {
-        Text(t).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).monospacedDigit()
+        Text(t).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
     }
 }
 
@@ -301,7 +299,7 @@ private struct Facts: View {
         let f = BrainWords.facts[i]
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
             Text(f.title).foregroundStyle(GlassInk.secondary)
-            Text(value).font(.system(size: MacTextSize.body, weight: .semibold)).monospacedDigit()
+            Text(value).coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
         }
         .help(f.help)
         .accessibilityElement(children: .combine)

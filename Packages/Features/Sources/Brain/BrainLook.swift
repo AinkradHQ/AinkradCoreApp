@@ -50,7 +50,7 @@ struct BrainLookSection: View {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
             } content: {
                 if prefs.followLook {
-                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
+                    Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                 } else {
                     GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")

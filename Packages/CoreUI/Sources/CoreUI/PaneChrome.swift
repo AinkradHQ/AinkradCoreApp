@@ -81,7 +81,7 @@ public struct CoreIconButton: View {
     public var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: MacTextSize.body, weight: .medium))
+                .coreFont(size: MacTextSize.body, weight: .medium)
                 .frame(width: MacSize.controlMd, height: MacSize.controlMd)
                 .background(
                     selected ? palette.navActive : hovering ? palette.uDimHover : .clear, in: coreShape(Radius.control)
@@ -106,7 +106,7 @@ public struct CoreKeycap: View {
     public init(_ keys: String) { self.keys = keys }
     public var body: some View {
         Text(keys)
-            .font(.system(size: MacTextSize.meta, weight: .medium))
+            .coreFont(size: MacTextSize.meta, weight: .medium)
             .foregroundStyle(palette.text2)
             .padding(.horizontal, Space.s2)
             .frame(minWidth: MacSize.chip, minHeight: MacSize.chip)

@@ -58,7 +58,7 @@ struct SwitchesSection: View {
                                 IconTile("server.rack", hue: pty ? GlassInk.green : GlassInk.slate, size: 32)
                                     .overlay(alignment: .topTrailing) { if pty { LiveDot().offset(x: 3, y: -3) } }
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                                    Text(r.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                                     Text(
                                         pty
                                             ? "Terminals work on this runner."
@@ -68,7 +68,7 @@ struct SwitchesSection: View {
                                 }
                                 Spacer()
                                 Label(pty ? "On" : "Off", systemImage: pty ? "checkmark.circle.fill" : "minus.circle")
-                                    .font(.system(size: MacTextSize.meta, weight: .semibold))
+                                    .coreFont(size: MacTextSize.meta, weight: .semibold)
                                     .foregroundStyle(pty ? GlassInk.green : GlassInk.secondary)
                                     .padding(.horizontal, 8).frame(height: 24)
                                     .background((pty ? GlassInk.green : GlassInk.slate).opacity(0.16), in: coreShape(6))
@@ -167,7 +167,7 @@ private struct FlagCard: View {
         GlassSection(title, sub: sub, symbol: symbol, hue: hue, index: index) {
             HStack(spacing: Space.s2) {
                 Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orangeInk)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.orangeInk)
                 if model.busy == setting.key { ProgressView().controlSize(.small) }
                 GlassToggleTile(
                     isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
@@ -185,9 +185,7 @@ private struct FlagCard: View {
                 title: isOn ? "On · less safe" : "Off · safer", line: isOn ? onLine : offLine, trigger: isOn
             ) { EmptyView() }
             if let needs {
-                Label(needs, systemImage: "arrow.turn.right.up").font(
-                    .system(size: MacTextSize.meta, weight: .semibold)
-                )
+                Label(needs, systemImage: "arrow.turn.right.up").coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.blueInk)
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
@@ -234,7 +232,7 @@ private struct StatePanel<Trailing: View>: View {
                 .contentTransition(.symbolEffect(.replace))
                 .coreBounce(trigger)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                     .contentTransition(.opacity)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }

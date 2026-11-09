@@ -53,13 +53,13 @@ struct NewRoomSheet: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    Text("What you get").font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text("What you get").coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(preview).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
                 if mode.widens {
                     Text("Touch ID is asked first, because this room will leave this Mac.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 if let n = model.host.elevationNotice {
                     CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
@@ -101,8 +101,8 @@ private struct ChoiceTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 2, alignment: .topLeading)

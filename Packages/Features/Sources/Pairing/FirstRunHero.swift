@@ -49,7 +49,7 @@ struct FirstRunHero: View {
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
                 .coreGlass(radius: Radius.control, interactive: false)
-            Text(label).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            Text(label).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 .contentTransition(.opacity)
         }
     }
@@ -85,7 +85,7 @@ struct FirstRunHero: View {
                 }
             }
         } symbols: {
-            Image(systemName: "key.fill").font(.system(size: MacTextSize.body)).foregroundStyle(palette.primary).tag(0)
+            Image(systemName: "key.fill").coreFont(size: MacTextSize.body).foregroundStyle(palette.primary).tag(0)
         }
     }
 }

@@ -94,7 +94,7 @@ struct SessionView: View {
             s.live
             ? ["↩ reply", "esc leave field", "C cancel", "K kill", "↓ latest"]
             : ["R resume"] + (s.outcome == .succeeded ? ["W wake"] : []) + ["↓ latest"]
-        return Text(keys.joined(separator: " · ")).font(.system(size: MacTextSize.meta))
+        return Text(keys.joined(separator: " · ")).coreFont(size: MacTextSize.meta)
             .foregroundStyle(GlassInk.secondary).lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)

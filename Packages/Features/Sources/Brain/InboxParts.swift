@@ -47,7 +47,7 @@ struct QuotedText: View {
 struct SourceBadge: View {
     let source: String
     var body: some View {
-        Label(source, systemImage: "doc.text").font(.system(size: MacTextSize.meta)).lineLimit(1)
+        Label(source, systemImage: "doc.text").coreFont(size: MacTextSize.meta).lineLimit(1)
             .labelStyle(.titleAndIcon)
             .padding(.horizontal, Space.s2).frame(height: MacSize.chip)
             .background(GlassInk.well, in: coreShape(Radius.chip))
@@ -66,7 +66,7 @@ struct KeyLabel: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             Text(title)
-            if let key { Text(key).font(.system(size: MacTextSize.meta)).opacity(0.7).accessibilityHidden(true) }
+            if let key { Text(key).coreFont(size: MacTextSize.meta).opacity(0.7).accessibilityHidden(true) }
         }
     }
 }
@@ -92,10 +92,10 @@ struct CardHeader: View {
     var body: some View {
         HStack(alignment: .center, spacing: Space.s2) {
             BrainChip(chip, hue)
-            Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(2)
+            Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(2)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s2)
-            Text(age).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(age).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
     }
 }

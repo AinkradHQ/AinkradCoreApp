@@ -112,7 +112,7 @@ struct BudgetsPage: View {
                         : none ? "dollarsign.circle" : "checkmark.seal.fill", hue: hue, size: 56, bounce: stopped.count
             )
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                Text(title).coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
@@ -161,12 +161,12 @@ private struct BudgetCard: View {
             HStack(spacing: Space.s3) {
                 IconTile(BudgetWords.symbol(b.kind), hue: s.hue, size: 36)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(model.budgetName(b)).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                    Text(model.budgetName(b)).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                     Text("\(BudgetWords.kind(b.kind)) · \(BudgetWords.period(b.period))")
                         .foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s2)
-                Label(s.title, systemImage: s.symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
+                Label(s.title, systemImage: s.symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(GlassInk.ink(s.hue)).padding(.horizontal, Space.s2).frame(height: 24)
                     .background(s.hue.opacity(0.14), in: coreShape(6))
             }
@@ -177,7 +177,7 @@ private struct BudgetCard: View {
             if let u = b.usdShare, let cap = b.usdCap {
                 bar("Dollars", "\(ModelPriceItem.usd(b.usdSpent)) of \(ModelPriceItem.usd(cap + b.raisedUSD))", u, b)
             } else {
-                Text("No dollar cap").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text("No dollar cap").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             HStack(spacing: Space.s2) {
                 Label(
@@ -204,7 +204,7 @@ private struct BudgetCard: View {
                 }
                 .opacity(shows ? 1 : 0).allowsHitTesting(shows)
             }
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
         .background(
@@ -230,7 +230,7 @@ private struct BudgetCard: View {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)
                 Spacer()
-                Text(words).font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
+                Text(words).coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {

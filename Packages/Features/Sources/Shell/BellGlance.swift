@@ -116,7 +116,7 @@ struct BellGlance: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Notifications").font(.system(size: MacTextSize.title, weight: .semibold))
+                Text("Notifications").coreFont(size: MacTextSize.title, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
                 summary.foregroundStyle(palette.text2)
             }
@@ -179,11 +179,11 @@ struct BellGlance: View {
                         HStack(spacing: Space.s1) {
                             Image(systemName: "chevron.forward").font(.system(size: 9, weight: .semibold))
                                 .rotationEffect(.degrees(shut.contains(g) ? 0 : 90)).frame(width: 12)
-                            Text(g.title).font(.system(size: MacTextSize.body, weight: .semibold))
-                            Text("\(rows.count)").font(.system(size: MacTextSize.meta)).monospacedDigit()
+                            Text(g.title).coreFont(size: MacTextSize.body, weight: .semibold)
+                            Text("\(rows.count)").coreFont(size: MacTextSize.meta).monospacedDigit()
                                 .foregroundStyle(palette.text2)
                             if let h = g.hint {
-                                Text(h).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                                Text(h).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                             }
                             Spacer(minLength: 0)
                         }
@@ -214,13 +214,13 @@ struct BellGlance: View {
                 .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
                 .coreGlass(radius: Radius.control, interactive: false)
             Text(tab == .approvals ? "Nothing needs your approval" : "You're all caught up")
-                .font(.system(size: MacTextSize.body, weight: .semibold))
+                .coreFont(size: MacTextSize.body, weight: .semibold)
             Text(
                 tab == .approvals
                     ? "When an agent asks to do something, it waits here for you."
                     : "Approvals and alerts from your Core show up here."
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).multilineTextAlignment(.center)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Space.s4)
@@ -233,18 +233,16 @@ struct BellGlance: View {
                 coreShape(2).fill(m.online ? palette.tone(.run).ink : palette.tone(.queue).ink)
                     .frame(width: 8, height: 8).padding(.top, 5).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(m.id).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(m.id).coreFont(size: MacTextSize.headline, weight: .semibold)
                     if !m.online {
                         Text("Offline").foregroundStyle(palette.text2)
                     } else {
                         Text(m.used == 0 ? "Idle" : "\(m.used) running").foregroundStyle(palette.text2)
                     }
                 }
-                .font(.system(size: MacTextSize.body))
+                .coreFont(size: MacTextSize.body)
                 Spacer(minLength: 0)
-                Text(m.slots > 0 ? "\(m.used)/\(m.slots)" : "").font(
-                    .system(size: MacTextSize.body, design: .monospaced)
-                )
+                Text(m.slots > 0 ? "\(m.used)/\(m.slots)" : "").coreFont(size: MacTextSize.body, design: .monospaced)
                 .foregroundStyle(palette.text2)
             }
             .padding(Space.s2).accessibilityElement(children: .combine)
@@ -266,14 +264,14 @@ private struct BellCard: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(item.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(item.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Space.s2)
                     if let time = item.time {
-                        Text(time).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                        Text(time).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     }
                 }
-                if let sub = item.sub { Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2) }
+                if let sub = item.sub { Text(sub).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2) }
                 if !item.actions.isEmpty {
                     HStack(spacing: Space.s2) {
                         Spacer(minLength: 0)

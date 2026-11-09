@@ -77,15 +77,15 @@ public struct AppFilterTile: View {
     public var body: some View {
         Button(action: pick) {
             HStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
+                Text(title).coreFont(size: MacTextSize.body, weight: on ? .semibold : .regular)
                 if count >= 0 {  // a negative count hides the badge (a page with nothing to count)
-                    Text("\(count)").font(.system(size: MacTextSize.meta, weight: .semibold)).monospacedDigit()
+                    Text("\(count)").coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
                         .padding(.horizontal, 6).frame(minHeight: 18)
                         .background(.white.opacity(on ? 0.22 : 0.1), in: coreShape(5))
                         .contentTransition(.numericText())
                 }
                 // Always laid out, shown by opacity: hover never changes the tile's width.
-                Text(key).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(
+                Text(key).coreFont(size: 10, weight: .medium, design: .rounded).foregroundStyle(
                     GlassInk.secondary
                 )
                 .opacity(hovering || on ? 1 : 0)
@@ -138,12 +138,12 @@ public struct AppActionTile: View {
     public var body: some View {
         Button(action: run) {
             HStack(spacing: Space.s2) {
-                Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                     .coreEnterBounce(hovering)
                     .symbolEffect(.pulse, options: .repeating, isActive: pulse && !reduce)
-                Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 if !key.isEmpty {
-                    Text(key).font(.system(size: 10, weight: .medium, design: .rounded))
+                    Text(key).coreFont(size: 10, weight: .medium, design: .rounded)
                         .padding(.horizontal, 5).frame(minHeight: 16).background(.white.opacity(0.16), in: coreShape(4))
                 }
             }
@@ -181,7 +181,7 @@ public struct AppStatChip: View {
             Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(hue)
             Text(text).monospacedDigit()
         }
-        .font(.system(size: MacTextSize.meta, weight: .medium))
+        .coreFont(size: MacTextSize.meta, weight: .medium)
         .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
         .background(GlassInk.well, in: coreShape(Radius.chip))
     }
@@ -272,7 +272,7 @@ public struct GlassSlider: View {
             }
             .frame(height: 24)
             Text(high).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            Text("\(percent(value))\(unit)").font(.system(size: MacTextSize.body, weight: .semibold)).monospacedDigit()
+            Text("\(percent(value))\(unit)").coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
                 .contentTransition(.numericText()).frame(width: 46, alignment: .trailing)
         }
         .focusable().focused($focused).focusEffectDisabled()
@@ -332,7 +332,7 @@ public struct SettingRow<Content: View>: View {
     }
     public var body: some View {
         HStack(spacing: Space.s3) {
-            Label(title, systemImage: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+            Label(title, systemImage: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                 .frame(width: 96, alignment: .leading)
             content
         }
@@ -360,7 +360,7 @@ public struct StepTrack: View {
                     if locked.contains(i) { Image(systemName: "lock.fill").font(.system(size: 9)) }
                     Text(name)
                 }
-                .font(.system(size: MacTextSize.meta, weight: i == at ? .semibold : .regular))
+                .coreFont(size: MacTextSize.meta, weight: i == at ? .semibold : .regular)
                 .foregroundStyle(i == at ? .white : GlassInk.secondary)
                 .padding(.horizontal, 8).frame(height: 24)
                 .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(6))

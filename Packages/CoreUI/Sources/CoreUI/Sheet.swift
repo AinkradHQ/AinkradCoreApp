@@ -16,7 +16,7 @@ public struct CoreSheet<Content: View, Footer: View>: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             ModalHeader(title)
-            content.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+            content.coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
             // Right-aligned by default; a footer that holds a Spacer spreads its buttons to both edges.
             HStack(spacing: Space.s2) { footer }.frame(maxWidth: .infinity, alignment: .trailing)
         }

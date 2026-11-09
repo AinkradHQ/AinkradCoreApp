@@ -38,8 +38,8 @@ struct SessionTile: View {
                 coreShape(2).fill(hue).frame(width: 3, height: 26)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(AgentWords.harnessName(session.harness))
-                        .font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                    Text(facts).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .lineLimit(1).truncationMode(.middle).monospacedDigit()
                 }
                 Spacer(minLength: 0)
@@ -54,7 +54,7 @@ struct SessionTile: View {
                     } icon: {
                         Image(systemName: "clock")
                     }
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
                     .opacity(showActions ? 0 : 1)
                     actions.opacity(showActions ? 1 : 0).allowsHitTesting(showActions)
                 }
@@ -124,8 +124,8 @@ struct SessionTile: View {
                     .symbolEffect(.pulse, options: .repeating, isActive: session.live && !waiting && !reduce)
                     .scaleEffect(shown || reduce ? 1 : 0.6)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(2)
-                    Text(line).font(.system(size: MacTextSize.meta, design: .monospaced))
+                    Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(2)
+                    Text(line).coreFont(size: MacTextSize.meta, design: .monospaced)
                         .foregroundStyle(.white.opacity(0.7)).lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -174,7 +174,7 @@ struct SessionTile: View {
             }
             Text(label).lineLimit(1)
         }
-        .font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.92))
+        .coreFont(size: 10, weight: .semibold).foregroundStyle(.white.opacity(0.92))
         .padding(.horizontal, 7).frame(height: 20)
         .background(state.opacity(0.3), in: coreShape(5))
         .overlay { coreShape(5).strokeBorder(state.opacity(0.5), lineWidth: 1) }
@@ -204,7 +204,7 @@ struct SessionTile: View {
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
-                Text(key).font(.system(size: 10, weight: .semibold, design: .rounded))
+                Text(key).coreFont(size: 10, weight: .semibold, design: .rounded)
             }
             .foregroundStyle(palette.text)
             .padding(.horizontal, 7).frame(height: 24)

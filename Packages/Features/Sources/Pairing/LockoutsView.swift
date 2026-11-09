@@ -56,7 +56,7 @@ struct LockoutsSection: View {
                 .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
                 Text(n == 0 ? "Nothing is locked" : n == 1 ? "1 lock right now" : "\(n) locks right now")
-                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                    .coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                     .contentTransition(.numericText())
                 Text(
                     n == 0
@@ -114,12 +114,12 @@ private struct LockCard: View {
                 HStack(spacing: Space.s3) {
                     IconTile(left == 0 ? "lock.open.fill" : who.symbol, hue: hue, size: 40, bounce: left == 0)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(who.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                        Text(who.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                         Text(who.sub).foregroundStyle(GlassInk.secondary)
                     }
                     Spacer(minLength: Space.s3)
                     Text(left == 0 ? "Ended" : Countdown.text(left))
-                        .font(.system(size: MacTextSize.large + 4, weight: .bold, design: .rounded).monospacedDigit())
+                        .coreFont(size: MacTextSize.large + 4, weight: .bold, design: .rounded).monospacedDigit()
                         .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
                     AppActionTile(
                         title: "Clear", symbol: "lock.open", key: selected ? "⌫" : "", hue: GlassInk.orange,
@@ -153,7 +153,7 @@ private struct LockCard: View {
                     Text(
                         "Strike \(lock.strikes). Until \(lock.lockedUntil.formatted(date: .omitted, time: .shortened)); the next lock would last twice as long."
                     )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
             .padding(Space.s3)

@@ -31,9 +31,9 @@ struct QuickSessionView: View {
                 IconTile("sparkles", hue: GlassInk.violet, size: 44, bounce: shown)
                     .shadow(color: GlassInk.violet.opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("New agent session").font(.system(size: MacTextSize.large + 2, weight: .bold))
+                    Text("New agent session").coreFont(size: MacTextSize.large + 2, weight: .bold)
                     Text("Say what it should do. It keeps running if you close this Mac.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
             .coreRise(shown, 0)
@@ -52,7 +52,7 @@ struct QuickSessionView: View {
                 chip("server.rack", runner?.name ?? "no runner", runner == nil ? GlassInk.red : GlassInk.green)
                 Spacer(minLength: 0)
                 if let w = PromptSize.words(prompt) {
-                    Text(w).font(.system(size: MacTextSize.meta)).foregroundStyle(
+                    Text(w).coreFont(size: MacTextSize.meta).foregroundStyle(
                         PromptSize.over(prompt) ? GlassInk.redInk : GlassInk.secondary)
                 }
             }
@@ -118,7 +118,7 @@ struct QuickSessionView: View {
     private func chip(_ symbol: String, _ text: String, _ hue: Color, picker: Bool = false) -> some View {
         HStack(spacing: 5) {
             Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(hue)
-            Text(text).font(.system(size: MacTextSize.meta, weight: .medium))
+            Text(text).coreFont(size: MacTextSize.meta, weight: .medium)
             if picker {
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)

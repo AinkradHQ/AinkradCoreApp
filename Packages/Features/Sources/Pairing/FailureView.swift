@@ -127,7 +127,7 @@ struct FailureView: View {
         return VStack(alignment: .leading, spacing: Space.s4) {
             FailureDiagram(failure: failure).frame(maxWidth: .infinity)
             // The error code is for support, so it sits in the tooltip, not on the card.
-            Text(failure.title).font(.system(size: MacTextSize.large, weight: .semibold))
+            Text(failure.title).coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
                 .help(failure.code ?? "")
             Text(failure.text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
@@ -141,11 +141,11 @@ struct FailureView: View {
                 Label(
                     "The Core answers again in \(coreClock(wait)).", systemImage: "clock"
                 )
-                .font(.system(size: MacTextSize.body, weight: .semibold))
+                .coreFont(size: MacTextSize.body, weight: .semibold)
             }
             if failure.fatal {
                 Label("Stopped. There is no way to continue from here.", systemImage: "hand.raised")
-                    .font(.system(size: MacTextSize.body, weight: .semibold))
+                    .coreFont(size: MacTextSize.body, weight: .semibold)
             }
             // Secondary actions sit at the left edge, the primary one at the right.
             HStack(spacing: Space.s2) {
@@ -159,7 +159,7 @@ struct FailureView: View {
                 }
             }
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("failure")
     }

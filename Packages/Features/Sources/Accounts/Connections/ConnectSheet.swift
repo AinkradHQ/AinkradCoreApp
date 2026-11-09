@@ -121,8 +121,8 @@ struct ConnectSheet: View {
                             HStack(spacing: Space.s3) {
                                 ConnTile(kind: c.kind)
                                 VStack(alignment: .leading, spacing: 0) {
-                                    Text(c.name).font(.system(size: MacTextSize.body, weight: .semibold))
-                                    Text("\(c.identity) · \(model.access(c))").font(.system(size: MacTextSize.meta))
+                                    Text(c.name).coreFont(size: MacTextSize.body, weight: .semibold)
+                                    Text("\(c.identity) · \(model.access(c))").coreFont(size: MacTextSize.meta)
                                         .foregroundStyle(GlassInk.secondary)
                                 }
                                 Spacer()
@@ -172,11 +172,11 @@ struct ConnectSheet: View {
                 }
                 if gh, case .waiting? = f?.step, let code = f?.userCode {
                     VStack(spacing: Space.s2) {
-                        Text(code).font(.system(size: 34, weight: .semibold, design: .monospaced)).textSelection(
+                        Text(code).coreFont(size: 34, weight: .semibold, design: .monospaced).textSelection(
                             .enabled
                         )
                         .accessibilityLabel("Code \(code.map(String.init).joined(separator: " "))")
-                        Text("GitHub asks for this code after you sign in.").font(.system(size: MacTextSize.meta))
+                        Text("GitHub asks for this code after you sign in.").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(GlassInk.secondary)
                         HStack {
                             AccLink(title: "Copy code", symbol: "doc.on.doc") {
@@ -279,7 +279,7 @@ struct TokenForm: View {
                 CoreSecureField("Token", placeholder: "Paste it here", text: $token)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     ForEach(Array(kind.tokenHelp.enumerated()), id: \.offset) { i, s in
-                        Text("\(i + 1). \(s)").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        Text("\(i + 1). \(s)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     }
                 }
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)

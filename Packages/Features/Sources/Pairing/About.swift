@@ -92,7 +92,7 @@ struct AboutBlock: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text("What this device may do").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("What this device may do").coreFont(size: MacTextSize.headline, weight: .semibold)
                 ForEach(AboutWords.scopes(a.scopes), id: \.self) { s in
                     HStack(spacing: Space.s2) {
                         Image(systemName: ScopeText.symbol(s)).foregroundStyle(ScopeText.hue(s)).frame(width: 22)
@@ -107,7 +107,7 @@ struct AboutBlock: View {
                         "This device can't open the admin pages: settings, secrets, audit, ops and lockouts are hidden.",
                         systemImage: "lock"
                     )
-                    .foregroundStyle(GlassInk.secondary).font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(GlassInk.secondary).coreFont(size: MacTextSize.meta)
                     .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -119,9 +119,9 @@ struct AboutBlock: View {
 
     private func fact(_ symbol: String, _ hue: Color, _ title: String, _ value: String, help: String?) -> some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Label(title, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
+            Label(title, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.ink(hue))
-            Text(value).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(2)
+            Text(value).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(2)
         }
         .padding(Space.s4).frame(maxWidth: .infinity, alignment: .topLeading)
         .background(GlassInk.well, in: coreShape(Radius.cardMac))

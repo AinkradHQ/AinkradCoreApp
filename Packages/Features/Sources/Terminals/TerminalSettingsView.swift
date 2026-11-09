@@ -30,7 +30,7 @@ struct TerminalSettingsView: View {
                     .frame(maxWidth: Space.s8 * 8)
                     .accessibilityLabel("Family")
                     Spacer()
-                    Text("\(Int(prefs.fontSize)) pt").font(.system(size: MacTextSize.body, weight: .semibold))
+                    Text("\(Int(prefs.fontSize)) pt").coreFont(size: MacTextSize.body, weight: .semibold)
                         .monospacedDigit().contentTransition(.numericText())
                 }
                 GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) {
@@ -59,7 +59,7 @@ struct TerminalSettingsView: View {
             } content: {
                 if prefs.followLook {
                     Text("Same as Settings, Appearance. Each terminal keeps its theme's colour.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 } else {
                     GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
                 }
@@ -148,12 +148,12 @@ private struct ThemeTile: View {
                         }
                     }
                 }
-                .font(.system(size: 11, design: .monospaced))
+                .coreFont(size: 11, design: .monospaced)
                 .padding(Space.s2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(nsColor: theme.background), in: coreShape(Radius.control))
                 HStack {
-                    Text(theme.title).font(.system(size: MacTextSize.body, weight: .semibold))
+                    Text(theme.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Spacer()
                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
@@ -190,7 +190,7 @@ private struct CursorTile: View {
             VStack(spacing: Space.s2) {
                 PreviewCursor(shape: shape, blink: blink && on, color: on ? GlassInk.blue : GlassInk.primary, size: 18)
                     .frame(height: 24)
-                Text(shape.rawValue.capitalized).font(.system(size: MacTextSize.meta, weight: .medium))
+                Text(shape.rawValue.capitalized).coreFont(size: MacTextSize.meta, weight: .medium)
             }
             .frame(maxWidth: .infinity, minHeight: 64)
             .background(on ? GlassInk.blue.opacity(0.18) : GlassInk.well, in: coreShape(Radius.row))

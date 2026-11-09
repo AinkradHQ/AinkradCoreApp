@@ -207,13 +207,13 @@ struct GreetingView: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             Text(profile.hasName ? "\(dayPart), \(profile.name)" : dayPart)
-                .font(.system(size: 28, weight: .semibold))
+                .coreFont(size: 28, weight: .semibold)
             HStack(spacing: Space.s2) {
                 Text("Press")
                 CoreKeycap("⌘K")
                 Text("to open the launcher.")
             }
-            .font(.system(size: 14)).opacity(0.85)
+            .coreFont(size: 14).opacity(0.85)
             if !profile.hasName { nameAsk }
         }
         .foregroundStyle(ink)

@@ -66,7 +66,7 @@ private struct ChainDialog: View {
                         Text(
                             "A session tries the first pool that has an account to give. Running sessions keep the chain they started with."
                         )
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -125,7 +125,7 @@ private struct ChainDialog: View {
         let pool = model.pool(entries[i].pool)
         let models = model.provider(pool?.provider ?? "")?.models ?? []
         return HStack(alignment: .bottom, spacing: Space.s2) {
-            Text("\(i + 1)").font(.system(size: MacTextSize.body, weight: .bold, design: .rounded))
+            Text("\(i + 1)").coreFont(size: MacTextSize.body, weight: .bold, design: .rounded)
                 .foregroundStyle(GlassInk.secondary).frame(width: 20).padding(.bottom, Space.s2)
             CoreSelect(
                 "Pool", selection: poolBinding(i),

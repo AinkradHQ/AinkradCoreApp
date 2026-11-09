@@ -68,7 +68,7 @@ struct SubscriptionSignIn: View {
                     runner.flatMap { r in runners.first { $0.id == r }?.name }.map { "Claude's sign-in runs on \($0)." }
                         ?? "Claude's sign-in runs on your best ready runner.", systemImage: "server.rack"
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: 0)
                 AccLink(title: advanced ? "Hide" : "Pick a runner", symbol: advanced ? "chevron.up" : "chevron.down") {
                     withAnimation(.smooth(duration: 0.35)) { advanced.toggle() }
@@ -113,7 +113,7 @@ struct SubscriptionSignIn: View {
                     Image(systemName: "doc.on.clipboard").foregroundStyle(
                         codeFocus ? GlassInk.blueInk : GlassInk.secondary)
                     TextField("Paste the code here", text: $code).textFieldStyle(.plain)
-                        .font(.system(size: MacTextSize.title, design: .monospaced)).focused($codeFocus)
+                        .coreFont(size: MacTextSize.title, design: .monospaced).focused($codeFocus)
                         .autocorrectionDisabled().onSubmit(send)
                         .accessibilityIdentifier("sign-in-code")
                 }
@@ -149,7 +149,7 @@ struct SubscriptionSignIn: View {
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
                     in: coreShape(16)
                 )
-            Text(title).font(.system(size: MacTextSize.large, weight: .bold))
+            Text(title).coreFont(size: MacTextSize.large, weight: .bold)
             Text(line).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             CoreBusyBar().frame(maxWidth: Space.s8 * 6)
             AppActionTile(title: "Stop", symbol: "xmark", key: "esc", hue: GlassInk.slate) {
@@ -174,7 +174,7 @@ struct SubscriptionSignIn: View {
                 )
                 .shadow(color: GlassInk.green.opacity(0.55), radius: 18)
                 .coreBounce(account)
-            Text("Your Claude plan is connected").font(.system(size: MacTextSize.large, weight: .bold))
+            Text("Your Claude plan is connected").coreFont(size: MacTextSize.large, weight: .bold)
             Text(
                 "It's saved in your Core as \(model.signIn?.label ?? "your plan"). Put it in a pool of its own so agents can use it."
             )
@@ -195,7 +195,7 @@ struct SubscriptionSignIn: View {
     private func failed(_ why: String) -> some View {
         VStack(spacing: Space.s3) {
             IconTile("exclamationmark.triangle.fill", hue: GlassInk.red, size: 64, bounce: false)
-            Text("Couldn't connect Claude").font(.system(size: MacTextSize.large, weight: .bold))
+            Text("Couldn't connect Claude").coreFont(size: MacTextSize.large, weight: .bold)
             Text(why).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             // When a retry cannot help (no runner can sign in), the real fix is the main button.
@@ -230,7 +230,7 @@ struct SubscriptionSignIn: View {
         HStack(alignment: .top, spacing: Space.s3) {
             Image(systemName: "\(n).square.fill").font(.system(size: 26, weight: .semibold)).foregroundStyle(hue)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(line).foregroundStyle(GlassInk.secondary)
                 c()
             }

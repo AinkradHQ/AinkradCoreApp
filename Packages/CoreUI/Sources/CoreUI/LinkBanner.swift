@@ -53,8 +53,8 @@ public struct LinkBanner: View {
             Image(systemName: state.symbol).foregroundStyle(c.ink).frame(width: Space.s4, height: Space.s4)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(state.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                detail.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                Text(state.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                detail.coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
                 if state == .renewing { CoreBusyBar().padding(.top, Space.s1) }
             }

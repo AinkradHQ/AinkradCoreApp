@@ -11,14 +11,14 @@ struct AdminSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+                Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
                 if let detail {
                     Text(detail).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 }
             }
             content
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -42,7 +42,7 @@ struct MetaChip: View {
     var mono = false
     @Environment(\.corePalette) private var palette
     var body: some View {
-        Text(text).font(.system(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default))
+        Text(text).coreFont(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
             .background(palette.uDim, in: coreShape(Radius.chip))
     }
@@ -55,7 +55,7 @@ struct GateTag: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         Label(text, systemImage: warn ? "exclamationmark.triangle" : "lock")
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(warn ? palette.tone(.warn).ink : palette.text2)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(warn ? palette.tone(.warn).ink : palette.text2)
             .labelStyle(.titleAndIcon)
     }
 }
@@ -69,7 +69,7 @@ struct AdminLink: View {
     @Environment(\.corePalette) private var palette
     @FocusState private var focused: Bool
     var body: some View {
-        Button(action: action) { Text(title).font(.system(size: MacTextSize.body)) }
+        Button(action: action) { Text(title).coreFont(size: MacTextSize.body) }
             .buttonStyle(.plain)
             .foregroundStyle(danger ? palette.tone(.fail).ink : palette.primary)
             .focused($focused).focusEffectDisabled()
@@ -97,10 +97,10 @@ struct IssueLine: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
             Image(systemName: "exclamationmark.triangle").accessibilityHidden(true)
-            if let code { Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)) }
+            if let code { Text(code).coreFont(size: MacTextSize.meta, design: .monospaced) }
             Text(text).fixedSize(horizontal: false, vertical: true)
         }
-        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
+        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.fail).ink)
         .accessibilityElement(children: .combine)
     }
 }
@@ -119,22 +119,22 @@ struct StateCard<Actions: View>: View {
     var body: some View {
         let c = palette.tone(tone)
         VStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.large)).foregroundStyle(c.ink)
+            Image(systemName: symbol).coreFont(size: MacTextSize.large).foregroundStyle(c.ink)
                 .frame(width: MacSize.controlLg + Space.s3, height: MacSize.controlLg + Space.s3)
                 .background(c.fill, in: coreShape(Radius.cardMac)).accessibilityHidden(true)
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
             if let code {
-                Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)).padding(.horizontal, Space.s2)
+                Text(code).coreFont(size: MacTextSize.meta, design: .monospaced).padding(.horizontal, Space.s2)
                     .frame(minHeight: MacSize.chip).background(palette.uDim, in: coreShape(Radius.chip))
             }
             if let errorID {
                 HStack(spacing: Space.s2) {
                     Text("error_id").foregroundStyle(palette.text2)
-                    Text(errorID).font(.system(size: MacTextSize.meta, design: .monospaced)).textSelection(.enabled)
+                    Text(errorID).coreFont(size: MacTextSize.meta, design: .monospaced).textSelection(.enabled)
                 }
-                .font(.system(size: MacTextSize.meta))
+                .coreFont(size: MacTextSize.meta)
             }
             HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
         }

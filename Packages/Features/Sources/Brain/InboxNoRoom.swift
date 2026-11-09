@@ -58,7 +58,7 @@ private struct MoreMenu: View {
                 BrainSheets.confirmDelete(model, ids)
             })
         return CoreDropdown(items: items, isPresented: $open) {
-            Image(systemName: "ellipsis").font(.system(size: MacTextSize.body, weight: .semibold))
+            Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
                 .foregroundStyle(GlassInk.primary)
                 .frame(width: MacSize.controlMd, height: MacSize.controlMd)
                 .background(open ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
@@ -89,7 +89,7 @@ private struct BulkBar: View {
     var body: some View {
         let ids = orderedSelection
         HStack(spacing: Space.s2) {
-            Text("\(ids.count) selected").font(.system(size: MacTextSize.headline, weight: .semibold))
+            Text("\(ids.count) selected").coreFont(size: MacTextSize.headline, weight: .semibold)
             Button("Select all") { model.inboxState.selected = Set(model.inboxState.captures.map(\.id)) }
                 .buttonStyle(CoreButtonStyle(.plain, size: .small))
                 .disabled(ids.count == model.inboxState.captures.count)
@@ -127,9 +127,9 @@ private struct CaptureRow: View {
             )
             .fixedSize()
             VStack(alignment: .leading, spacing: Space.s1) {
-                Text(u.source).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(2)
+                Text(u.source).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(2)
                 ChipFlow(spacing: Space.s2) {
-                    Text("Waiting \(BrainWords.glue(u.age))").font(.system(size: MacTextSize.meta))
+                    Text("Waiting \(BrainWords.glue(u.age))").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                     if u.stale { BrainChip("Stale", GlassInk.orange, help: "Older than 14 days") }
                     if u.inBell { BrainChip("In the bell", GlassInk.blue, help: "Older than 30 days") }

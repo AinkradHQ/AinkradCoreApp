@@ -31,7 +31,7 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         HStack(alignment: .center, spacing: Space.s2) {
             Image(systemName: enabled ? "text.bubble" : "lock")
-                .font(.system(size: MacTextSize.body, weight: .semibold))
+                .coreFont(size: MacTextSize.body, weight: .semibold)
                 .foregroundStyle(on ? GlassInk.violet : GlassInk.secondary)
                 .contentTransition(.symbolEffect(.replace)).coreBounce(on)
             TextField("Reply to the agent", text: draft, prompt: Text(placeholder))
@@ -46,7 +46,7 @@ struct ComposerView: View {
                 }
             if bytes > 0 {
                 Text("\(coreDecimal(Double(bytes) / 1024, bytes < 1024 ? 2 : 1)) / 16 KiB")
-                    .font(.system(size: MacTextSize.meta, design: .monospaced))
+                    .coreFont(size: MacTextSize.meta, design: .monospaced)
                     .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }

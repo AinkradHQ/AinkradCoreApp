@@ -113,12 +113,12 @@ struct SettingsView: View {
                     HStack(spacing: Space.s2) {
                         Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
                             .accessibilityHidden(true)
-                        Text("Settings").font(.system(size: MacTextSize.title, weight: .semibold))
+                        Text("Settings").coreFont(size: MacTextSize.title, weight: .semibold)
                             .accessibilityAddTraits(.isHeader)
                     }
                     .padding(.bottom, Space.s3)
                     ForEach(shell.settings.grouped(), id: \.0) { group, list in
-                        Text(group.rawValue).font(.system(size: MacTextSize.body, weight: .semibold))
+                        Text(group.rawValue).coreFont(size: MacTextSize.body, weight: .semibold)
                             .foregroundStyle(WidgetInk.secondary).padding(.top, Space.s3).accessibilityAddTraits(
                                 .isHeader)
                         ForEach(list) { s in
@@ -160,7 +160,7 @@ struct SettingsView: View {
                             .accessibilityHidden(true)
                     }
                     VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                        Text(current?.title ?? "").font(.system(size: MacTextSize.large + 6, weight: .bold))
+                        Text(current?.title ?? "").coreFont(size: MacTextSize.large + 6, weight: .bold)
                             .accessibilityAddTraits(.isHeader)
                         if let sub = current?.sub {
                             Text(sub).foregroundStyle(WidgetInk.secondary)
@@ -171,7 +171,7 @@ struct SettingsView: View {
                     Spacer()
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")
-                            .font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary)
+                            .coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
                             .transition(.opacity).accessibilityLabel("Saved")
                     }
                     // The close button turns a quarter on hover (Reduce Motion: no turn).
@@ -212,7 +212,7 @@ struct SettingsView: View {
 
     private func navRow(_ s: SettingsSection, selected: Bool) -> some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: s.symbol).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(.white)
+            Image(systemName: s.symbol).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(.white)
                 .coreBounce(selected)
                 .frame(width: MacSize.controlMd + 2, height: MacSize.controlMd + 2)
                 .background(
@@ -221,7 +221,7 @@ struct SettingsView: View {
                     in: coreShape(Radius.control)
                 )
                 .accessibilityHidden(true)
-            Text(s.title).font(.system(size: MacTextSize.headline, weight: selected ? .semibold : .regular))
+            Text(s.title).coreFont(size: MacTextSize.headline, weight: selected ? .semibold : .regular)
             Spacer(minLength: 0)
         }
         .foregroundStyle(WidgetInk.primary)
@@ -331,7 +331,7 @@ private struct SettingsBackTile: View {
                 Image(systemName: "chevron.backward").font(.system(size: 18, weight: .semibold))
                     .offset(x: hovering ? (direction == .rightToLeft ? 3 : -3) : 0)
                     .coreBounce(hovering)
-                Text(back.title).font(.system(size: 10, weight: .medium)).lineLimit(1)
+                Text(back.title).coreFont(size: 10, weight: .medium).lineLimit(1)
             }
             .foregroundStyle(WidgetInk.primary)
             .frame(width: 72, height: 56)

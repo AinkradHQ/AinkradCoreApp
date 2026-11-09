@@ -37,11 +37,11 @@ struct ConnCue: View {
                     ? "Couldn't \(Self.line(tool, summary).lowercased())\(why.isEmpty ? "" : ": \(why)")"
                     : Self.line(tool, summary)
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(refused ? GlassInk.primary : GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(refused ? GlassInk.primary : GlassInk.secondary)
             .lineLimit(2)
             if refused, let openConnections {
                 Button("Allow in Connections", action: openConnections).buttonStyle(.plain)
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.blueInk)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.blueInk)
             }
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)

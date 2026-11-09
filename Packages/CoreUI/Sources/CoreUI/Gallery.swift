@@ -33,7 +33,7 @@ public struct CoreUIGallery: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s6) {
-                    Text("CoreUI Gallery").font(.system(size: MacTextSize.large, weight: .semibold))
+                    Text("CoreUI Gallery").coreFont(size: MacTextSize.large, weight: .semibold)
                     if !officialOnly { ownComponents }
                     #if os(macOS)
                     if #available(macOS 26, *) { OfficialGlassSection().id("official") }
@@ -74,7 +74,7 @@ public struct CoreUIGallery: View {
 
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
             content()
         }
     }
@@ -152,7 +152,7 @@ public struct CoreUIGallery: View {
 
     private func badgeLine(_ name: String, _ items: [StateBadge]) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-            Text(name).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).frame(
+            Text(name).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).frame(
                 width: Space.s8 * 2, alignment: .leading)
             HStack(spacing: Space.s2) { ForEach(items.indices, id: \.self) { items[$0] } }
         }
@@ -212,7 +212,7 @@ public struct CoreUIGallery: View {
             CoreSegmented("Filter", segments: all, selection: $segment)
             CoreSegmented("Focused", segments: all, selection: $segment).environment(\.coreForcedInteraction, .focused)
             CoreSegmented("Disabled", segments: all, selection: $segment).disabled(true)
-            Text("Tab to focus, then arrow keys.").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            Text("Tab to focus, then arrow keys.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
     }
 

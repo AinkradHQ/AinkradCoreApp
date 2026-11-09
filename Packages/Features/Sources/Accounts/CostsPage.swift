@@ -54,11 +54,11 @@ struct CostsPage: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
                 IconTile(symbol, hue: hue, size: 28)
-                Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                Text(title).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
             }
-            Text(value).font(.system(size: 30, weight: .bold, design: .rounded)).contentTransition(.numericText())
+            Text(value).coreFont(size: 30, weight: .bold, design: .rounded).contentTransition(.numericText())
                 .lineLimit(1).minimumScaleFactor(0.7)
-            Text(window.rawValue.lowercased()).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(window.rawValue.lowercased()).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -74,7 +74,7 @@ struct CostsPage: View {
                 GlassInk.orange)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(CostWords.tokens(model.unpricedTokens)) tokens had no price")
-                    .font(.system(size: MacTextSize.headline, weight: .semibold))
+                    .coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text("They count as tokens but not as spend. Set a price for their model to count them from now on.")
                     .foregroundStyle(GlassInk.secondary)
             }
@@ -180,14 +180,14 @@ struct SpendBarRow: View {
             HStack(spacing: Space.s3) {
                 IconTile(symbol, hue: hue, size: 30)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(
+                    Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(
                         warn ? GlassInk.orangeInk : GlassInk.secondary
                     )
                     .lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
-                Text(value).font(.system(size: MacTextSize.title, weight: .bold, design: .rounded).monospacedDigit())
+                Text(value).coreFont(size: MacTextSize.title, weight: .bold, design: .rounded).monospacedDigit()
                     .contentTransition(.numericText())
             }
             GeometryReader { g in

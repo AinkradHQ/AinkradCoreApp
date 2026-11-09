@@ -38,7 +38,7 @@ struct BrainPane: View {
                     if let n = model.notice { notice(n) }
                     content
                 }
-                .font(.system(size: MacTextSize.body))
+                .coreFont(size: MacTextSize.body)
                 .foregroundStyle(GlassInk.primary)
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,7 +121,7 @@ struct BrainPane: View {
             }
             Spacer(minLength: 0)
             if model.tab == .rooms, model.inspectingID != nil {
-                Text("Esc back to all rooms").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text("Esc back to all rooms").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3).frame(minHeight: MacSize.controlSm)
@@ -150,7 +150,7 @@ struct RoomBar: View {
                     r.lock == nil ? GlassInk.green : GlassInk.slate)
                 RoomChips(room: r)
                 Text(r.lock == nil ? BrainWords.keyRenews(r.lease.left) : "Nothing from it is on screen.")
-                    .font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
                     .lineLimit(1).help(r.lock == nil ? BrainWords.leaseHelp : "")
             }
             Spacer(minLength: Space.s2)

@@ -31,7 +31,7 @@ struct AccountsView: View {
                         AccNotice(notice: model.host.elevationNotice)
                         content
                     }
-                    .font(.system(size: MacTextSize.body))
+                    .coreFont(size: MacTextSize.body)
                     .foregroundStyle(GlassInk.primary)
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -145,7 +145,7 @@ struct AccountsView: View {
             }
             AppStatChip("square.grid.2x2.fill", "\(model.pools.count) pools", GlassInk.blue)
             Spacer(minLength: 0)
-            Text(AccountsKeys.hint(model)).font(.system(size: MacTextSize.meta))
+            Text(AccountsKeys.hint(model)).coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)

@@ -16,7 +16,7 @@ struct ForgetSection: View {
                         app.service == nil
                             ? "Not connected to a Core" : "This Mac is paired with \(app.shell.home.coreName)"
                     )
-                    .font(.system(size: MacTextSize.large, weight: .bold))
+                    .coreFont(size: MacTextSize.large, weight: .bold)
                     Text("Forget it to pair with another Core, or to start this one over from a new code.")
                         .foregroundStyle(GlassInk.secondary)
                 }
@@ -44,7 +44,7 @@ struct ForgetSection: View {
         HStack(alignment: .top, spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)

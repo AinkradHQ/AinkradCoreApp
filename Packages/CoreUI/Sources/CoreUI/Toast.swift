@@ -56,7 +56,7 @@ public struct CoreToast: View {
     public var body: some View {
         HStack(spacing: Space.s3) {
             ToneGlyph(symbol: kind.symbol, ink: palette.tone(kind.tone).ink, size: 26)
-            Text(message).font(.system(size: MacTextSize.body))
+            Text(message).coreFont(size: MacTextSize.body)
             if let undo {
                 Button("Undo", action: undo).buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }

@@ -52,7 +52,7 @@ private struct AccountsList: View {
                     ProviderSection(model: model, provider: p, accounts: group)
                 }
                 if model.filter == .all {
-                    Text("More you can connect").font(.system(size: MacTextSize.title, weight: .semibold))
+                    Text("More you can connect").coreFont(size: MacTextSize.title, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: cardColumns, spacing: Space.s3) {
                         ForEach(model.spareProviders) { p in SpareCard(model: model, provider: p) }
@@ -84,7 +84,7 @@ private struct SummaryBar: View {
                 legend("pause.circle", "\(off + other) turned off or other", .queue)
                 Spacer(minLength: 0)
             }
-            .font(.system(size: MacTextSize.meta, weight: .medium))
+            .coreFont(size: MacTextSize.meta, weight: .medium)
             GeometryReader { geo in
                 let total = max(1, model.accounts.count)
                 HStack(spacing: 3) {
@@ -125,7 +125,7 @@ private struct ProviderSection: View {
             HStack(spacing: Space.s3) {
                 AccTile(provider: provider.id)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(provider.name).font(.system(size: MacTextSize.title, weight: .semibold))
+                    Text(provider.name).coreFont(size: MacTextSize.title, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)
                     Text(
                         "\(accounts.count) account\(accounts.count == 1 ? "" : "s")\(provider.builtin ? "" : " · custom, not usable by agents yet")"
@@ -186,7 +186,7 @@ struct ProviderAbout: View {
                             }
                         }
                         if let at = provider.pricedAt {
-                            Text("List prices read \(at)").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                            Text("List prices read \(at)").coreFont(size: MacTextSize.meta).foregroundStyle(
                                 palette.text2)
                         }
                     }
@@ -206,7 +206,7 @@ private struct SpareCard: View {
             HStack(spacing: Space.s3) {
                 AccTile(provider: provider.id)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(provider.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                    Text(provider.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                     Text(
                         provider.loginMethods.contains("browser_code")
                             ? "Sign in with your Claude plan"
@@ -267,7 +267,7 @@ private struct AddProviderCard: View {
             HStack(spacing: Space.s3) {
                 IconTile("plus", hue: GlassInk.slate, size: 32)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Add a provider").font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text("Add a provider").coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(
                         "OpenRouter or another API. Not usable by agents yet: its accounts can't join pools or chains."
                     )

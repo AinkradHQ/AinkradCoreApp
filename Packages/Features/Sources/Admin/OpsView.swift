@@ -132,7 +132,7 @@ private struct Verdict: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: !ok && !reduce)
             VStack(alignment: .leading, spacing: 3) {
                 Text(ok ? "Your Core is doing well" : "\(names.joined(separator: " and ")) needs a look")
-                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                    .coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                 Text(
                     ok
                         ? "Nothing needs you. Last read \(model.readAt.map { AdminWords.time($0) } ?? "just now")."
@@ -169,19 +169,17 @@ private struct WarningCard: View {
             HStack(spacing: Space.s3) {
                 IconTile(w?.symbol ?? "bell.fill", hue: hue, size: 36, bounce: a.raised)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(w?.title ?? a.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(w?.title ?? a.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Label(
                         a.raised ? "Needs a look" : "Fine",
                         systemImage: a.raised ? "exclamationmark.circle.fill" : "checkmark.circle.fill"
                     )
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
                 }
                 Spacer(minLength: 0)
             }
             if let r = detail.reading {
-                Text(OpsWords.reading(a.name, r)).font(
-                    .system(size: MacTextSize.large, weight: .bold, design: .rounded)
-                )
+                Text(OpsWords.reading(a.name, r)).coreFont(size: MacTextSize.large, weight: .bold, design: .rounded)
                 .contentTransition(.numericText())
                 if let l = detail.limit { Meter(reading: r, limit: l, hue: hue) }
             }
@@ -244,11 +242,11 @@ private struct FigureTile: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
                 IconTile(look.symbol, hue: look.hue, size: 28)
-                Text(tile.title).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(
+                Text(tile.title).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(
                     GlassInk.secondary)
                 Spacer(minLength: 0)
             }
-            Text(value).font(.system(size: MacTextSize.large, weight: .bold, design: .rounded)).lineLimit(1)
+            Text(value).coreFont(size: MacTextSize.large, weight: .bold, design: .rounded).lineLimit(1)
                 .minimumScaleFactor(0.7).contentTransition(.numericText())
             if let h = model.history[tile.name], h.count >= 2 { CoreSpark(h).frame(height: 24) }
         }
@@ -295,7 +293,7 @@ private struct RawMetrics: View {
         } content: {
             if model.showRaw {
                 ScrollView(.horizontal) {
-                    Text(model.raw).font(.system(size: MacTextSize.meta, design: .monospaced))
+                    Text(model.raw).coreFont(size: MacTextSize.meta, design: .monospaced)
                         .textSelection(.enabled).padding(Space.s3)
                 }
                 .frame(maxHeight: Space.s8 * 10)

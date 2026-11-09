@@ -31,7 +31,7 @@ struct FailureDiagram: View {
                 .foregroundStyle(ink)
                 .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
                 .background(fill, in: coreShape(Radius.control))
-            Text(label).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            Text(label).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
     }
 

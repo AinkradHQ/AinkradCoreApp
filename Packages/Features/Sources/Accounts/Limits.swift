@@ -129,7 +129,7 @@ struct AccountLimitsSection: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
                 Label("Limits", systemImage: "gauge.with.dots.needle.67percent")
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 if model.limitsLoad == .ready {
                     AccLink(title: "Add a usage limit", symbol: "plus", help: "Add a usage limit") {
@@ -206,8 +206,7 @@ struct AccountLimitsSection: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: Space.s2) {
                 AccChip(text: "Usage window")
-                Text(UsageLimitWords.amount(l.cap, unit: l.unit)).font(
-                    .system(size: MacTextSize.headline, weight: .semibold))
+                Text(UsageLimitWords.amount(l.cap, unit: l.unit)).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(UsageLimitWords.window(l.windowSecs).lowercased()).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 AccLink(title: "Change", symbol: "slider.horizontal.3") {
@@ -232,7 +231,7 @@ struct AccountLimitsSection: View {
             Text(
                 "\(UsageLimitWords.amount(l.used, unit: l.unit)) used, \(Int((l.share * 100).rounded()))%. Warns at \(l.warnPercent)%. \(UsageLimitWords.standing(l))"
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(ink)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(ink)
         }
         .padding(Space.s2)
         .background(GlassInk.well, in: coreShape(Radius.control))
@@ -302,7 +301,7 @@ struct LimitDialog: View {
                         ? "This account already has this limit. Saving replaces its numbers."
                         : "Past the limit, new work on this account waits until the window moves on."
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["limit-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
@@ -364,10 +363,10 @@ struct LimitRow: View {
         HStack(alignment: .center, spacing: Space.s2) {
             AccChip(text: kind)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     .fixedSize(horizontal: false, vertical: true)
                 if let detail {
-                    Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
             Spacer(minLength: Space.s2)

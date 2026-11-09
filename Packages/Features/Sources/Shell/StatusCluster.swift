@@ -91,7 +91,7 @@ struct StatusCluster: View {
                             .contentTransition(.numericText())
                     }
                 }
-                .font(.system(size: MacTextSize.body))
+                .coreFont(size: MacTextSize.body)
                 .padding(.horizontal, Space.s2)
                 .frame(minHeight: MacSize.controlMd)
                 .contentShape(coreShape(Radius.control))
@@ -134,7 +134,7 @@ private struct StatusButton: View {
                     CoreMeter(meter.value, low: meter.low, label: "Time left").frame(width: Space.s6)
                 }
             }
-            .font(.system(size: MacTextSize.body))
+            .coreFont(size: MacTextSize.body)
             .padding(.horizontal, Space.s2)
             .frame(minWidth: MacSize.controlMd, minHeight: MacSize.controlMd)
             .background(on ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.control))
@@ -191,7 +191,7 @@ struct ElevationPanel: View {
                             Image(systemName: "lock.open").accessibilityHidden(true)
                             (Text(left <= 60 ? "Locks in " : "Unlocked for ")
                                 + Text(timerInterval: Date.now...max(until, .now), countsDown: true))
-                                .font(.system(size: MacTextSize.title, weight: .semibold)).monospacedDigit()
+                                .coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
                         }
                         .accessibilityElement(children: .combine)
                         CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Time left")
@@ -206,7 +206,7 @@ struct ElevationPanel: View {
                 )
             }
             Text("Admin unlock ends early if the Core restarts or this device is revoked.")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
             let on = shell.elevatedUntil.map { $0 > Date() } ?? false
             Button(on ? "Renew with Touch ID" : "Unlock with Touch ID") {
@@ -227,7 +227,7 @@ struct ElevationPanel: View {
     private func header(_ title: String, _ symbol: String) -> some View {
         HStack(spacing: Space.s2) {
             Image(systemName: symbol).accessibilityHidden(true)
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).monospacedDigit()
+            Text(title).coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
         }
         .accessibilityElement(children: .combine)
     }

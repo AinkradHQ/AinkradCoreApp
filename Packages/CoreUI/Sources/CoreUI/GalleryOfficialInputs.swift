@@ -73,7 +73,7 @@ extension OfficialGlassSection {
                     selection: $core)
             }
             Text("No CoreUI search field, switch, slider, stepper, menu picker or date picker.")
-                .font(.system(size: MacTextSize.meta)).opacity(0.8)
+                .coreFont(size: MacTextSize.meta).opacity(0.8)
         }
     }
 
@@ -150,7 +150,7 @@ extension OfficialGlassSection {
                 .corePanel()
             }
             Text("CoreUI has no popover, toolbar group or scroll-edge effect.")
-                .font(.system(size: MacTextSize.meta)).opacity(0.8)
+                .coreFont(size: MacTextSize.meta).opacity(0.8)
         }
     }
 

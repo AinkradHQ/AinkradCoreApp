@@ -12,7 +12,7 @@ struct BrainChip: View {
         self.help = help
     }
     var body: some View {
-        Text(text).font(.system(size: MacTextSize.meta, weight: .medium)).lineLimit(1)
+        Text(text).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1)
             .foregroundStyle(GlassInk.primary)
             .padding(.horizontal, Space.s2).frame(height: MacSize.chip)
             .background(hue.opacity(0.28), in: coreShape(Radius.chip))
@@ -51,11 +51,11 @@ struct BrainCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             if let title {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
             }
             if let sub {
-                Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
+                Text(sub).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             content
@@ -132,7 +132,7 @@ struct BrainTitle: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
+        Text(text).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
     }
 }
 

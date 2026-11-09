@@ -25,7 +25,7 @@ struct AddDeviceView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .font(.system(size: MacTextSize.body))
+            .coreFont(size: MacTextSize.body)
         }
         .task { if model.quickMode { await model.quick() } else { await model.prepare() } }
         .task(id: model.pairingID) {
@@ -66,9 +66,7 @@ struct AddDeviceView: View {
                 ],
                 selection: $model.kind, fill: true)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text("Access narrowed from your own. You can only give less.").font(
-                    .system(size: MacTextSize.meta, weight: .semibold)
-                ).foregroundStyle(palette.text2)
+                Text("Access narrowed from your own. You can only give less.").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
                 if model.kind == "runner" {
                     Text("A runner holds exactly runner: it only redeems secret leases.").foregroundStyle(palette.text2)
                 } else {
@@ -89,7 +87,7 @@ struct AddDeviceView: View {
                 }
             }
             HStack(spacing: Space.s2) {
-                Text("Lasts 5 minutes · single use").font(.system(size: MacTextSize.meta))
+                Text("Lasts 5 minutes · single use").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
                 Button("Cancel", action: close).buttonStyle(.coreSecondary).coreShortcut(.cancel)
@@ -108,15 +106,15 @@ struct AddDeviceView: View {
                 .foregroundStyle(palette.text2)
             HStack(alignment: .top, spacing: Space.s5) {
                 VStack(alignment: .leading, spacing: Space.s3) {
-                    Text("Type this code on the new device").font(.system(size: MacTextSize.meta, weight: .semibold))
+                    Text("Type this code on the new device").coreFont(size: MacTextSize.meta, weight: .semibold)
                         .foregroundStyle(palette.text2)
                     CodeCells(code: Self.shown(p.code))
                     if let fp = app.coreFingerprint {
                         VStack(alignment: .leading, spacing: Space.s1) {
-                            Text("Core fingerprint").font(.system(size: MacTextSize.meta, weight: .semibold))
+                            Text("Core fingerprint").coreFont(size: MacTextSize.meta, weight: .semibold)
                                 .foregroundStyle(palette.text2)
                             Text(String(fp.prefix(24)) + "…")
-                                .font(.system(size: MacTextSize.body, design: .monospaced)).textSelection(.enabled)
+                                .coreFont(size: MacTextSize.body, design: .monospaced).textSelection(.enabled)
                         }
                     }
                     expiry(p)
@@ -129,7 +127,7 @@ struct AddDeviceView: View {
             }
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreBusyBar()
-                Text("Waiting for the new device to claim it").font(.system(size: MacTextSize.body, weight: .semibold))
+                Text("Waiting for the new device to claim it").coreFont(size: MacTextSize.body, weight: .semibold)
             }
             .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)
             HStack {
@@ -156,7 +154,7 @@ struct AddDeviceView: View {
                             Text("Expired")
                         }
                     }
-                    .font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
+                    .coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
                 }
                 .foregroundStyle(soon ? palette.tone(.warn).ink : palette.text2)
                 CoreMeter(Double(left) / 300, low: soon, label: "Code time left")
@@ -194,7 +192,7 @@ struct AddDeviceView: View {
             }
             .accessibilityIdentifier("check-code-field")
             Text("Typing it proves you looked at this device's own screen.")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
                 Button("Reject") { Task { await model.reject() } }.buttonStyle(.coreSecondary).disabled(model.busy)
@@ -231,7 +229,7 @@ struct AddDeviceView: View {
     private func approved(_ info: PairingInfo) -> some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Label("\(info.name ?? "The device") is paired.", systemImage: "checkmark")
-                .font(.system(size: MacTextSize.headline, weight: .semibold))
+                .coreFont(size: MacTextSize.headline, weight: .semibold)
             Text("It finishes on the new device once it confirms the check code there.").foregroundStyle(palette.text2)
             HStack {
                 Spacer()
@@ -283,7 +281,7 @@ private struct CodeCells: View {
                     Spacer().frame(width: Space.s2)
                 } else {
                     Text(String(ch))
-                        .font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
+                        .coreFont(size: MacTextSize.large, weight: .semibold, design: .monospaced)
                         .frame(width: MacSize.controlLg, height: MacSize.controlLg + Space.s3)
                         .background(palette.glassCard, in: coreShape(Radius.control))
                         .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }

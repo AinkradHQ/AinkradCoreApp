@@ -20,7 +20,7 @@ struct NewTerminalView: View {
             HStack(spacing: Space.s3) {
                 IconTile("terminal", hue: GlassInk.slate, size: 52, bounce: shown)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("New terminal").font(.system(size: MacTextSize.large + 4, weight: .bold))
+                    Text("New terminal").coreFont(size: MacTextSize.large + 4, weight: .bold)
                         .accessibilityAddTraits(.isHeader)
                     Text("Pick where it runs and what it starts.").foregroundStyle(GlassInk.secondary)
                 }
@@ -50,7 +50,7 @@ struct NewTerminalView: View {
                     }
                 }
                 TextField("Or any command, for example htop", text: $form.program)
-                    .textFieldStyle(.plain).font(.system(size: MacTextSize.body, design: .monospaced))
+                    .textFieldStyle(.plain).coreFont(size: MacTextSize.body, design: .monospaced)
                     .autocorrectionDisabled()
                     .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
                     .coreFieldSurface()
@@ -62,7 +62,7 @@ struct NewTerminalView: View {
                 "Runs as the runner's user in a sandbox: sudo, su and ping don't work. The terminal scope counts as admin-level today.",
                 systemImage: "info.circle"
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
             if let n = model.host.elevationNotice { ElevationBanner(notice: n) }
             if let e = form.error {
@@ -96,7 +96,7 @@ struct NewTerminalView: View {
         -> some View
     {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Label(title, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
+            Label(title, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.secondary)
             content()
         }
@@ -109,10 +109,10 @@ struct NewTerminalView: View {
         return HStack(spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(form.chosen?.name ?? "no runner") $ \(program.isEmpty ? "login shell" : program)")
-                    .font(.system(size: MacTextSize.body, design: .monospaced))
+                    .coreFont(size: MacTextSize.body, design: .monospaced)
                     .contentTransition(.opacity)
                 HStack(spacing: 0) {
-                    Text("30 × 100").font(.system(size: MacTextSize.meta, design: .monospaced))
+                    Text("30 × 100").coreFont(size: MacTextSize.meta, design: .monospaced)
                         .foregroundStyle(GlassInk.secondary)
                 }
             }
@@ -153,7 +153,7 @@ private struct RunnerTile: View {
                 IconTile("server.rack", hue: hue, size: 40, bounce: on)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack {
-                        Text(runner.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                        Text(runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         Spacer()
                         Image(systemName: on ? "checkmark.circle.fill" : "circle").foregroundStyle(
                             on ? GlassInk.blue : GlassInk.track
@@ -161,10 +161,10 @@ private struct RunnerTile: View {
                         .contentTransition(.symbolEffect(.replace))
                     }
                     Text([runner.arch, "\(model.onRunner(runner.id)) open"].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     CoreSlots(used: runner.load, capacity: runner.capacity)
                     if let warn {
-                        Label(warn, systemImage: st.symbol).font(.system(size: MacTextSize.meta, weight: .medium))
+                        Label(warn, systemImage: st.symbol).coreFont(size: MacTextSize.meta, weight: .medium)
                             .foregroundStyle(GlassInk.ink(hue))
                     }
                 }
@@ -203,7 +203,7 @@ private struct ShellTile: View {
         Button(action: pick) {
             VStack(spacing: Space.s1) {
                 Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).coreBounce(on)
-                Text(title).font(.system(size: MacTextSize.meta, weight: .medium, design: .monospaced)).lineLimit(1)
+                Text(title).coreFont(size: MacTextSize.meta, weight: .medium, design: .monospaced).lineLimit(1)
             }
             .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity, minHeight: 58)

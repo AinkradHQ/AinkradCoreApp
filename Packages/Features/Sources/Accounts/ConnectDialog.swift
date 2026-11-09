@@ -108,7 +108,7 @@ struct ConnectDialog: View {
 
     private var command: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(addCommand).font(.system(size: MacTextSize.meta, design: .monospaced)).textSelection(.enabled)
+            Text(addCommand).coreFont(size: MacTextSize.meta, design: .monospaced).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
                 .background(GlassInk.well, in: coreShape(Radius.control))
@@ -131,7 +131,7 @@ struct ConnectDialog: View {
                 .accessibilityIdentifier("connect-arrived")
         } else {
             VStack(alignment: .leading, spacing: Space.s1) {
-                Text("Waiting for the key to arrive").font(.system(size: MacTextSize.meta, weight: .semibold))
+                Text("Waiting for the key to arrive").coreFont(size: MacTextSize.meta, weight: .semibold)
                 CoreBusyBar().frame(maxWidth: Space.s8 * 5)
             }
             .accessibilityElement(children: .combine)
@@ -175,7 +175,7 @@ struct ConnectDialog: View {
             .frame(width: 30)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
                 Text(detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 action()
@@ -199,11 +199,9 @@ private struct ProviderChoice: View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
                 AccTile(large: true, provider: provider.id)
-                Text(ProviderLook.short(provider.id, provider.name)).font(
-                    .system(size: MacTextSize.body, weight: .semibold)
-                ).lineLimit(1)
+                Text(ProviderLook.short(provider.id, provider.name)).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 Text(provider.loginMethods.contains("browser_code") ? "Subscription" : "API key")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity).padding(.vertical, Space.s3)

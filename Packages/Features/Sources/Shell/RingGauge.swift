@@ -16,15 +16,15 @@ struct RingGauge: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             Spacer(minLength: 0)
-            Image(systemName: symbol).font(.system(size: MacTextSize.large + 6, weight: .medium))
+            Image(systemName: symbol).coreFont(size: MacTextSize.large + 6, weight: .medium)
                 .foregroundStyle(tint).coreBounce(shown > 0)
             if let caption {
                 VStack(spacing: 0) {
-                    Text(caption).font(.system(size: MacTextSize.headline + 2, weight: .semibold)).monospacedDigit()
+                    Text(caption).coreFont(size: MacTextSize.headline + 2, weight: .semibold).monospacedDigit()
                         .foregroundStyle(WidgetInk.primary)
                         .contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.7)
                     if let sub {
-                        Text(sub).font(.system(size: MacTextSize.meta, weight: .medium)).foregroundStyle(
+                        Text(sub).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(
                             WidgetInk.secondary
                         )
                         .lineLimit(1)

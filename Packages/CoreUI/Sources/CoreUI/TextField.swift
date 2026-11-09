@@ -6,7 +6,7 @@ public struct CoreFieldLabel: View {
     @Environment(\.corePalette) private var palette
     public init(_ text: String) { self.text = text }
     public var body: some View {
-        Text(text).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+        Text(text).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
     }
 }
 
@@ -17,7 +17,7 @@ public struct CoreFieldError: View {
     public init(_ text: String) { self.text = text }
     public var body: some View {
         Label(text, systemImage: "exclamationmark.triangle")
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.fail).ink)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -36,6 +36,7 @@ public struct CoreTextField: View {
     let onSubmit: () -> Void
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.coreTextScale) private var textScale
     @Environment(\.coreForcedInteraction) private var forced
     @FocusState private var focused: Bool
 
@@ -56,8 +57,8 @@ public struct CoreTextField: View {
 
     private var fieldFont: Font {
         mono
-            ? .system(size: big ? MacTextSize.large : MacTextSize.title, design: .monospaced)
-            : .system(size: MacTextSize.body)
+            ? .core(size: big ? MacTextSize.large : MacTextSize.title, design: .monospaced, scale: textScale)
+            : .core(size: MacTextSize.body, scale: textScale)
     }
 
     public var body: some View {
@@ -77,7 +78,7 @@ public struct CoreTextField: View {
                 .frame(minHeight: big ? MacSize.controlLg + Space.s3 : MacSize.controlLg)
                 .overlay(alignment: .trailing) {
                     if let suffix {
-                        Text(suffix).font(.system(size: MacTextSize.meta, design: .monospaced))
+                        Text(suffix).coreFont(size: MacTextSize.meta, design: .monospaced)
                             .foregroundStyle(palette.text2).padding(.trailing, Space.s3).allowsHitTesting(false)
                     }
                 }

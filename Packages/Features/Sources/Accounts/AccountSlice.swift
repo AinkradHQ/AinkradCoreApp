@@ -12,9 +12,7 @@ struct AccountSlice: View {
         let events = model.costs.filter { $0.accountID == account.id }.sorted { $0.at > $1.at }.prefix(4)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
-                Label("Spend and usage", systemImage: "chart.bar").font(
-                    .system(size: MacTextSize.meta, weight: .semibold)
-                )
+                Label("Spend and usage", systemImage: "chart.bar").coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 AccLink(title: "Open Costs", symbol: "arrow.right") { go(.costs) }
@@ -44,7 +42,7 @@ struct AccountSlice: View {
                         Text(AccountsNumbers.tokens(e.tokens)).foregroundStyle(GlassInk.secondary)
                         Text(e.costMicros.map { AccountsNumbers.usd($0) } ?? "Not priced")
                     }
-                    .font(.system(size: MacTextSize.meta))
+                    .coreFont(size: MacTextSize.meta)
                 }
             }
         }
@@ -58,12 +56,12 @@ struct AccountSlice: View {
 
     private func window(_ title: String, _ w: UsageWindowItem) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-            Text(AccountsNumbers.tokens(w.tokens)).font(.system(size: MacTextSize.title, weight: .semibold))
+            Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(AccountsNumbers.tokens(w.tokens)).coreFont(size: MacTextSize.title, weight: .semibold)
             Text(
                 "\(AccountsNumbers.usd(w.costMicros)), \(w.messages.formatted()) \(w.messages == 1 ? "message" : "messages")"
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

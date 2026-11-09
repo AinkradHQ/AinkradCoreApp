@@ -180,7 +180,7 @@ private struct SampleList: View {
                 ForEach(rows, id: \.0) { r in
                     CoreRow(r.0, subtitle: r.1) { StateBadge(r.2) }
                 }
-                Text("Sample data").font(.system(size: MacTextSize.meta)).padding(.top, Space.s2)
+                Text("Sample data").coreFont(size: MacTextSize.meta).padding(.top, Space.s2)
             }
             .padding(Space.s3)
         }

@@ -71,8 +71,7 @@ private struct DeleteAccountDialog: View {
                     "Its key is deleted from Core and cannot be recovered. Its leases are dropped.\(pools.isEmpty ? "" : " It leaves \(pools.map(\.name).joined(separator: ", ")).")"
                 )
                 .fixedSize(horizontal: false, vertical: true)
-                Text("Revoke the key at the provider too. Core cannot do that for you.").font(
-                    .system(size: MacTextSize.meta))
+                Text("Revoke the key at the provider too. Core cannot do that for you.").coreFont(size: MacTextSize.meta)
                 if let e = model.writeError["delete-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(confirm: "Delete account", danger: true, busy: busy, cancel: close) {
@@ -117,7 +116,7 @@ private struct CapDialog: View {
                 CoreTextField(
                     "Limit", placeholder: "No limit", text: $text, error: text.isEmpty ? nil : issue, autofocus: true
                 ) { go() }
-                Text("Over the limit, new sessions take another account or wait.").font(.system(size: MacTextSize.meta))
+                Text("Over the limit, new sessions take another account or wait.").coreFont(size: MacTextSize.meta)
                 if let e = model.writeError["cap-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(confirm: "Save", busy: busy, enabled: issue == nil, cancel: close) { go() }
@@ -159,7 +158,7 @@ private struct NewPoolDialog: View {
                         ) { provider = p.id }
                     }
                 }
-                Text("A pool holds accounts of one provider. It starts empty.").font(.system(size: MacTextSize.meta))
+                Text("A pool holds accounts of one provider. It starts empty.").coreFont(size: MacTextSize.meta)
                 let typed = name.trimmingCharacters(in: .whitespaces)
                 if !typed.isEmpty && !PoolName.isValid(typed) {
                     AccIssue(text: PoolName.rule)
@@ -247,7 +246,7 @@ private struct AddMemberDialog: View {
                             action: { pick = a.id }
                         ) { EmptyView() }
                     }
-                    Text("It goes last in the fallback order.").font(.system(size: MacTextSize.meta))
+                    Text("It goes last in the fallback order.").coreFont(size: MacTextSize.meta)
                 }
                 if let e = model.writeError["member-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
@@ -279,7 +278,7 @@ struct AccountsLinkSection: View {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
             } content: {
                 if prefs.followLook {
-                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
+                    Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                 } else {
                     GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")

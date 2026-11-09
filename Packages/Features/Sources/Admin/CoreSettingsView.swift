@@ -120,7 +120,7 @@ private struct LimitRow: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: Space.s2) {
-                        Text(SettingWords.title(setting)).font(.system(size: MacTextSize.headline, weight: .semibold))
+                        Text(SettingWords.title(setting)).coreFont(size: MacTextSize.headline, weight: .semibold)
                         if setting.isOverride {
                             SettingsChip(text: "Changed", symbol: "pencil", hue: hue)
                         }
@@ -136,7 +136,7 @@ private struct LimitRow: View {
                 // Always laid out, only faded: showing them never changes the row's size under the pointer.
                 actions.opacity(showsActions ? 1 : 0).allowsHitTesting(showsActions)
                 Text(SettingWords.value(setting, setting.value))
-                    .font(.system(size: MacTextSize.large, weight: .bold, design: .rounded))
+                    .coreFont(size: MacTextSize.large, weight: .bold, design: .rounded)
                     .foregroundStyle(selected ? hue : GlassInk.primary)
                     .contentTransition(.numericText())
             }
@@ -221,11 +221,11 @@ private struct LimitEditor: View {
                 .frame(maxWidth: Space.s8 * 6)
                 if let typed {
                     Label(SettingWords.value(setting, typed), systemImage: "equal")
-                        .font(.system(size: MacTextSize.headline, weight: .semibold, design: .rounded))
+                        .coreFont(size: MacTextSize.headline, weight: .semibold, design: .rounded)
                         .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText())
                 }
                 Spacer(minLength: Space.s3)
-                Label("Asks for Touch ID", systemImage: "touchid").font(.system(size: MacTextSize.meta))
+                Label("Asks for Touch ID", systemImage: "touchid").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
                 AppActionTile(title: "Cancel", symbol: "xmark", key: "esc", hue: GlassInk.slate) { model.cancelEdit() }
                 AppActionTile(title: "Save", symbol: "checkmark", key: "↩", hue: hue, prominent: true) {
@@ -268,7 +268,7 @@ struct SettingsChip: View {
     let symbol: String
     let hue: Color
     var body: some View {
-        Label(text, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
+        Label(text, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
             .foregroundStyle(hue == GlassInk.slate ? GlassInk.secondary : hue)
             .padding(.horizontal, 8).frame(height: 22)
             .background(hue.opacity(0.16), in: coreShape(6))
@@ -327,7 +327,7 @@ struct RangeBar: View {
                 Spacer()
                 Text(SettingWords.value(setting, setting.max))
             }
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
@@ -382,10 +382,10 @@ private struct HistoryTimeline: View {
             .frame(width: 10)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: Space.s2) {
-                    Text(change).font(.system(size: MacTextSize.body, weight: .semibold))
+                    Text(change).coreFont(size: MacTextSize.body, weight: .semibold)
                     if current { SettingsChip(text: "Now", symbol: "checkmark", hue: GlassInk.green) }
                 }
-                Text(who.isEmpty ? when : "\(when) · \(who)").font(.system(size: MacTextSize.meta))
+                Text(who.isEmpty ? when : "\(when) · \(who)").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
             }
             .padding(.bottom, Space.s3)

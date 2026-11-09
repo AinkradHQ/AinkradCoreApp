@@ -92,9 +92,9 @@ struct SessionSpendStrip: View {
                     session.stoppedByBudget ? AgentWords.endedWords("budget") : "Stopped at its limit",
                     systemImage: "gauge.with.dots.needle.100percent"
                 )
-                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.redInk)
+                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.redInk)
             }
-            Text(spentWords).font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
+            Text(spentWords).coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
                 .help(
                     ledger.unpriced
                         ? "Some calls had no price: their tokens count, their cost doesn't." : "From Core's ledger")
@@ -110,7 +110,7 @@ struct SessionSpendStrip: View {
                 .animation(.smooth(duration: 0.6), value: share)
             }
         }
-        .font(.system(size: MacTextSize.meta))
+        .coreFont(size: MacTextSize.meta)
         .accessibilityElement(children: .combine)
     }
 

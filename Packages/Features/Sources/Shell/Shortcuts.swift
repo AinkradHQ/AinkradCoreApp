@@ -50,7 +50,7 @@ struct ShortcutsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Keyboard Shortcuts").font(.system(size: MacTextSize.title, weight: .semibold))
+            Text("Keyboard Shortcuts").coreFont(size: MacTextSize.title, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
             TextField("Filter shortcuts", text: $filter)
                 .textFieldStyle(.plain)
@@ -68,7 +68,7 @@ struct ShortcutsView: View {
                         }
                         if !items.isEmpty {
                             VStack(alignment: .leading, spacing: Space.s1) {
-                                Text(g.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                                Text(g.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                                     .accessibilityAddTraits(.isHeader)
                                 ForEach(items, id: \.title) { item in
                                     HStack {

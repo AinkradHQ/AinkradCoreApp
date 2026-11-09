@@ -207,9 +207,9 @@ private struct AssignSheet: View {
                     option(.copy, "Copy", "A copy goes to the room and the original stays here for you to review.")
                     HStack(alignment: .top, spacing: Space.s3) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Link").font(.system(size: MacTextSize.headline, weight: .semibold))
+                            Text("Link").coreFont(size: MacTextSize.headline, weight: .semibold)
                             Text("Not available. A link would keep a door open into the inbox.")
-                                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         }
                         Spacer(minLength: 0)
                     }
@@ -252,9 +252,9 @@ private struct AssignSheet: View {
 
     private func endpoint(_ cap: String, _ name: String, _ sub: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(cap).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-            Text(name).font(.system(size: MacTextSize.headline, weight: .semibold))
-            Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(cap).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(name).coreFont(size: MacTextSize.headline, weight: .semibold)
+            Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
         .accessibilityElement(children: .combine)
@@ -266,8 +266,8 @@ private struct AssignSheet: View {
         } label: {
             HStack(alignment: .top, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -344,7 +344,7 @@ private struct SplitSheet: View {
     }
     private func part(_ title: String, _ sel: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+            Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
             CoreSelect(nil, selection: sel, options: rooms.map { CoreSelectOption($0.id, $0.name) })
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)

@@ -108,7 +108,7 @@ private struct ModePanel: View {
                 .shadow(color: hue.opacity(0.45), radius: 12)
             VStack(alignment: .leading, spacing: 2) {
                 Text(mode == 0 ? "Secrets are off" : mode == 1 ? "Test values only" : "Real values")
-                    .font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                    .coreFont(size: MacTextSize.headline, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                 Text(
                     mode == 0
                         ? "Nothing can be added or lent until you turn on Test keys."
@@ -159,12 +159,12 @@ private struct SecretCard: View {
             HStack(spacing: Space.s3) {
                 IconTile("key.fill", hue: GlassInk.orange, size: 36)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(secret.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(secret.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         .lineLimit(1).truncationMode(.middle)
                     Text(
                         secret.version == 1 ? "First value" : "Value \(secret.version), replaced \(secret.version - 1)×"
                     )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -242,7 +242,7 @@ private struct SecretCard: View {
                 .frame(width: 22, height: 22).background(hue.opacity(0.16), in: coreShape(6))
             Text(text).lineLimit(2)
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
     }
 }
 
@@ -259,7 +259,7 @@ private struct SealedValue: View {
                 ForEach(0..<n, id: \.self) { _ in coreShape(2).fill(.white.opacity(0.35)).frame(width: 7, height: 12) }
             }
             Spacer(minLength: 0)
-            Text("\(size) bytes · hidden").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text("\(size) bytes · hidden").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s3).frame(height: 34)
         .background(.black.opacity(0.22), in: coreShape(Radius.control))
@@ -280,10 +280,10 @@ private struct LeaseLine: View {
             VStack(alignment: .leading, spacing: Space.s1) {
                 HStack {
                     Label("Lent to \(lease.runner)", systemImage: "arrow.up.forward.circle.fill")
-                        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
+                        .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
                     Spacer()
                     Text(left > 0 ? Countdown.text(Int(left.rounded(.up))) : "Returned")
-                        .font(.system(size: MacTextSize.body, weight: .bold, design: .rounded).monospacedDigit())
+                        .coreFont(size: MacTextSize.body, weight: .bold, design: .rounded).monospacedDigit()
                         .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
                 }
                 GeometryReader { g in

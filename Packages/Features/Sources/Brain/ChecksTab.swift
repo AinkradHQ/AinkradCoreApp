@@ -24,7 +24,7 @@ struct ChecksTab: View {
                     VStack(alignment: .leading, spacing: Space.s3) {
                         VStack(spacing: Space.s2) { ForEach(c.items) { CheckRow(model: model, item: $0) } }
                         if !c.housekeeping.isEmpty {
-                            Text("Housekeeping").font(.system(size: MacTextSize.meta, weight: .medium))
+                            Text("Housekeeping").coreFont(size: MacTextSize.meta, weight: .medium)
                                 .foregroundStyle(GlassInk.secondary).padding(.top, Space.s1)
                             VStack(spacing: Space.s2) { ForEach(c.housekeeping) { CheckRow(model: model, item: $0) } }
                         }
@@ -85,7 +85,7 @@ struct TrendBars: View {
     var height: CGFloat = 22
     var body: some View {
         if history.isEmpty {
-            Text("No runs yet").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text("No runs yet").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         } else {
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(history.enumerated()), id: \.offset) { _, ok in
@@ -114,19 +114,19 @@ private struct CheckRow: View {
         HStack(spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name).fontWeight(.semibold)
-                Text(c.sentence(item)).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(c.sentence(item)).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Last run").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                Text(item.last).font(.system(size: MacTextSize.body, weight: .medium))
+                Text("Last run").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                Text(item.last).coreFont(size: MacTextSize.body, weight: .medium)
             }
             .frame(width: Space.s8 * 2.6, alignment: .leading)
             if let p = c.running[item.id] {
                 VStack(alignment: .leading, spacing: 3) {
                     CoreMeter(p, label: "\(item.name) progress")
-                    Text("Running, \(Int(p * 100))%").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                    Text("Running, \(Int(p * 100))%").coreFont(size: MacTextSize.meta).foregroundStyle(
                         GlassInk.secondary
                     )
                     .monospacedDigit()
@@ -137,7 +137,7 @@ private struct CheckRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     BrainChip(st.label, hue(st))
                     if st == .pass, item.due != "now" {
-                        Text("Due \(item.due)").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                        Text("Due \(item.due)").coreFont(size: MacTextSize.meta).foregroundStyle(
                             GlassInk.secondary)
                     }
                 }
@@ -178,12 +178,12 @@ private struct CheckDetail: View {
         let st = c.state(item)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                Text(item.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(item.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: Space.s2)
                 BrainChip(st.label, hue(st))
             }
-            Text(item.about).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(item.about).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Grid(alignment: .topLeading, horizontalSpacing: Space.s3, verticalSpacing: Space.s2) {
                 row("Last run", item.last)
@@ -191,7 +191,7 @@ private struct CheckDetail: View {
                 row("Measured", item.value, bad: st == .fail)
                 row("Target", item.target)
             }
-            .font(.system(size: MacTextSize.body)).padding(.top, Space.s1)
+            .coreFont(size: MacTextSize.body).padding(.top, Space.s1)
             if item.trend.isEmpty {
                 small("History, oldest to newest")
                 TrendBars(history: item.history, height: 56)
@@ -211,7 +211,7 @@ private struct CheckDetail: View {
                     text: "Run the check again to confirm.")
             }
             Label("This page keeps results only, never memory text. Hover for the codes.", systemImage: "info.circle")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .help("chk.\(item.id), run-\(item.id)-\(item.history.count)")
             HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
@@ -239,7 +239,7 @@ private struct CheckDetail: View {
     }
 
     private func small(_ t: String) -> some View {
-        Text(t).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).padding(.top, Space.s1)
+        Text(t).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).padding(.top, Space.s1)
     }
 }
 
@@ -272,7 +272,7 @@ private struct PilotTargets: View {
                     HStack(spacing: Space.s3) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(t.title)
-                            Text("Target: \(t.target)").font(.system(size: MacTextSize.meta))
+                            Text("Target: \(t.target)").coreFont(size: MacTextSize.meta)
                                 .foregroundStyle(GlassInk.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

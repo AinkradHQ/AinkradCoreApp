@@ -11,6 +11,7 @@ public struct CoreSecureField: View {
     let onSubmit: () -> Void
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.coreTextScale) private var textScale
     @Environment(\.coreForcedInteraction) private var forced
     @FocusState private var focused: Bool
 
@@ -31,8 +32,8 @@ public struct CoreSecureField: View {
             CoreFieldLabel(label)
             SecureField(palette.isDay ? "" : placeholder, text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: MacTextSize.body))
-                .coreDayPlaceholder(placeholder, empty: text.isEmpty, font: .system(size: MacTextSize.body))
+                .coreFont(size: MacTextSize.body)
+                .coreDayPlaceholder(placeholder, empty: text.isEmpty, font: .core(size: MacTextSize.body, scale: textScale))
                 .autocorrectionDisabled()
                 .focused($focused)
                 .onSubmit(onSubmit)

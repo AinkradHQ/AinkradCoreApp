@@ -24,10 +24,9 @@ public struct CoreCheckbox: View {
     public var body: some View {
         Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(
-                    .system(size: MacTextSize.body, weight: .semibold, design: mono ? .monospaced : .default))
+                Text(title).coreFont(size: MacTextSize.body, weight: .semibold, design: mono ? .monospaced : .default)
                 if let detail {
-                    Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
             }
         }
