@@ -72,7 +72,14 @@ public final class SettingsRegistry {
     public private(set) var savedAt: Date?
     /// A page inside a section (one device) puts its way back here: the title bar shows it beside the section's icon.
     public var back: SettingsBack?
+    /// One-shot arguments for the page being opened (Audit's filter): the page takes them when it shows.
+    public var handoff: [String: String] = [:]
     public init() {}
+    /// Selects a page and leaves it arguments, for a link that lands on a filtered view.
+    public func open(_ id: String, handoff: [String: String]) {
+        self.handoff = handoff
+        selected = id
+    }
     public func saved() { savedAt = Date() }
     public func section(_ s: SettingsSection) {
         sections.removeAll { $0.id == s.id }

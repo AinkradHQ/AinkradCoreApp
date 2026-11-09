@@ -49,6 +49,9 @@ struct SessionView: View {
             .onAppear {
                 if case .running = s.state { composing = true } else { paneFocus = true }
             }
+            .retakeFocus(after: model.shell) {
+                if case .running = s.state { composing = true } else { paneFocus = true }
+            }
             .onKeyPress(.return) { write(s) }
             .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in write(s) }
             .onKeyPress(.downArrow) { latest() }

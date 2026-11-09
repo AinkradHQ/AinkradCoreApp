@@ -41,6 +41,24 @@ public struct LiveAgentsAPI: AgentsAPI {
         } catch CoreError.forbiddenScope { return [] }
     }
 
+    public func bindings() async throws -> [AgentBinding] {
+        do {
+            return try await run {
+                try await client.listChainBindings().ok.body.json.map { AgentBinding(agent: $0.agent, chain: $0.chain) }
+            }
+        } catch CoreError.forbiddenScope { return [] }
+    }
+
+    public func bind(agent: String, chain: Int64) async throws {
+        try await run {
+            _ = try await client.bindAgentChain(path: .init(agent: agent), body: .json(.init(chain: chain))).ok
+        }
+    }
+
+    public func unbind(agent: String) async throws {
+        try await run { _ = try await client.unbindAgentChain(path: .init(agent: agent)).ok }
+    }
+
     public func sessions(before: Int64?, limit: Int) async throws -> [AgentSessionInfo] {
         try await run {
             let q = Operations.ListAgentSessions.Input.Query(before: before, limit: Int32(limit))

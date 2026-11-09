@@ -51,6 +51,7 @@ struct DevicesSection: View {
 
     @ViewBuilder private func list(_ model: DevicesModel) -> some View {
         @Bindable var model = model
+        AboutBlock(app: app)
         HStack(alignment: .center, spacing: Space.s3) {
             Text(
                 app.service == nil

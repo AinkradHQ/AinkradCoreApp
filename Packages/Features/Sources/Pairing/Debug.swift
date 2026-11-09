@@ -143,6 +143,7 @@ extension AppModel {
             self?.stepUpNotice = n == nil ? nil : StepUpNotice(phase: .cancelled, done: "changed", keepsEdit: true)
         }
     }
+    public var debugAccountsDetailOpen: Bool { accounts.debugDetailOpen }
     /// The Brain's states on sample data, for screenshots and clicking through. Needs no Core.
     public func debugBrainDemo() -> BrainDemo { BrainDemo(model: brain) }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }
@@ -171,7 +172,7 @@ extension AppModel {
     public func debugCloseDialog() { shell.closeDialog() }
     /// Snapshots: leave a first-run scene for the (sample) desktop.
     public func debugShowDesktop() { phase = .desktop }
-    /// Settings > About, the admin pages for a read-only device, the bell clearing an alarm and the terminal toast, on
+    /// Settings > Devices with its About block, the admin pages for a read-only device, the bell clearing an alarm and the terminal toast, on
     /// sample data (no Core is reached).
     public static let gapScenes = [
         "about-admin", "about-read-only", "about-loading", "about-error", "bell-alarm", "bell-alarm-cleared",
@@ -193,17 +194,17 @@ extension AppModel {
         switch scene {
         case "about-admin":
             self.about.debugSet(.ready(about(["read", "approve", "terminal", "agent", "admin"])))
-            debugOpenSettings("about")
+            debugOpenSettings("devices")
         case "about-read-only":
             self.about.debugSet(.ready(about(["read", "terminal"])))
             shell.settings.hidden = Set(Self.adminOnly)
-            debugOpenSettings("about")
+            debugOpenSettings("devices")
         case "about-loading":
             self.about.debugSet(.loading)
-            debugOpenSettings("about")
+            debugOpenSettings("devices")
         case "about-error":
             self.about.debugSet(.failed("The Core did not answer. Try again in a moment."))
-            debugOpenSettings("about")
+            debugOpenSettings("devices")
         case "bell-alarm", "bell-alarm-cleared":
             accountNotice("alarm.raised", ["alarm": "failover_storm"])
             accountNotice("account.expired", ["account": "1"])

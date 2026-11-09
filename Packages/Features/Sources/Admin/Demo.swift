@@ -9,6 +9,7 @@ import Shell
 public final class AdminDemo {
     final class Service: AdminService, @unchecked Sendable {
         var settingList: [SettingItem] = DemoData.settings
+        var auditRows: [AuditItem] = DemoData.audit
         func settings() async throws -> [SettingItem] { settingList }
         func setSetting(_ key: String, _ value: Int64) async throws -> SettingItem {
             guard let i = settingList.firstIndex(where: { $0.key == key }) else { throw CoreError.offline("gone") }
@@ -34,7 +35,7 @@ public final class AdminDemo {
         }
         func runners() async throws -> [RunnerChoice] { DemoData.runners }
         func audit(before: Int64?, limit: Int, filter: AuditFilter) async throws -> AuditPageItem {
-            let rows = DemoData.audit.filter {
+            let rows = auditRows.filter {
                 (filter.kind.isEmpty || $0.action.hasPrefix(filter.kind))
                     && (filter.target.isEmpty || "\($0.entityKind ?? ""):\($0.entityRef ?? "")".contains(filter.target))
                     && (filter.actor == .any || $0.actor.kind == filter.actor.rawValue)
@@ -49,7 +50,9 @@ public final class AdminDemo {
     public static let scenes = [
         "settings", "settings-switching", "settings-editing", "settings-refused", "settings-history", "switches",
         "secrets", "secrets-new",
-        "secrets-lease", "secrets-touchid-cancelled", "audit", "audit-selected", "audit-nomatch", "ops",
+        "secrets-lease", "secrets-touchid-cancelled", "audit", "audit-selected", "audit-nomatch", "audit-connections",
+        "audit-connection-history", "audit-accounts",
+        "audit-agents", "audit-one", "audit-many", "ops",
         "state-loading",
         "state-empty", "state-error", "state-scope", "banner-resuming", "banner-rate", "banner-renewing",
         "banner-restarted",
@@ -82,6 +85,7 @@ public final class AdminDemo {
         admin.registry.clearUI()
         admin.audit.clearFilters()
         admin.audit.selected = nil
+        service.auditRows = DemoData.audit
         admin.ops.showRaw = false
         try? await Task.sleep(for: .milliseconds(300))
         let first = DemoData.settings[0]
@@ -126,6 +130,25 @@ public final class AdminDemo {
             if scene == "audit-nomatch" {
                 admin.audit.filter.kind = "terminal."
                 try? await Task.sleep(for: .milliseconds(900))
+            }
+        case "audit-connections", "audit-accounts", "audit-agents":
+            await open("audit")
+            admin.audit.filter.kind =
+                scene == "audit-connections" ? "connection." : scene == "audit-agents" ? "agent." : "account."
+            try? await Task.sleep(for: .milliseconds(900))
+            admin.audit.selected = admin.audit.items.first?.seq
+        case "audit-connection-history":
+            // What a connection card's History does: Audit opens already filtered to that connection.
+            shell.settings.open("audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:2"])
+            shell.open(.settings)
+            try? await Task.sleep(for: .milliseconds(1200))
+        case "audit-one", "audit-many":
+            service.auditRows = scene == "audit-one" ? [DemoData.audit[0]] : DemoData.audit(1_000)
+            admin.audit.reset()
+            await open("audit")
+            await admin.audit.reload()  // the section may already be on screen, so its own load does not run again
+            if scene == "audit-many" {
+                for _ in 0..<19 { await admin.audit.loadOlder() }
             }
         case "ops":
             await open("ops")
@@ -243,7 +266,9 @@ nonisolated enum DemoData {
         ]
     }
 
-    nonisolated static var audit: [AuditItem] {
+    nonisolated static var audit: [AuditItem] { audit(60) }
+
+    nonisolated static func audit(_ count: Int) -> [AuditItem] {
         let kinds: [(String, String, String, String)] = [
             ("pairing.claimed", "pairing", "p_c4e1", "{\n  \"name\": \"iPad Air\",\n  \"platform\": \"ipados\"\n}"),
             ("device.scopes_set", "device", "d_ph18x3Kz", "{\n  \"scopes\": [\n    \"read\",\n    \"approve\"\n  ]\n}"),
@@ -252,8 +277,12 @@ nonisolated enum DemoData {
             ("secret.leased", "secret", "github-token-test", "{\n  \"runner\": \"d_run9Lq1\",\n  \"ttl_secs\": 120\n}"),
             ("auth.lockout_cleared", "lockout", "ip:198.51.100.7", "{}"),
             ("terminal.created", "terminal", "t_91c2", "{\n  \"runner\": \"d_run2Gt4\"\n}"),
+            ("connection.used", "connection", "2", "{\n  \"action\": \"github.get_issue\",\n  \"result\": \"ok\"\n}"),
+            ("connection.created", "connection", "2", "{\n  \"kind\": \"github\"\n}"),
+            ("account.tested", "account", "1", "{\n  \"result\": \"ok\"\n}"),
+            ("agent.created", "agent", "as_01JC4X7Q3MZ8N5V2K9R001", "{\n  \"harness\": \"claude\"\n}"),
         ]
-        return (0..<60).map { i in
+        return (0..<count).map { i in
             let k = kinds[(i * 5 + 3) % kinds.count]
             return AuditItem(
                 seq: Int64(5_230 - i), at: Date().addingTimeInterval(-Double(i) * 1_020 - 300), action: k.0,

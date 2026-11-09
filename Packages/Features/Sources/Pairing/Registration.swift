@@ -13,17 +13,11 @@ enum Registration {
         app.brain.install()
         shell.settings.section(
             SettingsSection(
-                id: "devices", group: .core, title: "Devices", sub: "Paired Macs, phones, runners and passkeys",
+                id: "devices", group: .core, title: "Devices",
+                sub: "This Core, and the Macs, phones, runners and passkeys that reach it",
                 symbol: "iphone", order: 1
             ) {
                 DevicesSection(app: app)
-            })
-        shell.settings.section(
-            SettingsSection(
-                id: "about", group: .core, title: "About this Core", sub: "Version and what this device may do",
-                symbol: "info.circle", order: 8
-            ) {
-                AboutSection(app: app)
             })
         shell.settings.section(
             SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {

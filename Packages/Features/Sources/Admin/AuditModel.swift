@@ -77,6 +77,14 @@ final class AuditModel {
     /// The kinds seen in the loaded rows, for the Kind menu.
     var knownKinds: [String] { Array(Set(items.map(\.action))).sorted() }
 
+    /// A link from another page (a connection's History): show exactly these rows. One search, not two.
+    func open(kind: String, target: String) {
+        search?.cancel()
+        filter = AuditFilter(kind: kind, target: target)
+        search?.cancel()
+        selected = nil
+    }
+
     func clearFilters() { filter = AuditFilter() }
 
     /// A new search a moment after the last keystroke.

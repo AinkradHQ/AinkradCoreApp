@@ -207,7 +207,12 @@ public struct ActivityFilter: Sendable, Equatable {
     public var result: ActivityResult?
     public init() {}
 
-    public var isActive: Bool { self != ActivityFilter() }
+    /// Whether a filter the person set is on. The room follows the room picker, so it never counts.
+    public var isActive: Bool {
+        var base = self
+        base.room = .all
+        return base != ActivityFilter()
+    }
 
     /// Rows of a sealed room never show (Q2): `mounted` is the set of mounted room ids.
     public func matches(_ e: ActivityEvent, mounted: Set<String>) -> Bool {

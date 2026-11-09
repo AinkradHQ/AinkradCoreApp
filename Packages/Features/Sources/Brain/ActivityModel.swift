@@ -136,7 +136,12 @@ public final class ActivityModel {
         Task { await load() }
     }
 
-    public func clearFilters() { filter = ActivityFilter() }
+    /// Clears what the person set; the room stays on the room picker's pick.
+    public func clearFilters() {
+        let room = filter.room
+        filter = ActivityFilter()
+        filter.room = room
+    }
 
     func loadEgress() async {
         guard let service = brain?.service, let id = egressRoomID, brain?.room(id)?.lock == nil else {

@@ -26,6 +26,11 @@ public protocol AgentsHost: AnyObject {
 
 struct ElevationDeclined: Error { let notice: InlineNotice }
 
+public enum BindingsPhase: Equatable, Sendable {
+    case loading, ready
+    case failed(String)
+}
+
 public enum AgentFilter: String, CaseIterable, Sendable { case all, needsYou, active, ended }
 public enum AgentsLink: Equatable, Sendable {
     case live, reconnecting
@@ -48,6 +53,8 @@ public final class AgentsModel {
     public var drafts: [String: String] = [:]
     /// The quick popup's prompt, carried into the advanced sheet.
     public var draftPrompt = ""
+    /// The chain picked on the quick sheet's chip, carried into the advanced sheet.
+    public var draftChain: Int64?
     public internal(set) var sending: Set<String> = []
     /// Sessions asked to stop that have not ended yet: the Core answers a cancel at once but the agent only stops after its tool
     /// call in flight (or the runner's grace), so the session reads as still running until then. Shown as "Cancelling".
@@ -64,6 +71,14 @@ public final class AgentsModel {
     public internal(set) var titles: [String: String] = [:]
     /// Agents a session can be started as (those with a chain bound). Empty for a device that is not an admin.
     public internal(set) var agentNames: [String] = []
+    /// Agent to chain, for Settings, Agents and chains. Empty for a device that is not an admin.
+    public internal(set) var bindings: [AgentBinding] = []
+    public internal(set) var bindingsPhase: BindingsPhase = .loading
+    /// What the last bind or unbind of an agent said, in place, and the agent being written now.
+    public internal(set) var bindingNotices: [String: InlineNotice] = [:]
+    public internal(set) var bindingBusy: String?
+    /// A write came back `forbidden_scope`: this device can read but not change.
+    public internal(set) var bindingsReadOnly = false
     @ObservationIgnored var raiseBudgetHook: ((AgentSessionInfo) -> Void)?
     @ObservationIgnored var titleLoading: Set<String> = []
 
@@ -87,6 +102,8 @@ public final class AgentsModel {
     /// Which source the New session sheet opens on in the snapshot walk (`chain`, `agent` or `busy`).
     @ObservationIgnored public var debugSource: String?
     @ObservationIgnored var debugChainList: [ChainOption]?
+    /// Keeps the Agents and chains page in the state a snapshot scene set (loading, failed) instead of reading again.
+    @ObservationIgnored var debugFreezeBindings = false
     #endif
 
     public init(
@@ -216,6 +233,7 @@ public final class AgentsModel {
         if let r = try? await api.runners() { runners = r }
         setChains((try? await api.chains()) ?? [])
         agentNames = (try? await api.agents()) ?? []
+        await loadBindings()
         for s in sessions.items where s.live && transcripts[s.id] == nil { _ = store(s.id) }
         for (id, t) in transcripts { await t.refresh(api, knownLast: sessions.session(id)?.lastSeq ?? 0) }
         syncDerived()

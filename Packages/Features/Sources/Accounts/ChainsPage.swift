@@ -126,34 +126,14 @@ private struct ChainDetail: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             AccPanel(spacing: Space.s2) {
-                HStack {
-                    Label("Agents on this chain", systemImage: "person.2").font(
-                        .system(size: MacTextSize.title, weight: .semibold))
-                    Spacer()
-                    AccLink(title: "Bind an agent", symbol: "plus") {
-                        AccountDialogs.openBindAgent(model, chain: chain)
+                HStack(spacing: Space.s3) {
+                    Label("Bind agents where you start work: Agents > Agents and chains", systemImage: "person.2")
+                        .font(.system(size: MacTextSize.body)).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Space.s2)
+                    AppActionTile(title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue) {
+                        model.openChainBinding()
                     }
-                    .disabled(ro)
-                }
-                let agents = model.agents(of: chain)
-                if agents.isEmpty {
-                    Text("No agent is bound to this chain.").foregroundStyle(GlassInk.secondary)
-                }
-                ForEach(agents) { b in
-                    HStack(spacing: Space.s3) {
-                        Text(b.agent).font(.system(size: MacTextSize.headline, weight: .semibold, design: .monospaced))
-                        Spacer(minLength: Space.s2)
-                        AccLink(title: "Unbind", symbol: "xmark", danger: true, help: "Unbind \(b.agent)") {
-                            Task { await model.unbind(b.agent) }
-                        }
-                        .disabled(ro || model.busy != nil)
-                    }
-                    .padding(Space.s2).background(GlassInk.well, in: coreShape(Radius.control + 2))
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("bound-\(b.agent)")
-                }
-                if let e = model.writeError["bind-chain"] ?? model.writeError["unbind-\(agents.first?.agent ?? "")"] {
-                    AccIssue(text: e)
+                    .accessibilityIdentifier("chain-bind-open")
                 }
             }
         }

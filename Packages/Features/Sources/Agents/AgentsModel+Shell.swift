@@ -169,6 +169,17 @@ extension AgentsModel {
             ) { AgentSettingsView(model: self) })
         shell.settings.section(
             SettingsSection(
+                id: "agent-chains", group: .apps, title: "Agents and chains",
+                sub: "Which chain each agent draws its accounts from", symbol: "link", order: 31
+            ) { AgentChainsSection(model: self) })
+        shell.launcher.register(
+            LauncherEntry(
+                id: "settings.agent-chains", title: "Agents and chains",
+                sub: "Settings, Agents · bind an agent to a chain", symbol: "link",
+                keywords: ["bind", "unbind", "chain", "agent", "fallback", "accounts"]
+            ) { [weak self] in self?.openChainBinding() })
+        shell.settings.section(
+            SettingsSection(
                 id: "notifications", group: .notifications, title: "Notifications", symbol: "bell", order: 0
             ) {
                 NotificationsSection(model: self)

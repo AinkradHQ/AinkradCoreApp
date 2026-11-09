@@ -45,6 +45,11 @@ enum AgentsSnapshots {
             a.debugList("normal")
         }
         a.debugPermission("allowed")
+        if env["CORE_AGENTS_ONLY"] == "chains" {
+            await chainShots(a, shell, only: only) { n, w in await shot(n, wait: w) }
+            NSApp.terminate(nil)
+            return
+        }
         log("key=\(window.isKeyWindow) fr=\(String(describing: window.firstResponder))")
 
         // The list, in each state the prototype shows.
@@ -236,6 +241,31 @@ enum AgentsSnapshots {
         await shot("bell-accounts")
         shell.bellOpen = false
         NSApp.terminate(nil)
+    }
+
+    /// Settings, Agents and chains in every state, the New session chain picker, and Accounts, Chains after the removal.
+    private static func chainShots(
+        _ a: AgentsModel, _ shell: ShellModel, only: (() -> Void) -> Void,
+        shot: (String, Double) async -> Void
+    ) async {
+        for mode in ["ready", "empty", "loading", "failed", "readonly", "nochains", "notadmin", "refused", "unbind"] {
+            await a.debugBindings(mode)
+            shell.settings.selected = "agent-chains"
+            shell.open(.settings)
+            await shot("agent-chains-\(mode)", 1.4)
+            shell.sheet = nil
+            shell.overlay = nil
+        }
+        await a.debugBindings("ready")
+        only { a.openNewSession() }
+        await shot("quick-chain-chip", 1.4)
+        only { a.openNewSession(advanced: true) }
+        await shot("advanced-default-chain", 1.4)
+        a.debugSource = "agent"
+        only { a.openNewSession(advanced: true) }
+        await shot("advanced-agent-link", 1.4)
+        a.debugSource = nil
+        shell.closeDialog()
     }
 
     private static func capture(_ window: NSWindow, to path: String) -> Bool {

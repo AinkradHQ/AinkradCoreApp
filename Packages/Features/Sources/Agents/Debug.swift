@@ -16,6 +16,49 @@ extension AgentsModel {
         agentNames = names
     }
 
+    /// Settings, Agents and chains in one named state: ready, empty, loading, failed, readonly, nochains, notadmin, refused,
+    /// unbind (the confirm sheet). Sample chains and agents; long and non-Latin names are in `ready` on purpose.
+    public func debugBindings(_ mode: String) async {
+        guard let fake = api as? FakeAgentsAPI else { return }
+        debugFreezeBindings = false
+        isAdmin = mode != "notadmin"
+        bindingsReadOnly = mode == "readonly"
+        bindingNotices = [:]
+        shell.sheet = nil
+        let long = "release-train-nightly-integration-agent:eu-west-1.canary.0042"
+        let chainsList = [
+            ChainOption(id: 1, name: "daily", isDefault: true, steps: ["claude · sonnet", "codex · default model"]),
+            ChainOption(id: 2, name: "careful", isDefault: false, steps: ["claude · opus"]),
+            ChainOption(id: 3, name: "سلسلة الصباح الطويلة جدا للاختبار", isDefault: false, steps: ["claude · haiku"]),
+        ]
+        debugChains(mode == "nochains" ? [] : chainsList)
+        fake.chainList = chains
+        fake.bindingList =
+            mode == "empty"
+            ? []
+            : [
+                AgentBinding(agent: "atlas", chain: 2), AgentBinding(agent: "orion", chain: 1),
+                AgentBinding(agent: long, chain: 3),
+            ]
+        fake.agentList = fake.bindingList.map(\.agent)
+        agentNames = fake.agentList
+        bindings = fake.bindingList
+        bindingsPhase = .ready
+        switch mode {
+        case "loading":
+            debugFreezeBindings = true
+            bindingsPhase = .loading
+        case "failed":
+            debugFreezeBindings = true
+            bindingsPhase = .failed("The Core did not answer.")
+        case "refused":
+            bindingNotices["atlas"] = InlineNotice(
+                title: "Binding did not go through.", detail: "The Core refused: that chain no longer exists.")
+        case "unbind": confirmUnbind("atlas")
+        default: break
+        }
+    }
+
     /// A believable climb to each session's token total, so the burn charts have samples in the demo.
     public func debugSeedBurn() {
         for (i, s) in sessions.items.enumerated() {

@@ -10,10 +10,6 @@ extension AccountDialogs {
     static func openDeleteChain(_ m: AccountsModel, _ c: ChainItem) {
         present(m, "chain-delete") { close in DeleteChainDialog(model: m, chain: c, close: close) }
     }
-    static func openBindAgent(_ m: AccountsModel, chain: ChainItem) {
-        m.note("bind-chain", nil)
-        present(m, "chain-bind") { close in BindAgentDialog(model: m, chain: chain, close: close) }
-    }
 }
 
 /// What a chain may hold, checked before the Core is asked. The Core checks the rest (a subscription pool at most once).
@@ -199,70 +195,5 @@ private struct DeleteChainDialog: View {
             }
         }
         .accessibilityIdentifier("chain-delete")
-    }
-}
-
-enum AgentIDRule {
-    static let words = "Use 1 to 64 letters, digits, dots, dashes, colons or underscores."
-}
-
-private struct BindAgentDialog: View {
-    let model: AccountsModel
-    let chain: ChainItem
-    let close: () -> Void
-    /// "": the person is typing an agent the Core has not met through this app yet.
-    @State private var pick: String
-    @State private var typedNew = ""
-    @State private var busy = false
-
-    init(model: AccountsModel, chain: ChainItem, close: @escaping () -> Void) {
-        self.model = model
-        self.chain = chain
-        self.close = close
-        _pick = State(initialValue: model.knownAgents.first ?? "")
-    }
-
-    private var chosen: String { (pick.isEmpty ? typedNew : pick).trimmingCharacters(in: .whitespaces) }
-
-    var body: some View {
-        let valid = AccountsModel.validAgent(chosen)
-        let error = model.writeError["bind-chain"]
-        let known = model.knownAgents
-        CoreDialogPanel("Bind an agent to \(chain.name)", width: Space.s8 * 14) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                // The Core has no list of agents; these are the ones already bound and the ones bound from here before.
-                if !known.isEmpty {
-                    CoreSelect(
-                        "Agent", selection: $pick,
-                        options: known.map {
-                            CoreSelectOption($0, $0 + (model.boundChain(of: $0).map { " · now on \($0.name)" } ?? ""))
-                        }
-                            + [CoreSelectOption("", "Another agent…")])
-                }
-                if pick.isEmpty {
-                    CoreTextField(
-                        "Agent id", placeholder: "atlas", text: $typedNew,
-                        error: chosen.isEmpty || valid ? nil : AgentIDRule.words, mono: true, autofocus: true
-                    ) { go(valid) }
-                }
-                Text("Its sessions get this chain. Binding it again moves it here.")
-                    .font(.system(size: MacTextSize.meta))
-                if let error { AccIssue(text: "\(error) Your choice is kept. Change it and try again, or cancel.") }
-                AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(
-                    confirm: error == nil ? "Bind agent" : "Try again", busy: busy, enabled: valid, cancel: close
-                ) { go(valid) }
-            }
-        }
-        .accessibilityIdentifier("chain-bind")
-    }
-    private func go(_ valid: Bool) {
-        guard valid else { return }
-        busy = true
-        Task {
-            let ok = await model.bind(agent: chosen, to: chain)
-            busy = false
-            if ok { close() }
-        }
     }
 }
