@@ -13,7 +13,18 @@ struct AccountNotice: Equatable {
     /// Kinds this build words. Others (`account.login.*`) are not announced.
     static let kinds: Set<String> = [
         "account.limited", "account.health", "account.failover", "account.budget", "account.expired", "alarm.raised",
+        "alarm.cleared", "terminal.reap_warning",
     ]
+
+    /// The bell entry an `alarm.cleared` event takes away (the one `alarm.raised` made), if this build worded it.
+    static func clearedID(kind: String, fields f: [String: String]) -> String? {
+        kind == "alarm.cleared" && f["alarm"] == "failover_storm" ? "account-storm" : nil
+    }
+
+    /// A short toast for events that are not an account's, not kept in the bell.
+    static func toast(kind: String) -> String? {
+        kind == "terminal.reap_warning" ? "A terminal is about to close." : nil
+    }
 
     /// `fields` is the event payload with every value as text. `account` names an account id ("Claude account Work"),
     /// `pool` a pool id; an id nobody knows reads as "An account".
