@@ -411,6 +411,10 @@ public final class ConnectionsModel {
             chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
         ) { ConnectionsView(model: self) }
         spec.tab = "Connections"
+        spec.onNew = { [weak self] in
+            guard let self, service != nil else { return }
+            ConnDialogs.openConnect(self, kind: nil)
+        }
         host.shell.openPane(spec)
         Task { await reload() }
     }
