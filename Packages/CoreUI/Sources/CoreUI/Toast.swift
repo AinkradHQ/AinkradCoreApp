@@ -33,10 +33,13 @@ public struct ToastItem: Identifiable, Sendable {
     public let undo: (@Sendable @MainActor () -> Void)?
     /// The button's words; Undo unless the action is something else (then ⌘Z does not trigger it).
     public let actionTitle: String
+    /// Hover help for the message: the technical detail (an id) that the words leave out.
+    public let help: String?
     public init(
-        _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo",
+        _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo", help: String? = nil,
         undo: (@Sendable @MainActor () -> Void)? = nil
     ) {
+        self.help = help
         self.actionTitle = actionTitle
         self.message = message
         self.kind = kind
@@ -52,9 +55,14 @@ public struct CoreToast: View {
     let kind: ToastKind
     let undo: (() -> Void)?
     let actionTitle: String
+    let help: String?
     @Environment(\.corePalette) private var palette
 
-    public init(_ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo", undo: (() -> Void)? = nil) {
+    public init(
+        _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo", help: String? = nil,
+        undo: (() -> Void)? = nil
+    ) {
+        self.help = help
         self.actionTitle = actionTitle
         self.message = message
         self.kind = kind
@@ -64,7 +72,7 @@ public struct CoreToast: View {
     public var body: some View {
         HStack(spacing: Space.s3) {
             ToneGlyph(symbol: kind.symbol, ink: palette.tone(kind.tone).ink, size: 26)
-            Text(message).coreFont(size: MacTextSize.body)
+            Text(message).coreFont(size: MacTextSize.body).help(help ?? "")
             if let undo {
                 Button(actionTitle, action: undo).buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
@@ -100,7 +108,7 @@ private struct ToastHost: ViewModifier {
             .overlay(alignment: .bottom) {
                 if let item {
                     CoreToast(
-                        item.message, kind: item.kind, actionTitle: item.actionTitle,
+                        item.message, kind: item.kind, actionTitle: item.actionTitle, help: item.help,
                         undo: item.undo.map { undo in
                             {
                                 undo()

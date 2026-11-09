@@ -303,7 +303,10 @@ public final class ShellModel {
         closePane(id)
         closedPanes.append(spec)
         if closedPanes.count > 10 { closedPanes.removeFirst() }
-        showToast("Closed \(spec.title). It keeps running.", kind: .info) { [weak self] in self?.reopenClosedPane() }
+        // Words name the pane the way its tab does; the title (which can carry an id) is hover help only.
+        toast = ToastItem(
+            "Closed \(tabName(spec)). It keeps running.", kind: .info, help: spec.title
+        ) { [weak self] in self?.reopenClosedPane() }
     }
 
     public func reopenClosedPane() {
