@@ -128,3 +128,42 @@ struct LaneL4Tests {
         #expect(m.tabName(spec) == "Accounts")
     }
 }
+
+@MainActor
+struct UndoShortcutTests {
+    private func shellWithClosedPane() -> ShellModel {
+        let shell = ShellModel()
+        shell.openPane(PaneSpec(id: "a", title: "a", symbol: "square") { EmptyView() })
+        shell.dismissPane("a")
+        return shell
+    }
+
+    @Test func commandZRunsTheShowingToastsUndo() {
+        let shell = shellWithClosedPane()
+        #expect(shell.panes.isEmpty && shell.toast != nil)
+        #expect(shell.undoToast())
+        #expect(shell.panes.map(\.id) == ["a"] && shell.toast == nil)
+    }
+
+    @Test func aTextFieldKeepsItsOwnUndo() {
+        let shell = shellWithClosedPane()
+        #expect(!shell.undoToast(inTextField: true))
+        #expect(shell.panes.isEmpty && shell.toast != nil)
+    }
+
+    @Test func aToastWithAnotherActionIsNotUndone() {
+        let shell = ShellModel()
+        var ran = false
+        shell.showToast("x", actionTitle: "Keep it") { ran = true }
+        #expect(!shell.undoToast() && !ran)
+        shell.toast = nil
+        #expect(!shell.undoToast())
+    }
+
+    @Test func shiftCommandTReopensTheLastClosedPane() {
+        let shell = shellWithClosedPane()
+        shell.toast = nil
+        shell.reopenClosedPane()
+        #expect(shell.panes.map(\.id) == ["a"])
+    }
+}

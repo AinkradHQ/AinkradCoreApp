@@ -90,6 +90,8 @@ final class FakeService: CoreService, @unchecked Sendable {
             id: id, status: "claimed", name: "iPhone", kind: "device", platform: "ios", keyStorage: "secure_enclave",
             scopes: ["read"], sas: "AAAA-BBBB-CCCC-DDDD", expiresAt: nil, deviceID: "d_x")
     }
+    var pending: [PairingInfo] = []
+    func pendingPairings() async throws -> [PairingInfo] { pending }
     func approve(_ id: String, sas: String, scopes: [String]?) async throws -> PairingInfo {
         PairingInfo(
             id: id, status: "approved", name: "iPhone", kind: "device", platform: "ios", keyStorage: nil, scopes: [],
