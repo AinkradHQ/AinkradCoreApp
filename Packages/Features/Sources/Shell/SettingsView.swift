@@ -268,7 +268,15 @@ public enum ThemeChoice: String, CaseIterable, Sendable {
         }
     }
     public static func stored(_ defaults: UserDefaults = .standard) -> ThemeChoice {
-        defaults.string(forKey: key).flatMap(ThemeChoice.init) ?? .system
+        #if DEBUG
+        // Shot runs: the theme they ask for holds for the whole run (FullScreen re-applies this after the walks set it).
+        switch ProcessInfo.processInfo.environment["CORE_THEME"] {
+        case "light", "day": return .day
+        case "dark", "night": return .night
+        default: break
+        }
+        #endif
+        return defaults.string(forKey: key).flatMap(ThemeChoice.init) ?? .system
     }
 }
 

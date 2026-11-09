@@ -41,7 +41,7 @@ struct RunnersView: View {
                     }
                     .frame(maxWidth: .infinity).padding(.top, Space.s8)
                 } else {
-                    BusyBar()
+                    CoreBusyBar()
                 }
             }
             ForEach(model.runners) { r in RunnerTile(model: model, runner: r) }
@@ -257,7 +257,7 @@ private struct RunnerDetail: View {
                 }
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
             }
-            if n == .running { BusyBar() }
+            if n == .running { CoreBusyBar() }
             Text("Needs the read and agent scopes.").font(.system(size: MacTextSize.meta)).foregroundStyle(
                 palette.text2)
             HStack(spacing: Space.s3) {

@@ -92,7 +92,7 @@ struct SessionSpendStrip: View {
                     session.stoppedByBudget ? "Stopped: budget reached" : "Stopped at its limit",
                     systemImage: "gauge.with.dots.needle.100percent"
                 )
-                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.red)
+                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.redInk)
             }
             Text(spentWords).font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
                 .help(

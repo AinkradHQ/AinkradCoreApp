@@ -19,6 +19,8 @@ extension AccountsDemo {
         let m = model.connections
         let shell = m.host.shell
         shell.dialog = nil
+        shell.overlay = nil  // Settings or another overlay must not sit over the pane
+        shell.launcherOpen = false
         m.stopFlow()
         m.busy = nil
         m.writeError = [:]

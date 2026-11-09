@@ -54,17 +54,22 @@ public struct CoreTextField: View {
         self.onSubmit = onSubmit
     }
 
+    private var fieldFont: Font {
+        mono
+            ? .system(size: big ? MacTextSize.large : MacTextSize.title, design: .monospaced)
+            : .system(size: MacTextSize.body)
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             CoreFieldLabel(label)
-            TextField(placeholder, text: $text)
+            TextField(palette.isDay ? "" : placeholder, text: $text)
                 .textFieldStyle(.plain)
-                .font(
-                    mono
-                        ? .system(size: big ? MacTextSize.large : MacTextSize.title, design: .monospaced)
-                        : .system(size: MacTextSize.body)
-                )
+                .font(fieldFont)
                 .multilineTextAlignment(big ? .center : .leading)
+                .coreDayPlaceholder(
+                    placeholder, empty: text.isEmpty, font: fieldFont, alignment: big ? .center : .leading
+                )
                 .autocorrectionDisabled()
                 .focused($focused)
                 .onSubmit(onSubmit)
@@ -121,16 +126,9 @@ private struct FieldSurface: ViewModifier {
 
     @ViewBuilder private func fill(lit: Bool) -> some View {
         if palette.isDay {
-            // Day: a white sheen, brighter at the top, like the glass controls.
-            let top = focused ? 1.0 : lit ? 0.86 : 0.72
-            let mid = focused ? 0.78 : lit ? 0.6 : 0.46
-            coreShape(radius).fill(
-                LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(top), location: 0),
-                        .init(color: .white.opacity(mid), location: 0.55),
-                        .init(color: .white.opacity((top + mid) / 2), location: 1),
-                    ], startPoint: .top, endPoint: .bottom))
+            // Day: a darker well over the deep glass (white 0.12 to 0.2), so white text and the placeholder read 4.5:1 or
+            // better and the field reads as an input, not a disabled value (Phase 0, 2026-11-09).
+            coreShape(radius).fill(.white.opacity(focused ? 0.2 : lit ? 0.16 : 0.12))
         } else {
             coreShape(radius).fill(focused || lit ? GlassInk.wellHover : GlassInk.well)
         }
@@ -139,11 +137,34 @@ private struct FieldSurface: ViewModifier {
     private var edge: AnyShapeStyle {
         if error { return AnyShapeStyle(palette.tone(.fail).ink) }
         if palette.isDay {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [.white.opacity(focused ? 1 : 0.95), .white.opacity(focused ? 0.9 : 0.5)],
-                    startPoint: .top, endPoint: .bottom))
+            let rest = palette.increased ? 0.7 : 0.45
+            return AnyShapeStyle(Color.white.opacity(focused ? 0.8 : hovering || forced == .hover ? rest + 0.1 : rest))
         }
-        return AnyShapeStyle(focused ? Color.white.opacity(0.3) : GlassInk.wellEdge)
+        // Night keeps its first well and edge.
+        return AnyShapeStyle(focused ? Color.white.opacity(0.3) : Color.white.opacity(palette.increased ? 0.4 : 0.14))
+    }
+}
+
+/// The placeholder of a day field, drawn by us in the secondary ink (the system one is a pale grey on the dark day well).
+/// Night keeps the system placeholder.
+private struct DayPlaceholder: ViewModifier {
+    let text: String
+    let empty: Bool
+    let font: Font
+    let alignment: Alignment
+    @Environment(\.corePalette) private var palette
+    func body(content: Content) -> some View {
+        content.overlay(alignment: alignment) {
+            if palette.isDay && empty {
+                Text(text).font(font).foregroundStyle(palette.text2).lineLimit(1).allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+extension View {
+    func coreDayPlaceholder(_ text: String, empty: Bool, font: Font, alignment: Alignment = .leading) -> some View {
+        modifier(DayPlaceholder(text: text, empty: empty, font: font, alignment: alignment))
     }
 }

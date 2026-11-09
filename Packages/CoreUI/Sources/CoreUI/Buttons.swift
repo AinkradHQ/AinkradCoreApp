@@ -136,7 +136,7 @@ private struct ButtonSurface: ViewModifier {
             .overlay {
                 if kind != .plain {
                     shape.strokeBorder(
-                        .white.opacity((kind == .secondary ? 0.15 : 0.3) + (hover ? 0.15 : 0)), lineWidth: 1)
+                        .white.opacity(0.3 + (hover ? 0.15 : 0)), lineWidth: 1)
                 }
             }
             .overlay { shape.fill(.black.opacity(darken ? 0.18 : 0)).allowsHitTesting(false) }

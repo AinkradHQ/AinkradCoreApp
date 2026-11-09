@@ -110,7 +110,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
             }
             .overlay {
                 coreShape(Radius.control).strokeBorder(
-                    .white.opacity(selected ? 0.3 : hovering ? 0.3 : 0.15), lineWidth: 1)
+                    .white.opacity(selected || hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
@@ -174,10 +174,10 @@ public struct GlassToggleTile: View {
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
                 coreShape(Radius.control)
-                    .fill(isOn ? GlassInk.blue.opacity(0.8) : hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
+                    .fill(hovering ? GlassInk.wellHover : GlassInk.well)  // neutral well: the switch carries "on"
             }
             .overlay {
-                coreShape(Radius.control).strokeBorder(.white.opacity(isOn || hovering ? 0.3 : 0.15), lineWidth: 1)
+                coreShape(Radius.control).strokeBorder(.white.opacity(hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
@@ -193,7 +193,7 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(5).fill(.white.opacity(isOn ? 0.35 : 0.12))
+        coreShape(5).fill(isOn ? GlassInk.blue : .white.opacity(0.18))
             .frame(width: 30, height: 18)
             .overlay(alignment: isOn ? .trailing : .leading) {
                 coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)

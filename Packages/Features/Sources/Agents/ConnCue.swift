@@ -31,7 +31,7 @@ struct ConnCue: View {
         let refused = ok == false
         HStack(spacing: Space.s2) {
             Image(systemName: refused ? "exclamationmark.triangle" : ok == nil ? "link" : "checkmark.circle")
-                .foregroundStyle(refused ? GlassInk.orange : GlassInk.secondary)
+                .foregroundStyle(refused ? GlassInk.orangeInk : GlassInk.secondary)
             Text(
                 refused
                     ? "Couldn't \(Self.line(tool, summary).lowercased())\(why.isEmpty ? "" : ": \(why)")"
@@ -41,7 +41,7 @@ struct ConnCue: View {
             .lineLimit(2)
             if refused, let openConnections {
                 Button("Allow in Connections", action: openConnections).buttonStyle(.plain)
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.blue)
+                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.blueInk)
             }
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)

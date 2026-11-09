@@ -135,9 +135,8 @@ private struct FeedView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            Text(a.announcement ?? "").frame(width: 1, height: 1).opacity(0.01)
-                .accessibilityLabel(a.announcement ?? "")
         }
+        .onChange(of: a.announcement) { _, text in if let text, !text.isEmpty { CoreAnnounce.post(text) } }
     }
 
     private func filters(_ a: ActivityModel) -> some View {

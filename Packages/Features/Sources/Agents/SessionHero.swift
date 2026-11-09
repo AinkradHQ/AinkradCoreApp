@@ -79,7 +79,7 @@ struct SessionHero: View {
                         : "Cancelling: it finishes the tool call in flight, then ends. K kills at once.",
                     systemImage: "hourglass"
                 )
-                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orange)
+                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orangeInk)
                 .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                 .accessibilityIdentifier("session-stopping")
             }

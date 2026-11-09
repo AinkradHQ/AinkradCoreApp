@@ -325,7 +325,7 @@ private struct ToolCard: View {
                     .onAppear { spin = true }
                 Text("running")
             }
-            .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.blue)
+            .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.blueInk)
         case .ok(let facts):
             badge("checkmark", facts.isEmpty ? "ok" : "ok · \(facts)", GlassInk.green)
         case .failed(let facts):

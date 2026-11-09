@@ -20,7 +20,7 @@ struct LoadNote: View {
         switch state {
         case .loading:
             VStack(alignment: .leading, spacing: Space.s1) {
-                IndBar().frame(maxWidth: Space.s8 * 5)
+                CoreBusyBar().frame(maxWidth: Space.s8 * 5)
                 Text("Loading…").foregroundStyle(palette.text2)
             }
             .accessibilityElement(children: .combine)

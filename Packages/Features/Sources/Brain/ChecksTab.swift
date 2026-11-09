@@ -235,7 +235,8 @@ private struct CheckDetail: View {
     private func row(_ k: String, _ v: String, bad: Bool = false) -> some View {
         GridRow {
             Text(k).foregroundStyle(GlassInk.secondary)
-            Text(v).foregroundStyle(bad ? GlassInk.red : GlassInk.primary).fixedSize(horizontal: false, vertical: true)
+            Text(v).foregroundStyle(bad ? GlassInk.redInk : GlassInk.primary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

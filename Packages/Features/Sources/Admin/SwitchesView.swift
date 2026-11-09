@@ -167,7 +167,7 @@ private struct FlagCard: View {
         GlassSection(title, sub: sub, symbol: symbol, hue: hue, index: index) {
             HStack(spacing: Space.s2) {
                 Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orange)
+                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orangeInk)
                 if model.busy == setting.key { ProgressView().controlSize(.small) }
                 GlassToggleTile(
                     isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
@@ -188,7 +188,7 @@ private struct FlagCard: View {
                 Label(needs, systemImage: "arrow.turn.right.up").font(
                     .system(size: MacTextSize.meta, weight: .semibold)
                 )
-                .foregroundStyle(GlassInk.blue)
+                .foregroundStyle(GlassInk.blueInk)
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }

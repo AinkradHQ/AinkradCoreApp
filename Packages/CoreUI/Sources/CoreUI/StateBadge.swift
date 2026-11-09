@@ -26,6 +26,7 @@ public struct StateBadge: View {
         .frame(minHeight: MacSize.chip)
         .background(colours.fill, in: coreShape(Radius.chip))
         .fixedSize()
+        .layoutPriority(2)  // titles shrink before badges
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("State: \(label)")
     }

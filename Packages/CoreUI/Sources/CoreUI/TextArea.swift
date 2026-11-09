@@ -48,7 +48,7 @@ public struct CoreTextArea: View {
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
                         // TextEditor has no placeholder; drawn where its first line sits.
-                        Text(placeholder).font(.system(size: size)).foregroundStyle(palette.text2.opacity(0.7))
+                        Text(placeholder).font(.system(size: size)).foregroundStyle(palette.text2)
                             .padding(.horizontal, Space.s2 + 5).padding(.vertical, Space.s2)
                             .allowsHitTesting(false).accessibilityHidden(true)
                     }

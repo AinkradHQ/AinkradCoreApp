@@ -60,29 +60,6 @@ struct GateTag: View {
     }
 }
 
-/// Progress with no end in sight: a rounded bar with a segment that slides. With Reduce Motion the segment rests in the middle.
-struct AdminBar: View {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        TimelineView(.animation(paused: reduce)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
-            let phase = reduce ? 0.5 : t - t.rounded(.down)
-            GeometryReader { geo in
-                let seg = geo.size.width * 0.3
-                ZStack(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(palette.track)
-                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
-                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
-                }
-                .clipShape(coreShape(Space.s1 / 2))
-            }
-        }
-        .frame(height: Space.s1)
-        .accessibilityHidden(true)
-    }
-}
-
 /// A text link in the primary colour with the one focus ring.
 struct AdminLink: View {
     let title: String
@@ -181,7 +158,7 @@ struct SectionSkeleton: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            AdminBar().frame(maxWidth: Space.s8 * 5)
+            CoreBusyBar().frame(maxWidth: Space.s8 * 5)
             Text("Loading…").foregroundStyle(palette.text2)
             ForEach(0..<5, id: \.self) { i in
                 coreShape(Radius.cardMac).fill(palette.glassCard).frame(height: i == 0 ? Space.s8 : Space.s8 + Space.s5)

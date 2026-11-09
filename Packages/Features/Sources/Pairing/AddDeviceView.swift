@@ -128,7 +128,7 @@ struct AddDeviceView: View {
                 if let qr = p.qr { QRImage(text: qr).frame(width: Space.s8 * 5, height: Space.s8 * 5) }
             }
             VStack(alignment: .leading, spacing: Space.s1) {
-                IndBar()
+                CoreBusyBar()
                 Text("Waiting for the new device to claim it").font(.system(size: MacTextSize.body, weight: .semibold))
             }
             .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)

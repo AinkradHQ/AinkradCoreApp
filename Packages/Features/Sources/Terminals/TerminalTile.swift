@@ -39,7 +39,7 @@ struct TerminalTile: View {
                         Text(model.shell.tabNames["terminal-\(item.id)"] ?? runner)
                             .font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                         if model.rang.contains(item.id) {
-                            Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orange)
+                            Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orangeInk)
                         }
                     }
                     Text(

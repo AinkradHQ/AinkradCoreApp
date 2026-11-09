@@ -70,7 +70,7 @@ private struct PoolTab: View {
                             .system(size: MacTextSize.headline, weight: .semibold)
                         ).lineLimit(1)
                         if pool.isDefault {
-                            Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orange)
+                            Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orangeInk)
                         }
                     }
                     Text("\(pool.members.count) account\(pool.members.count == 1 ? "" : "s")")
@@ -119,7 +119,7 @@ private struct PoolDetail: View {
                     HStack(spacing: Space.s2) {
                         if pool.isDefault {
                             Label("Default pool for its provider", systemImage: "star.fill")
-                                .foregroundStyle(GlassInk.orange)
+                                .foregroundStyle(GlassInk.orangeInk)
                         } else {
                             Label("Used by the chains that list it", systemImage: "link").foregroundStyle(
                                 GlassInk.secondary)
@@ -151,7 +151,7 @@ private struct PoolDetail: View {
                             .disabled(ro)
                     }
                     if pool.members.isEmpty {
-                        Text("Add an account to get this pool working.").foregroundStyle(GlassInk.orange)
+                        Text("Add an account to get this pool working.").foregroundStyle(GlassInk.orangeInk)
                     }
                     ForEach(Array(pool.members.enumerated()), id: \.offset) { i, id in
                         MemberRow(model: model, pool: pool, index: i, id: id, first: first?.id == id)

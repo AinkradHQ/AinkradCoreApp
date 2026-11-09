@@ -29,7 +29,7 @@ struct ActivityDetail: View {
             Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
             if let rule {
                 HStack(alignment: .top, spacing: Space.s2) {
-                    Image(systemName: "shield").foregroundStyle(GlassInk.red).accessibilityHidden(true)
+                    Image(systemName: "shield").foregroundStyle(GlassInk.redInk).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(BrainWords.blockedBy(rule.name)).fontWeight(.semibold)
                         if let t = rule.text { Text(t) }
@@ -43,7 +43,7 @@ struct ActivityDetail: View {
                 .help("Rule code: \(rule.code)")
             } else if let why {
                 Label(why, systemImage: "exclamationmark.triangle").font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(GlassInk.red)
+                    .foregroundStyle(GlassInk.redInk)
             }
             Grid(alignment: .topLeading, horizontalSpacing: Space.s3, verticalSpacing: Space.s2) {
                 ForEach(lines) { l in
@@ -93,7 +93,7 @@ struct ActivityRowView: View {
                             Text(why)
                             if let blockedBy { Text(blockedBy).fontWeight(.semibold) }
                         }
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.red).padding(.top, 2)
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.redInk).padding(.top, 2)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -164,7 +164,7 @@ struct PausedBanner: View {
         if model.health == .paused {
             HStack(alignment: .top, spacing: Space.s3) {
                 Image(systemName: "exclamationmark.octagon").font(.system(size: MacTextSize.large))
-                    .foregroundStyle(GlassInk.red).accessibilityHidden(true)
+                    .foregroundStyle(GlassInk.redInk).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text("Paused").font(.system(size: MacTextSize.title, weight: .semibold))
                     Text(BrainWords.pausedWhy).foregroundStyle(GlassInk.secondary)

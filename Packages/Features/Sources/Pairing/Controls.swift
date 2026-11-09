@@ -197,31 +197,6 @@ enum DeviceWords {
     }
 }
 
-/// Progress with no end in sight, as a rounded-rect bar with a segment that slides (the prototype's `.ind`). Never a circle.
-/// With Reduce Motion the segment rests in the middle.
-struct IndBar: View {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        TimelineView(.animation(paused: reduce)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
-            let phase = reduce ? 0.5 : t - t.rounded(.down)
-            GeometryReader { geo in
-                let seg = geo.size.width * 0.3
-                ZStack(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(palette.track)
-                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
-                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
-                }
-                .clipShape(coreShape(Space.s1 / 2))
-            }
-        }
-        .frame(height: Space.s1)
-        .accessibilityHidden(true)
-    }
-}
-
 /// A destructive-leaning secondary button: the fail tone on a quiet fill. Used for "It doesn't match" and revoke.
 struct DangerButtonStyle: ButtonStyle {
     @Environment(\.corePalette) private var palette

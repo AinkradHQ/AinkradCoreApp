@@ -8,6 +8,8 @@ public enum CoreInteraction: Sendable, Hashable { case hover, pressed, focused }
 public struct Palette: Sendable {
     public let isDay: Bool
     private let theme: ThemeColors
+    /// System Increase Contrast is on: edges and secondary ink go stronger (set by `coreTheme()`).
+    public var increased = false
 
     public static let night = Palette(isDay: false, theme: Themes.night)
     public static let day = Palette(isDay: true, theme: Themes.dayMac)
@@ -15,9 +17,15 @@ public struct Palette: Sendable {
     private func pick(_ key: String, fallback: Color) -> Color { theme.roles[key] ?? fallback }
 
     public var text: Color { theme["text"] }
-    public var text2: Color { theme["text2"] }
+    public var text2: Color { increased ? theme["text"] : theme["text2"] }
+    /// A copy of this palette with the system Increase Contrast setting applied.
+    public func contrast(_ level: ColorSchemeContrast) -> Palette {
+        var copy = self
+        copy.increased = level == .increased
+        return copy
+    }
     public var primary: Color { theme["primary"] }
-    public var disabled: Color { theme["disabled"] }
+    public var disabled: Color { isDay ? .white.opacity(0.62) : theme["disabled"] }
     public var btnPrimary: Color { theme["btnPrimary"] }
     public var btnPrimaryHover: Color { theme["btnPrimaryHover"] }
     public var btnPrimaryPress: Color { theme["btnPrimaryPress"] }
@@ -27,7 +35,8 @@ public struct Palette: Sendable {
     public var navActiveEdge: Color { .white.opacity(0.3) }
     public var navActiveInk: Color { .white }
     public var rowHover: Color { .white.opacity(0.1) }
-    public var edge: Color { theme["edge"] }
+    /// Neutral edges are white 0.30 or more (3:1 over the day glass, measured 2026-11-09); Increase Contrast goes to 0.55.
+    public var edge: Color { increased ? .white.opacity(0.55) : isDay ? .white.opacity(0.3) : theme["edge"] }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
     public var warning: Color { theme["warning"] }
@@ -42,7 +51,7 @@ public struct Palette: Sendable {
     /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
     /// soft white well with a light edge, not a dark slab, in both themes.
     public var glassCard: Color { .white.opacity(0.08) }
-    public var glassCardEdge: Color { .white.opacity(0.14) }
+    public var glassCardEdge: Color { .white.opacity(increased ? 0.55 : 0.3) }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
@@ -79,9 +88,10 @@ extension EnvironmentValues {
 
 private struct CoreThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
-            .environment(\.corePalette, scheme == .dark ? .night : .day)
+            .environment(\.corePalette, (scheme == .dark ? Palette.night : Palette.day).contrast(contrast))
             .foregroundStyle((scheme == .dark ? Palette.night : Palette.day).text)
             // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
             .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
@@ -103,13 +113,20 @@ extension View {
     }
 
     /// The disabled look every control shares.
-    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
+    public func coreDimWhenDisabled(_ enabled: Bool) -> some View { modifier(DimWhenDisabled(enabled: enabled)) }
 
     /// Keyboard focus without a ring (Ahmed, 2026-11-05; D6): the hover fill, a brighter 1 pt edge and a 1 pt lift.
     /// Reduce Motion: no lift. One implementation, so every control that calls it answers focus the same way.
     public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
         modifier(CoreFocusLook(show: show, radius: radius))
     }
+}
+
+/// Disabled dims the control, not its helper text. Day dims less (0.6) so the label stays legible over the glass.
+private struct DimWhenDisabled: ViewModifier {
+    let enabled: Bool
+    @Environment(\.corePalette) private var palette
+    func body(content: Content) -> some View { content.opacity(enabled ? 1 : palette.isDay ? 0.6 : 0.45) }
 }
 
 private struct CoreFocusLook: ViewModifier {

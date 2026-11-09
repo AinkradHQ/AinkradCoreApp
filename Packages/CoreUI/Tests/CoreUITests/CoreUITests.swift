@@ -59,3 +59,22 @@ struct HeatTests {
         #expect(heatBuckets([now], now: now, slice: 0, count: 3).isEmpty)
     }
 }
+
+struct SurfaceTests {
+    @Test func unitsJoinWithANoBreakSpace() {
+        #expect(coreUnit("12", "ms") == "12\u{00A0}ms")
+    }
+
+    @Test func textScaleHasAFloorAndDefaultsToOne() {
+        UserDefaults.standard.removeObject(forKey: MacTextSize.scaleKey)
+        #expect(MacTextSize.scale == 1 && MacTextSize.scaled(MacTextSize.meta) == 11)
+        UserDefaults.standard.set(0.8, forKey: MacTextSize.scaleKey)
+        #expect(MacTextSize.scaled(11) == 10)  // 8.8 would fall under the 10 pt floor
+        UserDefaults.standard.removeObject(forKey: MacTextSize.scaleKey)
+    }
+
+    @Test func increaseContrastStrengthensEdgeAndSecondaryInk() {
+        #expect(Palette.day.contrast(.increased).increased && !Palette.day.increased)
+        #expect(Palette.night.contrast(.standard).increased == false)
+    }
+}
