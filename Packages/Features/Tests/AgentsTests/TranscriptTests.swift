@@ -98,6 +98,16 @@ struct TranscriptStoreTests {
         #expect(t.approvals["r"]?.status(now: now, sessionOver: false) == .denied)
     }
 
+    @Test func anApprovalTheCoreRecordsTwiceShowsOneRow() {
+        let t = TranscriptStore(sessionID: "as_1")
+        t.append([
+            entry(1, .approvalRequest(id: "r", tool: "Bash", input: "ls", timeoutSecs: nil)),
+            entry(2, .approvalDecided(id: "r", approved: true)), entry(3, .approvalDecided(id: "r", approved: true)),
+            entry(4, .approvalDecided(id: "other", approved: false)),
+        ])
+        #expect(t.entries.map(\.seq) == [1, 2, 4])
+    }
+
     @Test func aDecisionSeenBeforeItsRequestStillApplies() {
         let t = TranscriptStore(sessionID: "as_1")
         t.start(after: 10)
