@@ -29,7 +29,7 @@ struct ConnectDialog: View {
     var body: some View {
         let site = ProviderSites.page(provider)
         let hue = GlassInk.blue
-        CoreDialogPanel(replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
+        CoreDialogPanel((replacing ?? flow.target).map { "New key for \($0.label)" } ?? "Connect an account") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 if replacing == nil && model.signIn == nil && flow.stage == .form && flow.target == nil {
                     HStack(spacing: Space.s2) {
@@ -92,7 +92,13 @@ struct ConnectDialog: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             if flow.needsGate { gateCard }
             if !rotating {
-                CoreTextField("Name", placeholder: "Work", text: $flow.label, error: nil)
+                CoreTextField("Name", placeholder: "work", text: $flow.label, error: nil)
+                Text(
+                    flow.slugged != flow.label && flow.labelOK
+                        ? "Will be saved as \(flow.slugged). Lowercase letters, digits, dot, dash, underscore."
+                        : "Lowercase letters, digits, dot, dash, underscore."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(flow.labelOK ? GlassInk.secondary : GlassInk.red)
             }
             HStack(alignment: .bottom, spacing: Space.s2) {
                 CoreSecureField("Key", placeholder: "Paste your key", text: $flow.key, autofocus: true)

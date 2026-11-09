@@ -48,7 +48,7 @@ struct ModelTests {
         #expect(m.testing == nil && m.testNote[1] == nil)
         svc.failure = CoreError.http(status: 409, code: "no_runner", message: "none")
         await m.test(m.account(1)!)
-        #expect(m.testNote[1]?.hasPrefix("No runner is online") == true)
+        #expect(m.testNote[1]?.hasPrefix("No runner can check this key yet") == true)
     }
 
     @Test func sessionLimitsGoBehindTouchIDAndClearWithNil() async {

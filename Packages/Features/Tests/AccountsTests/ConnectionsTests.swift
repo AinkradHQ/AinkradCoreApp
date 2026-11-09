@@ -307,3 +307,14 @@ struct TurnOnConnectionsTests {
         #expect(!ConnSay.isGate(CoreError.http(status: 409, code: "other", message: "")))
     }
 }
+
+struct ConnectionsRefusalWordsTests {
+    @Test(arguments: [
+        ("no_runner", 409, "No runner can check this key yet. Pick a runner that is online and has the gateway on."),
+        ("credential_rejected", 400, "The provider said no to that token. Check it and try again."),
+        ("not_configured", 409, "This service isn't set up yet. Use App registration on this page to set it up."),
+    ])
+    func plain(code: String, status: Int, words: String) {
+        #expect(ConnSay.plain(CoreError.http(status: status, code: code, message: "raw")) == words)
+    }
+}
