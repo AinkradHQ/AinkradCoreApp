@@ -75,6 +75,11 @@ extension AccountsModel {
         signIn = nil
     }
 
+    /// Any way out of an Accounts dialog (Esc, the scrim, a button) stops a sign-in that is still going.
+    func dialogClosed() {
+        if signIn != nil { Task { await cancelSignIn() } }
+    }
+
     var signInEnded: Bool {
         switch signIn?.stage {
         case .done?, .failed?, nil: true
