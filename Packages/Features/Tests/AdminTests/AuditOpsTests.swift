@@ -40,6 +40,23 @@ struct AuditTests {
         #expect(a.density() == nil && a.knownKinds.isEmpty)
     }
 
+    @Test("a link from Connections shows only that connection's rows, in one search")
+    func connectionHistory() async {
+        let s = FakeService()
+        s.auditRows = (1...10).map { audit(Int64($0), action: $0 % 2 == 0 ? "connection.used" : "setting.set") }
+        let (admin, service, _) = await makeAdmin(s)
+        let a = admin.audit!
+        let before = service.auditQueries.count
+        a.open(kind: "connection.", target: "connection:3")
+        await a.reload()
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(a.filter.kind == "connection." && a.filter.target == "connection:3")
+        #expect(a.items.allSatisfy { $0.action.hasPrefix("connection.") })
+        #expect(service.auditQueries.count == before + 1, "the link searches once")
+        #expect(AuditWords.areas.contains { $0.id == "connection." && $0.title == "Connections" })
+        #expect(AuditWords.area("connection.used").title == "Connections")
+    }
+
     @Test("a filter reads from the top again after a moment, and only kind, target and actor can be set")
     func filtering() async {
         let (admin, service) = await world(30)

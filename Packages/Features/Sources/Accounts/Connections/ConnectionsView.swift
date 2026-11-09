@@ -7,7 +7,6 @@ struct ConnectionsView: View {
     @FocusState private var paneFocus: Bool
 
     private func arrow(_ step: Int) -> KeyPress.Result {
-        guard model.page == .list else { return .ignored }
         withAnimation(.smooth(duration: 0.2)) { model.move(step) }
         return .handled
     }
@@ -15,14 +14,7 @@ struct ConnectionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
-                AppFilterTile(title: "Connections", count: model.items.count, on: model.page == .list, key: "⌘1") {
-                    withAnimation(.smooth(duration: 0.3)) { model.page = .list }
-                }
-                .keyboardShortcut("1", modifiers: .command)
-                AppFilterTile(title: "Activity", count: -1, on: model.page == .activity, key: "⌘2") {
-                    withAnimation(.smooth(duration: 0.3)) { model.page = .activity }
-                }
-                .keyboardShortcut("2", modifiers: .command)
+                AppFilterTile(title: "Connections", count: model.items.count, on: true, key: "") {}
             } actions: {
                 AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                     ConnDialogs.openConnect(model, kind: nil)
@@ -52,6 +44,7 @@ struct ConnectionsView: View {
             .focused($paneFocus)
             .focusEffectDisabled()
             .onAppear { paneFocus = true }
+            .retakeFocus(after: model.host.shell) { paneFocus = true }
             .onKeyPress(.downArrow) { arrow(1) }
             .onKeyPress(.rightArrow) { arrow(1) }
             .onKeyPress(.upArrow) { arrow(-1) }
@@ -64,7 +57,7 @@ struct ConnectionsView: View {
                 return .handled
             }
             .onKeyPress(characters: .letters) { model.key($0.characters.lowercased()) ? .handled : .ignored }
-            if model.page == .list && !model.items.isEmpty {
+            if !model.items.isEmpty {
                 HStack(spacing: Space.s2) {
                     AppStatChip("checkmark.seal.fill", "\(model.connected) connected", GlassInk.green)
                     if model.needLook > 0 {
@@ -73,7 +66,7 @@ struct ConnectionsView: View {
                     Spacer(minLength: 0)
                     Text(
                         model.cursor == nil
-                            ? "↑↓ move · ⌘N connect · ⌘2 activity"
+                            ? "↑↓ move · ⌘N connect"
                             : "↩ who can use it · T test · R rename · D default · ⌫ disconnect"
                     ).font(.system(size: MacTextSize.meta))
                         .foregroundStyle(GlassInk.secondary)
@@ -96,10 +89,7 @@ struct ConnectionsView: View {
             switch model.load {
             case .loading: AccSkeleton()
             case .ready:
-                Group {
-                    if model.page == .activity { ConnActivityPage(model: model) } else { ConnListPage(model: model) }
-                }
-                .transition(.opacity)
+                ConnListPage(model: model).transition(.opacity)
             default:
                 AccStateCard(
                     symbol: "exclamationmark.triangle", title: "Couldn't load connections",
@@ -302,6 +292,10 @@ struct ConnCard: View {
                 }
                 AccLink(title: model.testing == item.id ? "Testing…" : "Test", symbol: "play") {
                     Task { await model.test(item) }
+                }
+                if !model.host.shell.settings.hidden.contains("audit") {
+                    AccLink(title: "History", symbol: "clock.arrow.circlepath") { model.openHistory(item) }
+                        .help("Opens Settings, Audit, showing only what happened to this connection")
                 }
                 Spacer(minLength: 0)
                 AccLink(title: "Disconnect", symbol: "trash", danger: true) { ConnDialogs.openDisconnect(model, item) }

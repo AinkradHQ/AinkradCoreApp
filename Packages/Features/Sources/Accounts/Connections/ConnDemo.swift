@@ -10,7 +10,7 @@ extension AccountsDemo {
     public static let connScenes = [
         "conn-list", "conn-empty", "conn-pick", "conn-github-code", "conn-github-repos", "conn-jira-sites",
         "conn-failed", "conn-done", "conn-token", "conn-access", "conn-access-write", "conn-rename",
-        "conn-disconnect", "conn-activity", "conn-off", "conn-app-notset", "conn-app-set", "conn-app-saving",
+        "conn-disconnect", "conn-off", "conn-app-notset", "conn-app-set", "conn-app-saving",
         "conn-app-error", "conn-app-readonly", "conn-default-menu", "conn-default-cleared", "conn-replace",
         "conn-replace-working", "conn-replace-error", "conn-replace-done",
     ]
@@ -25,12 +25,11 @@ extension AccountsDemo {
         m.busy = nil
         m.writeError = [:]
         m.filter = .all
-        m.page = scene == "conn-activity" ? .activity : .list
         m.opener = { _ in }
         m.pollEvery = .seconds(3600)  // the scenes set each step themselves
         let svc = SampleConnections(empty: scene == "conn-empty")
         if scene == "conn-off" { m.detach() } else { m.use(svc, sample: true) }
-        m.show(m.page)
+        m.show()
         try? await Task.sleep(for: .milliseconds(500))
         func open(_ kind: String?, then step: ConnFlow.Step? = nil) async {
             ConnDialogs.openConnect(m, kind: kind)

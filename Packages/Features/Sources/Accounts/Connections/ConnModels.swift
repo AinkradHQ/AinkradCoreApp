@@ -121,8 +121,6 @@ enum ConnAppLoad: Equatable, Sendable {
     case failed(String)
 }
 
-enum ConnPage: String { case list, activity }
-
 enum ConnFilter: String, CaseIterable {
     case all = "All"
     case needsLook = "Needs a look"

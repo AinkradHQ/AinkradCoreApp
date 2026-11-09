@@ -35,8 +35,24 @@ struct AuditSection: View {
             }
             .foregroundStyle(GlassInk.primary)
         }
-        .task { await model.reload() }
+        .task {
+            takeHandoff(model)
+            await model.reload()
+        }
+        .onChange(of: admin.host.shell.settings.handoff) { takeHandoff(model) }
         .accessibilityIdentifier("audit")
+    }
+}
+
+extension AuditSection {
+    /// A link that brought us here with a filter (a connection's History) sets it once.
+    fileprivate func takeHandoff(_ model: AuditModel) {
+        let s = admin.host.shell.settings
+        guard let kind = s.handoff["audit.kind"] else { return }
+        let target = s.handoff["audit.target"] ?? ""
+        s.handoff = [:]
+        model.open(kind: kind, target: target)
+        if model.state != .loading { Task { await model.reload() } }
     }
 }
 
@@ -56,6 +72,7 @@ enum AuditWords {
         Area(id: "setting.", title: "Settings", symbol: "slider.horizontal.3", hue: GlassInk.blue),
         Area(id: "secret.", title: "Secrets", symbol: "key.fill", hue: GlassInk.orange),
         Area(id: "account.", title: "Accounts", symbol: "person.crop.circle.fill", hue: GlassInk.green),
+        Area(id: "connection.", title: "Connections", symbol: "link", hue: GlassInk.blue),
         Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.green),
         Area(id: "agent.", title: "Agents", symbol: "sparkles", hue: GlassInk.violet),
     ]
@@ -77,7 +94,10 @@ enum AuditWords {
         "auth_inconclusive": "couldn't confirm a refused key on", "session_limits_set": "changed the session limits of",
         "limit_set": "set a provider limit on", "limit_cleared": "cleared a provider limit on",
         "login_started": "started a sign-in for", "login_failed": "had a failed sign-in for",
-        "login_cancelled": "stopped a sign-in for",
+        "login_cancelled": "stopped a sign-in for", "updated": "changed", "disabled": "turned off",
+        "enabled": "turned on", "used": "used", "use": "used", "granted": "let an agent use",
+        "rotated": "gave a new token to", "default_set": "made the default",
+        "default_cleared": "cleared the default of",
     ]
 
     /// `You created secret github-token-test`, `The Core cleared the lock on 198.51.100.7`.
@@ -180,7 +200,7 @@ private struct AuditList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             ScrollViewReader { proxy in
-                VStack(spacing: 2) {
+                LazyVStack(spacing: 2) {
                     ForEach(Array(model.items.enumerated()), id: \.element.id) { i, a in
                         if i == 0 || !Calendar.current.isDate(a.at, inSameDayAs: model.items[i - 1].at) {
                             Text(day(a.at)).font(.system(size: MacTextSize.meta, weight: .semibold))

@@ -18,11 +18,8 @@ public final class ConnectionsModel {
 
     private(set) var kinds: [ConnKind] = []
     private(set) var items: [ConnItem] = []
-    private(set) var activity: [ConnActivity] = []
     var load: AccountsLoad = .loading
-    var page: ConnPage = .list
     var filter: ConnFilter = .all
-    var activityFilter: Int64?
     /// The sign-in running in the Connect sheet.
     var flow: ConnFlow?
     /// The connection being signed in to again (its "Sign in again" button), instead of a new one.
@@ -62,7 +59,6 @@ public final class ConnectionsModel {
         stopFlow()
         service = nil
         items = []
-        activity = []
         load = .loading
     }
 
@@ -140,8 +136,7 @@ public final class ConnectionsModel {
         do {
             async let k = service.kinds()
             async let i = service.connections()
-            async let a = service.activity(connection: nil)
-            (kinds, items, activity) = try await (k, i, a)
+            (kinds, items) = try await (k, i)
             // The defaults list is the truth for the "Default" badge; a member can't read it and keeps what the list said.
             if let d = try? await service.defaults() {
                 items = items.map {
@@ -403,8 +398,14 @@ public final class ConnectionsModel {
 
     // MARK: pane and launcher
 
-    func show(_ page: ConnPage = .list) {
-        self.page = page
+    /// "History" on a card: Settings, Audit, showing only this connection's rows.
+    func openHistory(_ item: ConnItem) {
+        host.shell.settings.open(
+            "audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:\(item.id)"])
+        host.shell.open(.settings)
+    }
+
+    func show() {
         var spec = PaneSpec(
             id: "connections", title: "Connections", sub: "Home Core", symbol: "link",
             chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
