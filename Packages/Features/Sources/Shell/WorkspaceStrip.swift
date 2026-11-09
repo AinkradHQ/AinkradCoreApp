@@ -64,7 +64,7 @@ struct StripBar: View {
         GeometryReader { g in
             let w = max(48, g.size.width * visible / max(total, 1))
             let x = (g.size.width - w) * offset / max(total - visible, 1)
-            Capsule().fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
+            coreShape(2).fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
         }
         .frame(height: 4)
         .padding(.horizontal, Space.s4).padding(.bottom, 2)

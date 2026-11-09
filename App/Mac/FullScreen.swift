@@ -30,9 +30,10 @@ private final class EnforcerView: NSView {
                 MainActor.assumeIsolated { Self.enter(window) }
             })
         tokens.append(
-            center.addObserver(forName: NSApplication.didUpdateNotification, object: nil, queue: .main) { _ in
-                MainActor.assumeIsolated { Self.scrubMenus() }
+            center.addObserver(forName: NSMenu.didAddItemNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { Self.scrubSoon() }
             })
+        Self.scrubSoon()
         // Mission Control's Spaces bar can drag this Space onto another (Split View tiles both, so the window shrinks to half
         // the screen) or onto a Desktop (it leaves full screen). No notification names the tiling, so every resize and every
         // screen change re-checks that the window still fills its screen, and puts things right if not.
@@ -113,6 +114,20 @@ private final class EnforcerView: NSView {
         NSApp.presentationOptions = [.fullScreen, .hideDock, .hideMenuBar]
         for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             window.standardWindowButton(b)?.isHidden = true
+        }
+    }
+
+    @MainActor private static var scrubQueued = false
+
+    /// One scrub per burst of added menu items, not one per item and never one per app update.
+    @MainActor private static func scrubSoon() {
+        guard !scrubQueued else { return }
+        scrubQueued = true
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                scrubQueued = false
+                scrubMenus()
+            }
         }
     }
 

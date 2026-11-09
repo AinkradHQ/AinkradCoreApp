@@ -76,7 +76,7 @@ struct AccountNoticeTests {
     @Test func aTerminalAboutToCloseIsAToastNotABellEntry() {
         let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
         m.accountNotice("terminal.reap_warning", ["terminal": "t_1"])
-        #expect(m.shell.toast?.message == "A terminal is about to close.")
+        #expect(m.shell.toast?.message == "A terminal will close soon: nobody has used it for a while.")
         #expect(m.shell.bell.items.isEmpty)
     }
 }

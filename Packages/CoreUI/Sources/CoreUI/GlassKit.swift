@@ -334,3 +334,18 @@ private struct EnterBounce: ViewModifier {
             .onChange(of: hovering) { _, now in if now && !reduce { count += 1 } }
     }
 }
+
+extension View {
+    /// A symbol bounce when `value` changes; none under Reduce Motion (the symbol's new state is the signal).
+    public func coreBounce<V: Equatable>(_ value: V) -> some View { modifier(ValueBounce(value: value)) }
+}
+
+private struct ValueBounce<V: Equatable>: ViewModifier {
+    let value: V
+    @State private var count = 0
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    func body(content: Content) -> some View {
+        content.symbolEffect(.bounce, value: count)
+            .onChange(of: value) { if !reduce { count += 1 } }
+    }
+}

@@ -88,6 +88,10 @@ public struct CoreDropdown<Label: View>: View {
             }
         }
         .onDisappear { stop() }
+        .coreEscape(active: open) {
+            open = false
+            return true
+        }
     }
 
     private var panel: some View {
@@ -178,7 +182,6 @@ public struct CoreDropdown<Label: View>: View {
             case 126: move(-1)  // ↑
             case 36, 76:  // Return, Enter
                 if items.indices.contains(selected), items[selected].enabled { choose(items[selected]) }
-            case 53: open = false  // Esc
             default: return e
             }
             return nil

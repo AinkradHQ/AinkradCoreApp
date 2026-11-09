@@ -80,3 +80,43 @@ struct ThemeTests {
         #expect(ThemeChoice.day.appearance?.name == .aqua && ThemeChoice.night.appearance?.name == .darkAqua)
     }
 }
+
+@MainActor
+struct LaneL4Tests {
+    private func model() -> ShellModel {
+        ShellModel(defaults: UserDefaults(suiteName: "l4-\(UUID().uuidString)")!)
+    }
+
+    @Test func escClosesTheNewestLayerFirstAndLeavesPanesAlone() {
+        let m = model()
+        #expect(!m.closeTopmost())  // nothing open: the pane's own back handler gets Esc
+        m.launcherOpen = true
+        m.presentSheet(title: "t", message: "m", actions: [])
+        #expect(m.closeTopmost() && m.sheet == nil && m.launcherOpen)
+        #expect(m.closeTopmost() && !m.launcherOpen)
+        #expect(!m.closeTopmost())
+    }
+
+    @Test func aDialogThatCannotBeDismissedIgnoresEsc() {
+        let m = model()
+        m.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { EmptyView() })
+        #expect(m.closeTopmost() && m.topDialog != nil)  // consumed, not closed
+    }
+
+    @Test func waitingCountsApprovalsFromTheSourceOnly() {
+        let m = model()
+        m.bell.add(BellItem(id: "a", kind: .approval, title: "a"))
+        m.bell.add(BellItem(id: "b", kind: .alarm, title: "b"))
+        #expect(m.waitingOnYou == 1 && m.alertsOnYou == 1)  // the alarm is its own count
+        m.waitingSource = { 3 }
+        #expect(m.waitingOnYou == 3 && m.alertsOnYou == 1)
+    }
+
+    @Test func aTabUsesTheAppsNameNotTheSubText() {
+        let m = model()
+        var spec = PaneSpec(id: "p", title: "Accounts", sub: "Home Core", symbol: "x") { EmptyView() }
+        #expect(m.tabName(spec) == "Home Core")
+        spec.tab = "Accounts"
+        #expect(m.tabName(spec) == "Accounts")
+    }
+}

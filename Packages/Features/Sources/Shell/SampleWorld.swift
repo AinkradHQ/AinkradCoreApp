@@ -25,7 +25,7 @@ extension HomeSnapshot {
         ],
         events: [
             Event(
-                id: "e1", text: "claude-code wants to push feat/e2-14", source: "mac-studio", minutesAgo: 1,
+                id: "e1", text: "Claude wants to push feat/e2-14", source: "mac-studio", minutesAgo: 1,
                 symbol: "lock.shield"),
             Event(
                 id: "e2", text: "cargo test passed · 412 tests", source: "mac-studio", minutesAgo: 3,
@@ -57,10 +57,10 @@ public enum SampleWorld {
     static func approvals(_ shell: ShellModel) {
         let rows = [
             (
-                "claude-code wants to push feat/e2-14-citadel-bootstrap",
+                "Claude wants to push feat/e2-14-citadel-bootstrap",
                 "mac-studio · needs Touch ID · expires in 5 min", "now"
             ),
-            ("claude-code wants to read GH_TOKEN", "oracle-arm · needs Touch ID · expires in 5 min", "2 min"),
+            ("Claude wants to read GH_TOKEN", "oracle-arm · needs Touch ID · expires in 5 min", "2 min"),
             ("codex wants to run cargo add prometheus-client", "linux-01 · needs Touch ID · expires in 5 min", "4 min"),
         ]
         for (i, r) in rows.enumerated() { shell.bell.add(approval(shell, id: "agents.appr-\(i)", r.0, r.1, r.2)) }
@@ -98,8 +98,8 @@ public enum SampleWorld {
             }
         }
         return [
-            pane("core", "Core", "Accounts, pools, budgets and costs", "creditcard"),
-            pane("terminals", "Terminals", "Rune terminals on your runners", "terminal"),
+            pane("core", "Accounts", "Accounts, pools, budgets and costs", "creditcard"),
+            pane("terminals", "Terminals", "Your terminals", "terminal"),
             pane("runners", "Runners", "machines and their slots", "server.rack"),
             action(
                 "new-terminal", "New terminal", "Open a shell on a runner · needs Touch ID", "terminal",
@@ -109,6 +109,13 @@ public enum SampleWorld {
     }
 
     public static func samplePane(_ id: String, _ shell: ShellModel) -> PaneSpec {
+        var spec = samplePaneBody(id, shell)
+        // The tab carries the app's name, as the real panes do.
+        spec.tab = ["agents": "Agents", "terminals": "Terminals", "runners": "Runners", "core": "Accounts"][id]
+        return spec
+    }
+
+    private static func samplePaneBody(_ id: String, _ shell: ShellModel) -> PaneSpec {
         switch id {
         case "agents":
             PaneSpec(
@@ -153,7 +160,7 @@ public enum SampleWorld {
                     ])
             }
         default:
-            PaneSpec(id: id, title: "Core", sub: "Home Core", symbol: "creditcard", minWidth: 560) {
+            PaneSpec(id: id, title: "Accounts", sub: "Home Core", symbol: "creditcard", minWidth: 560) {
                 SampleList(
                     rows: [
                         ("Accounts", "3 providers, all ready", SessionState.running),
@@ -190,7 +197,7 @@ public struct DemoCommands: Commands {
                 shell.bell.add(
                     SampleWorld.approval(
                         shell, id: "appr-\(shell.bell.count)-\(Int.random(in: 0..<999))",
-                        "claude-code wants to push feat/demo", "mac-studio · needs Touch ID", "now"))
+                        "Claude wants to push feat/demo", "mac-studio · needs Touch ID", "now"))
             }
             Button("Clear Bell") { shell.bell.removeAll() }
             Button("Reset Bell") {

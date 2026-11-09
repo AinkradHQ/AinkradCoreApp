@@ -44,7 +44,7 @@ final class AboutModel {
             state = .ready(a)
             return a
         } catch {
-            state = .failed(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription)
+            state = .failed(CoreError.unwrapping(error)?.localizedDescription ?? "The Core did not answer.")
             return nil
         }
     }

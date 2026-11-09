@@ -123,10 +123,9 @@ struct BellGlance: View {
             CoreSegmented(
                 "Notification filter",
                 segments: [
-                    CoreSegment(BellTab.all, "All \(all.count)"),
-                    CoreSegment(.approvals, "Approvals \(all.filter { $0.kind == .approval }.count)"),
-                    CoreSegment(.alerts, "Alerts \(all.filter { $0.kind != .approval }.count)"),
-                    CoreSegment(.runners, "Runners \(shell.home.machines.filter(\.online).count)"),
+                    // One word each, no counts: every group below carries its own count, and a count squeezed "Approvals" to "Approv…".
+                    CoreSegment(BellTab.all, "All"), CoreSegment(.approvals, "Approvals"),
+                    CoreSegment(.alerts, "Alerts"), CoreSegment(.runners, "Runners"),
                 ], selection: $tab, fill: true)
             // As tall as what it holds; past the cap the list scrolls.
             ViewThatFits(in: .vertical) {
@@ -155,12 +154,14 @@ struct BellGlance: View {
     }
 
     private var summary: some View {
-        let w = shell.bell.waiting
+        let w = shell.waitingOnYou
+        let alerts = shell.alertsOnYou
         let running = shell.home.runningAgents
         return
             (w == 0
             ? Text("Nothing waiting on you")
             : Text("\(w) waiting on you").fontWeight(.semibold).foregroundStyle(palette.text))
+            + Text(alerts > 0 ? " · \(alerts) \(alerts == 1 ? "alert" : "alerts")" : "")
             + Text(" · \(running) \(running == 1 ? "agent" : "agents") running")
     }
 
@@ -209,7 +210,7 @@ struct BellGlance: View {
             Image(systemName: tab == .approvals ? "checkmark.seal" : "bell")
                 .font(.system(size: MacTextSize.large * 1.6, weight: .medium))
                 .foregroundStyle(palette.primary)
-                .symbolEffect(.bounce, value: arrived)
+                .coreBounce(arrived)
                 .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
                 .coreGlass(radius: Radius.control, interactive: false)
             Text(tab == .approvals ? "Nothing needs your approval" : "You're all caught up")

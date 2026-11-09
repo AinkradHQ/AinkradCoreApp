@@ -16,14 +16,24 @@ struct AccountNotice: Equatable {
         "alarm.cleared", "terminal.reap_warning",
     ]
 
-    /// The bell entry an `alarm.cleared` event takes away (the one `alarm.raised` made), if this build worded it.
+    /// The bell entry an `alarm.cleared` event takes away (the one `alarm.raised` made), if this build worded it. Core's
+    /// `alarm.cleared` is `{alarm, value, threshold}` for backup_age, cert_expiry and disk_free (health.rs); it never clears
+    /// `failover_storm`, which is raised once per window and has no cleared event. So today this removes nothing a Core
+    /// sends; it is kept for the day Core clears the storm.
     static func clearedID(kind: String, fields f: [String: String]) -> String? {
         kind == "alarm.cleared" && f["alarm"] == "failover_storm" ? "account-storm" : nil
     }
 
-    /// A short toast for events that are not an account's, not kept in the bell.
-    static func toast(kind: String) -> String? {
-        kind == "terminal.reap_warning" ? "A terminal is about to close." : nil
+    /// A short toast for events that are not an account's, not kept in the bell. `reap_warning` is `{terminal, reason, grace_secs,
+    /// reap_at}`; it names the terminal when the app knows it. There is no "Keep it" button: the client has no operation that
+    /// keeps a terminal alive (using it does).
+    static func toast(kind: String, fields f: [String: String] = [:], terminal: (String) -> String? = { _ in nil })
+        -> String?
+    {
+        guard kind == "terminal.reap_warning" else { return nil }
+        let name = f["terminal"].flatMap(terminal) ?? "A terminal"
+        let why = f["reason"] == "orphan" ? "no window is attached to it" : "nobody has used it for a while"
+        return "\(name) will close soon: \(why)."
     }
 
     /// `fields` is the event payload with every value as text. `account` names an account id ("Claude account Work"),

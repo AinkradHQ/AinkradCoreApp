@@ -142,14 +142,21 @@ struct AddDeviceView: View {
 
     /// Time left as words and a bar that shrinks; amber in the last minute.
     private func expiry(_ p: NewPairing) -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+        // The words count down on their own (`timerInterval` stops at 0:00); the clock only moves the bar and the amber state.
+        TimelineView(.periodic(from: .now, by: 5)) { ctx in
             let left = max(0, Int((p.expiresAt ?? ctx.date).timeIntervalSince(ctx.date).rounded(.up)))
             let soon = left <= 60
             VStack(alignment: .leading, spacing: Space.s1) {
                 HStack(spacing: Space.s2) {
                     Image(systemName: soon ? "exclamationmark.triangle" : "clock").accessibilityHidden(true)
-                    Text(left > 0 ? "Expires in \(Countdown.text(left))" : "Expired")
-                        .font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
+                    Group {
+                        if left > 0, let end = p.expiresAt {
+                            Text("Expires in ") + Text(timerInterval: Date.now...max(end, .now), countsDown: true)
+                        } else {
+                            Text("Expired")
+                        }
+                    }
+                    .font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
                 }
                 .foregroundStyle(soon ? palette.tone(.warn).ink : palette.text2)
                 CoreMeter(Double(left) / 300, low: soon, label: "Code time left")

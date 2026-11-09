@@ -43,10 +43,6 @@ struct LauncherView: View {
                 .font(.system(size: MacTextSize.large))
                 .focused($focused)
                 .onSubmit { run(rows) }
-                .onKeyPress(.escape) {
-                    shell.closeTopmost()
-                    return .handled
-                }
                 .onKeyPress(phases: [.down, .repeat]) { press in key(press, rows.count) }
                 .onAppear { catchArrows() }
                 .onDisappear {
@@ -63,7 +59,7 @@ struct LauncherView: View {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
                             if i == 0 || rows[i - 1].group != row.group { groupTitle(row.group) }
                             LauncherItem(
-                                row: row, index: i, number: i < 9 ? i + 1 : nil, selected: i == selection, glide: glide,
+                                row: row, number: i < 9 ? i + 1 : nil, selected: i == selection, glide: glide,
                                 hover: {
                                     if Date().timeIntervalSince(keyAt) > 0.3 { point(i) }
                                 }
@@ -92,19 +88,17 @@ struct LauncherView: View {
         // The one frame: a glass rim around the Look's background (Settings, Appearance).
         .coreFrame(radius: Radius.panel + Space.s1, part: .launcher)
         .background { numberShortcuts(rows) }
-        .task {
-            // The root holds focus while the window is calm; take it once the overlay is in place.
-            try? await Task.sleep(for: .milliseconds(80))
-            focused = true
-        }
+        // The root holds focus while the window is calm; the field takes it as it appears, so the first typed key lands.
+        .defaultFocus($focused, true)
         .onAppear {
+            focused = true
             query = shell.launcherQuery
             shell.launcherQuery = ""
         }
         .onChange(of: query) { selection = 0 }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Launcher")
-        .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.97)))
+        .transition(.opacity)
     }
 
     private func groupTitle(_ group: LauncherEntry.Group) -> some View {
@@ -233,7 +227,6 @@ struct LauncherView: View {
 
 private struct LauncherItem: View {
     let row: LauncherRow
-    let index: Int
     let number: Int?
     let selected: Bool
     let glide: Namespace.ID
@@ -241,10 +234,7 @@ private struct LauncherItem: View {
     let action: () -> Void
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var arrived = false
     @State private var lastPoint: CGPoint?
-    /// Counts only the moments this row becomes selected, so the icon bounces on select and not on deselect.
-    @State private var picked = 0
 
     var body: some View {
         Button(action: action) {
@@ -258,7 +248,6 @@ private struct LauncherItem: View {
                         in: coreShape(Radius.control)
                     )
                     .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .symbolEffect(.bounce, value: picked)
                     .accessibilityHidden(true)
                 title
                 Spacer(minLength: Space.s2)
@@ -281,13 +270,6 @@ private struct LauncherItem: View {
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)
-        .onChange(of: selected) { _, now in if now { picked += 1 } }
-        // Rows arrive one after another when the launcher opens (22 ms apart, the first nine).
-        .opacity(arrived || reduce ? 1 : 0)
-        .offset(y: arrived || reduce ? 0 : 6)
-        .onAppear {
-            withAnimation(Motion.out(0.3).delay(Double(min(index, 8)) * 0.022)) { arrived = true }
-        }
         // Only a moving pointer selects: the first event on arrival (the launcher opening under a still pointer) does not.
         // Only a pointer that really moves selects. Rows scrolling under a still pointer change the row-local point, so
         // the screen position is what is compared (that loop made scrolling jitter).

@@ -484,16 +484,26 @@ public final class AccountsModel {
         host.shell.open(.settings)
     }
 
+    /// "Raise budget…" from an ended session: the Raise dialog for that account's spent budget when it is known, else the
+    /// Budgets page.
+    public func raiseBudget(forAccount account: Int64?) {
+        let spent = budgets.filter(\.exhausted)
+        let mine = account.flatMap { id in spent.first { $0.kind == "account" && $0.subject == String(id) } }
+        show(.budgets)
+        if let b = mine ?? (spent.count == 1 ? spent.first : nil) { AccountDialogs.openRaise(self, b) }
+    }
+
     func show(_ page: AccountsPage, account id: Int64? = nil, pool: Int64? = nil) {
         self.page = page
         detail = page == .accounts ? id : nil
         if let pool { poolSelection = pool }
         let shell = host.shell
-        shell.openPane(
-            PaneSpec(
-                id: "accounts", title: "Core", sub: "Accounts", symbol: "creditcard",
-                chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
-            ) { AccountsView(model: self) })
+        var spec = PaneSpec(
+            id: "accounts", title: "Accounts", sub: "Home Core", symbol: "creditcard",
+            chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
+        ) { AccountsView(model: self) }
+        spec.tab = "Accounts"
+        shell.openPane(spec)
         Task { await reload() }
     }
 
@@ -513,7 +523,7 @@ public final class AccountsModel {
                 })
         }
         entry(
-            "core", "Core", "Accounts, pools and chains", "creditcard",
+            "core", "Accounts overview", "Accounts, pools and chains", "creditcard",
             ["provider", "claude", "codex", "gemini", "budget"]
         ) {
             $0.show(.overview)
