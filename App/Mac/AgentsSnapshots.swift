@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import Agents
+import Accounts
 import Pairing
 import Shell
 import SwiftUI
@@ -129,6 +130,18 @@ enum AgentsSnapshots {
         // New session.
         a.openNewSession()
         await shot("new-session")
+        // New session from a chain, an agent, and a busy runner (admin only: a device with no chains sees none of this).
+        a.debugChains([
+            ChainOption(id: 1, name: "daily", isDefault: true, steps: ["claude · sonnet", "codex · default model"]),
+            ChainOption(id: 2, name: "careful", isDefault: false, steps: ["claude · opus"]),
+        ])
+        for source in ["chain", "agent", "busy"] {
+            a.debugSource = source
+            only { a.openNewSession() }
+            await shot("new-session-\(source)")
+        }
+        a.debugSource = nil
+        a.debugChains([])
         shell.closeDialog()
         shell.toggleLauncher()
         await shot("launcher")
@@ -142,6 +155,25 @@ enum AgentsSnapshots {
             await shot("settings-notifications-\(name)")
             shell.overlay = nil
         }
+        // An admin device: the account tiles, and the bell telling account news in plain words.
+        a.isAdmin = true
+        a.debugPermission("allowed")
+        shell.settings.selected = "notifications"
+        shell.open(.settings)
+        await shot("settings-notifications-admin")
+        shell.overlay = nil
+        let accounts = app.debugAccountsDemo()
+        await accounts.show(AccountsDemo.scenes[0])
+        let later = ISO8601DateFormatter().string(from: Date().addingTimeInterval(1_800))
+        app.accountNotice("account.limited", ["account": "1", "class": "rate_limited", "until": later])
+        app.accountNotice(
+            "account.failover", ["run": "r1", "from_account": "1", "to_account": "2", "to_session": "as_2", "hop": "1"])
+        app.accountNotice("account.health", ["account": "2", "reason": "upstream_errors"])
+        app.accountNotice("account.expired", ["account": "2", "reason": "auth"])
+        app.accountNotice("alarm.raised", ["alarm": "failover_storm", "user": "1"])
+        shell.bellOpen = true
+        await shot("bell-accounts")
+        shell.bellOpen = false
         NSApp.terminate(nil)
     }
 

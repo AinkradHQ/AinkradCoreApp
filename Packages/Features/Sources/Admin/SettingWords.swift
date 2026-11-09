@@ -30,6 +30,9 @@ enum SettingWords {
             id: "alerts", title: "Warnings", sub: "When your Core warns you about backups, certificates and disk.",
             symbol: "exclamationmark.triangle.fill", hue: GlassInk.red),
         Group(
+            id: "switching", title: "Account switching",
+            sub: "What happens when an AI account hits its limit.", symbol: "arrow.triangle.swap", hue: GlassInk.blue),
+        Group(
             id: "background", title: "Background work", sub: "How often your Core does its routine work.",
             symbol: "gearshape.2.fill", hue: GlassInk.slate),
     ]
@@ -92,6 +95,18 @@ enum SettingWords {
             group: "alerts", title: "Low disk warning", line: "Warn when free disk space falls below this."),
         "scheduler.tick_secs": Entry(
             group: "background", title: "Routine check every", line: "How often your Core runs its background work."),
+        "scheduler.wait_max_secs": Entry(
+            group: "switching", title: "A session waits for an account up to",
+            line: "When every account is at its limit, a session waits this long for one, then stops."),
+        "scheduler.max_hops": Entry(
+            group: "switching", title: "Switches per run",
+            line: "How many times one run may move to another account. 0 turns switching off."),
+        "scheduler.failovers_per_10min": Entry(
+            group: "switching", title: "Switches every 10 minutes",
+            line: "Most switches one person's runs may make in 10 minutes. At least 1."),
+        "scheduler.quota_cooldown_secs": Entry(
+            group: "switching", title: "An account rests after its quota runs out",
+            line: "How long an account is left alone after the provider says its quota is used up."),
         "push.interval_secs": Entry(
             group: "background", title: "Device updates every", line: "How often your Core sends news to your devices."),
         "events.retention_secs": Entry(
@@ -125,6 +140,8 @@ enum SettingWords {
             return ["Off", "Test keys", "Real keys"].indices.contains(Int(n))
                 ? ["Off", "Test keys", "Real keys"][Int(n)] : "\(n)"
         }
+        if s.key == "scheduler.max_hops" { return n == 0 ? "Off" : n == 1 ? "1 switch" : "\(n) switches" }
+        if s.key == "scheduler.failovers_per_10min" { return "\(n) in 10 min" }
         if RegistryModel.switchKeys.contains(s.key) { return n == 0 ? "Off" : "On" }
         return switch entries[s.key]?.unit ?? s.unit {
         case "seconds": duration(n, zero: s.min == 0 ? "Never" : "0 s")

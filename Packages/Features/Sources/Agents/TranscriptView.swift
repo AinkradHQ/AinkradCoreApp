@@ -26,12 +26,15 @@ struct TranscriptView: View {
                     LazyVStack(alignment: .leading, spacing: Space.s3) {
                         header(store)
                         ForEach(store.entries) { e in
-                            EntryRow(entry: e, harness: session.harness).equatable().id(e.seq)
-                                .transition(
-                                    reduce
-                                        ? .opacity
-                                        : .opacity.combined(with: .move(edge: .bottom)).combined(
-                                            with: .scale(scale: 0.97, anchor: .bottomLeading)))
+                            EntryRow(entry: e, harness: session.harness) {
+                                model.shell.launcher.entry("connections")?.run()
+                            }
+                            .equatable().id(e.seq)
+                            .transition(
+                                reduce
+                                    ? .opacity
+                                    : .opacity.combined(with: .move(edge: .bottom)).combined(
+                                        with: .scale(scale: 0.97, anchor: .bottomLeading)))
                         }
                         if session.live && store.load == .ready && !model.waiting(session.id) { Thinking() }
                         Color.clear.frame(height: 1).id("end")
@@ -115,6 +118,8 @@ private struct Thinking: View {
 struct EntryRow: View, Equatable {
     let entry: TranscriptEntry
     var harness = "claude"
+    /// Opens Connections from a refused connection call (CN5).
+    var openConnections: (() -> Void)?
     @State private var expanded = false
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool { a.entry == b.entry && a.harness == b.harness }
@@ -150,6 +155,16 @@ struct EntryRow: View, Equatable {
                     .agentCopyMenu(text)
                 Spacer(minLength: Space.s8)
             }
+        case .toolUse(_, let name, let summary) where ConnCue.kind(name) != nil:
+            ConnCue(tool: name, summary: summary, ok: nil, why: "")
+        case .toolDone(_, let name, let summary, let ok, _, let output, _) where ConnCue.kind(name) != nil:
+            ConnCue(
+                tool: name, summary: summary, ok: ok, why: output.split(separator: "\n").first.map(String.init) ?? "",
+                openConnections: openConnections)
+        case .toolResult(_, let name?, let ok, _, let output, _) where ConnCue.kind(name) != nil:
+            ConnCue(
+                tool: name, summary: "", ok: ok, why: output.split(separator: "\n").first.map(String.init) ?? "",
+                openConnections: openConnections)
         case .toolUse(_, let name, let summary):
             ToolCard(name: name, summary: summary, status: .running, output: "", expanded: $expanded)
         case .toolDone(_, let name, let summary, let ok, let code, let output, let ms):

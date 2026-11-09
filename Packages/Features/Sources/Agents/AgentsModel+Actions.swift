@@ -148,6 +148,7 @@ extension AgentsModel {
 
     public func loadRunners() async {
         if let api, let r = try? await api.runners() { runners = r }
+        if let api { setChains((try? await api.chains()) ?? []) }
     }
 
     /// Starts a session. The error comes back as words for the sheet; nothing is half done.
@@ -162,8 +163,17 @@ extension AgentsModel {
             shell.showToast("Session created")
             return nil
         } catch {
-            if let e = CoreError.unwrapping(error), case .http(_, let code, let message) = e {
-                return InlineNotice(title: Self.refusal(code), detail: message)
+            if let e = CoreError.unwrapping(error) {
+                if case .http(_, let code, let message) = e {
+                    let said = message.hasSuffix(".") ? message : message + "."
+                    return InlineNotice(title: Self.refusal(code), detail: "\(said) \(Self.fix(code))")
+                }
+                if case .forbiddenScope = e {
+                    return InlineNotice(
+                        title: "Only an admin can start a session from a chain or an agent.",
+                        detail:
+                            "Use a device that holds the admin scope, or start a plain session by choosing a harness.")
+                }
             }
             return Self.notice(error, doing: "Starting the session")
         }
@@ -176,6 +186,16 @@ extension AgentsModel {
         case "unsupported_command": "That runner cannot run agents"
         case "runner_busy": "That runner is too busy right now"
         default: "The Core refused: \(code)"
+        }
+    }
+
+    /// What to do about it, in a sentence.
+    static func fix(_ code: String) -> String {
+        switch code {
+        case "runner_offline": "Pick another runner, or bring this one back online."
+        case "unsupported_command": "Pick a runner that can run agents."
+        case "runner_busy": "Wait a moment and choose Try again, or pick another runner."
+        default: "Check what you chose and choose Try again."
         }
     }
 }

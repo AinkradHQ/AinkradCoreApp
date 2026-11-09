@@ -104,6 +104,10 @@ struct BrainPane: View {
                 case .inbox: Placeholder(title: "Inbox", text: "Memories waiting for you, conflicts and blocked notes.")
                 case .activity: ActivityTab(model: model)
                 case .checks: ChecksTab(model: model)
+                case .inbox: InboxTab(model: model)
+                case .activity:
+                    Placeholder(title: "Activity", text: "Who searched, saved or was refused, room by room.")
+                case .checks: Placeholder(title: "Checks", text: "Run the safety checks and see their history.")
                 }
             }
             .transition(.opacity)

@@ -11,7 +11,7 @@ struct AccountsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
-                ForEach(Array(Self.tabs.enumerated()), id: \.offset) { i, t in
+                ForEach(Array(tabs.enumerated()), id: \.offset) { i, t in
                     AppFilterTile(title: t.title, count: count(t.page), on: on(t.page), key: "⌘\(i + 1)") {
                         go(t.page)
                     }
@@ -60,9 +60,14 @@ struct AccountsView: View {
 
     /// The pages as tiles. Spend holds Budgets, Costs, Ledger and Prices, which the Core does not fill yet.
     static let tabs: [(title: String, page: AccountsPage)] = [
-        ("Overview", .overview), ("Accounts", .accounts), ("Pools", .pools),
+        ("Overview", .overview), ("Accounts", .accounts), ("Pools", .pools), ("Chains", .chains),
         ("Spend", .budgets),
     ]
+
+    /// Chains are for admins: a device the Core refused them sees no such page.
+    private var tabs: [(title: String, page: AccountsPage)] {
+        Self.tabs.filter { $0.page != .chains || model.chainsAllowed }
+    }
 
     private func on(_ page: AccountsPage) -> Bool {
         page == .budgets ? model.page.isSpend : model.page == page
@@ -73,6 +78,7 @@ struct AccountsView: View {
         case .overview: model.needLook.count
         case .accounts: model.accounts.count
         case .pools: model.pools.count
+        case .chains: model.chains.count
         case .budgets: model.budgets.filter { $0.standing == .stopped }.count.nonZero ?? -1
         default: -1
         }
@@ -97,6 +103,15 @@ struct AccountsView: View {
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
             AppActionTile(title: "New pool", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 Task { await model.quickPool() }
+            }
+            .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
+        case .chains:
+            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+                AccountDialogs.openChain(model, editing: nil)
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
+            AppActionTile(title: "New chain", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                Task { await model.quickChain() }
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .budgets:
@@ -161,6 +176,7 @@ struct AccountsView: View {
                     switch model.page {
                     case .overview: OverviewPage(model: model)
                     case .accounts: AccountsPageView(model: model)
+                    case .chains: ChainsPage(model: model)
                     default: PoolsPage(model: model)
                     }
                 }

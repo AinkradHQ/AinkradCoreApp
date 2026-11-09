@@ -75,7 +75,13 @@ let package = Package(
             name: "TerminalsTests",
             dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "AdminTests", dependencies: ["Admin", .product(name: "CoreKit", package: "CoreKit")]),
-        .testTarget(name: "AccountsTests", dependencies: ["Accounts", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(
+            name: "AccountsTests",
+            dependencies: [
+                "Accounts", .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ]),
         .testTarget(
             name: "AgentsTests", dependencies: ["Agents", "Shell", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "BrainTests", dependencies: ["Brain", "Shell", "Admin"]),

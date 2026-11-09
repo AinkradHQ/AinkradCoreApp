@@ -100,6 +100,21 @@ public struct RunnerInfo: Identifiable, Equatable, Sendable {
     public var runsAgents: Bool { drivers.contains("agent") }
 }
 
+/// A chain a session can start from: its name and, in order, the pools and models it tries. Only admins are given any.
+public struct ChainOption: Identifiable, Equatable, Sendable {
+    public let id: Int64
+    public let name: String
+    public let isDefault: Bool
+    /// One word per step, e.g. `claude-pool · sonnet`.
+    public let steps: [String]
+    public init(id: Int64, name: String, isDefault: Bool, steps: [String]) {
+        self.id = id
+        self.name = name
+        self.isDefault = isDefault
+        self.steps = steps
+    }
+}
+
 public struct NewAgentSession: Equatable, Sendable {
     public var runner: String
     public var harness: String
@@ -108,10 +123,16 @@ public struct NewAgentSession: Equatable, Sendable {
     /// `ask`, `accept_edits` or `sandboxed`.
     public var mode: String
     public var secrets: [String]
+    /// A fallback chain's id, or an agent id whose bound (else default) chain serves the session. Both need `admin`, and
+    /// with either the harness and model are left out: the account the Core picks sets them.
+    public var chain: Int64?
+    public var agent: String?
     public init(
         runner: String, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
-        secrets: [String] = []
+        secrets: [String] = [], chain: Int64? = nil, agent: String? = nil
     ) {
+        self.chain = chain
+        self.agent = agent
         self.runner = runner
         self.harness = harness
         self.model = model

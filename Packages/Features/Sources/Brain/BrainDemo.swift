@@ -12,10 +12,20 @@ public final class BrainDemo {
 
     public static let scenes = [
         "overview", "overview-healthy", "overview-paused", "rooms", "room", "new-room", "sealed", "unavailable",
-        "empty", "error", "offline", "rebuilding", "embedding-down", "inbox", "activity", "activity-blocked", "egress",
+        "activity", "activity-blocked", "egress",
         "egress-local", "activity-empty", "activity-error", "checks", "checks-running", "checks-paused",
         "checks-offline",
+        "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
+        "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
+        "inbox-offline",
     ]
+
+    private func inbox(_ list: InboxList, room: String? = nil) async {
+        model.show(.inbox)
+        if let room { model.view(room) }
+        model.inboxState.list = list
+        await model.loadInbox()
+    }
 
     public func showInteractive(_ scene: String) async { await show(scene) }
 
@@ -26,6 +36,7 @@ public final class BrainDemo {
         shell.launcherOpen = false
         shell.coreLink = .live
         model.detach()
+        model.inboxState.list = .waiting
         var s = SampleBrainService.Scenario()
         switch scene {
         case "overview-healthy": s.healthy = true
@@ -39,6 +50,9 @@ public final class BrainDemo {
         case "activity-error": s.activityError = true
         case "checks-paused": s.paused = true
         case "checks-offline": s.offline = true
+        case "inbox-empty": s.emptyInbox = true
+        case "inbox-error": s.inboxError = true
+        case "inbox-offline": s.offline = true
         default: break
         }
         if scene != "unavailable" {
@@ -82,6 +96,14 @@ public final class BrainDemo {
             await c.load()
             c.selectedID = "speed"
             Task { await c.run("speed") }
+        case "inbox-conflict": await inbox(.conflicts, room: "workan-space")
+        case "inbox-blocked": await inbox(.blocked, room: "automotive-ai")
+        case "inbox-noroom": await inbox(.noRoom)
+        case "inbox-assign":
+            await inbox(.noRoom)
+            BrainSheets.assign(model, ["u1"])
+        case "inbox-empty", "inbox-error", "inbox-offline": await inbox(.waiting)
+        case "inbox-sealed": await inbox(.waiting, room: "althaqeel")
         default: model.show(.overview)
         }
     }

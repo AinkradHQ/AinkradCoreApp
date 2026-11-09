@@ -5,6 +5,11 @@ import Foundation
 extension AgentsModel {
     public func debugDropHost() { host = nil }
 
+    public func debugChains(_ list: [ChainOption]) {
+        debugChainList = list.isEmpty ? nil : list
+        chains = list
+    }
+
     /// A believable climb to each session's token total, so the burn charts have samples in the demo.
     public func debugSeedBurn() {
         for (i, s) in sessions.items.enumerated() {

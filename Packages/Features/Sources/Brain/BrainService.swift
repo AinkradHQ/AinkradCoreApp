@@ -32,6 +32,12 @@ public protocol BrainService: Sendable {
     func runCheck(
         _ id: String, options: CheckRunOptions, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> CheckItem
+    /// One room's Inbox: waiting memories, conflicts and blocked notes. Only for a mounted room.
+    func inbox(room: String) async throws -> RoomInbox
+    /// The unclassified inbox. It is not a room, so it needs no mounted room.
+    func captures() async throws -> [Capture]
+    /// Applies one Inbox change (the caller has already asked for Touch ID where it is needed).
+    func perform(_ action: InboxAction) async throws
 }
 
 /// A failure the screens can word.
