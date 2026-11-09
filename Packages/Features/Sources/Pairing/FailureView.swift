@@ -144,8 +144,12 @@ struct FailureView: View {
                 .coreFont(size: MacTextSize.body, weight: .semibold)
             }
             if failure.fatal {
-                Label("Stopped. There is no way to continue from here.", systemImage: "hand.raised")
-                    .coreFont(size: MacTextSize.body, weight: .semibold)
+                Label(
+                    actions.isEmpty
+                        ? "Stopped. There is no way to continue from here." : "Stopped. Connect again to carry on.",
+                    systemImage: "hand.raised"
+                )
+                .coreFont(size: MacTextSize.body, weight: .semibold)
             }
             // Secondary actions sit at the left edge, the primary one at the right.
             HStack(spacing: Space.s2) {

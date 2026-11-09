@@ -109,8 +109,19 @@ enum AuditWords {
         return (who, verb, object(a, title: title))
     }
 
+    /// A row with no entity (`pairing.created`, `api.refused`) names what it was about in its details: `pairing p_1`.
+    static func fromDetails(_ a: AuditItem) -> String? {
+        guard let d = try? JSONSerialization.jsonObject(with: Data(a.details.utf8)) as? [String: Any] else {
+            return nil
+        }
+        for key in ["pairing", "device", "account", "agent", "secret", "connection", "terminal", "session"] {
+            if let v = d[key] as? String, !v.isEmpty { return "\(key) \(v)" }
+        }
+        return (d["path"] as? String).map { "a request to \($0)" }
+    }
+
     static func object(_ a: AuditItem, title: (String) -> String?) -> String {
-        guard let ref = a.entityRef else { return a.entityKind ?? "" }
+        guard let ref = a.entityRef else { return fromDetails(a) ?? a.entityKind ?? "" }
         switch a.entityKind {
         case "setting": return "“\(title(ref) ?? ref)”"
         case "lockout": return ref.split(separator: ":").dropFirst().joined(separator: ":")

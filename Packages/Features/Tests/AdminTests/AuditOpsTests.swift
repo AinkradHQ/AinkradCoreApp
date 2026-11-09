@@ -165,3 +165,16 @@ struct OpsTests {
         #expect(admin.ops.state == .empty)
     }
 }
+
+struct AuditObjectTests {
+    @Test func aRowWithNoEntityNamesWhatItWasAboutFromItsDetails() {
+        let created = AuditItem(
+            seq: 1, at: Date(), action: "pairing.created", actor: .user(1), entityKind: nil, entityRef: nil,
+            details: #"{"pairing":"p_1","kind":"device"}"#)
+        #expect(AuditWords.sentence(created) { _ in nil }.what == "pairing p_1")
+        let refused = AuditItem(
+            seq: 2, at: Date(), action: "api.refused", actor: .user(1), entityKind: nil, entityRef: nil,
+            details: #"{"path":"/api/v1/x","device":""}"#)
+        #expect(AuditWords.sentence(refused) { _ in nil }.what == "a request to /api/v1/x")
+    }
+}
