@@ -123,7 +123,7 @@ struct AboutSection: View {
     private func fact(_ symbol: String, _ hue: Color, _ title: String, _ value: String, help: String?) -> some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Label(title, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
-                .foregroundStyle(hue)
+                .foregroundStyle(GlassInk.ink(hue))
             Text(value).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(2)
         }
         .padding(Space.s4).frame(maxWidth: .infinity, alignment: .topLeading)

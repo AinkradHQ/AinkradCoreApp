@@ -377,3 +377,15 @@ struct ModelTests {
         #expect(!PoolName.isValid(String(repeating: "a", count: 65)))
     }
 }
+
+struct RefusalKindTests {
+    @Test func aRuleOfTheCoreNeedsDifferentInputButOutagesAndLimitsDoNot() {
+        #expect(AccountsModel.isRule(.http(status: 409, code: "conflict", message: "pool used twice")))
+        #expect(AccountsModel.isRule(.badRequest(message: "bad")))
+        #expect(!AccountsModel.isRule(.http(status: 500, code: "internal", message: "")))
+        #expect(!AccountsModel.isRule(.http(status: 429, code: "rate_limited", message: "")))
+        #expect(!AccountsModel.isRule(.forbiddenScope))
+        #expect(!AccountsModel.isRule(.offline("down")))
+        #expect(!AccountsModel.isRule(nil))
+    }
+}

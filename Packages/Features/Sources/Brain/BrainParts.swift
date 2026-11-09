@@ -102,53 +102,6 @@ struct BrainStateCard: View {
     }
 }
 
-/// A banner for an outcome or a condition: a tinted glyph (never a white glyph on a light tile, which drew as an empty
-/// square), a bold line, a quiet line and an optional action.
-struct BrainNotice<Action: View>: View {
-    let symbol: String
-    let title: String
-    let text: String
-    let tone: Tone
-    let action: Action
-    @Environment(\.corePalette) private var palette
-    init(symbol: String, title: String, text: String = "", tone: Tone = .queue, @ViewBuilder action: () -> Action) {
-        self.symbol = symbol
-        self.title = title
-        self.text = text
-        self.tone = tone
-        self.action = action()
-    }
-    var body: some View {
-        let c = palette.tone(tone)
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.headline, weight: .semibold)).foregroundStyle(
-                c.ink
-            )
-            .frame(width: Space.s5).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                if !text.isEmpty {
-                    Text(text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: Space.s3)
-            action
-        }
-        .padding(Space.s3)
-        .background(c.ink.opacity(0.14), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.35), lineWidth: 1) }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(text.isEmpty ? title : "\(title). \(text)")
-    }
-}
-
-extension BrainNotice where Action == EmptyView {
-    init(symbol: String, title: String, text: String = "", tone: Tone = .queue) {
-        self.init(symbol: symbol, title: title, text: text, tone: tone) { EmptyView() }
-    }
-}
-
 /// What a screen looks like while it loads: soft blocks in the shape of the content that is coming.
 struct BrainSkeleton: View {
     enum Shape { case page, list }
@@ -190,17 +143,17 @@ struct BrainConditions: View {
         if let f = model.overview?.flags {
             VStack(spacing: Space.s2) {
                 if let q = f.offlineQueued {
-                    BrainNotice(
+                    CoreNotice(
                         symbol: "wifi.slash", title: "Offline, \(q) queued",
                         text: "This Mac's own Core answers. Changes wait and go when the remote Core is reachable.")
                 }
                 if f.indexRebuilding {
-                    BrainNotice(
+                    CoreNotice(
                         symbol: "arrow.triangle.2.circlepath", title: "The search index is rebuilding",
                         text: "Results can be incomplete until it finishes. Nothing is lost.", tone: .warn)
                 }
                 if f.embeddingDown {
-                    BrainNotice(
+                    CoreNotice(
                         symbol: "text.magnifyingglass", title: "Meaning search is off",
                         text: "Exact search still works.", tone: .warn)
                 }

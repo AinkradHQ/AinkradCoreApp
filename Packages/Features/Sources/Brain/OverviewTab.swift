@@ -13,7 +13,7 @@ struct OverviewTab: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             banner
             if model.health == .paused {
-                BrainNotice(
+                CoreNotice(
                     symbol: "exclamationmark.octagon", title: BrainWords.pausedLine(names: model.pausedNames),
                     tone: .fail)
             }
@@ -72,7 +72,7 @@ struct OverviewTab: View {
     private func head(_ title: String, _ hue: Color, _ n: Int?, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(hue)
+                Text(title).font(.system(size: MacTextSize.large, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
                 if let n { count(n, hue) }
             }
             Text(text).foregroundStyle(GlassInk.secondary)

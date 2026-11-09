@@ -50,17 +50,27 @@ public struct CoreStateCard: View {
 }
 
 /// The one dialog footer: the way back on the left (`Cancel esc` unless the caller names another action), the main action on
-/// the right with its key. `danger` makes the primary the red button.
+/// the right with its key. `danger` makes the primary the red button; `enabled: false` dims it and stops its key (and
+/// Return) from running it; `busy` shows the spinner and ignores a second press. Keys: `.cancel` (esc), `.primary` (↩),
+/// `.command` (⌘↩, for an action that removes something), `.escape` (esc without the keycap, for "Keep it").
 public struct CoreDialogFooter: View {
     let cancel: CoreAction?
     let primary: CoreAction?
+    let alternate: CoreAction?
     let danger: Bool
     let busy: Bool
-    public init(cancel: CoreAction?, primary: CoreAction?, danger: Bool = false, busy: Bool = false) {
+    let enabled: Bool
+    /// `alternate` is a second, quieter action just left of the primary (for example "Try again" beside the real fix).
+    public init(
+        cancel: CoreAction?, primary: CoreAction?, alternate: CoreAction? = nil, danger: Bool = false,
+        busy: Bool = false, enabled: Bool = true
+    ) {
+        self.alternate = alternate
         self.cancel = cancel
         self.primary = primary
         self.danger = danger
         self.busy = busy
+        self.enabled = enabled
     }
     public var body: some View {
         HStack(spacing: Space.s2) {
@@ -69,10 +79,15 @@ public struct CoreDialogFooter: View {
                     .modifier(OptionalKey(key: cancel.key))
             }
             Spacer(minLength: Space.s3)
+            if let alternate {
+                Button(alternate.title) { if !busy { alternate.run() } }.buttonStyle(CoreButtonStyle(.secondary))
+                    .modifier(OptionalKey(key: alternate.key)).disabled(!enabled)
+            }
             if let primary {
-                Button(primary.title, action: primary.run)
+                Button(primary.title) { if !busy { primary.run() } }
                     .buttonStyle(CoreButtonStyle(danger ? .danger : .prominent, busy: busy))
                     .modifier(OptionalKey(key: primary.key))
+                    .disabled(!enabled)
             }
         }
     }

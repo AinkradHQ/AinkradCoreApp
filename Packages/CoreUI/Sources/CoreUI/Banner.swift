@@ -53,19 +53,11 @@ public struct ConnectionBanner: View {
         HStack(alignment: .top, spacing: Space.s3) {
             Group {
                 if state == .loading || state == .reconnecting {
-                    ProgressView().controlSize(.small)
+                    ProgressView().controlSize(.small).frame(width: 32, height: 32).accessibilityHidden(true)
                 } else {
-                    Image(systemName: state.symbol)
+                    ToneGlyph(symbol: state.symbol, ink: colours.ink, size: 32)
                 }
             }
-            .foregroundStyle(.white)
-            .frame(width: 32, height: 32)
-            // The state in a coloured tile, like every other icon on glass.
-            .background(
-                LinearGradient(colors: [colours.ink, colours.ink.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(Radius.control)
-            )
-            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(state.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text(state.detail).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)

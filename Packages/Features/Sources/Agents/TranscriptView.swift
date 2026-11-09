@@ -292,7 +292,8 @@ private struct ToolCard: View {
                     .frame(width: 28, height: 28)
                     .background(hue.opacity(0.85), in: coreShape(7))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(name).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                    Text(name).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                        GlassInk.ink(hue))
                     if !summary.isEmpty {
                         Text(summary).font(.system(size: 12, design: .monospaced)).lineLimit(2)
                             .truncationMode(.middle).textSelection(.enabled)
@@ -316,7 +317,7 @@ private struct ToolCard: View {
                                 expanded ? "Show less" : "Show all \(lines.count) lines",
                                 systemImage: expanded ? "chevron.up" : "chevron.down"
                             )
-                            .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                            .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
                         }
                         .buttonStyle(.plain)
                     }
@@ -356,7 +357,7 @@ private struct ToolCard: View {
             Image(systemName: symbol).symbolEffect(.bounce, value: text)
             Text(text).monospacedDigit()
         }
-        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(c)
+        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(c))
         .padding(.horizontal, 7).frame(height: 20)
         .background(c.opacity(0.15), in: coreShape(5))
     }

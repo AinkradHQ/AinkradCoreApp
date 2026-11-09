@@ -36,6 +36,9 @@ public final class AccountsModel {
     var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
     private(set) var writeError: [String: String] = [:]
+    /// Keys whose last refusal was a rule of the Core (a 4xx that is not rate limiting or scope): the input has to change,
+    /// so a plain retry would be refused again.
+    private(set) var writeRule: Set<String> = []
     private(set) var busy: String?
     /// The account whose key is being tested now, and what the last test of each answered when it could not run.
     var testing: Int64?
@@ -237,6 +240,7 @@ public final class AccountsModel {
         guard let service, mayWrite() else { return false }
         busy = key
         writeError[key] = nil
+        writeRule.remove(key)
         defer { busy = nil }
         do {
             try await host.elevated(reason, done: "changed", keepsEdit: keepsEdit) { try await op(service) }
@@ -252,7 +256,17 @@ public final class AccountsModel {
         } catch {
             if CoreError.unwrapping(error) == .forbiddenScope { readOnly = true }
             writeError[key] = words(error)
+            if Self.isRule(CoreError.unwrapping(error)) { writeRule.insert(key) }
             return false
+        }
+    }
+
+    /// A refusal that says "this input is not allowed" (400 to 499, but not rate limiting or scope).
+    nonisolated static func isRule(_ e: CoreError?) -> Bool {
+        switch e {
+        case .badRequest: true
+        case .http(let status, _, _): (400..<500).contains(status) && status != 429 && status != 403
+        default: false
         }
     }
 
@@ -293,7 +307,10 @@ public final class AccountsModel {
     }
 
     /// Say why a sheet opened, in the sheet's own error line (nil clears it).
-    func note(_ key: String, _ text: String?) { writeError[key] = text }
+    func note(_ key: String, _ text: String?, rule: Bool = false) {
+        writeError[key] = text
+        if text != nil && rule { writeRule.insert(key) } else { writeRule.remove(key) }
+    }
 
     /// The next free `pool-N` (the Core wants lowercase, so not "Pool 3").
     func nextPoolName() -> String {

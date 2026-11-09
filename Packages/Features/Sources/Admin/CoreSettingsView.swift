@@ -221,7 +221,7 @@ private struct LimitEditor: View {
                 if let typed {
                     Label(SettingWords.value(setting, typed), systemImage: "equal")
                         .font(.system(size: MacTextSize.headline, weight: .semibold, design: .rounded))
-                        .foregroundStyle(hue).contentTransition(.numericText())
+                        .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText())
                 }
                 Spacer(minLength: Space.s3)
                 Label("Asks for Touch ID", systemImage: "touchid").font(.system(size: MacTextSize.meta))

@@ -76,7 +76,7 @@ struct BrainPane: View {
     }
 
     private func notice(_ text: String) -> some View {
-        BrainNotice(symbol: "exclamationmark.circle", title: text, tone: .fail) {
+        CoreNotice(symbol: "exclamationmark.circle", title: text, tone: .fail) {
             Button("Dismiss") { model.dismissNotice() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
     }

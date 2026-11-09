@@ -57,7 +57,7 @@ struct ApprovalCardView: View {
                             .font(
                                 .system(size: MacTextSize.large + 2, weight: .bold, design: .rounded).monospacedDigit()
                             )
-                            .foregroundStyle(hue).contentTransition(.numericText(countsDown: true))
+                            .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
                         Text("to answer").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                     }
                 }

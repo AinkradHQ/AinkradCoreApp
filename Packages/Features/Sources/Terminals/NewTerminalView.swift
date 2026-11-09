@@ -165,7 +165,7 @@ private struct RunnerTile: View {
                     CoreSlots(used: runner.load, capacity: runner.capacity)
                     if let warn {
                         Label(warn, systemImage: st.symbol).font(.system(size: MacTextSize.meta, weight: .medium))
-                            .foregroundStyle(hue)
+                            .foregroundStyle(GlassInk.ink(hue))
                     }
                 }
             }
