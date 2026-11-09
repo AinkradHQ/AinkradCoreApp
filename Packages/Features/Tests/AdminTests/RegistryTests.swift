@@ -16,6 +16,7 @@ struct RegistryTests {
                 source: "server"),
             setting("auth.step_up_secs", value: 300, def: 300, min: 60, max: 900),
             setting("secrets.mode", value: 0, def: 0, min: 0, max: 2, unit: "count"),
+            setting("secrets.connections", value: 0, def: 0, min: 0, max: 1, unit: "count"),
             setting("auth.passkey_admin", value: 0, def: 0, min: 0, max: 1, unit: "count"),
             setting("mystery.thing", value: 5, def: 5, min: 0, max: 9, unit: "furlongs"),
         ]
@@ -29,9 +30,21 @@ struct RegistryTests {
         #expect(r.state == .ready)
         #expect(r.groups.map(\.name) == ["api", "auth", "mystery"])
         #expect(r.groups[0].items.map(\.name) == ["request_burst", "requests_per_min"])
-        #expect(r.switches.map(\.key) == ["secrets.mode", "auth.passkey_admin"])
+        #expect(r.switches.map(\.key) == ["secrets.mode", "secrets.connections", "auth.passkey_admin"])
+        #expect(r.limits.contains { $0.key == "secrets.connections" } == false)
+        #expect(RegistryModel.connectionsNeeds(mode: 0) != nil)
+        #expect(RegistryModel.connectionsNeeds(mode: 1) == nil)
         #expect(r.item("api.requests_per_min")?.isOverride == true)
         #expect(r.item("api.request_burst")?.isOverride == false)
+    }
+
+    @Test("the connection-tokens switch turns on through Touch ID")
+    func connectionsSwitch() async {
+        let (admin, _, _) = await world()
+        let r = admin.registry
+        await r.set(r.item("secrets.connections")!, to: 1, reason: "Let connections hold their own real tokens.")
+        #expect(r.item("secrets.connections")?.value == 1)
+        #expect(SettingWords.value(r.item("secrets.connections")!, 1) == "On")
     }
 
     @Test("an unknown unit shows its raw word, known ones their suffix")

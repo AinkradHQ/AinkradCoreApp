@@ -28,12 +28,25 @@ struct SwitchesSection: View {
                         onLine: "Accounts can hold real provider keys. Your agents can use them.",
                         needs: model.secretsMode < 1 ? "Set Keys and secrets to Test keys first." : nil,
                         reason: {
-                            $0 ? "Turn on secrets.provider_accounts." : "Turn off secrets.provider_accounts."
+                            $0 ? "Let accounts hold real provider keys." : "Stop accounts holding real provider keys."
+                        })
+                }
+                if let c = model.item("secrets.connections") {
+                    FlagCard(
+                        model: model, setting: c, index: 2, title: "Real connection tokens", symbol: "link",
+                        hue: GlassInk.orange,
+                        sub: "Let a connection to GitHub, Jira or Linear hold its own real token.",
+                        offLine: "Connections accept test tokens only.",
+                        onLine:
+                            "A connection can hold one real token of its own service. Real keys for other things stay refused.",
+                        needs: RegistryModel.connectionsNeeds(mode: model.secretsMode),
+                        reason: {
+                            $0 ? "Let connections hold their own real tokens." : "Stop connections holding real tokens."
                         })
                 }
                 if let p = model.item("auth.passkey_admin") {
                     FlagCard(
-                        model: model, setting: p, index: 2, title: "Admin from a browser", symbol: "globe",
+                        model: model, setting: p, index: 3, title: "Admin from a browser", symbol: "globe",
                         hue: GlassInk.violet,
                         sub: "Let a device that signs in with a passkey in a web browser become an admin.",
                         offLine: "Browser devices can read and approve, but not change your Core. Safer.",
@@ -42,15 +55,15 @@ struct SwitchesSection: View {
                         needs: nil,
                         reason: {
                             $0
-                                ? "Turn on auth.passkey_admin. A stolen passkey session could then hold admin."
-                                : "Turn off auth.passkey_admin."
+                                ? "Let browser devices become admin. A stolen passkey session could then hold admin."
+                                : "Stop browser devices becoming admin."
                         })
                 }
                 if !model.runners.isEmpty {
                     GlassSection(
                         "Terminals on your runners",
-                        sub: "Set on each runner when it starts. Shown here, changed there.",
-                        symbol: "terminal.fill", hue: GlassInk.green, index: 3
+                        sub: "Whether each runner can open terminals.",
+                        symbol: "terminal.fill", hue: GlassInk.green, index: 4
                     ) {
                         ForEach(model.runners) { r in
                             let pty = r.drivers.contains("pty")
@@ -62,7 +75,7 @@ struct SwitchesSection: View {
                                     Text(
                                         pty
                                             ? "Terminals work on this runner."
-                                            : "Terminals are off: this runner was started without terminal support."
+                                            : "Terminals are off. Turn them on on the machine that runs this runner."
                                     )
                                     .foregroundStyle(GlassInk.secondary)
                                 }

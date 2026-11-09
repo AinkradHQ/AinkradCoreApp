@@ -20,6 +20,10 @@ struct FirstRunTests {
         for _ in 0..<200 where !ok() { try? await Task.sleep(for: .milliseconds(5)) }
     }
 
+    @Test func bootstrapCommandIsTheRealOne() {
+        #expect(FirstRunView.bootstrapCommand == "ainkrad-core-server bootstrap <db>")
+    }
+
     @Test func codeFormatting() {
         #expect(CodeFormat.format("abcdefghjk") == "ABCDE-FGHJK")
         #expect(CodeFormat.format("abc") == "ABC")

@@ -1,3 +1,4 @@
+import AppKit
 import CoreKit
 import CoreUI
 import CryptoKit
@@ -248,19 +249,30 @@ struct FirstRunView: View {
         codeField = ""
     }
 
+    /// The one command the first device needs on the host. Interim: the Core has no API for it yet.
+    static let bootstrapCommand = "ainkrad-core-server bootstrap <db>"
+
     private var bootstrapStep: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             title("Setting up a new Core")
             note(
-                "The very first device is created on the host itself, never over the network. Open a terminal on the machine that runs the Core."
+                "The very first device can only be created on the machine that runs the Core, never over the network. Until this can be done from here, run this once on that machine, with the path of your Core's database."
             )
-            Text("$ ainkrad bootstrap").coreFont(size: MacTextSize.body, design: .monospaced)
-                .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.glassCard, in: coreShape(Radius.row))
+            HStack(spacing: Space.s2) {
+                Text(Self.bootstrapCommand).coreFont(size: MacTextSize.body, design: .monospaced)
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+                Button("Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(Self.bootstrapCommand, forType: .string)
+                }.coreGlassButton()
+            }
+            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.glassCard, in: coreShape(Radius.row))
             VStack(alignment: .leading, spacing: Space.s2) {
                 note("1. Enter the address, then the code it printed.")
                 note("2. Compare the check code on this Mac with the one the host prints, and type y there.")
-                note("3. Add a second admin device (your iPhone) afterwards, so losing one never needs SSH.")
+                note("3. Add a second admin device (your iPhone) afterwards, so losing one never locks you out.")
             }
             HStack {
                 Button("Back") { model.goTo(.address) }.coreGlassButton().coreShortcut(.cancel)

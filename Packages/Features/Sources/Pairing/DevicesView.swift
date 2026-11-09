@@ -107,7 +107,7 @@ private struct OnlyAdminWarning: View {
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text("Only one admin device").coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(
-                    "\(device.name) is the only device that can manage this Core. If you lose it, getting back in needs SSH to the host. Add a second admin device, such as your iPhone."
+                    "\(device.name) is the only device that can manage this Core. If you lose it, you would be locked out. Add a second admin device, such as your iPhone."
                 )
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }

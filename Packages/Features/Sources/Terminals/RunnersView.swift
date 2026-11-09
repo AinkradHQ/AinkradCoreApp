@@ -201,7 +201,7 @@ private struct RunnerDetail: View {
                 }
             }
             if !runner.hasPty && !runner.drivers.isEmpty {
-                Text("Terminals are off here. Start the runner with --enable-pty to use them.")
+                Text("Terminals are off here. Turn them on on the machine that runs this runner.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
         }
