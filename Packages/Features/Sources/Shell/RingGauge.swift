@@ -27,7 +27,7 @@ struct RingGauge: View {
                         Text(sub).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(
                             WidgetInk.secondary
                         )
-                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .lineLimit(1).minimumScaleFactor(TextSizePrefs.shared.scale > 1 ? 0.7 : 1)
                     }
                 }
             }
@@ -41,7 +41,7 @@ struct RingGauge: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s2)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: TextSizePrefs.shared.scale > 1 ? .infinity : nil)
         .onAppear { fill() }
         .onChange(of: value) { _, _ in fill() }
         .accessibilityElement(children: .ignore)

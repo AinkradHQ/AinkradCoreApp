@@ -100,9 +100,10 @@ private struct CoreThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.layoutDirection) private var layoutDirection
     #if DEBUG
-    /// `CORE_FORCE_A11Y=transparency,contrast` pretends the Mac asks for Reduce Transparency and/or Increase Contrast, so the
-    /// solid and high-contrast paths can be looked at without changing System Settings.
+    /// `CORE_FORCE_A11Y=transparency,contrast,rtl` pretends the Mac asks for Reduce Transparency and/or Increase Contrast and
+    /// lays everything out right to left, so those paths can be looked at without changing System Settings.
     private static let forced = ProcessInfo.processInfo.environment["CORE_FORCE_A11Y"] ?? ""
     private var effectiveContrast: ColorSchemeContrast { Self.forced.contains("contrast") ? .increased : contrast }
     private var solidOnly: Bool { reduceTransparency || Self.forced.contains("transparency") }
@@ -114,6 +115,9 @@ private struct CoreThemeModifier: ViewModifier {
         content
             .environment(\.corePalette, (scheme == .dark ? Palette.night : Palette.day).contrast(effectiveContrast))
             .environment(\.coreSolidOnly, solidOnly)
+            #if DEBUG
+        .environment(\.layoutDirection, Self.forced.contains("rtl") ? .rightToLeft : layoutDirection)
+            #endif
             .foregroundStyle((scheme == .dark ? Palette.night : Palette.day).text)
             // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
             .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
