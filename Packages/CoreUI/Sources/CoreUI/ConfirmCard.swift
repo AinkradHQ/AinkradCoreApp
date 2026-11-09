@@ -28,6 +28,7 @@ public struct ConfirmCard: View {
     @State private var selected = 0
     @State private var shown = false
     @State private var monitor: Any?
+    @Environment(\.layoutDirection) private var direction
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     public init(
@@ -97,10 +98,13 @@ public struct ConfirmCard: View {
     /// The keys, caught before anything else in the window while the card is up.
     private func listen() {
         guard monitor == nil else { return }
+        // The tiles mirror in a right-to-left layout, so the arrows swap with them.
+        let flip = direction == .rightToLeft ? -1 : 1
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
             switch e.keyCode {
-            case 123: selected = max(selected - 1, 0)  // ←
-            case 124, 48: selected = min(selected + 1, choices.count - 1)  // → or Tab
+            case 123, 124:  // ← →, swapped with the tiles in a right-to-left layout
+                selected = min(max(selected + (e.keyCode == 124 ? flip : -flip), 0), choices.count - 1)
+            case 48: selected = min(selected + 1, choices.count - 1)  // Tab
             case 36, 76:  // Return, Enter
                 run(e.modifierFlags.contains(.command) ? choices.count - 1 : selected)
             default: return e

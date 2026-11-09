@@ -6,7 +6,8 @@ import Foundation
 struct AccountVerdict: Equatable, Sendable {
     /// Worst first: the first that holds is the verdict.
     enum Kind: Int, Equatable, Sendable {
-        case turnedOff, keyRefused, unhealthy, budgetStopped, limitReached, resting, limited, budgetNear, limitNear
+        case turnedOff, keyRefused, unhealthy, budgetStopped, limitReached, resting, limited, budgetOver, budgetNear,
+            limitNear
         case noPool, ready, other
     }
 
@@ -59,7 +60,10 @@ struct AccountVerdict: Equatable, Sendable {
         if a.phase == .limited {
             return .init(.limited, "Limited", .warn, "gauge.with.dots.needle.100percent", .state)
         }
-        if mine.contains(where: { $0.standing == .warning || $0.standing == .over }) {
+        if mine.contains(where: { $0.standing == .over }) {
+            return .init(.budgetOver, "Over budget", .warn, "dollarsign.circle", .budgets)
+        }
+        if mine.contains(where: { $0.standing == .warning }) {
             return .init(.budgetNear, "Budget nearly spent", .warn, "dollarsign.circle", .budgets)
         }
         if limits.contains(where: { $0.standing == .warning }) {
@@ -77,6 +81,7 @@ struct AccountVerdict: Equatable, Sendable {
             "The provider refused this key. Core checks it again and turns the account off if it is refused again."
         case .budgetStopped, .budgetNear:
             "Its budget is \(kind == .budgetStopped ? "spent, so new work is stopped" : "nearly spent")."
+        case .budgetOver: "Its budget is spent, but it has no hard stop, so work goes on."
         case .limitReached:
             limits.first { $0.standing == .reached }.map {
                 "It reached \(UsageLimitWords.amount($0.cap, unit: $0.unit)) \(UsageLimitWords.window($0.windowSecs).lowercased()). New work waits until the window moves on."

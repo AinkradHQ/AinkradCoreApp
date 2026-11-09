@@ -11,7 +11,13 @@ enum AccountDialogs {
         m.host.clearElevationNotice()
         let shell = m.host.shell
         shell.present(
-            ShellDialog(id: id, onClose: { [weak m] in m?.host.clearElevationNotice() }) { v { shell.closeDialog() } })
+            ShellDialog(
+                id: id,
+                onClose: { [weak m] in
+                    m?.host.clearElevationNotice()
+                    m?.dialogClosed()
+                }
+            ) { v { shell.closeDialog() } })
     }
 
     static func openConnect(_ m: AccountsModel, provider: String?, replacing: AccountItem? = nil) {

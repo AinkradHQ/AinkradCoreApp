@@ -4,6 +4,76 @@
     "" : {
 
     },
+    "percent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "percent"
+          }
+        }
+      }
+    },
+    "Reconnecting to Core" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reconnecting to Core"
+          }
+        }
+      }
+    },
+    "Core is offline" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Core is offline"
+          }
+        }
+      }
+    },
+    "Core asked the app to slow down" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Core asked the app to slow down"
+          }
+        }
+      }
+    },
+    "The session is renewing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The session is renewing"
+          }
+        }
+      }
+    },
+    "Core restarted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Core restarted"
+          }
+        }
+      }
+    },
+    "Back online" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Back online"
+          }
+        }
+      }
+    },
     " · %lld %@" : {
       "localizations" : {
         "en" : {

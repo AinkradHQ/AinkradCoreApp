@@ -199,12 +199,14 @@ private struct DeviceCard: View {
         Button(action: open) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 HStack(alignment: .top, spacing: Space.s3) {
-                    IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 52, bounce: hovering)
-                        .overlay(alignment: .bottomTrailing) {
-                            if me {
-                                StatusDot(color: GlassInk.green, live: true).offset(x: 4, y: 4)
-                            }
+                    IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 52).coreEnterBounce(
+                        hovering
+                    )
+                    .overlay(alignment: .bottomTrailing) {
+                        if me {
+                            StatusDot(color: GlassInk.green, live: true).offset(x: 4, y: 4)
                         }
+                    }
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: Space.s1) {
                             Text(device.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)

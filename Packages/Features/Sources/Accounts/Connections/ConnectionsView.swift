@@ -44,7 +44,7 @@ struct ConnectionsView: View {
             .focused($paneFocus)
             .focusEffectDisabled()
             .onAppear { paneFocus = true }
-            .retakeFocus(after: model.host.shell) { paneFocus = true }
+            .retakeFocus(after: model.host.shell, pane: "connections") { paneFocus = true }
             .onKeyPress(.downArrow) { arrow(1) }
             .coreSideKeys { arrow($0) }
             .onKeyPress(.upArrow) { arrow(-1) }

@@ -185,7 +185,6 @@ private struct PaneTabs: View {
     let onDrag: (String, CGPoint, CGSize) -> Void
     let onDragEnd: (String) -> Void
     @Namespace private var indicator
-    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         HStack(spacing: Space.s1) {
@@ -197,7 +196,7 @@ private struct PaneTabs: View {
         }
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac)
-        .animation(reduce ? nil : Motion.out(Motion.ui), value: shell.focusedPane ?? shell.activePane)
+        .coreAnimation(Motion.out(Motion.ui), value: shell.focusedPane ?? shell.activePane)
         .coreSideKeys {
             shell.cyclePane($0)
             return .handled

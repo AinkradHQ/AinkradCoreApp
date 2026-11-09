@@ -73,6 +73,15 @@ struct ModelTests {
         #expect(why.hasPrefix("Nothing happened for 10 minutes"))
     }
 
+    @Test func closingTheDialogByAnyRouteStopsARunningSignIn() async {
+        let (m, svc, _) = await make()
+        m.signIn = SignInFlow(stage: .working, login: "lg", label: "plan")
+        m.dialogClosed()
+        for _ in 0..<50 where m.signIn != nil { await Task.yield() }
+        #expect(m.signIn == nil)
+        #expect(svc.log.contains("cancelLogin lg"))
+    }
+
     @Test func budgetStandingCountsWhatWasRaisedAndTheHardStop() {
         func b(
             cap: Int64, usd: Int64?, spent: Int64, usdSpent: Int64, raised: Int64 = 0, stop: Bool = true,

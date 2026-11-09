@@ -56,7 +56,7 @@ struct LimitsTests {
         let (m, svc, host) = await make(limits: [Self.day])
         #expect(await m.clearLimit(m.account(1)!, Self.day))
         #expect(svc.log.contains("clearLimit 1 tokens 86400"))
-        #expect(host.reasons.first?.hasPrefix("Remove the 1,000\u{00A0}tokens limit") == true)
+        #expect(host.reasons.first?.hasPrefix("Remove the \(1000.formatted())\u{00A0}tokens limit") == true)
     }
 
     @Test func aDeclinedTouchIDChangesNothing() async {
