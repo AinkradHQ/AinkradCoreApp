@@ -163,3 +163,85 @@ struct ConnectionsKeysTests {
         #expect(m.key("x") == false)
     }
 }
+
+@MainActor
+struct ConnectionsGapTests {
+    func make() async -> (ConnectionsModel, SampleConnections, FakeHost) {
+        let host = FakeHost()
+        let m = ConnectionsModel(host: host)
+        let s = SampleConnections()
+        m.use(s)
+        await m.reload()
+        return (m, s, host)
+    }
+
+    @Test func theDefaultBadgeFollowsTheDefaultsListAndClearingRemovesIt() async {
+        let (m, _, host) = await make()
+        #expect(m.item(1)?.isDefault == true && m.item(3)?.isDefault == true)
+        await m.clearDefault(m.item(1)!)
+        #expect(m.item(1)?.isDefault == false)
+        #expect(m.item(3)?.isDefault == true)  // another kind is untouched
+        #expect(host.reasons.last?.contains("Stop using") == true)
+    }
+
+    @Test func aDeclinedTouchIDChangesNothing() async {
+        let (m, _, host) = await make()
+        host.declines = true
+        await m.clearDefault(m.item(1)!)
+        #expect(m.item(1)?.isDefault == true)
+        #expect(await m.replaceToken(m.item(2)!, token: "t", fields: [:]) == false)
+        #expect(m.item(2)?.status == .needsLook)
+    }
+
+    @Test func replacingATokenSendsItOnceAndFixesTheConnection() async {
+        let (m, s, host) = await make()
+        #expect(await m.replaceToken(m.item(2)!, token: "new-token", fields: [:]))
+        #expect(s.sent == ["new-token"])
+        #expect(m.item(2)?.status == .connected)
+        #expect(!host.reasons.joined().contains("new-token"))  // never in a reason shown to the person
+        #expect(m.writeError["replace-2"] == nil)
+    }
+
+    @Test func aRefusedReplacementSaysSoInWordsAndKeepsTheOldState() async {
+        let (m, s, _) = await make()
+        s.failReplace = true
+        #expect(await m.replaceToken(m.item(2)!, token: "bad", fields: [:]) == false)
+        #expect(m.writeError["replace-2"]?.contains("Nothing was changed") == true)
+        #expect(m.item(2)?.status == .needsLook)
+    }
+
+    @Test func appRegistrationShowsSetAndNotSetAndNeverASecret() async {
+        let (m, s, _) = await make()
+        guard case .ready(let gh) = await m.loadApp("github") else {
+            Issue.record("no app")
+            return
+        }
+        #expect(gh.configured && gh.fields.first { $0.id == "client_id" }?.value == "Iv1.sample1234")
+        #expect(gh.fields.first { $0.id == "app_key" }?.secret == true)
+        #expect(gh.fields.first { $0.id == "app_key" }?.value == nil)
+        guard case .ready(let jira) = await m.loadApp("jira") else {
+            Issue.record("no app")
+            return
+        }
+        #expect(!jira.configured && jira.redirect == "http://127.0.0.1:47613/callback")
+        #expect(await m.saveApp("jira", fields: ["client_id": "abc", "client_secret": "s3cret"]))
+        guard case .ready(let after) = await m.loadApp("jira") else {
+            Issue.record("no app")
+            return
+        }
+        #expect(after.configured)
+        let secret = after.fields.first { $0.id == "client_secret" }
+        #expect(secret?.isSet == true && secret?.value == nil)
+        #expect(s.sent.contains("s3cret"))
+    }
+
+    @Test func aNonAdminGetsReadOnlyAndAFailureSaysWhatToDo() async {
+        let (m, s, _) = await make()
+        s.appReadOnly = true
+        #expect(await m.loadApp("github") == .readOnly)
+        s.appReadOnly = false
+        s.failApp = true
+        #expect(await m.saveApp("github", fields: ["client_id": "x"]) == false)
+        #expect(m.writeError["app-github"]?.contains("Nothing was changed") == true)
+    }
+}

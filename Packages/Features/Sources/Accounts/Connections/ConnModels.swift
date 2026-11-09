@@ -94,6 +94,33 @@ struct ConnActivity: Identifiable, Equatable, Sendable {
     let at: Date
 }
 
+/// Ainkrad's OAuth app for a kind, as the Core says it. A secret field only ever says whether it is set.
+struct ConnApp: Equatable, Sendable {
+    struct Field: Identifiable, Equatable, Sendable {
+        /// The Core's key for the field, shown only as hover help.
+        let id: String
+        let title: String
+        let secret: Bool
+        let isSet: Bool
+        /// A field that is no secret says its value.
+        let value: String?
+    }
+    let kind: String
+    let configured: Bool
+    let fields: [Field]
+    /// Atlassian: the address to register with them, exactly.
+    let redirect: String?
+}
+
+/// What the App registration sheet shows while it reads the Core.
+enum ConnAppLoad: Equatable, Sendable {
+    case loading
+    case ready(ConnApp)
+    /// Only an admin may read or change it.
+    case readOnly
+    case failed(String)
+}
+
 enum ConnPage: String { case list, activity }
 
 enum ConnFilter: String, CaseIterable {

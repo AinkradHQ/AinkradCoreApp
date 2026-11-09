@@ -34,8 +34,9 @@ public final class ConnectionsModel {
     /// What the last Test of each connection said.
     var tested: [Int64: String] = [:]
     var testing: Int64?
-    private(set) var writeError: [String: String] = [:]
-    private(set) var busy: String?
+    /// Set by the Debug scenes too (a Touch ID write can't run there), hence not private(set).
+    var writeError: [String: String] = [:]
+    var busy: String?
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     /// A macOS notification (id, title, body); the app routes it through the Agents notifier.
     @ObservationIgnored public var notify: ((String, String, String) -> Void)?
@@ -141,6 +142,14 @@ public final class ConnectionsModel {
             async let i = service.connections()
             async let a = service.activity(connection: nil)
             (kinds, items, activity) = try await (k, i, a)
+            // The defaults list is the truth for the "Default" badge; a member can't read it and keeps what the list said.
+            if let d = try? await service.defaults() {
+                items = items.map {
+                    var c = $0
+                    c.isDefault = d[c.kind] == c.id
+                    return c
+                }
+            }
             load = .ready
         } catch {
             load = .failed(code: "error", message: ConnSay.plain(error))
@@ -313,6 +322,40 @@ public final class ConnectionsModel {
         let k = kind(c.kind)?.name ?? c.kind
         await write("default-\(c.id)", reason: "Use \(c.name) first for \(k).", done: "\(c.name) is the \(k) default") {
             try await $0.setDefault(c.id)
+        }
+    }
+
+    func clearDefault(_ c: ConnItem) async {
+        let k = kind(c.kind)?.name ?? c.kind
+        await write("cleardefault-\(c.id)", reason: "Stop using \(c.name) first for \(k).", done: "\(k) has no default")
+        {
+            try await $0.clearDefault(kind: c.kind)
+        }
+    }
+
+    /// Replace the token behind a connection. The token goes in once and is not kept anywhere here.
+    func replaceToken(_ c: ConnItem, token: String, fields: [String: String]) async -> Bool {
+        await write("replace-\(c.id)", reason: "Replace the token for \(c.name).", done: "\(c.name) has a new token") {
+            try await $0.replaceCredential(c.id, token: token, fields: fields)
+        }
+    }
+
+    // MARK: app registration
+
+    func loadApp(_ kind: String) async -> ConnAppLoad {
+        guard let service else { return .failed("This Mac isn't connected to a Core.") }
+        do { return .ready(try await service.app(kind: kind)) } catch CoreError.forbiddenScope {
+            return .readOnly
+        } catch {
+            return .failed(ConnSay.plain(error))
+        }
+    }
+
+    /// Only the changed fields are sent; secrets are never kept or shown again.
+    func saveApp(_ kind: String, fields: [String: String]) async -> Bool {
+        let name = self.kind(kind)?.name ?? kind
+        return await write("app-\(kind)", reason: "Change the \(name) app registration.", done: "\(name) app saved") {
+            _ = try await $0.setApp(kind: kind, fields: fields)
         }
     }
 
