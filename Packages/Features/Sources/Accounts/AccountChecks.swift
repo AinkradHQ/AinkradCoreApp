@@ -68,7 +68,7 @@ enum TestWords {
 
 enum LimitWords {
     static func tokens(_ n: Int64?) -> String {
-        n.map { "\($0.formatted(.number.notation(.compactName))) tokens" } ?? "no token limit"
+        n.map { AccountsNumbers.tokens($0) } ?? "no token limit"
     }
     static func usd(_ micros: Int64?) -> String {
         micros.map { ModelPriceItem.usd($0) } ?? "no dollar limit"
@@ -137,7 +137,7 @@ struct LimitsTileBody: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s4) {
-            figure(account.maxTokens.map { $0.formatted(.number.notation(.compactName)) }, "tokens")
+            figure(account.maxTokens.map { AccountsNumbers.amount($0) }, "tokens")
             figure(account.maxUSDMicros.map { ModelPriceItem.usd($0) }, "dollars")
             Spacer(minLength: 0)
             AccLink(title: "Change · S", symbol: "slider.horizontal.3") { AccountDialogs.openLimits(model, account) }
@@ -170,24 +170,23 @@ struct LimitsDialog: View {
         self.model = model
         self.account = account
         self.close = close
-        _tokens = State(initialValue: account.maxTokens.map(String.init) ?? "")
+        _tokens = State(initialValue: account.maxTokens.map { AccountsNumbers.grouped($0) } ?? "")
         _dollars = State(
-            initialValue: account.maxUSDMicros.map { String(format: "%.2f", Double($0) / 1_000_000) } ?? "")
+            initialValue: account.maxUSDMicros.map { AccountsNumbers.dollarsField($0) } ?? "")
     }
 
     private static func clean(_ s: String) -> String {
         s.filter { !",_ $".contains($0) }
     }
     private var tokenValue: Int64?? {
-        let t = Self.clean(tokens)
-        if t.isEmpty { return .some(nil) }
-        guard let n = Int64(t), n >= Self.minTokens else { return nil }
+        if Self.clean(tokens).isEmpty { return .some(nil) }
+        guard let n = AccountsNumbers.parseWhole(tokens), n >= Self.minTokens else { return nil }
         return .some(n)
     }
     private var usdValue: Int64?? {
         let t = Self.clean(dollars)
         if t.isEmpty { return .some(nil) }
-        guard let d = Double(t), d > 0, d < 1_000_000 else { return nil }
+        guard let d = AccountsNumbers.parseDecimal(dollars), d > 0, d < 1_000_000 else { return nil }
         return .some(Int64((d * 1_000_000).rounded()))
     }
 
@@ -198,7 +197,7 @@ struct LimitsDialog: View {
                     CoreTextField(
                         "Most tokens", placeholder: "No limit", text: $tokens,
                         error: tokenValue == nil
-                            ? "A whole number, at least \(Self.minTokens.formatted()). One turn needs that much." : nil,
+                            ? "A whole number, at least \(AccountsNumbers.grouped(Self.minTokens)). One turn needs that much." : nil,
                         suffix: "tokens", autofocus: true
                     ) { go() }
                     CoreTextField(

@@ -115,8 +115,8 @@ public final class AccountsModel {
     func providerName(_ id: String) -> String { provider(id)?.name ?? id }
     func account(_ id: Int64) -> AccountItem? { accounts.first { $0.id == id } }
     func pool(_ id: Int64) -> PoolItem? { pools.first { $0.id == id } }
-    var needLook: [AccountItem] { accounts.filter { $0.phase.needsLook } }
-    var readyCount: Int { accounts.filter { $0.phase == .active }.count }
+    var needLook: [AccountItem] { needLookAccounts }
+    var readyCount: Int { readyAccounts }
     var selectedPool: PoolItem? { pool(poolSelection ?? -1) ?? pools.first { $0.isDefault } ?? pools.first }
     func members(of pool: PoolItem) -> [AccountItem] { pool.members.compactMap { account($0) } }
     func chain(_ id: Int64) -> ChainItem? { chains.first { $0.id == id } }
@@ -127,7 +127,7 @@ public final class AccountsModel {
     func pools(for provider: String) -> [PoolItem] { pools.filter { $0.provider == provider } }
     func defaultPool(_ provider: String) -> PoolItem? { pools.first { $0.provider == provider && $0.isDefault } }
     /// The member tried first: the first one in the fallback order that is ready.
-    func firstReady(in pool: PoolItem) -> AccountItem? { members(of: pool).first { $0.phase == .active } }
+    func firstReady(in pool: PoolItem) -> AccountItem? { members(of: pool).first { verdict($0).isReady } }
     /// Accounts of the pool's provider that are not in it yet.
     func candidates(for pool: PoolItem) -> [AccountItem] {
         accounts.filter { $0.provider == pool.provider && !pool.members.contains($0.id) }
@@ -155,7 +155,9 @@ public final class AccountsModel {
             await reloadChains(service)
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
-        if detail != nil { await reloadLimits() }
+        // The verdict on every card needs the limits and budgets too; a device without `admin` just gets none.
+        await reloadLimits()
+        await reloadBudgets()
         gate = (try? await service.gate()) ?? GateState()
         let chip: PaneChip =
             switch load {

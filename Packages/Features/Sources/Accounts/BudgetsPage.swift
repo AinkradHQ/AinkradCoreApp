@@ -270,9 +270,9 @@ struct BudgetDialog: View {
         _kind = State(initialValue: editing?.kind ?? "account")
         _subject = State(initialValue: editing?.subject ?? "")
         _period = State(initialValue: editing?.period ?? "month")
-        _tokens = State(initialValue: editing.map { $0.tokenCap > 0 ? String($0.tokenCap) : "" } ?? "")
+        _tokens = State(initialValue: editing.map { $0.tokenCap > 0 ? AccountsNumbers.grouped($0.tokenCap) : "" } ?? "")
         _dollars = State(
-            initialValue: editing?.usdCap.map { String(format: "%.2f", Double($0) / 1_000_000) } ?? "")
+            initialValue: editing?.usdCap.map { AccountsNumbers.dollarsField($0) } ?? "")
         _warn = State(initialValue: String(editing?.warnAt ?? 80))
         _hardStop = State(initialValue: editing?.hardStop ?? true)
     }
@@ -280,12 +280,12 @@ struct BudgetDialog: View {
     private static func clean(_ s: String) -> String { s.filter { !",_ $".contains($0) } }
     private var tokenCap: Int64? {
         let t = Self.clean(tokens)
-        return t.isEmpty ? 0 : Int64(t).flatMap { $0 > 0 ? $0 : nil }
+        return t.isEmpty ? 0 : AccountsNumbers.parseWhole(t).flatMap { $0 > 0 ? $0 : nil }
     }
     private var usdCap: Int64?? {
         let t = Self.clean(dollars)
         if t.isEmpty { return .some(nil) }
-        guard let d = Double(t), d > 0 else { return nil }
+        guard let d = AccountsNumbers.parseDecimal(t), d > 0 else { return nil }
         return .some(Int64((d * 1_000_000).rounded()))
     }
     private var warnAt: Int64? {
@@ -406,12 +406,12 @@ struct RaiseDialog: View {
 
     private var t: Int64?? {
         let s = tokens.filter { !", _".contains($0) }
-        return s.isEmpty ? .some(nil) : Int64(s).flatMap { $0 > 0 ? .some($0) : nil }
+        return s.isEmpty ? .some(nil) : AccountsNumbers.parseWhole(s).flatMap { $0 > 0 ? .some($0) : nil }
     }
     private var u: Int64?? {
         let s = dollars.filter { !", _$".contains($0) }
         if s.isEmpty { return .some(nil) }
-        return Double(s).flatMap { $0 > 0 ? .some(Int64(($0 * 1_000_000).rounded())) : nil }
+        return AccountsNumbers.parseDecimal(s).flatMap { $0 > 0 ? .some(Int64(($0 * 1_000_000).rounded())) : nil }
     }
     private var ok: Bool {
         guard let t, let u else { return false }

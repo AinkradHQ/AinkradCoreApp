@@ -40,8 +40,8 @@ enum UsageLimitWords {
     }
 
     static func amount(_ n: Int64, unit: String) -> String {
-        let v = n.formatted(.number.notation(.compactName))
-        return unit == "messages" ? "\(v) \(n == 1 ? "message" : "messages")" : "\(v) tokens"
+        unit == "messages"
+            ? coreUnit(AccountsNumbers.amount(n), n == 1 ? "message" : "messages") : AccountsNumbers.tokens(n)
     }
 
     static func standing(_ l: LimitItem) -> String {
@@ -54,7 +54,7 @@ enum UsageLimitWords {
 
     /// A whole number of at least 1, commas and spaces allowed.
     static func parseCap(_ text: String) -> Int64? {
-        Int64(text.filter { !",_ ".contains($0) }).flatMap { $0 >= 1 ? $0 : nil }
+        AccountsNumbers.parseWhole(text).flatMap { $0 >= 1 ? $0 : nil }
     }
 }
 
@@ -105,26 +105,57 @@ extension AccountDialogs {
     }
 }
 
-/// "Usage limits" on an account page: each limit with how much of it is used, add, change and remove. Reading needs
-/// `admin` like the usage it comes from, so a device without it sees one line saying so.
+/// "Limits" on an account page: every way this account can be capped, in one card and in plain words. Each row says its
+/// kind: how many sessions at once, what one session may spend, the budget for a period, and the usage windows. Reading
+/// usage needs `admin` like the usage it comes from, so a device without it sees one line saying so.
 struct AccountLimitsSection: View {
     let model: AccountsModel
     let account: AccountItem
     let hue: Color
 
+    private var sessionWords: String {
+        switch (account.maxTokens, account.maxUSDMicros) {
+        case (nil, nil): "No limit. A session may spend as much as it needs."
+        case (let t?, nil): "Core stops a session at \(AccountsNumbers.tokens(t))."
+        case (nil, let u?): "Core stops a session at \(AccountsNumbers.usd(u))."
+        case (let t?, let u?):
+            "Core stops a session at \(AccountsNumbers.tokens(t)) or \(AccountsNumbers.usd(u)), whichever comes first."
+        }
+    }
+
     var body: some View {
         let rows = model.limits(of: account)
+        let budgets = model.budgets.filter { $0.kind == "account" && $0.subject == String(account.id) }
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
-                Label("Usage limits", systemImage: "gauge.with.dots.needle.67percent")
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                Label("Limits", systemImage: "gauge.with.dots.needle.67percent")
+                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 if model.limitsLoad == .ready {
-                    AccLink(title: "Add a limit", symbol: "plus", help: "Add a usage limit") {
+                    AccLink(title: "Add a usage limit", symbol: "plus", help: "Add a usage limit") {
                         AccountDialogs.openLimit(model, account, editing: nil)
                     }
                     .disabled(model.readOnly)
                 }
+            }
+            LimitRow(
+                kind: "Sessions at once", title: account.cap == 0 ? "No limit" : "Up to \(account.cap) at the same time",
+                detail: "More sessions than that wait for a free place.", change: "Change"
+            ) { AccountDialogs.openCap(model, account) }
+            .disabled(model.readOnly)
+            LimitRow(
+                kind: "Each session", title: sessionWords, detail: nil, change: "Change"
+            ) { AccountDialogs.openLimits(model, account) }
+            .disabled(model.readOnly)
+            if let e = model.writeError["cap-\(account.id)"] ?? model.writeError["limits-\(account.id)"] {
+                AccIssue(text: e)
+            }
+            ForEach(budgets) { b in
+                LimitRow(
+                    kind: "Budget", title: AccountBudgetLine.text(b),
+                    detail: b.standing == .stopped ? "Spent. New work on this account is stopped." : nil,
+                    change: "Open Budgets"
+                ) { model.page = .budgets; model.detail = nil }
             }
             switch model.limitsLoad {
             case .loading: AccSkeleton()
@@ -160,10 +191,17 @@ struct AccountLimitsSection: View {
             switch l.standing {
             case .reached: GlassInk.red
             case .warning: GlassInk.orange
-            case .fine: GlassInk.green
+            case .fine: GlassInk.blue
+            }
+        let ink: Color =
+            switch l.standing {
+            case .reached: GlassInk.redInk
+            case .warning: GlassInk.orangeInk
+            case .fine: GlassInk.secondary
             }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: Space.s2) {
+                AccChip(text: "Usage window")
                 Text(UsageLimitWords.amount(l.cap, unit: l.unit)).font(
                     .system(size: MacTextSize.headline, weight: .semibold))
                 Text(UsageLimitWords.window(l.windowSecs).lowercased()).foregroundStyle(GlassInk.secondary)
@@ -190,7 +228,7 @@ struct AccountLimitsSection: View {
             Text(
                 "\(UsageLimitWords.amount(l.used, unit: l.unit)) used, \(Int((l.share * 100).rounded()))%. Warns at \(l.warnPercent)%. \(UsageLimitWords.standing(l))"
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(l.standing == .fine ? GlassInk.secondary : tone)
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(ink)
         }
         .padding(Space.s2)
         .background(GlassInk.well, in: coreShape(Radius.control))
@@ -217,7 +255,7 @@ struct LimitDialog: View {
         self.close = close
         _unit = State(initialValue: editing?.unit ?? "tokens")
         _window = State(initialValue: editing?.windowSecs ?? 86_400)
-        _cap = State(initialValue: editing.map { String($0.cap) } ?? "")
+        _cap = State(initialValue: editing.map { AccountsNumbers.grouped($0.cap) } ?? "")
         _warn = State(initialValue: Double(editing?.warnPercent ?? 80) / 100)
     }
 
@@ -308,5 +346,49 @@ struct ClearLimitDialog: View {
             }
         }
         .accessibilityIdentifier("account-limit-clear")
+    }
+}
+
+/// One row of the Limits card: its kind, the rule in a sentence and the way to change it.
+struct LimitRow: View {
+    let kind: String
+    let title: String
+    let detail: String?
+    let change: String
+    let action: () -> Void
+    var body: some View {
+        HStack(alignment: .center, spacing: Space.s2) {
+            AccChip(text: kind)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                }
+            }
+            Spacer(minLength: Space.s2)
+            AccLink(title: change, symbol: "slider.horizontal.3", action: action)
+        }
+        .padding(Space.s2)
+        .background(GlassInk.well, in: coreShape(Radius.control))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+enum AccountBudgetLine {
+    /// "Up to 2 million tokens and $50.00 each month, 40% used".
+    static func text(_ b: BudgetItem) -> String {
+        var caps: [String] = []
+        if b.tokenCap > 0 { caps.append(AccountsNumbers.tokens(b.tokenCap)) }
+        if let u = b.usdCap { caps.append(AccountsNumbers.usd(u)) }
+        let per =
+            switch b.period {
+            case "day": "each day"
+            case "week": "each week"
+            case "month": "each month"
+            default: "in total"
+            }
+        let pct = Int((b.share * 100).rounded())
+        return "Up to \(caps.isEmpty ? "no amount" : caps.joined(separator: " and ")) \(per), \(pct)% used"
     }
 }

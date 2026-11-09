@@ -217,17 +217,17 @@ struct PriceDialog: View {
         self.model = model
         self.editing = editing
         self.close = close
-        func d(_ v: Int64?) -> String { v.map { String(format: "%.2f", Double($0) / 1_000_000) } ?? "" }
+        func d(_ v: Int64?) -> String { v.map { AccountsNumbers.dollarsField($0) } ?? "" }
         _provider = State(initialValue: editing?.provider ?? model.providers.first?.id ?? "")
         _modelID = State(initialValue: editing?.model ?? "")
         _input = State(initialValue: d(editing?.input))
         _output = State(initialValue: d(editing?.output))
-        _cache = State(initialValue: editing == nil ? "0.00" : d(editing?.cache))
+        _cache = State(initialValue: editing == nil ? d(0) : d(editing?.cache))
     }
 
     private func micros(_ s: String) -> Int64? {
         let t = s.filter { !", $".contains($0) }
-        return Double(t).flatMap { $0 >= 0 && $0 < 100_000 ? Int64(($0 * 1_000_000).rounded()) : nil }
+        return AccountsNumbers.parseDecimal(t).flatMap { $0 >= 0 && $0 < 100_000 ? Int64(($0 * 1_000_000).rounded()) : nil }
     }
     private var issue: String? {
         if provider.isEmpty { return "Pick a provider." }

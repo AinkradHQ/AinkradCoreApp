@@ -28,11 +28,11 @@ struct OverviewPage: View {
                     StatTile(
                         "Need a look", value: need.count, of: total, symbol: "exclamationmark.triangle.fill",
                         hue: need.isEmpty ? GlassInk.slate : GlassInk.orange)
-                    StatTile("In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue)
+                    StatTile("In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue, bar: false)
                     if model.chainsAllowed {
                         StatTile(
                             "Agents bound", value: model.chainBindings.count, of: max(model.chainBindings.count, 1),
-                            symbol: "link", hue: GlassInk.violet)
+                            symbol: "link", hue: GlassInk.blue, bar: false)
                     }
                 }
                 if !need.isEmpty {
@@ -112,16 +112,17 @@ private struct AlertRow: View {
     @State private var hovering = false
     var body: some View {
         let on = model.cursor == "a-\(account.id)"
-        let hue = account.phase.tone == .fail ? GlassInk.red : GlassInk.orange
+        let verdict = model.verdict(account)
+        let hue = verdict.tone == .fail ? GlassInk.red : GlassInk.orange
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
                 AccTile(provider: account.provider)
                 Text(account.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                 Spacer(minLength: Space.s2)
-                PhaseBadge(phase: account.phase)
+                VerdictBadge(verdict: model.verdict(account))
             }
-            Text(AccountsWords.why(account, now: model.now())).foregroundStyle(GlassInk.secondary)
-                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            Text(verdict.line(account, limits: model.limits(of: account), budgets: model.budgets, now: model.now()))
+                .foregroundStyle(GlassInk.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, minHeight: 34, alignment: .topLeading)
         }
         .padding(Space.s3)
@@ -150,8 +151,11 @@ private struct StatTile: View {
     let of: Int
     let symbol: String
     let hue: Color
+    /// False for a figure that is not a share of the total (nothing to measure, so no bar).
+    let bar: Bool
     @State private var shown = false
-    init(_ title: String, value: Int, of: Int, symbol: String, hue: Color) {
+    init(_ title: String, value: Int, of: Int, symbol: String, hue: Color, bar: Bool = true) {
+        self.bar = bar
         self.title = title
         self.value = value
         self.of = of
@@ -166,14 +170,16 @@ private struct StatTile: View {
                 Spacer(minLength: 0)
             }
             Text("\(value)").font(.system(size: 30, weight: .bold, design: .rounded)).contentTransition(.numericText())
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    coreShape(3).fill(GlassInk.track)
-                    coreShape(3).fill(hue.gradient)
-                        .frame(width: shown ? g.size.width * CGFloat(value) / CGFloat(max(of, 1)) : 0)
+            if bar {
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        coreShape(3).fill(GlassInk.track)
+                        coreShape(3).fill(GlassInk.blue)
+                            .frame(width: shown ? g.size.width * CGFloat(value) / CGFloat(max(of, 1)) : 0)
+                    }
                 }
+                .frame(height: 6)
             }
-            .frame(height: 6)
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
@@ -183,7 +189,7 @@ private struct StatTile: View {
         .animation(.smooth(duration: 0.4), value: value)
         .onAppear { shown = true }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title): \(value) of \(of)")
+        .accessibilityLabel(bar ? "\(title): \(value) of \(of)" : "\(title): \(value)")
     }
 }
 
@@ -195,7 +201,7 @@ private struct TriedFirst: View {
             Label {
                 Text("Tried first").font(.system(size: MacTextSize.title, weight: .semibold))
             } icon: {
-                Image(systemName: "arrow.right.to.line").foregroundStyle(GlassInk.violet)
+                Image(systemName: "arrow.right.to.line").foregroundStyle(GlassInk.blue)
             }
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s2, alignment: .leading)],
@@ -245,25 +251,25 @@ struct AccountCard: View {
 
     var body: some View {
         let a = account
-        let hue = ProviderLook.hue(a.provider)
         let on = model.cursor == "a-\(a.id)"
-        let usable = model.usable(a)
-        // The bar says whether agents can use it: full green only when ready and in a pool, two thirds orange when it
-        // only lacks a pool, part-filled in its tone otherwise.
+        let verdict = model.verdict(a)
+        let usable = verdict.usable
+        // The bar says whether agents can use it: full green only when ready and in a pool, part-filled in its tone
+        // otherwise. The same verdict as the badge, the account page and Overview.
         let state =
             usable
             ? GlassInk.green
-            : a.phase.tone == .fail ? GlassInk.red : a.phase == .disabled ? GlassInk.slate : GlassInk.orange
+            : verdict.tone == .fail ? GlassInk.red : verdict.tone == .queue ? GlassInk.slate : GlassInk.orange
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                AccTile(provider: a.provider).symbolEffect(.bounce, value: hovering)
+                AccTile(provider: a.provider)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(a.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                     Text(model.providerName(a.provider)).font(.system(size: MacTextSize.meta))
                         .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
-                PhaseBadge(phase: a.phase)
+                VerdictBadge(verdict: verdict)
             }
             // Readiness as a bar (see `state`).
             GeometryReader { g in
@@ -273,18 +279,16 @@ struct AccountCard: View {
                         .frame(
                             width: shown
                                 ? g.size.width
-                                    * (usable ? 1 : a.phase == .active ? 0.66 : a.phase == .disabled ? 0.08 : 0.45)
+                                    * (usable ? 1 : verdict.kind == .turnedOff ? 0.08 : verdict.tone == .fail ? 0.2 : 0.5)
                                 : 0
                         )
-                        .shadow(color: state.opacity(0.6), radius: 4)
                 }
             }
             .frame(height: 4)
             Text(
-                model.usable(a)
+                usable
                     ? "Ready for your agents."
-                    : a.phase == .active
-                        ? "Not in a pool yet, so agents can't use it." : AccountsWords.why(a, now: model.now())
+                    : verdict.line(a, limits: model.limits(of: a), budgets: model.budgets, now: model.now())
             )
             .foregroundStyle(GlassInk.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -315,14 +319,12 @@ struct AccountCard: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s3)
         .background(
-            on ? hue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
+            on ? GlassInk.blue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
         )
         .overlay {
-            coreShape(Radius.cardMac).strokeBorder(on ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
+            coreShape(Radius.cardMac).strokeBorder(on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
         }
-        .shadow(color: hue.opacity(on ? 0.45 : hovering ? 0.25 : 0), radius: 16, y: 4)
-        .opacity(a.phase == .disabled ? 0.7 : 1)
-        .scaleEffect(hovering ? 1.02 : on ? 1.01 : 1)
+        .opacity(verdict.kind == .turnedOff ? 0.7 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }
         .onHover { hovering = $0 }
@@ -332,7 +334,7 @@ struct AccountCard: View {
         .coreRise(shown, index)
         .onAppear { shown = true }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(a.label), \(model.providerName(a.provider)), \(a.phase.label)")
+        .accessibilityLabel("\(a.label), \(model.providerName(a.provider)), \(verdict.label)")
         .accessibilityAddTraits(on ? [.isSelected, .isButton] : .isButton)
         .accessibilityAction { openIt() }
         .accessibilityHint("Opens the account")

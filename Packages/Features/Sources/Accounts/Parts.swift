@@ -63,10 +63,13 @@ struct AccTile: View {
     }
 }
 
-/// The state badge for an account: a symbol and its word, never colour alone.
-struct PhaseBadge: View {
-    let phase: AccountPhase
-    var body: some View { StateBadge(phase.label, tone: phase.tone, symbol: phase.symbol) }
+/// The state badge for an account: the one verdict (`AccountVerdict`), a symbol and its word, never colour alone.
+struct VerdictBadge: View {
+    let verdict: AccountVerdict
+    var body: some View {
+        StateBadge(verdict.label, tone: verdict.tone, symbol: verdict.symbol)
+            .help(verdict.cause.map { "Opens: \(AccountsWords.causeName($0))" } ?? verdict.label)
+    }
 }
 
 /// A small glass action: icon and words, lifting and lighting in its colour on hover (red when it removes something).

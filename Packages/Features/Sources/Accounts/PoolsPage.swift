@@ -197,7 +197,7 @@ private struct MemberRow: View {
                     .foregroundStyle(first ? hue : GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
-            if let a { PhaseBadge(phase: a.phase) }
+            if let a { VerdictBadge(verdict: model.verdict(a)) }
             if let a, hovering || on {
                 AccLink(title: "Remove", symbol: "xmark", danger: true, help: "Remove \(a.label) from \(pool.name)") {
                     Task { await model.remove(a, from: pool) }

@@ -83,7 +83,7 @@ enum SpendWindow: String, CaseIterable, Sendable {
 
 enum CostWords {
     static func usd(_ micros: Int64) -> String { ModelPriceItem.usd(micros) }
-    static func tokens(_ n: Int64) -> String { n.formatted(.number.notation(.compactName)) }
+    static func tokens(_ n: Int64) -> String { AccountsNumbers.amount(n) }
 
     static func basis(_ b: String) -> (title: String, hue: Color) {
         switch b {

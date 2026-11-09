@@ -8,90 +8,83 @@ import SwiftUI
 struct AccountDetailView: View {
     let model: AccountsModel
     let account: AccountItem
-    @State private var shown = false
     @State private var tech = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let a = account
         let ro = model.readOnly
-        let hue = ProviderLook.hue(a.provider)
         let pools = model.pools(of: a)
         let on = a.phase != .disabled
-        let usable = a.phase == .active && !pools.isEmpty
-        VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(alignment: .center, spacing: Space.s3) {
-                BackTile { model.detail = nil }
-                AccTile(large: true, provider: a.provider)
-                    .symbolEffect(.pulse, options: .repeating, isActive: usable && !reduce)
-                VStack(alignment: .leading, spacing: 3) {
+        let verdict = model.verdict(a)
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading, spacing: Space.s4) {
+                HStack(alignment: .center, spacing: Space.s3) {
+                    BackTile { model.detail = nil }
+                    AccTile(large: true, provider: a.provider)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: Space.s2) {
+                            Text(a.label).font(.system(size: MacTextSize.large, weight: .bold)).lineLimit(1)
+                                .accessibilityAddTraits(.isHeader)
+                            VerdictBadge(verdict: verdict)
+                        }
+                        Text(model.providerName(a.provider)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: Space.s3)
                     HStack(spacing: Space.s2) {
-                        Text(a.label).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(
-                            .isHeader)
-                        PhaseBadge(phase: a.phase)
+                        AppActionTile(title: "Remove", symbol: "trash", key: "⌫", hue: GlassInk.red) {
+                            AccountDialogs.openDelete(model, a)
+                        }
+                        .disabled(ro)
+                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.blue) {
+                            AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
+                        }
+                        .disabled(ro)
+                        AppActionTile(
+                            title: on ? "Turn off" : "Turn on", symbol: on ? "pause.fill" : "play.fill", key: "T",
+                            hue: on ? GlassInk.slate : GlassInk.green, prominent: !on
+                        ) {
+                            Task { await model.setEnabled(a, !on) }
+                        }
+                        .disabled(ro || model.busy != nil)
                     }
-                    Text(model.providerName(a.provider)).foregroundStyle(GlassInk.secondary)
                 }
-                Spacer(minLength: Space.s3)
+                .id("top")
+                banner(a, verdict: verdict, pools: pools, proxy: proxy)
+                if let e = model.writeError["account-\(a.id)"] { AccIssue(text: e) }
+                if a.lastTest?.result == "auth_failed", a.phase != .disabled { confirming }
+                HStack(alignment: .top, spacing: Space.s3) {
+                    keyTile(a)
+                    tile("Key test", "checkmark.shield.fill") { TestTile(model: model, account: a, hue: GlassInk.blue) }
+                        .id("keytest")
+                    poolsTile(a, pools).id("pools")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                AccountLimitsSection(model: model, account: a, hue: GlassInk.blue).id("limits")
+                AccountSlice(model: model, account: a)
                 HStack(spacing: Space.s2) {
-                    AppActionTile(title: "Remove", symbol: "trash", key: "⌫", hue: GlassInk.red) {
-                        AccountDialogs.openDelete(model, a)
-                    }
-                    .disabled(ro)
-                    AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.orange) {
-                        AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
-                    }
-                    .disabled(ro)
-                    AppActionTile(
-                        title: on ? "Turn off" : "Turn on", symbol: on ? "pause.fill" : "play.fill", key: "T",
-                        hue: on ? GlassInk.slate : GlassInk.green, prominent: !on
+                    Spacer(minLength: Space.s2)
+                    AccLink(
+                        title: tech ? "Hide details" : "Technical details", symbol: tech ? "chevron.up" : "chevron.down"
                     ) {
-                        Task { await model.setEnabled(a, !on) }
+                        withAnimation(Motion.out(Motion.ui)) { tech.toggle() }
                     }
-                    .disabled(ro || model.busy != nil)
                 }
-            }
-            verdict(a, usable: usable, on: on, pools: pools, hue: hue)
-            if let e = model.writeError["account-\(a.id)"] { AccIssue(text: e) }
-            if a.lastTest?.result == "auth_failed", a.phase != .disabled { confirming }
-            HStack(alignment: .top, spacing: Space.s3) {
-                keyTile(a, hue)
-                capTile(a, hue)
-                poolsTile(a, pools, hue)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .top, spacing: Space.s3) {
-                tile("Key test", "checkmark.shield.fill", hue) { TestTile(model: model, account: a, hue: hue) }
-                tile("Each session", "gauge.with.needle.fill", hue) {
-                    LimitsTileBody(model: model, account: a, hue: hue)
+                .font(.system(size: MacTextSize.meta))
+                if tech {
+                    HStack(spacing: Space.s2) {
+                        AccChip(text: "state \(a.state)", mono: true)
+                        AccChip(text: a.baseURL, mono: true)
+                        AccChip(text: "id \(a.id)", mono: true)
+                        AccChip(text: "added \(a.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                    }
+                    .transition(.opacity)
                 }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            AccountLimitsSection(model: model, account: a, hue: hue)
-            HStack(spacing: Space.s2) {
-                Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
-                Text("Spend and usage over time appear here once Core reports them.")
-                    .foregroundStyle(GlassInk.secondary)
-                Spacer(minLength: Space.s2)
-                AccLink(
-                    title: tech ? "Hide details" : "Technical details", symbol: tech ? "chevron.up" : "chevron.down"
-                ) {
-                    withAnimation(.smooth(duration: 0.35)) { tech.toggle() }
-                }
-            }
-            .font(.system(size: MacTextSize.meta))
-            if tech {
-                HStack(spacing: Space.s2) {
-                    AccChip(text: "state \(a.state)", mono: true)
-                    AccChip(text: a.baseURL, mono: true)
-                    AccChip(text: "id \(a.id)", mono: true)
-                    AccChip(text: "added \(a.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .foregroundStyle(GlassInk.primary)
-        .onAppear { shown = true }
+        .task(id: a.id) { await model.reloadCosts() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-detail")
     }
@@ -103,7 +96,6 @@ struct AccountDetailView: View {
         HStack(spacing: Space.s3) {
             Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(GlassInk.orangeInk)
-                .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
             VStack(alignment: .leading, spacing: 2) {
                 Text("The provider refused this key once").font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text("Core is checking it again. If it's refused again, the account turns off by itself.")
@@ -117,56 +109,59 @@ struct AccountDetailView: View {
         .transition(.opacity)
     }
 
-    /// "Agents can use it" or what is missing, with the three things an account needs as a path, and the fix.
-    private func verdict(_ a: AccountItem, usable: Bool, on: Bool, pools: [PoolItem], hue: Color) -> some View {
-        let tone: Color = usable ? GlassInk.green : a.phase.tone == .fail ? GlassInk.red : GlassInk.orange
-        let title =
-            usable
-            ? "Your agents can use it"
-            : !on ? "Turned off" : a.phase != .active ? a.phase.label : "Not in a pool yet"
+    /// The one verdict: what it is, why, and the way to its cause.
+    private func banner(_ a: AccountItem, verdict: AccountVerdict, pools: [PoolItem], proxy: ScrollViewProxy) -> some View
+    {
+        let tone = palette.tone(verdict.tone)
+        let title = verdict.usable ? "Your agents can use it" : verdict.label
         let line =
-            usable
-            ? "It's in \(pools.map { "\($0.name)" }.joined(separator: ", ")). Agents bound to \(pools.count == 1 ? "that pool" : "those pools") draw on it."
-            : !on || a.phase != .active
-                ? AccountsWords.why(a, now: model.now())
-                : "Agents only use accounts that are in a pool. Add it to one and it's ready."
+            verdict.usable
+            ? "It's in \(pools.map(\.name).joined(separator: ", ")). Agents bound to \(pools.count == 1 ? "that pool" : "those pools") draw on it."
+            : verdict.line(a, limits: model.limits(of: a), budgets: model.budgets, now: model.now())
         return HStack(spacing: Space.s4) {
-            Image(systemName: usable ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
+            Image(systemName: verdict.usable ? "checkmark.seal.fill" : verdict.symbol)
+                .font(.system(size: 24, weight: .semibold)).foregroundStyle(tone.ink)
                 .frame(width: 52, height: 52)
-                .background(
-                    LinearGradient(colors: [tone, tone.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(13)
-                )
-                .shadow(color: tone.opacity(0.5), radius: 12)
-                .symbolEffect(.bounce, value: usable)
+                .background(GlassInk.well, in: coreShape(Radius.cardMac))
                 .contentTransition(.symbolEffect(.replace))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: MacTextSize.title, weight: .bold)).foregroundStyle(tone)
+                Text(title).font(.system(size: MacTextSize.title, weight: .bold)).foregroundStyle(tone.ink)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
-            path(on: on, inPool: !pools.isEmpty, hue: tone)
-            if on, a.phase == .active, pools.isEmpty {
-                AppActionTile(title: "Add to a pool", symbol: "square.grid.2x2", key: "P", hue: hue, prominent: true) {
+            path(on: a.phase != .disabled, inPool: !pools.isEmpty, hue: GlassInk.blue)
+            if let cause = verdict.cause, cause != .state, cause != .pools {
+                AccLink(title: "Open \(AccountsWords.causeName(cause))", symbol: "arrow.down.right") {
+                    open(cause, proxy: proxy)
+                }
+            }
+            if verdict.kind == .noPool {
+                AppActionTile(title: "Add to a pool", symbol: "square.grid.2x2", key: "P", hue: GlassInk.blue, prominent: true) {
                     addToPool(a)
                 }
                 .disabled(model.readOnly)
             }
         }
         .padding(Space.s4)
-        // The glow is an overlay of the fill, so it can never change the banner's size.
-        .background {
-            tone.opacity(0.1)
-                .overlay(alignment: .leading) {
-                    coreShape(60).fill(tone.opacity(0.35)).frame(width: 200, height: 80).blur(radius: 50)
-                        .offset(x: shown && !reduce ? 40 : -60)
-                        .animation(reduce ? nil : .easeInOut(duration: 4).repeatForever(), value: shown)
-                }
-                .clipShape(coreShape(Radius.cardMac))
+        .background(tone.fill.opacity(0.12), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(tone.ink.opacity(0.4), lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("account-verdict")
+    }
+
+    /// A verdict's cause lives in one section of this page (or in Budgets): scroll to it.
+    private func open(_ cause: AccountVerdict.Cause, proxy: ScrollViewProxy) {
+        withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+            switch cause {
+            case .keyTest: proxy.scrollTo("keytest", anchor: .center)
+            case .limits: proxy.scrollTo("limits", anchor: .center)
+            case .pools: proxy.scrollTo("pools", anchor: .center)
+            case .budgets:
+                model.page = .budgets
+                model.detail = nil
+            case .state: proxy.scrollTo("top", anchor: .top)
+            }
         }
-        .overlay { coreShape(Radius.cardMac).strokeBorder(tone.opacity(0.45), lineWidth: 1) }
-        .animation(.smooth(duration: 0.4), value: usable)
     }
 
     /// Key saved → Turned on → In a pool: each step lit once it holds.
@@ -190,11 +185,10 @@ struct AccountDetailView: View {
 
     // MARK: tiles
 
-    private func tile<C: View>(_ title: String, _ symbol: String, _ hue: Color, @ViewBuilder _ c: () -> C) -> some View
-    {
+    private func tile<C: View>(_ title: String, _ symbol: String, @ViewBuilder _ c: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Label(title, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
-                .foregroundStyle(hue)
+                .foregroundStyle(GlassInk.secondary)
             c()
             Spacer(minLength: 0)
         }
@@ -204,63 +198,38 @@ struct AccountDetailView: View {
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 
-    private func keyTile(_ a: AccountItem, _ hue: Color) -> some View {
-        tile("Key", "lock.shield.fill", hue) {
+    private func keyTile(_ a: AccountItem) -> some View {
+        tile("Key", "lock.shield.fill") {
             HStack(spacing: 6) {
-                ForEach(0..<4, id: \.self) { i in
+                ForEach(0..<4, id: \.self) { _ in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
-                        .opacity(shown ? 1 : 0).animation(.smooth(duration: 0.3).delay(Double(i) * 0.06), value: shown)
                 }
                 Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).font(
                     .system(size: MacTextSize.title, weight: .semibold, design: .monospaced))
             }
             Text("Kept sealed in Core. It can't be shown again.").font(.system(size: MacTextSize.meta))
                 .foregroundStyle(GlassInk.secondary)
-        }
-    }
-
-    /// The limit as slots: one rounded bar per session it may run at once (or an open line when there is no limit).
-    private func capTile(_ a: AccountItem, _ hue: Color) -> some View {
-        tile("At once", "square.stack.3d.up.fill", hue) {
-            HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                Text(a.cap == 0 ? "∞" : "\(a.cap)").font(.system(size: 30, weight: .bold, design: .rounded))
-                    .contentTransition(.numericText())
-                Text(a.cap == 0 ? "no limit" : a.cap == 1 ? "session" : "sessions").foregroundStyle(
-                    GlassInk.secondary)
-                Spacer(minLength: 0)
-                AccLink(title: "Change · L", symbol: "slider.horizontal.3") { AccountDialogs.openCap(model, a) }
-                    .disabled(model.readOnly)
-            }
-            HStack(spacing: 4) {
-                ForEach(0..<Int(min(max(a.cap, 1), 12)), id: \.self) { i in
-                    coreShape(3).fill(a.cap == 0 ? hue.opacity(0.35) : hue.opacity(0.8)).frame(height: 8)
-                        .scaleEffect(x: 1, y: shown ? 1 : 0.2, anchor: .bottom)
-                        .animation(.smooth(duration: 0.4).delay(Double(i) * 0.05), value: shown)
-                }
-            }
             Text(AccountsWords.used(a.lastUsedAt, now: model.now())).font(.system(size: MacTextSize.meta))
                 .foregroundStyle(GlassInk.secondary)
         }
     }
 
-    private func poolsTile(_ a: AccountItem, _ pools: [PoolItem], _ hue: Color) -> some View {
-        tile("Pools", "square.grid.2x2.fill", hue) {
+    private func poolsTile(_ a: AccountItem, _ pools: [PoolItem]) -> some View {
+        tile("Pools", "square.grid.2x2.fill") {
             if pools.isEmpty {
                 Text("In no pool").font(.system(size: MacTextSize.title, weight: .semibold))
                 Text("Agents can't reach it yet.").font(.system(size: MacTextSize.meta)).foregroundStyle(
-                    GlassInk.orange)
+                    GlassInk.orangeInk)
             }
             ForEach(pools) { p in
                 Button {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        model.poolSelection = p.id
-                        model.page = .pools
-                        model.detail = nil
-                    }
+                    model.poolSelection = p.id
+                    model.page = .pools
+                    model.detail = nil
                 } label: {
                     HStack(spacing: Space.s2) {
-                        Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(hue)
-                        Text(p.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                        Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(GlassInk.blueInk)
+                        Text(p.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
                     }

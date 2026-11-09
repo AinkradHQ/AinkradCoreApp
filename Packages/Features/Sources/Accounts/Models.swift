@@ -326,5 +326,16 @@ enum AccountsWords {
         return s
     }
 
+    /// The section of the account page a verdict's cause lives in.
+    static func causeName(_ c: AccountVerdict.Cause) -> String {
+        switch c {
+        case .keyTest: "Key test"
+        case .limits: "Limits"
+        case .budgets: "Budgets"
+        case .state: "Account state"
+        case .pools: "Pools"
+        }
+    }
+
     static func capWords(_ cap: Int64) -> String { cap == 0 ? "No limit on sessions at once" : "Up to \(cap) at once" }
 }
