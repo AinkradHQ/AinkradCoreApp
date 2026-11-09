@@ -154,7 +154,7 @@ struct SubscriptionSignIn: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
             Text(title).font(.system(size: MacTextSize.large, weight: .bold))
             Text(line).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
-            AccBar().frame(maxWidth: Space.s8 * 6)
+            CoreBusyBar().frame(maxWidth: Space.s8 * 6)
             AppActionTile(title: "Stop", symbol: "xmark", key: "esc", hue: GlassInk.slate) {
                 Task {
                     await model.cancelSignIn()

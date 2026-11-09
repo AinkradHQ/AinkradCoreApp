@@ -215,7 +215,7 @@ private struct TriedFirst: View {
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 Text(first?.label ?? (model.defaultPool(p.id) == nil ? "No default pool" : "None ready"))
                     .font(.system(size: MacTextSize.body, weight: .semibold))
-                    .foregroundStyle(first == nil ? GlassInk.orange : GlassInk.primary).lineLimit(1)
+                    .foregroundStyle(first == nil ? GlassInk.orangeInk : GlassInk.primary).lineLimit(1)
             }
             Spacer(minLength: 0)
         }
@@ -296,7 +296,7 @@ struct AccountCard: View {
                             line.tone == .run
                                 ? GlassInk.green
                                 : line.tone == .fail
-                                    ? GlassInk.red : line.tone == .warn ? GlassInk.orange : GlassInk.secondary
+                                    ? GlassInk.redInk : line.tone == .warn ? GlassInk.orangeInk : GlassInk.secondary
                         )
                         .help(line.help)
                     if let n = AccountHealthWords.live(a.live) {

@@ -124,12 +124,14 @@ extension View {
     }
 }
 
-private struct FrameModifier: ViewModifier {
+struct FrameModifier: ViewModifier {
     let radius: CGFloat
     let rim: CGFloat
     let active: Bool
     let part: LookPart?
     let fill: Bool
+    /// The rim's resting edge; dialogs and pop-ups pass 0.3 so the frame reads 3:1 over the day glass.
+    var edge = 0.12
     @Environment(\.coreLook) private var inForce
     func body(content: Content) -> some View {
         let prefs = LookPrefs.shared
@@ -140,7 +142,7 @@ private struct FrameModifier: ViewModifier {
             .clipShape(coreShape(max(radius - rim, Radius.chip)))
             .padding(rim)
             .coreGlass(radius: radius, interactive: false, tinted: false)
-            .overlay { coreShape(radius).strokeBorder(.white.opacity(active ? 0.3 : 0.12), lineWidth: 1) }
+            .overlay { coreShape(radius).strokeBorder(.white.opacity(active ? max(0.3, edge) : edge), lineWidth: 1) }
     }
 }
 

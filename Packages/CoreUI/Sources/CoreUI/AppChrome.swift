@@ -98,7 +98,7 @@ public struct AppFilterTile: View {
             )
             .overlay {
                 if on || hovering {
-                    coreShape(Radius.control).strokeBorder(.white.opacity(on ? 0.25 : 0.14), lineWidth: 1)
+                    coreShape(Radius.control).strokeBorder(.white.opacity(on ? 0.4 : 0.3), lineWidth: 1)
                 }
             }
             .contentShape(coreShape(Radius.control))
@@ -155,7 +155,7 @@ public struct AppActionTile: View {
             )
             .overlay {
                 coreShape(Radius.control).strokeBorder(
-                    .white.opacity(prominent || hovering ? 0.3 : 0.15), lineWidth: 1)
+                    .white.opacity(prominent || hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
@@ -355,7 +355,7 @@ public struct StepTrack: View {
     public var body: some View {
         HStack(spacing: 6) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, name in
-                if i > 0 { coreShape(1).fill(i <= at ? hue : GlassInk.track).frame(width: 14, height: 2) }
+                if i > 0 { coreShape(1).fill(i <= at ? GlassInk.blue : GlassInk.track).frame(width: 14, height: 2) }
                 HStack(spacing: 4) {
                     if locked.contains(i) { Image(systemName: "lock.fill").font(.system(size: 9)) }
                     Text(name)
@@ -363,7 +363,7 @@ public struct StepTrack: View {
                 .font(.system(size: MacTextSize.meta, weight: i == at ? .semibold : .regular))
                 .foregroundStyle(i == at ? .white : GlassInk.secondary)
                 .padding(.horizontal, 8).frame(height: 24)
-                .background(i == at ? hue.opacity(0.75) : GlassInk.well, in: coreShape(6))
+                .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(6))
             }
         }
         .fixedSize()

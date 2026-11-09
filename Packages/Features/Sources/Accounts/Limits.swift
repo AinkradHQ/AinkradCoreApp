@@ -133,7 +133,7 @@ struct AccountLimitsSection: View {
                     .foregroundStyle(GlassInk.secondary)
             case .failed(_, let message):
                 HStack(spacing: Space.s2) {
-                    Text("Could not load usage limits. \(message)").foregroundStyle(GlassInk.orange)
+                    Text("Could not load usage limits. \(message)").foregroundStyle(GlassInk.orangeInk)
                     Spacer(minLength: Space.s2)
                     AccLink(title: "Try again", symbol: "arrow.clockwise") { Task { await model.reloadLimits() } }
                 }

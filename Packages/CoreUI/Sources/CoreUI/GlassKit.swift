@@ -8,11 +8,17 @@ public enum GlassInk {
     public static let track = Color.white.opacity(0.24)
     public static let well = Color.white.opacity(0.08)
     public static let wellHover = Color.white.opacity(0.13)
-    public static let wellEdge = Color.white.opacity(0.14)
+    /// Neutral edge: white 0.30, the least that reads 3:1 over the day glass (measured 2026-11-09).
+    public static let wellEdge = Color.white.opacity(0.3)
     public static let blue = Color(red: 0.25, green: 0.6, blue: 1)
     public static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
     public static let orange = Color(red: 1, green: 0.62, blue: 0.1)
     public static let red = Color(red: 1, green: 0.38, blue: 0.4)
+    // The same hues as TEXT: lighter, so red, orange and the blue link read 4.5:1 or better on the day glass (measured
+    // 2026-11-09: 3.05 to 4.34 before). Fills, tiles and bars keep the hues above.
+    public static let blueInk = Color(red: 0.52, green: 0.76, blue: 1)
+    public static let orangeInk = Color(red: 1, green: 0.70, blue: 0.30)
+    public static let redInk = Color(red: 1, green: 0.64, blue: 0.62)
     public static let violet = Color(red: 0.62, green: 0.45, blue: 1)
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
 }
@@ -192,13 +198,16 @@ public struct ScopeTile: View {
             }
             Spacer(minLength: 0)
             Image(systemName: on ? "checkmark.circle.fill" : "circle").font(.system(size: MacTextSize.title))
-                .foregroundStyle(on ? hue : GlassInk.track).contentTransition(.symbolEffect(.replace))
+                .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
                 .accessibilityHidden(true)
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(on ? hue.opacity(0.16) : GlassInk.well, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(on ? hue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1) }
+        // Selection is blue; the subject colour stays on the icon tile.
+        .background(on ? GlassInk.blue.opacity(0.16) : GlassInk.well, in: coreShape(Radius.row))
+        .overlay {
+            coreShape(Radius.row).strokeBorder(on ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
+        }
         .opacity(on ? 1 : 0.75)
         .animation(Motion.out(Motion.ui), value: on)
         .accessibilityElement(children: .combine)
@@ -256,13 +265,22 @@ public struct GlassScroll<Content: View>: View {
     var active = false
     @ObservationIgnored private var fade: Task<Void, Never>?
 
+    @ObservationIgnored private var last = Date.distantPast
+
+    /// Called every scroll frame: no allocation and no state write unless something changed; one fade task at a time.
     func update(_ new: ScrollMetrics) {
-        metrics = new
-        active = true
-        fade?.cancel()
+        if new != metrics { metrics = new }
+        last = Date()
+        if !active { active = true }
+        guard fade == nil else { return }
         fade = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.2))
+            while !Task.isCancelled {
+                let left = 1.2 - Date().timeIntervalSince(last)
+                if left <= 0 { break }
+                try? await Task.sleep(for: .seconds(left))
+            }
             if !Task.isCancelled { active = false }
+            fade = nil
         }
     }
 }

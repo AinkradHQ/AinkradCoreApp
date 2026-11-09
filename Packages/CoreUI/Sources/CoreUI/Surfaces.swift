@@ -36,7 +36,9 @@ private struct PanelModifier: ViewModifier {
         if solid {
             content.padding(padding).background(palette.panelStrong, in: coreShape(radius))
         } else {
-            content.padding(padding).coreFrame(radius: radius, rim: Space.s2, part: part)
+            content.padding(padding)
+                .modifier(
+                    FrameModifier(radius: radius, rim: Space.s2, active: false, part: part, fill: true, edge: 0.3))
         }
     }
 }
@@ -47,9 +49,13 @@ private struct GlassModifier: ViewModifier {
     let interactive: Bool
     let tinted: Bool
     let frosted: Bool
+    @Environment(\.accessibilityReduceTransparency) private var solid
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
-        if #available(macOS 26, iOS 26, *) {
+        if solid {
+            // Reduce Transparency: a solid panel fill instead of Liquid Glass (glass is not documented to honour the setting).
+            content.environment(\.colorScheme, .dark).background(palette.panelStrong, in: shape)
+        } else if #available(macOS 26, iOS 26, *) {
             if tinted {
                 // The one glass for cards, tiles and dialogs (the launcher's): a dark layer on Apple's glass, clear by
                 // day and frosted at night. The older deep-blue tint is gone (Ahmed, 2026-11-05: latest style everywhere).

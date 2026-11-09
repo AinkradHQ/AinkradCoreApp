@@ -87,7 +87,7 @@ struct AccLink: View {
                 }
                 Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).lineLimit(1)
             }
-            .foregroundStyle(hovering ? .white : hue)
+            .foregroundStyle(hovering ? .white : danger ? GlassInk.redInk : GlassInk.blueInk)
             .padding(.horizontal, Space.s2).frame(minHeight: 26)
             .background(hovering ? hue.opacity(0.7) : hue.opacity(0.12), in: coreShape(7))
             .overlay { coreShape(7).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
@@ -100,29 +100,6 @@ struct AccLink: View {
         .animation(.smooth(duration: 0.25), value: hovering)
         .coreDimWhenDisabled(enabled)
         .help(help ?? title)
-    }
-}
-
-/// Progress with no end in sight: a rounded bar with a segment that slides. With Reduce Motion the segment rests.
-struct AccBar: View {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        TimelineView(.animation(paused: reduce)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
-            let phase = reduce ? 0.5 : t - t.rounded(.down)
-            GeometryReader { geo in
-                let seg = geo.size.width * 0.3
-                ZStack(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(palette.track)
-                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
-                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
-                }
-                .clipShape(coreShape(Space.s1 / 2))
-            }
-        }
-        .frame(height: Space.s1)
-        .accessibilityHidden(true)
     }
 }
 
@@ -200,7 +177,7 @@ struct AccSkeleton: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            AccBar().frame(maxWidth: Space.s8 * 5)
+            CoreBusyBar().frame(maxWidth: Space.s8 * 5)
             Text("Loading…").foregroundStyle(palette.text2)
             ForEach(0..<4, id: \.self) { _ in
                 coreShape(Radius.cardMac).fill(palette.glassCard).frame(height: Space.s8 + Space.s6)

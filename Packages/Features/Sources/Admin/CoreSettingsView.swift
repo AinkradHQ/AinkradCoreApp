@@ -319,7 +319,7 @@ struct RangeBar: View {
                         "\(SettingWords.value(setting, ghost)) is \(ghost < setting.min ? "below the lowest" : "above the highest") allowed",
                         systemImage: "exclamationmark.triangle.fill"
                     )
-                    .foregroundStyle(GlassInk.red)
+                    .foregroundStyle(GlassInk.redInk)
                 } else {
                     Text("Default \(SettingWords.value(setting, setting.defaultValue))")
                 }
@@ -344,7 +344,7 @@ private struct HistoryTimeline: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch load {
-            case .none, .loading?: AdminBar().frame(maxWidth: Space.s8 * 5)
+            case .none, .loading?: CoreBusyBar().frame(maxWidth: Space.s8 * 5)
             case .failed(let m)?: IssueLine(code: nil, text: m)
             case .ready(let list)?:
                 if list.isEmpty {

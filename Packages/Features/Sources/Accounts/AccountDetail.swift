@@ -101,7 +101,8 @@ struct AccountDetailView: View {
     /// One refusal no longer turns an account off: Core tests the key again and only a second refusal does.
     private var confirming: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold)).foregroundStyle(GlassInk.orange)
+            Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(GlassInk.orangeInk)
                 .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
             VStack(alignment: .leading, spacing: 2) {
                 Text("The provider refused this key once").font(.system(size: MacTextSize.headline, weight: .semibold))

@@ -112,7 +112,7 @@ struct ApprovalCardView: View {
         let tile = AppActionTile(
             title: approve ? (elevated ? "Approve" : "Approve with Touch ID") : "Deny",
             symbol: approve ? (elevated ? "checkmark" : "touchid") : "xmark", key: approve ? "⌘↩" : "⌘⌫",
-            hue: approve ? GlassInk.green : GlassInk.slate, prominent: approve
+            hue: approve ? GlassInk.blue : GlassInk.slate, prominent: approve  // blue primary: green is for status only
         ) { Task { await model.decide(request, approved: approve) } }
         .disabled(busy)
         .help(

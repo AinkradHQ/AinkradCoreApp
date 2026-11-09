@@ -106,7 +106,7 @@ struct TestTile: View {
                     .help("Sends one free request with the key through a runner. Nothing is spent.")
                 }
                 if running {
-                    AccBar()
+                    CoreBusyBar()
                 } else {
                     Text(w?.line ?? "One free request checks the key works. Nothing is spent.")
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)

@@ -324,7 +324,7 @@ struct FirstRunView: View {
                 "Nothing is signed or sent from this Mac yet. The Core has to prove who it is first, then this Mac claims the code."
             )
             .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            IndBar().accessibilityHidden(true)
+            CoreBusyBar().accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)
@@ -361,7 +361,7 @@ struct FirstRunView: View {
                 .font(.system(size: MacTextSize.body, weight: .semibold))
         } else {
             VStack(alignment: .leading, spacing: Space.s1) {
-                IndBar().accessibilityHidden(true)
+                CoreBusyBar().accessibilityHidden(true)
                 Text("Waiting for approval").font(.system(size: MacTextSize.body, weight: .semibold))
                 Text(
                     "A pairing lasts 5 minutes from when the approver made the code. This Mac isn't told the exact time."

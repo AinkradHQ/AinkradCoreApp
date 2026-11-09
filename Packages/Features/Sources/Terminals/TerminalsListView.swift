@@ -51,7 +51,7 @@ struct TerminalsListView: View {
             ConnectionBanner(.error(message), retry: { Task { await model.reload() } }).padding(.horizontal, Space.s3)
             Spacer(minLength: 0)
         case .idle where model.items.isEmpty, .loading where model.items.isEmpty:
-            BusyBar().padding(Space.s4)
+            CoreBusyBar().padding(Space.s4)
             Spacer(minLength: 0)
         default:
             if model.shown.isEmpty {

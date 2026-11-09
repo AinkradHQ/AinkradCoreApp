@@ -48,7 +48,7 @@ struct OverviewTab: View {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s2) {
                         Text("Paused").font(.system(size: MacTextSize.large, weight: .semibold))
-                            .foregroundStyle(GlassInk.red)
+                            .foregroundStyle(GlassInk.redInk)
                         count(n, GlassInk.red)
                     }
                     Text(BrainWords.pausedWhy).foregroundStyle(GlassInk.secondary)

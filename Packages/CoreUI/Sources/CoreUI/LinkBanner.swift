@@ -56,7 +56,7 @@ public struct LinkBanner: View {
                 Text(state.title).font(.system(size: MacTextSize.headline, weight: .semibold))
                 detail.font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
-                if state == .renewing { LinkBar().padding(.top, Space.s1) }
+                if state == .renewing { CoreBusyBar().padding(.top, Space.s1) }
             }
             Spacer(minLength: Space.s2)
             if state != .renewing, case .resuming = state, let retry {
@@ -102,28 +102,5 @@ public struct LinkBanner: View {
                 "Sessions were renewed silently. Elevation did not survive the restart, so your next change asks for Touch ID again."
             )
         }
-    }
-}
-
-/// Progress with no end in sight, a rounded bar with a sliding segment (a rest in the middle with Reduce Motion).
-private struct LinkBar: View {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        TimelineView(.animation(paused: reduce)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate / (Motion.tick * 1.5)
-            let phase = reduce ? 0.5 : t - t.rounded(.down)
-            GeometryReader { geo in
-                let seg = geo.size.width * 0.3
-                ZStack(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(palette.track)
-                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg)
-                        .offset(x: (geo.size.width - seg) * phase)  // grid: ok progress motion, not layout
-                }
-                .clipShape(coreShape(Space.s1 / 2))
-            }
-        }
-        .frame(height: Space.s1)
-        .accessibilityHidden(true)
     }
 }

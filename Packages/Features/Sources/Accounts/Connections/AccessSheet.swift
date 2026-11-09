@@ -50,7 +50,7 @@ struct AccessSheet: View {
                         "Agents will be able to change things on \(k?.name ?? "it") as you. Saving needs Touch ID.",
                         systemImage: "exclamationmark.triangle"
                     )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.orange)
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.orangeInk)
                     .transition(.opacity)
                 }
                 CoreSegmented(

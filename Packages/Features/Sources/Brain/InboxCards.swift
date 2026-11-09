@@ -92,7 +92,7 @@ struct ConflictCard: View {
             Text(s.when).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
             if let higher = model.overridden(c, choice) {
                 Text("Keeping this one replaces a higher source (\(higher.label)). Touch ID asks.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.orange)
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.orangeInk)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)

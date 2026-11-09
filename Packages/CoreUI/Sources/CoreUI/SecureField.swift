@@ -29,9 +29,10 @@ public struct CoreSecureField: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             CoreFieldLabel(label)
-            SecureField(placeholder, text: $text)
+            SecureField(palette.isDay ? "" : placeholder, text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: MacTextSize.body))
+                .coreDayPlaceholder(placeholder, empty: text.isEmpty, font: .system(size: MacTextSize.body))
                 .autocorrectionDisabled()
                 .focused($focused)
                 .onSubmit(onSubmit)

@@ -69,6 +69,7 @@ public struct CoreUIGallery: View {
         segmented
         banners
         overlays
+        stateCards
     }
 
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
@@ -223,6 +224,30 @@ public struct CoreUIGallery: View {
                 ConnectionBanner(.loading)
                 ConnectionBanner(.error("The request timed out. Check the server and try again."), retry: {})
             }
+        }
+    }
+
+    private var stateCards: some View {
+        section("State card, dialog footer, skeleton, chips") {
+            CoreStateCard(
+                symbol: "tray", title: "Nothing here yet", line: "Sessions you start show up here.",
+                secondary: CoreAction("Learn more") {}, primary: CoreAction("New session") {})
+            CoreDialogFooter(
+                cancel: CoreAction("Cancel", key: .cancel) {}, primary: CoreAction("Save", key: .primary) {})
+            HStack(spacing: Space.s3) {
+                CoreSkeleton().frame(width: 160, height: 28)
+                CoreSkeleton(coreShape(Radius.cardMac)).frame(width: 120, height: 48)
+                CoreChip("Needs a look", symbol: "exclamationmark.triangle")
+                CoreChip("2\u{00A0}ms")
+            }
+            HStack {
+                CoreBusyBar().frame(width: 240)
+                Text("A very long title that has to shrink before its badge does").lineLimit(1)
+                StateBadge("Needs a look", tone: .warn, symbol: "exclamationmark.triangle")
+            }
+            GlassToggleTile(
+                "An approval is waiting", sub: "Neutral well, the switch carries on.", symbol: "hand.raised",
+                isOn: .constant(true), fill: true)
         }
     }
 
