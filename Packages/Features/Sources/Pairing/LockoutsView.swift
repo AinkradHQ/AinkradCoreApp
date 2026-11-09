@@ -173,6 +173,7 @@ private struct LockCard: View {
             .help(lock.key)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(who.title), \(left == 0 ? "ended" : "\(Countdown.text(left)) left")")
+            .coreActivates(pick)
         }
     }
 

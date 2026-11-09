@@ -79,8 +79,7 @@ struct AppearanceSection: View {
         }
         .foregroundStyle(GlassInk.primary)
         .focusable().focused($focus).focusEffectDisabled()
-        .onKeyPress(.leftArrow) { step(-1) }
-        .onKeyPress(.rightArrow) { step(1) }
+        .coreSideKeys { step($0) }
         .onAppear { focus = true }
     }
 

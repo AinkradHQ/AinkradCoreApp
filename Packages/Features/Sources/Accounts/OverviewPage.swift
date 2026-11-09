@@ -143,6 +143,10 @@ private struct AlertRow: View {
         .help("Open \(account.label)")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            model.page = .accounts
+            model.detail = account.id
+        }
     }
 }
 
@@ -236,6 +240,13 @@ private struct TriedFirst: View {
                     model.page = .accounts
                     model.detail = first.id
                 }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .coreActivates(enabled: first != nil) {
+            if let first {
+                model.page = .accounts
+                model.detail = first.id
             }
         }
     }

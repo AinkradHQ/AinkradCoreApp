@@ -44,8 +44,7 @@ struct AccountsView: View {
                 .retakeFocus(after: model.host.shell) { paneFocus = true }
                 .onKeyPress(.downArrow) { AccountsKeys.move(model, 1, proxy) }
                 .onKeyPress(.upArrow) { AccountsKeys.move(model, -1, proxy) }
-                .onKeyPress(.rightArrow) { AccountsKeys.side(model, 1, proxy) }
-                .onKeyPress(.leftArrow) { AccountsKeys.side(model, -1, proxy) }
+                .coreSideKeys { AccountsKeys.side(model, $0, proxy) }
                 .onKeyPress(.return) { AccountsKeys.open(model) }
                 .onKeyPress(.escape) { AccountsKeys.back(model) }
                 .onKeyPress(.delete) { AccountsKeys.letter(model, "⌫") }

@@ -321,14 +321,15 @@ extension ShellModel {
 /// bounces on hover. ⌘← does the same.
 private struct SettingsBackTile: View {
     let back: SettingsBack
+    @Environment(\.layoutDirection) private var direction
     @State private var hovering = false
     var body: some View {
         Button {
             back.run()
         } label: {
             VStack(spacing: 2) {
-                Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold))
-                    .offset(x: hovering ? -3 : 0)
+                Image(systemName: "chevron.backward").font(.system(size: 18, weight: .semibold))
+                    .offset(x: hovering ? (direction == .rightToLeft ? 3 : -3) : 0)
                     .coreBounce(hovering)
                 Text(back.title).font(.system(size: 10, weight: .medium)).lineLimit(1)
             }
@@ -340,7 +341,7 @@ private struct SettingsBackTile: View {
         }
         .buttonStyle(.plain)
         .keyboardShortcut(.leftArrow, modifiers: .command)
-        .scaleEffect(hovering ? 1.04 : 1)
+        .coreScaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityLabel("Back to \(back.title)")

@@ -127,7 +127,7 @@ private struct StatusButton: View {
                 if let gem {
                     GemMark(state: gem)
                 } else if let symbol {
-                    Image(systemName: symbol).symbolEffect(.bounce, value: bounce ?? 0).accessibilityHidden(true)
+                    Image(systemName: symbol).coreBounce(bounce ?? 0).accessibilityHidden(true)
                 }
                 if let title { Text(title).lineLimit(1).contentTransition(.numericText()) }
                 if let meter {
@@ -172,7 +172,7 @@ private struct ElevationChip: View {
 
 /// m:ss, as the prototype's `mmss`.
 public enum Countdown {
-    public static func text(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
+    public static func text(_ seconds: Int) -> String { coreClock(seconds) }
 }
 
 /// What the elevation chip opens: what is unlocked, the time left, and Renew / Unlock with Touch ID.

@@ -124,7 +124,7 @@ private struct ModelField: View {
         HStack(spacing: Space.s2) {
             Image(systemName: text.isEmpty ? "sparkles" : "brain.head.profile")
                 .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.violet)
-                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: text.count)
+                .contentTransition(.symbolEffect(.replace)).coreBounce(text.count)
             TextField("The harness default", text: $text).textFieldStyle(.plain).focused($focused)
                 .autocorrectionDisabled()
             if !text.isEmpty {

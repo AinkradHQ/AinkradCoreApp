@@ -229,7 +229,7 @@ struct EntryRow: View, Equatable {
     }
 
     private func facts(_ code: Int?, _ ms: Int?) -> String {
-        [code.map { "exit \($0)" }, ms.map { String(format: "%.1f s", Double($0) / 1000) }].compactMap { $0 }
+        [code.map { "exit \($0)" }, ms.map { "\(coreDecimal(Double($0) / 1000, 1)) s" }].compactMap { $0 }
             .joined(separator: " · ")
     }
 
@@ -262,6 +262,7 @@ private struct ToolCard: View {
     let output: String
     @Binding var expanded: Bool
     @State private var spin = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var hue: Color {
         switch name.lowercased() {
@@ -339,8 +340,14 @@ private struct ToolCard: View {
         switch status {
         case .running:
             HStack(spacing: 5) {
-                Image(systemName: "arrow.triangle.2.circlepath").rotationEffect(.degrees(spin ? 360 : 0))
-                    .animation(.linear(duration: 1.2).repeatForever(autoreverses: false), value: spin)
+                // Reduce Motion: the glyph breathes instead of turning.
+                Image(systemName: "arrow.triangle.2.circlepath").rotationEffect(.degrees(spin && !reduce ? 360 : 0))
+                    .opacity(spin && reduce ? 0.4 : 1)
+                    .animation(
+                        reduce
+                            ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                            : .linear(duration: 1.2).repeatForever(autoreverses: false), value: spin
+                    )
                     .onAppear { spin = true }
                 Text("running")
             }
@@ -354,7 +361,7 @@ private struct ToolCard: View {
 
     private func badge(_ symbol: String, _ text: String, _ c: Color) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: symbol).symbolEffect(.bounce, value: text)
+            Image(systemName: symbol).coreBounce(text)
             Text(text).monospacedDigit()
         }
         .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(c))

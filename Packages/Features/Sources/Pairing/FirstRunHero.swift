@@ -22,7 +22,7 @@ struct FirstRunHero: View {
             .frame(height: MacSize.controlLg * 1.6)
             .opacity(scene == .you ? 0.35 : 1)
             tile(right.symbol, right.label, ink: scene == .paired ? palette.tone(.run).ink : palette.primary)
-                .symbolEffect(.pulse, options: .repeating, isActive: scene == .find || scene == .checking)
+                .corePulse(scene == .find || scene == .checking)
         }
         .coreBounce(scene)
         .animation(Motion.out(Motion.ui), value: scene)

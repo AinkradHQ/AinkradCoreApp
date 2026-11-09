@@ -130,7 +130,7 @@ private struct RoomView: View {
             Button {
                 model.closeInspect()
             } label: {
-                Label("All rooms", systemImage: "chevron.left")
+                Label("All rooms", systemImage: "chevron.backward")
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             if let d = model.inspected, d.room.id == id {

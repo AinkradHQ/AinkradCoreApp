@@ -86,7 +86,8 @@ struct AccLink: View {
         Button(action: action) {
             HStack(spacing: Space.s1) {
                 if let symbol {
-                    Image(systemName: symbol).symbolEffect(.bounce, value: hovering).accessibilityHidden(true)
+                    Image(systemName: symbol).flipsForRightToLeftLayoutDirection(true).coreBounce(hovering)
+                        .accessibilityHidden(true)
                 }
                 Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).lineLimit(1)
             }
@@ -98,7 +99,7 @@ struct AccLink: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(hovering ? 1.04 : 1)
+        .coreScaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 && enabled }
         .animation(.smooth(duration: 0.25), value: hovering)
         .coreDimWhenDisabled(enabled)
@@ -131,7 +132,7 @@ struct AccStateCard<Actions: View>: View {
         let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.orange : GlassInk.blue
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown).shadow(color: hue.opacity(0.5), radius: 18)
-                .scaleEffect(shown ? 1 : 0.6)
+                .coreScaleEffect(shown ? 1 : 0.6)
             Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)

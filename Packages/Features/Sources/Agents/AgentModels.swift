@@ -229,16 +229,15 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
 /// Words and numbers for sessions: one place, so the list, the pane and the bell agree.
 public enum AgentWords {
     public static func tokens(_ n: Int64) -> String {
-        n >= 1_000_000
-            ? String(format: "%.1fM", Double(n) / 1e6) : n >= 1000 ? "\(Int((Double(n) / 1e3).rounded()))k" : "\(n)"
+        n.formatted(.number.notation(.compactName))
     }
 
-    public static func cost(_ micros: Int64?) -> String? { micros.map { String(format: "$%.2f", Double($0) / 1e6) } }
+    public static func cost(_ micros: Int64?) -> String? {
+        micros.map { (Double($0) / 1e6).formatted(.currency(code: "USD")) }
+    }
 
     public static func clock(_ seconds: TimeInterval) -> String {
-        let t = max(0, Int(seconds))
-        let (h, m, s) = (t / 3600, (t % 3600) / 60, t % 60)
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+        coreClock(Int(seconds))
     }
 
     public static func ago(_ date: Date, now: Date = Date()) -> String {

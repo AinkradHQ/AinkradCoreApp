@@ -176,6 +176,7 @@ private struct LimitRow: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(SettingWords.title(setting)), \(SettingWords.value(setting, setting.value))")
+        .coreActivates(pick)
     }
 
     private var rowShape: some InsettableShape { coreShape(Radius.cardMac) }

@@ -198,12 +198,8 @@ private struct PaneTabs: View {
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac)
         .animation(reduce ? nil : Motion.out(Motion.ui), value: shell.focusedPane ?? shell.activePane)
-        .onKeyPress(.leftArrow) {
-            shell.cyclePane(-1)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            shell.cyclePane(1)
+        .coreSideKeys {
+            shell.cyclePane($0)
             return .handled
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -291,8 +287,9 @@ private struct PaneTab: View {
         .contextMenu { menu }
         .help("\(spec.title) · right-click for actions, ⌃Tab next tab, ⇧⌘R rename")
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(shell.tabName(spec))
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityLabel(spec.chip.map { "\(shell.tabName(spec)), \($0.label)" } ?? shell.tabName(spec))
+        .accessibilityAddTraits(on ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction { pick() }
     }
 
     /// The pane's own actions, then the workspace's.

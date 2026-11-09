@@ -221,6 +221,7 @@ private struct BudgetCard: View {
         .help("\(b.kind) \(b.subject), \(b.period) \(b.periodKey)")
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(model.budgetName(b)), \(s.title)")
+        .coreActivates { model.cursor = "g-\(b.id)" }
     }
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {

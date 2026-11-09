@@ -173,7 +173,7 @@ struct SubscriptionSignIn: View {
                     in: coreShape(18)
                 )
                 .shadow(color: GlassInk.green.opacity(0.55), radius: 18)
-                .symbolEffect(.bounce, value: account)
+                .coreBounce(account)
             Text("Your Claude plan is connected").font(.system(size: MacTextSize.large, weight: .bold))
             Text(
                 "It's saved in your Core as \(model.signIn?.label ?? "your plan"). Put it in a pool of its own so agents can use it."

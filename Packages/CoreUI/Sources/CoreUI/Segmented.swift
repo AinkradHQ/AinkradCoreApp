@@ -46,9 +46,8 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
         .focusable(enabled)
         .focused($focused)
         .focusEffectDisabled()
-        .onKeyPress(.leftArrow) { move(-1) }
+        .coreSideKeys { move($0) }
         .onKeyPress(.upArrow) { move(-1) }
-        .onKeyPress(.rightArrow) { move(1) }
         .onKeyPress(.downArrow) { move(1) }
         .onKeyPress(.home) { jump(0) }
         .onKeyPress(.end) { jump(segments.count - 1) }
@@ -87,7 +86,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
             HStack(spacing: Space.s2) {
                 if let symbol = segment.symbol {
                     Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                        .symbolEffect(.bounce, value: selected)
+                        .coreBounce(selected)
                         .coreEnterBounce(hovering)
                         .accessibilityHidden(true)
                 }
@@ -155,7 +154,7 @@ public struct GlassToggleTile: View {
                 Image(systemName: isOn ? onSymbol : symbol)
                     .font(.system(size: sub == nil ? MacTextSize.body : MacTextSize.headline + 2, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
-                    .symbolEffect(.bounce, value: isOn)
+                    .coreBounce(isOn)
                     .symbolEffect(.pulse, options: .repeating, isActive: isOn && !reduce && sub == nil)
                     .frame(width: sub == nil ? nil : 28)
                     .accessibilityHidden(true)

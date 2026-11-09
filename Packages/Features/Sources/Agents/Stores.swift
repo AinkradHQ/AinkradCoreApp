@@ -1,3 +1,4 @@
+import CoreUI
 import Foundation
 import Observation
 
@@ -179,6 +180,11 @@ public final class SessionsStore {
     public func upsert(_ s: AgentSessionInfo) {
         sample(s)
         if let i = items.firstIndex(where: { $0.id == s.id }) {
+            if case .ended = s.state, case .ended = items[i].state {
+            } else if case .ended = s.state {
+                let end = AgentWords.status(s, waiting: false)
+                if end.tone == .fail { CoreAnnounce.post("A session ended with an error: \(end.label)") }
+            }
             if items[i] != s { items[i] = s }
         } else {
             let at = items.firstIndex { $0.createdAt <= s.createdAt } ?? items.count

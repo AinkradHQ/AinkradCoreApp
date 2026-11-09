@@ -239,7 +239,7 @@ struct BackTile: View {
     @State private var hovering = false
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+            Image(systemName: "chevron.backward").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                 .offset(x: hovering ? -2 : 0)
                 .frame(width: 36, height: 56)
                 .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(10))

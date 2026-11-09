@@ -139,7 +139,7 @@ struct FailureView: View {
             }
             if wait > 0 {
                 Label(
-                    "The Core answers again in \(wait / 60):\(String(format: "%02d", wait % 60)).", systemImage: "clock"
+                    "The Core answers again in \(coreClock(wait)).", systemImage: "clock"
                 )
                 .font(.system(size: MacTextSize.body, weight: .semibold))
             }

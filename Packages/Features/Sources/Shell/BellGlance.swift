@@ -177,7 +177,7 @@ struct BellGlance: View {
                         }
                     } label: {
                         HStack(spacing: Space.s1) {
-                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
+                            Image(systemName: "chevron.forward").font(.system(size: 9, weight: .semibold))
                                 .rotationEffect(.degrees(shut.contains(g) ? 0 : 90)).frame(width: 12)
                             Text(g.title).font(.system(size: MacTextSize.body, weight: .semibold))
                             Text("\(rows.count)").font(.system(size: MacTextSize.meta)).monospacedDigit()

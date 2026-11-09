@@ -156,6 +156,10 @@ private struct AccountSpendRow: View {
             }
         }
         .help("Open \(model.label(ofAccount: usage.accountID))")
+        .coreActivates(enabled: a != nil) {
+            model.page = .accounts
+            model.detail = usage.accountID
+        }
     }
 }
 

@@ -79,7 +79,7 @@ private struct RunnerTile: View {
                     CoreSlots(used: runner.load, capacity: runner.capacity)
                 }
                 if let p = runner.perCore {
-                    labelled("Host load per core", String(format: "%.2f", p)) {
+                    labelled("Host load per core", coreDecimal(p, 2)) {
                         Meter(value: p, max: 6, limit: RunnerStatus.busyPerCore, warn: p > RunnerStatus.busyPerCore)
                     }
                     if let s = model.loadSamples[runner.id], s.count >= 2 {
@@ -139,7 +139,7 @@ private struct RunnerDetail: View {
         Button {
             model.runnerDetail = nil
         } label: {
-            Label("All runners", systemImage: "chevron.left")
+            Label("All runners", systemImage: "chevron.backward")
         }
         .buttonStyle(CoreButtonStyle(.plain, size: .small))
         .keyboardShortcut(.escape, modifiers: [])
@@ -166,7 +166,7 @@ private struct RunnerDetail: View {
             TermBanner(
                 tone: .warn, title: "Too busy for new work",
                 detail:
-                    "Host load is \(String(format: "%.1f", runner.perCore ?? 0)) per core and the default limit is \(Int(RunnerStatus.busyPerCore)), so new terminals and sessions are refused with runner_busy (503). Work already running is not touched. It clears by itself when the load drops."
+                    "Host load is \(coreDecimal(runner.perCore ?? 0, 1)) per core and the default limit is \(Int(RunnerStatus.busyPerCore)), so new terminals and sessions are refused with runner_busy (503). Work already running is not touched. It clears by itself when the load drops."
             )
         case .ok: EmptyView()
         }
@@ -174,8 +174,8 @@ private struct RunnerDetail: View {
             fact("Work running", "\(runner.load) of \(runner.capacity)")
             CoreSlots(used: runner.load, capacity: runner.capacity)
             if let a = runner.avg1, let c = runner.cores {
-                fact("Host load, 1 min average", "\(String(format: "%.1f", a)) on \(c) cores")
-                fact("Per core", String(format: "%.2f", runner.perCore ?? 0))
+                fact("Host load, 1 min average", "\(coreDecimal(a, 1)) on \(c) cores")
+                fact("Per core", coreDecimal(runner.perCore ?? 0, 2))
                 Meter(value: runner.perCore ?? 0, max: 6, limit: RunnerStatus.busyPerCore, warn: st == .busy)
                 Text(
                     "The marker is the limit: above \(Int(RunnerStatus.busyPerCore)) per core the runner refuses new work (default)."

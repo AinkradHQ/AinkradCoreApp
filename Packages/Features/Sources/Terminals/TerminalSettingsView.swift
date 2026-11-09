@@ -172,7 +172,7 @@ private struct ThemeTile: View {
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
-        .scaleEffect(hovering ? 1.02 : 1)
+        .coreScaleEffect(hovering ? 1.02 : 1)
         .onHover { hovering = $0 }
         .animation(.spring(duration: 0.25), value: hovering)
         .accessibilityLabel("\(theme.title) theme")
@@ -224,7 +224,7 @@ private struct PreviewCursor: View {
         }
         .foregroundStyle(color)
         .opacity(blink && dim ? 0.15 : 1)
-        .animation(blink ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : .default, value: dim)
+        .coreLoop(blink ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : .default, value: dim)
         .onAppear { dim = true }
         .accessibilityHidden(true)
     }

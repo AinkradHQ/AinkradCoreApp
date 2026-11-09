@@ -216,5 +216,6 @@ private struct MemberRow: View {
         .id("m-\(id)")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("member-\(a?.label ?? String(id))")
+        .coreActivates { model.cursor = "m-\(id)" }
     }
 }

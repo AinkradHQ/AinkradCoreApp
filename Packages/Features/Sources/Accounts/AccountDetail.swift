@@ -235,7 +235,7 @@ struct AccountDetailView: View {
                             GlassInk.blueInk)
                         Text(p.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
+                        Image(systemName: "chevron.forward").foregroundStyle(GlassInk.secondary)
                     }
                     .padding(.horizontal, Space.s2).frame(minHeight: 30)
                     .background(GlassInk.well, in: coreShape(Radius.control))

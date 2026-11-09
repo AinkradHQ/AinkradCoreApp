@@ -47,3 +47,16 @@ public struct CoreChip: View {
         .layoutPriority(2)
     }
 }
+
+/// A number with a fixed count of decimals, in the reader's own separators.
+public func coreDecimal(_ value: Double, _ digits: Int) -> String {
+    value.formatted(.number.precision(.fractionLength(digits)))
+}
+
+/// Seconds as `m:ss` (or `h:mm:ss` from an hour), in the reader's own digits.
+public func coreClock(_ seconds: Int) -> String {
+    let d = Duration.seconds(max(0, seconds))
+    return seconds >= 3600
+        ? d.formatted(.time(pattern: .hourMinuteSecond(padHourToLength: 1)))
+        : d.formatted(.time(pattern: .minuteSecond(padMinuteToLength: 1)))
+}

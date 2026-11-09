@@ -136,7 +136,7 @@ public struct StatusDot: View {
     public var body: some View {
         coreShape(2).fill(color).frame(width: Space.s2, height: Space.s2)
             .opacity(live && dim ? 0.45 : 1)
-            .animation(live ? .easeInOut(duration: 1.1).repeatForever() : nil, value: dim)
+            .coreLoop(live ? .easeInOut(duration: 1.1).repeatForever() : nil, value: dim)
             .onAppear { if live { dim = true } }
             .accessibilityHidden(true)
     }

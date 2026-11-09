@@ -241,7 +241,9 @@ private struct AssignSheet: View {
     private var fromTo: some View {
         HStack(spacing: Space.s3) {
             endpoint("From", "No room yet", "Unclassified inbox")
-            Image(systemName: "arrow.right").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true).foregroundStyle(
+                GlassInk.secondary
+            ).accessibilityHidden(true)
             endpoint(
                 "To", room?.name ?? "Choose a room",
                 room.map { "\($0.mode.label), \($0.provider.label.lowercased())" } ?? "")

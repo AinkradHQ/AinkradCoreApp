@@ -233,6 +233,7 @@ private struct SecretCard: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("secret-\(secret.name)")
+        .coreActivates(pick)
     }
 
     private func fact(_ symbol: String, _ hue: Color, _ text: String) -> some View {

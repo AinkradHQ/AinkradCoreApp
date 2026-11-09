@@ -161,6 +161,7 @@ private struct CheckRow: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.name), \(st.label)")
         .accessibilityAddTraits(on ? .isSelected : [])
+        .coreActivates { c.selectedID = item.id }
     }
 
     private func run(advanced: Bool) {

@@ -80,7 +80,7 @@ struct AgentRowButton<Label: View>: View {
             .shadow(
                 color: (waiting ? GlassInk.orange : GlassInk.violet).opacity(hovering || waiting ? 0.3 : 0), radius: 14
             )
-            .scaleEffect(hovering ? 1.015 : 1)
+            .coreScaleEffect(hovering ? 1.015 : 1)
             .animation(Motion.out(Motion.hover), value: hovering)
             .onHover { hovering = $0 }
     }

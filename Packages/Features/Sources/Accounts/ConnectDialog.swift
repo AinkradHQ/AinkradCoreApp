@@ -40,8 +40,7 @@ struct ConnectDialog: View {
                     .focusable()
                     .focused($keys)
                     .focusEffectDisabled()
-                    .onKeyPress(.leftArrow) { move(-1) }
-                    .onKeyPress(.rightArrow) { move(1) }
+                    .coreSideKeys { move($0) }
                     .onAppear { keys = true }
                 }
                 if let p = model.provider(provider), p.loginMethods.contains("browser_code") {

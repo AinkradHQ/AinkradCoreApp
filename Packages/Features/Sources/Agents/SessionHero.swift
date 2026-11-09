@@ -27,7 +27,7 @@ struct SessionHero: View {
                         in: coreShape(13)
                     )
                     .overlay { coreShape(13).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .symbolEffect(.pulse, options: .repeating, isActive: alive)
+                    .corePulse(alive)
                     .scaleEffect(shown || reduce ? 1 : 0.6)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: Space.s2) {

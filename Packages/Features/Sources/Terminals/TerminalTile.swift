@@ -91,8 +91,8 @@ struct TerminalTile: View {
         .accessibilityLabel(
             "Terminal on \(runner), \(chip.label), \(item.cols) by \(item.rows), \(item.attached) attached"
         )
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityAction(named: "Open") { TileAction.run(.open, item.id, model) }
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction { TileAction.run(.open, item.id, model) }
     }
 
     /// The tile's actions on hover: icon tiles that bounce in, each with its key.
@@ -144,7 +144,7 @@ private struct TileScreen: View {
                 HStack(spacing: 5) {
                     coreShape(1.5).fill(state).frame(width: 6, height: 6)
                         .opacity(!ended && blink ? 0.4 : 1)
-                        .animation(ended ? nil : .easeInOut(duration: 1.1).repeatForever(), value: blink)
+                        .coreLoop(ended ? nil : .easeInOut(duration: 1.1).repeatForever(), value: blink)
                     Text(label).font(.system(size: 10, weight: .semibold)).lineLimit(1)
                 }
                 .foregroundStyle(.white.opacity(0.9))
@@ -161,7 +161,7 @@ private struct TileScreen: View {
                 } else {
                     Rectangle().fill(Color(nsColor: t.caret)).frame(width: 7, height: 14)
                         .opacity(blink ? 0.15 : 1)
-                        .animation(.easeInOut(duration: 0.6).repeatForever(), value: blink)
+                        .coreLoop(.easeInOut(duration: 0.6).repeatForever(), value: blink)
                 }
             }
             .font(Font(prefs.font).weight(.medium))

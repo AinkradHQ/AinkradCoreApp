@@ -230,6 +230,6 @@ private struct EgressView: View {
             ? "stayed on this Mac" : c.provider == .approvedCloud ? "approved cloud" : "not approved"
         guard c.sent else { return "\(c.target) · \(place)" }
         return
-            "\(c.target) · \(place) · \(String(format: "%.1f", Double(c.bytes) / 1000)) KB out · \(c.redacted) redacted"
+            "\(c.target) · \(place) · \(coreDecimal(Double(c.bytes) / 1000, 1)) KB out · \(c.redacted) redacted"
     }
 }

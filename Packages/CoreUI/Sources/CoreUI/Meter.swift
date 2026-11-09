@@ -29,6 +29,6 @@ public struct CoreMeter: View {
             .frame(height: height)
             .accessibilityElement()
             .accessibilityLabel(label)
-            .accessibilityValue("\(Int((value * 100).rounded())) percent")
+            .accessibilityValue(value.formatted(.percent.precision(.fractionLength(0))))
     }
 }

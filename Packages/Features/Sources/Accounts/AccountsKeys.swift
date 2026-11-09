@@ -144,8 +144,8 @@ enum AccountsKeys {
         case .accounts where m.detail != nil:
             "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
         case .accounts: "↑↓ move · ↩ open · F filter · ⌘N connect"
-        case .pools: "← → pool · ↑↓ account · D default · A add · ⌫ remove"
-        case .chains: "← → chain · D default · E edit · ⌘N new chain"
+        case .pools: "\(coreArrowKeys()) pool · ↑↓ account · D default · A add · ⌫ remove"
+        case .chains: "\(coreArrowKeys()) chain · D default · E edit · ⌘N new chain"
         case .budgets: "↑↓ move · E edit · R raise · ⌫ remove · ⌘N new budget"
         default: "⌘1–5 pages · ⌘J audit"
         }

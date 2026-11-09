@@ -181,9 +181,9 @@ struct StepUpSheet: View {
                     ForEach(0..<3, id: \.self) { i in
                         coreShape(Radius.cardMac + 10).stroke(hue.opacity(0.5), lineWidth: 1.5)
                             .frame(width: 112, height: 112)
-                            .scaleEffect(ripple ? 1.55 : 1)
+                            .coreScaleEffect(ripple ? 1.55 : 1)
                             .opacity(ripple ? 0 : 0.8)
-                            .animation(
+                            .coreLoop(
                                 .easeOut(duration: 2.1).repeatForever(autoreverses: false).delay(Double(i) * 0.7),
                                 value: ripple)
                     }

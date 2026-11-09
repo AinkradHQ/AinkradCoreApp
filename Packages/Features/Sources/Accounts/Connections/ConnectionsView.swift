@@ -46,9 +46,8 @@ struct ConnectionsView: View {
             .onAppear { paneFocus = true }
             .retakeFocus(after: model.host.shell) { paneFocus = true }
             .onKeyPress(.downArrow) { arrow(1) }
-            .onKeyPress(.rightArrow) { arrow(1) }
+            .coreSideKeys { arrow($0) }
             .onKeyPress(.upArrow) { arrow(-1) }
-            .onKeyPress(.leftArrow) { arrow(-1) }
             .onKeyPress(.return) { model.key("↩") ? .handled : .ignored }
             .onKeyPress(.delete) { model.key("⌫") ? .handled : .ignored }
             .onKeyPress(.escape) {

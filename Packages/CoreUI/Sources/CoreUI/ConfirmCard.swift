@@ -64,7 +64,7 @@ public struct ConfirmCard: View {
                 }
             }
             .coreRise(shown, 2)
-            Text("← → choose · ↩ run the highlighted · esc cancel").font(.system(size: MacTextSize.meta))
+            Text("\(coreArrowKeys()) choose · ↩ run the highlighted · esc cancel").font(.system(size: MacTextSize.meta))
                 .foregroundStyle(GlassInk.secondary.opacity(0.8))
         }
         .foregroundStyle(GlassInk.primary)

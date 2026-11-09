@@ -54,6 +54,7 @@ struct DeskWidget: View {
         .contextMenu { menu }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.kind.title) widget, \(item.size.title)")
+        .coreActivates(enabled: item.kind.launch != nil) { if !editing { open() } }
         .accessibilityAction(named: "Remove") { shell.removeWidget(item.id) }
         .accessibilityAction(named: "Move left") { shell.moveWidget(item.id, dx: -1, dy: 0) }
         .accessibilityAction(named: "Move right") { shell.moveWidget(item.id, dx: 1, dy: 0) }

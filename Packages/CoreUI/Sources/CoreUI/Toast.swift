@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if canImport(AppKit)
+import AppKit
+#endif
+
 /// What a toast says by symbol and tone, so the meaning is never colour alone (`shell.js` toast kinds).
 public enum ToastKind: Sendable {
     case ok, info, warn, error
@@ -71,6 +75,17 @@ private struct ToastHost: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduce
     /// The pointer on a toast holds it open; it counts down again when the pointer leaves.
     @State private var hovering = false
+    /// VoiceOver's cursor is on the toast: it stays until the cursor leaves.
+    @AccessibilityFocusState private var toastFocused: Bool
+
+    /// With VoiceOver on, a toast stays three times as long: reading it takes longer than a glance.
+    private var scale: Double {
+        #if canImport(AppKit)
+        NSWorkspace.shared.isVoiceOverEnabled ? 3 : 1
+        #else
+        1
+        #endif
+    }
 
     func body(content: Content) -> some View {
         content
@@ -86,6 +101,7 @@ private struct ToastHost: ViewModifier {
                         }
                     )
                     .onHover { hovering = $0 }
+                    .accessibilityFocused($toastFocused)
                     // 52 pt up: clears the widget bar on Home (prototype)
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s8 + Space.s5)
                     .transition(
@@ -94,11 +110,27 @@ private struct ToastHost: ViewModifier {
                             removal: .opacity)
                     )
                     .task(id: item.id) { AccessibilityNotification.Announcement(item.message).post() }
-                    .task(id: "\(item.id)-\(hovering)") {
-                        guard !hovering else { return }
-                        try? await Task.sleep(for: .seconds(lifetime ?? item.lifetime))
+                    .task(id: "\(item.id)-\(hovering)-\(toastFocused)") {
+                        guard !hovering, !toastFocused else { return }
+                        try? await Task.sleep(for: .seconds((lifetime ?? item.lifetime) * scale))
                         if !Task.isCancelled { self.item = nil }
                     }
+                }
+            }
+            .background {
+                // ⌘Z undoes the toast that is showing; in a text field it stays the field's own undo.
+                if let undo = item?.undo {
+                    Button("Undo") {
+                        #if canImport(AppKit)
+                        if NSApp.keyWindow?.firstResponder is NSTextView {
+                            NSApp.sendAction(Selector(("undo:")), to: nil, from: nil)
+                            return
+                        }
+                        #endif
+                        undo()
+                        item = nil
+                    }
+                    .keyboardShortcut("z", modifiers: .command).opacity(0).accessibilityHidden(true)
                 }
             }
             .animation(Motion.calm(item == nil ? Motion.exit(0.25) : Motion.out(Motion.move), reduce), value: item?.id)

@@ -42,14 +42,17 @@ enum AccountHealthWords {
         }
     }
 
-    static func line(_ h: AccountHealthItem, now: Date, calendar: Calendar = .current) -> Line {
-        let f = DateFormatter()
-        f.calendar = calendar
-        f.timeZone = calendar.timeZone
-        f.locale = Locale(identifier: "en_US_POSIX")
+    static func line(
+        _ h: AccountHealthItem, now: Date, calendar: Calendar = .current, locale: Locale = .current
+    ) -> Line {
         func clock(_ d: Date) -> String {
-            f.dateFormat = calendar.isDate(d, inSameDayAs: now) ? "HH:mm" : "MMM d, HH:mm"
-            return f.string(from: d)
+            let same = calendar.isDate(d, inSameDayAs: now)
+            var style =
+                same ? Date.FormatStyle().hour().minute() : Date.FormatStyle().month(.abbreviated).day().hour().minute()
+            style.calendar = calendar
+            style.timeZone = calendar.timeZone
+            style.locale = locale
+            return d.formatted(style)
         }
         let codes = [
             "fail_streak \(h.failStreak)", "auth_streak \(h.authStreak)", h.planStatus.map { "plan \($0)" },

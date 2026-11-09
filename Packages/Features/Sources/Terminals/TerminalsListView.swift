@@ -83,8 +83,7 @@ struct TerminalsListView: View {
                     .focusEffectDisabled()
                     .onKeyPress(.downArrow) { move(1, proxy) }
                     .onKeyPress(.upArrow) { move(-1, proxy) }
-                    .onKeyPress(.rightArrow) { move(1, proxy) }
-                    .onKeyPress(.leftArrow) { move(-1, proxy) }
+                    .coreSideKeys { move($0, proxy) }
                     .onKeyPress(.return) { act(.open) }
                     .onKeyPress(characters: .letters) { press in
                         switch press.characters.lowercased() {

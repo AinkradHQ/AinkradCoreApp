@@ -184,7 +184,7 @@ private struct RunnerTile: View {
         }
         .buttonStyle(.plain)
         .disabled(st == .off && !on)
-        .scaleEffect(hovering ? 1.015 : 1)
+        .coreScaleEffect(hovering ? 1.015 : 1)
         .onHover { hovering = $0 }
         .animation(.spring(duration: 0.25), value: hovering)
         .accessibilityLabel("\(runner.name), \(st.label)\(warn.map { ", \($0)" } ?? "")")
@@ -229,7 +229,7 @@ private struct BlinkingCursor: View {
     var body: some View {
         Rectangle().fill(GlassInk.green).frame(width: 9, height: 18)
             .opacity(on ? 1 : 0.15)
-            .animation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
+            .coreLoop(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
             .onAppear { on = false }
             .accessibilityHidden(true)
     }

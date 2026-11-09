@@ -24,7 +24,7 @@ struct RouteTests {
         let w = SessionWaiting(
             since: now.addingTimeInterval(-300), until: now.addingTimeInterval(600),
             why: "every account the chain can use is cooling, limited or at its cap")
-        let t = SessionCues.waiting(w, now: now, calendar: utc)
+        let t = SessionCues.waiting(w, now: now, calendar: utc, locale: Locale(identifier: "en_GB"))
         #expect(t.title == "Waiting for an account")
         #expect(
             t.text.hasPrefix(

@@ -43,7 +43,7 @@ public struct IconTile<Trigger: Equatable>: View {
     }
     public var body: some View {
         Image(systemName: symbol).font(.system(size: size * 0.46, weight: .semibold)).foregroundStyle(.white)
-            .symbolEffect(.bounce, value: bounce)
+            .coreBounce(bounce)
             .frame(width: size, height: size)
             .background(
                 LinearGradient(colors: [hue, hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),

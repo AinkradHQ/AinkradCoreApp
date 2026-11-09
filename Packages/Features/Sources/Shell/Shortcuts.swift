@@ -25,7 +25,10 @@ enum ShortcutCatalog {
         ),
         (
             "Panes",
-            [("Focus mode tabs", "← →"), ("Focus or tile a pane", "double click head"), ("Tile a pane", "drag head")]
+            [
+                ("Focus mode tabs", coreArrowKeys()), ("Focus or tile a pane", "double click head"),
+                ("Tile a pane", "drag head"),
+            ]
         ),
         (
             "Launcher",

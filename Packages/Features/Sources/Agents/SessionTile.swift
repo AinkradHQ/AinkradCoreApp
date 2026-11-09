@@ -166,9 +166,9 @@ struct SessionTile: View {
     private func badge(state: Color, label: String) -> some View {
         HStack(spacing: 5) {
             if waiting {
-                Image(systemName: "hand.raised.fill").symbolEffect(.pulse, options: .repeating)
+                Image(systemName: "hand.raised.fill").corePulse()
             } else if session.live {
-                Image(systemName: "waveform").symbolEffect(.variableColor.iterative, options: .repeating)
+                Image(systemName: "waveform").coreIterate()
             } else {
                 coreShape(2).fill(state).frame(width: 6, height: 6)
             }
