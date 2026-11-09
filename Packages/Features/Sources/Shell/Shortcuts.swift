@@ -145,7 +145,7 @@ public struct ShellCommands: Commands {
             Button("Actions…") { shell.toggleActions() }.keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(paneCount == 0)
             Divider()
-            Button("New Agent Session") { shell.launcher.entry("agents.new")?.run() }.keyboardShortcut("n")
+            Button("New Agent Session") { shell.newItem() }.keyboardShortcut("n")
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
             Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
                 .keyboardShortcut("t", modifiers: [.command, .option])

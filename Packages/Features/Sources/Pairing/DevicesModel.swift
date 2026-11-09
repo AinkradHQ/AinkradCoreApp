@@ -62,7 +62,8 @@ final class DevicesModel {
         }
         if items.isEmpty { load = .loading }
         do {
-            items = try await service.devices().sorted(by: Self.order)
+            // A pending device is a pairing still waiting for approval: the bell and Add device handle it, not this list.
+            items = try await service.devices().filter { $0.status != "pending" }.sorted(by: Self.order)
             load = .ready
         } catch { load = .failed(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription) }
     }

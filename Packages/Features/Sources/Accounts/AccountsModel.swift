@@ -516,6 +516,19 @@ public final class AccountsModel {
         if let b = mine ?? (spent.count == 1 ? spent.first : nil) { AccountDialogs.openRaise(self, b) }
     }
 
+    /// ⌘N on the page now: the same as the page's main button.
+    func newItem() {
+        guard !readOnly else { return }
+        switch page {
+        case .pools: Task { await quickPool() }
+        case .chains: Task { await quickChain() }
+        case .budgets: AccountDialogs.openBudget(self, editing: nil)
+        case .prices: AccountDialogs.openPrice(self, editing: nil)
+        case .costs, .ledger: break
+        default: AccountDialogs.openConnect(self, provider: nil)
+        }
+    }
+
     func show(_ page: AccountsPage, account id: Int64? = nil, pool: Int64? = nil) {
         self.page = page
         detail = page == .accounts ? id : nil
@@ -526,6 +539,7 @@ public final class AccountsModel {
             chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
         ) { AccountsView(model: self) }
         spec.tab = "Accounts"
+        spec.onNew = { [weak self] in self?.newItem() }
         shell.openPane(spec)
         Task { await reload() }
     }

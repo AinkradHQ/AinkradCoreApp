@@ -178,7 +178,7 @@ public struct AppStatChip: View {
     }
     public var body: some View {
         HStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(hue)
+            Image(systemName: symbol).coreFont(size: 9, weight: .bold).foregroundStyle(hue)
             Text(text).monospacedDigit()
         }
         .coreFont(size: MacTextSize.meta, weight: .medium)
@@ -358,7 +358,7 @@ public struct StepTrack: View {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, name in
                 if i > 0 { coreShape(1).fill(i <= at ? GlassInk.blue : GlassInk.track).frame(width: 14, height: 2) }
                 HStack(spacing: 4) {
-                    if locked.contains(i) { Image(systemName: "lock.fill").font(.system(size: 9)) }
+                    if locked.contains(i) { Image(systemName: "lock.fill").coreFont(size: 9) }
                     Text(name)
                 }
                 .coreFont(size: MacTextSize.meta, weight: i == at ? .semibold : .regular)

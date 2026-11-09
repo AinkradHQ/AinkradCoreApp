@@ -155,7 +155,7 @@ struct EntryRow: View, Equatable {
         case .assistant(let text):
             HStack(alignment: .top, spacing: Space.s2) {
                 let hue = SessionTile.hue(harness)
-                Image(systemName: AgentsModel.harnessSymbol(harness)).font(.system(size: 12, weight: .bold))
+                Image(systemName: AgentsModel.harnessSymbol(harness)).coreFont(size: 12, weight: .bold)
                     .foregroundStyle(.white).frame(width: 26, height: 26)
                     .background(hue.opacity(0.85), in: coreShape(7))
                     .shadow(color: hue.opacity(0.4), radius: 6)
@@ -289,7 +289,7 @@ private struct ToolCard: View {
         let long = lines.count > 6
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Space.s3) {
-                Image(systemName: symbol).font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                Image(systemName: symbol).coreFont(size: 13, weight: .bold).foregroundStyle(.white)
                     .frame(width: 28, height: 28)
                     .background(hue.opacity(0.85), in: coreShape(7))
                 VStack(alignment: .leading, spacing: 1) {

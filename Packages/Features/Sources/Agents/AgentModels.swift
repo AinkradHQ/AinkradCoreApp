@@ -283,6 +283,8 @@ public enum AgentWords {
         case "token_cap": return "It used all the tokens it was allowed"
         case "runner_lost": return "The runner went away"
         case "budget": return "A budget ran out"
+        // The runner's own words for a cancelled run; the state word is "Cancelled".
+        case "paused by admin": return "Cancelled"
         default:
             let code = reason.range(of: #"^[a-z0-9]+(_[a-z0-9]+)+$"#, options: .regularExpression) != nil
             return code ? sentence(reason) : reason

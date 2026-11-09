@@ -19,6 +19,7 @@ struct LaneL1Tests {
         #expect(AgentWords.endedWords("token_cap") == "Ended: token limit reached")
         #expect(AgentWords.endedWords("budget") == "Ended: budget reached")
         #expect(AgentWords.reasonWords("host_lost") == "The runner's terminal process was lost")
+        #expect(AgentWords.reasonWords("paused by admin") == "Cancelled")
         #expect(AgentWords.reasonWords("some_new_code") == "Some new code")
         #expect(AgentWords.reasonWords("It asked to stop.") == "It asked to stop.")
     }

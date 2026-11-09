@@ -95,10 +95,10 @@ public struct HomeSnapshot: Sendable {
 public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
     case today, needs, running, spend, machines, board, events, core, quick, clock
     public var id: String { rawValue }
-    /// Core has no board, so the board widget exists in the Debug demo only.
+    /// Core has no board, so the board widget exists in the sample world (`CORE_DEMO=1`) only, never on a live Core.
     static var boardShown: Bool {
         #if DEBUG
-        true
+        ProcessInfo.processInfo.environment["CORE_DEMO"] == "1"
         #else
         false
         #endif

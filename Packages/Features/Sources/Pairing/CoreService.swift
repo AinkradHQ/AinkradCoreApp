@@ -233,7 +233,7 @@ struct LiveCoreService: CoreService {
                     case .gap: out.yield(.gap)
                     case .ended(let e): out.yield(.ended(e))
                     case .event(let e):
-                        let p = e.payload.value
+                        let p = Self.flatten(e.payload.value)
                         let kind = Self.eventKind(e.kind, p)
                         out.yield(
                             .event(kind: kind, pairingID: p["pairing"] as? String, deviceID: p["device"] as? String))
@@ -253,6 +253,17 @@ struct LiveCoreService: CoreService {
     /// Core sends every audit row as kind "audit" with the real action in the payload; the app routes on the action.
     static func eventKind(_ kind: String, _ payload: [String: (any Sendable)?]) -> String {
         kind == "audit" ? (payload["action"] as? String ?? kind) : kind
+    }
+
+    /// An audit row keeps its own fields under `details` (`{"action":"pairing.claimed","details":{"pairing":"p_…"}}`) and names a
+    /// device it is about in `entity_ref`. Lifts both to the top so every reader sees one flat shape; a top-level field wins.
+    static func flatten(_ payload: [String: (any Sendable)?]) -> [String: (any Sendable)?] {
+        var p = payload
+        if let d = payload["details"] as? [String: (any Sendable)?] { p.merge(d) { top, _ in top } }
+        if p["device"] == nil, payload["entity_kind"] as? String == "device", let ref = payload["entity_ref"] {
+            p["device"] = ref
+        }
+        return p
     }
 
     /// A payload value as text; null and nested values have none.

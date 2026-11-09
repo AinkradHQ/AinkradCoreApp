@@ -74,9 +74,15 @@ struct OverviewPage: View {
     }
 
     private func headline(_ need: Int) -> String {
-        if model.accounts.isEmpty { return "Add your first account" }
-        if need == 0 { return "Everything is working" }
-        return need == 1 ? "One account needs a look" : "\(need) accounts need a look"
+        Self.headline(total: model.accounts.count, ready: model.readyCount, need: need)
+    }
+
+    /// "Everything is working" only when every account is ready; an account that is neither ready nor in need of a look (no
+    /// pool yet, say) is not working.
+    static func headline(total: Int, ready: Int, need: Int) -> String {
+        if total == 0 { return "Add your first account" }
+        if need > 0 { return need == 1 ? "One account needs a look" : "\(need) accounts need a look" }
+        return ready == total ? "Everything is working" : "Not every account is ready yet"
     }
 
     private var summary: String {

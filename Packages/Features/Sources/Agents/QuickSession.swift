@@ -117,10 +117,10 @@ struct QuickSessionView: View {
 
     private func chip(_ symbol: String, _ text: String, _ hue: Color, picker: Bool = false) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(hue)
+            Image(systemName: symbol).coreFont(size: 10, weight: .semibold).foregroundStyle(hue)
             Text(text).coreFont(size: MacTextSize.meta, weight: .medium)
             if picker {
-                Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold))
+                Image(systemName: "chevron.up.chevron.down").coreFont(size: 8, weight: .semibold)
                     .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
             }
         }

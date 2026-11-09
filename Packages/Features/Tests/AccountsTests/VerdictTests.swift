@@ -20,6 +20,13 @@ struct VerdictTests {
         return a
     }
 
+    @Test func theOverviewOnlySaysEverythingWorksWhenEveryAccountIsReady() {
+        #expect(OverviewPage.headline(total: 1, ready: 0, need: 0) == "Not every account is ready yet")
+        #expect(OverviewPage.headline(total: 2, ready: 2, need: 0) == "Everything is working")
+        #expect(OverviewPage.headline(total: 2, ready: 1, need: 1) == "One account needs a look")
+        #expect(OverviewPage.headline(total: 0, ready: 0, need: 0) == "Add your first account")
+    }
+
     @Test func aPlainActiveAccountInAPoolIsReady() {
         let v = AccountVerdict.of(account(1, "a"))
         #expect(v.isReady && v.usable && v.label == "Ready" && v.cause == nil)

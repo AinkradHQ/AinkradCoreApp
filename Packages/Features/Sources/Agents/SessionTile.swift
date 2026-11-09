@@ -116,7 +116,7 @@ struct SessionTile: View {
                 colors: [hue.opacity(alive ? 0.4 : 0.25), .clear], center: .topLeading, startRadius: 0, endRadius: 150)
             HStack(alignment: .center, spacing: Space.s3) {
                 Image(systemName: AgentsModel.harnessSymbol(session.harness))
-                    .font(.system(size: 26, weight: .semibold)).foregroundStyle(.white)
+                    .coreFont(size: 26, weight: .semibold).foregroundStyle(.white)
                     .frame(width: 52, height: 52)
                     .background(
                         LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
@@ -205,7 +205,7 @@ struct SessionTile: View {
             act(code)
         } label: {
             HStack(spacing: 3) {
-                Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
+                Image(systemName: symbol).coreFont(size: 11, weight: .semibold)
                 Text(key).coreFont(size: 10, weight: .semibold, design: .rounded)
             }
             .foregroundStyle(palette.text)

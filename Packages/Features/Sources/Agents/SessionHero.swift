@@ -20,7 +20,7 @@ struct SessionHero: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .center, spacing: Space.s3) {
                 Image(systemName: AgentsModel.harnessSymbol(session.harness))
-                    .font(.system(size: 26, weight: .semibold)).foregroundStyle(.white)
+                    .coreFont(size: 26, weight: .semibold).foregroundStyle(.white)
                     .frame(width: 56, height: 56)
                     .background(
                         LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
