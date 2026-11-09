@@ -44,6 +44,7 @@ public final class AppModel {
     private let demo: Bool
     private var events: Task<Void, Never>?
     private var retry: Task<Void, Never>?
+    private var noticeIDs: [String] = []
     private var expiry: Task<Void, Never>?
 
     /// The app: pairing and the connection live in the Keychain. `demo` (Debug) skips both and shows the sample desktop.
@@ -148,6 +149,7 @@ public final class AppModel {
             shell.elevatedUntil = nil
             startEvents(service)
             if let api = service.agentsAPI { agents.attach(api) }
+            agents.isAdmin = (try? await service.myScopes())?.contains("admin") ?? false
             await refreshAll()
         } catch {
             let f = Failure.from(error)
@@ -218,6 +220,7 @@ public final class AppModel {
             if case .revokedHere = f.kind { try? keyStore.wipe() }
             shell.coreLink = .none
             phase = .blocked(f)
+        case .notice(let kind, let fields): accountNotice(kind, fields)
         case .event(let kind, let pairing, _):
             terminals?.event(kind: kind)
             admin.event(kind: kind)
@@ -225,6 +228,25 @@ public final class AppModel {
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
             if kind.hasPrefix("pairing."), let pairing { await pairingEvent(kind, pairing) }
+        }
+    }
+
+    // MARK: account events
+
+    /// An account event in plain words: a bell entry (the newest 20 stay) and, for the push kinds, a macOS banner.
+    /// The screens that show the account already refresh on the same event (`accounts.event`).
+    public func accountNotice(_ kind: String, _ fields: [String: String]) {
+        guard
+            let n = AccountNotice.make(
+                kind: kind, fields: fields, account: { [accounts] in accounts.accountName($0) },
+                pool: { [accounts] in accounts.poolName($0) })
+        else { return }
+        shell.bell.add(BellItem(id: n.id, kind: n.isAlarm ? .alarm : .event, title: n.title, sub: n.sub, time: "now"))
+        noticeIDs.removeAll { $0 == n.id }
+        noticeIDs.append(n.id)
+        while noticeIDs.count > 20 { shell.bell.remove(noticeIDs.removeFirst()) }
+        if let push = n.pushKind, let banner = n.banner {
+            agents.postAccountBanner(push, n.id, banner.title, banner.body)
         }
     }
 
