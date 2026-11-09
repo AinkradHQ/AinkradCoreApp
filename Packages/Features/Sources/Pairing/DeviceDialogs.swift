@@ -102,7 +102,7 @@ struct ScopeWarnings: View {
                 out.append(
                     (
                         .fail, "xmark.octagon",
-                        "\(device.name) is the last admin. The Core will refuse this (409 conflict)."
+                        "\(device.name) is the last admin. The Core will refuse this."
                     ))
             } else {
                 out.append((.warn, "exclamationmark.triangle", "It can no longer manage devices, secrets or settings."))

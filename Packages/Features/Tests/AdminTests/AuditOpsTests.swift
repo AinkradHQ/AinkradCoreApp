@@ -171,10 +171,40 @@ struct AuditObjectTests {
         let created = AuditItem(
             seq: 1, at: Date(), action: "pairing.created", actor: .user(1), entityKind: nil, entityRef: nil,
             details: #"{"pairing":"p_1","kind":"device"}"#)
-        #expect(AuditWords.sentence(created) { _ in nil }.what == "pairing p_1")
+        #expect(AuditWords.sentence(created) { _ in nil }.what == "a pairing")
         let refused = AuditItem(
             seq: 2, at: Date(), action: "api.refused", actor: .user(1), entityKind: nil, entityRef: nil,
             details: #"{"path":"/api/v1/x","device":""}"#)
         #expect(AuditWords.sentence(refused) { _ in nil }.what == "a request to /api/v1/x")
+    }
+}
+
+struct AuditPlainWordsTests {
+    private func row(_ kind: String?, _ ref: String?, _ details: String = "{}") -> AuditItem {
+        AuditItem(
+            seq: 1, at: Date(), action: "device.approved", actor: .user(1), entityKind: kind, entityRef: ref,
+            details: details)
+    }
+
+    @Test func aDeviceShowsItsNameWhenKnownElseAPlainPhrase() {
+        let a = row("device", "d_71wsK2")
+        #expect(
+            AuditWords.sentence(a, deviceName: { $0 == "d_71wsK2" ? "iPad Air" : nil }) { _ in nil }.what
+                == "“iPad Air”")
+        #expect(AuditWords.sentence(a) { _ in nil }.what == "a device")
+        #expect(AuditWords.ids(a) == "d_71wsK2")
+    }
+
+    @Test func idsFromDetailsStayOutOfTheSentence() {
+        let a = row(nil, nil, #"{"device":"d_71wsK2"}"#)
+        #expect(AuditWords.sentence(a) { _ in nil }.what == "a device")
+        #expect(AuditWords.sentence(a, deviceName: { _ in "Ahmed's iPhone" }) { _ in nil }.what == "“Ahmed's iPhone”")
+    }
+
+    @Test func namesAreNotTreatedAsIds() {
+        #expect(AuditWords.isOpaqueID("d_71wsK2") && AuditWords.isOpaqueID("p_1") && AuditWords.isOpaqueID("req4k2"))
+        #expect(!AuditWords.isOpaqueID("github-token-test") && !AuditWords.isOpaqueID("atlas"))
+        #expect(!AuditWords.isOpaqueID("secrets_mode"))
+        #expect(AuditWords.sentence(row("secret", "github-token-test")) { _ in nil }.what == "secret github-token-test")
     }
 }

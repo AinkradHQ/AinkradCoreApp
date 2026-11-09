@@ -215,7 +215,7 @@ struct AdminScreen<Content: View>: View {
                     StateCard(
                         symbol: "lock", title: "This device is not allowed to do that",
                         text:
-                            "Reading and changing this needs the admin scope (forbidden_scope). Use a device that holds it.",
+                            "Reading and changing this needs the admin scope. Use a device that holds it.",
                         code: "forbidden_scope")
                 }
             }

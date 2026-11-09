@@ -10,6 +10,8 @@ import SwiftUI
 @MainActor @Observable
 public final class AdminModel {
     let host: any AdminHost
+    /// Device names by id, when the app knows them (the audit log shows the name, not `d_…`).
+    public var deviceNames: [String: String] = [:]
     private(set) var service: (any AdminService)?
     @ObservationIgnored private(set) lazy var registry = RegistryModel(hub: self)
     @ObservationIgnored private(set) var secrets: SecretsModel!
