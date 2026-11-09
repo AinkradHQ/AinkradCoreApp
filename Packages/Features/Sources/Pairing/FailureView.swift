@@ -21,6 +21,7 @@ extension Failure {
         case .rejected: "The approver rejected this Mac"
         case .expired: "The pairing expired"
         case .badCode: "That code did not work"
+        case .badInvite: "The Core did not accept this link"
         case .sasMismatch: "The check codes do not match"
         case .oldApp: "This app and the Core do not speak the same version"
         case .revokedHere: "This Mac was revoked"
@@ -37,7 +38,7 @@ extension Failure {
         case .identityMismatch: "core_identity_mismatch"
         case .clockSkew: "401 clock_skew"
         case .rejected: "status: rejected"
-        case .badCode: "401 pairing_failed"
+        case .badCode, .badInvite: "401 pairing_failed"
         case .sasMismatch: "409 sas_mismatch"
         case .oldApp: "api_minor"
         default: nil
@@ -70,6 +71,8 @@ extension Failure {
         case .rejected:
             "This Mac was not added to the Core. Its keys were discarded. If it was a mistake, ask for a new code."
         case .expired: "A pairing lasts 5 minutes. Ask the approver for a new code."
+        case .badInvite:
+            "The secret in the link is wrong, or it was already used. A link works once. Get a new one: run the installer again, or use Add device on a device that is already connected."
         case .badCode:
             "The code is wrong, already used or past its 5 minutes. A code works once. After a few wrong tries the Core stops accepting codes from this address."
         case .sasMismatch:

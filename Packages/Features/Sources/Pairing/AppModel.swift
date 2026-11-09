@@ -23,6 +23,11 @@ public final class AppModel {
     public let agents: AgentsModel
     var phase: Phase = .starting
     private(set) var firstRun: FirstRunModel!
+    /// The setup wizard is the first screen; the typed-code first run is its fallback (and a pairing left half done).
+    private(set) var wizard: SetupWizardModel!
+    var useTypedCode = false
+    /// Makes device invites (QR). Unavailable until the Core serves them.
+    var invites: any InviteService = UnavailableInviteService()
     private(set) var service: (any CoreService)?
     let stepUp = StepUpModel()
     /// Why the last elevated action did not run; shown inline by the panel that asked. Cleared by the next attempt.
@@ -80,6 +85,10 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
+        wizard = SetupWizardModel(driver: driver) { [weak self] in
+            guard let self else { return }
+            Task { await self.openDesktop() }
+        }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
@@ -112,6 +121,17 @@ public final class AppModel {
 
     // MARK: launch
 
+    /// An `ainkrad://connect` link was opened: it fills the wizard's paste screen, and the person presses Connect.
+    public func open(url: URL) {
+        guard url.scheme?.lowercased() == "ainkrad" else { return }
+        guard phase != .desktop else {
+            shell.showToast("This Mac is already connected to a Core.")
+            return
+        }
+        useTypedCode = false
+        wizard.receive(url: url)
+    }
+
     public func start() async {
         guard phase == .starting else { return }
         if demo {
@@ -129,6 +149,7 @@ public final class AppModel {
             } else {
                 phase = .firstRun
                 await firstRun.resume()
+                useTypedCode = firstRun.stage != .form
             }
         } catch { phase = .blocked(Failure.from(error)) }
     }
@@ -424,6 +445,26 @@ public final class AppModel {
             })
     }
 
+    /// Add device, the QR way. Falls back to the typed-code quick flow while the Core cannot make invites.
+    func openInviteDevice() {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        guard invites.isAvailable else { return openAddDevice(quick: true) }
+        stepUpNotice = nil
+        let model = InviteDeviceModel(host: self)
+        shell.present(
+            ShellDialog(id: "invite-device", onClose: { [weak self] in self?.stepUpNotice = nil }) {
+                InviteDeviceView(
+                    app: self, model: model, close: { [weak self] in self?.shell.closeDialog() },
+                    typedCode: { [weak self] in
+                        self?.shell.closeDialog()
+                        self?.openAddDevice()
+                    })
+            })
+    }
+
     // MARK: elevation
 
     /// The Core's key fingerprint this Mac paired with, for the new device to compare against.
@@ -520,6 +561,8 @@ public final class AppModel {
         shell.home = .empty
         shell.resetToFresh()
         firstRun.resetAll()
+        wizard.startOver()
+        useTypedCode = false
         phase = .firstRun
     }
 

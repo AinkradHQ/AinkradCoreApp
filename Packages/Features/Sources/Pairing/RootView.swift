@@ -13,7 +13,12 @@ public struct RootView: View {
         Group {
             switch app.phase {
             case .starting: sky.overlay { CoreBusyBar().frame(width: Space.s8 * 4) }
-            case .firstRun: FirstRunView(model: app.firstRun)
+            case .firstRun:
+                if app.useTypedCode {
+                    FirstRunView(model: app.firstRun)
+                } else {
+                    SetupWizardView(model: app.wizard) { app.useTypedCode = true }
+                }
             case .desktop: ShellView(shell: app.shell)
             case .blocked(let f): blocked(f)
             }

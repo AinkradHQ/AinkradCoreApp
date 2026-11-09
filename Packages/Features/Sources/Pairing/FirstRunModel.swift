@@ -45,6 +45,8 @@ struct Failure: Equatable {
         case rejected
         case expired
         case badCode
+        /// The invite secret of a connect link was refused: wrong, or already used.
+        case badInvite
         case sasMismatch
         case oldApp
         case revokedHere

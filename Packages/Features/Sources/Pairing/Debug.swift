@@ -18,6 +18,7 @@ extension AppModel {
 
     public func debugFirstRun(_ scene: String) {
         phase = .firstRun
+        useTypedCode = true
         let sas = ClaimInfo(
             sas: "K7QD-2M9X-R4TB-0W6E", deviceID: "d_01JC4X7Q3MZ8N5V2K9RT6HBEWA",
             coreFingerprint: "9F3C1D27B804E5A652C107DE4B983A60D1F78C2E")

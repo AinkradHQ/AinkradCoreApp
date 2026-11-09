@@ -33,6 +33,10 @@ enum PairingSnapshots {
             return good
         }
 
+        for scene in AppModel.wizardScenes {
+            app.debugWizard(scene)
+            await shot("wizard-\(scene)")
+        }
         for scene in AppModel.firstRunScenes {
             app.debugFirstRun(scene)
             await shot("firstrun-\(scene)")

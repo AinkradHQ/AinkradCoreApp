@@ -17,6 +17,7 @@ struct AinkradCoreApp: App {
         Window("Ainkrad", id: "main") {
             RootView(app: app)
                 .background(FullScreenEnforcer())
+                .onOpenURL { app.open(url: $0) }
                 #if DEBUG
             .task { await SnapshotRunner.runIfRequested(app) }
                 #endif
