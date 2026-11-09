@@ -31,7 +31,13 @@ public struct ToastItem: Identifiable, Sendable {
     public let message: String
     public let kind: ToastKind
     public let undo: (@Sendable @MainActor () -> Void)?
-    public init(_ message: String, kind: ToastKind = .ok, undo: (@Sendable @MainActor () -> Void)? = nil) {
+    /// The button's words; Undo unless the action is something else (then ⌘Z does not trigger it).
+    public let actionTitle: String
+    public init(
+        _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo",
+        undo: (@Sendable @MainActor () -> Void)? = nil
+    ) {
+        self.actionTitle = actionTitle
         self.message = message
         self.kind = kind
         self.undo = undo
@@ -45,9 +51,11 @@ public struct CoreToast: View {
     let message: String
     let kind: ToastKind
     let undo: (() -> Void)?
+    let actionTitle: String
     @Environment(\.corePalette) private var palette
 
-    public init(_ message: String, kind: ToastKind = .ok, undo: (() -> Void)? = nil) {
+    public init(_ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo", undo: (() -> Void)? = nil) {
+        self.actionTitle = actionTitle
         self.message = message
         self.kind = kind
         self.undo = undo
@@ -58,7 +66,7 @@ public struct CoreToast: View {
             ToneGlyph(symbol: kind.symbol, ink: palette.tone(kind.tone).ink, size: 26)
             Text(message).coreFont(size: MacTextSize.body)
             if let undo {
-                Button("Undo", action: undo).buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                Button(actionTitle, action: undo).buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
         }
         .foregroundStyle(GlassInk.primary)
@@ -92,7 +100,7 @@ private struct ToastHost: ViewModifier {
             .overlay(alignment: .bottom) {
                 if let item {
                     CoreToast(
-                        item.message, kind: item.kind,
+                        item.message, kind: item.kind, actionTitle: item.actionTitle,
                         undo: item.undo.map { undo in
                             {
                                 undo()
@@ -119,7 +127,7 @@ private struct ToastHost: ViewModifier {
             }
             .background {
                 // ⌘Z undoes the toast that is showing; in a text field it stays the field's own undo.
-                if let undo = item?.undo {
+                if let undo = item?.undo, item?.actionTitle == "Undo" {
                     Button("Undo") {
                         #if canImport(AppKit)
                         if NSApp.keyWindow?.firstResponder is NSTextView {

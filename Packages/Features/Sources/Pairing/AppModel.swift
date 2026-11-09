@@ -48,6 +48,7 @@ public final class AppModel {
     private let makeService: @MainActor (any KeyStore) throws -> any CoreService
     private let demo: Bool
     private var events: Task<Void, Never>?
+    private var homeFeed: HomeFeed?
     private var retry: Task<Void, Never>?
     private var noticeIDs: [String] = []
     private var expiry: Task<Void, Never>?
@@ -135,8 +136,9 @@ public final class AppModel {
             phase = .blocked(Failure.from(error))
             return
         }
-        shell.home.coreName = "Home Core"
+        shell.home.coreName = (try? keyStore.loadIdentity())??.endpoint.host() ?? "Home Core"
         if let live = service as? LiveCoreService {
+            homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
@@ -166,6 +168,7 @@ public final class AppModel {
             agents.isAdmin = isAdmin
             showAdminPages(isAdmin)
             await refreshAll()
+            await homeFeed?.refresh()
         } catch {
             let f = Failure.from(error)
             switch f.kind {
@@ -255,6 +258,7 @@ public final class AppModel {
             terminals?.event(kind: kind)
             admin.event(kind: kind)
             accounts.event(kind: kind)
+            homeFeed?.event(kind: kind)
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
             if kind.hasPrefix("pairing."), let pairing { await pairingEvent(kind, pairing) }
@@ -274,7 +278,11 @@ public final class AppModel {
         if let words = AccountNotice.toast(
             kind: kind, fields: fields, terminal: { [terminals] in terminals?.displayName(ofTerminal: $0) })
         {
-            shell.showToast(words, kind: .warn)
+            // Core closes a reaped terminal unless a client attaches meanwhile, so opening it is what keeps it.
+            let keep = fields["terminal"].map { id in
+                { @Sendable @MainActor [weak self] in _ = self?.terminals?.openTerminal(id) }
+            }
+            shell.showToast(words, kind: .warn, actionTitle: "Keep it", undo: keep)
             return
         }
         guard
@@ -421,6 +429,8 @@ public final class AppModel {
     func forgetCore() async {
         events?.cancel()
         retry?.cancel()
+        homeFeed?.stop()
+        homeFeed = nil
         agents.detach()
         await service?.close()
         service = nil
@@ -440,6 +450,7 @@ public final class AppModel {
         accounts.detach()
         brain.detach()
         shell.linkNotice = nil
+        shell.home = .empty
         shell.resetToFresh()
         firstRun.resetAll()
         phase = .firstRun

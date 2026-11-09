@@ -46,7 +46,7 @@ public struct WidgetLayout: Equatable, Sendable {
         let d: [(WidgetKind, WidgetSize, Int, Int)] = [
             (.today, .x, 0, 0), (.clock, .s, 0, 3), (.spend, .s, 1, 3), (.quick, .m, 0, 4),
             (.machines, .l, 6, 0), (.board, .m, 6, 2), (.events, .m, 6, 3),
-        ]
+        ].filter { $0.0 != .board || WidgetKind.boardShown }
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
     }
 

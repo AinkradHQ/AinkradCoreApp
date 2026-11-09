@@ -253,7 +253,7 @@ public final class TerminalsModel {
     }
 
     /// Opens a terminal's pane. `attach`: connect at once (a terminal this app just made, or one nobody else holds).
-    func openTerminal(_ id: String, attach: Bool = true) {
+    public func openTerminal(_ id: String, attach: Bool = true) {
         guard let item = items.first(where: { $0.id == id }) else { return }
         selected = id
         rang.remove(id)

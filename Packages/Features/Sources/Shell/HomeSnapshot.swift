@@ -95,6 +95,14 @@ public struct HomeSnapshot: Sendable {
 public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
     case today, needs, running, spend, machines, board, events, core, quick, clock
     public var id: String { rawValue }
+    /// Core has no board, so the board widget exists in the Debug demo only.
+    static var boardShown: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
+    }
     public var title: String {
         switch self {
         case .today: "Today"
