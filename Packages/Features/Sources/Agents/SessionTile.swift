@@ -107,6 +107,8 @@ struct SessionTile: View {
 
     /// The stage: a dark glass well washed in the harness colour, the glyph glowing at the left, state at the top right.
     private func stage(hue: Color, state: Color, label: String) -> some View {
+        // Larger text makes the stage taller and pushes the title below the state badge.
+        let grow = max(1, TextSizePrefs.shared.scale)
         let alive = (session.live || waiting) && !reduce
         return ZStack(alignment: .topLeading) {
             // A still wash of the harness colour behind the glyph: a gradient, no blur and no loop.
@@ -130,7 +132,7 @@ struct SessionTile: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(Space.s3)
+            .padding(.horizontal, Space.s3).padding(.bottom, Space.s3).padding(.top, Space.s3 + (grow - 1) * 28)
             .frame(maxHeight: .infinity)
             HStack {
                 Spacer()
@@ -145,7 +147,7 @@ struct SessionTile: View {
                 .padding(.horizontal, Space.s2).padding(.bottom, 4)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 104, maxHeight: 104)
+        .frame(maxWidth: .infinity, minHeight: 104 * grow, maxHeight: 104 * grow)
         .background(Color(red: 0.05, green: 0.06, blue: 0.1).opacity(0.75))
         .clipShape(coreShape(Radius.row))
         .overlay {

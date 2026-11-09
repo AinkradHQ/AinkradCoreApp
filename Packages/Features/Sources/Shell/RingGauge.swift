@@ -16,7 +16,7 @@ struct RingGauge: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             Spacer(minLength: 0)
-            Image(systemName: symbol).coreFont(size: MacTextSize.large + 6, weight: .medium)
+            Image(systemName: symbol).font(.system(size: MacTextSize.large + 6, weight: .medium))
                 .foregroundStyle(tint).coreBounce(shown > 0)
             if let caption {
                 VStack(spacing: 0) {
@@ -27,7 +27,7 @@ struct RingGauge: View {
                         Text(sub).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(
                             WidgetInk.secondary
                         )
-                        .lineLimit(1)
+                        .lineLimit(1).minimumScaleFactor(0.7)
                     }
                 }
             }
@@ -41,6 +41,7 @@ struct RingGauge: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s2)
+        .frame(maxWidth: .infinity)
         .onAppear { fill() }
         .onChange(of: value) { _, _ in fill() }
         .accessibilityElement(children: .ignore)
