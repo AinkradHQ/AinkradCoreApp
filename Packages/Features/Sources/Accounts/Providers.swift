@@ -262,9 +262,7 @@ private struct PriceField: View {
             Text("$").foregroundStyle(GlassInk.secondary)
             TextField("0.00", text: $text).textFieldStyle(.plain).frame(width: 56).monospacedDigit()
                 .onChange(of: text) { _, t in
-                    if let d = AccountsNumbers.parseDecimal(t), d >= 0 {
-                        micros = Int64((d * 1_000_000).rounded())
-                    }
+                    if let m = BudgetInput.price(t) { micros = m }
                 }
             Text("\(label) / M").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }

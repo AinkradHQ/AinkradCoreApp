@@ -343,3 +343,52 @@ struct AccPick: View {
         .animation(.smooth(duration: 0.2), value: hovering)
     }
 }
+
+/// How the money fields read what was typed, in one place: the raw text goes to the locale-aware parser, never
+/// stripped of commas first (`2,50` is two dollars fifty, not 250).
+enum BudgetInput {
+    /// Whole tokens, empty meaning none (0).
+    static func tokens(_ s: String, locale: Locale = .current) -> Int64? {
+        isBlank(s) ? 0 : AccountsNumbers.parseWhole(s, locale: locale).flatMap { $0 > 0 ? $0 : nil }
+    }
+    /// A raise: empty means no change (`.some(nil)`).
+    static func raiseTokens(_ s: String, locale: Locale = .current) -> Int64?? {
+        isBlank(s) ? .some(nil) : AccountsNumbers.parseWhole(s, locale: locale).flatMap { $0 > 0 ? .some($0) : nil }
+    }
+    /// Per-session tokens: empty means no limit; below `min` is refused.
+    static func sessionTokens(_ s: String, min: Int64, locale: Locale = .current) -> Int64?? {
+        if isBlank(s) { return .some(nil) }
+        guard let n = AccountsNumbers.parseWhole(s, locale: locale), n >= min else { return nil }
+        return .some(n)
+    }
+    /// A dollar amount above zero in millionths; empty means none (`.some(nil)`).
+    static func dollars(_ s: String, below: Double = .infinity, locale: Locale = .current) -> Int64?? {
+        if isBlank(s) { return .some(nil) }
+        guard let d = AccountsNumbers.parseDecimal(s, locale: locale), d > 0, d < below else { return nil }
+        return AccountsNumbers.parseUSDMicros(s, locale: locale).map { .some($0) }
+    }
+    /// A price per million tokens: zero allowed, under $100,000.
+    static func price(_ s: String, locale: Locale = .current) -> Int64? {
+        guard let d = AccountsNumbers.parseDecimal(s, locale: locale), d >= 0, d < 100_000 else { return nil }
+        return AccountsNumbers.parseUSDMicros(s, locale: locale)
+    }
+    /// The plain message under a budget form whose text did not read.
+    static func issue(tokens: String, dollars: String, locale: Locale = .current) -> String {
+        if Self.tokens(tokens, locale: locale) == nil {
+            return "Tokens are a whole number, like 5000000 or 5,000,000."
+        }
+        return "Dollars are an amount like 2.50 or 1,234.50. Check the commas and dots."
+    }
+    private static func isBlank(_ s: String) -> Bool { s.trimmingCharacters(in: .whitespaces).isEmpty }
+}
+
+/// The amount the dollar field reads as, so the person sees what will be saved before they save it.
+struct UsdPreview: View {
+    let text: String
+    var body: some View {
+        if let line = AccountsNumbers.usdPreview(text) {
+            Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                .accessibilityLabel("Reads as \(line.dropFirst(2))")
+        }
+    }
+}

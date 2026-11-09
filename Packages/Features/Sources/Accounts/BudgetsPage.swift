@@ -278,17 +278,8 @@ struct BudgetDialog: View {
         _hardStop = State(initialValue: editing?.hardStop ?? true)
     }
 
-    private static func clean(_ s: String) -> String { s.filter { !",_ $".contains($0) } }
-    private var tokenCap: Int64? {
-        let t = Self.clean(tokens)
-        return t.isEmpty ? 0 : AccountsNumbers.parseWhole(t).flatMap { $0 > 0 ? $0 : nil }
-    }
-    private var usdCap: Int64?? {
-        let t = Self.clean(dollars)
-        if t.isEmpty { return .some(nil) }
-        guard let d = AccountsNumbers.parseDecimal(t), d > 0 else { return nil }
-        return .some(Int64((d * 1_000_000).rounded()))
-    }
+    private var tokenCap: Int64? { BudgetInput.tokens(tokens) }
+    private var usdCap: Int64?? { BudgetInput.dollars(dollars) }
     private var warnAt: Int64? {
         Int64(warn.trimmingCharacters(in: .whitespaces)).flatMap { (1...100).contains($0) ? $0 : nil }
     }
@@ -298,7 +289,7 @@ struct BudgetDialog: View {
     }
     private var issue: String? {
         guard subjectOK else { return "Pick what this budget caps." }
-        guard let t = tokenCap, let u = usdCap else { return "Caps are whole tokens and dollar amounts." }
+        guard let t = tokenCap, let u = usdCap else { return BudgetInput.issue(tokens: tokens, dollars: dollars) }
         guard t > 0 || u != nil else { return "Set a token cap, a dollar cap, or both." }
         guard warnAt != nil else { return "Warn at a percent from 1 to 100." }
         return nil
@@ -342,6 +333,7 @@ struct BudgetDialog: View {
                 GlassToggleTile(
                     "Hard stop", sub: "At the cap, new work waits and work already running ends. Off, Core only warns.",
                     symbol: "bell", onSymbol: "hand.raised.fill", isOn: $hardStop, fill: true)
+                UsdPreview(text: dollars)
                 if let i = issue, !(tokens.isEmpty && dollars.isEmpty && subject.isEmpty) { AccIssue(text: i) }
                 if let e = model.writeError["budget"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
@@ -405,15 +397,8 @@ struct RaiseDialog: View {
     @State private var dollars = ""
     @State private var busy = false
 
-    private var t: Int64?? {
-        let s = tokens.filter { !", _".contains($0) }
-        return s.isEmpty ? .some(nil) : AccountsNumbers.parseWhole(s).flatMap { $0 > 0 ? .some($0) : nil }
-    }
-    private var u: Int64?? {
-        let s = dollars.filter { !", _$".contains($0) }
-        if s.isEmpty { return .some(nil) }
-        return AccountsNumbers.parseDecimal(s).flatMap { $0 > 0 ? .some(Int64(($0 * 1_000_000).rounded())) : nil }
-    }
+    private var t: Int64?? { BudgetInput.raiseTokens(tokens) }
+    private var u: Int64?? { BudgetInput.dollars(dollars) }
     private var ok: Bool {
         guard let t, let u else { return false }
         return t != nil || u != nil
@@ -440,6 +425,7 @@ struct RaiseDialog: View {
                     ) { go() }
                     .disabled(budget.usdCap == nil)
                 }
+                UsdPreview(text: dollars)
                 if let e = model.writeError["raise-\(budget.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(confirm: "Raise", busy: busy, enabled: ok, cancel: close) { go() }
