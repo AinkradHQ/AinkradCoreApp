@@ -243,7 +243,7 @@ struct BellGlance: View {
                 .coreFont(size: MacTextSize.body)
                 Spacer(minLength: 0)
                 Text(m.slots > 0 ? "\(m.used)/\(m.slots)" : "").coreFont(size: MacTextSize.body, design: .monospaced)
-                .foregroundStyle(palette.text2)
+                    .foregroundStyle(palette.text2)
             }
             .padding(Space.s2).accessibilityElement(children: .combine)
         }

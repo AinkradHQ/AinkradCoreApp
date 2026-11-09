@@ -231,7 +231,7 @@ private struct SpeedChart: View {
         ) {
             HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
                 Text(coreUnit("\(Int(speed.last ?? 0))", "ms")).coreFont(size: MacTextSize.large, weight: .semibold)
-                .monospacedDigit()
+                    .monospacedDigit()
                 Text("today").foregroundStyle(GlassInk.secondary)
             }
             GeometryReader { g in

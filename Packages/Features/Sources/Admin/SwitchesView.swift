@@ -186,7 +186,7 @@ private struct FlagCard: View {
             ) { EmptyView() }
             if let needs {
                 Label(needs, systemImage: "arrow.turn.right.up").coreFont(size: MacTextSize.meta, weight: .semibold)
-                .foregroundStyle(GlassInk.blueInk)
+                    .foregroundStyle(GlassInk.blueInk)
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }

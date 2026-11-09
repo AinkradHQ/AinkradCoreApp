@@ -22,7 +22,9 @@ struct InboxView: View {
                         }
                         if !decided.isEmpty {
                             VStack(alignment: .leading, spacing: Space.s2) {
-                                Text("Answered since this Mac opened").coreFont(size: MacTextSize.headline, weight: .semibold)
+                                Text("Answered since this Mac opened").coreFont(
+                                    size: MacTextSize.headline, weight: .semibold
+                                )
                                 .agentHeading()
                                 ForEach(decided) { r in ApprovalCardView(model: model, request: r) }
                             }

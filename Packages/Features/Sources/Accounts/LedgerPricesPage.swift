@@ -85,7 +85,7 @@ private struct LedgerRow: View {
         let b = CostWords.basis(c.basis)
         HStack(spacing: Space.s3) {
             Text(c.at.formatted(date: .omitted, time: .shortened)).coreFont(size: MacTextSize.body).monospacedDigit()
-            .foregroundStyle(GlassInk.secondary).frame(width: 64, alignment: .leading)
+                .foregroundStyle(GlassInk.secondary).frame(width: 64, alignment: .leading)
             VStack(alignment: .leading, spacing: 1) {
                 Text(c.model).coreFont(size: MacTextSize.body, weight: .semibold, design: .monospaced).lineLimit(1)
                 Text(model.label(ofAccount: c.accountID)).coreFont(size: MacTextSize.meta)

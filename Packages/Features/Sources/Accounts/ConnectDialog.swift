@@ -199,7 +199,8 @@ private struct ProviderChoice: View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
                 AccTile(large: true, provider: provider.id)
-                Text(ProviderLook.short(provider.id, provider.name)).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                Text(ProviderLook.short(provider.id, provider.name)).coreFont(size: MacTextSize.body, weight: .semibold)
+                    .lineLimit(1)
                 Text(provider.loginMethods.contains("browser_code") ? "Subscription" : "API key")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }

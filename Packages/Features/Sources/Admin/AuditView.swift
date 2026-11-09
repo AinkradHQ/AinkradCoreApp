@@ -273,7 +273,7 @@ private struct AuditList: View {
                 .lineLimit(1).truncationMode(.middle)
             Spacer(minLength: Space.s2)
             Text(a.at.formatted(date: .omitted, time: .shortened)).coreFont(size: MacTextSize.meta).monospacedDigit()
-            .foregroundStyle(GlassInk.secondary)
+                .foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s2).frame(height: 40)
         .background(on ? area.hue.opacity(0.16) : .clear, in: coreShape(Radius.control))

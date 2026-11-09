@@ -206,7 +206,8 @@ struct AccountLimitsSection: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: Space.s2) {
                 AccChip(text: "Usage window")
-                Text(UsageLimitWords.amount(l.cap, unit: l.unit)).coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text(UsageLimitWords.amount(l.cap, unit: l.unit)).coreFont(
+                    size: MacTextSize.headline, weight: .semibold)
                 Text(UsageLimitWords.window(l.windowSecs).lowercased()).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 AccLink(title: "Change", symbol: "slider.horizontal.3") {

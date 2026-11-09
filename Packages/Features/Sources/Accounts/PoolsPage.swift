@@ -66,7 +66,9 @@ private struct PoolTab: View {
                 AccTile(provider: pool.provider).scaleEffect(0.8)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 4) {
-                        Text("\(ProviderLook.short(pool.provider, pool.provider)) · \(pool.name)").coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
+                        Text("\(ProviderLook.short(pool.provider, pool.provider)) · \(pool.name)").coreFont(
+                            size: MacTextSize.headline, weight: .semibold
+                        ).lineLimit(1)
                         if pool.isDefault {
                             Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orangeInk)
                         }
@@ -140,7 +142,8 @@ private struct PoolDetail: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 AccPanel(spacing: Space.s2) {
                     HStack {
-                        Label("Accounts, in the order they're tried", systemImage: "list.number").coreFont(size: MacTextSize.title, weight: .semibold)
+                        Label("Accounts, in the order they're tried", systemImage: "list.number").coreFont(
+                            size: MacTextSize.title, weight: .semibold)
                         Spacer()
                         AccLink(title: "Add · A", symbol: "plus") { AccountDialogs.openAddMember(model, pool: pool) }
                             .disabled(ro)

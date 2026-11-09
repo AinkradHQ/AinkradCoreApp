@@ -71,7 +71,8 @@ private struct DeleteAccountDialog: View {
                     "Its key is deleted from Core and cannot be recovered. Its leases are dropped.\(pools.isEmpty ? "" : " It leaves \(pools.map(\.name).joined(separator: ", ")).")"
                 )
                 .fixedSize(horizontal: false, vertical: true)
-                Text("Revoke the key at the provider too. Core cannot do that for you.").coreFont(size: MacTextSize.meta)
+                Text("Revoke the key at the provider too. Core cannot do that for you.").coreFont(
+                    size: MacTextSize.meta)
                 if let e = model.writeError["delete-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(confirm: "Delete account", danger: true, busy: busy, cancel: close) {

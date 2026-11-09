@@ -90,7 +90,9 @@ struct TranscriptView: View {
                 Text("Nothing here yet. The first entries arrive when the agent starts.").meta(palette)
                     .frame(maxWidth: .infinity)
             } else {
-                Label("Start of the session", systemImage: "flag.fill").coreFont(size: MacTextSize.meta, weight: .semibold)
+                Label("Start of the session", systemImage: "flag.fill").coreFont(
+                    size: MacTextSize.meta, weight: .semibold
+                )
                 .foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3).frame(height: 24)
                 .background(GlassInk.well, in: coreShape(6)).frame(maxWidth: .infinity).padding(.top, Space.s2)
             }

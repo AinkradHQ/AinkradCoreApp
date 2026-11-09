@@ -115,7 +115,8 @@ private struct ChainDetail: View {
                 .accessibilityIdentifier("chain-delete-button")
             }
             AccPanel(spacing: Space.s2) {
-                Label("Pools, in the order they're tried", systemImage: "list.number").coreFont(size: MacTextSize.title, weight: .semibold)
+                Label("Pools, in the order they're tried", systemImage: "list.number").coreFont(
+                    size: MacTextSize.title, weight: .semibold)
                 ForEach(Array(chain.entries.enumerated()), id: \.offset) { i, e in
                     EntryRow(model: model, index: i, entry: e)
                 }

@@ -279,7 +279,7 @@ struct ConnCard: View {
                 Text(when).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Spacer()
                 Text(item.users <= 1 ? "Only you" : "You and \(item.users - 1) agents").coreFont(size: MacTextSize.meta)
-                .foregroundStyle(GlassInk.secondary)
+                    .foregroundStyle(GlassInk.secondary)
             }
             HStack(spacing: Space.s1) {
                 if need {

@@ -249,7 +249,7 @@ private struct CostCard: View {
         BrainCard("Cost this month") {
             HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
                 Text(cost.month.formatted(.currency(code: "USD"))).coreFont(size: MacTextSize.large, weight: .semibold)
-                .monospacedDigit()
+                    .monospacedDigit()
                 Text("of \(cost.cap.formatted(.currency(code: "USD").precision(.fractionLength(0)))) cap")
                     .foregroundStyle(GlassInk.secondary)
             }

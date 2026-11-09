@@ -180,7 +180,7 @@ private struct WarningCard: View {
             }
             if let r = detail.reading {
                 Text(OpsWords.reading(a.name, r)).coreFont(size: MacTextSize.large, weight: .bold, design: .rounded)
-                .contentTransition(.numericText())
+                    .contentTransition(.numericText())
                 if let l = detail.limit { Meter(reading: r, limit: l, hue: hue) }
             }
             Text(a.raised ? (w?.raised ?? "Raised.") : (w?.ok ?? "Clear."))

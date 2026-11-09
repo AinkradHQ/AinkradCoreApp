@@ -207,7 +207,8 @@ struct AccountDetailView: View {
                 ForEach(0..<4, id: \.self) { _ in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
                 }
-                Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(size: MacTextSize.title, weight: .semibold, design: .monospaced)
+                Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(
+                    size: MacTextSize.title, weight: .semibold, design: .monospaced)
             }
             Text("Kept sealed in Core. It can't be shown again.").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary)

@@ -335,7 +335,7 @@ struct FirstRunView: View {
     private var sas: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text("Check it matches the code on your Core's screen").coreFont(size: MacTextSize.large, weight: .semibold)
-            .accessibilityAddTraits(.isHeader)
+                .accessibilityAddTraits(.isHeader)
             Text("It has to match the code on their screen, every character. If it doesn't, don't go on.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             if let claim = model.claim { SASView(sas: claim.sas) }

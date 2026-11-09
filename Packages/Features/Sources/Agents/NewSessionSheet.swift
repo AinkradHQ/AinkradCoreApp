@@ -224,7 +224,8 @@ struct NewSessionSheet: View {
         ]
         .compactMap { $0 }
         return VStack(alignment: .leading, spacing: Space.s1) {
-            Text(runner == nil ? words : "This will run \(words)").coreFont(size: MacTextSize.headline, weight: .semibold)
+            Text(runner == nil ? words : "This will run \(words)").coreFont(
+                size: MacTextSize.headline, weight: .semibold)
             HStack(spacing: Space.s1) {
                 ForEach(options, id: \.self) { o in
                     Text(o).coreFont(size: MacTextSize.meta, design: .monospaced)

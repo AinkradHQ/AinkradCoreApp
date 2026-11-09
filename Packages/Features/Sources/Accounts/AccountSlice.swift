@@ -13,7 +13,7 @@ struct AccountSlice: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
                 Label("Spend and usage", systemImage: "chart.bar").coreFont(size: MacTextSize.meta, weight: .semibold)
-                .foregroundStyle(GlassInk.secondary)
+                    .foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 AccLink(title: "Open Costs", symbol: "arrow.right") { go(.costs) }
                 AccLink(title: "Open Ledger", symbol: "arrow.right") { go(.ledger) }
