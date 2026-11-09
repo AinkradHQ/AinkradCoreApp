@@ -208,3 +208,22 @@ struct AuditPlainWordsTests {
         #expect(AuditWords.sentence(row("secret", "github-token-test")) { _ in nil }.what == "secret github-token-test")
     }
 }
+
+struct AuditDetailWordsTests {
+    private let item = AuditItem(
+        seq: 11, at: Date(), action: "pairing.approved", actor: .user(1), entityKind: nil, entityRef: nil,
+        details:
+            #"{"bootstrap":0,"by_device":"d_7ffdjdny38t6c","device":"d_6s1bm7ah2y8sg","pairing":"p_7k1nbawnpbt88"}"#)
+
+    @Test func idsBecomePlainWordsAndMoveToTechnicalDetails() {
+        let r = AuditWords.detailRows(item) { $0 == "d_6s1bm7ah2y8sg" ? "iPad Air" : nil }
+        let plain = Dictionary(uniqueKeysWithValues: r.plain.map { ($0.0, $0.1) })
+        #expect(plain["device"] == "iPad Air")
+        #expect(plain["by device"] == "a device")
+        #expect(plain["pairing"] == "a pairing")
+        #expect(r.plain.allSatisfy { !AuditWords.isOpaqueID($0.1) })
+        #expect(r.technical.contains { $0.1 == "p_7k1nbawnpbt88" })
+        #expect(r.technical.contains { $0 == ("Entry", "11") })
+        #expect(r.technical.contains { $0 == ("Action", "pairing.approved") })
+    }
+}
