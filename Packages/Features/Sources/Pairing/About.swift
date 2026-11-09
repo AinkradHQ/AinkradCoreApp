@@ -16,7 +16,7 @@ struct CoreAbout: Equatable, Sendable {
     var isAdmin: Bool { scopes.contains("admin") }
 }
 
-/// Settings, Core, About: read again whenever a connection opens. The model owns no business logic, only the last answer.
+/// Settings, Core, Devices (top of the page): read again whenever a connection opens. The model owns no business logic, only the last answer.
 @MainActor @Observable
 final class AboutModel {
     enum State: Equatable {
@@ -63,16 +63,13 @@ enum AboutWords {
     static func api(_ a: CoreAbout) -> String { "\(a.apiMajor).\(a.apiMinor)" }
 }
 
-struct AboutSection: View {
+/// Which Core this is and what this Mac may do on it: the block at the top of Settings, Devices.
+struct AboutBlock: View {
     let app: AppModel
 
     var body: some View {
         let model = app.about
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Which Core this is, and what this Mac may do on it.").foregroundStyle(GlassInk.secondary)
-            if app.service == nil && model.state == .idle {
-                NotConnectedNote(what: "These details")
-            }
             switch model.state {
             case .idle: EmptyView()
             case .loading: LoadNote(state: .loading) {}

@@ -479,6 +479,12 @@ public final class AccountsModel {
         host.shell.open(.settings)
     }
 
+    /// Chains are defined here; agents are bound where work starts: Settings, Agents and chains (Agents registers the page).
+    func openChainBinding() {
+        host.shell.settings.selected = "agent-chains"
+        host.shell.open(.settings)
+    }
+
     func openAudit() {
         host.shell.settings.selected = "audit"
         host.shell.open(.settings)
@@ -572,10 +578,6 @@ public final class AccountsModel {
                 id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
             ) {
                 AccountsLinkSection(model: self)
-            })
-        shell.settings.section(
-            SettingsSection(id: "accounts-gate", group: .security, title: "Real accounts", symbol: "lock", order: 3) {
-                AccountsGateSection(model: self)
             })
     }
 }

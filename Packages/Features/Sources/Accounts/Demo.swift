@@ -5,6 +5,11 @@ import CoreKit
 import Foundation
 import Shell
 
+extension AccountsModel {
+    /// For the Esc and focus runtime check (`CORE_ESC_CHECK`): whether an account's page is open.
+    public var debugDetailOpen: Bool { detail != nil }
+}
+
 /// Debug only: every Accounts state of the prototype on sample data and a stand-in service, for screenshots and for the
 /// reviewer to click through. Nothing here reaches a Core, and nothing here is a real key: the names are made up.
 @MainActor
@@ -406,7 +411,7 @@ public final class AccountsDemo {
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "chains", "chains-second", "chain-new", "chain-edit", "chain-delete",
-        "chain-bind", "chain-error",
+        "chain-error",
         "budgets", "costs", "ledger", "prices", "connect", "delete-account", "cap", "new-pool",
         "add-member",
         "delete-pool", "signin-intro", "signin-url", "signin-working", "signin-done", "signin-failed",
@@ -479,7 +484,7 @@ public final class AccountsDemo {
                 "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
-            case "chains", "chains-second", "chain-new", "chain-edit", "chain-delete", "chain-bind", "chain-error":
+            case "chains", "chains-second", "chain-new", "chain-edit", "chain-delete", "chain-error":
                 .chains
             case "budgets", "costs", "ledger", "prices": AccountsPage(rawValue: scene)!
             case "price-new": .prices
@@ -549,7 +554,6 @@ public final class AccountsDemo {
         case "chain-new": AccountDialogs.openChain(model, editing: nil)
         case "chain-edit": AccountDialogs.openChain(model, editing: model.chain(1))
         case "chain-delete": AccountDialogs.openDeleteChain(model, model.chain(2)!)
-        case "chain-bind": AccountDialogs.openBindAgent(model, chain: model.chain(1)!)
         case "chain-error":
             AccountDialogs.openChain(model, editing: model.chain(1))
             model.note("chain", "The Core refused: a chain may hold only one subscription pool.")
@@ -568,9 +572,7 @@ public final class AccountsDemo {
         case "state-error": model.load = .failed(code: "internal", message: "Core could not read its accounts.")
         case "state-scope": model.load = .forbidden
         case "launcher": shell.toggleLauncher()
-        case "settings-gate":
-            shell.settings.selected = "accounts-gate"
-            shell.open(.settings)
+        case "settings-gate": model.openSwitches()
         default: break
         }
     }
