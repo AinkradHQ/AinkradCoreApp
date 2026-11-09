@@ -5,7 +5,7 @@ import SwiftUI
 /// The dialogs of the Core app, shown over the shell like the Devices and Secrets dialogs.
 @MainActor
 enum AccountDialogs {
-    private static func present<V: View>(
+    static func present<V: View>(
         _ m: AccountsModel, _ id: String, @ViewBuilder _ v: @escaping (@escaping () -> Void) -> V
     ) {
         m.host.clearElevationNotice()
@@ -185,11 +185,13 @@ private struct DeletePoolDialog: View {
     let close: () -> Void
     @State private var busy = false
     var body: some View {
-        let n = model.bindings(of: pool).count
+        let used = model.chains(using: pool)
         CoreDialogPanel("Delete \(pool.name)?", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
-                    "The pool goes, and so do its \(n) binding\(n == 1 ? "" : "s"). Those agents fall back to the default pool. The accounts stay."
+                    used.isEmpty
+                        ? "The pool goes. The accounts stay."
+                        : "\(used.map(\.name).joined(separator: ", ")) still uses this pool, so the Core will refuse. Take it out of the chain first, then delete it."
                 )
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["delete-pool-\(pool.id)"] { AccIssue(text: e) }
@@ -267,7 +269,7 @@ struct AccountsLinkSection: View {
                 }
             }
             GlassSection(
-                "The Core app", sub: "Accounts, pools and bindings, shared by agents, Citadel and every device.",
+                "The Core app", sub: "Accounts, pools and chains, shared by agents, Citadel and every device.",
                 symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
             ) {
                 AppActionTile(

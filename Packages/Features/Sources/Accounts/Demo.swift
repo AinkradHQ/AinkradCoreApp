@@ -82,16 +82,25 @@ public final class AccountsDemo {
             PoolItem(id: 4, name: "Default", provider: "google", isDefault: true, members: [5, 6]),
             PoolItem(id: 5, name: "Research", provider: "google", isDefault: false, members: []),
         ]
-        var bindingList = [
-            BindingItem(agent: "atlas", provider: "anthropic", poolID: 2),
-            BindingItem(agent: "ines", provider: "anthropic", poolID: 2),
-            BindingItem(agent: "vesper", provider: "openai", poolID: 3),
+        var chainList = [
+            ChainItem(
+                id: 1, name: "daily", isDefault: true,
+                entries: [
+                    ChainEntryItem(pool: 1, provider: "anthropic", harness: "claude", model: "claude-sonnet"),
+                    ChainEntryItem(pool: 3, provider: "openai", harness: "codex", model: nil),
+                ]),
+            ChainItem(
+                id: 2, name: "careful", isDefault: false,
+                entries: [ChainEntryItem(pool: 2, provider: "anthropic", harness: "claude", model: "claude-opus")]),
+        ]
+        var chainBindingList = [
+            ChainBindingItem(agent: "atlas", chain: 2), ChainBindingItem(agent: "ines", chain: 2),
+            ChainBindingItem(agent: "vesper", chain: 1),
         ]
         var gateState = GateState(mode: 1, providerAccounts: 1)
         func providers() async throws -> [ProviderItem] { providerList }
         func accounts() async throws -> [AccountItem] { accountList }
         func pools() async throws -> [PoolItem] { poolList }
-        func bindings() async throws -> [BindingItem] { bindingList }
         func gate() async throws -> GateState { gateState }
         func createPool(name: String, provider: String) async throws -> PoolItem {
             let p = PoolItem(
@@ -118,16 +127,43 @@ public final class AccountsDemo {
                     ) : $0
             }
         }
-        func bind(agent: String, pool: Int64) async throws -> BindingItem {
-            let provider = poolList.first { $0.id == pool }?.provider ?? ""
-            bindingList.removeAll { $0.agent == agent && $0.provider == provider }
-            let b = BindingItem(agent: agent, provider: provider, poolID: pool)
-            bindingList.append(b)
+        func chains() async throws -> [ChainItem] { chainList }
+        private func entries(_ drafts: [ChainEntryDraft]) -> [ChainEntryItem] {
+            drafts.map { d in
+                let p = poolList.first { $0.id == d.pool }
+                let h = providerList.first { $0.id == p?.provider }?.harness ?? "claude"
+                return ChainEntryItem(pool: d.pool, provider: p?.provider ?? "", harness: h, model: d.model)
+            }
+        }
+        func createChain(name: String, entries drafts: [ChainEntryDraft]) async throws -> ChainItem {
+            let c = ChainItem(
+                id: Int64(chainList.count + 10), name: name, isDefault: chainList.isEmpty, entries: entries(drafts))
+            chainList.append(c)
+            return c
+        }
+        func replaceChain(_ id: Int64, name: String, entries drafts: [ChainEntryDraft]) async throws -> ChainItem {
+            let old = chainList.first { $0.id == id }
+            let c = ChainItem(id: id, name: name, isDefault: old?.isDefault ?? false, entries: entries(drafts))
+            chainList = chainList.map { $0.id == id ? c : $0 }
+            return c
+        }
+        func deleteChain(_ id: Int64) async throws {
+            chainList.removeAll { $0.id == id }
+            chainBindingList.removeAll { $0.chain == id }
+        }
+        func setDefaultChain(_ id: Int64) async throws {
+            chainList = chainList.map {
+                ChainItem(id: $0.id, name: $0.name, isDefault: $0.id == id, entries: $0.entries)
+            }
+        }
+        func chainBindings() async throws -> [ChainBindingItem] { chainBindingList }
+        func bindAgent(_ agent: String, chain: Int64) async throws -> ChainBindingItem {
+            chainBindingList.removeAll { $0.agent == agent }
+            let b = ChainBindingItem(agent: agent, chain: chain)
+            chainBindingList.append(b)
             return b
         }
-        func unbind(agent: String, provider: String) async throws {
-            bindingList.removeAll { $0.agent == agent && $0.provider == provider }
-        }
+        func unbindAgent(_ agent: String) async throws { chainBindingList.removeAll { $0.agent == agent } }
         func setState(account: Int64, state: String) async throws -> AccountItem {
             change(account) { ($0.label, state, $0.cap) }
         }
@@ -333,7 +369,8 @@ public final class AccountsDemo {
         "account-ready",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
-        "limits", "pools", "pools-second",
+        "limits", "pools", "pools-second", "chains", "chains-second", "chain-new", "chain-edit", "chain-delete",
+        "chain-bind", "chain-error",
         "budgets", "costs", "ledger", "prices", "connect", "delete-account", "cap", "new-pool",
         "add-member",
         "delete-pool", "signin-intro", "signin-url", "signin-working", "signin-done", "signin-failed",
@@ -367,6 +404,7 @@ public final class AccountsDemo {
         model.readOnly = false
         model.filter = .all
         model.poolSelection = nil
+        model.chainSelection = scene == "chains-second" || scene == "chain-delete" ? 2 : nil
         model.opener = { _ in }
         model.signIn = nil
         switch scene {
@@ -391,6 +429,8 @@ public final class AccountsDemo {
                 "signin-done", "signin-failed":
                 .accounts
             case "pools", "pools-second", "new-pool", "add-member", "delete-pool", "touchid-cancelled": .pools
+            case "chains", "chains-second", "chain-new", "chain-edit", "chain-delete", "chain-bind", "chain-error":
+                .chains
             case "budgets", "costs", "ledger", "prices": AccountsPage(rawValue: scene)!
             case "price-new": .prices
             case "provider-new", "provider-edit": .accounts
@@ -435,6 +475,13 @@ public final class AccountsDemo {
         case "budget-raise": AccountDialogs.openRaise(model, model.budgets.first { $0.id == 2 }!)
         case "budgets": model.cursor = "g-3"
         case "account-testing": Task { await model.test(model.account(1)!) }
+        case "chain-new": AccountDialogs.openChain(model, editing: nil)
+        case "chain-edit": AccountDialogs.openChain(model, editing: model.chain(1))
+        case "chain-delete": AccountDialogs.openDeleteChain(model, model.chain(2)!)
+        case "chain-bind": AccountDialogs.openBindAgent(model, chain: model.chain(1)!)
+        case "chain-error":
+            AccountDialogs.openChain(model, editing: model.chain(1))
+            model.note("chain", "The Core refused: a chain may hold only one subscription pool.")
         case "new-pool": AccountDialogs.openNewPool(model)
         case "add-member": AccountDialogs.openAddMember(model, pool: model.pool(2)!)
         case "delete-pool": AccountDialogs.openDeletePool(model, model.pool(2)!)

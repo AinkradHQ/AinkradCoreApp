@@ -231,9 +231,44 @@ struct ModelTests {
         let (m, api, _, _) = await make()
         api.failNext = CoreError.http(status: 409, code: "runner_offline", message: "mac-studio is not connected")
         let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go"))
-        #expect(n?.title == "That runner is offline" && n?.detail == "mac-studio is not connected")
+        #expect(n?.title == "That runner is offline")
+        #expect(n?.detail == "mac-studio is not connected. Pick another runner, or bring this one back online.")
         let ok = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go"))
         #expect(ok == nil && m.shell.panes.contains { $0.id.hasPrefix("agents.s-as_new") })
+    }
+
+    @Test func chainsLoadForAdminsAndAreEmptyOtherwise() async {
+        let api = FakeAgentsAPI.prototypeWorld()
+        api.chainList = [ChainOption(id: 1, name: "daily", isDefault: true, steps: ["claude · sonnet"])]
+        let (m, _, _, _) = await make(api)
+        await m.loadRunners()
+        #expect(m.chains.map(\.name) == ["daily"])
+        let (plain, _, _, _) = await make()
+        await plain.loadRunners()
+        #expect(plain.chains.isEmpty)
+    }
+
+    @Test func aBusyRunnerSaysWhatToDo() async {
+        let (m, api, _, _) = await make()
+        api.failNext = CoreError.http(status: 503, code: "runner_busy", message: "mac-studio has no free slot")
+        let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go", chain: 1))
+        #expect(n?.title == "That runner is too busy right now")
+        #expect(n?.detail == "mac-studio has no free slot. Wait a moment and choose Try again, or pick another runner.")
+    }
+
+    @Test func aChainForANonAdminIsRefusedPlainly() async {
+        let (m, api, _, _) = await make()
+        api.failNext = CoreError.forbiddenScope
+        let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go", chain: 1))
+        #expect(n?.title == "Only an admin can start a session from a chain or an agent.")
+        #expect(n?.detail.contains("harness") == true)
+    }
+
+    @Test func agentIdsFollowTheCoresRule() {
+        #expect(SessionSource.validAgent("atlas:1.a_b-c"))
+        #expect(!SessionSource.validAgent(""))
+        #expect(!SessionSource.validAgent("two words"))
+        #expect(!SessionSource.validAgent(String(repeating: "a", count: 65)))
     }
 
     @Test func theNotificationQuestionIsAskedOnceInTheAppsWordsFirst() async {

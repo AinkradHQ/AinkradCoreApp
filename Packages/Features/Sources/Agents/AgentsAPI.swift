@@ -49,9 +49,12 @@ public protocol AgentsAPI: Sendable {
     func events() -> AsyncStream<AgentFeed>
     /// What Core's ledger holds for a session (`admin`), or nil when this device can't read it.
     func ledger(_ session: String) async throws -> SessionLedger?
+    /// The chains a session can start from (`admin`). A device without it gets none, not an error.
+    func chains() async throws -> [ChainOption]
 }
 
 extension AgentsAPI {
+    public func chains() async throws -> [ChainOption] { [] }
     public func ledger(_ session: String) async throws -> SessionLedger? { nil }
 }
 
