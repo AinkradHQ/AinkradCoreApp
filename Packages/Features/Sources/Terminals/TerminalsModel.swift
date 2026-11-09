@@ -209,13 +209,13 @@ public final class TerminalsModel {
                 shell.bell.add(
                     BellItem(
                         id: id, kind: .runner, title: "\(r.name) disconnected",
-                        sub: "runner.disconnected · its terminals answer runner_offline", time: "now",
+                        sub: "Its terminals can't be reached until it's back.", time: "now",
                         actions: [BellAction("View runner", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
             case .degraded:
                 shell.bell.add(
                     BellItem(
                         id: id, kind: .runner, title: "\(r.name) is slow to answer",
-                        sub: "runner.degraded · missed two heartbeats", time: "now",
+                        sub: "It missed two check-ins in a row.", time: "now",
                         actions: [BellAction("View runner", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
             default: shell.bell.remove(id)
             }
@@ -481,7 +481,17 @@ final class NewTerminalModel {
     }
 
     var chosen: RunnerItem? { runner.flatMap { model.runner($0) } }
-    var canOpen: Bool { !busy && chosen?.online == true && chosen?.hasPty == true }
+    var canOpen: Bool { !busy && blockedReason == nil }
+
+    /// Why Open is off, in plain words; nil when it can go.
+    var blockedReason: String? {
+        guard let c = chosen else {
+            return model.runners.isEmpty ? "No runner is paired with this Core." : "Pick a runner to open it on."
+        }
+        if !c.online { return "That runner is offline." }
+        if !c.hasPty { return "Terminals are off on that runner." }
+        return nil
+    }
 
     func pick(_ id: String) {
         runner = id
@@ -489,7 +499,11 @@ final class NewTerminalModel {
     }
 
     func submit() async {
-        guard let r = chosen, canOpen else { return }
+        guard !busy else { return }
+        guard let r = chosen, blockedReason == nil else {
+            error = Refusal(title: blockedReason ?? "Pick a runner to open it on.", text: "", code: "", http: 0)
+            return
+        }
         error = nil
         busy = true
         defer { busy = false }

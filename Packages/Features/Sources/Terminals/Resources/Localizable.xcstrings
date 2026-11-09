@@ -76,7 +76,7 @@
     "Detach" : {
 
     },
-    "Disconnected, so the test would fail with runner_offline." : {
+    "Disconnected, so the test would fail." : {
 
     },
     "End Terminal…" : {

@@ -125,7 +125,7 @@ struct PaneView: Equatable {
                 banner: .init(
                     tone: .fail, title: "\(machine) is not connected",
                     detail:
-                        "The Core can’t reach this terminal while its runner is disconnected (runner_offline). Terminal output only ever lives on the runner.",
+                        "The Core can’t reach this terminal while its runner is disconnected. Terminal output only ever lives on the runner.",
                     action: .runner),
                 card: .init(
                     title: "Can’t attach right now", body: "Attach again once \(machine) reconnects.", note: nil,

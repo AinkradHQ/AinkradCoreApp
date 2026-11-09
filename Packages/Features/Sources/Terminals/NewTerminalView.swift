@@ -65,6 +65,10 @@ struct NewTerminalView: View {
             .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
             if let n = model.host.elevationNotice { ElevationBanner(notice: n) }
+            if let why = form.blockedReason, form.error == nil {
+                Label(why, systemImage: "exclamationmark.triangle").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary).accessibilityIdentifier("new-terminal-blocked")
+            }
             if let e = form.error {
                 TermBanner(
                     tone: .fail, title: e.title,
@@ -83,7 +87,8 @@ struct NewTerminalView: View {
                     Label(form.error?.code == "runner_busy" ? "Try again" : "Open terminal", systemImage: "touchid")
                 }
                 .buttonStyle(CoreButtonStyle(.prominent, busy: form.busy)).coreShortcut(.primary)
-                .disabled(!form.canOpen)
+                .disabled(!form.canOpen).opacity(form.canOpen || form.busy ? 1 : 0.45)
+                .help(form.blockedReason ?? "")
             }
         }
         .foregroundStyle(GlassInk.primary)
