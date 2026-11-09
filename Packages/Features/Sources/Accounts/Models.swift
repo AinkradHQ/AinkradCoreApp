@@ -47,6 +47,9 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     /// What one session may spend on it; nil is no limit.
     var maxTokens: Int64?
     var maxUSDMicros: Int64?
+    /// Sessions holding a slot now, and the scheduler's health counters (admin only; nil for any other device).
+    var live: Int64?
+    var health: AccountHealthItem?
     var phase: AccountPhase { AccountPhase(state) }
 
     static func == (l: Self, r: Self) -> Bool {
@@ -55,7 +58,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.stateUntil == r.stateUntil && l.cap == r.cap && l.lastUsedAt == r.lastUsedAt
             && l.createdAt == r.createdAt && l.lastTest?.at == r.lastTest?.at
             && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
-            && l.maxUSDMicros == r.maxUSDMicros
+            && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
     }
 }
 

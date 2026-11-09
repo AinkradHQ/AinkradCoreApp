@@ -49,15 +49,29 @@ public final class AccountsDemo {
         lazy var accountList: [AccountItem] = [
             a(
                 1, "claude-api-metered", "anthropic", "active", "x9Lm", 4, used: 7_200, test: (10_800, "ok"),
-                limits: (2_000_000, 5_000_000)),
+                limits: (2_000_000, 5_000_000), live: 2,
+                health: AccountHealthItem(lastSuccessAt: now.addingTimeInterval(-120))),
             a(
                 2, "claude-api-batch", "anthropic", "cooling", "k2Tq", 4, used: 1_100,
-                reason: "Rate limit from the provider", until: 2_460),
-            a(3, "codex-api", "openai", "active", "b2Rt", 0, used: 660, test: (240, "auth_failed")),
+                reason: "Rate limit from the provider", until: 2_460, live: 0,
+                health: AccountHealthItem(
+                    lastSuccessAt: now.addingTimeInterval(-3_000), planStatus: "rejected",
+                    windows: [
+                        PlanWindowItem(name: "five_hour", utilization: 1.01, resetsAt: now.addingTimeInterval(2_460))
+                    ])),
+            a(
+                3, "codex-api", "openai", "active", "b2Rt", 0, used: 660, test: (240, "auth_failed"), live: 1,
+                health: AccountHealthItem(
+                    failStreak: 3, lastSuccessAt: now.addingTimeInterval(-900), upstreamClass: "server_error")),
             a(
                 4, "codex-api-ci", "openai", "unhealthy", "r7Vd", 2, used: 86_400,
-                reason: "The provider refused the key", test: (3_600, "auth_failed")),
-            a(5, "gemini-key", "google", "active", "Qp0s", 4, used: 10_800),
+                reason: "The provider refused the key", test: (3_600, "auth_failed"), live: 0,
+                health: AccountHealthItem(authStreak: 2, upstreamClass: "auth_failed")),
+            a(
+                5, "gemini-key", "google", "active", "Qp0s", 4, used: 10_800, live: 3,
+                health: AccountHealthItem(
+                    lastSuccessAt: now.addingTimeInterval(-60), planStatus: "allowed_warning",
+                    windows: [PlanWindowItem(name: "seven_day", utilization: 0.87, resetsAt: nil)])),
             a(
                 6, "gemini-spare", "google", "disabled", "d1Zn", 4, used: 777_600,
                 reason: "Disabled while the key is replaced"),
@@ -65,7 +79,8 @@ public final class AccountsDemo {
         func a(
             _ id: Int64, _ label: String, _ provider: String, _ state: String, _ tail: String, _ cap: Int64,
             used: TimeInterval, reason: String? = nil, until: TimeInterval? = nil,
-            test: (TimeInterval, String)? = nil, limits: (Int64?, Int64?) = (nil, nil)
+            test: (TimeInterval, String)? = nil, limits: (Int64?, Int64?) = (nil, nil), live: Int64? = nil,
+            health: AccountHealthItem? = nil
         ) -> AccountItem {
             AccountItem(
                 id: id, provider: provider, label: label, maskedTail: tail, baseURL: "https://api.example.com",
@@ -73,7 +88,7 @@ public final class AccountsDemo {
                 stateReason: reason, stateUntil: until.map { now.addingTimeInterval($0) }, cap: cap,
                 lastUsedAt: now.addingTimeInterval(-used), createdAt: now.addingTimeInterval(-9_000_000),
                 lastTest: test.map { (now.addingTimeInterval(-$0.0), $0.1) }, maxTokens: limits.0,
-                maxUSDMicros: limits.1)
+                maxUSDMicros: limits.1, live: live, health: health)
         }
         var poolList = [
             PoolItem(id: 1, name: "Default", provider: "anthropic", isDefault: true, members: [1, 2]),
@@ -366,7 +381,7 @@ public final class AccountsDemo {
 
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
-        "account-ready",
+        "account-ready", "accounts-not-admin",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "chains", "chains-second", "chain-new", "chain-edit", "chain-delete",
@@ -415,13 +430,21 @@ public final class AccountsDemo {
                 PoolItem(id: $0.id, name: $0.name, provider: $0.provider, isDefault: $0.isDefault, members: [])
             }
         case "budgets-empty": svc.budgetList = []
+        case "accounts-not-admin":
+            svc.accountList = svc.accountList.map {
+                var x = $0
+                x.live = nil
+                x.health = nil
+                return x
+            }
         default: break
         }
         model.use(svc)
         try? await Task.sleep(for: .milliseconds(500))
         let page: AccountsPage =
             switch scene {
-            case "accounts", "accounts-need", "account-ready", "account-cooling", "account-unhealthy",
+            case "accounts", "accounts-need", "accounts-not-admin", "account-ready", "account-cooling",
+                "account-unhealthy",
                 "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
                 "cap",
                 "signin-intro", "signin-url", "signin-working",
