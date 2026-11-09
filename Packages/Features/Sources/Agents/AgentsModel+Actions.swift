@@ -20,7 +20,21 @@ extension AgentsModel {
         if let d = error as? ElevationDeclined { return d.notice }
         let e = CoreError.unwrapping(error)
         let words = e?.localizedDescription ?? error.localizedDescription
-        return InlineNotice(title: "\(doing) did not go through.", detail: words)
+        return InlineNotice(title: "\(doing) did not go through.", detail: sentence(words))
+    }
+
+    /// The Core's refusals are short lower-case phrases: say the known ones plainly, and make the rest a sentence.
+    static func sentence(_ words: String) -> String {
+        switch words {
+        case "only a lost or interrupted session is resumed":
+            return "Only a session that was lost or interrupted can be resumed. This one is running or finished."
+        case "the session's account is full: resume again when one of its sessions ends":
+            return "The account this session runs on is full. Try again when one of its sessions ends."
+        default:
+            guard let first = words.first else { return words }
+            let s = first.uppercased() + words.dropFirst()
+            return s.hasSuffix(".") || s.hasSuffix("?") || s.hasSuffix("!") ? s : s + "."
+        }
     }
 
     func note(_ id: String, _ n: InlineNotice?) { notices[id] = n }

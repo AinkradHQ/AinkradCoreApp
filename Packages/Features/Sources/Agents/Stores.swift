@@ -51,10 +51,19 @@ public final class TranscriptStore {
             absorb(e)
             if foldResult(e) { continue }
             if case .toolUse(let id, _, _) = e.kind { toolSeq[id] = e.seq }
-            if e.visible { entries.append(e) }
+            if e.visible, !repeatsDecision(e) { entries.append(e) }
         }
         trim()
         return added
+    }
+
+    /// The Core records one approval twice (the answer the app sent, and the one the harness reports): one row is enough.
+    private func repeatsDecision(_ e: TranscriptEntry) -> Bool {
+        guard case .approvalDecided(let id, _) = e.kind else { return false }
+        return entries.contains {
+            if case .approvalDecided(let other, _) = $0.kind { return other == id }
+            return false
+        }
     }
 
     /// Keeps the newest `window` entries; what falls off is paged back in by `loadEarlier`.
@@ -83,7 +92,12 @@ public final class TranscriptStore {
         let first = entries.first?.seq ?? lastSeq + 1
         let older = page.filter { $0.seq < first }.sorted { $0.seq < $1.seq }
         for e in older { absorb(e) }
-        entries.insert(contentsOf: older.filter(\.visible), at: 0)
+        var seen = Set<String>()
+        let shown = older.filter(\.visible).filter { e in
+            guard case .approvalDecided(let id, _) = e.kind else { return true }
+            return seen.insert(id).inserted && !repeatsDecision(e)
+        }
+        entries.insert(contentsOf: shown, at: 0)
         heldAfter = min(heldAfter, after)
     }
 

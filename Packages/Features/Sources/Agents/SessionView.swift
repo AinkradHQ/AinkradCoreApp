@@ -89,15 +89,22 @@ struct SessionView: View {
     }
 
     /// The keys this pane answers, for what this session can do now.
+    /// The stack badge's width (icon, "3 of 3", "⌃Tab", padding), growing with the app's text size like the badge.
+    private var badgeRoom: CGFloat { 116 * CGFloat(TextSizePrefs.shared.scale) }
+
     private func keyHints(_ s: AgentSessionInfo) -> some View {
         let keys: [String] =
             s.live
             ? ["↩ reply", "esc leave field", "C cancel", "K kill", "↓ latest"]
             : ["R resume"] + (s.outcome == .succeeded ? ["W wake"] : []) + ["↓ latest"]
-        return Text(keys.joined(separator: " · ")).coreFont(size: MacTextSize.meta)
-            .foregroundStyle(GlassInk.secondary).lineLimit(1)
+        let line = keys.joined(separator: " · ")
+        // With other panes open this one can be the front of a stack, whose "2 of 3 ⌃Tab" badge sits over the bottom right
+        // corner: the hints stop short of it (and cut with an ellipsis, full line on hover) instead of running under it.
+        return Text(line).coreFont(size: MacTextSize.meta)
+            .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).help(line)
             .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
+            .padding(.leading, Space.s4).padding(.trailing, Space.s4 + (model.shell.panes.count > 1 ? badgeRoom : 0))
+            .padding(.bottom, Space.s2)
     }
 }
 
