@@ -82,6 +82,7 @@ public struct LiveAgentsAPI: AgentsAPI {
             switch try await client.getAgentSession(path: .init(id: id)) {
             case .ok(let o): return Self.session(try o.body.json)
             case .notFound(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -96,6 +97,7 @@ public struct LiveAgentsAPI: AgentsAPI {
                 let t = try o.body.json
                 return TranscriptPage(entries: t.entries.map(Self.entry), lastSeq: t.lastSeq)
             case .notFound(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -230,7 +232,7 @@ public struct LiveAgentsAPI: AgentsAPI {
 
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch {
-            throw CoreError.unwrapping(error) ?? error
+            throw CoreFailure.of(error) ?? error
         }
     }
 

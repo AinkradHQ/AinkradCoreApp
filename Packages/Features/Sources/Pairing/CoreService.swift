@@ -128,6 +128,7 @@ struct LiveCoreService: CoreService {
             case .badRequest(let r): throw Self.fail(r)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -140,6 +141,7 @@ struct LiveCoreService: CoreService {
             case .badRequest(let r): throw Self.fail(r)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -151,6 +153,7 @@ struct LiveCoreService: CoreService {
             case .ok(let o): return Self.device(try o.body.json)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -167,6 +170,7 @@ struct LiveCoreService: CoreService {
                 return NewPairing(id: id, code: code, qr: p.qr, expiresAt: p.expiresAt)
             case .badRequest(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -177,6 +181,7 @@ struct LiveCoreService: CoreService {
             switch try await client.getPairing(path: .init(id: id)) {
             case .ok(let o): return Self.pairing(try o.body.json, fallback: id)
             case .notFound(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -204,6 +209,7 @@ struct LiveCoreService: CoreService {
             case .badRequest(let r): throw Self.fail(r)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -215,6 +221,7 @@ struct LiveCoreService: CoreService {
             case .ok(let o): return Self.pairing(try o.body.json, fallback: id)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
         }
@@ -303,7 +310,7 @@ struct LiveCoreService: CoreService {
     /// Whatever the generated client threw, as the `CoreError` inside it.
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch {
-            throw CoreError.unwrapping(error) ?? Self.unknown
+            throw CoreFailure.of(error) ?? Self.unknown
         }
     }
 
@@ -330,6 +337,14 @@ struct LiveCoreService: CoreService {
     }
     private static func fail(_ r: Components.Responses.BadRequest) -> CoreError {
         .badRequest(message: (try? r.body.json)?.message ?? "The Core refused that.")
+    }
+    /// A status the contract does not list (410, 413, 502, 503): the Core's standard error body, when it has one.
+    private static func status(_ code: Int, _ payload: UndocumentedPayload) async -> CoreError {
+        var data = Data()
+        if let body = payload.body, let all = try? await Data(collecting: body, upTo: 16 * 1024) { data = all }
+        let b = try? JSONDecoder().decode(Components.Schemas.ErrorBody.self, from: data)
+        return .http(
+            status: code, code: b?.code ?? "error", message: b?.message ?? "The Core could not do that (\(code)).")
     }
     private static func fail(_ r: Components.Responses.NotFound) -> CoreError {
         .http(status: 404, code: "not_found", message: (try? r.body.json)?.message ?? "The Core does not know that.")
