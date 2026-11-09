@@ -22,7 +22,7 @@ struct NewSessionSheet: View {
     @FocusState private var runnerFocus: String?
 
     private var runner: RunnerInfo? { model.runners.first { $0.id == (runnerID ?? "") } }
-    private var chain: ChainOption? { model.chains.first { $0.id == (chainID ?? model.chains.first?.id) } }
+    private var chain: ChainOption? { model.chains.first { $0.id == chainID } ?? model.defaultChain }
     private var agentOK: Bool { SessionSource.validAgent(agentID.trimmingCharacters(in: .whitespaces)) }
     private var sourceOK: Bool {
         switch source {
@@ -107,6 +107,11 @@ struct NewSessionSheet: View {
             }
             #endif
             pickRunner()
+            if let d = model.draftChain {
+                chainID = d
+                if !model.chains.isEmpty { source = .chain }
+                model.draftChain = nil
+            }
             if prompt.isEmpty, !model.draftPrompt.isEmpty {
                 prompt = model.draftPrompt
                 model.draftPrompt = ""
@@ -162,8 +167,18 @@ struct NewSessionSheet: View {
                 )
                 .onAppear { if agentID.isEmpty { agentID = model.agentNames[0] } }
             }
-            Text("The chain bound to this agent serves the session, else the default chain.")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            HStack(spacing: Space.s2) {
+                Text("The chain bound to this agent serves the session, else the default chain.")
+                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button("Agents and chains") {
+                    model.shell.closeDialog()
+                    model.openChainBinding()
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .help("Settings, Agents and chains: bind an agent to a chain")
+            }
         }
     }
 

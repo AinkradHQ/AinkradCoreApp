@@ -9,6 +9,7 @@ struct QuickSessionView: View {
     @State private var busy = false
     @State private var notice: InlineNotice?
     @State private var shown = false
+    @State private var chainID: Int64?
     @FocusState private var focus: Bool
 
     private let prefs = AgentPrefs.shared
@@ -16,8 +17,9 @@ struct QuickSessionView: View {
         if !prefs.runner.isEmpty, let r = model.runners.first(where: { $0.id == prefs.runner }) { return r }
         return model.runners.first { $0.online && $0.runsAgents && !$0.degraded } ?? model.runners.first { $0.online }
     }
-    /// The chain a plain start uses: the default one, when this device may see chains. It sets the harness and model.
-    private var chain: ChainOption? { model.chains.first { $0.isDefault } ?? model.chains.first }
+    /// The chain a start uses: the one picked on the chip, else the default one, when this device may see chains. It sets the
+    /// harness and model. KAN-475: a pool chip would sit beside it once `SessionPoolHook.isAvailable`.
+    private var chain: ChainOption? { model.chains.first { $0.id == chainID } ?? model.defaultChain }
     private var ready: Bool {
         runner != nil && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy
             && !PromptSize.over(prompt)
@@ -42,8 +44,7 @@ struct QuickSessionView: View {
             .coreRise(shown, 1)
             HStack(spacing: Space.s2) {
                 if let chain {
-                    chip("link", chain.name, GlassInk.blue).help(
-                        "Default chain: \(chain.steps.joined(separator: ", then "))")
+                    chainChip(chain)
                 } else {
                     chip("sparkles", AgentWords.harnessName(prefs.harness), GlassInk.violet)
                 }
@@ -78,7 +79,13 @@ struct QuickSessionView: View {
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         .coreModalEntrance()
-        .onAppear { shown = true }
+        .onAppear {
+            shown = true
+            if let d = model.draftChain {
+                chainID = d
+                model.draftChain = nil
+            }
+        }
         .task {
             await model.loadRunners()
             try? await Task.sleep(for: .milliseconds(200))
@@ -86,10 +93,36 @@ struct QuickSessionView: View {
         }
     }
 
-    private func chip(_ symbol: String, _ text: String, _ hue: Color) -> some View {
+    /// The chain the session draws accounts from. With more than one chain the chip opens a picker.
+    @ViewBuilder private func chainChip(_ chain: ChainOption) -> some View {
+        let help = "\(chain.isDefault ? "Default chain" : "Chain"): \(chain.steps.joined(separator: ", then "))"
+        if model.chains.count > 1 {
+            CoreDropdown(
+                items: model.chains.map { c in
+                    CoreDropdownItem(
+                        c.name, symbol: "link", checked: c.id == chain.id, note: c.isDefault ? "default" : nil
+                    ) {
+                        chainID = c.id
+                    }
+                }
+            ) {
+                chip("link", chain.name, GlassInk.blue, picker: true)
+            }
+            .help("\(help). Click to choose another chain.")
+            .accessibilityLabel("Chain, \(chain.name)")
+        } else {
+            chip("link", chain.name, GlassInk.blue).help(help)
+        }
+    }
+
+    private func chip(_ symbol: String, _ text: String, _ hue: Color, picker: Bool = false) -> some View {
         HStack(spacing: 5) {
             Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(hue)
             Text(text).font(.system(size: MacTextSize.meta, weight: .medium))
+            if picker {
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, Space.s2).frame(height: 22)
         .background(GlassInk.well, in: coreShape(6))
@@ -112,6 +145,7 @@ struct QuickSessionView: View {
 
     private func advanced() {
         model.draftPrompt = prompt
+        model.draftChain = chain?.id
         model.shell.closeDialog()
         model.openNewSession(advanced: true)
     }

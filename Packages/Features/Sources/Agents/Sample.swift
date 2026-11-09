@@ -70,6 +70,26 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
     public func chains() async throws -> [ChainOption] { chainList }
     public var agentList: [String] = []
     public func agents() async throws -> [String] { agentList }
+    public var bindingList: [AgentBinding] = []
+    public func bindings() async throws -> [AgentBinding] {
+        try record("bindings")
+        return lock.withLock { bindingList }
+    }
+    public func bind(agent: String, chain: Int64) async throws {
+        try record("bind \(agent) \(chain)")
+        lock.withLock {
+            bindingList.removeAll { $0.agent == agent }
+            bindingList.append(AgentBinding(agent: agent, chain: chain))
+            if !agentList.contains(agent) { agentList.append(agent) }
+        }
+    }
+    public func unbind(agent: String) async throws {
+        try record("unbind \(agent)")
+        lock.withLock {
+            bindingList.removeAll { $0.agent == agent }
+            agentList.removeAll { $0 == agent }
+        }
+    }
     public func attempts(run: String) async throws -> [AgentSessionInfo] {
         lock.withLock {
             runAttempts[run] ?? order.compactMap { sessionsByID[$0] }.filter { $0.route?.run == run }

@@ -337,3 +337,14 @@ public enum AgentWords {
 
 /// What a session was asked to do that has not finished yet.
 public enum StopKind: Sendable { case cancelling, killing }
+
+/// An agent and the chain its sessions draw accounts from.
+public struct AgentBinding: Identifiable, Equatable, Sendable {
+    public var id: String { agent }
+    public let agent: String
+    public let chain: Int64
+    public init(agent: String, chain: Int64) {
+        self.agent = agent
+        self.chain = chain
+    }
+}
