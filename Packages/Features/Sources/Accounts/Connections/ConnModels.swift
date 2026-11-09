@@ -78,6 +78,8 @@ struct ConnFlow: Equatable, Sendable {
     var step: Step
     /// The `state` an OAuth redirect must carry back with its code (not the flow id); nil for a device-code sign-in.
     var callbackState: String?
+    /// The sign-in failed because connections are off on the Core: the sheet offers "Turn on connections".
+    var gated = false
     var isConnected: Bool {
         if case .connected = step { return true }
         return false

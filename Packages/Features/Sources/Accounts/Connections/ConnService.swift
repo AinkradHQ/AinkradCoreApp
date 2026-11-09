@@ -36,6 +36,9 @@ protocol ConnectionsService: Sendable {
     func setApp(kind: String, fields: [String: String]) async throws -> ConnApp
     /// A new token for an existing connection, sent once and never read back.
     func replaceCredential(_ id: Int64, token: String, fields: [String: String]) async throws
+    /// One Core setting (server scope). "Turn on connections" reads `secrets.mode`, then sets it and `secrets.connections`.
+    func coreSetting(_ key: String) async throws -> Int64
+    func setCoreSetting(_ key: String, _ value: Int64) async throws
 }
 
 #if DEBUG
@@ -223,8 +226,33 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         try await addToken(kind: kind, name: "GitHub App", fields: [:], token: "")
     }
 
-    func addToken(kind: String, name: String, fields: [String: String], token: String) async throws -> ConnItem {
+    /// Connections are off on this stand-in Core until its settings are set (tests); `failSetting` refuses the write.
+    var gated = false
+    var failSetting: (any Error)?
+    private var settings: [String: Int64] = ["secrets.mode": 0, "secrets.connections": 0]
+    /// Every setting written and every credential write, in order. Sample only.
+    private(set) var order: [String] = []
+    private func gate(_ what: String) throws {
+        try lock.withLock {
+            if gated, settings["secrets.connections"] != 1 || (settings["secrets.mode"] ?? 0) < 1 {
+                order.append("\(what) refused")
+                throw CoreError.http(status: 409, code: "real_secret_refused", message: "")
+            }
+            order.append(what)
+        }
+    }
+    func coreSetting(_ key: String) async throws -> Int64 { lock.withLock { settings[key] ?? 0 } }
+    func setCoreSetting(_ key: String, _ value: Int64) async throws {
+        if let failSetting { throw failSetting }
         lock.withLock {
+            settings[key] = value
+            order.append("\(key)=\(value)")
+        }
+    }
+
+    func addToken(kind: String, name: String, fields: [String: String], token: String) async throws -> ConnItem {
+        try gate("addToken")
+        return lock.withLock {
             nextID += 1
             let c = ConnItem(
                 id: nextID, kind: kind, name: name, identity: fields["Site"] ?? "@sample-dev", status: .connected,
@@ -281,6 +309,7 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         }
     }
     func replaceCredential(_ id: Int64, token: String, fields: [String: String]) async throws {
+        try gate("replace")
         if failReplace {
             failReplace = false
             throw CoreError.http(status: 400, code: "bad_request", message: "")

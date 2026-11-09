@@ -225,6 +225,16 @@ struct LiveConnectionsService: ConnectionsService {
         }
     }
 
+    func coreSetting(_ key: String) async throws -> Int64 {
+        try await run { try await client.listServerSettings().ok.body.json.first { $0.key == key }?.value ?? 0 }
+    }
+
+    func setCoreSetting(_ key: String, _ value: Int64) async throws {
+        try await run {
+            _ = try await client.setSetting(path: .init(scope: "server", key: key), body: .json(.init(value: value))).ok
+        }
+    }
+
     static func app(_ a: Components.Schemas.ConnectionApp) -> ConnApp {
         ConnApp(
             kind: a.kind, configured: a.configured,
@@ -323,7 +333,9 @@ struct LiveConnectionsService: ConnectionsService {
             case "failed": failed(f, service)
             default: .waiting
             }
-        return ConnFlow(id: f.id, kind: f.kind, userCode: f.userCode, url: url, step: step, callbackState: f.state)
+        return ConnFlow(
+            id: f.id, kind: f.kind, userCode: f.userCode, url: url, step: step, callbackState: f.state,
+            gated: ConnSay.isGate(code: f.errorCode))
     }
 
     private static func failed(_ f: Components.Schemas.ConnectionFlow, _ service: String) -> ConnFlow.Step {
@@ -337,7 +349,8 @@ struct LiveConnectionsService: ConnectionsService {
         case "identity_unavailable":
             .failed(
                 title: "You signed in, but \(service) wouldn't say who you are.", fix: "Wait a minute and try again.")
-        case "real_secret_refused": .failed(title: "Connections are turned off on this Core.", fix: ConnSay.turnedOff)
+        case "real_secret_refused", "secrets_disabled":
+            .failed(title: "Connections are turned off on this Core.", fix: ConnSay.turnedOff)
         default:
             .failed(
                 title: f.errorMessage.flatMap { $0.contains(" ") ? $0 : nil } ?? "The sign-in didn't finish.",
@@ -358,7 +371,25 @@ struct LiveConnectionsService: ConnectionsService {
 
 /// Every failure in plain words with what to do, never a code.
 enum ConnSay {
-    static let turnedOff = "Ask whoever runs your Core to turn connections on, then try again."
+    static let turnedOff = "Press Turn on connections. This Mac does it for you."
+
+    /// The Core's two refusals that mean "connections are off": the broker is off, or a real token isn't admitted yet.
+    static func isGate(code: String?) -> Bool { code == "real_secret_refused" || code == "secrets_disabled" }
+    static func isGate(_ error: any Error) -> Bool {
+        if case .http(_, let code, _)? = CoreError.unwrapping(error) ?? error as? CoreError {
+            return isGate(code: code)
+        }
+        return false
+    }
+
+    /// Why "Turn on connections" itself didn't work, in words.
+    static func turnOnRefusal(_ error: any Error) -> String {
+        if case .forbiddenScope? = CoreError.unwrapping(error) ?? error as? CoreError {
+            return
+                "This Mac can only look. Turning connections on needs a Mac you allowed to manage the Core. Nothing was changed."
+        }
+        return plain(error)
+    }
 
     static func plain(_ error: any Error) -> String {
         guard let e = error as? CoreError ?? CoreError.unwrapping(error) else {
@@ -374,7 +405,7 @@ enum ConnSay {
         case .rateLimited(let s):
             return "That was tried a moment ago. Try again in \(max(Int((s ?? 5).rounded(.up)), 1)) seconds."
         case .http(let status, let code, let message):
-            if code == "real_secret_refused" { return "Connections are turned off on this Core. \(turnedOff)" }
+            if isGate(code: code) { return "Connections are turned off on this Core. \(turnedOff)" }
             if status == 409 {
                 return
                     "This is still the default for its service. Make another one the default first, then disconnect it."

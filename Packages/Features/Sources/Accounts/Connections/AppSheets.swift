@@ -27,7 +27,7 @@ struct AppRegistrationSheet: View {
                     CoreNotice(
                         symbol: "lock", title: "This Mac can only look",
                         text:
-                            "Changes need a Mac you allowed to manage the Core. Ask whoever runs it to set up the \(kind.name) app."
+                            "Changes need a Mac you allowed to manage the Core. Use that Mac to set up the \(kind.name) app."
                     )
                     AccDialogButtons(cancelTitle: "Close", cancel: close)
                 case .ready(let app): form(app)
@@ -152,6 +152,14 @@ struct ReplaceTokenSheet: View {
                     }
                     CoreSecureField("New token", placeholder: "Paste it here", text: $token, autofocus: true)
                     if let e = model.writeError[key] { AccIssue(text: e) }
+                    if model.gated.contains(key) {
+                        TurnOnConnections(model: model) {
+                            if await model.replaceToken(item, token: token, fields: fields) {
+                                token = ""
+                                done = true
+                            }
+                        }
+                    }
                     AccDialogButtons(
                         confirm: "Replace", busy: model.busy == key,
                         enabled: !token.isEmpty && (k?.tokenFields ?? []).allSatisfy { !(fields[$0] ?? "").isEmpty },
