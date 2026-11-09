@@ -12,7 +12,7 @@ PACKAGES := Packages/AinkradClient Packages/CoreUI Packages/CoreKit Packages/Fea
 FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features -name '*.swift' -not -path '*/.build/*'))
 
 .DEFAULT_GOAL := generate
-.PHONY: generate open build test uitest run lint format format-check sync-client clean
+.PHONY: dmg generate open build test uitest run lint format format-check sync-client clean
 
 generate: ## Generate the Xcode project from project.yml
 	xcodegen generate --quiet
@@ -45,3 +45,6 @@ sync-client: ## Re-vendor the generated client from ../AinkradCore
 
 clean:
 	rm -rf build $(PROJECT)
+
+dmg: ## Release .dmg in build/ (dry run: signs only when SIGN_IDENTITY and NOTARY_PROFILE are set; see scripts/release.sh)
+	scripts/release.sh
