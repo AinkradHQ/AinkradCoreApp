@@ -47,6 +47,17 @@ struct ShellModelTests {
         #expect(shell.panes.map(\.id) == ["b", "c"] && shell.activePane == "c")
     }
 
+    @Test func theUndoToastNamesThePaneInWordsAndKeepsTheIdForHover() {
+        let shell = ShellModel()
+        shell.openPane(
+            PaneSpec(id: "p", title: "Claude on runner-1 · as_6w0r", sub: "Fix the login", symbol: "square") {
+                EmptyView()
+            })
+        shell.dismissPane("p")
+        #expect(shell.toast?.message == "Closed Fix the login. It keeps running.")
+        #expect(shell.toast?.help == "Claude on runner-1 · as_6w0r")
+    }
+
     @Test func aClosedPaneComesBackWithUndoAndReopen() {
         let shell = ShellModel()
         for id in ["a", "b"] { shell.openPane(PaneSpec(id: id, title: id, symbol: "square") { EmptyView() }) }
@@ -109,6 +120,16 @@ struct LaneL4Tests {
         let m = model()
         m.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { EmptyView() })
         #expect(m.closeTopmost() && m.topDialog != nil)  // consumed, not closed
+    }
+
+    @Test func escInsideTheNewSessionSheetClosesAnInnerDialogBeforeTheSheet() {
+        let m = model()
+        m.present(ShellDialog(id: "agents.quick") { EmptyView() })
+        m.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { EmptyView() })
+        #expect(m.closeTopmost() && m.topDialog != nil && m.dialog != nil)  // the prompt holds; the typed text stays
+        m.presentOnTop(ShellDialog(id: "confirm") { EmptyView() })
+        #expect(m.closeTopmost() && m.topDialog == nil && m.dialog?.id == "agents.quick")  // the inner layer only
+        #expect(m.closeTopmost() && m.dialog == nil)  // the next Esc closes the sheet
     }
 
     @Test func waitingCountsApprovalsFromTheSourceOnly() {
