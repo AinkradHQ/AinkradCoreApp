@@ -1,0 +1,308 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "%@" : {
+
+    },
+    "%@ choose · ↩ run the highlighted · esc cancel" : {
+
+    },
+    "%@ to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ to %2$@"
+          }
+        }
+      }
+    },
+    "%@, %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld"
+          }
+        }
+      }
+    },
+    "%@, step %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, step %2$lld of %3$lld"
+          }
+        }
+      }
+    },
+    "%@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. %2$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld%2$@"
+          }
+        }
+      }
+    },
+    "A very long title that has to shrink before its badge does" : {
+
+    },
+    "Actions" : {
+
+    },
+    "Add" : {
+
+    },
+    "All" : {
+
+    },
+    "Allow terminal" : {
+
+    },
+    "Appearance uses the content background from Settings, Appearance" : {
+
+    },
+    "Bordered" : {
+
+    },
+    "Borderless" : {
+
+    },
+    "Busy" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Card tint" : {
+
+    },
+    "Checkbox" : {
+
+    },
+    "Collapse" : {
+
+    },
+    "Confirm sheet" : {
+
+    },
+    "CoreUI Gallery" : {
+
+    },
+    "CoreUI has no container, morph, union or concentric shape: each coreGlass is a separate glass." : {
+
+    },
+    "CoreUI has no popover, toolbar group or scroll-edge effect." : {
+
+    },
+    "Count %lld" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Destructive confirm" : {
+
+    },
+    "Device" : {
+
+    },
+    "Device name" : {
+
+    },
+    "Disabled" : {
+
+    },
+    "Dismiss" : {
+
+    },
+    "Done" : {
+
+    },
+    "Due" : {
+
+    },
+    "Duplicate" : {
+
+    },
+    "Expand" : {
+
+    },
+    "Filter" : {
+
+    },
+    "Glass control" : {
+
+    },
+    "Large" : {
+
+    },
+    "Left: Apple's SwiftUI API. Right: the CoreUI component it would replace. Over the Home sky." : {
+
+    },
+    "Medium" : {
+
+    },
+    "Merge" : {
+
+    },
+    "Name" : {
+
+    },
+    "No CoreUI search field, switch, slider, stepper, menu picker or date picker." : {
+
+    },
+    "Off" : {
+
+    },
+    "Official Liquid Glass" : {
+
+    },
+    "On" : {
+
+    },
+    "One" : {
+
+    },
+    "Outer 16, inset 8, inner concentric" : {
+
+    },
+    "Panel content" : {
+
+    },
+    "Passphrase" : {
+
+    },
+    "Pick" : {
+
+    },
+    "Plain" : {
+
+    },
+    "Popover" : {
+
+    },
+    "Popover content" : {
+
+    },
+    "Prominent" : {
+
+    },
+    "Reduce Transparency makes glass opaque; Reduce Motion turns the morph into a fade." : {
+
+    },
+    "Regular material panel. Content lives here; glass never sits on it." : {
+
+    },
+    "Rename" : {
+
+    },
+    "Retry" : {
+
+    },
+    "Retry now" : {
+
+    },
+    "Row %lld of scrolling content" : {
+
+    },
+    "Running" : {
+
+    },
+    "Save" : {
+
+    },
+    "Sessions were renewed silently. Elevation did not survive the restart, so your next change asks for Touch ID again." : {
+
+    },
+    "Sheet" : {
+
+    },
+    "Show toast" : {
+
+    },
+    "Shown here inline; the system sheet frames it." : {
+
+    },
+    "Small" : {
+
+    },
+    "Split" : {
+
+    },
+    "State: %@" : {
+
+    },
+    "Static glass" : {
+
+    },
+    "Switch" : {
+
+    },
+    "System sheet" : {
+
+    },
+    "Tab to focus, then arrow keys." : {
+
+    },
+    "The connection to Home Core dropped. What you see is from %@. Changes are paused and nothing is lost: events replay by sequence once it is back." : {
+
+    },
+    "This Mac is renewing its session in the background (session_expired). Nothing to do." : {
+
+    },
+    "Tinted" : {
+
+    },
+    "Too many requests (rate_limited). Changes are paused until the limit lifts." : {
+
+    },
+    "Too many requests (rate_limited). Try again in %lld s. Changes are paused until then." : {
+
+    },
+    "Two" : {
+
+    },
+    "Undo" : {
+
+    },
+    "hard" : {
+
+    },
+    "linux-01" : {
+
+    },
+    "linux-02" : {
+
+    },
+    "off" : {
+
+    },
+    "on" : {
+
+    },
+    "soft" : {
+
+    }
+  },
+  "version" : "1.0"
+}

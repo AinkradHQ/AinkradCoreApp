@@ -242,15 +242,15 @@ public enum AgentWords {
 
     public static func ago(_ date: Date, now: Date = Date()) -> String {
         let s = Int(now.timeIntervalSince(date))
-        if s < 45 { return "just now" }
-        if s < 3600 { return "\(max(1, s / 60)) min ago" }
-        if s < 86400 { return "\(s / 3600) h ago" }
-        return "\(s / 86400) d ago"
+        if s < 45 { return String(localized: "just now", bundle: .module) }
+        if s < 3600 { return String(localized: "\(max(1, s / 60)) min ago", bundle: .module) }
+        if s < 86400 { return String(localized: "\(s / 3600) h ago", bundle: .module) }
+        return String(localized: "\(s / 86400) d ago", bundle: .module)
     }
 
     /// The word for a session in a list or head: a pending approval wins over the state.
     public static func status(_ s: AgentSessionInfo, waiting: Bool) -> (label: String, tone: Tone, symbol: String) {
-        if waiting { return ("Waiting on you", .warn, "hand.raised") }
+        if waiting { return (String(localized: "Waiting on you", bundle: .module), .warn, "hand.raised") }
         if case .ended = s.state, s.stoppedByBudget {
             return (endedWords("budget"), .warn, "gauge.with.dots.needle.100percent")
         }
@@ -264,14 +264,14 @@ public enum AgentWords {
     /// How a session ended, in words, for the header, the tile and the transcript's last chip. The raw code goes in `.help` only.
     public static func endedWords(_ kind: String) -> String {
         switch kind {
-        case "succeeded": "Ended: finished"
-        case "failed": "Ended: failed"
-        case "stalled": "Ended: stopped making progress"
-        case "token_cap": "Ended: token limit reached"
-        case "budget": "Ended: budget reached"
-        case "cancelled": "Ended: cancelled"
-        case "lost": "Ended: the runner lost it"
-        case "ended", "": "Ended"
+        case "succeeded": String(localized: "Ended: finished", bundle: .module)
+        case "failed": String(localized: "Ended: failed", bundle: .module)
+        case "stalled": String(localized: "Ended: stopped making progress", bundle: .module)
+        case "token_cap": String(localized: "Ended: token limit reached", bundle: .module)
+        case "budget": String(localized: "Ended: budget reached", bundle: .module)
+        case "cancelled": String(localized: "Ended: cancelled", bundle: .module)
+        case "lost": String(localized: "Ended: the runner lost it", bundle: .module)
+        case "ended", "": String(localized: "Ended", bundle: .module)
         default: "Ended: " + sentence(kind).lowercased()
         }
     }

@@ -1,0 +1,451 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "%@\n%@ on %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@\n%2$@ on %3$@ · %4$@"
+          }
+        }
+      }
+    },
+    "%@ / 16 KiB" : {
+
+    },
+    "%@ on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ on %2$@"
+          }
+        }
+      }
+    },
+    "%@ wants to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ wants to %2$@"
+          }
+        }
+      }
+    },
+    "%@ · key held by the runner" : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@. Click to choose another chain." : {
+
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%lld approvals are waiting on you" : {
+
+    },
+    "%lld d ago" : {
+
+    },
+    "%lld h ago" : {
+
+    },
+    "%lld min ago" : {
+
+    },
+    "1 approval is waiting on you" : {
+
+    },
+    "Agent sessions" : {
+
+    },
+    "Agents and chains" : {
+
+    },
+    "Ainkrad can show a macOS banner for each new approval. macOS will ask you to allow it once." : {
+
+    },
+    "Allow in Connections" : {
+
+    },
+    "Answered since this Mac opened" : {
+
+    },
+    "Any secret you pass can be read by the agent in that session. Each is leased to the runner at every start." : {
+
+    },
+    "Approvals" : {
+
+    },
+    "Approvals only. Alerts and Brain inbox items are counted separately." : {
+
+    },
+    "Approvals, %lld waiting" : {
+
+    },
+    "Approve %@" : {
+
+    },
+    "Attempts of this run" : {
+
+    },
+    "Banners are on" : {
+
+    },
+    "Banners aren't set up yet" : {
+
+    },
+    "Bind agent" : {
+
+    },
+    "Bind another agent" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Cancel asks %@ to stop after its current tool call. Safe; try this first." : {
+
+    },
+    "Cancel, stop after its current tool call" : {
+
+    },
+    "Cancelling: it finishes the tool call in flight, then ends. K kills at once." : {
+
+    },
+    "Chain for %@" : {
+
+    },
+    "Chain, %@" : {
+
+    },
+    "Chains are made in Accounts." : {
+
+    },
+    "Copy" : {
+
+    },
+    "Deny %@" : {
+
+    },
+    "Earlier entries load as you scroll up" : {
+
+    },
+    "Ended" : {
+
+    },
+    "Ended: budget reached" : {
+
+    },
+    "Ended: cancelled" : {
+
+    },
+    "Ended: failed" : {
+
+    },
+    "Ended: finished" : {
+
+    },
+    "Ended: stopped making progress" : {
+
+    },
+    "Ended: the runner lost it" : {
+
+    },
+    "Ended: token limit reached" : {
+
+    },
+    "From Core's ledger" : {
+
+    },
+    "Get told when an agent needs you" : {
+
+    },
+    "It runs on a runner of the Home Core. You can close this Mac and it keeps going." : {
+
+    },
+    "It wants to use Bash on mac-studio." : {
+
+    },
+    "Kill stops it at once on the runner and can leave files half-written. Use it only if Cancel did not work." : {
+
+    },
+    "Kill, stop at once" : {
+
+    },
+    "Killing: stopping it on the runner now." : {
+
+    },
+    "Let %@ %@ (⌘Return). Asks for Touch ID when this Mac is locked." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Let %1$@ %2$@ (⌘Return). Asks for Touch ID when this Mac is locked."
+          }
+        }
+      }
+    },
+    "Loading sessions" : {
+
+    },
+    "Loading the agents" : {
+
+    },
+    "Loading the transcript…" : {
+
+    },
+    "More options" : {
+
+    },
+    "New agent session" : {
+
+    },
+    "No runner is paired yet. Add one from Settings, Devices." : {
+
+    },
+    "Nobody answered in time: %@" : {
+
+    },
+    "Not now" : {
+
+    },
+    "Nothing here yet. The first entries arrive when the agent starts." : {
+
+    },
+    "Nothing is waiting on you" : {
+
+    },
+    "Now on %@" : {
+
+    },
+    "Older sessions load as you scroll" : {
+
+    },
+    "On %@ · asked %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On %1$@ · asked %2$@"
+          }
+        }
+      }
+    },
+    "Open" : {
+
+    },
+    "Open Accounts" : {
+
+    },
+    "Open Accounts, Chains" : {
+
+    },
+    "Open the budget that stopped this session, raise it, then resume" : {
+
+    },
+    "Open this attempt" : {
+
+    },
+    "Preview: claude is waiting on you" : {
+
+    },
+    "Prompt" : {
+
+    },
+    "Remove %@" : {
+
+    },
+    "Reply to the agent" : {
+
+    },
+    "Resume" : {
+
+    },
+    "Resume starts this session again from where it stopped. The transcript is kept." : {
+
+    },
+    "Runner %@" : {
+
+    },
+    "Same as Settings, Appearance." : {
+
+    },
+    "Sandboxed needs the admin scope; the Core refuses it otherwise." : {
+
+    },
+    "Say what it should do. It keeps running if you close this Mac." : {
+
+    },
+    "Send the message (Return)" : {
+
+    },
+    "Session %@ · tool %@ · request %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Session %1$@ · tool %2$@ · request %3$@"
+          }
+        }
+      }
+    },
+    "Settings, Agents and chains: bind an agent to a chain" : {
+
+    },
+    "Show all %lld lines" : {
+
+    },
+    "Show less" : {
+
+    },
+    "Some calls had no price: their tokens count, their cost doesn't." : {
+
+    },
+    "Start" : {
+
+    },
+    "Start of the session" : {
+
+    },
+    "Start the session (⌘Return)" : {
+
+    },
+    "Starting needs Touch ID." : {
+
+    },
+    "Starting…" : {
+
+    },
+    "Tell %@ no (⌘Delete). It carries on without it." : {
+
+    },
+    "The agent is working" : {
+
+    },
+    "The agent stopped waiting for this. Ask it again from the composer if you still want it." : {
+
+    },
+    "The chain bound to this agent serves the session, else the default chain." : {
+
+    },
+    "The harness default" : {
+
+    },
+    "The key is used by the runner's gateway and never enters the agent's sandbox." : {
+
+    },
+    "The provider's last answer to this session: %@" : {
+
+    },
+    "This session is not in the list anymore." : {
+
+    },
+    "Tokens used, as this Mac saw them change" : {
+
+    },
+    "Tool %@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tool %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "Tries, in order: %@. It sets the harness and model." : {
+
+    },
+    "Turn on" : {
+
+    },
+    "Turn them on in System Settings → Notifications → Ainkrad. Ainkrad can't change this itself." : {
+
+    },
+    "Unbind" : {
+
+    },
+    "Use the harness default" : {
+
+    },
+    "Waiting for your Core…" : {
+
+    },
+    "Waiting on you" : {
+
+    },
+    "Wake queues another turn for this finished agent. It keeps the same session. Resume restarts one that stopped." : {
+
+    },
+    "What an approval banner looks like" : {
+
+    },
+    "You: %@" : {
+
+    },
+    "claude is waiting on you" : {
+
+    },
+    "just now" : {
+
+    },
+    "macOS asks you once. Until then Ainkrad can't show banners." : {
+
+    },
+    "macOS has banners off" : {
+
+    },
+    "macOS shows Ainkrad's banners." : {
+
+    },
+    "now" : {
+
+    },
+    "on %@" : {
+
+    },
+    "ran %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ran %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "running" : {
+
+    },
+    "to answer" : {
+
+    },
+    "↩ open · %@ move · A approvals · C cancel · K kill · R resume" : {
+
+    }
+  },
+  "version" : "1.0"
+}

@@ -4,6 +4,7 @@ options:
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
+  developmentLanguage: en
 
 settings:
   base:
@@ -16,6 +17,9 @@ settings:
     DEVELOPMENT_TEAM: RT9AA68C38
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # Swift string literals land in each String Catalog on build; catalogs are preferred over .strings.
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 
 packages:
   AinkradClient:
