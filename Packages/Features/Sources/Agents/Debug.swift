@@ -1,4 +1,5 @@
 #if DEBUG
+import CoreUI
 import Foundation
 
 /// Debug only: puts the module in a named state for the self-snapshot walk (no keys sent, nothing leaves the app).
@@ -57,6 +58,29 @@ extension AgentsModel {
 
     public func debugSessionNotice(_ id: String, title: String, detail: String) {
         notices[id] = title.isEmpty ? nil : InlineNotice(title: title, detail: detail)
+    }
+
+    /// A session as the scheduler places it (or, with a nil route, as a device that is not an admin sees it).
+    public func debugRoute(
+        _ id: String, route: SessionRoute?, attempts list: [AgentSessionInfo] = [], accounts: [Int64: String] = [:],
+        ledger: SessionLedger? = nil, ended: (SessionOutcome, String?)? = nil
+    ) async {
+        (api as? FakeAgentsAPI)?.update(id) {
+            $0.route = route
+            if let ended {
+                $0.state = .ended
+                $0.outcome = ended.0
+                $0.outcomeReason = ended.1
+                $0.endedAt = Date().addingTimeInterval(-90)
+            }
+        }
+        await refreshSession(id)
+        for (k, v) in accounts { accountNames[k] = v }
+        if let run = route?.run {
+            attempts[run] = list
+            (api as? FakeAgentsAPI)?.runAttempts[run] = list
+        }
+        ledgers[id] = ledger
     }
 
     public func debugPendingIDs() -> [String] { pending.map(\.id) }
