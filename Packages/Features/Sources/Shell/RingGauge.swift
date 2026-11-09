@@ -45,8 +45,13 @@ struct RingGauge: View {
         .onAppear { fill() }
         .onChange(of: value) { _, _ in fill() }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([caption, sub].compactMap(\.self).joined(separator: ", "))
-        .accessibilityValue("\(Int((min(max(value, 0), 1) * 100).rounded())) percent")
+        .accessibilityLabel(
+            [caption, sub].compactMap(\.self).joined(separator: ", ").isEmpty
+                ? String(localized: "percent", bundle: .module)
+                : [caption, sub].compactMap(\.self).joined(separator: ", ")
+        )
+        .accessibilityValue(
+            String(localized: "\(Int((min(max(value, 0), 1) * 100).rounded())) percent", bundle: .module))
     }
 
     private func fill() {

@@ -75,12 +75,14 @@ public struct ShellView: View {
         .onChange(of: bannerKey) { old, new in
             let words: String?
             switch new {
-            case "reconnecting": words = "Reconnecting to Core"
-            case "offline": words = "Core is offline"
-            case "rate": words = "Core asked the app to slow down"
-            case "renew": words = "The session is renewing"
-            case "restart": words = "Core restarted"
-            default: words = old == "reconnecting" || old == "offline" ? "Back online" : nil
+            case "reconnecting": words = String(localized: "Reconnecting to Core", bundle: .module)
+            case "offline": words = String(localized: "Core is offline", bundle: .module)
+            case "rate": words = String(localized: "Core asked the app to slow down", bundle: .module)
+            case "renew": words = String(localized: "The session is renewing", bundle: .module)
+            case "restart": words = String(localized: "Core restarted", bundle: .module)
+            default:
+                words =
+                    old == "reconnecting" || old == "offline" ? String(localized: "Back online", bundle: .module) : nil
             }
             if let words { CoreAnnounce.settled("link", words) }
         }
