@@ -42,7 +42,7 @@ extension LiveAgentsAPI {
         } catch {
             // A device without `admin`, or a Core older than the ledger: nothing to show, not an error.
             if case .forbiddenScope? = CoreError.unwrapping(error) { return nil }
-            throw CoreError.unwrapping(error) ?? error
+            throw CoreFailure.of(error) ?? error
         }
         var l = SessionLedger(
             costMicros: events.compactMap(\.costUsdMicros).reduce(0, +),
