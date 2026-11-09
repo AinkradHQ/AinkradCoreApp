@@ -336,7 +336,7 @@ public final class AppModel {
         shell.bell.add(  // the same id as the live path, so a claim seen twice is one item
             BellItem(
                 id: "pairing-\(id)", kind: .approval, title: "\(info.name ?? "A new device") wants to join",
-                sub: [DeviceWords.platform(info.platform), DeviceWords.storage(info.keyStorage)].joined(
+                sub: [DeviceWords.platform(info.platform), DeviceWords.keyNote(info.keyStorage)].joined(
                     separator: " · "),
                 time: "now",
                 actions: [BellAction("Review", primary: true) { [weak self] in self?.openAddDevice(existing: id) }]))

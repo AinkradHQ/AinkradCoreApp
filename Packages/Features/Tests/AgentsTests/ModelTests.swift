@@ -107,7 +107,7 @@ struct ModelTests {
         let r = try #require(m.pending.first)
         await m.decide(r, approved: true)
         #expect(m.pending.count == 3)
-        #expect(m.approvalNotices[r.id]?.detail.contains("no such request") == true)
+        #expect(m.approvalNotices[r.id]?.detail.contains("No such request") == true)
     }
 
     @Test func aNewApprovalOnTheFeedReachesTheBellAndMacOS() async {

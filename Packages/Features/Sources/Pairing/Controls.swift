@@ -167,6 +167,15 @@ enum DeviceWords {
         case nil: "Didn't say"
         }
     }
+    /// The same fact for a one-line subtitle, where "In a file" alone does not say what is in a file.
+    static func keyNote(_ s: String?) -> String {
+        switch s {
+        case "secure_enclave": "Key locked in a chip"
+        case "software": "Key kept in a file"
+        case .some(let o): "Key: \(o)"
+        case nil: "Key storage unknown"
+        }
+    }
     static func kind(_ k: String) -> String {
         switch k {
         case "runner": "Runner"
