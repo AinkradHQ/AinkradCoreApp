@@ -1,6 +1,7 @@
 #if DEBUG
 import Accounts
 import Admin
+import Brain
 import CoreKit
 import CryptoKit
 import Foundation
@@ -142,6 +143,8 @@ extension AppModel {
             self?.stepUpNotice = n == nil ? nil : StepUpNotice(phase: .cancelled, done: "changed", keepsEdit: true)
         }
     }
+    /// The Brain's states on sample data, for screenshots and clicking through. Needs no Core.
+    public func debugBrainDemo() -> BrainDemo { BrainDemo(model: brain) }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }
     public var debugPairingCode: String? {
         if case .code(let p)? = addDevice?.stage { return p.code }

@@ -93,6 +93,23 @@ struct InboxView: View {
     }
 }
 
+/// The account news a banner can tell an admin about, in the Core's push kinds.
+private struct AccountTile {
+    let kind: String, title: String, sub: String, symbol: String, onSymbol: String
+    static let all = [
+        AccountTile(
+            kind: "account_health", title: "An account stops working", sub: "The provider keeps failing for it.",
+            symbol: "exclamationmark.triangle", onSymbol: "exclamationmark.triangle.fill"),
+        AccountTile(
+            kind: "account_failover", title: "A session moves to another account",
+            sub: "An account hit its limit and a run moved on.", symbol: "arrow.triangle.swap",
+            onSymbol: "arrow.triangle.swap"),
+        AccountTile(
+            kind: "account_expired", title: "An account is turned off", sub: "The provider refused its key.",
+            symbol: "key", onSymbol: "key.fill"),
+    ]
+}
+
 /// Settings, Notifications: whether macOS lets Ainkrad show banners, what it tells you about, and where activity shows
 /// inside Ainkrad. Saved on this Mac.
 struct NotificationsSection: View {
@@ -115,6 +132,17 @@ struct NotificationsSection: View {
                         symbol: "hand.raised", onSymbol: "hand.raised.fill", isOn: $model.notifyApprovals, fill: true
                     )
                     .disabled(!allowed)
+                    if model.isAdmin {
+                        ForEach(AccountTile.all, id: \.kind) { t in
+                            GlassToggleTile(
+                                t.title, sub: allowed ? t.sub : "Allow banners above first.", symbol: t.symbol,
+                                onSymbol: t.onSymbol,
+                                isOn: Binding(get: { model.notifies(t.kind) }, set: { model.setNotifies(t.kind, $0) }),
+                                fill: true
+                            )
+                            .disabled(!allowed)
+                        }
+                    }
                     ForEach(
                         [
                             ("A session fails", "xmark.octagon"), ("A session finishes", "checkmark.circle"),

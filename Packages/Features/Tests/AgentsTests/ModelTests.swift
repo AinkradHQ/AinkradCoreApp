@@ -133,6 +133,17 @@ struct ModelTests {
         #expect(n.posted.count == 1 && m.pending.count == 5)
     }
 
+    @Test func accountBannersAreForAdminsAndFollowTheirTile() async {
+        let (m, _, _, n) = await make()
+        m.postAccountBanner("account_health", "a1", "Work is not working", "")
+        #expect(n.posted.isEmpty, "a device without admin gets no account banners")
+        m.isAdmin = true
+        m.postAccountBanner("account_health", "a1", "Work is not working", "")
+        m.setNotifies("account_expired", false)
+        m.postAccountBanner("account_expired", "a2", "Work was turned off", "")
+        #expect(n.posted == ["a1"] && m.notifies("account_health") && !m.notifies("account_expired"))
+    }
+
     @Test func aGapRefetchesTheListAndTheTranscripts() async {
         let (m, api, _, _) = await make()
         api.add(
@@ -146,6 +157,8 @@ struct ModelTests {
     @Test func transcriptEventsAppendToAnOpenTranscriptOnly() async {
         let (m, api, _, _) = await make()
         let id = "as_01JC4X7Q3MZ8N5V2K9R001"
+        // The open transcript loads in the background; read its end only once it is there.
+        for _ in 0..<400 where (m.transcripts[id]?.lastSeq ?? 0) == 0 { try? await Task.sleep(for: .milliseconds(5)) }
         let before = m.transcripts[id]?.lastSeq ?? 0
         api.append(id, [.assistant("more")])
         await m.handle(.event(AgentEvent(kind: "agent.transcript", session: id, from: before + 1, to: before + 1)))

@@ -47,7 +47,8 @@ public final class AdminDemo {
     }
 
     public static let scenes = [
-        "settings", "settings-editing", "settings-refused", "settings-history", "switches", "secrets", "secrets-new",
+        "settings", "settings-switching", "settings-editing", "settings-refused", "settings-history", "switches",
+        "secrets", "secrets-new",
         "secrets-lease", "secrets-touchid-cancelled", "audit", "audit-selected", "audit-nomatch", "ops",
         "state-loading",
         "state-empty", "state-error", "state-scope", "banner-resuming", "banner-rate", "banner-renewing",
@@ -86,6 +87,14 @@ public final class AdminDemo {
         let first = DemoData.settings[0]
         switch scene {
         case "settings": await open("core")
+        case "settings-switching":
+            await open("core")
+            let wait = DemoData.settings.first { $0.key == "scheduler.wait_max_secs" } ?? first
+            try? await Task.sleep(for: .milliseconds(600))
+            admin.registry.cursor = wait.key
+            try? await Task.sleep(for: .milliseconds(900))  // the list scrolls to it first
+            admin.registry.beginEdit(wait)
+            admin.registry.draft = "900"
         case "settings-editing":
             await open("core")
             admin.registry.beginEdit(first)
@@ -189,6 +198,14 @@ nonisolated enum DemoData {
         s(
             "alarm.disk_min_free_pct", 10, 10, 1, 90, "percent",
             "The disk_free alarm raises when less than this share is free."),
+        s(
+            "scheduler.wait_max_secs", 600, 600, 0, 86_400, "seconds",
+            "The longest a chain session waits for an account."),
+        s("scheduler.max_hops", 3, 3, 0, 20, "count", "Most failovers one run may make; 0 turns failover off."),
+        s("scheduler.failovers_per_10min", 10, 10, 1, 1_000, "count", "Most failovers per user in 10 minutes."),
+        s(
+            "scheduler.quota_cooldown_secs", 3_600, 3_600, 60, 86_400, "seconds",
+            "How long an account rests after its quota runs out."),
     ].enumerated().map { i, item in
         var x = item
         if i == 0 {

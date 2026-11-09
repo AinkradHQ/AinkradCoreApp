@@ -91,7 +91,18 @@ public final class AgentsModel {
         self.defaults = defaults
         self.host = host
         registerBase()
-        notifier.onOpen = { [weak self] id in self?.openSession(id) }
+        notifier.onOpen = { [weak self] id in
+            if id == "connections" {
+                self?.shell.launcher.entry("connections")?.run()
+            } else if !id.isEmpty {
+                self?.openSession(id)
+            }
+        }
+    }
+
+    /// A notification that is not about a session (a connection that needs you, CN5); a click opens Connections.
+    public func notifyConnections(id: String, title: String, body: String) {
+        notifier.post(id: id, title: title, body: body, session: "connections")
     }
 
     func setChains(_ list: [ChainOption]) {
@@ -115,6 +126,24 @@ public final class AgentsModel {
         set {
             withMutation(keyPath: \.notifyApprovals) { defaults.set(newValue, forKey: "agents.notify.approvals") }
         }
+    }
+
+    /// This device holds the admin scope: only then does the Core send it account news, and only then the tiles show.
+    public var isAdmin = false
+
+    /// Banners for the account push kinds (`account_health`, `account_failover`, `account_expired`). On by default.
+    public func notifies(_ pushKind: String) -> Bool {
+        access(keyPath: \.notifyApprovals)
+        return defaults.object(forKey: "agents.notify.\(pushKind)") as? Bool ?? true
+    }
+    public func setNotifies(_ pushKind: String, _ on: Bool) {
+        withMutation(keyPath: \.notifyApprovals) { defaults.set(on, forKey: "agents.notify.\(pushKind)") }
+    }
+
+    /// A banner for an account event, when the person wants that kind and macOS allows it.
+    public func postAccountBanner(_ pushKind: String, _ id: String, _ title: String, _ body: String) {
+        guard isAdmin, notifies(pushKind) else { return }
+        notifier.post(id: id, title: title, body: body, session: "")
     }
 
     /// The app has put its own question about notifications to the person once. Never again on its own.

@@ -53,11 +53,20 @@ public final class AccountsModel {
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var now: () -> Date = { Date() }
 
-    public init(host: any AdminHost) { self.host = host }
+    /// Connections (GitHub, Jira…): its own pane, driven alongside the accounts.
+    public let connections: ConnectionsModel
+
+    public init(host: any AdminHost) {
+        self.host = host
+        connections = ConnectionsModel(host: host)
+    }
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveAccountsService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        use(LiveAccountsService(connection: connection))
+        connections.attach(connection: connection)
+    }
 
     func use(_ service: any AccountsService) {
         self.service = service
@@ -65,6 +74,7 @@ public final class AccountsModel {
     }
 
     public func detach() {
+        connections.detach()
         service = nil
         providers = []
         accounts = []
@@ -83,12 +93,18 @@ public final class AccountsModel {
     public func resync() { if service != nil { Task { await reload() } } }
     /// An event from the Core that may change what these screens show.
     public func event(kind: String) {
+        connections.event(kind: kind)
         let kinds = ["account.", "pool.", "chain.", "setting."]
         if kinds.contains(where: kind.hasPrefix) { resync() }
     }
 
     // MARK: derived
 
+    /// "Claude account Work": how an event names an account. Nil until the account is known.
+    public func accountName(_ id: Int64) -> String? {
+        account(id).map { "\(providerName($0.provider)) account \($0.label)" }
+    }
+    public func poolName(_ id: Int64) -> String? { pool(id)?.name }
     func provider(_ id: String) -> ProviderItem? { providers.first { $0.id == id } }
     func providerName(_ id: String) -> String { provider(id)?.name ?? id }
     func account(_ id: Int64) -> AccountItem? { accounts.first { $0.id == id } }
@@ -454,6 +470,7 @@ public final class AccountsModel {
 
     /// Launcher entries and the two Settings sections. Ids match the shell's own sample entries, so Demo mode keeps its own.
     public func install() {
+        connections.install()
         let shell = host.shell
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,

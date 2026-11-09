@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"]),
         .library(name: "Terminals", targets: ["Terminals"]), .library(name: "Admin", targets: ["Admin"]),
         .library(name: "Accounts", targets: ["Accounts"]), .library(name: "Agents", targets: ["Agents"]),
+        .library(name: "Brain", targets: ["Brain"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -56,9 +57,14 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
+            name: "Brain",
+            dependencies: ["Shell", "Admin", .product(name: "CoreUI", package: "CoreUI")],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Agents", "Terminals", "Admin", "Accounts", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain",
+                .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
@@ -69,9 +75,16 @@ let package = Package(
             name: "TerminalsTests",
             dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "AdminTests", dependencies: ["Admin", .product(name: "CoreKit", package: "CoreKit")]),
-        .testTarget(name: "AccountsTests", dependencies: ["Accounts", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(
+            name: "AccountsTests",
+            dependencies: [
+                "Accounts", .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ]),
         .testTarget(
             name: "AgentsTests", dependencies: ["Agents", "Shell", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(name: "BrainTests", dependencies: ["Brain", "Shell", "Admin"]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
 )
