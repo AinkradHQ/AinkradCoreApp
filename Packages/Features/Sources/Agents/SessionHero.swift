@@ -100,7 +100,7 @@ struct SessionHero: View {
                 waiting ? GlassInk.orange.opacity(0.6) : hue.opacity(0.35), lineWidth: 1)
         }
         .padding([.horizontal, .top], Space.s3).padding(.bottom, Space.s2)
-        .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
+        .animation(Motion.out(Motion.ui), value: shown)
         .onAppear { shown = true }
         .task(id: session.id) { await model.followLedger(session.id) }
         .task(id: session.id) { await model.followRoute(session.id) }

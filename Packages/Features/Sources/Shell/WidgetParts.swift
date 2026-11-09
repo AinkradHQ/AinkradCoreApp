@@ -99,7 +99,7 @@ struct RollingNumber: View {
             .accessibilityLabel(format(value))
     }
     private func roll() {
-        withAnimation(reduce ? .easeOut(duration: 0.2) : .spring(duration: 0.9, bounce: 0.15)) { shown = value }
+        withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = value }
     }
 }
 
@@ -163,7 +163,7 @@ struct Meter: View {
                 }
             }
             .onAppear {
-                withAnimation(reduce ? .easeOut(duration: 0.2) : .spring(duration: 1.0, bounce: 0.1)) { shown = value }
+                withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = value }
             }
             .onChange(of: value) { _, v in withAnimation(Motion.out(Motion.tick)) { shown = v } }
             .accessibilityHidden(true)

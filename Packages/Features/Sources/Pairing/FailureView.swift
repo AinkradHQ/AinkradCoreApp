@@ -119,7 +119,7 @@ struct FailureView: View {
             // Arrives with a short rise; Reduce Motion keeps the fade and drops the travel.
             .opacity(shown ? 1 : 0)
             .offset(y: shown || reduceMotion ? 0 : Space.s4)
-            .onAppear { withAnimation(.spring(duration: 0.45, bounce: 0.2)) { shown = true } }
+            .onAppear { withAnimation(Motion.out(Motion.ui)) { shown = true } }
     }
 
     private func card(now: Date) -> some View {

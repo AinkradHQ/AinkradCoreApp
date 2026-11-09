@@ -37,7 +37,7 @@ struct OverviewView: View {
         .corePanel(radius: Radius.panel + Space.s1, padding: 0, part: .popups)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         .scaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: shown)
+        .animation(Motion.out(Motion.ui), value: shown)
         .animation(.spring(duration: 0.25), value: selected)
         .onAppear {
             selected = panes.firstIndex { $0.id == shell.activePane } ?? 0

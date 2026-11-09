@@ -250,7 +250,7 @@ private struct SpeedChart: View {
             .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .onAppear { withAnimation(reduce ? nil : Motion.out(Motion.reveal)) { shown = true } }
+        .onAppear { withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = true } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Local search \(Int(speed.last ?? 0)) milliseconds today, target \(Int(target))")
     }

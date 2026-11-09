@@ -58,6 +58,7 @@ private struct CoreButtonBody: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.coreForcedInteraction) private var forced
     @Environment(\.coreKeycap) private var keycap
+    @Environment(\.isFocused) private var isFocused
     @State private var hovering = false
 
     private var pressed: Bool { configuration.isPressed || forced == .pressed }
@@ -82,10 +83,9 @@ private struct CoreButtonBody: View {
         .foregroundStyle(ink)
         .frame(minHeight: size.height)
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
-        .modifier(ButtonSurface(kind: kind, radius: size.radius, fill: fill, hover: hover))
-        // Gallery only: pinned "focused" preview. Real focus is the system ring below, drawn only on the one control that
-        // has keyboard focus (isFocused here reports the container's focus, which lit every button in it).
-        .coreFocusRing(forced == .focused, radius: size.radius, palette: palette)
+        .modifier(ButtonSurface(kind: kind, radius: size.radius, fill: fill, hover: hover, darken: pressed && reduce))
+        // Keyboard focus: the hover fill step, a brighter edge and a 1 pt lift (D6), no ring.
+        .coreFocusRing(isFocused || forced == .focused, radius: size.radius, palette: palette)
         .coreDimWhenDisabled(enabled)
         .scaleEffect(pressed && !reduce ? 0.97 : 1)
         .coreAnimation(Motion.press(Motion.press), value: pressed)
@@ -111,13 +111,15 @@ private struct CoreButtonBody: View {
 }
 
 /// Every CoreUI button is the app-header tile (Ahmed, 2026-11-05: "apply this style of buttons everywhere"): prominent is
-/// a soft blue tile, danger a soft red one, secondary a dark glass well; a light edge, a glow and a small lift on hover.
-/// Plain buttons stay quiet until hovered.
+/// a soft blue tile, danger a soft red one, secondary a dark glass well; a light edge that brightens on hover.
+/// No glow and no scale on hover (D3): hover is a fill step and a brighter edge. Plain buttons stay quiet until hovered.
 private struct ButtonSurface: ViewModifier {
     let kind: CoreButtonKind
     let radius: CGFloat
     let fill: Color
     let hover: Bool
+    /// Pressed under Reduce Motion: the fill darkens instead of the button shrinking.
+    let darken: Bool
 
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
@@ -133,12 +135,29 @@ private struct ButtonSurface: ViewModifier {
             }
             .overlay {
                 if kind != .plain {
-                    shape.strokeBorder(.white.opacity(kind == .secondary ? 0.15 : 0.3), lineWidth: 1)
+                    shape.strokeBorder(
+                        .white.opacity((kind == .secondary ? 0.15 : 0.3) + (hover ? 0.15 : 0)), lineWidth: 1)
                 }
             }
-            .shadow(color: (kind == .plain ? Color.clear : hue).opacity(hover ? 0.45 : 0), radius: 10)
-            .scaleEffect(hover && kind != .plain ? 1.04 : 1)
-            .animation(.spring(duration: 0.25, bounce: 0.3), value: hover)
+            .overlay { shape.fill(.black.opacity(darken ? 0.18 : 0)).allowsHitTesting(false) }
+            .animation(Motion.out(Motion.hover), value: darken)
+    }
+}
+
+/// The press for glass tiles and icon buttons: scale 0.97 with the press curve; Reduce Motion darkens the tile instead.
+/// Hover and fill stay with the tile itself.
+struct CoreTilePress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { TilePressBody(configuration: configuration) }
+}
+
+private struct TilePressBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    var body: some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduce ? 0.97 : 1)
+            .overlay { Color.black.opacity(configuration.isPressed && reduce ? 0.18 : 0).allowsHitTesting(false) }
+            .animation(Motion.press(Motion.press), value: configuration.isPressed)
     }
 }
 

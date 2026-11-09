@@ -88,7 +88,7 @@ public struct CoreIconButton: View {
                 )
                 .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoreTilePress())
         .focused($focused)
         .focusEffectDisabled()
         .coreFocusRing(focused, radius: Radius.control, palette: palette)

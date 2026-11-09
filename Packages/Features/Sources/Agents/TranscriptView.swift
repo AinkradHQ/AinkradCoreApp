@@ -45,7 +45,7 @@ struct TranscriptView: View {
                 }
                 .defaultScrollAnchor(.bottom)
                 .scrollIndicators(.never)
-                .animation(.spring(duration: 0.4, bounce: 0.2), value: store.entries.count)
+                .animation(Motion.out(Motion.ui), value: store.entries.count)
                 .onChange(of: store.lastSeq) { _, _ in
                     if atEnd { withAnimation(.spring(duration: 0.4)) { proxy.scrollTo("end", anchor: .bottom) } }
                 }

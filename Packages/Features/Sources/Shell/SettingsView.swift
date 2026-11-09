@@ -126,7 +126,7 @@ struct SettingsView: View {
                     }
                 }
                 .padding(Space.s5)
-                .animation(reduce ? nil : Motion.out(0.26), value: shell.settings.selected)
+                .animation(Motion.calm(Motion.out(0.26), reduce), value: shell.settings.selected)
             }
             .frame(width: Space.s8 * 8)
             .background(Color.black.opacity(0.12))
@@ -327,7 +327,7 @@ private struct SettingsBackTile: View {
         .keyboardShortcut(.leftArrow, modifiers: .command)
         .scaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.3, bounce: 0.3), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityLabel("Back to \(back.title)")
     }
 }

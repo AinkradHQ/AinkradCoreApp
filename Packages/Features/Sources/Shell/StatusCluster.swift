@@ -97,8 +97,8 @@ struct StatusCluster: View {
                 .contentShape(coreShape(Radius.control))
             }
             .buttonStyle(.plain)
-            .animation(reduce ? nil : Motion.out(Motion.ui), value: running)
-            .animation(reduce ? nil : Motion.out(Motion.ui), value: waiting)
+            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: running)
+            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: waiting)
             .help(waiting > 0 ? "\(waiting) waiting on you. Open notifications" : "Nothing waiting on you")
             .accessibilityLabel("\(running) running, \(waiting) waiting. Open notifications")
         }

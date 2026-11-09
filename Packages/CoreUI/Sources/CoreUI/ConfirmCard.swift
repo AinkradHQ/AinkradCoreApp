@@ -16,8 +16,7 @@ public struct ConfirmChoice: Identifiable {
     }
 }
 
-/// Every confirmation in the app (Ahmed, 2026-11-05: visual, animated, keyboard driven): a coloured icon tile that
-/// pulses for a destructive choice, a large title and the consequence, then the choices as glass tiles with their keys.
+/// Every confirmation in the app (Ahmed, 2026-11-05: visual, animated, keyboard driven): a coloured icon tile, a large title and the consequence, then the choices as glass tiles with their keys.
 /// ← → move between choices, Return runs the highlighted one, Esc cancels, ⌘Return runs the last (the confirm) at once.
 /// The first choice is the safe one and starts highlighted, so Return alone never destroys anything.
 public struct ConfirmCard: View {
@@ -48,9 +47,6 @@ public struct ConfirmCard: View {
     public var body: some View {
         VStack(spacing: Space.s4) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown)
-                .symbolEffect(.pulse, options: .repeating, isActive: danger && !reduce)
-                .shadow(color: hue.opacity(0.5), radius: 18)
-                .scaleEffect(shown || reduce ? 1 : 0.6)
             VStack(spacing: Space.s2) {
                 Text(title).font(.system(size: MacTextSize.large + 4, weight: .bold)).multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
@@ -76,10 +72,10 @@ public struct ConfirmCard: View {
         .frame(width: Space.s8 * 14)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
-        .scaleEffect(shown || reduce ? 1 : 0.92)
+        .scaleEffect(shown || reduce ? 1 : 0.97)
         .opacity(shown ? 1 : 0)
-        .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
-        .animation(.spring(duration: 0.25, bounce: 0.2), value: selected)
+        .animation(Motion.modal(shown, reduce), value: shown)
+        .animation(Motion.out(Motion.hover), value: selected)
         .onAppear {
             shown = true
             listen()
@@ -128,7 +124,7 @@ public struct ChoiceTile: View {
         Button(action: run) {
             HStack(spacing: Space.s2) {
                 Image(systemName: choice.symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                    .symbolEffect(.bounce, value: on)
+                    .coreEnterBounce(on)
                 Text(choice.label).font(.system(size: MacTextSize.body, weight: .semibold))
                 if let keys {
                     Text(keys).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
@@ -141,14 +137,13 @@ public struct ChoiceTile: View {
             .background(
                 on ? hue.opacity(choice.destructive ? 0.85 : 0.6) : GlassInk.well, in: coreShape(Radius.control + 2)
             )
+            .animation(Motion.out(Motion.hover), value: on)
             .overlay {
                 coreShape(Radius.control + 2).strokeBorder(on ? .white.opacity(0.4) : GlassInk.wellEdge, lineWidth: 1)
             }
-            .shadow(color: on ? hue.opacity(0.45) : .clear, radius: 10)
-            .scaleEffect(on ? 1.03 : 1)
             .contentShape(coreShape(Radius.control + 2))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoreTilePress())
         .accessibilityLabel(choice.label)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
@@ -180,8 +175,6 @@ public struct ModalCard: View {
     public var body: some View {
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 56, bounce: shown)
-                .shadow(color: hue.opacity(0.45), radius: 16)
-                .scaleEffect(shown || reduce ? 1 : 0.6)
             Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(message).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
@@ -216,10 +209,10 @@ public struct ModalCard: View {
         .padding(Space.s5)
         .frame(maxWidth: Space.s8 * 13)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
-        .scaleEffect(shown || reduce ? 1 : 0.94)
+        .scaleEffect(shown || reduce ? 1 : 0.97)
         .opacity(shown ? 1 : 0)
-        .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
-        .animation(.spring(duration: 0.25), value: hovered)
+        .animation(Motion.modal(shown, reduce), value: shown)
+        .animation(Motion.out(Motion.hover), value: hovered)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
     }
@@ -263,7 +256,6 @@ public struct ModalHeader: View {
         let look = ModalLook.of(title)
         HStack(spacing: Space.s3) {
             IconTile(symbol ?? look.symbol, hue: look.hue, size: 44, bounce: shown)
-                .shadow(color: look.hue.opacity(0.4), radius: 12)
             Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s2)
             if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
@@ -273,7 +265,7 @@ public struct ModalHeader: View {
 }
 
 extension View {
-    /// The modal entrance: settles from 94 % with a spring; Reduce Motion fades.
+    /// The modal entrance: opacity and a 0.97 scale on the UI ease, 150 ms out; Reduce Motion fades only.
     public func coreModalEntrance() -> some View { modifier(ModalEntrance()) }
 }
 
@@ -281,8 +273,8 @@ private struct ModalEntrance: ViewModifier {
     @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduce
     func body(content: Content) -> some View {
-        content.scaleEffect(shown || reduce ? 1 : 0.94).opacity(shown ? 1 : 0)
-            .animation(.spring(duration: 0.4, bounce: 0.25), value: shown)
+        content.scaleEffect(shown || reduce ? 1 : 0.97).opacity(shown ? 1 : 0)
+            .animation(Motion.modal(shown, reduce), value: shown)
             .onAppear { shown = true }
     }
 }

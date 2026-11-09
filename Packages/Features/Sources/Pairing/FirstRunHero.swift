@@ -25,7 +25,7 @@ struct FirstRunHero: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: scene == .find || scene == .checking)
         }
         .symbolEffect(.bounce, value: scene)
-        .animation(.spring(duration: 0.5, bounce: 0.25), value: scene)
+        .animation(Motion.out(Motion.ui), value: scene)
         .accessibilityHidden(true)
     }
 

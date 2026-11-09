@@ -92,7 +92,7 @@ struct HomeView: View {
         DeskWidget(item: item, shell: shell, editing: shell.editingWidgets, lifting: held, focus: $focus)
             .rise(arrived, index + 1, reduce)
             .offset(x: p.x, y: p.y)
-            .animation(held || reduce ? nil : Motion.out(Motion.move), value: item)
+            .animation(held ? nil : Motion.calm(Motion.out(Motion.move), reduce), value: item)
             .zIndex(held ? 30 : 0)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 5, coordinateSpace: .named(Self.stageSpace))
@@ -119,7 +119,7 @@ struct HomeView: View {
                 coreShape(20).strokeBorder(palette.navActiveEdge, lineWidth: 1.5)
             }
             .frame(width: s.width, height: s.height).offset(x: o.x, y: o.y).allowsHitTesting(false)
-            .animation(reduce ? nil : Motion.out(0.18), value: c)
+            .animation(Motion.calm(Motion.out(0.18), reduce), value: c)
             .accessibilityHidden(true)
         }
     }
