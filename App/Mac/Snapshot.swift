@@ -28,6 +28,12 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             return await app.debugAccountsDemo().showInteractive(scene)
         }
+        if let dir = env["CORE_BRAIN_SNAPSHOT"] { return await BrainSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_BRAIN_DEMO=<scene>`: the Brain on sample data, left open to click through (no Core is reached).
+        if let scene = env["CORE_BRAIN_DEMO"] {
+            try? await Task.sleep(for: .seconds(3))
+            return await app.debugBrainDemo().showInteractive(scene)
+        }
         if let dir = env["CORE_ADMIN_SNAPSHOT"] { return await AdminSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_TERM_SNAPSHOT"] { return await TerminalSnapshots.run(app, dir: dir, env: env) }
         // `CORE_LOCK_SNAPSHOT=<dir> [CORE_SETTINGS_PAGE=<id>]`: one Settings page on the paired Core (Lockouts, the default,
