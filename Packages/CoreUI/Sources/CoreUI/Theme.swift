@@ -96,7 +96,8 @@ extension View {
     /// Apply once near the root: night when the system is dark, day ("Light" to people) otherwise.
     public func coreTheme() -> some View { modifier(CoreThemeModifier()) }
 
-    /// Motion with the Reduce Motion fallback: movement is dropped, fades and colour changes stay (motion spec).
+    /// Motion with the Reduce Motion fallback: the animation becomes a 180 ms fade, never nil (motion spec). Movement the
+    /// caller draws is dropped with `coreMove`.
     public func coreAnimation<V: Equatable>(_ animation: Animation, value: V) -> some View {
         modifier(CoreAnimationModifier(animation: animation, value: value))
     }
@@ -104,9 +105,40 @@ extension View {
     /// The disabled look every control shares.
     public func coreDimWhenDisabled(_ enabled: Bool) -> some View { opacity(enabled ? 1 : 0.45) }
 
-    /// Focus ring: 2 pt, offset 2, in `focusRing`. Shape is always a rounded rectangle.
-    /// Draws nothing in the app: focus rings are off everywhere (Ahmed, 2026-11-05). Kept so callers need no change.
-    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View { self }
+    /// Keyboard focus without a ring (Ahmed, 2026-11-05; D6): the hover fill, a brighter 1 pt edge and a 1 pt lift.
+    /// Reduce Motion: no lift. One implementation, so every control that calls it answers focus the same way.
+    public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
+        modifier(CoreFocusLook(show: show, radius: radius))
+    }
+}
+
+private struct CoreFocusLook: ViewModifier {
+    let show: Bool
+    let radius: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                coreShape(radius).fill(.white.opacity(show ? 0.08 : 0))
+                    .overlay { coreShape(radius).strokeBorder(.white.opacity(show ? 0.55 : 0), lineWidth: 1) }
+                    .allowsHitTesting(false)
+            }
+            .offset(y: show && !reduce ? -1 : 0)
+            .animation(Motion.out(Motion.hover), value: show)
+    }
+}
+
+extension Motion {
+    /// Interruptible, no overshoot: for values that can change again before the last change has settled.
+    public static func smooth(_ d: Double) -> Animation { .smooth(duration: d) }
+    /// Shared modal entrance (opacity + 0.97 scale on the UI ease) and its 150 ms exit.
+    public static func modal(_ shown: Bool, _ reduce: Bool) -> Animation {
+        calm(shown ? out(ui) : exit(0.15), reduce)
+    }
+    /// Reduce Motion keeps a fade: the 180 ms hover ease replaces `animation`, so a change is never an instant cut.
+    public static func calm(_ animation: Animation, _ reduce: Bool) -> Animation {
+        reduce ? out(hover) : animation
+    }
 }
 
 private struct CoreAnimationModifier<V: Equatable>: ViewModifier {
@@ -114,7 +146,7 @@ private struct CoreAnimationModifier<V: Equatable>: ViewModifier {
     let animation: Animation
     let value: V
     func body(content: Content) -> some View {
-        content.animation(reduce ? nil : animation, value: value)
+        content.animation(Motion.calm(animation, reduce), value: value)
     }
 }
 

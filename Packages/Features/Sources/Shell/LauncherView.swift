@@ -259,12 +259,6 @@ private struct LauncherItem: View {
                     )
                     .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                     .symbolEffect(.bounce, value: picked)
-                    // The selected tile glows; the glow fades in and out with the highlight instead of popping.
-                    .background {
-                        if selected {
-                            coreShape(Radius.control).fill(hue).blur(radius: 8).opacity(0.55).transition(.opacity)
-                        }
-                    }
                     .accessibilityHidden(true)
                 title
                 Spacer(minLength: Space.s2)

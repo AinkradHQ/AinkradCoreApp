@@ -12,6 +12,7 @@ PACKAGES := Packages/AinkradClient Packages/CoreUI Packages/CoreKit Packages/Fea
 FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features -name '*.swift' -not -path '*/.build/*'))
 
 .DEFAULT_GOAL := generate
+include scripts/guardrails.mk
 .PHONY: dmg generate open build test uitest run lint format format-check sync-client clean
 
 generate: ## Generate the Xcode project from project.yml
@@ -32,7 +33,7 @@ uitest: generate ## Keyboard-path UI tests (take over the screen: wait for the s
 run: build
 	open "$(APP)"
 
-lint: format-check
+lint: format-check guard-bounce
 
 format:
 	swift format format -i --recursive --parallel $(FORMAT_PATHS)

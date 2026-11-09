@@ -112,7 +112,7 @@ struct AgentRowButton<Label: View>: View {
                 color: (waiting ? GlassInk.orange : GlassInk.violet).opacity(hovering || waiting ? 0.3 : 0), radius: 14
             )
             .scaleEffect(hovering ? 1.015 : 1)
-            .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
+            .animation(Motion.out(Motion.hover), value: hovering)
             .onHover { hovering = $0 }
     }
 }

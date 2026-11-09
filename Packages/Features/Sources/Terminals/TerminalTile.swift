@@ -67,17 +67,16 @@ struct TerminalTile: View {
         )
         .overlay {
             coreShape(Radius.cardMac).strokeBorder(
-                selected ? accent.opacity(0.7) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
+                selected ? accent.opacity(0.7) : hovering ? .white.opacity(0.26) : GlassInk.wellEdge,
+                lineWidth: selected ? 1.5 : 1)
         }
-        .shadow(color: accent.opacity(selected ? 0.45 : hovering ? 0.25 : 0), radius: 16, y: 4)
         .opacity(item.isEnded ? 0.7 : 1)
-        .scaleEffect(hovering ? 1.02 : selected ? 1.01 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(count: 2) { TileAction.run(.open, item.id, model) }
         .onTapGesture { withAnimation(.spring(duration: 0.25)) { model.selected = item.id } }
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: hovering)
-        .animation(.spring(duration: 0.3), value: selected)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.hover), value: selected)
         .coreRise(shown, index)
         .onAppear { shown = true }
         .contextMenu {

@@ -88,8 +88,8 @@ struct NewTerminalView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .onAppear { shown = true }
-        .animation(.spring(duration: 0.3, bounce: 0.2), value: form.runner)
-        .animation(.spring(duration: 0.3, bounce: 0.2), value: form.program)
+        .animation(Motion.out(Motion.ui), value: form.runner)
+        .animation(Motion.out(Motion.ui), value: form.program)
     }
 
     private func step<C: View>(_ title: String, _ symbol: String, index: Int, @ViewBuilder _ content: () -> C)

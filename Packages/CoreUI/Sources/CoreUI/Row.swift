@@ -50,6 +50,7 @@ private struct RowBody<Trailing: View>: View {
     let selected: Bool
     let trailing: Trailing
     @Environment(\.corePalette) private var palette
+    @Environment(\.isEnabled) private var enabled
 
     var body: some View {
         HStack(spacing: Space.s3) {
@@ -58,16 +59,18 @@ private struct RowBody<Trailing: View>: View {
                     .font(.system(size: MacTextSize.title))
                     .foregroundStyle(selected ? palette.navActiveInk : palette.primary)
                     .frame(width: MacSize.controlMd)
+                    .coreDimWhenDisabled(enabled)
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                // Disabled dims the control (icon, title, trailing), not the helper line under it.
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).coreDimWhenDisabled(enabled)
                 if let subtitle {
                     Text(subtitle).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                 }
             }
             Spacer(minLength: Space.s2)
-            trailing
+            trailing.coreDimWhenDisabled(enabled)
         }
         .padding(.horizontal, Space.s3)
         .padding(.vertical, Space.s2)
@@ -87,24 +90,25 @@ private struct RowChrome: View {
     let configuration: ButtonStyleConfiguration
     let selected: Bool
     @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
     @Environment(\.coreForcedInteraction) private var forced
+    @Environment(\.isFocused) private var isFocused
     @State private var hovering = false
 
     var body: some View {
-        let hover = hovering || configuration.isPressed || forced == .hover || forced == .pressed
+        let pressed = configuration.isPressed || forced == .pressed
+        let hover = hovering || forced == .hover
         configuration.label
             .background(
-                selected ? palette.navActive : hover ? palette.rowHover : palette.glassCard, in: coreShape(Radius.row)
+                selected
+                    ? palette.navActive : pressed ? palette.uDimHover : hover ? palette.rowHover : palette.glassCard,
+                in: coreShape(Radius.row)
             )
             .overlay {
                 if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
             }
-            // Gallery only: pinned "focused" preview. Real focus is the system ring below, drawn only on the one control that
-            // has keyboard focus (isFocused here reports the container's focus, which lit every button in it).
-            .coreFocusRing(forced == .focused, radius: Radius.row, palette: palette)
-            .coreDimWhenDisabled(enabled)
+            .coreFocusRing(isFocused || forced == .focused, radius: Radius.row, palette: palette)
             .animation(Motion.out(Motion.hover), value: hover)
+            .animation(Motion.out(Motion.press), value: pressed)
             .onHover { hovering = $0 }
             .contentShape(.focusEffect, coreShape(Radius.row))
     }

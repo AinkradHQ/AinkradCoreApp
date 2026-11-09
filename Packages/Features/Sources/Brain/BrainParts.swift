@@ -77,7 +77,7 @@ struct BrainBar: View {
             }
         }
         .frame(height: height)
-        .onAppear { withAnimation(reduce ? nil : Motion.out(Motion.reveal)) { shown = true } }
+        .onAppear { withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = true } }
         .accessibilityHidden(true)
     }
 }

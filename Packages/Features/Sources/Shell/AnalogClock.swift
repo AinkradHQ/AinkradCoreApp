@@ -25,7 +25,7 @@ struct AnalogClock: View {
                         hand(width: r * 0.015, length: r * 0.86, color: Self.orange, tail: r * 0.16)
                             .rotationEffect(.degrees(sec * 6))
                     }
-                    .animation(reduce ? nil : .spring(duration: 0.2, bounce: 0.3), value: sec)
+                    .animation(Motion.out(Motion.hover), value: sec)
                 }
                 Circle().fill(Self.orange).frame(width: r * 0.09, height: r * 0.09)
                 Circle().fill(.white).frame(width: r * 0.04, height: r * 0.04)

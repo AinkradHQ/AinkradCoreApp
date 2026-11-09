@@ -64,7 +64,7 @@ public enum Motion {
     public static let move: Double = 0.42
     public static let reveal: Double = 0.6
     public static let tick: Double = 1.4
-    public static let stagger: Double = 0.035
+    public static let stagger: Double = 0.045
     public static func out(_ d: Double) -> Animation { .timingCurve(0.22, 1, 0.36, 1, duration: d) }
     public static func expo(_ d: Double) -> Animation { .timingCurve(0.16, 1, 0.3, 1, duration: d) }
     public static func exit(_ d: Double) -> Animation { .timingCurve(0.55, 0.055, 0.675, 0.19, duration: d) }

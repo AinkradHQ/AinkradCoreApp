@@ -54,6 +54,6 @@ struct RingGauge: View {
     }
 
     private func fill() {
-        withAnimation(reduce ? .easeOut(duration: 0.2) : .spring(duration: 1.1, bounce: 0.15)) { shown = value }
+        withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = value }
     }
 }

@@ -73,7 +73,7 @@ struct ComposerView: View {
         }
         .shadow(color: GlassInk.violet.opacity(on ? 0.35 : 0), radius: 14)
         .opacity(enabled || session.over ? 1 : 0.6)
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: on)
+        .animation(Motion.out(Motion.ui), value: on)
         .animation(.spring(duration: 0.3), value: bytes > 0)
         .padding(.horizontal, Space.s3).padding(.bottom, Space.s1)
     }

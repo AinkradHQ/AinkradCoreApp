@@ -219,7 +219,7 @@ struct FirstRunView: View {
                 }
             }
         }
-        .animation(.spring(duration: 0.4, bounce: 0.2), value: model.localCore)
+        .animation(Motion.out(Motion.ui), value: model.localCore)
         .task { await model.lookForLocalCore() }
     }
 

@@ -85,7 +85,7 @@ struct ApprovalCardView: View {
                     }
                 }
                 .frame(height: 6)
-                .animation(reduce ? nil : .linear(duration: 1), value: ratio)
+                .animation(.linear(duration: 1), value: ratio)
             }
             if let n = model.approvalNotices[request.id] { NoticeBanner(notice: n) }
             HStack(spacing: Space.s2) {

@@ -97,7 +97,7 @@ struct TerminalSettingsView: View {
             }
         }
         .foregroundStyle(GlassInk.primary)
-        .animation(.spring(duration: 0.3, bounce: 0.2), value: prefs.themeID)
+        .animation(Motion.out(Motion.ui), value: prefs.themeID)
     }
 }
 

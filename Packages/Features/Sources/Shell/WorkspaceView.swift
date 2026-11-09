@@ -91,7 +91,7 @@ struct WorkspaceView: View {
                     guard maxX > 0, let id, let f = layout.frames[id] else { return }
                     let target =
                         f.minX < scrollX ? f.minX : f.maxX > scrollX + area.width ? f.maxX - area.width : scrollX
-                    withAnimation(.spring(duration: 0.4, bounce: 0.1)) { scrollX = min(max(target, 0), maxX) }
+                    withAnimation(reduce ? nil : Motion.out(Motion.move)) { scrollX = min(max(target, 0), maxX) }
                 }
                 .padding(.leading, ShellMetrics.paneInset)
                 .padding(.top, ShellMetrics.topBar)
@@ -197,7 +197,7 @@ private struct PaneTabs: View {
         }
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac)
-        .animation(reduce ? nil : .spring(duration: 0.3, bounce: 0.2), value: shell.focusedPane ?? shell.activePane)
+        .animation(reduce ? nil : Motion.out(Motion.ui), value: shell.focusedPane ?? shell.activePane)
         .onKeyPress(.leftArrow) {
             shell.cyclePane(-1)
             return .handled
@@ -260,14 +260,15 @@ private struct PaneTab: View {
             if let c = stateColor {
                 Circle().fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
             }
-            if hovering {
-                Button {
-                    shell.dismissPane(spec.id)
-                } label: {
-                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 16, height: 16)
-                }
-                .buttonStyle(.plain).accessibilityLabel("Close \(spec.title)")
+            // Always laid out in a fixed 24 pt slot and shown by opacity, so hover never moves the tab.
+            Button {
+                shell.dismissPane(spec.id)
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain).accessibilityLabel("Close \(spec.title)")
+            .opacity(hovering ? 1 : 0).allowsHitTesting(hovering)
         }
         .foregroundStyle(WidgetInk.secondary)
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
@@ -277,7 +278,7 @@ private struct PaneTab: View {
                     .matchedGeometryEffect(id: "on", in: indicator)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .contentShape(coreShape(Radius.control))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { toggleFocus() }
@@ -396,7 +397,7 @@ private struct PaneHost: View {
             }
         }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .animation(.spring(duration: 0.2), value: gripHover)
     }
 }

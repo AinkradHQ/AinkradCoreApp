@@ -141,6 +141,6 @@ private struct ModelField: View {
         .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + 4)
         .coreFieldSurface(focused: focused)
         .focusEffectDisabled()
-        .animation(.spring(duration: 0.3, bounce: 0.25), value: text.isEmpty)
+        .animation(Motion.out(Motion.ui), value: text.isEmpty)
     }
 }

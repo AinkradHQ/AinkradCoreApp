@@ -171,7 +171,7 @@ struct BellGlance: View {
             if !rows.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     Button {
-                        withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+                        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
                             if shut.contains(g) { shut.remove(g) } else { shut.insert(g) }
                         }
                     } label: {

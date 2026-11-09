@@ -88,7 +88,11 @@ private struct ToastHost: ViewModifier {
                     .onHover { hovering = $0 }
                     // 52 pt up: clears the widget bar on Home (prototype)
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s8 + Space.s5)
-                    .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s4))))
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .offset(y: coreMove(reduce, Space.s4))),
+                            removal: .opacity)
+                    )
                     .task(id: item.id) { AccessibilityNotification.Announcement(item.message).post() }
                     .task(id: "\(item.id)-\(hovering)") {
                         guard !hovering else { return }
@@ -97,7 +101,7 @@ private struct ToastHost: ViewModifier {
                     }
                 }
             }
-            .coreAnimation(Motion.out(Motion.move), value: item?.id)
+            .animation(Motion.calm(item == nil ? Motion.exit(0.25) : Motion.out(Motion.move), reduce), value: item?.id)
     }
 }
 

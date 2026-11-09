@@ -19,7 +19,7 @@ public struct ShellView: View {
             covers
             escape
         }
-        .animation(reduce ? nil : Motion.out(Motion.move), value: shell.surface)
+        .animation(Motion.calm(Motion.out(Motion.move), reduce), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
         .coreToast($shell.toast)
@@ -59,7 +59,7 @@ public struct ShellView: View {
         }
         .blur(radius: scrimmed ? 6 : 0)
         .saturation(scrimmed ? 0.9 : 1)
-        .animation(reduce ? nil : Motion.out(Motion.ui), value: scrimmed)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: scrimmed)
     }
 
     /// Reconnecting and offline show a banner under the status cluster; the Home Core button says the same in words. A link notice
@@ -99,7 +99,7 @@ public struct ShellView: View {
                 .scaleEffect(ws && !reduce ? 1.03 : 1)
         }
         .clipped()
-        .animation(reduce ? nil : Motion.out(0.5), value: ws)
+        .animation(Motion.calm(Motion.out(0.5), reduce), value: ws)
         .accessibilityHidden(true)
     }
 

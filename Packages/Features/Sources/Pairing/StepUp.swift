@@ -223,7 +223,7 @@ struct StepUpSheet: View {
             .frame(width: 170, height: 170)
             .modifier(Shake(count: missed && !reduce ? 3 : 0))
             .animation(.linear(duration: 0.45), value: missed)
-            .animation(.spring(duration: 0.4, bounce: 0.35), value: done)
+            .animation(Motion.out(Motion.ui), value: done)
             .accessibilityHidden(true)
             VStack(spacing: Space.s2) {
                 Text(done ? "Unlocked" : missed ? "Didn't match" : "Touch the sensor")

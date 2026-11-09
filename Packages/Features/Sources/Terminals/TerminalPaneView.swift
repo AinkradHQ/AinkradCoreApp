@@ -28,7 +28,7 @@ struct TerminalPaneView: View {
                         .background {
                             if TerminalPrefs.shared.lookBlur { Rectangle().fill(.ultraThinMaterial) }
                         }
-                        .animation(reduce ? nil : Motion.out(Motion.ui), value: v.dim)
+                        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: v.dim)
                 } else {
                     AppSurfaceFill(
                         style: TerminalPrefs.app(TerminalPrefs.shared.lookScreen),

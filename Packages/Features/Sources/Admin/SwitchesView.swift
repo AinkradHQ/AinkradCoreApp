@@ -255,7 +255,7 @@ private struct StatePanel<Trailing: View>: View {
             .clipShape(coreShape(Radius.cardMac))
             .allowsHitTesting(false)
         }
-        .animation(.spring(duration: 0.4, bounce: 0.25), value: hue)
+        .animation(Motion.out(Motion.ui), value: hue)
         .onChange(of: trigger) { _, _ in
             guard !reduce else { return }
             sweep = false

@@ -104,7 +104,7 @@ extension GlassSection where Accessory == EmptyView {
     }
 }
 
-/// A section's action: an icon and a word, the icon bouncing when the pointer arrives.
+/// A section's action: an icon and a word, the icon bouncing once when the pointer arrives.
 public struct SectionAction: View {
     let title: String
     let symbol: String
@@ -122,7 +122,7 @@ public struct SectionAction: View {
             Label {
                 Text(title)
             } icon: {
-                Image(systemName: symbol).symbolEffect(.bounce, value: hovering)
+                Image(systemName: symbol).coreEnterBounce(hovering)
             }
         }
         .buttonStyle(CoreButtonStyle(danger ? .danger : .secondary))
@@ -200,7 +200,7 @@ public struct ScopeTile: View {
         .background(on ? hue.opacity(0.16) : GlassInk.well, in: coreShape(Radius.row))
         .overlay { coreShape(Radius.row).strokeBorder(on ? hue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1) }
         .opacity(on ? 1 : 0.75)
-        .animation(.spring(duration: 0.3, bounce: 0.2), value: on)
+        .animation(Motion.out(Motion.ui), value: on)
         .accessibilityElement(children: .combine)
         .accessibilityValue(on ? "on" : "off")
     }
@@ -220,21 +220,18 @@ private struct RiseModifier: ViewModifier {
     func body(content: Content) -> some View {
         content.opacity(shown ? 1 : 0).offset(y: shown || reduce ? 0 : 10)
             .animation(
-                (reduce ? Animation.easeOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.2))
-                    .delay(Double(min(index, 10)) * 0.05),
+                Motion.calm(Motion.out(Motion.move), reduce).delay(Double(min(index, 10)) * Motion.stagger),
                 value: shown)
     }
 }
 
 /// A scroll view with a glass scroll bar: a thin white thumb at the very right edge that fades in while scrolling and
 /// widens under the pointer, instead of the grey system bar (Ahmed, 2026-11-05). macOS 15 and later; below that the
-/// system bar stays.
+/// system bar stays. The scroll position lives in `ScrollThumbModel`, read only by the thumb, so scrolling redraws the
+/// thumb and not this view's body.
 public struct GlassScroll<Content: View>: View {
     let content: Content
-    @State private var metrics = ScrollMetrics()
-    @State private var active = false
-    @State private var hovering = false
-    @State private var fade: Task<Void, Never>?
+    @State private var model = ScrollThumbModel()
     public init(@ViewBuilder content: () -> Content) { self.content = content() }
 
     public var body: some View {
@@ -245,39 +242,22 @@ public struct GlassScroll<Content: View>: View {
                     ScrollMetrics(
                         offset: g.contentOffset.y, content: g.contentSize.height, visible: g.containerSize.height)
                 } action: { _, new in
-                    metrics = new
-                    wake()
+                    model.update(new)
                 }
-                .overlay(alignment: .topTrailing) { thumb }
+                .overlay(alignment: .topTrailing) { ScrollThumb(model: model) }
         } else {
             ScrollView { content }
         }
     }
+}
 
-    @ViewBuilder private var thumb: some View {
-        if metrics.content > metrics.visible + 1 {
-            let ratio = metrics.visible / metrics.content
-            let height = max(36, metrics.visible * ratio)
-            let travel = metrics.visible - height
-            let progress = min(max(metrics.offset / (metrics.content - metrics.visible), 0), 1)
-            Capsule()
-                .fill(.white.opacity(hovering ? 0.55 : 0.38))
-                .overlay { Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
-                .frame(width: hovering ? 8 : 5, height: height)
-                .offset(y: travel * progress)
-                .padding(.trailing, 3)
-                .opacity(active || hovering ? 1 : 0)
-                .animation(.easeOut(duration: 0.25), value: active)
-                .animation(.spring(duration: 0.25), value: hovering)
-                .frame(width: 16, alignment: .trailing)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .contentShape(Rectangle())
-                .onHover { hovering = $0 }
-                .accessibilityHidden(true)
-        }
-    }
+@MainActor @Observable final class ScrollThumbModel {
+    var metrics = ScrollMetrics()
+    var active = false
+    @ObservationIgnored private var fade: Task<Void, Never>?
 
-    private func wake() {
+    func update(_ new: ScrollMetrics) {
+        metrics = new
         active = true
         fade?.cancel()
         fade = Task { @MainActor in
@@ -287,8 +267,52 @@ public struct GlassScroll<Content: View>: View {
     }
 }
 
+private struct ScrollThumb: View {
+    let model: ScrollThumbModel
+    @State private var hovering = false
+
+    var body: some View {
+        let metrics = model.metrics
+        if metrics.content > metrics.visible + 1 {
+            let ratio = metrics.visible / metrics.content
+            let height = max(36, metrics.visible * ratio)
+            let travel = metrics.visible - height
+            let progress = min(max(metrics.offset / (metrics.content - metrics.visible), 0), 1)
+            coreShape(2.5)
+                .fill(.white.opacity(hovering ? 0.55 : 0.38))
+                .overlay { coreShape(2.5).strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
+                .frame(width: hovering ? 8 : 5, height: height)
+                .offset(y: travel * progress)
+                .padding(.trailing, 3)
+                .opacity(model.active || hovering ? 1 : 0)
+                .animation(Motion.out(Motion.ui), value: model.active)
+                .animation(Motion.out(Motion.hover), value: hovering)
+                .frame(width: 16, alignment: .trailing)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 struct ScrollMetrics: Equatable {
     var offset: CGFloat = 0
     var content: CGFloat = 0
     var visible: CGFloat = 0
+}
+
+extension View {
+    /// A symbol bounce on pointer enter only (never on leave); none under Reduce Motion.
+    public func coreEnterBounce(_ hovering: Bool) -> some View { modifier(EnterBounce(hovering: hovering)) }
+}
+
+private struct EnterBounce: ViewModifier {
+    let hovering: Bool
+    @State private var count = 0
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    func body(content: Content) -> some View {
+        content.symbolEffect(.bounce, value: count)
+            .onChange(of: hovering) { _, now in if now && !reduce { count += 1 } }
+    }
 }

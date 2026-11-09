@@ -18,7 +18,6 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
     let label: String
     /// Stretch to the container's width, the segments sharing it equally.
     let fill: Bool
-    @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
     @Environment(\.coreForcedInteraction) private var forced
     @FocusState private var focused: Bool
@@ -35,10 +34,14 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
         // Each option is its own glass tile (the section-action look); the picked one lights blue and the light glides.
         HStack(spacing: Space.s2) {
             ForEach(segments) { seg in
-                Segment(segment: seg, selected: seg.id == selection, fill: fill, lens: lens) { selection = seg.id }
+                Segment(
+                    segment: seg, selected: seg.id == selection,
+                    focused: focused && seg.id == selection
+                        || forced == .focused && seg.id == selection,
+                    fill: fill, lens: lens
+                ) { selection = seg.id }
             }
         }
-        .coreFocusRing(focused || forced == .focused, radius: Radius.control, palette: palette)
         .coreDimWhenDisabled(enabled)
         .focusable(enabled)
         .focused($focused)
@@ -70,11 +73,14 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
 private struct Segment<ID: Hashable & Sendable>: View {
     let segment: CoreSegment<ID>
     let selected: Bool
+    /// The container has keyboard focus and this is the picked segment: it shows the hover fill, a lift and a brighter edge.
+    let focused: Bool
     let fill: Bool
     let lens: Namespace.ID
     let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
     @State private var hovering = false
-    @State private var pressed = false
 
     var body: some View {
         Button(action: action) {
@@ -82,7 +88,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
                 if let symbol = segment.symbol {
                     Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
                         .symbolEffect(.bounce, value: selected)
-                        .symbolEffect(.bounce, value: hovering)
+                        .coreEnterBounce(hovering)
                         .accessibilityHidden(true)
                 }
                 Text(segment.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
@@ -91,35 +97,34 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .padding(.horizontal, Space.s3)
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
-                if selected {
+                coreShape(Radius.control).fill(hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
+            }
+            .background {
+                // The parent's animation glides the highlight between segments. Reduce Motion: it jumps and its colour fades.
+                if reduce {
+                    coreShape(Radius.control).fill(GlassInk.blue.opacity(selected ? 0.8 : 0))
+                } else if selected {
                     coreShape(Radius.control).fill(GlassInk.blue.opacity(0.8))
-                        .shadow(color: GlassInk.blue.opacity(0.45), radius: 10)
                         .matchedGeometryEffect(id: "lens", in: lens)
-                } else {
-                    coreShape(Radius.control).fill(hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
                 }
             }
             .overlay {
-                coreShape(Radius.control).strokeBorder(.white.opacity(selected ? 0.3 : 0.15), lineWidth: 1)
+                coreShape(Radius.control).strokeBorder(
+                    .white.opacity(selected ? 0.3 : hovering ? 0.3 : 0.15), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoreTilePress())
         .focusable(false)
-        .scaleEffect(pressed ? 0.96 : hovering ? 1.04 : 1)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
-        )
+        .coreFocusRing(focused, radius: Radius.control, palette: palette)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
-        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
-        .animation(.spring(duration: 0.35, bounce: 0.25), value: selected)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
-/// An on/off setting as a glass tile in the segment look (Ahmed, 2026-11-05): its icon swaps and bounces, a small
-/// rounded switch slides inside, and it lights blue when on. Hover lifts it; a press springs.
+/// An on/off setting as a glass tile in the segment look (Ahmed, 2026-11-05): its icon swaps, a small
+/// rounded switch slides inside, and it lights blue when on. Hover steps the fill and edge; a press shrinks it a little.
 public struct GlassToggleTile: View {
     let title: String
     let sub: String?
@@ -128,7 +133,6 @@ public struct GlassToggleTile: View {
     let fill: Bool
     @Binding var isOn: Bool
     @State private var hovering = false
-    @State private var pressed = false
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     public init(
@@ -171,21 +175,17 @@ public struct GlassToggleTile: View {
             .background {
                 coreShape(Radius.control)
                     .fill(isOn ? GlassInk.blue.opacity(0.8) : hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
-                    .shadow(color: GlassInk.blue.opacity(isOn ? 0.45 : 0), radius: 10)
             }
-            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(isOn ? 0.3 : 0.15), lineWidth: 1) }
+            .overlay {
+                coreShape(Radius.control).strokeBorder(.white.opacity(isOn || hovering ? 0.3 : 0.15), lineWidth: 1)
+            }
             .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoreTilePress())
         .focusable(false)
-        .scaleEffect(pressed ? 0.96 : hovering ? 1.03 : 1)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
-        )
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25, bounce: 0.3), value: hovering)
-        .animation(.spring(duration: 0.2, bounce: 0.4), value: pressed)
-        .animation(.spring(duration: 0.35, bounce: 0.35), value: isOn)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.ui), value: isOn)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
