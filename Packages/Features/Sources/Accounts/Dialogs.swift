@@ -148,10 +148,17 @@ private struct NewPoolDialog: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField("Name", placeholder: "client-work", text: $name, autofocus: true) { go(chosen) }
                 CoreFieldLabel("Provider")
-                CoreSegmented(
-                    "Provider",
-                    segments: model.providers.map { CoreSegment($0.id, $0.name, symbol: ProviderLook.symbol($0.id)) },
-                    selection: Binding(get: { chosen }, set: { provider = $0 }))
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible(), spacing: Space.s2)],
+                    spacing: Space.s2
+                ) {
+                    ForEach(ProviderLook.ordered(model.providers)) { p in
+                        AccPick(
+                            title: p.name, sub: p.loginMethods.contains("browser_code") ? "Subscription" : "API key",
+                            symbol: ProviderLook.symbol(p.id), hue: GlassInk.blue, on: p.id == chosen
+                        ) { provider = p.id }
+                    }
+                }
                 Text("A pool holds accounts of one provider. It starts empty.").font(.system(size: MacTextSize.meta))
                 let typed = name.trimmingCharacters(in: .whitespaces)
                 if !typed.isEmpty && !PoolName.isValid(typed) {
@@ -191,12 +198,20 @@ private struct DeletePoolDialog: View {
                 Text(
                     used.isEmpty
                         ? "The pool goes. The accounts stay."
-                        : "\(used.map(\.name).joined(separator: ", ")) still uses this pool, so the Core will refuse. Take it out of the chain first, then delete it."
+                        : "\(used.map(\.name).joined(separator: ", ")) still uses this pool, so it can't be deleted yet. Take it out of the chain first."
                 )
                 .fixedSize(horizontal: false, vertical: true)
+                if let c = used.first {
+                    AccLink(title: "Open \(c.name)", symbol: "link") {
+                        close()
+                        model.chainSelection = c.id
+                        model.page = .chains
+                        model.detail = nil
+                    }
+                }
                 if let e = model.writeError["delete-pool-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Delete pool", danger: true, busy: busy, cancel: close) {
+                AccDialogButtons(confirm: "Delete pool", danger: true, busy: busy, enabled: used.isEmpty, cancel: close) {
                     busy = true
                     Task {
                         let ok = await model.delete(pool)

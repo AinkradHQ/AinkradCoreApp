@@ -118,13 +118,13 @@ private struct ChainDialog: View {
                 })
             if models.isEmpty {
                 CoreTextField(
-                    "Model", placeholder: "the harness default",
+                    "Model", placeholder: "the provider's default model",
                     text: modelBinding(i), mono: true)
             } else {
                 CoreSelect(
                     "Model",
                     selection: modelBinding(i),
-                    options: [CoreSelectOption("", "Harness default")] + models.map { CoreSelectOption($0.id, $0.id) })
+                    options: [CoreSelectOption("", "Provider's default model")] + models.map { CoreSelectOption($0.id, $0.id) })
             }
             AccLink(title: "Up", symbol: "arrow.up", help: "Try this pool earlier") { entries.swapAt(i, i - 1) }
                 .disabled(i == 0)
@@ -189,34 +189,55 @@ private struct BindAgentDialog: View {
     let model: AccountsModel
     let chain: ChainItem
     let close: () -> Void
-    @State private var agent = ""
+    /// "": the person is typing an agent the Core has not met through this app yet.
+    @State private var pick: String
+    @State private var typedNew = ""
     @State private var busy = false
+
+    init(model: AccountsModel, chain: ChainItem, close: @escaping () -> Void) {
+        self.model = model
+        self.chain = chain
+        self.close = close
+        _pick = State(initialValue: model.knownAgents.first ?? "")
+    }
+
+    private var chosen: String { (pick.isEmpty ? typedNew : pick).trimmingCharacters(in: .whitespaces) }
+
     var body: some View {
-        let typed = agent.trimmingCharacters(in: .whitespaces)
-        let valid = AccountsModel.validAgent(typed)
+        let valid = AccountsModel.validAgent(chosen)
         let error = model.writeError["bind-chain"]
+        let known = model.knownAgents
         CoreDialogPanel("Bind an agent to \(chain.name)", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                CoreTextField(
-                    "Agent id", placeholder: "atlas", text: $agent,
-                    error: typed.isEmpty || valid ? nil : AgentIDRule.words, mono: true, autofocus: true
-                ) { go(typed, valid) }
+                // The Core has no list of agents; these are the ones already bound and the ones bound from here before.
+                if !known.isEmpty {
+                    CoreSelect(
+                        "Agent", selection: $pick,
+                        options: known.map { CoreSelectOption($0, $0 + (model.boundChain(of: $0).map { " · now on \($0.name)" } ?? "")) }
+                            + [CoreSelectOption("", "Another agent…")])
+                }
+                if pick.isEmpty {
+                    CoreTextField(
+                        "Agent id", placeholder: "atlas", text: $typedNew,
+                        error: chosen.isEmpty || valid ? nil : AgentIDRule.words, mono: true, autofocus: true
+                    ) { go(valid) }
+                }
                 Text("Its sessions get this chain. Binding it again moves it here.")
                     .font(.system(size: MacTextSize.meta))
-                if let error { AccIssue(text: "\(error) Try again, or cancel.") }
+                if let error { AccIssue(text: "\(error) Your choice is kept. Change it and try again, or cancel.") }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(
                     confirm: error == nil ? "Bind agent" : "Try again", busy: busy, enabled: valid, cancel: close
-                ) { go(typed, valid) }
+                ) { go(valid) }
             }
         }
         .accessibilityIdentifier("chain-bind")
     }
-    private func go(_ typed: String, _ valid: Bool) {
+    private func go(_ valid: Bool) {
         guard valid else { return }
         busy = true
         Task {
-            let ok = await model.bind(agent: typed, to: chain)
+            let ok = await model.bind(agent: chosen, to: chain)
             busy = false
             if ok { close() }
         }

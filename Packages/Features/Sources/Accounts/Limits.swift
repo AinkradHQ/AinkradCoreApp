@@ -160,7 +160,7 @@ struct AccountLimitsSection: View {
             switch model.limitsLoad {
             case .loading: AccSkeleton()
             case .forbidden:
-                Text("Only a device with the admin scope can see or change usage limits.")
+                Text("This Mac can only look. Usage limits need a Mac you allowed to manage the Core.")
                     .foregroundStyle(GlassInk.secondary)
             case .failed(_, let message):
                 HStack(spacing: Space.s2) {

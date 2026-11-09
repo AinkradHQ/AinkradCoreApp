@@ -51,7 +51,8 @@ struct BudgetsPage: View {
                 } else {
                     AccStateCard(
                         symbol: "lock", title: "This device can't read budgets",
-                        text: "Budgets need the read scope. Use a device that holds it.", code: "forbidden_scope")
+                        text: "This Mac is not allowed to look at budgets. Use a Mac you allowed to read from the Core.",
+                        code: "forbidden_scope")
                 }
             case .failed(let code, let message):
                 AccStateCard(

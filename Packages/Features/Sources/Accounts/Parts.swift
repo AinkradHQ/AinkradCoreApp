@@ -135,10 +135,6 @@ struct AccStateCard<Actions: View>: View {
             Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
-            if let code {
-                Text(code).font(.system(size: MacTextSize.meta, design: .monospaced)).padding(.horizontal, Space.s2)
-                    .frame(minHeight: 22).background(GlassInk.well, in: coreShape(6))
-            }
             HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
         }
         .padding(Space.s6)
@@ -147,6 +143,7 @@ struct AccStateCard<Actions: View>: View {
         .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(tone == .queue ? 0.15 : 0.45), lineWidth: 1) }
         .animation(.smooth(duration: 0.45), value: shown)
         .onAppear { shown = true }
+        .help(code ?? "")
         .accessibilityElement(children: .contain)
     }
 }
@@ -247,48 +244,40 @@ struct ReadOnlyBanner: View {
     var body: some View {
         if model.readOnly {
             CoreNotice(
-                symbol: "lock", title: "This device can only read",
-                text: "Changes are refused (forbidden_scope). Use a device that holds the admin scope."
+                symbol: "lock", title: "This Mac can only look",
+                text: "Changes need a Mac you allowed to manage the Core."
             )
+            .help("The Core answered forbidden_scope.")
             .accessibilityIdentifier("read-only-banner")
         }
     }
 }
 
-/// Cancel and the one action of a dialog, as glass tiles with their keys: Cancel at the left (esc), the action at the
-/// right (↩, or ⌘↩ when it removes something, so Return alone never destroys).
+/// The footer of an Accounts dialog, built from the CoreUI buttons: the way back on the left (`Cancel esc`, or `Close esc`
+/// when there is nothing to confirm), the one action on the right (↩, or ⌘↩ when it removes something, so Return alone
+/// never destroys). Only Cancel and Close carry the esc keycap.
 struct AccDialogButtons: View {
-    let confirm: String
+    var confirm: String?
     var cancelTitle = "Cancel"
     var danger = false
     var busy = false
     var enabled = true
     let cancel: () -> Void
-    let run: () -> Void
-    @State private var hovered: Int?
+    var run: () -> Void = {}
     var body: some View {
         HStack(spacing: Space.s2) {
-            ChoiceTile(
-                choice: ConfirmChoice(cancelTitle, symbol: cancelTitle == "Cancel" ? "arrow.uturn.backward" : "xmark"),
-                on: hovered == 0, keys: "esc",
-                run: cancel
-            )
-            .keyboardShortcut(.cancelAction)
-            .onHover { hovered = $0 ? 0 : nil }
-            .frame(maxWidth: Space.s8 * 5)
-            Spacer(minLength: Space.s2)
-            ChoiceTile(
-                choice: ConfirmChoice(
-                    busy ? "\(confirm)…" : confirm, symbol: danger ? "trash" : "checkmark", destructive: danger),
-                on: hovered != 0 && enabled && !busy, keys: danger ? "⌘↩" : "↩", run: run
-            )
-            .keyboardShortcut(.return, modifiers: danger ? .command : [])
-            .disabled(!enabled || busy)
-            .opacity(enabled ? 1 : 0.5)
-            .onHover { hovered = $0 ? 1 : nil }
-            .frame(maxWidth: Space.s8 * 7)
+            Button(cancelTitle, action: cancel).buttonStyle(CoreButtonStyle(.secondary))
+                .keyboardShortcut(.cancelAction)
+                .environment(\.coreKeycap, ["Cancel", "Close"].contains(cancelTitle) ? "esc" : nil)
+            Spacer(minLength: Space.s3)
+            if let confirm {
+                Button(busy ? "\(confirm)…" : confirm, action: run)
+                    .buttonStyle(CoreButtonStyle(danger ? .danger : .prominent, busy: busy))
+                    .keyboardShortcut(.return, modifiers: danger ? .command : [])
+                    .environment(\.coreKeycap, danger ? "⌘↩" : "↩")
+                    .disabled(!enabled || busy)
+            }
         }
-        .animation(.smooth(duration: 0.25), value: hovered)
     }
 }
 

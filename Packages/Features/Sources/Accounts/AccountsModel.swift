@@ -100,6 +100,8 @@ public final class AccountsModel {
     /// An event from the Core that may change what these screens show.
     public func event(kind: String) {
         connections.event(kind: kind)
+        // A sign-in's own events move it on at once; the one-second poll stays as the fallback.
+        if kind.hasPrefix("account.login."), let id = signIn?.login, !signInEnded { Task { await refreshSignIn(id) } }
         let kinds = ["account.", "pool.", "chain.", "setting."]
         if kinds.contains(where: kind.hasPrefix) { resync() }
     }
@@ -418,10 +420,20 @@ public final class AccountsModel {
         ) { try await $0.setDefaultChain(c.id) }
     }
 
+    /// Agents the app knows: every one bound to a chain, then the ones bound from here before. The Core has no agent list.
+    var knownAgents: [String] {
+        let bound = chainBindings.map(\.agent)
+        let recent = UserDefaults.standard.stringArray(forKey: "accounts.recentAgents") ?? []
+        return Array(NSOrderedSet(array: bound + recent)) as? [String] ?? bound
+    }
+    func boundChain(of agent: String) -> ChainItem? {
+        chainBindings.first { $0.agent == agent }.flatMap { chain($0.chain) }
+    }
+
     func bind(agent: String, to c: ChainItem) async -> Bool {
         let a = agent.trimmingCharacters(in: .whitespaces)
         let before = chainBindings.first { $0.agent == a }.flatMap { chain($0.chain) }
-        return await write(
+        let ok = await write(
             "bind-chain", reason: "Bind \(a) to \(c.name). Its sessions draw accounts from that chain.",
             done: "\(a) is bound to \(c.name)", keepsEdit: true,
             undo: { [weak self] in
@@ -433,6 +445,11 @@ public final class AccountsModel {
                 }
             }
         ) { _ = try await $0.bindAgent(a, chain: c.id) }
+        if ok {
+            let d = UserDefaults.standard
+            d.set(Array(([a] + (d.stringArray(forKey: "accounts.recentAgents") ?? [])).prefix(12)), forKey: "accounts.recentAgents")
+        }
+        return ok
     }
 
     func unbind(_ agent: String, undoable: Bool = true) async {
@@ -451,6 +468,9 @@ public final class AccountsModel {
     func openProviderPage(_ provider: String) {
         if let site = ProviderSites.page(provider) { opener(site.url) }
     }
+
+    /// The Runners pane (Terminals registers it in the launcher).
+    func openRunners() { host.shell.launcher.entry("runners")?.run() }
 
     func openSwitches() {
         host.shell.settings.selected = "switches"

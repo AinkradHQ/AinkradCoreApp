@@ -21,7 +21,7 @@ struct AccountSlice: View {
             switch model.costsLoad {
             case .loading: AccSkeleton()
             case .forbidden:
-                Text("Only a device with the admin scope can see usage and costs.").foregroundStyle(GlassInk.secondary)
+                Text("This Mac can only look. Usage and costs need a Mac you allowed to manage the Core.").foregroundStyle(GlassInk.secondary)
             case .failed(_, let message):
                 Text("Could not load usage. \(message)").foregroundStyle(GlassInk.orangeInk)
             case .ready:

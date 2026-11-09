@@ -163,9 +163,9 @@ struct SpendState: View {
                 OlderCoreCard(what: what)
             } else {
                 AccStateCard(
-                    symbol: "lock", title: "This device can't see \(what.lowercased())",
+                    symbol: "lock", title: "This Mac can't see \(what.lowercased())",
                     text:
-                        "\(what) need\(what.hasSuffix("s") ? "" : "s") the \(scope) scope, or a newer Core. Use a device that holds it, or update Core.",
+                        "This Mac can only look. \(what) need\(what.hasSuffix("s") ? "" : "s") a Mac you allowed to \(scope == "read" ? "read from" : "manage") the Core, or a newer Core.",
                     code: "forbidden_scope")
             }
         case .failed(let code, let message):
