@@ -31,6 +31,18 @@ struct BrainModelTests {
         return (model, host)
     }
 
+    @Test func theRoomActionsWaitForAService() {
+        let host = FakeHost()
+        let model = BrainModel(host: host)
+        model.install()
+        let ids = { host.shell.launcher.entries.map(\.id).filter { $0.hasPrefix("brain") } }
+        #expect(ids() == ["brain"])
+        model.use(SampleBrainService())
+        #expect(Set(ids()) == ["brain", "brain-open-room", "brain-new-room", "brain-new-room-advanced"])
+        model.detach()
+        #expect(ids() == ["brain"])
+    }
+
     @Test func noServiceMeansUnavailable() {
         let model = BrainModel(host: FakeHost())
         #expect(model.load == .unavailable)

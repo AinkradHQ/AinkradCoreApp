@@ -398,3 +398,21 @@ struct RefusalKindTests {
         #expect(!AccountsModel.isRule(nil))
     }
 }
+
+@MainActor
+struct ConnectCommandTests {
+    @Test func aNewKeyIsAnAddNeverAKeyOnTheCommandLine() {
+        let c = ConnectDialog.addCommand(provider: "claude", label: "Work", replacing: nil)
+        #expect(c == "ainkradctl account add claude --label 'Work' --key-file <file with the key>")
+        #expect(!c.contains("curl") && !c.contains("Authorization"))
+    }
+
+    @Test func aReplacementRotatesTheAccount() {
+        let c = ConnectDialog.addCommand(provider: "claude", label: "Work", replacing: 7)
+        #expect(c == "ainkradctl account rotate 7 --key-file <file with the new key>")
+    }
+
+    @Test func aLabelWithAQuoteStaysOneWord() {
+        #expect(ConnectDialog.addCommand(provider: "p", label: "Bob's", replacing: nil).contains("'Bob'\\''s'"))
+    }
+}

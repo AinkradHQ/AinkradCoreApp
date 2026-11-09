@@ -47,12 +47,14 @@ public final class BrainModel {
     /// Attach a service. Release attaches none until Core serves the Brain; Debug demo and tests attach the sample.
     public func use(_ service: any BrainService) {
         self.service = service
+        registerActions()
         load = .loading
         Task { await reload() }
     }
 
     public func detach() {
         service = nil
+        for id in Self.actionIDs { host.shell.launcher.unregister(id) }
         activity.reset()
         checks.reset()
         clearRoomView()
@@ -298,21 +300,22 @@ public final class BrainModel {
         }
     }
 
-    /// Launcher entries, the bell watch and the Look section in Settings.
-    public func install() {
-        let shell = host.shell
-        func entry(
-            _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
-            _ run: @escaping @MainActor (BrainModel) -> Void
-        ) {
-            shell.launcher.register(
-                LauncherEntry(id: id, title: title, sub: sub, symbol: symbol, keywords: keys, isAction: action) {
-                    [weak self] in if let self { run(self) }
-                })
-        }
-        entry("brain", "Brain", "Rooms, memory and health", "brain", ["memory", "rooms", "sealed", "health"]) {
-            $0.show(.overview)
-        }
+    private static let actionIDs = ["brain-open-room", "brain-new-room", "brain-new-room-advanced"]
+    @ObservationIgnored private var installed = false
+
+    private func entry(
+        _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
+        _ run: @escaping @MainActor (BrainModel) -> Void
+    ) {
+        host.shell.launcher.register(
+            LauncherEntry(id: id, title: title, sub: sub, symbol: symbol, keywords: keys, isAction: action) {
+                [weak self] in if let self { run(self) }
+            })
+    }
+
+    /// The room actions need a service to act on: registered when one attaches, withdrawn when it goes.
+    private func registerActions() {
+        guard installed else { return }
         entry(
             "brain-open-room", "Open room…", "Pick a room to look at", "lock.open", ["room", "mount", "unseal"],
             action: true
@@ -331,6 +334,16 @@ public final class BrainModel {
             m.show(.rooms)
             BrainSheets.openNewRoom(m)
         }
+    }
+
+    /// Launcher entries, the bell watch and the Look section in Settings.
+    public func install() {
+        let shell = host.shell
+        installed = true
+        entry("brain", "Brain", "Rooms, memory and health", "brain", ["memory", "rooms", "sealed", "health"]) {
+            $0.show(.overview)
+        }
+        if service != nil { registerActions() }
         shell.settings.section(
             SettingsSection(
                 id: "brain-link", group: .apps, title: "Brain", sub: "Look of the memory app", symbol: "brain",

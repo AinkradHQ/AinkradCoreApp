@@ -95,15 +95,16 @@ struct ConnectDialog: View {
         model.accounts.first { !known.contains($0.id) && $0.provider == provider }
     }
 
-    /// The real path today: the Core's own API (`ainkradctl` has no command to add an account). The key is yours to paste
-    /// there; this app never sees it.
+    /// The `ainkradctl` command for this dialog. The key is read by ainkradctl from a file or stdin, never typed on the
+    /// command line, so it never reaches shell history or this app.
+    static func addCommand(provider: String, label: String, replacing id: Int64?) -> String {
+        if let id { return "ainkradctl account rotate \(id) --key-file <file with the new key>" }
+        let quoted = "'" + label.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        return "ainkradctl account add \(provider) --label \(quoted) --key-file <file with the key>"
+    }
+
     private var addCommand: String {
-        let label = replacing?.label ?? "Work"
-        return """
-            curl -X POST "$CORE/api/v1/accounts" -H "Authorization: Bearer $ADMIN_TOKEN" \\
-              -H "Content-Type: application/json" \\
-              -d '{"provider":"\(provider)","label":"\(label)","value":"<paste the key here>"}'
-            """
+        Self.addCommand(provider: provider, label: replacing?.label ?? "Work", replacing: replacing?.id)
     }
 
     private var command: some View {
