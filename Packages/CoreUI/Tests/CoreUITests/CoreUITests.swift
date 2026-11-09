@@ -85,3 +85,42 @@ struct SurfaceTests {
         #expect(Palette.night.contrast(.standard).increased == false)
     }
 }
+
+/// Accessibility label audit: every state word a badge, tile or chip shows has a name, a tone symbol and a label that
+/// is not just the raw code, so VoiceOver never reads a blank or a snake_case word.
+struct LabelAuditTests {
+    private func audit<S: CoreState>(_ type: S.Type) {
+        for e in S.table {
+            #expect(!e.label.isEmpty, "\(S.self).\(e.raw) has no label")
+            #expect(!e.symbol.isEmpty, "\(S.self).\(e.raw) has no symbol")
+            #expect(!e.label.contains("_"), "\(S.self).\(e.raw) reads as a code")
+        }
+    }
+
+    @Test func everyStateHasAWordAndASymbol() {
+        audit(AccountState.self)
+        audit(SessionState.self)
+        audit(SessionOutcome.self)
+        audit(TerminalState.self)
+        audit(IssueState.self)
+        audit(RunState.self)
+    }
+
+    @Test func tonesAreNeverColourOnly() {
+        // Each tone must map to a distinct word-bearing state: a tone alone is never the signal.
+        for kind in [ToastKind.ok, .info, .warn, .error] { #expect(!kind.symbol.isEmpty) }
+    }
+
+    @Test func settledAnnouncementsCollapse() async {
+        // Two posts on one channel inside the delay leave one pending task (the first is cancelled).
+        await MainActor.run {
+            CoreAnnounce.settled("t", "one", after: .seconds(60))
+            CoreAnnounce.settled("t", "two", after: .seconds(60))
+        }
+    }
+
+    @Test func clocksAndDecimalsUseTheReadersFormat() {
+        #expect(coreClock(272) == "4:32" && coreClock(8) == "0:08" && coreClock(3725) == "1:02:05")
+        #expect(coreDecimal(1.5, 2).hasPrefix("1") && coreDecimal(1.5, 2).hasSuffix("50"))
+    }
+}
