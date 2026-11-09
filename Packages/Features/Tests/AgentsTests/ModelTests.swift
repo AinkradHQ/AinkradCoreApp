@@ -157,6 +157,8 @@ struct ModelTests {
     @Test func transcriptEventsAppendToAnOpenTranscriptOnly() async {
         let (m, api, _, _) = await make()
         let id = "as_01JC4X7Q3MZ8N5V2K9R001"
+        // The open transcript loads in the background; read its end only once it is there.
+        for _ in 0..<400 where (m.transcripts[id]?.lastSeq ?? 0) == 0 { try? await Task.sleep(for: .milliseconds(5)) }
         let before = m.transcripts[id]?.lastSeq ?? 0
         api.append(id, [.assistant("more")])
         await m.handle(.event(AgentEvent(kind: "agent.transcript", session: id, from: before + 1, to: before + 1)))
