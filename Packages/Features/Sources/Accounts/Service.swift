@@ -44,8 +44,11 @@ protocol AccountsService: Sendable {
     func setBudget(_ b: BudgetDraft) async throws
     func deleteBudget(_ id: Int64) async throws
     func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws
-    /// Each account's use over 5 hours and 7 days (`admin`).
+    /// Each account's use over 5 hours and 7 days, with where each of its usage limits stands (`admin`).
     func usage() async throws -> [UsageItem]
+    /// Add a usage limit or change the one with the same unit and window (`admin`, Touch ID).
+    func setLimit(account: Int64, _ d: LimitDraft) async throws
+    func clearLimit(account: Int64, unit: String, windowSecs: Int64) async throws
     /// Cost events, newest first, at most 100 (`admin`).
     func costs(account: Int64?) async throws -> [CostItem]
     func prices() async throws -> [PriceItem]
@@ -250,6 +253,21 @@ struct LiveAccountsService: AccountsService {
     func usage() async throws -> [UsageItem] {
         try await run { try await client.accountsUsage().ok.body.json.map(Self.usage) }
     }
+    func setLimit(account: Int64, _ d: LimitDraft) async throws {
+        try await run {
+            _ = try await client.setAccountLimit(
+                path: .init(id: String(account)),
+                body: .json(.init(cap: d.cap, unit: d.unit, warnPercent: d.warnPercent, windowSecs: d.windowSecs))
+            ).ok
+        }
+    }
+    func clearLimit(account: Int64, unit: String, windowSecs: Int64) async throws {
+        try await run {
+            _ = try await client.clearAccountLimit(
+                path: .init(id: String(account), unit: unit, windowSecs: windowSecs)
+            ).ok
+        }
+    }
     func costs(account: Int64?) async throws -> [CostItem] {
         try await run {
             try await client.listCosts(query: .init(account: account, limit: 100)).ok.body.json.map {
@@ -291,6 +309,11 @@ struct LiveAccountsService: AccountsService {
             hasLimits: !u.limits.isEmpty, drops: u.recentDrops,
             companies: u.byCompany.map {
                 CompanyUsage(company: $0.company, fiveHours: w($0.fiveHours), sevenDays: w($0.sevenDays))
+            },
+            limits: u.limits.map {
+                LimitItem(
+                    unit: $0.unit, windowSecs: $0.windowSecs, cap: $0.cap, used: $0.used, warnPercent: $0.warnPercent,
+                    exhausted: $0.exhausted)
             })
     }
 

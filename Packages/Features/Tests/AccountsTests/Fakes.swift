@@ -174,7 +174,17 @@ final class FakeService: AccountsService, @unchecked Sendable {
     func deleteProvider(_ id: String) async throws { try note("deleteProvider \(id)") }
     var usageList: [UsageItem] = []
     var costList: [CostItem] = []
-    func usage() async throws -> [UsageItem] { usageList }
+    var usageFailure: (any Error)?
+    func usage() async throws -> [UsageItem] {
+        if let usageFailure { throw usageFailure }
+        return usageList
+    }
+    func setLimit(account id: Int64, _ d: LimitDraft) async throws {
+        try note("setLimit \(id) \(d.unit) \(d.windowSecs) \(d.cap) \(d.warnPercent)")
+    }
+    func clearLimit(account id: Int64, unit: String, windowSecs: Int64) async throws {
+        try note("clearLimit \(id) \(unit) \(windowSecs)")
+    }
     func costs(account: Int64?) async throws -> [CostItem] { costList }
     func prices() async throws -> [PriceItem] { [] }
     func setPrice(_ p: PriceDraft) async throws {
