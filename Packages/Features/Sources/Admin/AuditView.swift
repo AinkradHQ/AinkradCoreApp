@@ -128,6 +128,48 @@ enum AuditWords {
         return seen.isEmpty ? nil : seen.joined(separator: ", ")
     }
 
+    /// The details of a row split for the side panel: plain pairs (ids replaced by a device name or "a device"), and
+    /// the technical ones (the raw ids, the entry number and the action code) that sit behind a folded disclosure.
+    static func detailRows(_ a: AuditItem, deviceName: (String) -> String? = { _ in nil }) -> (
+        plain: [(String, String)], technical: [(String, String)]
+    ) {
+        var plain: [(String, String)] = []
+        var technical: [(String, String)] = []
+        for (k, v) in pairs(a.details) {
+            let key = k.replacingOccurrences(of: "_", with: " ")
+            guard isOpaqueID(v) else {
+                plain.append((key, v))
+                continue
+            }
+            let kind = k.hasPrefix("by_") ? String(k.dropFirst(3)) : k
+            plain.append((key, (kind == "device" ? deviceName(v) : nil) ?? thing(kind)))
+            technical.append((key, v))
+        }
+        if let ref = a.entityRef, isOpaqueID(ref), !technical.contains(where: { $0.1 == ref }) {
+            technical.append(("Id", ref))
+        }
+        technical += [("Entry", "\(a.seq)"), ("Action", a.action)]
+        return (plain, technical)
+    }
+
+    /// A details object as name and value pairs; a value that is a list or object is shown compactly.
+    static func pairs(_ json: String) -> [(String, String)] {
+        guard let data = json.data(using: .utf8),
+            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : [("Details", json)] }
+        return obj.keys.sorted().map { k in
+            let v = obj[k]
+            let text: String =
+                switch v {
+                case let a as [Any]: a.map { "\($0)" }.joined(separator: ", ")
+                case let s as String: s
+                case let n as NSNumber: n.stringValue
+                default: v.map { "\($0)" } ?? ""
+                }
+            return (k, text)
+        }
+    }
+
     private static func detailsDict(_ a: AuditItem) -> [String: Any]? {
         (try? JSONSerialization.jsonObject(with: Data(a.details.utf8))) as? [String: Any]
     }
@@ -343,6 +385,7 @@ private struct AuditList: View {
 private struct AuditDetail: View {
     let admin: AdminModel
     let item: AuditItem?
+    @State private var technical = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -360,7 +403,8 @@ private struct AuditDetail: View {
                     fact(a.actor == .system ? "server.rack" : "person.fill", a.actor.label)
                     fact(area.symbol, area.title)
                 }
-                let pairs = Self.pairs(a.details)
+                let rows = AuditWords.detailRows(a, deviceName: { admin.deviceNames[$0] })
+                let pairs = rows.plain
                 if !pairs.isEmpty {
                     VStack(alignment: .leading, spacing: Space.s1) {
                         ForEach(pairs, id: \.0) { k, v in
@@ -378,8 +422,21 @@ private struct AuditDetail: View {
                     .padding(Space.s3)
                     .background(.black.opacity(0.2), in: coreShape(Radius.control + 2))
                 }
-                Text("Entry \(a.seq) · \(a.action)").coreFont(size: MacTextSize.meta, design: .monospaced)
-                    .foregroundStyle(GlassInk.secondary).textSelection(.enabled)
+                DisclosureGroup("Technical details", isExpanded: $technical) {
+                    VStack(alignment: .leading, spacing: Space.s1) {
+                        ForEach(Array(rows.technical.enumerated()), id: \.offset) { _, kv in
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(kv.0.capitalized).foregroundStyle(GlassInk.secondary)
+                                Spacer(minLength: Space.s2)
+                                Text(kv.1).coreFont(size: MacTextSize.meta, design: .monospaced)
+                                    .textSelection(.enabled).multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                    .padding(.top, Space.s1)
+                }
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .help("The ids, entry number and action code behind this row.")
             } else {
                 Text("Pick a row to see everything about it.").foregroundStyle(GlassInk.secondary)
             }
@@ -394,24 +451,6 @@ private struct AuditDetail: View {
 
     private func fact(_ symbol: String, _ text: String) -> some View {
         Label(text, systemImage: symbol).foregroundStyle(GlassInk.primary)
-    }
-
-    /// A details object as name and value pairs; a value that is a list or object is shown compactly.
-    static func pairs(_ json: String) -> [(String, String)] {
-        guard let data = json.data(using: .utf8),
-            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : [("Details", json)] }
-        return obj.keys.sorted().map { k in
-            let v = obj[k]
-            let text: String =
-                switch v {
-                case let a as [Any]: a.map { "\($0)" }.joined(separator: ", ")
-                case let s as String: s
-                case let n as NSNumber: n.stringValue
-                default: v.map { "\($0)" } ?? ""
-                }
-            return (k, text)
-        }
     }
 }
 
