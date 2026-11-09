@@ -112,15 +112,16 @@ private struct CoreThemeModifier: ViewModifier {
     private var solidOnly: Bool { reduceTransparency }
     #endif
     func body(content: Content) -> some View {
+        let palette = (scheme == .dark ? Palette.night : Palette.day).contrast(effectiveContrast)
         content
-            .environment(\.corePalette, (scheme == .dark ? Palette.night : Palette.day).contrast(effectiveContrast))
+            .environment(\.corePalette, palette)
             .environment(\.coreSolidOnly, solidOnly)
             #if DEBUG
         .environment(\.layoutDirection, Self.forced.contains("rtl") ? .rightToLeft : layoutDirection)
             #endif
-            .foregroundStyle((scheme == .dark ? Palette.night : Palette.day).text)
+            .foregroundStyle(palette.text)
             // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
-            .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
+            .tint(palette.btnPrimary)
             .font(.system(size: MacTextSize.scaled(MacTextSize.body, by: TextSizePrefs.shared.scale)))
             // No focus rings anywhere (Ahmed, 2026-11-05): the system ring and our own both stay off. Keyboard focus
             // still moves; the focused control is the one that answers Space and Return.

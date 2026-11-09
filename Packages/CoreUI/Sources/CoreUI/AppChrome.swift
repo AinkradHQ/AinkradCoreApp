@@ -228,6 +228,7 @@ public struct GlassSlider: View {
     let step: Double
     @State private var dragging = false
     @FocusState private var focused: Bool
+    @Environment(\.layoutDirection) private var direction
 
     public init(
         value: Binding<Double>, in range: ClosedRange<Double> = 0...1, low: String, high: String, unit: String = "%",
@@ -253,7 +254,7 @@ public struct GlassSlider: View {
                     coreShape(3).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
                     coreShape(6).fill(.white).frame(width: 18, height: 18)
                         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-                        .offset(x: x - 9)
+                        .offset(x: direction == .rightToLeft ? 9 - x : x - 9)
                 }
                 .frame(maxHeight: .infinity)
                 // Dragging follows the pointer with no easing; only the keyboard path glides (move()).
@@ -263,7 +264,8 @@ public struct GlassSlider: View {
                     DragGesture(minimumDistance: 0)
                         .onChanged { d in
                             dragging = true
-                            let t = min(max(d.location.x / max(g.size.width, 1), 0), 1)
+                            let along = min(max(d.location.x / max(g.size.width, 1), 0), 1)
+                            let t = direction == .rightToLeft ? 1 - along : along
                             let raw = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
                             let snapped = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
                             if snapped != value { value = snapped }
@@ -276,8 +278,7 @@ public struct GlassSlider: View {
                 .contentTransition(.numericText()).frame(width: 46, alignment: .trailing)
         }
         .focusable().focused($focused).focusEffectDisabled()
-        .onKeyPress(.leftArrow) { move(-1) }
-        .onKeyPress(.rightArrow) { move(1) }
+        .coreSideKeys { move(Double($0)) }
         .accessibilityElement()
         .accessibilityLabel("\(low) to \(high)")
         .accessibilityValue("\(percent(value))\(unit == "%" ? " percent" : unit)")

@@ -60,6 +60,8 @@ struct HeatTests {
     }
 }
 
+/// Serialized: `textScaleHasAFloorAndDefaultsToOne` writes the shared standard defaults the other tests read.
+@Suite(.serialized)
 struct SurfaceTests {
     @Test func unitsJoinWithANoBreakSpace() {
         #expect(coreUnit("12", "ms") == "12\u{00A0}ms")
@@ -67,6 +69,7 @@ struct SurfaceTests {
 
     @Test func textScaleHasAFloorAndDefaultsToOne() {
         UserDefaults.standard.removeObject(forKey: MacTextSize.scaleKey)
+        defer { UserDefaults.standard.removeObject(forKey: MacTextSize.scaleKey) }
         #expect(MacTextSize.scale == 1 && MacTextSize.scaled(MacTextSize.meta) == 11)
         UserDefaults.standard.set(0.8, forKey: MacTextSize.scaleKey)
         #expect(MacTextSize.scaled(11) == 10)  // 8.8 would fall under the 10 pt floor
