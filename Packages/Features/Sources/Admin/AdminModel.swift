@@ -11,14 +11,13 @@ import SwiftUI
 public final class AdminModel {
     let host: any AdminHost
     private(set) var service: (any AdminService)?
-    @ObservationIgnored private(set) var registry: RegistryModel!
+    @ObservationIgnored private(set) lazy var registry = RegistryModel(hub: self)
     @ObservationIgnored private(set) var secrets: SecretsModel!
     @ObservationIgnored private(set) var audit: AuditModel!
     @ObservationIgnored private(set) var ops: OpsModel!
 
     public init(host: any AdminHost) {
         self.host = host
-        registry = RegistryModel(hub: self)
         secrets = SecretsModel(hub: self)
         audit = AuditModel(hub: self)
         ops = OpsModel(hub: self)

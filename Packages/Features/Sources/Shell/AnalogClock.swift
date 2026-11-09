@@ -9,12 +9,13 @@ struct AnalogClock: View {
 
     /// The dial is drawn once; only the three hands move, as rotated layers, ticking once a second with a short spring
     /// like a quartz clock. A continuous sweep kept an animation running every frame and cost about 30% CPU at idle.
+    @Environment(\.homeLive) private var live
     var body: some View {
         GeometryReader { g in
             let r = min(g.size.width, g.size.height) / 2
             ZStack {
                 Canvas { c, size in dial(c, size) }
-                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                TimelineView(homeTicks(1, live: live)) { ctx in
                     let t =
                         ctx.date.timeIntervalSinceReferenceDate + Double(TimeZone.current.secondsFromGMT(for: ctx.date))
                     // Angles from a running count of seconds, so 59 → 0 keeps turning forward.
@@ -27,8 +28,8 @@ struct AnalogClock: View {
                     }
                     .animation(Motion.out(Motion.hover), value: sec)
                 }
-                Circle().fill(Self.orange).frame(width: r * 0.09, height: r * 0.09)
-                Circle().fill(.white).frame(width: r * 0.04, height: r * 0.04)
+                coreShape(r * 0.02).fill(Self.orange).frame(width: r * 0.09, height: r * 0.09)
+                coreShape(r * 0.01).fill(.white).frame(width: r * 0.04, height: r * 0.04)
             }
             .frame(width: 2 * r, height: 2 * r)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -42,7 +43,7 @@ struct AnalogClock: View {
 
     /// A hand pointing at 12 from the centre, with an optional tail past it; rotation turns it about the centre.
     private func hand(width: CGFloat, length: CGFloat, color: Color, tail: CGFloat = 0) -> some View {
-        Capsule().fill(color).frame(width: width, height: length + tail)
+        coreShape(width / 4).fill(color).frame(width: width, height: length + tail)
             .offset(y: -(length - tail) / 2)
     }
 

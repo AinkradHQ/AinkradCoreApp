@@ -69,7 +69,7 @@ struct TodayBody: View {
 
     var body: some View {
         let h = shell.home
-        let waiting = shell.bell.waiting
+        let waiting = shell.waitingOnYou
         let needs = RingGauge(
             value: min(Double(waiting), 5) / 5, symbol: "hand.raised", tint: WidgetInk.orange,
             caption: "\(waiting)", sub: "waiting")
@@ -305,6 +305,7 @@ struct CoreBody: View {
 
 struct ClockBody: View {
     let size: WidgetSize
+    @Environment(\.homeLive) private var live
     @Environment(\.corePalette) private var palette
     /// The macOS clock widget: the dial is the widget. Wider sizes put the day and date beside or under it.
     var body: some View {
@@ -328,7 +329,7 @@ struct ClockBody: View {
     }
 
     private func dateText(big: Bool) -> some View {
-        TimelineView(.periodic(from: .now, by: 60)) { ctx in
+        TimelineView(homeTicks(60, live: live)) { ctx in
             VStack(alignment: big ? .leading : .center, spacing: 2) {
                 Text(ctx.date, format: .dateTime.weekday(.wide)).font(.system(size: big ? 20 : 15, weight: .semibold))
                 Text(ctx.date, format: .dateTime.month(.wide).day())

@@ -17,7 +17,6 @@ public struct ShellView: View {
         ZStack {
             base
             covers
-            escape
         }
         .animation(Motion.calm(Motion.out(Motion.move), reduce), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
@@ -28,12 +27,13 @@ public struct ShellView: View {
         .focusable()
         .focused($calm)
         .focusEffectDisabled()
-        .onKeyPress(.escape) { shell.closeTopmost() ? .handled : .ignored }
+        // The one Esc owner: the shell's own layers close here; a pane's back handler only sees Esc when none is open.
+        .coreEscape { shell.closeTopmost() }
         .onAppear { calm = true }
         .ignoresSafeArea()
     }
 
-    /// One scrim for the launcher, Settings, dialogs and sheets (prototype MV-05): the desktop behind blurs 6 pt and dims.
+    /// One scrim for the launcher, Settings, dialogs and sheets (prototype MV-05): the desktop behind dims and loses a little colour (no blur: it re-rendered the whole window).
     private var scrimmed: Bool {
         shell.launcherOpen || shell.actionsOpen || shell.overviewOpen || shell.overlay != nil || shell.dialog != nil
             || shell.topDialog != nil || shell.sheet != nil
@@ -43,6 +43,7 @@ public struct ShellView: View {
         ZStack {
             sky
             HomeView(shell: shell)
+                .environment(\.homeLive, shell.surface == .home)
                 .opacity(shell.surface == .home ? 1 : 0)
                 .scaleEffect(shell.surface == .home || reduce ? 1 : 0.97)
                 .allowsHitTesting(shell.surface == .home)
@@ -57,14 +58,39 @@ public struct ShellView: View {
                 Spacer(minLength: 0)
             }
         }
-        .blur(radius: scrimmed ? 6 : 0)
         .saturation(scrimmed ? 0.9 : 1)
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: scrimmed)
     }
 
     /// Reconnecting and offline show a banner under the status cluster; the Home Core button says the same in words. A link notice
     /// (slow down, session renewing, Core restarted) takes the banner's place while it lasts.
-    @ViewBuilder private var connectionBanner: some View {
+    private var connectionBanner: some View {
+        ZStack {
+            if bannerKey != "" {
+                banner.id(bannerKey)
+                    .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 4)))
+            }
+        }
+        .animation(Motion.out(Motion.ui), value: bannerKey)
+    }
+
+    /// Which banner shows now; changes when it comes, goes or is replaced by another.
+    private var bannerKey: String {
+        if let notice = shell.linkNotice {
+            switch notice {
+            case .rateLimited: return "rate"
+            case .renewing: return "renew"
+            case .restarted: return "restart"
+            }
+        }
+        switch shell.coreLink {
+        case .reconnecting: return "reconnecting"
+        case .offline: return "offline"
+        default: return ""
+        }
+    }
+
+    @ViewBuilder private var banner: some View {
         let width = ShellMetrics.bellWidth * 1.5
         if let notice = shell.linkNotice {
             switch notice {
@@ -175,12 +201,5 @@ public struct ShellView: View {
         }
         .id("sheet-\(sheet.id)")
         .transition(.opacity)
-    }
-
-    /// Esc closes the topmost thing, from anywhere in the window.
-    private var escape: some View {
-        Button("Close") { shell.closeTopmost() }
-            .keyboardShortcut(.cancelAction)
-            .opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
     }
 }

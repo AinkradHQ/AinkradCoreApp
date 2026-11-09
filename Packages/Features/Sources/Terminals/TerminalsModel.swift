@@ -69,6 +69,12 @@ public final class TerminalsModel {
     var openCount: Int { items.filter { !$0.isEnded }.count }
     var shown: [TerminalItem] { items.filter(filter.matches) }
     func runner(_ id: String) -> RunnerItem? { runners.first { $0.id == id } }
+    /// What a terminal is called on screen: the tab name the person gave it, else the machine it runs on.
+    public func displayName(ofTerminal id: String) -> String? {
+        guard let item = items.first(where: { $0.id == id }) else { return nil }
+        return shell.tabNames["terminal-\(id)"] ?? name(of: item.runner)
+    }
+
     func name(of runner: String) -> String { self.runner(runner)?.name ?? runner }
     func onRunner(_ id: String) -> Int { items.filter { $0.runner == id && !$0.isEnded }.count }
 
@@ -159,7 +165,7 @@ public final class TerminalsModel {
             })
         l.register(
             LauncherEntry(
-                id: "terminals", title: "Terminals", sub: "Rune terminals on your runners", symbol: "terminal",
+                id: "terminals", title: "Terminals", sub: "Your terminals", symbol: "terminal",
                 keywords: ["rune", "shell", "zsh", "bash"]
             ) { [weak self] in self?.openList() })
         // Quick by default, advanced on request (Ahmed, 2026-11-05): New terminal opens one at once with the defaults;
@@ -228,11 +234,12 @@ public final class TerminalsModel {
     // MARK: panes
 
     func openList() {
-        shell.openPane(
-            PaneSpec(
-                id: "terminals", title: "Terminals", sub: "Rune", symbol: "terminal",
-                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
-            ) { TerminalsListView(model: self) })
+        var spec = PaneSpec(
+            id: "terminals", title: "Terminals", sub: "Home Core", symbol: "terminal",
+            chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
+        ) { TerminalsListView(model: self) }
+        spec.tab = "Terminals"
+        shell.openPane(spec)
         Task { await reload() }
     }
 

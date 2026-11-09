@@ -139,7 +139,7 @@ struct SettingsView: View {
                         // The section's own icon, large, bouncing in each time the section changes.
                         Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
                             .foregroundStyle(.white)
-                            .symbolEffect(.bounce, value: current.id)
+                            .coreBounce(current.id)
                             .contentTransition(.symbolEffect(.replace))
                             .frame(width: 56, height: 56)
                             .background(
@@ -206,7 +206,7 @@ struct SettingsView: View {
     private func navRow(_ s: SettingsSection, selected: Bool) -> some View {
         HStack(spacing: Space.s3) {
             Image(systemName: s.symbol).font(.system(size: MacTextSize.body, weight: .semibold)).foregroundStyle(.white)
-                .symbolEffect(.bounce, value: selected)
+                .coreBounce(selected)
                 .frame(width: MacSize.controlMd + 2, height: MacSize.controlMd + 2)
                 .background(
                     LinearGradient(
@@ -322,7 +322,7 @@ private struct SettingsBackTile: View {
             VStack(spacing: 2) {
                 Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold))
                     .offset(x: hovering ? -3 : 0)
-                    .symbolEffect(.bounce, value: hovering)
+                    .coreBounce(hovering)
                 Text(back.title).font(.system(size: 10, weight: .medium)).lineLimit(1)
             }
             .foregroundStyle(WidgetInk.primary)

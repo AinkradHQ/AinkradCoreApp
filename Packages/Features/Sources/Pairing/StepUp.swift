@@ -25,8 +25,13 @@ enum StepUpPhase: Equatable {
         switch CoreError.unwrapping(error) {
         case .stepUpCancelled: return StepUpPhase.cancelled
         case .stepUpUnavailable: return StepUpPhase.noKey
-        case .keyStore: return StepUpPhase.failed("The Secure Enclave could not sign the request.")
-        case .some(let e): return StepUpPhase.refused(e.localizedDescription)
+        case .keyStore: return StepUpPhase.failed("Touch ID didn't match. Try again.")
+        case .some(let e):
+            let words = e.localizedDescription
+            // The Core's own phrase for a request that is gone says nothing a person can act on.
+            return StepUpPhase.refused(
+                words.lowercased().contains("no such request") ? "This request was already answered or expired." : words
+            )
         case nil: return StepUpPhase.failed(error.localizedDescription)
         }
     }
@@ -54,7 +59,7 @@ struct StepUpNotice: Equatable {
         switch phase {
         case .cancelled:
             keepsEdit ? "Your edit is still here. Try again when you are ready." : "Try again when you are ready."
-        case .failed(let m): "\(m) Try again. After a few misses macOS asks for your password instead."
+        case .failed(let m): "\(m) After a few misses macOS asks for your password instead."
         case .noKey: "A Mac with no step-up key can never unlock admin actions. Use another admin device for this."
         case .refused(let m): m
         case .asking, .done: ""
@@ -268,9 +273,6 @@ struct StepUpSheet: View {
             sweep = true
             keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
                 switch e.keyCode {
-                case 53:  // Esc
-                    model.cancel()
-                    return nil
                 case 36,
                     76 where missed:  // Return: Try again after a miss
                     model.retry()
@@ -280,6 +282,10 @@ struct StepUpSheet: View {
             }
         }
         .onDisappear { if let keys { NSEvent.removeMonitor(keys) } }
+        .coreEscape {
+            model.cancel()
+            return true
+        }
         .onChange(of: done) { _, now in
             if now { withAnimation(.easeOut(duration: reduce ? 0.01 : 0.4).delay(0.1)) { drawn = 1 } }
         }

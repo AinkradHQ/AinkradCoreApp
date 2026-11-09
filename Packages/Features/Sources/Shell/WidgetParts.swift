@@ -29,7 +29,7 @@ struct WidgetHead: View {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
                     .foregroundStyle(palette.primary)
-                    .symbolEffect(.bounce, value: shown)
+                    .coreBounce(shown)
                     .frame(width: MacSize.controlMd, height: MacSize.controlMd)
                     .coreGlass(radius: Radius.control, interactive: false)
                     .accessibilityHidden(true)

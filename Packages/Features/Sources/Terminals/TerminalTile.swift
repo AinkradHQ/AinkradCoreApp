@@ -111,7 +111,7 @@ struct TerminalTile: View {
     private func mini(_ symbol: String, _ key: String, _ hue: Color, run: @escaping () -> Void) -> some View {
         Button(action: run) {
             VStack(spacing: 1) {
-                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).symbolEffect(.bounce, value: hovering)
+                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).coreBounce(hovering)
                 Text(key).font(.system(size: 8, weight: .bold, design: .rounded)).opacity(0.85)
             }
             .foregroundStyle(.white)
@@ -142,7 +142,7 @@ private struct TileScreen: View {
                 ForEach(0..<3, id: \.self) { _ in Circle().fill(.white.opacity(0.16)).frame(width: 6, height: 6) }
                 Spacer()
                 HStack(spacing: 5) {
-                    Circle().fill(state).frame(width: 6, height: 6)
+                    coreShape(1.5).fill(state).frame(width: 6, height: 6)
                         .opacity(!ended && blink ? 0.4 : 1)
                         .animation(ended ? nil : .easeInOut(duration: 1.1).repeatForever(), value: blink)
                     Text(label).font(.system(size: 10, weight: .semibold)).lineLimit(1)

@@ -82,6 +82,8 @@ public final class AppModel {
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
         brain = BrainModel(host: AdminHostAdapter(app: self))
+        shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
+        agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
         shell.elevate = { [weak self] in
             guard let self else { return }
             Task {
@@ -269,7 +271,9 @@ public final class AppModel {
             noticeIDs.removeAll { $0 == id }
             return
         }
-        if let words = AccountNotice.toast(kind: kind) {
+        if let words = AccountNotice.toast(
+            kind: kind, fields: fields, terminal: { [terminals] in terminals?.displayName(ofTerminal: $0) })
+        {
             shell.showToast(words, kind: .warn)
             return
         }

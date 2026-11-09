@@ -24,6 +24,8 @@ struct DeskWidget: View {
                 .shadow(color: .black.opacity(palette.isDay ? 0.35 : 0.25), radius: 3, y: 1)
                 .padding(18).padding(.top, editing ? 30 : 0)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
+                // The edit padding snaps (re-laying out a widget every frame was the cost); the fade below still animates.
+                .transaction(value: editing) { $0.animation = nil }
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
                 .animation(.easeOut(duration: 0.2), value: editing)
@@ -36,7 +38,9 @@ struct DeskWidget: View {
         .overlay {
             coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)).allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(lifting ? 0.35 : 0.12), radius: lifting ? 30 : 14, y: lifting ? 14 : 4)
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
+        // The lifted shadow is a second layer that fades in; its radius never animates.
+        .shadow(color: .black.opacity(lifting ? 0.3 : 0), radius: 30, y: 14)
         .scaleEffect(lifting && !reduce ? 1.025 : 1)
         .animation(.easeOut(duration: 0.2), value: lifting)
         .animation(.easeOut(duration: 0.24), value: hovering)

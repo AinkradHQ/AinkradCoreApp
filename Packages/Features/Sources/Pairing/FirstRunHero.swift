@@ -24,7 +24,7 @@ struct FirstRunHero: View {
             tile(right.symbol, right.label, ink: scene == .paired ? palette.tone(.run).ink : palette.primary)
                 .symbolEffect(.pulse, options: .repeating, isActive: scene == .find || scene == .checking)
         }
-        .symbolEffect(.bounce, value: scene)
+        .coreBounce(scene)
         .animation(Motion.out(Motion.ui), value: scene)
         .accessibilityHidden(true)
     }

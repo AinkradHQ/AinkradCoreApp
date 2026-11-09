@@ -20,6 +20,8 @@ public struct PaneSpec: Identifiable {
     public let id: String
     public var title: String
     public var sub: String?
+    /// The tab's name when it should not follow `sub`: an app is called by one name wherever it shows (Agents, Accounts, Brain...).
+    public var tab: String?
     public var symbol: String
     public var chip: PaneChip?
     /// Panes with their own sidebar (Citadel, Core, admin) ask for more room than a list or terminal.
@@ -190,6 +192,13 @@ public final class ShellModel {
     public private(set) var elevationSpan: TimeInterval = 300
     /// The panel under the elevation chip (what is unlocked, time left, Renew with Touch ID).
     public var elevationPanelOpen = false
+    /// The one "waiting on you" number: approvals nobody answered, supplied by Agents (`AgentsModel.waitingOnYou`). Alerts and Brain
+    /// inbox items are not in it; the bell counts them on their own. Until Agents is up, the bell's approval items stand in.
+    public var waitingSource: (@MainActor () -> Int)?
+    public var waitingOnYou: Int { waitingSource?() ?? bell.items.filter { $0.kind == .approval }.count }
+    /// Alarms (backup age, an account turned off...): counted on their own, never added to the approvals.
+    public var alertsOnYou: Int { bell.items.filter { $0.kind == .alarm }.count }
+
     /// Settings → Activity: the "N running · M waiting" chip in the status cluster. The bell is always there.
     public var showActivityChip = true {
         didSet { defaults.set(showActivityChip, forKey: Self.activityChipKey) }
@@ -234,7 +243,7 @@ public final class ShellModel {
             ) { [weak self] in self?.open(.settings) })
         launcher.register(
             LauncherEntry(
-                id: "shortcuts", title: "Keyboard Shortcuts", sub: "every key the app answers to",
+                id: "shortcuts", title: "Keyboard Shortcuts", sub: "All keyboard shortcuts",
                 symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
             ) { [weak self] in self?.open(.shortcuts) })
         launcher.register(

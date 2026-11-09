@@ -8,7 +8,7 @@ struct CoreSettingsSection: View {
     @FocusState private var listFocus: Bool
 
     var body: some View {
-        let model = admin.registry!
+        let model = admin.registry
         AdminScreen(
             admin: admin, what: "Settings",
             intro:
