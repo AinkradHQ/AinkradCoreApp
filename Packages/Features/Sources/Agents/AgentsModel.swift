@@ -88,7 +88,14 @@ public final class AgentsModel {
         self.defaults = defaults
         self.host = host
         registerBase()
-        notifier.onOpen = { [weak self] id in self?.openSession(id) }
+        notifier.onOpen = { [weak self] id in
+            if id == "connections" { self?.shell.launcher.entry("connections")?.run() } else { self?.openSession(id) }
+        }
+    }
+
+    /// A notification that is not about a session (a connection that needs you, CN5); a click opens Connections.
+    public func notifyConnections(id: String, title: String, body: String) {
+        notifier.post(id: id, title: title, body: body, session: "connections")
     }
 
     func setChains(_ list: [ChainOption]) {

@@ -92,6 +92,9 @@ public final class AppModel {
             Task { await self.connect() }
         }
         agents.setHost(self)
+        accounts.connections.notify = { [weak self] id, title, body in
+            self?.agents.notifyConnections(id: id, title: title, body: body)
+        }
         Registration.install(into: self)
     }
 
