@@ -76,4 +76,16 @@ private struct FakeHome: HomeSource {
         try await Task.sleep(for: .milliseconds(250))
         #expect(shell.home.runningAgents == 1)
     }
+
+    @Test func pairingEventsRefreshHomeAndReadInPlainWords() async throws {
+        let shell = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
+        let src = FakeHome(auditList: [
+            HomeAudit(seq: 2, at: now, action: "pairing.approved", actor: "User 1"),
+            HomeAudit(seq: 1, at: now, action: "pairing.claimed", actor: "Core"),
+        ])
+        let feed = HomeFeed(shell: shell, source: src, quiet: .milliseconds(20), now: { [now] in now })
+        feed.event(kind: "pairing.claimed")
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(shell.home.events.map(\.text) == ["Pairing approved", "Pairing claimed"])
+    }
 }

@@ -355,4 +355,42 @@ struct AppModelTests {
         )
         #expect(m.devices.active.map(\.id).contains("d_2"))
     }
+
+    private func claimed(_ id: String) -> PairingInfo {
+        PairingInfo(
+            id: id, status: "claimed", name: "iPad", kind: "device", platform: "ipados", keyStorage: "secure_enclave",
+            scopes: ["read"], sas: "AAAA", expiresAt: nil, deviceID: "d_x")
+    }
+
+    @Test func aPairingClaimedBeforeConnectingReachesTheBellOnce() async throws {
+        let s = FakeService()
+        s.pending = [claimed("p_old")]
+        let m = try app(s)
+        await m.start()
+        #expect(m.shell.bell.items.filter { $0.id == "pairing-p_old" }.count == 1)
+        #expect(m.shell.bell.items.first?.title == "iPad wants to join")
+        // The same claim arriving live, and a gap resync, add nothing new.
+        await m.handle(.event(kind: "pairing.claimed", pairingID: "p_old", deviceID: nil))
+        await m.handle(.gap)
+        #expect(m.shell.bell.items.filter { $0.id == "pairing-p_old" }.count == 1)
+    }
+
+    @Test func aDeviceThatMayNotListPairingsStillConnects() async throws {
+        let s = FakeService()
+        s.scopes = ["read"]
+        s.pending = [claimed("p_old")]
+        let m = try app(s)
+        await m.start()
+        #expect(m.phase == .desktop && m.shell.bell.items.isEmpty)
+    }
+
+    @Test func aCutOffDeviceHasNoLastSeenLine() {
+        for (status, cut) in [
+            ("active", false), ("revoked", true), ("rejected", true), ("locked", true), ("expired", true),
+        ] {
+            var d = FakeService.device("d_1", "x")
+            d.status = status
+            #expect(d.cutOff == cut)
+        }
+    }
 }

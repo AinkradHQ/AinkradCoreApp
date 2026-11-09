@@ -91,7 +91,7 @@ final class HomeFeed {
     private var pending: Task<Void, Never>?
     private var history: [String: [Double]] = [:]
     /// The kinds that change what Home shows.
-    static let prefixes = ["agent.", "runner.", "account.", "audit"]
+    static let prefixes = ["agent.", "runner.", "account.", "audit", "pairing."]
 
     init(
         shell: ShellModel, source: any HomeSource, quiet: Duration = .milliseconds(500),

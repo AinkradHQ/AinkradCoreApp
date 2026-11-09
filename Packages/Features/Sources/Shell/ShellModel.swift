@@ -490,6 +490,16 @@ public final class ShellModel {
         toast = ToastItem(message, kind: kind, actionTitle: actionTitle, undo: undo)
     }
 
+    /// ⌘Z: runs the showing toast's Undo and clears it. False (nothing run) when there is none, its button is not an Undo, or
+    /// the keys are going to a text field, whose own undo keeps ⌘Z.
+    @discardableResult
+    public func undoToast(inTextField: Bool = false) -> Bool {
+        guard !inTextField, let t = toast, t.actionTitle == "Undo", let undo = t.undo else { return false }
+        toast = nil
+        undo()
+        return true
+    }
+
     public func presentSheet(title: String, message: String, actions: [ShellSheetAction], symbol: String? = nil) {
         sheet = ShellSheet(title: title, message: message, actions: actions, symbol: symbol)
     }

@@ -129,6 +129,16 @@ public struct ShellCommands: Commands {
     }
 
     public var body: some Commands {
+        // The menu owns ⌘Z (a key equivalent in the window's content never reached it): the toast's Undo first, a text field's own
+        // undo otherwise.
+        CommandGroup(replacing: .undoRedo) {
+            Button("Undo") {
+                let inField = NSApp.keyWindow?.firstResponder is NSTextView
+                if !shell.undoToast(inTextField: inField) { NSApp.sendAction(Selector(("undo:")), to: nil, from: nil) }
+            }.keyboardShortcut("z")
+            Button("Redo") { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+        }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { shell.open(.settings) }.keyboardShortcut(",")
         }

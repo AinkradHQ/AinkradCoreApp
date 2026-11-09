@@ -220,7 +220,7 @@ private struct DeviceCard: View {
                 }
                 KeyStorageLabel(storage: device.keyStorage)
                 ScopeIcons(scopes: device.scopes)
-                LastSeenLine(lastUsed: device.lastUsed)
+                if !device.cutOff { LastSeenLine(lastUsed: device.lastUsed) }
             }
             .foregroundStyle(GlassInk.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -414,7 +414,7 @@ struct DeviceDetail: View {
                     }
                     Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
                         .foregroundStyle(GlassInk.secondary)
-                    LastSeenLine(lastUsed: device.lastUsed)
+                    if !device.cutOff { LastSeenLine(lastUsed: device.lastUsed) }
                 }
             }
             .coreRise(shown, 0)

@@ -221,12 +221,14 @@ struct SettingsView: View {
                     in: coreShape(Radius.control)
                 )
                 .accessibilityHidden(true)
+            // Two lines at large text sizes instead of "Agents and ch…".
             Text(s.title).coreFont(size: MacTextSize.headline, weight: selected ? .semibold : .regular)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .foregroundStyle(WidgetInk.primary)
         .padding(.horizontal, Space.s2)
-        .frame(height: MacSize.controlLg + Space.s1)
+        .frame(minHeight: MacSize.controlLg + Space.s1)
         // One selection that glides between rows (`s-glide`), not a background swapped per row.
         .background {
             if selected {

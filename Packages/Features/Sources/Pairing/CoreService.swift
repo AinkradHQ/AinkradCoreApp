@@ -20,6 +20,8 @@ struct DeviceInfo: Identifiable, Equatable, Sendable {
     /// Whether it has a step-up key (the Core's field; nil when the Core does not say).
     var stepup: Bool?
     var revoked: Bool { status == "revoked" || status == "rejected" }
+    /// No longer able to reach the Core, so "Active now" / "Last seen" would only mislead.
+    var cutOff: Bool { revoked || status == "locked" || status == "expired" }
 }
 
 /// A pairing as its approver sees it (`PairingView`).
@@ -81,6 +83,8 @@ protocol CoreService: Sendable {
     func revoke(_ id: String) async throws -> DeviceInfo
     func createPairing(name: String, kind: String, scopes: [String]) async throws -> NewPairing
     func pairing(_ id: String) async throws -> PairingInfo
+    /// Pairings claimed and still waiting for a decision (admin; the Core has no list route, so the audit's claims are asked).
+    func pendingPairings() async throws -> [PairingInfo]
     func approve(_ id: String, sas: String, scopes: [String]?) async throws -> PairingInfo
     func reject(_ id: String) async throws -> PairingInfo
     func lockouts() async throws -> [LockoutInfo]
@@ -92,6 +96,7 @@ protocol CoreService: Sendable {
 
 extension CoreService {
     var agentsAPI: (any AgentsAPI)? { nil }
+    func pendingPairings() async throws -> [PairingInfo] { [] }
 }
 
 struct LiveCoreService: CoreService {
@@ -175,6 +180,21 @@ struct LiveCoreService: CoreService {
             default: throw Self.unknown
             }
         }
+    }
+
+    func pendingPairings() async throws -> [PairingInfo] {
+        let rows = try await run {
+            try await client.listAudit(query: .init(limit: 50, kind: "pairing.claimed")).ok.body.json.items
+        }
+        var ids: [String] = []
+        for r in rows {
+            if let id = r.details.value["pairing"] as? String, !ids.contains(id) { ids.append(id) }
+        }
+        var out: [PairingInfo] = []
+        for id in ids {
+            if let p = try? await pairing(id), p.status == "claimed" { out.append(p) }
+        }
+        return out
     }
 
     func approve(_ id: String, sas: String, scopes: [String]?) async throws -> PairingInfo {

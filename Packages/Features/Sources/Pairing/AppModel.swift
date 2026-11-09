@@ -169,6 +169,7 @@ public final class AppModel {
             showAdminPages(isAdmin)
             await refreshAll()
             await homeFeed?.refresh()
+            if isAdmin { await syncPendingPairings() }
         } catch {
             let f = Failure.from(error)
             switch f.kind {
@@ -247,7 +248,9 @@ public final class AppModel {
                 try? await Task.sleep(for: .seconds(20))
                 if !Task.isCancelled, self?.shell.linkNotice == .restarted { self?.shell.linkNotice = nil }
             }
-        case .gap: await refreshAll()
+        case .gap:
+            await refreshAll()
+            await syncPendingPairings()
         case .ended(let error):
             let f = Failure.from(error)
             if case .revokedHere = f.kind { try? keyStore.wipe() }
@@ -322,18 +325,28 @@ public final class AppModel {
         switch kind {
         case "pairing.claimed":
             guard let info = try? await service?.pairing(id) else { return }
-            shell.bell.add(
-                BellItem(
-                    id: "pairing-\(id)", kind: .approval, title: "\(info.name ?? "A new device") wants to join",
-                    sub: [DeviceWords.platform(info.platform), DeviceWords.storage(info.keyStorage)]
-                        .joined(separator: " · "),
-                    time: "now",
-                    actions: [BellAction("Review", primary: true) { [weak self] in self?.openAddDevice(existing: id) }])
-            )
+            addJoinBell(id, info)
         case "pairing.approved", "pairing.rejected", "pairing.expired", "pairing.burned":
             shell.bell.remove("pairing-\(id)")
         default: break
         }
+    }
+
+    private func addJoinBell(_ id: String, _ info: PairingInfo) {
+        shell.bell.add(  // the same id as the live path, so a claim seen twice is one item
+            BellItem(
+                id: "pairing-\(id)", kind: .approval, title: "\(info.name ?? "A new device") wants to join",
+                sub: [DeviceWords.platform(info.platform), DeviceWords.storage(info.keyStorage)].joined(
+                    separator: " · "),
+                time: "now",
+                actions: [BellAction("Review", primary: true) { [weak self] in self?.openAddDevice(existing: id) }]))
+    }
+
+    /// Claims that came before this app connected (or while the stream had a gap) never fired a live event: ask the Core.
+    /// A device without `admin` is refused, and that is fine: it has nothing to approve.
+    func syncPendingPairings() async {
+        guard let list = try? await service?.pendingPairings() else { return }
+        for p in list { addJoinBell(p.id, p) }
     }
 
     /// `quick` makes the code at once with the defaults; otherwise the form opens (advanced).
