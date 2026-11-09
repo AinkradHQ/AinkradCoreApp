@@ -37,7 +37,7 @@ struct CostsPage: View {
         HStack(spacing: Space.s3) {
             figure("Spent", CostWords.usd(total.costMicros), "dollarsign.circle.fill", GlassInk.green)
             figure("Tokens", CostWords.tokens(total.tokens), "text.word.spacing", GlassInk.blue)
-            figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.violet)
+            figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.blue)
         }
         if model.unpricedTokens > 0 { unpriced }
         if model.usage.isEmpty {
@@ -110,13 +110,13 @@ struct CostsPage: View {
         if !all.isEmpty {
             let top = max(1, all.first?.1.costMicros ?? 1)
             GlassSection(
-                "By company", sub: "Who the spend was for", symbol: "building.2.fill", hue: GlassInk.violet, index: 1
+                "By company", sub: "Who the spend was for", symbol: "building.2.fill", hue: GlassInk.blue, index: 1
             ) {
                 VStack(spacing: Space.s2) {
                     ForEach(all, id: \.0) { c, w in
                         SpendBarRow(
                             title: c, sub: "\(CostWords.tokens(w.tokens)) tokens", value: CostWords.usd(w.costMicros),
-                            share: Double(w.costMicros) / Double(top), hue: GlassInk.violet, symbol: "building.2")
+                            share: Double(w.costMicros) / Double(top), hue: GlassInk.blue, symbol: "building.2")
                     }
                 }
             }
@@ -144,7 +144,7 @@ private struct AccountSpendRow: View {
             title: model.label(ofAccount: usage.accountID),
             sub: "\(CostWords.tokens(w.tokens)) tokens · \(w.messages.formatted()) messages\(limit)\(drops)",
             value: CostWords.usd(w.costMicros), share: Double(w.costMicros) / Double(top),
-            hue: a.map { ProviderLook.hue($0.provider) } ?? GlassInk.slate, symbol: "creditcard",
+            hue: GlassInk.blue, symbol: "creditcard",
             warn: usage.limitsExhausted || usage.limitShare >= 0.8 || usage.drops > 0
         )
         .contentShape(coreShape(Radius.cardMac))
@@ -194,7 +194,6 @@ struct SpendBarRow: View {
                             LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: max(4, g.size.width * min(1, share) * (shown ? 1 : 0)))
-                        .shadow(color: hue.opacity(0.5), radius: 5)
                 }
             }
             .frame(height: 6)

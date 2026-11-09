@@ -28,7 +28,9 @@ struct OverviewPage: View {
                     StatTile(
                         "Need a look", value: need.count, of: total, symbol: "exclamationmark.triangle.fill",
                         hue: need.isEmpty ? GlassInk.slate : GlassInk.orange)
-                    StatTile("In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue, bar: false)
+                    StatTile(
+                        "In a pool", value: pooled, of: total, symbol: "square.grid.2x2.fill", hue: GlassInk.blue,
+                        bar: false)
                     if model.chainsAllowed {
                         StatTile(
                             "Agents bound", value: model.chainBindings.count, of: max(model.chainBindings.count, 1),
@@ -279,7 +281,8 @@ struct AccountCard: View {
                         .frame(
                             width: shown
                                 ? g.size.width
-                                    * (usable ? 1 : verdict.kind == .turnedOff ? 0.08 : verdict.tone == .fail ? 0.2 : 0.5)
+                                    * (usable
+                                        ? 1 : verdict.kind == .turnedOff ? 0.08 : verdict.tone == .fail ? 0.2 : 0.5)
                                 : 0
                         )
                 }
@@ -319,10 +322,12 @@ struct AccountCard: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s3)
         .background(
-            on ? GlassInk.blue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
+            on ? GlassInk.blue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well,
+            in: coreShape(Radius.cardMac)
         )
         .overlay {
-            coreShape(Radius.cardMac).strokeBorder(on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
+            coreShape(Radius.cardMac).strokeBorder(
+                on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
         }
         .opacity(verdict.kind == .turnedOff ? 0.7 : 1)
         .contentShape(coreShape(Radius.cardMac))

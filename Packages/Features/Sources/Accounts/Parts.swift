@@ -63,6 +63,13 @@ struct AccTile: View {
     }
 }
 
+extension GlassInk {
+    /// The text colour for a fill hue: red, orange and blue have lighter inks that pass contrast; others keep their colour.
+    static func ink(_ hue: Color) -> Color {
+        hue == red ? redInk : hue == orange ? orangeInk : hue == blue ? blueInk : hue == slate ? secondary : hue
+    }
+}
+
 /// The state badge for an account: the one verdict (`AccountVerdict`), a symbol and its word, never colour alone.
 struct VerdictBadge: View {
     let verdict: AccountVerdict

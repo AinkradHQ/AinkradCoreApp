@@ -26,7 +26,9 @@ struct AppRegistrationSheet: View {
                 case .readOnly:
                     CoreNotice(
                         symbol: "lock", title: "This Mac can only look",
-                        text: "Changes need a Mac you allowed to manage the Core. Ask whoever runs it to set up the \(kind.name) app.")
+                        text:
+                            "Changes need a Mac you allowed to manage the Core. Ask whoever runs it to set up the \(kind.name) app."
+                    )
                     AccDialogButtons(cancelTitle: "Close", cancel: close)
                 case .ready(let app): form(app)
                 }

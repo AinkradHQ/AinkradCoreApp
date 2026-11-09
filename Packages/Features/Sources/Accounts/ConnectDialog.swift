@@ -1,5 +1,5 @@
-import CoreUI
 import AppKit
+import CoreUI
 import SwiftUI
 
 /// Connect an account, or use a new key. Sign-in happens on the provider's own page: this dialog opens it and never holds a

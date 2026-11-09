@@ -266,10 +266,10 @@ enum AccountFilter: String, CaseIterable, Sendable {
     case all = "All"
     case need = "Needs a look"
     case off = "Turned off"
-    func matches(_ a: AccountItem) -> Bool {
+    func matches(_ a: AccountItem, verdict: AccountVerdict) -> Bool {
         switch self {
         case .all: true
-        case .need: a.phase.needsLook
+        case .need: verdict.needsLook
         case .off: a.phase == .disabled
         }
     }

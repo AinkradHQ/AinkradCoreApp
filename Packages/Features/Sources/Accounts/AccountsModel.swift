@@ -136,7 +136,7 @@ public final class AccountsModel {
     }
     var providersByUse: [(ProviderItem, [AccountItem])] {
         providers.compactMap { p in
-            let g = accounts.filter { $0.provider == p.id && filter.matches($0) }
+            let g = accounts.filter { $0.provider == p.id && filter.matches($0, verdict: verdict($0)) }
             return g.isEmpty ? nil : (p, g)
         }
     }
@@ -447,7 +447,9 @@ public final class AccountsModel {
         ) { _ = try await $0.bindAgent(a, chain: c.id) }
         if ok {
             let d = UserDefaults.standard
-            d.set(Array(([a] + (d.stringArray(forKey: "accounts.recentAgents") ?? [])).prefix(12)), forKey: "accounts.recentAgents")
+            d.set(
+                Array(([a] + (d.stringArray(forKey: "accounts.recentAgents") ?? [])).prefix(12)),
+                forKey: "accounts.recentAgents")
         }
         return ok
     }

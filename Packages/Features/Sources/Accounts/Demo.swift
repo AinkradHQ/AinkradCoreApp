@@ -402,7 +402,7 @@ public final class AccountsDemo {
 
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
-        "account-ready", "accounts-not-admin",
+        "account-ready", "account-at-limit", "connect-arrived", "accounts-not-admin",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
         "limits", "pools", "pools-second", "chains", "chains-second", "chain-new", "chain-edit", "chain-delete",
@@ -471,7 +471,7 @@ public final class AccountsDemo {
         let page: AccountsPage =
             switch scene {
             case "accounts", "accounts-need", "accounts-not-admin", "account-ready", "account-cooling",
-                "account-unhealthy",
+                "account-unhealthy", "account-at-limit", "connect-arrived",
                 "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
                 "cap", "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit",
                 "usage-limit-clear", "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
@@ -489,11 +489,11 @@ public final class AccountsDemo {
             }
         let detail: Int64? =
             switch scene {
-            case "account-ready", "delete-account", "cap", "limits", "account-testing", "usage-limits",
+            case "account-at-limit", "delete-account", "cap", "limits", "account-testing", "usage-limits",
                 "usage-limit-new", "usage-limit-edit", "usage-limit-clear", "usage-limits-error",
                 "usage-limits-no-admin", "usage-limits-read-only":
                 1
-            case "usage-limits-empty": 5
+            case "usage-limits-empty", "account-ready": 5
             case "account-confirming": 3
             case "account-cooling": 2
             case "account-unhealthy": 4
@@ -505,6 +505,15 @@ public final class AccountsDemo {
         if scene == "accounts-need" { model.filter = .need }
         switch scene {
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
+        case "connect-arrived":
+            AccountDialogs.openConnect(model, provider: "anthropic")
+            try? await Task.sleep(for: .milliseconds(300))
+            svc.accountList.append(
+                AccountItem(
+                    id: 7, provider: "anthropic", label: "claude-new", maskedTail: "k3Wf",
+                    baseURL: "https://api.example.com", state: "active", stateReason: nil, stateUntil: nil, cap: 4,
+                    lastUsedAt: nil, createdAt: Date()))
+            await model.reload()
         case "signin-intro": AccountDialogs.openConnect(model, provider: "claude-sub")
         case "signin-url", "signin-working", "signin-done", "signin-failed":
             AccountDialogs.openConnect(model, provider: "claude-sub")

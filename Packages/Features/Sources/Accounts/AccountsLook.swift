@@ -46,7 +46,7 @@ enum ProviderLook {
         case "anthropic", "claude-sub": GlassInk.orange
         case "openai": GlassInk.green
         case "google", "gemini": GlassInk.blue
-        default: GlassInk.violet
+        default: GlassInk.blue
         }
     }
     /// The brand on a choice card; how it signs in is the line under it.

@@ -12,8 +12,10 @@ struct AccountSlice: View {
         let events = model.costs.filter { $0.accountID == account.id }.sorted { $0.at > $1.at }.prefix(4)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
-                Label("Spend and usage", systemImage: "chart.bar").font(.system(size: MacTextSize.meta, weight: .semibold))
-                    .foregroundStyle(GlassInk.secondary)
+                Label("Spend and usage", systemImage: "chart.bar").font(
+                    .system(size: MacTextSize.meta, weight: .semibold)
+                )
+                .foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 AccLink(title: "Open Costs", symbol: "arrow.right") { go(.costs) }
                 AccLink(title: "Open Ledger", symbol: "arrow.right") { go(.ledger) }
@@ -21,7 +23,8 @@ struct AccountSlice: View {
             switch model.costsLoad {
             case .loading: AccSkeleton()
             case .forbidden:
-                Text("This Mac can only look. Usage and costs need a Mac you allowed to manage the Core.").foregroundStyle(GlassInk.secondary)
+                Text("This Mac can only look. Usage and costs need a Mac you allowed to manage the Core.")
+                    .foregroundStyle(GlassInk.secondary)
             case .failed(_, let message):
                 Text("Could not load usage. \(message)").foregroundStyle(GlassInk.orangeInk)
             case .ready:
@@ -57,8 +60,10 @@ struct AccountSlice: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
             Text(AccountsNumbers.tokens(w.tokens)).font(.system(size: MacTextSize.title, weight: .semibold))
-            Text("\(AccountsNumbers.usd(w.costMicros)), \(w.messages.formatted()) \(w.messages == 1 ? "message" : "messages")")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(
+                "\(AccountsNumbers.usd(w.costMicros)), \(w.messages.formatted()) \(w.messages == 1 ? "message" : "messages")"
+            )
+            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

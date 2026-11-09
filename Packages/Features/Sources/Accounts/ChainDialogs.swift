@@ -124,7 +124,8 @@ private struct ChainDialog: View {
                 CoreSelect(
                     "Model",
                     selection: modelBinding(i),
-                    options: [CoreSelectOption("", "Provider's default model")] + models.map { CoreSelectOption($0.id, $0.id) })
+                    options: [CoreSelectOption("", "Provider's default model")]
+                        + models.map { CoreSelectOption($0.id, $0.id) })
             }
             AccLink(title: "Up", symbol: "arrow.up", help: "Try this pool earlier") { entries.swapAt(i, i - 1) }
                 .disabled(i == 0)
@@ -213,7 +214,9 @@ private struct BindAgentDialog: View {
                 if !known.isEmpty {
                     CoreSelect(
                         "Agent", selection: $pick,
-                        options: known.map { CoreSelectOption($0, $0 + (model.boundChain(of: $0).map { " · now on \($0.name)" } ?? "")) }
+                        options: known.map {
+                            CoreSelectOption($0, $0 + (model.boundChain(of: $0).map { " · now on \($0.name)" } ?? ""))
+                        }
                             + [CoreSelectOption("", "Another agent…")])
                 }
                 if pick.isEmpty {

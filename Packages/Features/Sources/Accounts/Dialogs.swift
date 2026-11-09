@@ -211,7 +211,8 @@ private struct DeletePoolDialog: View {
                 }
                 if let e = model.writeError["delete-pool-\(pool.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
-                AccDialogButtons(confirm: "Delete pool", danger: true, busy: busy, enabled: used.isEmpty, cancel: close) {
+                AccDialogButtons(confirm: "Delete pool", danger: true, busy: busy, enabled: used.isEmpty, cancel: close)
+                {
                     busy = true
                     Task {
                         let ok = await model.delete(pool)
@@ -241,7 +242,8 @@ private struct AddMemberDialog: View {
                     CoreFieldLabel("Account")
                     ForEach(rest) { a in
                         CoreRow(
-                            a.label, subtitle: a.phase.label, symbol: "key", selected: (pick ?? rest[0].id) == a.id,
+                            a.label, subtitle: model.verdict(a).label, symbol: "key",
+                            selected: (pick ?? rest[0].id) == a.id,
                             action: { pick = a.id }
                         ) { EmptyView() }
                     }
@@ -362,7 +364,7 @@ struct AccountsGateSection: View {
             )
             .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
-                Text(g.title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(g.title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)

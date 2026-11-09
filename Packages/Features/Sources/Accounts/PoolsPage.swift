@@ -12,7 +12,7 @@ struct PoolsPage: View {
                 title: "Pools",
                 detail:
                     "A pool is a team of accounts from one provider. Agents share it, and Core picks who works next.",
-                symbol: "square.grid.2x2.fill", hue: GlassInk.violet
+                symbol: "square.grid.2x2.fill", hue: GlassInk.blue
             ) { EmptyView() }
             if model.pools.isEmpty {
                 AccStateCard(
@@ -55,7 +55,7 @@ private struct PoolTab: View {
     let lens: Namespace.ID
     @State private var hovering = false
     var body: some View {
-        let hue = ProviderLook.hue(pool.provider)
+        let hue = GlassInk.blue
         Button {
             withAnimation(.smooth(duration: 0.3)) {
                 model.poolSelection = pool.id
@@ -82,7 +82,6 @@ private struct PoolTab: View {
             .background {
                 if on {
                     coreShape(Radius.control + 2).fill(hue.opacity(0.35))
-                        .shadow(color: hue.opacity(0.45), radius: 10)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
                     coreShape(Radius.control + 2).fill(hovering ? GlassInk.wellHover : GlassInk.well)
@@ -95,7 +94,6 @@ private struct PoolTab: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(hovering ? 1.03 : 1)
         .onHover { hovering = $0 }
         .animation(.smooth(duration: 0.25), value: hovering)
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -129,7 +127,7 @@ private struct PoolDetail: View {
                 }
                 Spacer(minLength: Space.s2)
                 if !pool.isDefault {
-                    AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.orange) {
+                    AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.blue) {
                         Task { await model.makeDefault(pool) }
                     }
                     .disabled(ro || model.busy != nil)
@@ -181,20 +179,19 @@ private struct MemberRow: View {
 
     var body: some View {
         let a = model.account(id)
-        let hue = ProviderLook.hue(pool.provider)
+        let hue = GlassInk.blue
         let on = model.cursor == "m-\(id)"
         HStack(spacing: Space.s3) {
             Text("\(index + 1)").font(.system(size: MacTextSize.body, weight: .bold, design: .rounded))
                 .foregroundStyle(first ? .white : GlassInk.secondary)
                 .frame(width: 26, height: 26)
                 .background(first ? hue.opacity(0.85) : GlassInk.well, in: coreShape(7))
-                .shadow(color: hue.opacity(first ? 0.5 : 0), radius: 6)
             AccTile(provider: pool.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
                 Text(a?.label ?? "Account \(id)").font(.system(size: MacTextSize.headline, weight: .semibold))
                     .lineLimit(1)
                 Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).font(.system(size: MacTextSize.meta))
-                    .foregroundStyle(first ? hue : GlassInk.secondary)
+                    .foregroundStyle(first ? GlassInk.blueInk : GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let a { VerdictBadge(verdict: model.verdict(a)) }
@@ -211,7 +208,6 @@ private struct MemberRow: View {
             on ? hue.opacity(0.18) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2)
         )
         .overlay { coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.7) : .clear, lineWidth: 1.5) }
-        .shadow(color: hue.opacity(on ? 0.4 : 0), radius: 10)
         .contentShape(coreShape(Radius.control + 2))
         .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "m-\(id)" } }
         .onHover { hovering = $0 }

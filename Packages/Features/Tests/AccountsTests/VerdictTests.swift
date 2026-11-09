@@ -9,7 +9,8 @@ struct VerdictTests {
     }
     func budget(spent: Int64, hardStop: Bool = true, subject: String = "1") -> BudgetItem {
         BudgetItem(
-            id: 1, kind: "account", subject: subject, company: nil, period: "month", periodKey: "2026-11", tokenCap: 100,
+            id: 1, kind: "account", subject: subject, company: nil, period: "month", periodKey: "2026-11",
+            tokenCap: 100,
             usdCap: nil, spent: spent, usdSpent: 0, held: 0, raised: 0, raisedUSD: 0, warnAt: 80, hardStop: hardStop,
             exhausted: false)
     }
@@ -72,7 +73,9 @@ struct VerdictTests {
 
     @Test func numbersAreGroupedAndWordedAndParsedBack() {
         #expect(AccountsNumbers.tokens(2_000_000) == "2\u{00A0}million tokens")
-        #expect(AccountsNumbers.tokens(328_000) == "328,000\u{00A0}tokens" || AccountsNumbers.tokens(328_000).contains("328"))
+        #expect(
+            AccountsNumbers.tokens(328_000) == "328,000\u{00A0}tokens"
+                || AccountsNumbers.tokens(328_000).contains("328"))
         #expect(AccountsNumbers.parseWhole(AccountsNumbers.grouped(80_000_000)) == 80_000_000)
         #expect(AccountsNumbers.parseWhole("80 000 000") == 80_000_000)
         #expect(AccountsNumbers.parseDecimal("2.50") == 2.5)

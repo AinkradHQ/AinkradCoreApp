@@ -191,7 +191,8 @@ struct ConnListPage: View {
                     }
                 }
                 emptyStep(
-                    missing.isEmpty ? 1 : 2, "Connect", "Sign in on the service's own website. Core never asks for a password."
+                    missing.isEmpty ? 1 : 2, "Connect",
+                    "Sign in on the service's own website. Core never asks for a password."
                 ) {
                     ForEach(model.liveKinds) { k in
                         AppActionTile(

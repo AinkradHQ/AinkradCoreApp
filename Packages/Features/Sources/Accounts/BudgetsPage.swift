@@ -51,7 +51,8 @@ struct BudgetsPage: View {
                 } else {
                     AccStateCard(
                         symbol: "lock", title: "This device can't read budgets",
-                        text: "This Mac is not allowed to look at budgets. Use a Mac you allowed to read from the Core.",
+                        text:
+                            "This Mac is not allowed to look at budgets. Use a Mac you allowed to read from the Core.",
                         code: "forbidden_scope")
                 }
             case .failed(let code, let message):
@@ -69,7 +70,7 @@ struct BudgetsPage: View {
                 let theirs = model.budgets.filter { !["account", "pool"].contains($0.kind) }
                 if !mine.isEmpty { section("Accounts and pools", "creditcard.fill", GlassInk.blue, mine, 0) }
                 if !theirs.isEmpty {
-                    section("Agents, companies and projects", "person.3.fill", GlassInk.violet, theirs, 1)
+                    section("Agents, companies and projects", "person.3.fill", GlassInk.blue, theirs, 1)
                 }
             }
         }
@@ -110,9 +111,8 @@ struct BudgetsPage: View {
                         ? "exclamationmark.triangle.fill"
                         : none ? "dollarsign.circle" : "checkmark.seal.fill", hue: hue, size: 56, bounce: stopped.count
             )
-            .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
@@ -167,7 +167,7 @@ private struct BudgetCard: View {
                 }
                 Spacer(minLength: Space.s2)
                 Label(s.title, systemImage: s.symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
-                    .foregroundStyle(s.hue).padding(.horizontal, Space.s2).frame(height: 24)
+                    .foregroundStyle(GlassInk.ink(s.hue)).padding(.horizontal, Space.s2).frame(height: 24)
                     .background(s.hue.opacity(0.14), in: coreShape(6))
             }
             if let t = b.tokenShare {
@@ -224,7 +224,7 @@ private struct BudgetCard: View {
     }
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {
-        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.orange : GlassInk.green
+        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.orange : GlassInk.blue
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)
@@ -239,7 +239,6 @@ private struct BudgetCard: View {
                             LinearGradient(colors: [hue.opacity(0.55), hue], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: g.size.width * min(1, share))
-                        .shadow(color: hue.opacity(0.5), radius: 5)
                     // The warning point, as a notch on the track.
                     coreShape(1).fill(GlassInk.secondary.opacity(0.7)).frame(width: 2, height: 10)
                         .offset(x: g.size.width * Double(b.warnAt) / 100 - 1)

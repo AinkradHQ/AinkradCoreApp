@@ -139,7 +139,8 @@ struct AccountLimitsSection: View {
                 }
             }
             LimitRow(
-                kind: "Sessions at once", title: account.cap == 0 ? "No limit" : "Up to \(account.cap) at the same time",
+                kind: "Sessions at once",
+                title: account.cap == 0 ? "No limit" : "Up to \(account.cap) at the same time",
                 detail: "More sessions than that wait for a free place.", change: "Change"
             ) { AccountDialogs.openCap(model, account) }
             .disabled(model.readOnly)
@@ -155,7 +156,10 @@ struct AccountLimitsSection: View {
                     kind: "Budget", title: AccountBudgetLine.text(b),
                     detail: b.standing == .stopped ? "Spent. New work on this account is stopped." : nil,
                     change: "Open Budgets"
-                ) { model.page = .budgets; model.detail = nil }
+                ) {
+                    model.page = .budgets
+                    model.detail = nil
+                }
             }
             switch model.limitsLoad {
             case .loading: AccSkeleton()

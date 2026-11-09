@@ -73,7 +73,8 @@ struct AccountVerdict: Equatable, Sendable {
     /// One plain sentence for the cause, with the numbers it has.
     func line(_ a: AccountItem, limits: [LimitItem], budgets: [BudgetItem], now: Date) -> String {
         switch kind {
-        case .keyRefused: "The provider refused this key. Core checks it again and turns the account off if it is refused again."
+        case .keyRefused:
+            "The provider refused this key. Core checks it again and turns the account off if it is refused again."
         case .budgetStopped, .budgetNear:
             "Its budget is \(kind == .budgetStopped ? "spent, so new work is stopped" : "nearly spent")."
         case .limitReached:

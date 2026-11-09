@@ -91,13 +91,13 @@ struct TestTile: View {
                 HStack(spacing: Space.s2) {
                     Image(systemName: running ? "arrow.triangle.2.circlepath" : w?.symbol ?? "checkmark.shield")
                         .font(.system(size: 22, weight: .semibold)).foregroundStyle(
-                            running ? hue : w?.hue ?? GlassInk.slate
+                            running ? GlassInk.blueInk : GlassInk.ink(w?.hue ?? GlassInk.slate)
                         )
-                        .symbolEffect(.pulse, options: .repeating, isActive: running)
                         .contentTransition(.symbolEffect(.replace))
                     Text(running ? "Testing…" : w?.title ?? "Never tested")
                         .font(.system(size: MacTextSize.title, weight: .semibold))
-                        .foregroundStyle(running ? GlassInk.primary : w?.hue ?? GlassInk.primary)
+                        .foregroundStyle(
+                            running ? GlassInk.primary : w.map { GlassInk.ink($0.hue) } ?? GlassInk.primary)
                     Spacer(minLength: 0)
                     AccLink(
                         title: rest > 0 ? "Again in \(rest) s" : "Test now · V", symbol: "play.fill"
@@ -197,7 +197,8 @@ struct LimitsDialog: View {
                     CoreTextField(
                         "Most tokens", placeholder: "No limit", text: $tokens,
                         error: tokenValue == nil
-                            ? "A whole number, at least \(AccountsNumbers.grouped(Self.minTokens)). One turn needs that much." : nil,
+                            ? "A whole number, at least \(AccountsNumbers.grouped(Self.minTokens)). One turn needs that much."
+                            : nil,
                         suffix: "tokens", autofocus: true
                     ) { go() }
                     CoreTextField(

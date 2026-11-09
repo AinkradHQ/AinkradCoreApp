@@ -110,7 +110,8 @@ struct AccountDetailView: View {
     }
 
     /// The one verdict: what it is, why, and the way to its cause.
-    private func banner(_ a: AccountItem, verdict: AccountVerdict, pools: [PoolItem], proxy: ScrollViewProxy) -> some View
+    private func banner(_ a: AccountItem, verdict: AccountVerdict, pools: [PoolItem], proxy: ScrollViewProxy)
+        -> some View
     {
         let tone = palette.tone(verdict.tone)
         let title = verdict.usable ? "Your agents can use it" : verdict.label
@@ -136,7 +137,9 @@ struct AccountDetailView: View {
                 }
             }
             if verdict.kind == .noPool {
-                AppActionTile(title: "Add to a pool", symbol: "square.grid.2x2", key: "P", hue: GlassInk.blue, prominent: true) {
+                AppActionTile(
+                    title: "Add to a pool", symbol: "square.grid.2x2", key: "P", hue: GlassInk.blue, prominent: true
+                ) {
                     addToPool(a)
                 }
                 .disabled(model.readOnly)
@@ -228,7 +231,8 @@ struct AccountDetailView: View {
                     model.detail = nil
                 } label: {
                     HStack(spacing: Space.s2) {
-                        Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(GlassInk.blueInk)
+                        Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(
+                            GlassInk.blueInk)
                         Text(p.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
