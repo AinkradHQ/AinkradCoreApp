@@ -108,7 +108,7 @@ private struct ModePanel: View {
                 .shadow(color: hue.opacity(0.45), radius: 12)
             VStack(alignment: .leading, spacing: 2) {
                 Text(mode == 0 ? "Secrets are off" : mode == 1 ? "Test values only" : "Real values")
-                    .font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 Text(
                     mode == 0
                         ? "Nothing can be added or lent until you turn on Test keys."
@@ -279,11 +279,11 @@ private struct LeaseLine: View {
             VStack(alignment: .leading, spacing: Space.s1) {
                 HStack {
                     Label("Lent to \(lease.runner)", systemImage: "arrow.up.forward.circle.fill")
-                        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
                     Spacer()
                     Text(left > 0 ? Countdown.text(Int(left.rounded(.up))) : "Returned")
                         .font(.system(size: MacTextSize.body, weight: .bold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(hue).contentTransition(.numericText(countsDown: true))
+                        .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
                 }
                 GeometryReader { g in
                     ZStack(alignment: .leading) {

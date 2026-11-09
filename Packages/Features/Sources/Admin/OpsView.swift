@@ -132,7 +132,7 @@ private struct Verdict: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: !ok && !reduce)
             VStack(alignment: .leading, spacing: 3) {
                 Text(ok ? "Your Core is doing well" : "\(names.joined(separator: " and ")) needs a look")
-                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 Text(
                     ok
                         ? "Nothing needs you. Last read \(model.readAt.map { AdminWords.time($0) } ?? "just now")."
@@ -174,7 +174,7 @@ private struct WarningCard: View {
                         a.raised ? "Needs a look" : "Fine",
                         systemImage: a.raised ? "exclamationmark.circle.fill" : "checkmark.circle.fill"
                     )
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
                 }
                 Spacer(minLength: 0)
             }
