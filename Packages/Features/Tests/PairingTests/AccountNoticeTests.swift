@@ -73,12 +73,62 @@ struct AccountNoticeTests {
         #expect(m.shell.bell.items.map(\.id) == ["account-expired-1"])
     }
 
-    @Test func aTerminalAboutToCloseIsAToastNotABellEntry() {
+    private func reapFields(in secs: Double, _ id: String = "t_1") -> [String: String] {
+        let at = ISO8601DateFormatter().string(from: Date().addingTimeInterval(secs))
+        return ["terminal": id, "reason": "idle", "grace_secs": "120", "reap_at": at]
+    }
+
+    @Test func aTerminalAboutToCloseIsAToastAndABellEntry() {
         let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
-        m.accountNotice("terminal.reap_warning", ["terminal": "t_1"])
-        #expect(m.shell.toast?.message == "A terminal will close soon: nobody has used it for a while.")
-        #expect(m.shell.bell.items.isEmpty)
-        #expect(m.shell.toast?.actionTitle == "Keep it")
-        #expect(m.shell.toast?.undo != nil)
+        m.accountNotice("terminal.reap_warning", reapFields(in: 120))
+        #expect(
+            m.shell.toast?.message
+                == "A terminal will close soon: nobody has used it for a while. Closes in about 2 minutes.")
+        #expect(m.shell.toast?.actionTitle == "Keep it" && m.shell.toast?.undo != nil)
+        #expect(m.shell.toast.map { $0.lifetime >= 100 } == true)
+        #expect(m.shell.bell.items.map(\.id) == ["reap-t_1"])
+        #expect(m.shell.bell.items[0].actions.map(\.label) == ["Keep it"])
+        m.accountNotice("terminal.reap_warning", reapFields(in: 120))
+        #expect(m.shell.bell.items.count == 1)
+    }
+
+    @Test func aShortGraceStillKeepsTheToastSevenSeconds() {
+        let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
+        m.accountNotice("terminal.reap_warning", reapFields(in: 3))
+        #expect(m.shell.toast?.lifetime == 7)
+        #expect(m.shell.toast?.message.hasSuffix("Closes in under a minute.") == true)
+    }
+
+    @Test func attachedOrClosedTakesBothAway() {
+        for kind in ["terminal.attached", "terminal.closed"] {
+            let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
+            m.accountNotice("terminal.reap_warning", reapFields(in: 120))
+            m.accountNotice(kind, ["terminal": "t_2"])
+            #expect(m.shell.toast != nil && m.shell.bell.items.count == 1)
+            m.accountNotice(kind, ["terminal": "t_1"])
+            #expect(m.shell.toast == nil && m.shell.bell.items.isEmpty)
+        }
+    }
+
+    @Test func keepItClearsBoth() throws {
+        let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
+        m.accountNotice("terminal.reap_warning", reapFields(in: 120))
+        m.shell.bell.items[0].actions[0].run()
+        #expect(m.shell.toast == nil && m.shell.bell.items.isEmpty)
+    }
+
+    @Test func theBellEntryGoesWhenReapAtPasses() async throws {
+        let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
+        m.accountNotice("terminal.reap_warning", reapFields(in: 1))
+        #expect(m.shell.bell.items.count == 1)
+        try await Task.sleep(for: .seconds(2.5))
+        #expect(m.shell.bell.items.isEmpty && m.shell.toast == nil)
+    }
+
+    @Test func closesInIsPlainMinutes() {
+        let now = Date()
+        #expect(AccountNotice.closesIn(now.addingTimeInterval(60), now: now) == "Closes in about 1 minute")
+        #expect(AccountNotice.closesIn(now.addingTimeInterval(119), now: now) == "Closes in about 2 minutes")
+        #expect(AccountNotice.closesIn(now.addingTimeInterval(20), now: now) == "Closes in under a minute")
     }
 }

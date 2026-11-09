@@ -51,6 +51,8 @@ public final class AppModel {
     private var homeFeed: HomeFeed?
     private var retry: Task<Void, Never>?
     private var noticeIDs: [String] = []
+    /// One per terminal Core has warned about: the toast it owns and the task that keeps its words fresh until `reap_at`.
+    private var reaps: [String: (toast: UUID, watch: Task<Void, Never>)] = [:]
     private var expiry: Task<Void, Never>?
 
     /// The app: pairing and the connection live in the Keychain. `demo` (Debug) skips both and shows the sample desktop.
@@ -278,14 +280,12 @@ public final class AppModel {
             noticeIDs.removeAll { $0 == id }
             return
         }
-        if let words = AccountNotice.toast(
-            kind: kind, fields: fields, terminal: { [terminals] in terminals?.displayName(ofTerminal: $0) })
-        {
-            // Core closes a reaped terminal unless a client attaches meanwhile, so opening it is what keeps it.
-            let keep = fields["terminal"].map { id in
-                { @Sendable @MainActor [weak self] in _ = self?.terminals?.openTerminal(id) }
-            }
-            shell.showToast(words, kind: .warn, actionTitle: "Keep it", undo: keep)
+        if kind == "terminal.reap_warning" {
+            reapWarning(fields)
+            return
+        }
+        if kind == "terminal.attached" || kind == "terminal.closed" {
+            if let id = fields["terminal"] { clearReap(id) }
             return
         }
         guard
@@ -301,6 +301,60 @@ public final class AppModel {
         if let push = n.pushKind, let banner = n.banner {
             agents.postAccountBanner(push, n.id, banner.title, banner.body)
         }
+    }
+
+    // MARK: reap warning
+
+    /// Core closes the terminal at `reap_at` unless a client attaches. The toast and a bell entry both stay until then, until
+    /// the terminal is attached or closed, or until "Keep it" (opening the terminal is what keeps it).
+    private func reapWarning(_ f: [String: String]) {
+        let tid = f["terminal"] ?? "unknown"
+        clearReap(tid)
+        let at = AccountNotice.reapAt(f, now: Date())
+        let toastID = UUID()
+        let keep: @Sendable @MainActor () -> Void = { [weak self] in
+            self?.clearReap(tid)
+            if tid != "unknown" { _ = self?.terminals?.openTerminal(tid) }
+        }
+        func show(first: Bool = false) {
+            let now = Date()
+            let words = AccountNotice.toast(
+                kind: "terminal.reap_warning", fields: f,
+                terminal: { [terminals] in terminals?.displayName(ofTerminal: $0) },
+                now: now)
+            guard let words else { return }
+            let name = f["terminal"].flatMap { terminals?.displayName(ofTerminal: $0) } ?? "A terminal"
+            // After the first showing only the words move; a toast somebody dismissed or another replaced is left alone.
+            if first ? true : shell.toast?.id == toastID {
+                shell.showToast(
+                    words, kind: .warn, actionTitle: "Keep it", id: toastID,
+                    lifetime: max(7, at.timeIntervalSince(now)),
+                    undo: keep)
+            }
+            shell.bell.add(
+                BellItem(
+                    id: "reap-\(tid)", kind: .alarm, title: "\(name) will close soon",
+                    sub: "\(AccountNotice.closesIn(at, now: now)). Open it to keep it.", time: "now",
+                    actions: [BellAction("Keep it", primary: true) { keep() }]))
+        }
+        show(first: true)
+        reaps[tid] = (
+            toastID,
+            Task { [weak self] in
+                while !Task.isCancelled, at.timeIntervalSinceNow > 0 {
+                    try? await Task.sleep(for: .seconds(min(15, max(at.timeIntervalSinceNow, 0.1))))
+                    guard !Task.isCancelled, let self else { return }
+                    if at.timeIntervalSinceNow > 0 { show() } else { self.clearReap(tid) }
+                }
+            }
+        )
+    }
+
+    private func clearReap(_ tid: String) {
+        guard let r = reaps.removeValue(forKey: tid) else { return }
+        r.watch.cancel()
+        shell.bell.remove("reap-\(tid)")
+        if shell.toast?.id == r.toast { shell.toast = nil }
     }
 
     // MARK: rate limit

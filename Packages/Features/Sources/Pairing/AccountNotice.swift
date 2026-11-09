@@ -13,7 +13,7 @@ struct AccountNotice: Equatable {
     /// Kinds this build words. Others (`account.login.*`) are not announced.
     static let kinds: Set<String> = [
         "account.limited", "account.health", "account.failover", "account.budget", "account.expired", "alarm.raised",
-        "alarm.cleared", "terminal.reap_warning",
+        "alarm.cleared", "terminal.reap_warning", "terminal.attached", "terminal.closed",
     ]
 
     /// The bell entry an `alarm.cleared` event takes away (the one `alarm.raised` made), if this build worded it. Core's
@@ -24,16 +24,34 @@ struct AccountNotice: Equatable {
         kind == "alarm.cleared" && f["alarm"] == "failover_storm" ? "account-storm" : nil
     }
 
-    /// A short toast for events that are not an account's, not kept in the bell. `reap_warning` is `{terminal, reason, grace_secs,
-    /// reap_at}`; it names the terminal when the app knows it. The toast's "Keep it" opens the terminal: attaching is what
-    /// keeps it alive.
-    static func toast(kind: String, fields f: [String: String] = [:], terminal: (String) -> String? = { _ in nil })
-        -> String?
-    {
+    /// A short toast for events that are not an account's. `reap_warning` is `{terminal, reason, grace_secs, reap_at}`; it names
+    /// the terminal when the app knows it. The toast's "Keep it" opens the terminal: attaching is what keeps it alive.
+    static func toast(
+        kind: String, fields f: [String: String] = [:], terminal: (String) -> String? = { _ in nil }, now: Date = Date()
+    ) -> String? {
         guard kind == "terminal.reap_warning" else { return nil }
         let name = f["terminal"].flatMap(terminal) ?? "A terminal"
         let why = f["reason"] == "orphan" ? "no window is attached to it" : "nobody has used it for a while"
-        return "\(name) will close soon: \(why)."
+        return "\(name) will close soon: \(why). \(closesIn(reapAt(f, now: now), now: now))."
+    }
+
+    /// When Core closes the terminal: `reap_at` (ISO text), else now plus `grace_secs`, else Core's usual 120 s.
+    static func reapAt(_ f: [String: String], now: Date) -> Date {
+        if let text = f["reap_at"],
+            let date = (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+                ?? (try? Date(text, strategy: .iso8601))
+        {
+            return date
+        }
+        return now.addingTimeInterval(f["grace_secs"].flatMap(Double.init) ?? 120)
+    }
+
+    /// "Closes in about 2 minutes": whole minutes, no second-by-second count.
+    static func closesIn(_ at: Date, now: Date) -> String {
+        let secs = at.timeIntervalSince(now)
+        if secs < 45 { return "Closes in under a minute" }
+        let m = Int((secs / 60).rounded())
+        return "Closes in about \(m) minute\(m == 1 ? "" : "s")"
     }
 
     /// `fields` is the event payload with every value as text. `account` names an account id ("Claude account Work"),

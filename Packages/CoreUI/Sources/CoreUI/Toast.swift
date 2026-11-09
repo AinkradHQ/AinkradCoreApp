@@ -27,7 +27,7 @@ public enum ToastKind: Sendable {
 
 /// One toast. Every destructive action offers Undo.
 public struct ToastItem: Identifiable, Sendable {
-    public let id = UUID()
+    public let id: UUID
     public let message: String
     public let kind: ToastKind
     public let undo: (@Sendable @MainActor () -> Void)?
@@ -35,10 +35,14 @@ public struct ToastItem: Identifiable, Sendable {
     public let actionTitle: String
     /// Hover help for the message: the technical detail (an id) that the words leave out.
     public let help: String?
+    /// How long it stays; nil is the default below. A reused `id` swaps the words without a new announcement or animation.
+    private let stays: TimeInterval?
     public init(
         _ message: String, kind: ToastKind = .ok, actionTitle: String = "Undo", help: String? = nil,
-        undo: (@Sendable @MainActor () -> Void)? = nil
+        id: UUID = UUID(), lifetime: TimeInterval? = nil, undo: (@Sendable @MainActor () -> Void)? = nil
     ) {
+        self.id = id
+        self.stays = lifetime
         self.help = help
         self.actionTitle = actionTitle
         self.message = message
@@ -46,7 +50,7 @@ public struct ToastItem: Identifiable, Sendable {
         self.undo = undo
     }
     /// An Undo stays longer than a plain message (prototype: 7 s against 3.5 s).
-    public var lifetime: TimeInterval { undo == nil ? 3.5 : 7 }
+    public var lifetime: TimeInterval { stays ?? (undo == nil ? 3.5 : 7) }
 }
 
 /// The toast surface: floating glass-card with the message and an optional Undo.
