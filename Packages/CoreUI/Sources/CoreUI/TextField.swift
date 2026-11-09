@@ -36,7 +36,7 @@ public struct CoreTextField: View {
     let onSubmit: () -> Void
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
-    @Environment(\.coreTextScale) private var textScale
+    private var textScale: Double { TextSizePrefs.shared.scale }
     @Environment(\.coreForcedInteraction) private var forced
     @FocusState private var focused: Bool
 

@@ -226,7 +226,7 @@ struct LauncherView: View {
 }
 
 private struct LauncherItem: View {
-    @Environment(\.coreTextScale) private var textScale
+    private var textScale: Double { TextSizePrefs.shared.scale }
     let row: LauncherRow
     let number: Int?
     let selected: Bool

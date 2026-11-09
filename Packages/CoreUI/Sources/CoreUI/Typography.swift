@@ -1,3 +1,4 @@
+import Observation
 import SwiftUI
 
 extension MacTextSize {
@@ -8,8 +9,9 @@ extension MacTextSize {
 
     /// The factor from the setting: 1.0 when unset, kept between 0.8 and 2.
     public static var scale: Double {
-        let v = UserDefaults.standard.object(forKey: scaleKey) as? Double ?? 1
-        return min(max(v, 0.8), 2)
+        // `double(forKey:)` also reads a value given as a launch argument (`-core.textScale 1.5`), which arrives as text.
+        let v = UserDefaults.standard.double(forKey: scaleKey)
+        return v == 0 ? 1 : min(max(v, 0.8), 2)
     }
 
     /// A token size with the factor applied and the 10 pt floor. At 100 % the size is untouched; a size already under the
@@ -21,25 +23,24 @@ extension MacTextSize {
     }
 }
 
-private struct TextScaleKey: EnvironmentKey {
-    static var defaultValue: Double { MacTextSize.scale }
-}
-
-extension EnvironmentValues {
-    /// The text-size factor; `coreTheme()` keeps it in step with the setting so text redraws when it changes.
-    public var coreTextScale: Double {
-        get { self[TextScaleKey.self] }
-        set { self[TextScaleKey.self] = newValue }
+/// The Text size setting, observable: a view that reads `scale` while it draws redraws when the setting changes, with no
+/// property wrapper per text (a wrapper on every text modifier was too heavy for SwiftUI's debug stack).
+@MainActor @Observable
+public final class TextSizePrefs {
+    public static let shared = TextSizePrefs()
+    public var scale: Double {
+        didSet { UserDefaults.standard.set(min(max(scale, 0.8), 2), forKey: MacTextSize.scaleKey) }
     }
+    private init() { scale = MacTextSize.scale }
 }
 
 private struct CoreFontModifier: ViewModifier {
     let size: CGFloat
     let weight: Font.Weight
     let design: Font.Design
-    @Environment(\.coreTextScale) private var scale
     func body(content: Content) -> some View {
-        content.coreFont(size: MacTextSize.scaled(size, by: scale), weight: weight, design: design)
+        content.font(
+            .system(size: MacTextSize.scaled(size, by: TextSizePrefs.shared.scale), weight: weight, design: design))
     }
 }
 
@@ -53,7 +54,7 @@ extension View {
 }
 
 extension Font {
-    /// For a `Font` value that cannot be a modifier (an argument). Pass the scale from `@Environment(\.coreTextScale)`.
+    /// For a `Font` value that cannot be a modifier (an argument). Pass `TextSizePrefs.shared.scale`, read while drawing.
     public static func core(
         size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default, scale: Double
     ) -> Font {

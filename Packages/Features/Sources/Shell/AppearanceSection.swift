@@ -11,7 +11,7 @@ struct AppearanceSection: View {
     @State private var advanced = !LookPrefs.shared.custom.isEmpty
     @FocusState private var focus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @AppStorage(MacTextSize.scaleKey) private var textScale = 1.0
+    @Bindable private var textSize = TextSizePrefs.shared
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
     var body: some View {
@@ -33,13 +33,13 @@ struct AppearanceSection: View {
                 "Text size", sub: "How large the words are in every window. 100% is the usual size.",
                 symbol: "textformat.size", hue: GlassInk.blue, index: 1
             ) {
-                Text(textScale.formatted(.percent.precision(.fractionLength(0))))
+                Text(textSize.scale.formatted(.percent.precision(.fractionLength(0))))
                     .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
             } content: {
                 CoreSegmented(
                     "Text size",
                     segments: Self.scales.map { CoreSegment($0, $0.formatted(.percent.precision(.fractionLength(0)))) },
-                    selection: $textScale, fill: true)
+                    selection: $textSize.scale, fill: true)
             }
             GlassSection(
                 "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",

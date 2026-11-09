@@ -70,7 +70,7 @@ struct FactRow: View {
     let value: String
     var mono = false
     @Environment(\.corePalette) private var palette
-    @Environment(\.coreTextScale) private var textScale
+    private var textScale: Double { TextSizePrefs.shared.scale }
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(key).foregroundStyle(palette.text2)
