@@ -114,9 +114,10 @@ struct ConnectionsView: View {
     }
 }
 
-/// CN1: one section per kind with its connections as cards, the kinds coming later, or the empty state.
+/// CN1: one section per kind with its connections as cards, or the empty state.
 struct ConnListPage: View {
     let model: ConnectionsModel
+    @State private var missing: [ConnKind] = []
     private let columns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
 
     var body: some View {
@@ -165,49 +166,68 @@ struct ConnListPage: View {
                     }
                 }
             }
-            if !model.laterKinds.isEmpty {
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    Text("Coming later").font(.system(size: MacTextSize.headline, weight: .semibold))
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: Space.s3) {
-                        ForEach(model.laterKinds) { k in
-                            AccPanel {
-                                HStack(spacing: Space.s3) {
-                                    ConnTile(kind: k.id)
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        Text(k.name).font(.system(size: MacTextSize.body, weight: .semibold))
-                                        Text(k.say).font(.system(size: MacTextSize.meta)).foregroundStyle(
-                                            GlassInk.secondary)
-                                    }
-                                    Spacer()
-                                    StateBadge("Not yet", tone: .queue, symbol: "clock")
-                                }
-                            }
-                            .opacity(0.6)
-                        }
-                    }
-                }
-            }
         }
     }
 
+    /// Step 1 only when an app is missing: set the sign-in up once. Then connect.
     private var empty: some View {
         AccStateCard(
             symbol: "link", title: "Nothing connected yet",
             text:
                 "Sign in to GitHub or Jira once, here. Core keeps the sign-in safe and lets your agents read issues and code. They can't change anything until you allow it."
         ) {
-            ForEach(model.liveKinds) { k in
-                AppActionTile(
-                    title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.blue,
-                    prominent: true
+            VStack(alignment: .leading, spacing: Space.s3) {
+                if !missing.isEmpty {
+                    emptyStep(
+                        1, "Set up sign-in once",
+                        "\(missing.map(\.name).joined(separator: " and ")) need\(missing.count == 1 ? "s" : "") an app registered with your Core before anyone can sign in."
+                    ) {
+                        ForEach(missing) { k in
+                            AppActionTile(
+                                title: "Set up \(k.name)", symbol: "gearshape", key: "", hue: GlassInk.blue,
+                                prominent: true
+                            ) { ConnDialogs.openApp(model, k) }
+                        }
+                    }
+                }
+                emptyStep(
+                    missing.isEmpty ? 1 : 2, "Connect",
+                    "Sign in on the service's own website. Core never asks for a password."
                 ) {
-                    ConnDialogs.openConnect(model, kind: k.id)
+                    ForEach(model.liveKinds) { k in
+                        AppActionTile(
+                            title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.blue,
+                            prominent: missing.isEmpty
+                        ) { ConnDialogs.openConnect(model, kind: k.id) }
+                        .disabled(missing.contains { $0.id == k.id })
+                    }
                 }
             }
-            ForEach(model.liveKinds) { k in
-                AccLink(title: "\(k.name) app registration", symbol: "gearshape") { ConnDialogs.openApp(model, k) }
+            .frame(maxWidth: Space.s8 * 14, alignment: .leading)
+        }
+        .task(id: model.liveKinds.map(\.id)) { await findMissing() }
+    }
+
+    private func emptyStep<C: View>(_ n: Int, _ title: String, _ line: String, @ViewBuilder _ c: () -> C) -> some View {
+        HStack(alignment: .top, spacing: Space.s3) {
+            Image(systemName: "\(n).square.fill").font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(GlassInk.blueInk).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Space.s2) { c() }
             }
         }
+    }
+
+    /// The kinds whose app registration the Core does not have yet. A device that may not read it learns nothing here and
+    /// sees only Connect.
+    private func findMissing() async {
+        var out: [ConnKind] = []
+        for k in model.liveKinds {
+            if case .ready(let app) = await model.loadApp(k.id), !app.configured { out.append(k) }
+        }
+        missing = out
     }
 }
 
@@ -216,7 +236,26 @@ struct ConnListPage: View {
 struct ConnCard: View {
     let model: ConnectionsModel
     let item: ConnItem
-    @State private var hovering = false
+    @State private var menuOpen = false
+
+    /// The rarer actions: Test and Disconnect stay on the card.
+    private var menuItems: [CoreDropdownItem] {
+        let need = item.status == .needsLook
+        return [
+            CoreDropdownItem("Rename", symbol: "pencil", enabled: !need) { ConnDialogs.openRename(model, item) },
+            item.isDefault
+                ? CoreDropdownItem("Clear default", symbol: "star.slash", enabled: !need) {
+                    Task { await model.clearDefault(item) }
+                }
+                : CoreDropdownItem("Use by default", symbol: "star", enabled: !need) {
+                    Task { await model.makeDefault(item) }
+                },
+            CoreDropdownItem("Who can use it", symbol: "lock.shield", enabled: !need) {
+                ConnDialogs.openAccess(model, item)
+            },
+            CoreDropdownItem("Replace token", symbol: "key") { ConnDialogs.openReplace(model, item) },
+        ]
+    }
 
     var body: some View {
         let (label, tone, symbol) = ConnLook.badge(item.status)
@@ -227,14 +266,15 @@ struct ConnCard: View {
                 ConnTile(kind: item.kind)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: Space.s2) {
-                        Text(item.name).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                        Text(item.name).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(2)
+                            .layoutPriority(1)
                         if item.isDefault { AccChip(text: "Default") }
                     }
                     Text(item.identity).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
-                StateBadge(label, tone: tone, symbol: symbol)
+                StateBadge(label, tone: tone, symbol: symbol).layoutPriority(2)
             }
             Text(
                 need
@@ -263,36 +303,26 @@ struct ConnCard: View {
                 AccLink(title: model.testing == item.id ? "Testing…" : "Test", symbol: "play") {
                     Task { await model.test(item) }
                 }
-                if !need {
-                    AccLink(title: "Rename", symbol: "pencil") { ConnDialogs.openRename(model, item) }
-                    if item.isDefault {
-                        AccLink(title: "Clear default", symbol: "star.slash") {
-                            Task { await model.clearDefault(item) }
-                        }
-                    } else {
-                        AccLink(title: "Use by default", symbol: "star") { Task { await model.makeDefault(item) } }
-                    }
-                    AccLink(title: "Who can use it", symbol: "lock.shield") { ConnDialogs.openAccess(model, item) }
-                }
                 Spacer(minLength: 0)
                 AccLink(title: "Disconnect", symbol: "trash", danger: true) { ConnDialogs.openDisconnect(model, item) }
+                CoreDropdown(items: menuItems, isPresented: $menuOpen) {
+                    Image(systemName: "ellipsis").font(.system(size: MacTextSize.body, weight: .semibold))
+                        .foregroundStyle(GlassInk.primary)
+                        .frame(width: 30, height: 26)
+                        .background(GlassInk.well, in: coreShape(7))
+                        .overlay { coreShape(7).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                        .contentShape(coreShape(7))
+                }
+                .help("More: rename, default, who can use it, replace the token")
+                .accessibilityLabel("More actions for \(item.name)")
             }
-            .opacity(need || hovering || on ? 1 : 0)
-            .allowsHitTesting(need || hovering || on)
-            .animation(.smooth(duration: 0.2), value: hovering)
-            HStack {
-                AccLink(
-                    title: "Replace token", symbol: "key",
-                    help: "Paste a new token if this one was changed or ran out."
-                ) { ConnDialogs.openReplace(model, item) }
-                Spacer(minLength: 0)
-            }
-            .opacity(need || hovering || on ? 1 : 0)
-            .allowsHitTesting(need || hovering || on)
-            .animation(.smooth(duration: 0.2), value: hovering)
         }
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(on ? 0.7 : 0), lineWidth: 1.5) }
-        .onHover { hovering = $0 }
+        .contextMenu {
+            ForEach(menuItems) { i in
+                Button(i.title, role: i.destructive ? .destructive : nil) { i.run() }.disabled(!i.enabled)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.name), \(label)")
         .accessibilityAddTraits(on ? .isSelected : [])

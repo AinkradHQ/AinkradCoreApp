@@ -83,7 +83,7 @@ enum SpendWindow: String, CaseIterable, Sendable {
 
 enum CostWords {
     static func usd(_ micros: Int64) -> String { ModelPriceItem.usd(micros) }
-    static func tokens(_ n: Int64) -> String { n.formatted(.number.notation(.compactName)) }
+    static func tokens(_ n: Int64) -> String { AccountsNumbers.amount(n) }
 
     static func basis(_ b: String) -> (title: String, hue: Color) {
         switch b {
@@ -163,9 +163,9 @@ struct SpendState: View {
                 OlderCoreCard(what: what)
             } else {
                 AccStateCard(
-                    symbol: "lock", title: "This device can't see \(what.lowercased())",
+                    symbol: "lock", title: "This Mac can't see \(what.lowercased())",
                     text:
-                        "\(what) need\(what.hasSuffix("s") ? "" : "s") the \(scope) scope, or a newer Core. Use a device that holds it, or update Core.",
+                        "This Mac can only look. \(what) need\(what.hasSuffix("s") ? "" : "s") a Mac you allowed to \(scope == "read" ? "read from" : "manage") the Core, or a newer Core.",
                     code: "forbidden_scope")
             }
         case .failed(let code, let message):

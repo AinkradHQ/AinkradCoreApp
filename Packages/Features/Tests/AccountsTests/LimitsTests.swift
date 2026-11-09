@@ -56,7 +56,7 @@ struct LimitsTests {
         let (m, svc, host) = await make(limits: [Self.day])
         #expect(await m.clearLimit(m.account(1)!, Self.day))
         #expect(svc.log.contains("clearLimit 1 tokens 86400"))
-        #expect(host.reasons.first?.hasPrefix("Remove the 1K tokens limit") == true)
+        #expect(host.reasons.first?.hasPrefix("Remove the 1,000\u{00A0}tokens limit") == true)
     }
 
     @Test func aDeclinedTouchIDChangesNothing() async {
@@ -94,7 +94,7 @@ struct LimitsTests {
         #expect(UsageLimitWords.window(18_000) == "Every 5 hours")
         #expect(UsageLimitWords.window(172_800) == "Every 2 days")
         #expect(UsageLimitWords.window(90) == "Every 90 seconds")
-        #expect(UsageLimitWords.amount(1, unit: "messages") == "1 message")
+        #expect(UsageLimitWords.amount(1, unit: "messages") == "1\u{00A0}message")
         #expect(UsageLimitWords.parseCap("5,000,000") == 5_000_000)
         #expect(UsageLimitWords.parseCap("0") == nil)
         #expect(UsageLimitWords.parseCap("abc") == nil)

@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -8,11 +9,16 @@ struct ConnectDialog: View {
     let replacing: AccountItem?
     let close: () -> Void
     @State private var provider: String
+    /// The accounts that were there when the dialog opened: one that is not in it has arrived.
+    @State private var known: Set<Int64>
+    @State private var copied = false
+    @Environment(\.corePalette) private var palette
 
     init(model: AccountsModel, provider: String?, replacing: AccountItem?, close: @escaping () -> Void) {
         self.model = model
         self.replacing = replacing
         self.close = close
+        _known = State(initialValue: Set(model.accounts.map(\.id)))
         _provider = State(
             initialValue: provider ?? model.providers.first { ProviderSites.page($0.id) != nil }?.id ?? model.providers
                 .first?.id ?? "")
@@ -20,14 +26,14 @@ struct ConnectDialog: View {
 
     var body: some View {
         let site = ProviderSites.page(provider)
-        let hue = ProviderLook.hue(provider)
+        let hue = GlassInk.blue
         CoreDialogPanel(replacing.map { "New key for \($0.label)" } ?? "Connect an account") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 if replacing == nil && model.signIn == nil {
                     HStack(spacing: Space.s2) {
                         ForEach(ProviderLook.ordered(model.providers)) { p in
                             ProviderChoice(provider: p, on: p.id == provider, lens: lens) {
-                                withAnimation(.smooth(duration: 0.35)) { provider = p.id }
+                                provider = p.id
                             }
                         }
                     }
@@ -59,18 +65,85 @@ struct ConnectDialog: View {
                             }
                         }
                         step(
-                            2, "Add it to your Core", hue: hue, on: false, last: true,
+                            2, "Add it to your Core", hue: hue, on: arrived == nil, last: true,
                             detail:
-                                "Keys are added from an admin computer, not from this app: there is no place here to type one, so a key can't leak from this Mac."
-                        ) { EmptyView() }
+                                "Keys are added from an admin computer, not from this app: there is no place here to type one, so a key can't leak from this Mac. Run this there, with your own admin token and the key."
+                        ) {
+                            command
+                            waiting
+                        }
                     }
                     .id(provider)
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    AccDialogButtons(confirm: "Done", cancel: close, run: close)
+                    .transition(.opacity)
+                    if let arrived {
+                        AccDialogButtons(
+                            confirm: "Open \(arrived.label)", cancelTitle: "Close", cancel: close
+                        ) {
+                            close()
+                            model.show(.accounts, account: arrived.id)
+                        }
+                    } else {
+                        AccDialogButtons(cancelTitle: "Close", cancel: close)
+                    }
                 }
             }
         }
         .accessibilityIdentifier("account-connect")
+    }
+
+    /// The new account of this provider that showed up since the dialog opened.
+    private var arrived: AccountItem? {
+        model.accounts.first { !known.contains($0.id) && $0.provider == provider }
+    }
+
+    /// The real path today: the Core's own API (`ainkradctl` has no command to add an account). The key is yours to paste
+    /// there; this app never sees it.
+    private var addCommand: String {
+        let label = replacing?.label ?? "Work"
+        return """
+            curl -X POST "$CORE/api/v1/accounts" -H "Authorization: Bearer $ADMIN_TOKEN" \\
+              -H "Content-Type: application/json" \\
+              -d '{"provider":"\(provider)","label":"\(label)","value":"<paste the key here>"}'
+            """
+    }
+
+    private var command: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Text(addCommand).font(.system(size: MacTextSize.meta, design: .monospaced)).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
+                .background(GlassInk.well, in: coreShape(Radius.control))
+                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            AccLink(title: copied ? "Copied" : "Copy command", symbol: copied ? "checkmark" : "doc.on.doc") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(addCommand, forType: .string)
+                copied = true
+                CoreAnnounce.post("Command copied")
+            }
+            .help("Copies the command. It has no key in it.")
+        }
+    }
+
+    /// Live: turns into the new account when the list changes (events drive it; a slow re-read covers a missed one).
+    @ViewBuilder private var waiting: some View {
+        if let arrived {
+            Label("\(arrived.label) arrived and is in your Core.", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(palette.tone(.run).ink)
+                .accessibilityIdentifier("connect-arrived")
+        } else {
+            VStack(alignment: .leading, spacing: Space.s1) {
+                Text("Waiting for the key to arrive").font(.system(size: MacTextSize.meta, weight: .semibold))
+                CoreBusyBar().frame(maxWidth: Space.s8 * 5)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("connect-waiting")
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(8))
+                    model.resync()
+                }
+            }
+        }
     }
 
     @Namespace private var lens
@@ -79,7 +152,7 @@ struct ConnectDialog: View {
     private func move(_ step: Int) -> KeyPress.Result {
         let ids = ProviderLook.ordered(model.providers).map(\.id)
         guard let i = ids.firstIndex(of: provider) else { return .ignored }
-        withAnimation(.smooth(duration: 0.35)) { provider = ids[min(max(i + step, 0), ids.count - 1)] }
+        provider = ids[min(max(i + step, 0), ids.count - 1)]
         return .handled
     }
 
@@ -90,14 +163,12 @@ struct ConnectDialog: View {
     ) -> some View {
         HStack(alignment: .top, spacing: Space.s3) {
             VStack(spacing: 0) {
-                Image(systemName: on ? "\(n).square.fill" : "lock.square.fill")
+                Image(systemName: on ? "\(n).square.fill" : "checkmark.square.fill")
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(on ? hue : GlassInk.slate)
-                    .shadow(color: hue.opacity(on ? 0.5 : 0), radius: 8)
-                    .symbolEffect(.bounce, value: provider)
+                    .foregroundStyle(on ? GlassInk.blueInk : GlassInk.slate)
                 if !last {
                     coreShape(1).fill(
-                        LinearGradient(colors: [hue, GlassInk.track], startPoint: .top, endPoint: .bottom)
+                        LinearGradient(colors: [GlassInk.blue, GlassInk.track], startPoint: .top, endPoint: .bottom)
                     )
                     .frame(width: 2).frame(minHeight: 24).padding(.vertical, 4)
                 }
@@ -126,10 +197,9 @@ private struct ProviderChoice: View {
     let pick: () -> Void
     @State private var hovering = false
     var body: some View {
-        let hue = ProviderLook.hue(provider.id)
         Button(action: pick) {
             VStack(spacing: Space.s2) {
-                AccTile(large: true, provider: provider.id).symbolEffect(.bounce, value: on)
+                AccTile(large: true, provider: provider.id)
                 Text(ProviderLook.short(provider.id, provider.name)).font(
                     .system(size: MacTextSize.body, weight: .semibold)
                 ).lineLimit(1)
@@ -140,8 +210,7 @@ private struct ProviderChoice: View {
             .frame(maxWidth: .infinity).padding(.vertical, Space.s3)
             .background {
                 if on {
-                    coreShape(Radius.cardMac).fill(hue.opacity(0.22))
-                        .shadow(color: hue.opacity(0.45), radius: 14)
+                    coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.22))
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
                     coreShape(Radius.cardMac).fill(hovering ? GlassInk.wellHover : GlassInk.well)
@@ -149,15 +218,13 @@ private struct ProviderChoice: View {
             }
             .overlay {
                 coreShape(Radius.cardMac).strokeBorder(
-                    on ? hue.opacity(0.75) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
+                    on ? GlassInk.blue.opacity(0.75) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
             }
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(on ? 1.03 : hovering ? 1.02 : 1)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: hovering)
         .accessibilityLabel(provider.name)
         .accessibilityAddTraits(on ? .isSelected : [])
     }

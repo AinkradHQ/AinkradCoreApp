@@ -91,6 +91,13 @@ extension AccountsModel {
         if case .done = signIn?.stage { await reload() }
     }
 
+    /// Reads the sign-in again now, because an `account.login.*` event said it changed.
+    func refreshSignIn(_ id: String) async {
+        guard let service, signIn?.login == id, let l = try? await service.login(id) else { return }
+        apply(l)
+        if case .done = signIn?.stage { await reload() }
+    }
+
     private func apply(_ l: LoginItem) {
         guard signIn != nil else { return }
         signIn?.login = l.id

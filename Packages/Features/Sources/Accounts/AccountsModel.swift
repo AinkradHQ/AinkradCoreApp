@@ -100,6 +100,8 @@ public final class AccountsModel {
     /// An event from the Core that may change what these screens show.
     public func event(kind: String) {
         connections.event(kind: kind)
+        // A sign-in's own events move it on at once; the one-second poll stays as the fallback.
+        if kind.hasPrefix("account.login."), let id = signIn?.login, !signInEnded { Task { await refreshSignIn(id) } }
         let kinds = ["account.", "pool.", "chain.", "setting."]
         if kinds.contains(where: kind.hasPrefix) { resync() }
     }
@@ -115,8 +117,8 @@ public final class AccountsModel {
     func providerName(_ id: String) -> String { provider(id)?.name ?? id }
     func account(_ id: Int64) -> AccountItem? { accounts.first { $0.id == id } }
     func pool(_ id: Int64) -> PoolItem? { pools.first { $0.id == id } }
-    var needLook: [AccountItem] { accounts.filter { $0.phase.needsLook } }
-    var readyCount: Int { accounts.filter { $0.phase == .active }.count }
+    var needLook: [AccountItem] { needLookAccounts }
+    var readyCount: Int { readyAccounts }
     var selectedPool: PoolItem? { pool(poolSelection ?? -1) ?? pools.first { $0.isDefault } ?? pools.first }
     func members(of pool: PoolItem) -> [AccountItem] { pool.members.compactMap { account($0) } }
     func chain(_ id: Int64) -> ChainItem? { chains.first { $0.id == id } }
@@ -127,14 +129,14 @@ public final class AccountsModel {
     func pools(for provider: String) -> [PoolItem] { pools.filter { $0.provider == provider } }
     func defaultPool(_ provider: String) -> PoolItem? { pools.first { $0.provider == provider && $0.isDefault } }
     /// The member tried first: the first one in the fallback order that is ready.
-    func firstReady(in pool: PoolItem) -> AccountItem? { members(of: pool).first { $0.phase == .active } }
+    func firstReady(in pool: PoolItem) -> AccountItem? { members(of: pool).first { verdict($0).isReady } }
     /// Accounts of the pool's provider that are not in it yet.
     func candidates(for pool: PoolItem) -> [AccountItem] {
         accounts.filter { $0.provider == pool.provider && !pool.members.contains($0.id) }
     }
     var providersByUse: [(ProviderItem, [AccountItem])] {
         providers.compactMap { p in
-            let g = accounts.filter { $0.provider == p.id && filter.matches($0) }
+            let g = accounts.filter { $0.provider == p.id && filter.matches($0, verdict: verdict($0)) }
             return g.isEmpty ? nil : (p, g)
         }
     }
@@ -155,7 +157,9 @@ public final class AccountsModel {
             await reloadChains(service)
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
-        if detail != nil { await reloadLimits() }
+        // The verdict on every card needs the limits and budgets too; a device without `admin` just gets none.
+        await reloadLimits()
+        await reloadBudgets()
         gate = (try? await service.gate()) ?? GateState()
         let chip: PaneChip =
             switch load {
@@ -416,10 +420,20 @@ public final class AccountsModel {
         ) { try await $0.setDefaultChain(c.id) }
     }
 
+    /// Agents the app knows: every one bound to a chain, then the ones bound from here before. The Core has no agent list.
+    var knownAgents: [String] {
+        let bound = chainBindings.map(\.agent)
+        let recent = UserDefaults.standard.stringArray(forKey: "accounts.recentAgents") ?? []
+        return Array(NSOrderedSet(array: bound + recent)) as? [String] ?? bound
+    }
+    func boundChain(of agent: String) -> ChainItem? {
+        chainBindings.first { $0.agent == agent }.flatMap { chain($0.chain) }
+    }
+
     func bind(agent: String, to c: ChainItem) async -> Bool {
         let a = agent.trimmingCharacters(in: .whitespaces)
         let before = chainBindings.first { $0.agent == a }.flatMap { chain($0.chain) }
-        return await write(
+        let ok = await write(
             "bind-chain", reason: "Bind \(a) to \(c.name). Its sessions draw accounts from that chain.",
             done: "\(a) is bound to \(c.name)", keepsEdit: true,
             undo: { [weak self] in
@@ -431,6 +445,13 @@ public final class AccountsModel {
                 }
             }
         ) { _ = try await $0.bindAgent(a, chain: c.id) }
+        if ok {
+            let d = UserDefaults.standard
+            d.set(
+                Array(([a] + (d.stringArray(forKey: "accounts.recentAgents") ?? [])).prefix(12)),
+                forKey: "accounts.recentAgents")
+        }
+        return ok
     }
 
     func unbind(_ agent: String, undoable: Bool = true) async {
@@ -449,6 +470,9 @@ public final class AccountsModel {
     func openProviderPage(_ provider: String) {
         if let site = ProviderSites.page(provider) { opener(site.url) }
     }
+
+    /// The Runners pane (Terminals registers it in the launcher).
+    func openRunners() { host.shell.launcher.entry("runners")?.run() }
 
     func openSwitches() {
         host.shell.settings.selected = "switches"

@@ -97,7 +97,7 @@ enum BudgetWords {
         }
     }
 
-    static func tokens(_ n: Int64) -> String { n.formatted(.number.notation(.compactName)) }
+    static func tokens(_ n: Int64) -> String { AccountsNumbers.amount(n) }
 }
 
 extension AccountsModel {

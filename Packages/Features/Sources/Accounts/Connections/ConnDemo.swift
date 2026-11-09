@@ -86,7 +86,8 @@ extension AccountsDemo {
             try? await Task.sleep(for: .milliseconds(400))
             if scene == "conn-replace-working" { m.busy = "replace-\(c.id)" }
             if scene == "conn-replace-error" {
-                m.writeError["replace-\(c.id)"] = ConnSay.plain(CoreError.http(status: 400, code: "x", message: ""))
+                m.writeError["replace-\(c.id)"] = ConnSay.plain(
+                    CoreError.http(status: 400, code: "bad_token", message: "Atlassian says this token has expired"))
             }
         default: break
         }

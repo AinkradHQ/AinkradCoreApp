@@ -89,17 +89,13 @@ struct ConnectSheet: View {
                 Text("Pick one. You sign in on its own website; Core never asks for a password.")
                     .foregroundStyle(GlassInk.secondary)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Space.s2) {
-                    ForEach(model.kinds) { k in
+                    ForEach(model.liveKinds) { k in
                         AccPick(
-                            title: k.name, sub: k.available ? k.say : "Coming later", symbol: ConnLook.symbol(k.id),
-                            hue: ConnLook.hue(k.id), on: false, enabled: k.available
+                            title: k.name, sub: k.say, symbol: ConnLook.symbol(k.id), hue: GlassInk.blue, on: false
                         ) { picked = k.id }
                     }
                 }
-                HStack {
-                    AccLink(title: "Cancel", action: close).keyboardShortcut(.cancelAction)
-                    Spacer()
-                }
+                AccDialogButtons(cancel: close)
             }
         }
     }
@@ -135,11 +131,11 @@ struct ConnectSheet: View {
                         }
                     }
                     AccDialogButtons(
-                        confirm: "Done", cancelTitle: "Who can use it",
-                        cancel: {
+                        confirm: "Who can use it", cancelTitle: "Close", cancel: close,
+                        run: {
                             close()
                             if let c = model.item(id) { ConnDialogs.openAccess(model, c) }
-                        }, run: close)
+                        })
                 }
             }
         default:
@@ -210,38 +206,29 @@ struct ConnectSheet: View {
 
     @ViewBuilder private func footer(_ k: ConnKind, _ f: ConnFlow?) -> some View {
         HStack(spacing: Space.s2) {
-            AccLink(title: "Cancel", action: close).keyboardShortcut(.cancelAction)
+            Button("Cancel", action: close).buttonStyle(CoreButtonStyle(.secondary))
+                .keyboardShortcut(.cancelAction).environment(\.coreKeycap, "esc")
             switch f?.step {
             case .chooseResources:
-                AccLink(title: "Skip for now") { Task { await model.choose(site: nil) } }
-                Spacer()
-                AppActionTile(
-                    title: model.installing ? "Waiting for GitHub…" : "Choose on github.com",
-                    symbol: "arrow.up.right.square",
-                    key: "↩", hue: GlassInk.blue, prominent: true
-                ) {
-                    model.openInstall()
-                }
-                .disabled(model.installing)
-                .keyboardShortcut(.defaultAction)
+                Button("Skip for now") { Task { await model.choose(site: nil) } }
+                    .buttonStyle(CoreButtonStyle(.secondary))
+                Spacer(minLength: Space.s3)
+                Button(model.installing ? "Waiting for GitHub…" : "Choose on github.com") { model.openInstall() }
+                    .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.installing)
+                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
             case .pickSite(let sites):
-                Spacer()
-                AppActionTile(
-                    title: "Use this site", symbol: "checkmark", key: "↩", hue: GlassInk.blue, prominent: true
-                ) {
-                    Task { await model.choose(site: site ?? sites.first) }
-                }
-                .keyboardShortcut(.defaultAction)
+                Spacer(minLength: Space.s3)
+                Button("Use this site") { Task { await model.choose(site: site ?? sites.first) } }
+                    .buttonStyle(CoreButtonStyle(.prominent))
+                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
             default:
-                if !k.tokenTitle.isEmpty { AccLink(title: "(advanced)…") { advanced = true } }
-                Spacer()
-                AppActionTile(
-                    title: k.signIn == .deviceCode ? "Open github.com" : "Open \(k.name)",
-                    symbol: "arrow.up.right.square",
-                    key: "↩", hue: GlassInk.blue, prominent: true
-                ) { model.openSignIn() }
-                .keyboardShortcut(.defaultAction)
-                .disabled(f == nil)
+                if !k.tokenTitle.isEmpty {
+                    Button("(advanced)…") { advanced = true }.buttonStyle(CoreButtonStyle(.secondary))
+                }
+                Spacer(minLength: Space.s3)
+                Button(k.signIn == .deviceCode ? "Open github.com" : "Open \(k.name)") { model.openSignIn() }
+                    .buttonStyle(CoreButtonStyle(.prominent)).disabled(f == nil)
+                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
             }
         }
     }

@@ -17,7 +17,7 @@ struct SubscriptionSignIn: View {
     @FocusState private var codeFocus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    private var hue: Color { ProviderLook.hue(provider.id) }
+    private var hue: Color { GlassInk.blue }
     private var labelOK: Bool { label.range(of: "^[a-z][a-z0-9._-]{0,63}$", options: .regularExpression) != nil }
 
     var body: some View {
@@ -110,8 +110,8 @@ struct SubscriptionSignIn: View {
             }
             numbered(2, "Paste the code Claude shows you", "It's a short code, not a password.") {
                 HStack(spacing: Space.s2) {
-                    Image(systemName: "doc.on.clipboard").foregroundStyle(codeFocus ? hue : GlassInk.secondary)
-                        .symbolEffect(.bounce, value: codeFocus)
+                    Image(systemName: "doc.on.clipboard").foregroundStyle(
+                        codeFocus ? GlassInk.blueInk : GlassInk.secondary)
                     TextField("Paste the code here", text: $code).textFieldStyle(.plain)
                         .font(.system(size: MacTextSize.title, design: .monospaced)).focused($codeFocus)
                         .autocorrectionDisabled().onSubmit(send)
@@ -123,7 +123,6 @@ struct SubscriptionSignIn: View {
                     coreShape(Radius.control + 2).strokeBorder(
                         codeFocus ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: codeFocus ? 1.5 : 1)
                 }
-                .shadow(color: hue.opacity(codeFocus ? 0.35 : 0), radius: 10)
                 .focusEffectDisabled()
                 if let e = model.signIn?.codeError { AccIssue(text: e) }
             }
@@ -150,8 +149,6 @@ struct SubscriptionSignIn: View {
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
                     in: coreShape(16)
                 )
-                .shadow(color: hue.opacity(0.5), radius: 16)
-                .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
             Text(title).font(.system(size: MacTextSize.large, weight: .bold))
             Text(line).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             CoreBusyBar().frame(maxWidth: Space.s8 * 6)
@@ -197,12 +194,29 @@ struct SubscriptionSignIn: View {
 
     private func failed(_ why: String) -> some View {
         VStack(spacing: Space.s3) {
-            IconTile("exclamationmark.triangle.fill", hue: GlassInk.red, size: 64, bounce: true)
-                .shadow(color: GlassInk.red.opacity(0.5), radius: 16)
+            IconTile("exclamationmark.triangle.fill", hue: GlassInk.red, size: 64, bounce: false)
             Text("Couldn't connect Claude").font(.system(size: MacTextSize.large, weight: .bold))
             Text(why).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            AccDialogButtons(confirm: "Try again", cancelTitle: "Close", cancel: finish) { model.signIn = nil }
+            // When a retry cannot help (no runner can sign in), the real fix is the main button.
+            let noRunner = why.hasPrefix("No runner")
+            HStack(spacing: Space.s2) {
+                Button("Close", action: finish).buttonStyle(CoreButtonStyle(.secondary))
+                    .keyboardShortcut(.cancelAction).environment(\.coreKeycap, "esc")
+                Spacer(minLength: Space.s3)
+                if noRunner {
+                    Button("Try again") { model.signIn = nil }.buttonStyle(CoreButtonStyle(.secondary))
+                    Button("Open runners") {
+                        finish()
+                        model.openRunners()
+                    }
+                    .buttonStyle(CoreButtonStyle(.prominent)).keyboardShortcut(.defaultAction)
+                    .environment(\.coreKeycap, "↩")
+                } else {
+                    Button("Try again") { model.signIn = nil }.buttonStyle(CoreButtonStyle(.prominent))
+                        .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
+                }
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -215,7 +229,6 @@ struct SubscriptionSignIn: View {
     private func numbered<C: View>(_ n: Int, _ title: String, _ line: String, @ViewBuilder _ c: () -> C) -> some View {
         HStack(alignment: .top, spacing: Space.s3) {
             Image(systemName: "\(n).square.fill").font(.system(size: 26, weight: .semibold)).foregroundStyle(hue)
-                .shadow(color: hue.opacity(0.45), radius: 8)
             VStack(alignment: .leading, spacing: Space.s2) {
                 Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
                 Text(line).foregroundStyle(GlassInk.secondary)

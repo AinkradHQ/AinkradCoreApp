@@ -25,9 +25,11 @@ struct AppRegistrationSheet: View {
                     }
                 case .readOnly:
                     CoreNotice(
-                        symbol: "lock", title: "Only an admin can see or change this.",
-                        text: "Ask an admin of your Core to set up the \(kind.name) app for you.")
-                    AccDialogButtons(confirm: "Save", cancelTitle: "Close", enabled: false, cancel: close) {}
+                        symbol: "lock", title: "This Mac can only look",
+                        text:
+                            "Changes need a Mac you allowed to manage the Core. Ask whoever runs it to set up the \(kind.name) app."
+                    )
+                    AccDialogButtons(cancelTitle: "Close", cancel: close)
                 case .ready(let app): form(app)
                 }
             }
@@ -75,8 +77,11 @@ struct AppRegistrationSheet: View {
             let sent = changes(app)
             Task {
                 let ok = await model.saveApp(kind.id, fields: sent)
-                secrets = [:]  // a secret lives in this sheet only until it is sent
-                if ok { close() }
+                // A secret lives in this sheet only: gone once the Core took it (or the sheet closes), kept after a refusal.
+                if ok {
+                    secrets = [:]
+                    close()
+                }
             }
         }
     }
@@ -136,7 +141,7 @@ struct ReplaceTokenSheet: View {
                     CoreNotice(
                         symbol: "checkmark.circle", title: "Token replaced.",
                         text: "Core uses the new token from now on. The old one is gone.", tone: .done)
-                    AccDialogButtons(confirm: "Done", cancelTitle: "Close", cancel: close, run: close)
+                    AccDialogButtons(cancelTitle: "Close", cancel: close)
                 } else {
                     Text("Paste a new token for \(item.identity). Core keeps it sealed and never shows it again.")
                         .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
@@ -155,8 +160,10 @@ struct ReplaceTokenSheet: View {
                         let t = token
                         Task {
                             let ok = await model.replaceToken(item, token: t, fields: fields)
-                            token = ""  // not kept once sent
-                            if ok { withAnimation(.smooth(duration: 0.25)) { done = true } }
+                            if ok {
+                                token = ""  // not kept once the Core took it
+                                done = true
+                            }  // after a refusal the typed token stays, with the Core's reason above
                         }
                     }
                 }

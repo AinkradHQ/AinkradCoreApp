@@ -195,7 +195,7 @@ struct AccountsView: View {
             case .forbidden:
                 AccStateCard(
                     symbol: "lock", title: "This device is not allowed to read this",
-                    text: "Accounts need the read scope (forbidden_scope). Use a device that holds it.",
+                    text: "This Mac is not allowed to look at accounts. Use a Mac you allowed to read from the Core.",
                     code: "forbidden_scope")
             }
         }

@@ -266,10 +266,10 @@ enum AccountFilter: String, CaseIterable, Sendable {
     case all = "All"
     case need = "Needs a look"
     case off = "Turned off"
-    func matches(_ a: AccountItem) -> Bool {
+    func matches(_ a: AccountItem, verdict: AccountVerdict) -> Bool {
         switch self {
         case .all: true
-        case .need: a.phase.needsLook
+        case .need: verdict.needsLook
         case .off: a.phase == .disabled
         }
     }
@@ -324,6 +324,17 @@ enum AccountsWords {
         if let r = a.stateReason, !r.isEmpty { s += r.hasSuffix(".") ? " \(r)" : " \(r)." }
         if let u = a.stateUntil, u > now { s += " Back in \(duration(u.timeIntervalSince(now)))." }
         return s
+    }
+
+    /// The section of the account page a verdict's cause lives in.
+    static func causeName(_ c: AccountVerdict.Cause) -> String {
+        switch c {
+        case .keyTest: "Key test"
+        case .limits: "Limits"
+        case .budgets: "Budgets"
+        case .state: "Account state"
+        case .pools: "Pools"
+        }
     }
 
     static func capWords(_ cap: Int64) -> String { cap == 0 ? "No limit on sessions at once" : "Up to \(cap) at once" }

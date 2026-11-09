@@ -262,7 +262,7 @@ private struct PriceField: View {
             Text("$").foregroundStyle(GlassInk.secondary)
             TextField("0.00", text: $text).textFieldStyle(.plain).frame(width: 56).monospacedDigit()
                 .onChange(of: text) { _, t in
-                    if let d = Double(t.filter { !", $".contains($0) }), d >= 0 {
+                    if let d = AccountsNumbers.parseDecimal(t), d >= 0 {
                         micros = Int64((d * 1_000_000).rounded())
                     }
                 }
@@ -270,7 +270,7 @@ private struct PriceField: View {
         }
         .padding(.horizontal, Space.s2).frame(height: 28)
         .coreFieldSurface()
-        .onAppear { text = micros == 0 ? "" : String(format: "%.2f", Double(micros) / 1_000_000) }
+        .onAppear { text = micros == 0 ? "" : AccountsNumbers.dollarsField(micros) }
     }
 }
 

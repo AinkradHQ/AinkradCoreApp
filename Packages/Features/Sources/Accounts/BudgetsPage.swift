@@ -51,7 +51,9 @@ struct BudgetsPage: View {
                 } else {
                     AccStateCard(
                         symbol: "lock", title: "This device can't read budgets",
-                        text: "Budgets need the read scope. Use a device that holds it.", code: "forbidden_scope")
+                        text:
+                            "This Mac is not allowed to look at budgets. Use a Mac you allowed to read from the Core.",
+                        code: "forbidden_scope")
                 }
             case .failed(let code, let message):
                 AccStateCard(
@@ -68,7 +70,7 @@ struct BudgetsPage: View {
                 let theirs = model.budgets.filter { !["account", "pool"].contains($0.kind) }
                 if !mine.isEmpty { section("Accounts and pools", "creditcard.fill", GlassInk.blue, mine, 0) }
                 if !theirs.isEmpty {
-                    section("Agents, companies and projects", "person.3.fill", GlassInk.violet, theirs, 1)
+                    section("Agents, companies and projects", "person.3.fill", GlassInk.blue, theirs, 1)
                 }
             }
         }
@@ -109,9 +111,8 @@ struct BudgetsPage: View {
                         ? "exclamationmark.triangle.fill"
                         : none ? "dollarsign.circle" : "checkmark.seal.fill", hue: hue, size: 56, bounce: stopped.count
             )
-            .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
@@ -166,7 +167,7 @@ private struct BudgetCard: View {
                 }
                 Spacer(minLength: Space.s2)
                 Label(s.title, systemImage: s.symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
-                    .foregroundStyle(s.hue).padding(.horizontal, Space.s2).frame(height: 24)
+                    .foregroundStyle(GlassInk.ink(s.hue)).padding(.horizontal, Space.s2).frame(height: 24)
                     .background(s.hue.opacity(0.14), in: coreShape(6))
             }
             if let t = b.tokenShare {
@@ -223,7 +224,7 @@ private struct BudgetCard: View {
     }
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {
-        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.orange : GlassInk.green
+        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.orange : GlassInk.blue
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)
@@ -238,7 +239,6 @@ private struct BudgetCard: View {
                             LinearGradient(colors: [hue.opacity(0.55), hue], startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: g.size.width * min(1, share))
-                        .shadow(color: hue.opacity(0.5), radius: 5)
                     // The warning point, as a notch on the track.
                     coreShape(1).fill(GlassInk.secondary.opacity(0.7)).frame(width: 2, height: 10)
                         .offset(x: g.size.width * Double(b.warnAt) / 100 - 1)
@@ -270,9 +270,9 @@ struct BudgetDialog: View {
         _kind = State(initialValue: editing?.kind ?? "account")
         _subject = State(initialValue: editing?.subject ?? "")
         _period = State(initialValue: editing?.period ?? "month")
-        _tokens = State(initialValue: editing.map { $0.tokenCap > 0 ? String($0.tokenCap) : "" } ?? "")
+        _tokens = State(initialValue: editing.map { $0.tokenCap > 0 ? AccountsNumbers.grouped($0.tokenCap) : "" } ?? "")
         _dollars = State(
-            initialValue: editing?.usdCap.map { String(format: "%.2f", Double($0) / 1_000_000) } ?? "")
+            initialValue: editing?.usdCap.map { AccountsNumbers.dollarsField($0) } ?? "")
         _warn = State(initialValue: String(editing?.warnAt ?? 80))
         _hardStop = State(initialValue: editing?.hardStop ?? true)
     }
@@ -280,12 +280,12 @@ struct BudgetDialog: View {
     private static func clean(_ s: String) -> String { s.filter { !",_ $".contains($0) } }
     private var tokenCap: Int64? {
         let t = Self.clean(tokens)
-        return t.isEmpty ? 0 : Int64(t).flatMap { $0 > 0 ? $0 : nil }
+        return t.isEmpty ? 0 : AccountsNumbers.parseWhole(t).flatMap { $0 > 0 ? $0 : nil }
     }
     private var usdCap: Int64?? {
         let t = Self.clean(dollars)
         if t.isEmpty { return .some(nil) }
-        guard let d = Double(t), d > 0 else { return nil }
+        guard let d = AccountsNumbers.parseDecimal(t), d > 0 else { return nil }
         return .some(Int64((d * 1_000_000).rounded()))
     }
     private var warnAt: Int64? {
@@ -406,12 +406,12 @@ struct RaiseDialog: View {
 
     private var t: Int64?? {
         let s = tokens.filter { !", _".contains($0) }
-        return s.isEmpty ? .some(nil) : Int64(s).flatMap { $0 > 0 ? .some($0) : nil }
+        return s.isEmpty ? .some(nil) : AccountsNumbers.parseWhole(s).flatMap { $0 > 0 ? .some($0) : nil }
     }
     private var u: Int64?? {
         let s = dollars.filter { !", _$".contains($0) }
         if s.isEmpty { return .some(nil) }
-        return Double(s).flatMap { $0 > 0 ? .some(Int64(($0 * 1_000_000).rounded())) : nil }
+        return AccountsNumbers.parseDecimal(s).flatMap { $0 > 0 ? .some(Int64(($0 * 1_000_000).rounded())) : nil }
     }
     private var ok: Bool {
         guard let t, let u else { return false }

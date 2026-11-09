@@ -366,20 +366,25 @@ enum ConnSay {
         }
         switch e {
         case .offline: return "This Mac can't reach your Core. Check the network, then try again."
-        case .forbiddenScope: return "Only an admin can do that. Nothing was changed."
+        case .forbiddenScope:
+            return "This Mac can only look. Changes need a Mac you allowed to manage the Core. Nothing was changed."
         case .stepUpRequired: return "Touch ID is needed for that. Try again and confirm it."
         case .authFailed, .sessionExpired, .revoked:
             return "This Mac needs to sign in to your Core again. Reopen Ainkrad and try again."
         case .rateLimited(let s):
             return "That was tried a moment ago. Try again in \(max(Int((s ?? 5).rounded(.up)), 1)) seconds."
-        case .http(let status, let code, _):
+        case .http(let status, let code, let message):
             if code == "real_secret_refused" { return "Connections are turned off on this Core. \(turnedOff)" }
             if status == 409 {
                 return
                     "This is still the default for its service. Make another one the default first, then disconnect it."
             }
             if status == 404 { return "That connection is gone already. Nothing was changed." }
-            return "Your Core didn't take that. Nothing was changed; try again."
+            // The Core's own reason, so a refusal says what to fix.
+            let why = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return why.isEmpty
+                ? "Your Core didn't take that. Nothing was changed; try again."
+                : "Your Core said: \(why.hasSuffix(".") ? why : why + "."). Nothing was changed. Your input is still here."
         default: return "Your Core didn't take that. Nothing was changed; try again."
         }
     }

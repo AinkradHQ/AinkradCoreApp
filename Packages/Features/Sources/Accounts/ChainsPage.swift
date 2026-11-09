@@ -12,7 +12,7 @@ struct ChainsPage: View {
                 title: "Chains",
                 detail:
                     "A chain lists pools in the order a session tries them. If an account fails, the next pool takes over.",
-                symbol: "link", hue: GlassInk.violet
+                symbol: "link", hue: GlassInk.blue
             ) { EmptyView() }
             if model.chains.isEmpty {
                 AccStateCard(
@@ -62,12 +62,12 @@ private struct ChainTab: View {
             .foregroundStyle(GlassInk.primary)
             .padding(.horizontal, Space.s3).frame(minHeight: 48)
             .background(
-                on ? GlassInk.violet.opacity(0.3) : hovering ? GlassInk.wellHover : GlassInk.well,
+                on ? GlassInk.blue.opacity(0.3) : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.control + 2)
             )
             .overlay {
                 coreShape(Radius.control + 2).strokeBorder(
-                    on ? GlassInk.violet.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
+                    on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control + 2))
         }
@@ -170,17 +170,18 @@ private struct EntryRow: View {
             Text("\(index + 1)").font(.system(size: MacTextSize.body, weight: .bold, design: .rounded))
                 .foregroundStyle(index == 0 ? .white : GlassInk.secondary)
                 .frame(width: 26, height: 26)
-                .background(index == 0 ? GlassInk.violet.opacity(0.85) : GlassInk.well, in: coreShape(7))
+                .background(index == 0 ? GlassInk.blue.opacity(0.85) : GlassInk.well, in: coreShape(7))
             AccTile(provider: entry.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
-                Text(model.pool(entry.pool)?.name ?? "Pool \(entry.pool)").font(
-                    .system(size: MacTextSize.headline, weight: .semibold)
-                ).lineLimit(1)
+                Text("\(model.providerName(entry.provider)) · \(model.pool(entry.pool)?.name ?? "Pool \(entry.pool)")")
+                    .font(
+                        .system(size: MacTextSize.headline, weight: .semibold)
+                    ).lineLimit(1)
                 Text(index == 0 ? "Tried first" : "Tried if the one above has no account to give")
                     .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
-            AccChip(text: entry.model ?? "default model", mono: entry.model != nil)
+            AccChip(text: entry.model ?? "Provider's default model", mono: entry.model != nil)
         }
         .padding(Space.s2).background(GlassInk.well, in: coreShape(Radius.control + 2))
         .accessibilityElement(children: .combine)

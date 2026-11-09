@@ -32,7 +32,9 @@ private struct AccountsList: View {
                         "Show",
                         segments: AccountFilter.allCases.map { f in
                             CoreSegment(
-                                f, "\(f.rawValue) \(model.accounts.filter { f.matches($0) }.count)", symbol: f.symbol)
+                                f,
+                                "\(f.rawValue) \(model.accounts.filter { f.matches($0, verdict: model.verdict($0)) }.count)",
+                                symbol: f.symbol)
                         }, selection: $model.filter
                     )
                     .fixedSize()
@@ -68,17 +70,26 @@ private struct AccountsList: View {
 private struct SummaryBar: View {
     let model: AccountsModel
     @State private var shown = false
+    @Environment(\.corePalette) private var palette
     var body: some View {
         let ready = model.readyCount
-        let off = model.accounts.filter { $0.phase == .disabled }.count
+        let off = model.accounts.filter { model.verdict($0).kind == .turnedOff }.count
         let need = model.needLook.count
         let other = model.accounts.count - ready - off - need
         VStack(alignment: .leading, spacing: Space.s2) {
+            // The counts sit directly above the bar they describe, each with its symbol: never colour alone.
+            HStack(spacing: Space.s4) {
+                legend("checkmark.circle", "\(ready) ready", .run)
+                legend("exclamationmark.triangle", "\(need) need a look", .warn)
+                legend("pause.circle", "\(off + other) turned off or other", .queue)
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: MacTextSize.meta, weight: .medium))
             GeometryReader { geo in
                 let total = max(1, model.accounts.count)
                 HStack(spacing: 3) {
-                    seg(ready, GlassInk.green, geo.size.width, total)
-                    seg(need, GlassInk.orange, geo.size.width, total)
+                    seg(ready, palette.tone(.run).fill, geo.size.width, total)
+                    seg(need, palette.tone(.warn).fill, geo.size.width, total)
                     seg(off + other, GlassInk.slate, geo.size.width, total)
                 }
             }
@@ -90,11 +101,14 @@ private struct SummaryBar: View {
         .accessibilityLabel("\(ready) ready, \(need) need a look, \(off + other) turned off or other")
     }
 
+    private func legend(_ symbol: String, _ text: String, _ tone: Tone) -> some View {
+        Label(text, systemImage: symbol).foregroundStyle(palette.tone(tone).ink)
+    }
+
     @ViewBuilder private func seg(_ n: Int, _ c: Color, _ width: CGFloat, _ total: Int) -> some View {
         if n > 0 {
-            coreShape(4).fill(c.gradient)
+            coreShape(4).fill(c)
                 .frame(width: shown ? max(8, width * CGFloat(n) / CGFloat(total) - 3) : 8)
-                .shadow(color: c.opacity(0.5), radius: 4)
         }
     }
 }
@@ -114,7 +128,7 @@ private struct ProviderSection: View {
                     Text(provider.name).font(.system(size: MacTextSize.title, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                     Text(
-                        "\(accounts.count) account\(accounts.count == 1 ? "" : "s")\(provider.builtin ? "" : " · custom")"
+                        "\(accounts.count) account\(accounts.count == 1 ? "" : "s")\(provider.builtin ? "" : " · custom, not usable by agents yet")"
                     )
                     .foregroundStyle(GlassInk.secondary)
                 }
@@ -254,8 +268,10 @@ private struct AddProviderCard: View {
                 IconTile("plus", hue: GlassInk.slate, size: 32)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Add a provider").font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text("OpenRouter, or any API like Anthropic, OpenAI or Gemini").foregroundStyle(GlassInk.secondary)
-                        .lineLimit(1)
+                    Text(
+                        "OpenRouter or another API. Not usable by agents yet: its accounts can't join pools or chains."
+                    )
+                    .foregroundStyle(GlassInk.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
