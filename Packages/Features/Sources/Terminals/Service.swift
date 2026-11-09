@@ -88,6 +88,7 @@ struct LiveTerminalService: TerminalService {
             switch try await client.getTerminal(path: .init(id: id)) {
             case .ok(let o): return Self.item(try o.body.json)
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -162,7 +163,7 @@ struct LiveTerminalService: TerminalService {
 
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch {
-            throw CoreError.unwrapping(error) ?? error
+            throw CoreFailure.of(error) ?? error
         }
     }
 
