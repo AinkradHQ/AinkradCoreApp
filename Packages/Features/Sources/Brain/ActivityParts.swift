@@ -15,8 +15,11 @@ struct ActivityDetail: View {
     let sub: String
     let rule: Rule?
     let why: String?
+    /// What happened, in words. The ids and codes are behind "Technical details".
+    let sentence: String
     let lines: [DetailLine]
     let note: String
+    @State private var technical = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
@@ -27,6 +30,7 @@ struct ActivityDetail: View {
                 BrainChip(chip.0, chip.1)
             }
             Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(sentence).fixedSize(horizontal: false, vertical: true).padding(.top, Space.s1)
             if let rule {
                 HStack(alignment: .top, spacing: Space.s2) {
                     Image(systemName: "shield").foregroundStyle(GlassInk.redInk).accessibilityHidden(true)
@@ -40,23 +44,30 @@ struct ActivityDetail: View {
                 .font(.system(size: MacTextSize.meta))
                 .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
                 .background(GlassInk.red.opacity(0.14), in: coreShape(Radius.control))
-                .help("Rule code: \(rule.code)")
+                .help("Rule: \(rule.name)")
             } else if let why {
                 Label(why, systemImage: "exclamationmark.triangle").font(.system(size: MacTextSize.meta))
                     .foregroundStyle(GlassInk.redInk)
             }
-            Grid(alignment: .topLeading, horizontalSpacing: Space.s3, verticalSpacing: Space.s2) {
-                ForEach(lines) { l in
-                    GridRow {
-                        Text(l.key).foregroundStyle(GlassInk.secondary).gridColumnAlignment(.leading)
-                        Text(l.value).font(.system(size: MacTextSize.meta, design: .monospaced))
-                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            DisclosureGroup(isExpanded: $technical) {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    Grid(alignment: .topLeading, horizontalSpacing: Space.s3, verticalSpacing: Space.s2) {
+                        ForEach(lines + (rule.map { [DetailLine(key: "Rule code", value: $0.code)] } ?? [])) { l in
+                            GridRow {
+                                Text(l.key).foregroundStyle(GlassInk.secondary).gridColumnAlignment(.leading)
+                                Text(l.value).font(.system(size: MacTextSize.meta, design: .monospaced))
+                                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
                     }
+                    Label(note, systemImage: "info.circle").foregroundStyle(GlassInk.secondary)
                 }
+                .font(.system(size: MacTextSize.meta)).padding(.top, Space.s2)
+            } label: {
+                Text("Technical details").font(.system(size: MacTextSize.meta, weight: .medium))
             }
-            .font(.system(size: MacTextSize.meta)).padding(.top, Space.s1)
-            Label(note, systemImage: "info.circle").font(.system(size: MacTextSize.meta))
-                .foregroundStyle(GlassInk.secondary).padding(.top, Space.s1)
+            .padding(.top, Space.s1)
+            .help("Event id, action code, result code and the other ids behind this row.")
         }
         .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading).coreWell()
         .accessibilityElement(children: .contain)

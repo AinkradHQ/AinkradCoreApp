@@ -62,7 +62,7 @@ struct NewRoomSheet: View {
                         .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 }
                 if let n = model.host.elevationNotice {
-                    CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
+                    BrainNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
                 }
                 HStack(spacing: Space.s2) {
                     Spacer()

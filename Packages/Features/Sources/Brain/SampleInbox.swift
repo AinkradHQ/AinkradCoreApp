@@ -60,6 +60,19 @@ struct SampleInbox: Sendable {
         ]
     }
 
+    /// Worst case: a thousand captures, some with very long or non-Latin sources.
+    mutating func inflate() {
+        let long = "Sample clip from a very long page title that keeps going well past one line of the list, again"
+        for i in 5...1000 {
+            let src =
+                i % 7 == 0
+                ? "ملاحظة عينة طويلة جداً من الهاتف رقم \(i)" : i % 3 == 0 ? "\(long) \(i)" : "Sample capture \(i)"
+            captures.append(
+                Capture(
+                    id: "u\(i)", source: src, days: i % 40, guess: i % 5 == 0 ? "Employer engagement programme" : nil))
+        }
+    }
+
     func inbox(room: String) -> RoomInbox {
         RoomInbox(
             room: room, waiting: candidates.filter { $0.room == room }, conflicts: conflicts.filter { $0.room == room },

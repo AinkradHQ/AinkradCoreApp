@@ -2,8 +2,8 @@ import CoreUI
 import SwiftUI
 
 /// The Brain, in the shape of every other Core app: tab tiles and action tiles in one header, the open-room bar under it,
-/// the tab below, and a quiet footer. Overview and Rooms are real in this change; Inbox, Activity and Checks are placeholders
-/// the next changes fill. The keyboard drives it: ⌘1 to ⌘5 tabs, ⌘N a new room, ⌥⌘N the advanced sheet, Esc back.
+/// the tab below, and a quiet footer. Overview and Checks are global; the room picker sits inside Rooms, Inbox and Activity,
+/// the tabs that look at one room. The keyboard drives it: ⌘1 to ⌘5 tabs, ⌘N a new room, ⌥⌘N the advanced sheet, Esc back.
 struct BrainPane: View {
     let model: BrainModel
     @FocusState private var paneFocus: Bool
@@ -20,7 +20,9 @@ struct BrainPane: View {
                 }
             } actions: {
                 if model.tab == .rooms, model.load == .ready {
-                    AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+                    AppActionTile(
+                        title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+                    ) {
                         BrainSheets.openNewRoom(model)
                     }
                     .keyboardShortcut("n", modifiers: [.command, .option])
@@ -30,9 +32,9 @@ struct BrainPane: View {
                     .keyboardShortcut("n", modifiers: .command)
                 }
             }
-            if model.load == .ready, !model.rooms.isEmpty { RoomBar(model: model).padding(.horizontal, Space.s4) }
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
+                    if model.load == .ready, !model.rooms.isEmpty, showsRoomBar { RoomBar(model: model) }
                     if let n = model.notice { notice(n) }
                     content
                 }
@@ -41,7 +43,6 @@ struct BrainPane: View {
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .scrollIndicators(.never)
             .focusable().focused($paneFocus).focusEffectDisabled()
             .onAppear { paneFocus = true }
             .onKeyPress(.escape) {
@@ -57,6 +58,15 @@ struct BrainPane: View {
         .accessibilityIdentifier("brain-pane")
     }
 
+    /// Rooms, Inbox (but not the no-room list) and Activity look at one room. Overview and Checks are global.
+    private var showsRoomBar: Bool {
+        switch model.tab {
+        case .rooms, .activity: true
+        case .inbox: model.inboxState.list != .noRoom
+        case .overview, .checks: false
+        }
+    }
+
     private func go(_ t: BrainTab) {
         withAnimation(.smooth(duration: 0.3)) {
             model.closeInspect()
@@ -66,7 +76,7 @@ struct BrainPane: View {
     }
 
     private func notice(_ text: String) -> some View {
-        CoreNotice(symbol: "exclamationmark.circle", title: text, tone: .fail) {
+        BrainNotice(symbol: "exclamationmark.circle", title: text, tone: .fail) {
             Button("Dismiss") { model.dismissNotice() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
     }
@@ -74,40 +84,29 @@ struct BrainPane: View {
     @ViewBuilder private var content: some View {
         switch model.load {
         case .unavailable:
-            BrainStateCard(
-                symbol: "brain", title: BrainWords.unavailableTitle, text: BrainWords.unavailableText
-            )
-            .accessibilityIdentifier("brain-unavailable")
+            BrainStateCard(symbol: "brain", title: BrainWords.unavailableTitle, text: BrainWords.unavailableText)
+                .accessibilityIdentifier("brain-unavailable")
         case .loading:
-            BrainStateCard(symbol: "hourglass", title: "Loading the Brain", text: "Reading your rooms.")
+            BrainSkeleton(shape: .page).accessibilityIdentifier("brain-loading")
         case .failed(let why):
-            BrainStateCard(symbol: "exclamationmark.triangle", title: "The Brain did not load", text: why, tone: .fail)
-            {
-                Button("Cancel") { model.host.shell.closePane("brain") }.buttonStyle(CoreButtonStyle(.secondary))
-                Button("Retry") { model.retry() }.buttonStyle(CoreButtonStyle(.prominent))
-            }
+            BrainStateCard(
+                symbol: "exclamationmark.triangle", title: "The Brain did not load", text: why,
+                primary: CoreAction("Try again") { model.retry() })
         case .ready where model.rooms.isEmpty:
             BrainStateCard(
                 symbol: "tray", title: "No rooms yet",
-                text: "A room keeps one kind of memory sealed apart from every other. Make the first one."
-            ) {
-                Button("New room (advanced)…") { BrainSheets.openNewRoom(model) }.buttonStyle(
-                    CoreButtonStyle(.secondary))
-                Button("New room") { Task { await model.quickRoom() } }.buttonStyle(CoreButtonStyle(.prominent))
-            }
+                text: "A room keeps one kind of memory sealed apart from every other. Make the first one.",
+                secondary: CoreAction("New room (advanced)…") { BrainSheets.openNewRoom(model) },
+                primary: CoreAction("New room") { Task { await model.quickRoom() } })
         case .ready:
             BrainConditions(model: model)
             Group {
                 switch model.tab {
                 case .overview: OverviewTab(model: model)
                 case .rooms: RoomsTab(model: model)
-                case .inbox: Placeholder(title: "Inbox", text: "Memories waiting for you, conflicts and blocked notes.")
+                case .inbox: InboxTab(model: model)
                 case .activity: ActivityTab(model: model)
                 case .checks: ChecksTab(model: model)
-                case .inbox: InboxTab(model: model)
-                case .activity:
-                    Placeholder(title: "Activity", text: "Who searched, saved or was refused, room by room.")
-                case .checks: Placeholder(title: "Checks", text: "Run the safety checks and see their history.")
                 }
             }
             .transition(.opacity)
@@ -125,16 +124,6 @@ struct BrainPane: View {
             }
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3).frame(minHeight: MacSize.controlSm)
-    }
-}
-
-/// A quiet placeholder for a tab the next change builds. It says so in plain words.
-private struct Placeholder: View {
-    let title: String
-    let text: String
-    var body: some View {
-        BrainStateCard(symbol: "clock", title: "\(title) is coming in the next change", text: text)
-            .accessibilityIdentifier("brain-placeholder")
     }
 }
 
@@ -156,12 +145,12 @@ struct RoomBar: View {
             .frame(width: Space.s8 * 7)
             if let r {
                 BrainChip(
-                    r.lock == nil ? "Open" : r.lock == .expired ? "Lease ended" : "Sealed",
+                    r.lock == nil ? "Open" : r.lock == .expired ? "Key ended" : "Sealed",
                     r.lock == nil ? GlassInk.green : GlassInk.slate)
                 RoomChips(room: r)
-                Text(r.lock == nil ? "Lease \(r.lease.left) left" : "Nothing from it is on screen.")
+                Text(r.lock == nil ? BrainWords.keyRenews(r.lease.left) : "Nothing from it is on screen.")
                     .font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
-                    .lineLimit(1)
+                    .lineLimit(1).help(r.lock == nil ? BrainWords.leaseHelp : "")
             }
             Spacer(minLength: Space.s2)
             if let r {

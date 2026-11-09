@@ -177,7 +177,7 @@ public struct CandidateEdit: Sendable, Hashable {
     }
 }
 
-/// The settings of "Approve (advanced)…". The plain Approve uses the room defaults.
+/// The settings of "Approve with options…". The plain Approve uses the room defaults.
 public struct ApproveOptions: Sendable, Hashable {
     public var appliesTo = "Whole project"
     public var whoSaidSo: Authority = .projectOwner

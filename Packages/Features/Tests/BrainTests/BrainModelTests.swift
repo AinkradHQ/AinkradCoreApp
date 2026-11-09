@@ -154,3 +154,49 @@ struct BrainModelTests {
         #expect(n.chip.label == "Needs you, \(n.needsTotal)")
     }
 }
+
+@MainActor
+struct PlainWordsTests {
+    @Test func theBreakdownNamesEveryTypeBiggestFirst() {
+        let shares = [
+            TypeShare("rule", 410), TypeShare("fact", 820), TypeShare("summary", 1), TypeShare("identity", 2),
+        ]
+        #expect(BrainWords.breakdown(shares) == "820 facts, 410 rules, 2 identities, 1 summary")
+        #expect(BrainWords.mostly(shares) == "67% facts")
+        #expect(BrainWords.mostly([]) == "")
+    }
+
+    @Test func aNumberNeverLeavesItsUnit() {
+        #expect(
+            BrainWords.glue("Local search 212 ms, target 300 ms") == "Local search 212\u{00A0}ms, target 300\u{00A0}ms")
+        #expect(BrainWords.keyRenews("19 h") == "Key renews in 19\u{00A0}h")
+        #expect(BrainWords.glue("Three rooms") == "Three rooms")
+    }
+
+    @Test func healthTilesGetPlainNamesAndKeepTheTermInHelp() {
+        let t = BrainWords.tile("restore", "Restore drill")
+        #expect(t.name == "Backup test" && t.help.contains("Restore drill"))
+        #expect(BrainWords.tile("isolation", "Isolation").help.contains("Isolation"))
+        #expect(BrainWords.tile("unknown", "Whatever").name == "Whatever")
+    }
+
+    @Test func anActivityRowIsAWholeSentence() async {
+        let host = FakeHost()
+        let m = BrainModel(host: host)
+        m.use(SampleBrainService(.init(), pace: .zero))
+        await m.reload()
+        await m.activity.load()
+        let e = m.activity.events[0]
+        let s = BrainWords.sentence(e, room: m.room(e.room)?.name)
+        #expect(s.contains(e.actor) && s.hasSuffix(".") && !s.contains(e.actionCode))
+    }
+
+    @Test func overviewIsGlobalAndNeverCountsASealedRoom() async {
+        let host = FakeHost()
+        let m = BrainModel(host: host)
+        m.use(SampleBrainService(.init(), pace: .zero))
+        await m.reload()
+        #expect(m.recordsPerRoom.allSatisfy { $0.room.mounted })
+        #expect(m.visibleNeeds.allSatisfy { n in n.room.map { m.room($0)?.mounted ?? false } ?? true })
+    }
+}

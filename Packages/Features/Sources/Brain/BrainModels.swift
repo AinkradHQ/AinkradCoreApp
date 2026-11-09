@@ -43,10 +43,19 @@ public enum ProviderClass: String, Sendable, CaseIterable, Hashable {
     case approvedCloud = "approved-cloud"
     case unapproved
 
+    /// Hover help: the technical term and what it means.
+    public var help: String {
+        switch self {
+        case .local: "Local models only: nothing from this room is ever sent to a cloud model."
+        case .approvedCloud: "Approved cloud: you approved named cloud models to read this room. Each call is logged."
+        case .unapproved: "Not approved: no cloud model may read this room."
+        }
+    }
+
     public var label: String {
         switch self {
         case .local: "Local models only"
-        case .approvedCloud: "Approved cloud"
+        case .approvedCloud: "Cloud allowed"
         case .unapproved: "Not approved"
         }
     }

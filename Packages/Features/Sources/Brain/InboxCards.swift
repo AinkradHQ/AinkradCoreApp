@@ -31,7 +31,7 @@ struct CandidateCard: View {
                 Button(action: edit) { KeyLabel("Edit", key: "E") }
                     .buttonStyle(CoreButtonStyle(.secondary)).help("Change the title or text, then approve.")
                 Spacer(minLength: Space.s2)
-                Button("Approve (advanced)…", action: advanced).buttonStyle(CoreButtonStyle(.plain))
+                Button("Approve with options…", action: advanced).buttonStyle(CoreButtonStyle(.plain))
                     .help("Choose who it applies to, who said so and when it ends.")
                 Button(action: approve) { KeyLabel("Approve", key: "⌘↩") }
                     .buttonStyle(CoreButtonStyle(.prominent)).help(
@@ -69,10 +69,11 @@ struct ConflictCard: View {
                 Spacer(minLength: Space.s2)
                 Button("Keep first") { keep(.first) }.buttonStyle(CoreButtonStyle(.secondary))
                 Button("Keep second") { keep(.second) }.buttonStyle(CoreButtonStyle(.secondary))
-                Button("Keep both scoped") { keep(.both) }.buttonStyle(CoreButtonStyle(.prominent))
+                Button("Keep both") { keep(.both) }.buttonStyle(CoreButtonStyle(.prominent))
                     .disabled(c.sameScope).help(
                         c.sameScope
-                            ? "Both say the same scope, so they cannot both stay." : "Each one keeps its own scope.")
+                            ? "Both say the same scope, so they cannot both stay."
+                            : "Keep both, scoped: each one applies only to its own scope.")
             }
             .disabled(busy)
         }
@@ -84,7 +85,7 @@ struct ConflictCard: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).foregroundStyle(GlassInk.secondary)
             QuotedText(text: s.text)
-            HStack(spacing: Space.s2) {
+            ChipFlow(spacing: Space.s2) {
                 SourceBadge(source: s.source)
                 BrainChip(s.authority.label, GlassInk.slate, help: "Authority id: \(s.authority.rawValue)")
                 BrainChip("Applies to: \(s.scope)", GlassInk.slate)

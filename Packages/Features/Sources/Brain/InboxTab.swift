@@ -72,17 +72,15 @@ struct InboxTab: View {
     @ViewBuilder private var content: some View {
         switch st.phase {
         case .idle, .loading:
-            BrainStateCard(symbol: "hourglass", title: "Loading the Inbox", text: "Reading what waits for you.")
+            BrainSkeleton(shape: .list)
         case .failed(let why):
             BrainStateCard(
-                symbol: "exclamationmark.triangle", title: "Could not read the Inbox", text: why, tone: .fail
-            ) {
-                Button("Cancel") { withAnimation { model.tab = .overview } }.buttonStyle(CoreButtonStyle(.secondary))
-                Button("Retry") { model.retryInbox() }.buttonStyle(CoreButtonStyle(.prominent))
-            }
+                symbol: "exclamationmark.triangle", title: "Could not read the Inbox", text: why,
+                primary: CoreAction("Try again") { model.retryInbox() }
+            )
             .accessibilityIdentifier("inbox-error")
         case .refused(let why):
-            BrainStateCard(symbol: "shield", title: "Refused by a room rule", text: why, tone: .warn)
+            BrainStateCard(symbol: "shield", title: "Refused by a room rule", text: why)
                 .accessibilityIdentifier("inbox-refused")
         case .ready:
             if st.list == .noRoom {
@@ -91,21 +89,15 @@ struct InboxTab: View {
                 BrainStateCard(
                     symbol: "lock", title: "Pick a room first",
                     text:
-                        "Waiting memories, conflicts and blocked notes belong to one room. Choose a room in the bar above."
+                        "Waiting memories, conflicts and blocked notes belong to one room. Choose a room in the picker above."
                 )
             } else if let lock = model.viewingLock, let r = model.viewing {
                 BrainStateCard(
                     symbol: "lock", title: "This room is sealed",
                     text: lock.sentence
-                        + " Its memories, conflicts and blocked notes stay hidden. No agent, cloud runner or search can read it."
-                ) {
-                    Button {
-                        Task { await model.open(r.id) }
-                    } label: {
-                        Label("Open this room", systemImage: "touchid")
-                    }
-                    .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.busy != nil)
-                }
+                        + " Its memories, conflicts and blocked notes stay hidden. No agent, cloud runner or search can read it.",
+                    primary: CoreAction("Open this room with Touch ID") { Task { await model.open(r.id) } }
+                )
                 .accessibilityIdentifier("inbox-sealed")
             } else {
                 roomList
@@ -162,10 +154,10 @@ struct InboxTab: View {
 
     /// An empty list says what it is for and gives one next step.
     func empty(_ title: String, _ text: String) -> some View {
-        BrainStateCard(symbol: "tray", title: title, text: text) {
-            Button("Back to Overview") { withAnimation { model.tab = .overview } }.buttonStyle(
-                CoreButtonStyle(.secondary))
-        }
+        BrainStateCard(
+            symbol: "tray", title: title, text: text,
+            secondary: CoreAction("Back to Overview") { withAnimation { model.tab = .overview } }
+        )
         .accessibilityIdentifier("inbox-empty")
     }
 }

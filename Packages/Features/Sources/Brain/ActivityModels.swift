@@ -237,4 +237,30 @@ extension BrainWords {
     public static func leftNothing(_ room: String) -> String { "Nothing from \(room) has left this Mac" }
     public static let leftNothingText = "This room is local only. It is not visible to cloud agents and not backed up."
     public static let activityIdsOnly = "Ids and codes only. No memory text or search words are kept here."
+
+    /// One row of the feed, as a sentence: who, on what, where, and how it ended. Words only; the codes are elsewhere.
+    static func sentence(_ e: ActivityEvent, room: String?) -> String {
+        let where_ = room.map { "in \($0)" } ?? "with no room chosen"
+        let how =
+            switch e.result {
+            case .ok: "It was allowed."
+            case .blocked: "It was blocked\(e.reason.map { ": \($0)" } ?? ".")"
+            case .failed: "It failed\(e.reason.map { ": \($0)" } ?? ".")"
+            }
+        return "\(e.actor) on \(e.device): \(e.action.lowercased()) \(where_). \(how)"
+    }
+
+    /// One row of "Sent out of this Mac", as a sentence.
+    static func sentence(_ c: EgressCall) -> String {
+        let place =
+            c.provider == .local
+            ? "a model on this Mac"
+            : c.provider == .approvedCloud ? "an approved cloud model" : "a model you have not approved"
+        guard c.sent else {
+            return "\(c.actor) tried to use \(place) for \(c.kind.label.lowercased()). It was blocked, so nothing left."
+        }
+        return c.stayedHere
+            ? "\(c.actor) used \(place) for \(c.kind.label.lowercased()). Nothing left this Mac."
+            : "\(c.actor) sent \(c.kind.label.lowercased()) to \(place)."
+    }
 }

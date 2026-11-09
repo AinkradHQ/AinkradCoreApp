@@ -139,7 +139,7 @@ extension SampleBrainService {
                 "sync", "Sync", "Changes on one device reach the others within a minute of reconnecting.", "Today",
                 .pass, "in 1 day", "38 s", "Under 60 s", "pppfppp", server: true),
             item(
-                "restore", "Restore drill", "Rebuilds a room on a clean Mac from its backup.", "41 days ago", .due,
+                "restore", "Backup test", "Rebuilds a room on a clean Mac from its backup.", "41 days ago", .due,
                 "now", "24 min", "Under 30 min", "ppp", server: true),
             item(
                 "keys", "Key rotation drill",
