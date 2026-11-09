@@ -40,7 +40,7 @@ struct LauncherView: View {
                 )
                 .textFieldStyle(.plain)
                 .foregroundStyle(WidgetInk.primary)
-                .font(.system(size: MacTextSize.large))
+                .coreFont(size: MacTextSize.large)
                 .focused($focused)
                 .onSubmit { run(rows) }
                 .onKeyPress(phases: [.down, .repeat]) { press in key(press, rows.count) }
@@ -102,13 +102,13 @@ struct LauncherView: View {
     }
 
     private func groupTitle(_ group: LauncherEntry.Group) -> some View {
-        Text(group.title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(WidgetInk.secondary)
+        Text(group.title).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(WidgetInk.secondary)
             .padding(.top, Space.s3).padding(.horizontal, Space.s2).accessibilityAddTraits(.isHeader)
     }
 
     private var empty: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Text("Nothing matches “\(query)”").font(.system(size: MacTextSize.headline, weight: .semibold))
+            Text("Nothing matches “\(query)”").coreFont(size: MacTextSize.headline, weight: .semibold)
             Text("Try fewer letters, or the first letters of each word.").foregroundStyle(WidgetInk.secondary)
         }
         .padding(Space.s4)
@@ -122,7 +122,7 @@ struct LauncherView: View {
             hint("⌘/", "all shortcuts")
             hint("esc", "close")
         }
-        .font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary)
+        .coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(Space.s3)
     }
@@ -226,6 +226,7 @@ struct LauncherView: View {
 }
 
 private struct LauncherItem: View {
+    private var textScale: Double { TextSizePrefs.shared.scale }
     let row: LauncherRow
     let number: Int?
     let selected: Bool
@@ -239,7 +240,7 @@ private struct LauncherItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s3) {
-                Image(systemName: row.entry.symbol).font(.system(size: MacTextSize.body + 1, weight: .semibold))
+                Image(systemName: row.entry.symbol).coreFont(size: MacTextSize.body + 1, weight: .semibold)
                     .foregroundStyle(.white)
                     .frame(width: MacSize.controlLg, height: MacSize.controlLg)
                     .background(
@@ -252,7 +253,7 @@ private struct LauncherItem: View {
                 title
                 Spacer(minLength: Space.s2)
                 if let sub = row.entry.sub {
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(WidgetInk.secondary).lineLimit(1)
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary).lineLimit(1)
                 }
                 if let number { CoreKeycap("⌘\(number)") }
             }
@@ -305,15 +306,15 @@ private struct LauncherItem: View {
         }
     }
 
-    private var title: Text {
+    private var title: some View {
         var out = AttributedString(row.entry.title)
         let chars = Array(out.characters.indices)
         for i in row.matched where chars.indices.contains(i) {
             let r = chars[i]..<out.characters.index(after: chars[i])
-            out[r].font = .system(size: MacTextSize.headline, weight: .bold)
+            out[r].font = .core(size: MacTextSize.headline, weight: .bold, scale: textScale)
             out[r].foregroundColor = hue == .white.opacity(0.35) ? WidgetInk.blue : hue
         }
-        return Text(out).font(.system(size: MacTextSize.headline, weight: .semibold))
+        return Text(out).coreFont(size: MacTextSize.headline, weight: .semibold)
     }
 }
 
@@ -327,10 +328,10 @@ private struct PaneActionsHeader: View {
                 IconTile(spec.symbol, hue: GlassInk.blue, size: 44, bounce: shown)
                     .shadow(color: GlassInk.blue.opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Actions").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                    Text("Actions").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                         WidgetInk.secondary)
                     HStack(spacing: Space.s2) {
-                        Text(spec.title).font(.system(size: MacTextSize.title, weight: .bold))
+                        Text(spec.title).coreFont(size: MacTextSize.title, weight: .bold)
                         if let sub = spec.sub { Text(sub).foregroundStyle(WidgetInk.secondary) }
                     }
                 }
@@ -341,7 +342,7 @@ private struct PaneActionsHeader: View {
                             color: chip.tone == .fail
                                 ? GlassInk.red : chip.tone == .warn ? GlassInk.orange : GlassInk.green,
                             live: chip.tone == .run || chip.tone == .done)
-                        Text(chip.label).font(.system(size: MacTextSize.meta, weight: .medium))
+                        Text(chip.label).coreFont(size: MacTextSize.meta, weight: .medium)
                     }
                     .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm + 2)
                     .background(GlassInk.well, in: coreShape(Radius.chip))

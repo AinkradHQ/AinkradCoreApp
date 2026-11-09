@@ -66,7 +66,7 @@ struct OverviewPage: View {
 
     private func section(_ title: String, _ symbol: String, _ hue: Color) -> some View {
         Label {
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold))
+            Text(title).coreFont(size: MacTextSize.title, weight: .semibold)
         } icon: {
             Image(systemName: symbol).foregroundStyle(hue)
         }
@@ -119,7 +119,7 @@ private struct AlertRow: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
                 AccTile(provider: account.provider)
-                Text(account.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                Text(account.label).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                 Spacer(minLength: Space.s2)
                 VerdictBadge(verdict: model.verdict(account))
             }
@@ -143,6 +143,10 @@ private struct AlertRow: View {
         .help("Open \(account.label)")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            model.page = .accounts
+            model.detail = account.id
+        }
     }
 }
 
@@ -168,10 +172,10 @@ private struct StatTile: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
                 Image(systemName: symbol).foregroundStyle(hue)
-                Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: 0)
             }
-            Text("\(value)").font(.system(size: 30, weight: .bold, design: .rounded)).contentTransition(.numericText())
+            Text("\(value)").coreFont(size: 30, weight: .bold, design: .rounded).contentTransition(.numericText())
             if bar {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
@@ -201,7 +205,7 @@ private struct TriedFirst: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Label {
-                Text("Tried first").font(.system(size: MacTextSize.title, weight: .semibold))
+                Text("Tried first").coreFont(size: MacTextSize.title, weight: .semibold)
             } icon: {
                 Image(systemName: "arrow.right.to.line").foregroundStyle(GlassInk.blue)
             }
@@ -220,9 +224,9 @@ private struct TriedFirst: View {
             AccTile(provider: p.id).scaleEffect(0.8)
             VStack(alignment: .leading, spacing: 0) {
                 Text(ProviderLook.short(p.id, p.name) + (p.loginMethods.contains("browser_code") ? " · plan" : ""))
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Text(first?.label ?? (model.defaultPool(p.id) == nil ? "No default pool" : "None ready"))
-                    .font(.system(size: MacTextSize.body, weight: .semibold))
+                    .coreFont(size: MacTextSize.body, weight: .semibold)
                     .foregroundStyle(first == nil ? GlassInk.orangeInk : GlassInk.primary).lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -236,6 +240,13 @@ private struct TriedFirst: View {
                     model.page = .accounts
                     model.detail = first.id
                 }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .coreActivates(enabled: first != nil) {
+            if let first {
+                model.page = .accounts
+                model.detail = first.id
             }
         }
     }
@@ -268,8 +279,8 @@ struct AccountCard: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 AccTile(provider: a.provider).opacity(dim)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(a.label).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
-                    Text(model.providerName(a.provider)).font(.system(size: MacTextSize.meta))
+                    Text(a.label).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
+                    Text(model.providerName(a.provider)).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
@@ -312,14 +323,14 @@ struct AccountCard: View {
                         Label(n, systemImage: "waveform").foregroundStyle(GlassInk.secondary)
                     }
                 }
-                .font(.system(size: MacTextSize.meta, weight: .medium))
+                .coreFont(size: MacTextSize.meta, weight: .medium)
             }
             HStack {
                 Label(AccountsWords.used(a.lastUsedAt, now: model.now()), systemImage: "clock")
                 Spacer()
                 Text(AccountsWords.capWords(a.cap)).lineLimit(1)
             }
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s3)

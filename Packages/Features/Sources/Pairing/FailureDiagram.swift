@@ -19,7 +19,7 @@ struct FailureDiagram: View {
             }
             .frame(height: MacSize.controlLg * 1.6)
             node(failure.diagramEnd, failure.diagramLabel, ink: tone.ink, fill: tone.fill)
-                .symbolEffect(.pulse, options: .repeating)
+                .corePulse()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("This Mac to \(failure.diagramLabel): stopped")
@@ -31,7 +31,7 @@ struct FailureDiagram: View {
                 .foregroundStyle(ink)
                 .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
                 .background(fill, in: coreShape(Radius.control))
-            Text(label).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            Text(label).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
     }
 

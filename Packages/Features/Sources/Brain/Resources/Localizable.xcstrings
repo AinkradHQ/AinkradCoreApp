@@ -1,0 +1,436 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    " This room can reach cloud agents, so " : {
+
+    },
+    " a conflict. Each room keeps its own rule, and only disagreements inside this room show here." : {
+
+    },
+    " before it goes in." : {
+
+    },
+    " left" : {
+
+    },
+    "%@ " : {
+
+    },
+    "%@ holds two topics. Give each part its own room. Each part follows that room's rules." : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@, %@, %lld memories" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@, %4$lld memories"
+          }
+        }
+      }
+    },
+    "%@, %@. %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@. %3$@. %4$@"
+          }
+        }
+      }
+    },
+    "%@, %@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@: %3$@"
+          }
+        }
+      }
+    },
+    "%@: %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@. %3$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld %@%@. Opens %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@%3$@. Opens %4$@."
+          }
+        }
+      }
+    },
+    "%lld days ago" : {
+
+    },
+    "%lld ms" : {
+
+    },
+    "%lld selected" : {
+
+    },
+    "All rooms" : {
+
+    },
+    "Approve this memory with settings you choose. The plain Approve uses the room defaults." : {
+
+    },
+    "Approve with options…" : {
+
+    },
+    "Approve with the room defaults. Agents can use it at once." : {
+
+    },
+    "Ask me later" : {
+
+    },
+    "Assign selected…" : {
+
+    },
+    "Assign to a room…" : {
+
+    },
+    "Backup: %@" : {
+
+    },
+    "Blocked by: %@. " : {
+
+    },
+    "Both say the same scope, so they cannot both stay." : {
+
+    },
+    "Capture id: %@" : {
+
+    },
+    "Captured by %@" : {
+
+    },
+    "Change the title or text, then approve." : {
+
+    },
+    "Choose the room this capture belongs to." : {
+
+    },
+    "Choose what to run. The plain Run now uses the defaults: every mounted room, 1,000 test questions." : {
+
+    },
+    "Choose who it applies to, who said so and when it ends." : {
+
+    },
+    "Clear" : {
+
+    },
+    "Clear filters" : {
+
+    },
+    "Clear pause with Touch ID" : {
+
+    },
+    "Code: %@" : {
+
+    },
+    "Discard…" : {
+
+    },
+    "Dismiss" : {
+
+    },
+    "Done this session %lld" : {
+
+    },
+    "Due %@" : {
+
+    },
+    "Each room is sealed apart from the others. Pick one to look at its numbers." : {
+
+    },
+    "Egress log: everything a model ever received from a room." : {
+
+    },
+    "Esc back to all rooms" : {
+
+    },
+    "Event id, action code, result code and the other ids behind this row." : {
+
+    },
+    "Everything a model ever received from this room, one row per try. Used for a provider revocation report." : {
+
+    },
+    "Housekeeping" : {
+
+    },
+    "Keep both" : {
+
+    },
+    "Keep both, scoped: each one applies only to its own scope." : {
+
+    },
+    "Keep first" : {
+
+    },
+    "Keep second" : {
+
+    },
+    "Keeping this one replaces a higher source (%@). Touch ID asks." : {
+
+    },
+    "Last %lld runs, %lld over the target" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last %1$lld runs, %2$lld over the target"
+          }
+        }
+      }
+    },
+    "Last %lld runs: %lld passed, %lld failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last %1$lld runs: %2$lld passed, %3$lld failed"
+          }
+        }
+      }
+    },
+    "Last run" : {
+
+    },
+    "Link" : {
+
+    },
+    "Live" : {
+
+    },
+    "Load more" : {
+
+    },
+    "Loading" : {
+
+    },
+    "Local search %lld milliseconds today, target %lld, highest in %lld days %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Local search %1$lld milliseconds today, target %2$lld, highest in %3$lld days %4$lld"
+          }
+        }
+      }
+    },
+    "Memory id: %@" : {
+
+    },
+    "Memory waiting: %@. Command Return approves, Command Delete rejects." : {
+
+    },
+    "More actions for the selected captures" : {
+
+    },
+    "More actions for this capture" : {
+
+    },
+    "More: %@" : {
+
+    },
+    "Name and mode only" : {
+
+    },
+    "Needs Touch ID" : {
+
+    },
+    "New rows arrive within seconds." : {
+
+    },
+    "No room yet" : {
+
+    },
+    "No runs yet" : {
+
+    },
+    "Not available. A link would keep a door open into the inbox." : {
+
+    },
+    "Open Checks" : {
+
+    },
+    "Open with Touch ID" : {
+
+    },
+    "Paused" : {
+
+    },
+    "Paused. " : {
+
+    },
+    "Pilot target %@" : {
+
+    },
+    "Proposed by %@" : {
+
+    },
+    "Quoted text: %@" : {
+
+    },
+    "Redact and keep" : {
+
+    },
+    "Reject this memory. The proposer is told it was not used." : {
+
+    },
+    "Remove the secret and keep the rest. The cleaned note waits in Waiting." : {
+
+    },
+    "Rule: %@" : {
+
+    },
+    "Run all" : {
+
+    },
+    "Run all with options…" : {
+
+    },
+    "Run leakage check again" : {
+
+    },
+    "Run now" : {
+
+    },
+    "Run now. Option-click for more choices." : {
+
+    },
+    "Run with options…" : {
+
+    },
+    "Running, %lld%%" : {
+
+    },
+    "Same as Settings, Appearance." : {
+
+    },
+    "Seal room" : {
+
+    },
+    "Sealed rooms show only their name and mode. Counts appear after you open them." : {
+
+    },
+    "Select all" : {
+
+    },
+    "Select all %lld" : {
+
+    },
+    "Shows only this room" : {
+
+    },
+    "Target %@" : {
+
+    },
+    "Target: %@" : {
+
+    },
+    "Technical details" : {
+
+    },
+    "Text from this source is untrusted. It is shown as written and never run." : {
+
+    },
+    "The darkest part is the most common kind. Hover a row for the full breakdown." : {
+
+    },
+    "The inbox is only entered by capture, so a link into it is not allowed." : {
+
+    },
+    "These captures had no trusted room. They are never searched and never shown to agents. A capture older than 14 days shows as stale, and at 30 days it also rings the bell. Nothing is deleted or assigned for you." : {
+
+    },
+    "This Mac and iPhone only" : {
+
+    },
+    "This list is not a room. " : {
+
+    },
+    "This page keeps results only, never memory text. Hover for the codes." : {
+
+    },
+    "Today" : {
+
+    },
+    "Touch ID asks" : {
+
+    },
+    "Touch ID is asked first, because this room will leave this Mac." : {
+
+    },
+    "Try again" : {
+
+    },
+    "Two rooms that disagree are " : {
+
+    },
+    "View this room" : {
+
+    },
+    "Waiting %@" : {
+
+    },
+    "What happens. " : {
+
+    },
+    "What you get" : {
+
+    },
+    "Who touched which room, and what was refused. Never any memory text." : {
+
+    },
+    "Wipe the note from this Mac. Touch ID asks." : {
+
+    },
+    "chk.%@, run-%@-%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "chk.%1$@, run-%2$@-%3$lld"
+          }
+        }
+      }
+    },
+    "not" : {
+
+    },
+    "of %@ cap" : {
+
+    },
+    "today" : {
+
+    }
+  },
+  "version" : "1.0"
+}

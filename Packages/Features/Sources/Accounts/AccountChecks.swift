@@ -95,7 +95,7 @@ struct TestTile: View {
                         )
                         .contentTransition(.symbolEffect(.replace))
                     Text(running ? "Testing…" : w?.title ?? "Never tested")
-                        .font(.system(size: MacTextSize.title, weight: .semibold))
+                        .coreFont(size: MacTextSize.title, weight: .semibold)
                         .foregroundStyle(
                             running ? GlassInk.primary : w.map { GlassInk.ink($0.hue) } ?? GlassInk.primary)
                     Spacer(minLength: 0)
@@ -109,7 +109,7 @@ struct TestTile: View {
                     CoreBusyBar()
                 } else {
                     Text(w?.line ?? "One free request checks the key works. Nothing is spent.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let note = model.testNote[account.id] {
@@ -120,7 +120,7 @@ struct TestTile: View {
                             ? "Tested just now"
                             : "Tested \(AccountsWords.duration(ctx.date.timeIntervalSince(last.at))) ago"
                     )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .help("result \(last.result)")
                 }
             }
@@ -143,15 +143,15 @@ struct LimitsTileBody: View {
             AccLink(title: "Change · S", symbol: "slider.horizontal.3") { AccountDialogs.openLimits(model, account) }
                 .disabled(model.readOnly)
         }
-        Text("When a session reaches either, Core stops it.").font(.system(size: MacTextSize.meta))
+        Text("When a session reaches either, Core stops it.").coreFont(size: MacTextSize.meta)
             .foregroundStyle(GlassInk.secondary)
     }
 
     private func figure(_ v: String?, _ unit: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(v ?? "∞").font(.system(size: 26, weight: .bold, design: .rounded)).contentTransition(.numericText())
+            Text(v ?? "∞").coreFont(size: 26, weight: .bold, design: .rounded).contentTransition(.numericText())
             Text(v == nil ? "no \(unit == "tokens" ? "token" : "dollar") limit" : unit)
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
     }
 }
@@ -209,7 +209,7 @@ struct LimitsDialog: View {
                 Text(
                     "A lower limit starts with the next session, resume or top-up. Sessions running now keep the limit they started with."
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["limits-\(account.id)"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)

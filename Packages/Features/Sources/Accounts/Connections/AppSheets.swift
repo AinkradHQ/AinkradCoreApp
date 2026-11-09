@@ -57,9 +57,9 @@ struct AppRegistrationSheet: View {
         }
         if let r = app.redirect {
             VStack(alignment: .leading, spacing: Space.s1) {
-                Text("Give \(kind.name) this return address, exactly:").font(.system(size: MacTextSize.meta))
+                Text("Give \(kind.name) this return address, exactly:").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
-                Text(r).font(.system(size: MacTextSize.meta, design: .monospaced)).textSelection(.enabled)
+                Text(r).coreFont(size: MacTextSize.meta, design: .monospaced).textSelection(.enabled)
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
             .background(GlassInk.well, in: coreShape(Radius.cardMac))
@@ -69,7 +69,7 @@ struct AppRegistrationSheet: View {
                 "Changing the app can make existing \(kind.name) sign-ins ask to be signed in again.",
                 systemImage: "info.circle"
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
         if let e = model.writeError[key] { AccIssue(text: e) }

@@ -43,7 +43,7 @@ struct ApprovalCardView: View {
                 IconTile(ask.symbol, hue: GlassInk.orange, size: 44, bounce: request.id)
                     .shadow(color: GlassInk.orange.opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(who) wants to \(ask.verb)").font(.system(size: MacTextSize.title, weight: .bold))
+                    Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.title, weight: .bold)
                     Text(
                         "On \(session.map { model.runnerName($0.runner) } ?? "a runner") · asked \(AgentWords.ago(request.requestedAt, now: now))"
                     )
@@ -54,18 +54,16 @@ struct ApprovalCardView: View {
                 if let left {
                     VStack(alignment: .trailing, spacing: 0) {
                         Text(AgentWords.clock(left))
-                            .font(
-                                .system(size: MacTextSize.large + 2, weight: .bold, design: .rounded).monospacedDigit()
-                            )
+                            .coreFont(size: MacTextSize.large + 2, weight: .bold, design: .rounded).monospacedDigit()
                             .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
-                        Text("to answer").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        Text("to answer").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     }
                 }
             }
             if !request.input.isEmpty {
                 HStack(alignment: .top, spacing: Space.s2) {
                     Image(systemName: ask.wellSymbol).foregroundStyle(GlassInk.secondary)
-                    Text(request.input).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(5)
+                    Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(5)
                         .textSelection(.enabled).agentCopyMenu(request.input)
                     Spacer(minLength: 0)
                 }
@@ -93,7 +91,7 @@ struct ApprovalCardView: View {
             HStack(spacing: Space.s2) {
                 answer(approve: false, busy: busy)
                 if busy {
-                    Text("Waiting for your Core…").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                    Text("Waiting for your Core…").coreFont(size: MacTextSize.meta).foregroundStyle(
                         GlassInk.secondary)
                 }
                 Spacer(minLength: 0)
@@ -141,8 +139,8 @@ struct ApprovalCardView: View {
         let hue = ok ? GlassInk.green : GlassInk.slate
         return HStack(spacing: Space.s3) {
             IconTile(ok ? "checkmark" : "xmark", hue: hue, size: 26)
-            Text("\(ok ? "Approved" : "Denied"): \(ask.verb)").font(.system(size: MacTextSize.body, weight: .semibold))
-            Text(request.input).font(.system(size: MacTextSize.body, design: .monospaced)).foregroundStyle(
+            Text("\(ok ? "Approved" : "Denied"): \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
+            Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced).foregroundStyle(
                 GlassInk.secondary
             )
             .lineLimit(1).truncationMode(.tail)
@@ -157,11 +155,11 @@ struct ApprovalCardView: View {
         HStack(alignment: .top, spacing: Space.s3) {
             IconTile("clock.badge.xmark", hue: GlassInk.slate, size: 26)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Nobody answered in time: \(ask.verb)").font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(request.input).font(.system(size: MacTextSize.body, design: .monospaced))
+                Text("Nobody answered in time: \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
+                Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced)
                     .foregroundStyle(GlassInk.secondary).lineLimit(2)
                 Text("The agent stopped waiting for this. Ask it again from the composer if you still want it.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: 0)
         }

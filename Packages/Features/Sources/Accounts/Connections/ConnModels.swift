@@ -168,7 +168,7 @@ struct ConnTile: View {
     var body: some View {
         let hue = ConnLook.hue(kind)
         let size: CGFloat = large ? 48 : 34
-        Image(systemName: ConnLook.symbol(kind)).font(.system(size: large ? 20 : 15, weight: .semibold))
+        Image(systemName: ConnLook.symbol(kind)).coreFont(size: large ? 20 : 15, weight: .semibold)
             .foregroundStyle(.white).frame(width: size, height: size)
             .background(
                 LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),

@@ -16,7 +16,7 @@ struct WidgetGallery: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Add Widget").font(.system(size: MacTextSize.title, weight: .semibold))
+                Text("Add Widget").coreFont(size: MacTextSize.title, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button("Done") { shell.addingWidget = false }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
@@ -27,7 +27,7 @@ struct WidgetGallery: View {
                     ForEach(Self.cats, id: \.self) { cat in
                         let kinds = WidgetKind.allCases.filter { $0.category == cat }
                         if !kinds.isEmpty {
-                            Text(cat).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                            Text(cat).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                                 palette.text2
                             )
                             .padding(.horizontal, 6).padding(.top, 8)
@@ -51,8 +51,8 @@ struct WidgetGallery: View {
         return VStack(alignment: .leading, spacing: 8) {
             preview(kind, s)
             VStack(alignment: .leading, spacing: 1) {
-                Text(kind.title).font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(kind.about).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                Text(kind.title).coreFont(size: MacTextSize.body, weight: .semibold)
+                Text(kind.about).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 4) {
@@ -118,7 +118,7 @@ private struct ChoiceStyle: ButtonStyle {
     @State private var hovering = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: MacTextSize.meta, weight: .medium))
+            .coreFont(size: MacTextSize.meta, weight: .medium)
             .foregroundStyle(on ? palette.primary : palette.text)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlSm)
             .background(on ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.chip))

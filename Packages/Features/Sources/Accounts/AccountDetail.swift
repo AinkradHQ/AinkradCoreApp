@@ -25,7 +25,7 @@ struct AccountDetailView: View {
                     AccTile(large: true, provider: a.provider)
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: Space.s2) {
-                            Text(a.label).font(.system(size: MacTextSize.large, weight: .bold)).lineLimit(1)
+                            Text(a.label).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
                                 .accessibilityAddTraits(.isHeader)
                             VerdictBadge(verdict: verdict)
                         }
@@ -71,7 +71,7 @@ struct AccountDetailView: View {
                         withAnimation(Motion.out(Motion.ui)) { tech.toggle() }
                     }
                 }
-                .font(.system(size: MacTextSize.meta))
+                .coreFont(size: MacTextSize.meta)
                 if tech {
                     HStack(spacing: Space.s2) {
                         AccChip(text: "state \(a.state)", mono: true)
@@ -97,7 +97,7 @@ struct AccountDetailView: View {
             Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(GlassInk.orangeInk)
             VStack(alignment: .leading, spacing: 2) {
-                Text("The provider refused this key once").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("The provider refused this key once").coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text("Core is checking it again. If it's refused again, the account turns off by itself.")
                     .foregroundStyle(GlassInk.secondary)
             }
@@ -126,7 +126,7 @@ struct AccountDetailView: View {
                 .background(GlassInk.well, in: coreShape(Radius.cardMac))
                 .contentTransition(.symbolEffect(.replace))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: MacTextSize.title, weight: .bold)).foregroundStyle(tone.ink)
+                Text(title).coreFont(size: MacTextSize.title, weight: .bold).foregroundStyle(tone.ink)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
@@ -174,7 +174,7 @@ struct AccountDetailView: View {
                 i, s in
                 if i > 0 { coreShape(1).fill(s.1 ? hue : GlassInk.track).frame(width: 14, height: 2) }
                 Label(s.0, systemImage: s.1 ? "checkmark" : "circle.dashed")
-                    .font(.system(size: MacTextSize.meta, weight: .semibold))
+                    .coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(s.1 ? .white : GlassInk.secondary)
                     .padding(.horizontal, 8).frame(height: 24)
                     .background(s.1 ? hue.opacity(0.6) : GlassInk.well, in: coreShape(6))
@@ -190,7 +190,7 @@ struct AccountDetailView: View {
 
     private func tile<C: View>(_ title: String, _ symbol: String, @ViewBuilder _ c: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Label(title, systemImage: symbol).font(.system(size: MacTextSize.meta, weight: .semibold))
+            Label(title, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.secondary)
             c()
             Spacer(minLength: 0)
@@ -207,12 +207,12 @@ struct AccountDetailView: View {
                 ForEach(0..<4, id: \.self) { _ in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
                 }
-                Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).font(
-                    .system(size: MacTextSize.title, weight: .semibold, design: .monospaced))
+                Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(
+                    size: MacTextSize.title, weight: .semibold, design: .monospaced)
             }
-            Text("Kept sealed in Core. It can't be shown again.").font(.system(size: MacTextSize.meta))
+            Text("Kept sealed in Core. It can't be shown again.").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary)
-            Text(AccountsWords.used(a.lastUsedAt, now: model.now())).font(.system(size: MacTextSize.meta))
+            Text(AccountsWords.used(a.lastUsedAt, now: model.now())).coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary)
         }
     }
@@ -220,8 +220,8 @@ struct AccountDetailView: View {
     private func poolsTile(_ a: AccountItem, _ pools: [PoolItem]) -> some View {
         tile("Pools", "square.grid.2x2.fill") {
             if pools.isEmpty {
-                Text("In no pool").font(.system(size: MacTextSize.title, weight: .semibold))
-                Text("Agents can't reach it yet.").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                Text("In no pool").coreFont(size: MacTextSize.title, weight: .semibold)
+                Text("Agents can't reach it yet.").coreFont(size: MacTextSize.meta).foregroundStyle(
                     GlassInk.orangeInk)
             }
             ForEach(pools) { p in
@@ -233,9 +233,9 @@ struct AccountDetailView: View {
                     HStack(spacing: Space.s2) {
                         Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(
                             GlassInk.blueInk)
-                        Text(p.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                        Text(p.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
+                        Image(systemName: "chevron.forward").foregroundStyle(GlassInk.secondary)
                     }
                     .padding(.horizontal, Space.s2).frame(minHeight: 30)
                     .background(GlassInk.well, in: coreShape(Radius.control))

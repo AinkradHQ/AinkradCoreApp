@@ -1,0 +1,260 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    " ~ " : {
+
+    },
+    "$ " : {
+
+    },
+    "$ ls" : {
+
+    },
+    "%@ $ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ $ %2$@"
+          }
+        }
+      }
+    },
+    "%@ cursor" : {
+
+    },
+    "%@ theme" : {
+
+    },
+    "%@, %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@%3$@"
+          }
+        }
+      }
+    },
+    "%@, %@, %lld of %lld slots in use" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$lld of %4$lld slots in use"
+          }
+        }
+      }
+    },
+    "%lld at once" : {
+
+    },
+    "%lld attached" : {
+
+    },
+    "%lld pt" : {
+
+    },
+    "%lld terminals" : {
+
+    },
+    "1 terminal" : {
+
+    },
+    "30 × 100" : {
+
+    },
+    "All runners" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Detach" : {
+
+    },
+    "Disconnected, so the test would fail with runner_offline." : {
+
+    },
+    "End Terminal…" : {
+
+    },
+    "Family" : {
+
+    },
+    "Load sampled on this Mac while it watched." : {
+
+    },
+    "Needs Touch ID. Covers this action only." : {
+
+    },
+    "Needs the read and agent scopes." : {
+
+    },
+    "New terminal" : {
+
+    },
+    "No drivers reported yet" : {
+
+    },
+    "No runners" : {
+
+    },
+    "No runners are paired with this Core." : {
+
+    },
+    "No terminals here" : {
+
+    },
+    "None reported yet." : {
+
+    },
+    "Not available while disconnected." : {
+
+    },
+    "Nothing running." : {
+
+    },
+    "Open" : {
+
+    },
+    "Open a shell on one of your runners." : {
+
+    },
+    "Open a terminal here" : {
+
+    },
+    "Open terminal" : {
+
+    },
+    "Opens %@ on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Opens %1$@ on %2$@"
+          }
+        }
+      }
+    },
+    "Or any command, for example htop" : {
+
+    },
+    "Output this Mac saw in the last hour" : {
+
+    },
+    "Pair a runner to open terminals." : {
+
+    },
+    "Pick where it runs and what it starts." : {
+
+    },
+    "Preview of the terminal" : {
+
+    },
+    "Program to start" : {
+
+    },
+    "Refused while the host is over its load limit." : {
+
+    },
+    "Rename…" : {
+
+    },
+    "Run no-op test" : {
+
+    },
+    "Runners report work slots and load per core; memory and disk are not reported." : {
+
+    },
+    "Runs as the runner's user in a sandbox: sudo, su and ping don't work. The terminal scope counts as admin-level today." : {
+
+    },
+    "Same as Settings, Appearance. Each terminal keeps its theme's colour." : {
+
+    },
+    "Send SIG%@" : {
+
+    },
+    "Send Signal…" : {
+
+    },
+    "Sends an empty round trip to the runner. No work is started." : {
+
+    },
+    "Signal to send" : {
+
+    },
+    "Start with %@" : {
+
+    },
+    "Terminal" : {
+
+    },
+    "Terminal on %@, %@, %lld by %lld, %lld attached" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Terminal on %1$@, %2$@, %3$lld by %4$lld, %5$lld attached"
+          }
+        }
+      }
+    },
+    "Terminals" : {
+
+    },
+    "Terminals are off here. Start the runner with --enable-pty to use them." : {
+
+    },
+    "Terminals are off on this runner." : {
+
+    },
+    "Terminals this device opened. The Core keeps no output, so a tile shows the shell, not its screen." : {
+
+    },
+    "The marker is the limit: above %lld per core the runner refuses new work (default)." : {
+
+    },
+    "The runner answered in %lld ms. No work was started." : {
+
+    },
+    "This runner has not reported host load." : {
+
+    },
+    "Try again" : {
+
+    },
+    "Waiting for the runner…" : {
+
+    },
+    "[exited]" : {
+
+    },
+    "not attached" : {
+
+    },
+    "test result: ok. 412 passed; 0 failed" : {
+
+    },
+    "v%@" : {
+
+    },
+    "warning: 2 unused imports" : {
+
+    },
+    "~/AinkradCore $ " : {
+
+    },
+    "~/AinkradCore $ cargo test -p citadel" : {
+
+    },
+    "↩ open · D detach · E end · S signal · R rename" : {
+
+    }
+  },
+  "version" : "1.0"
+}

@@ -178,7 +178,7 @@ private struct AuditFilters: View {
     private func chip(_ title: String, _ symbol: String, _ hue: Color, on: Bool, run: @escaping () -> Void) -> some View
     {
         Button(action: run) {
-            Label(title, systemImage: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+            Label(title, systemImage: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                 .foregroundStyle(on ? .white : GlassInk.secondary)
                 .padding(.horizontal, Space.s3).frame(height: 30)
                 .background(on ? hue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.control))
@@ -203,7 +203,7 @@ private struct AuditList: View {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(model.items.enumerated()), id: \.element.id) { i, a in
                         if i == 0 || !Calendar.current.isDate(a.at, inSameDayAs: model.items[i - 1].at) {
-                            Text(day(a.at)).font(.system(size: MacTextSize.meta, weight: .semibold))
+                            Text(day(a.at)).coreFont(size: MacTextSize.meta, weight: .semibold)
                                 .foregroundStyle(GlassInk.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, Space.s2).padding(.top, i == 0 ? 0 : Space.s2)
@@ -238,7 +238,7 @@ private struct AuditList: View {
             .accessibilityLabel("Audit rows")
             .accessibilityHint("Arrow keys move between rows")
             HStack(spacing: Space.s3) {
-                Text("\(model.items.count) shown").font(.system(size: MacTextSize.meta))
+                Text("\(model.items.count) shown").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
                 Spacer()
                 if let e = model.moreError { IssueLine(code: nil, text: e) }
@@ -250,7 +250,7 @@ private struct AuditList: View {
                     .help("Show the next \(AuditModel.pageSize) older rows")
                 } else {
                     Label("That's the start of the log", systemImage: "flag.checkered")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
         }
@@ -272,10 +272,8 @@ private struct AuditList: View {
             (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
                 .lineLimit(1).truncationMode(.middle)
             Spacer(minLength: Space.s2)
-            Text(a.at.formatted(date: .omitted, time: .shortened)).font(
-                .system(size: MacTextSize.meta).monospacedDigit()
-            )
-            .foregroundStyle(GlassInk.secondary)
+            Text(a.at.formatted(date: .omitted, time: .shortened)).coreFont(size: MacTextSize.meta).monospacedDigit()
+                .foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s2).frame(height: 40)
         .background(on ? area.hue.opacity(0.16) : .clear, in: coreShape(Radius.control))
@@ -306,7 +304,7 @@ private struct AuditDetail: View {
                 IconTile(area.symbol, hue: area.hue, size: 44, bounce: a.seq).shadow(
                     color: area.hue.opacity(0.45), radius: 12)
                 (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
-                    .font(.system(size: MacTextSize.headline)).fixedSize(horizontal: false, vertical: true)
+                    .coreFont(size: MacTextSize.headline).fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: Space.s2) {
                     fact("clock.fill", AdminWords.whenExact(a.at))
                     fact(a.actor == .system ? "server.rack" : "person.fill", a.actor.label)
@@ -320,7 +318,7 @@ private struct AuditDetail: View {
                                 Text(k.replacingOccurrences(of: "_", with: " ").capitalized).foregroundStyle(
                                     GlassInk.secondary)
                                 Spacer(minLength: Space.s2)
-                                Text(v).font(.system(size: MacTextSize.body, design: .monospaced)).textSelection(
+                                Text(v).coreFont(size: MacTextSize.body, design: .monospaced).textSelection(
                                     .enabled
                                 )
                                 .multilineTextAlignment(.trailing)
@@ -330,7 +328,7 @@ private struct AuditDetail: View {
                     .padding(Space.s3)
                     .background(.black.opacity(0.2), in: coreShape(Radius.control + 2))
                 }
-                Text("Entry \(a.seq) · \(a.action)").font(.system(size: MacTextSize.meta, design: .monospaced))
+                Text("Entry \(a.seq) · \(a.action)").coreFont(size: MacTextSize.meta, design: .monospaced)
                     .foregroundStyle(GlassInk.secondary).textSelection(.enabled)
             } else {
                 Text("Pick a row to see everything about it.").foregroundStyle(GlassInk.secondary)
@@ -399,7 +397,7 @@ private struct Activity: View {
                 Spacer()
                 Text(to.formatted(date: .abbreviated, time: .shortened))
             }
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Rows over time, \(AdminWords.when(from)) to \(AdminWords.when(to))")

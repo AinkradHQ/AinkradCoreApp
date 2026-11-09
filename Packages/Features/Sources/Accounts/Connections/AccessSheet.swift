@@ -25,8 +25,8 @@ struct AccessSheet: View {
                 ForEach(k?.capabilities ?? []) { c in
                     HStack(spacing: Space.s3) {
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(c.title).font(.system(size: MacTextSize.body, weight: .semibold))
-                            Text(c.say).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                            Text(c.title).coreFont(size: MacTextSize.body, weight: .semibold)
+                            Text(c.say).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         }
                         Spacer()
                         GlassToggleTile(
@@ -50,7 +50,7 @@ struct AccessSheet: View {
                         "Agents will be able to change things on \(k?.name ?? "it") as you. Saving needs Touch ID.",
                         systemImage: "exclamationmark.triangle"
                     )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.orangeInk)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.orangeInk)
                     .transition(.opacity)
                 }
                 CoreSegmented(

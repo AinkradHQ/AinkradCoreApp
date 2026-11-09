@@ -169,7 +169,7 @@ struct WorkspaceView: View {
 
     private var empty: some View {
         VStack(spacing: Space.s1) {
-            Text("No apps in this workspace").font(.system(size: MacTextSize.title, weight: .semibold))
+            Text("No apps in this workspace").coreFont(size: MacTextSize.title, weight: .semibold)
             Text("Open one from the launcher with ⌘K.").foregroundStyle(palette.text2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -198,12 +198,8 @@ private struct PaneTabs: View {
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac)
         .animation(reduce ? nil : Motion.out(Motion.ui), value: shell.focusedPane ?? shell.activePane)
-        .onKeyPress(.leftArrow) {
-            shell.cyclePane(-1)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            shell.cyclePane(1)
+        .coreSideKeys {
+            shell.cyclePane($0)
             return .handled
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -238,12 +234,12 @@ private struct PaneTab: View {
     /// quiet white glass that glides between tabs; ⋯ and × appear on hover only.
     var body: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: spec.symbol).font(.system(size: MacTextSize.body, weight: .medium))
+            Image(systemName: spec.symbol).coreFont(size: MacTextSize.body, weight: .medium)
                 .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary)
                 .accessibilityHidden(true)
             if shell.renamingTab == spec.id {
                 TextField("Tab name", text: $draft)
-                    .textFieldStyle(.plain).font(.system(size: MacTextSize.body, weight: .semibold))
+                    .textFieldStyle(.plain).coreFont(size: MacTextSize.body, weight: .semibold)
                     .foregroundStyle(WidgetInk.primary).frame(width: Space.s8 * 4)
                     .focused($editing)
                     .onSubmit { shell.renameTab(spec.id, to: draft) }
@@ -253,7 +249,7 @@ private struct PaneTab: View {
                         editing = true
                     }
             } else {
-                Text(shell.tabName(spec)).font(.system(size: MacTextSize.body, weight: on ? .semibold : .regular))
+                Text(shell.tabName(spec)).coreFont(size: MacTextSize.body, weight: on ? .semibold : .regular)
                     .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary).lineLimit(1)
                     .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
             }
@@ -291,8 +287,9 @@ private struct PaneTab: View {
         .contextMenu { menu }
         .help("\(spec.title) · right-click for actions, ⌃Tab next tab, ⇧⌘R rename")
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(shell.tabName(spec))
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityLabel(spec.chip.map { "\(shell.tabName(spec)), \($0.label)" } ?? shell.tabName(spec))
+        .accessibilityAddTraits(on ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction { pick() }
     }
 
     /// The pane's own actions, then the workspace's.

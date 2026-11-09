@@ -50,13 +50,13 @@ struct RunRows: View {
         ForEach(runs) { r in
             HStack(spacing: Space.s2) {
                 StatusDot(color: WidgetInk.green, live: true)
-                Text(r.tool).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                Text(r.tool).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                 Text(r.name).foregroundStyle(WidgetInk.secondary).lineLimit(1)
                 Spacer(minLength: 0)
-                Text("\(r.minutes) min").font(.system(size: MacTextSize.meta, design: .monospaced))
+                Text("\(r.minutes) min").coreFont(size: MacTextSize.meta, design: .monospaced)
                     .foregroundStyle(WidgetInk.secondary)
             }
-            .font(.system(size: MacTextSize.body)).padding(.vertical, 3)
+            .coreFont(size: MacTextSize.body).padding(.vertical, 3)
             .accessibilityElement(children: .combine)
         }
     }
@@ -173,7 +173,7 @@ struct SpendBody: View {
                 ring.frame(width: 96)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     RollingNumber(value: home.monthTokensUsed * 100, format: { "\(Int($0))%" }, size: 30)
-                    Text("of this month's tokens").font(.system(size: MacTextSize.body)).foregroundStyle(
+                    Text("of this month's tokens").coreFont(size: MacTextSize.body).foregroundStyle(
                         WidgetInk.secondary)
                 }
                 Spacer(minLength: 0)
@@ -263,13 +263,13 @@ struct EventsBody: View {
             }
             ForEach(Array(home.events.prefix(size == .m ? 2 : 8).enumerated()), id: \.element.id) { i, e in
                 HStack(spacing: Space.s3) {
-                    Image(systemName: e.symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                    Image(systemName: e.symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                         .foregroundStyle(WidgetInk.primary)
                         .frame(width: 34, height: 34).background(WidgetInk.well, in: coreShape(Radius.control))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(e.text).font(.system(size: MacTextSize.headline, weight: .medium)).lineLimit(1)
-                        Text("\(e.source) · \(e.minutesAgo) min").font(.system(size: MacTextSize.meta))
+                        Text(e.text).coreFont(size: MacTextSize.headline, weight: .medium).lineLimit(1)
+                        Text("\(e.source) · \(e.minutesAgo) min").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(WidgetInk.secondary)
                     }
                 }
@@ -331,9 +331,9 @@ struct ClockBody: View {
     private func dateText(big: Bool) -> some View {
         TimelineView(homeTicks(60, live: live)) { ctx in
             VStack(alignment: big ? .leading : .center, spacing: 2) {
-                Text(ctx.date, format: .dateTime.weekday(.wide)).font(.system(size: big ? 20 : 15, weight: .semibold))
+                Text(ctx.date, format: .dateTime.weekday(.wide)).coreFont(size: big ? 20 : 15, weight: .semibold)
                 Text(ctx.date, format: .dateTime.month(.wide).day())
-                    .font(.system(size: MacTextSize.body)).foregroundStyle(WidgetInk.secondary)
+                    .coreFont(size: MacTextSize.body).foregroundStyle(WidgetInk.secondary)
             }
         }
         .accessibilityElement(children: .combine)

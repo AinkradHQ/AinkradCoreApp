@@ -20,14 +20,14 @@ struct RingGauge: View {
                 .foregroundStyle(tint).coreBounce(shown > 0)
             if let caption {
                 VStack(spacing: 0) {
-                    Text(caption).font(.system(size: MacTextSize.headline + 2, weight: .semibold)).monospacedDigit()
+                    Text(caption).coreFont(size: MacTextSize.headline + 2, weight: .semibold).monospacedDigit()
                         .foregroundStyle(WidgetInk.primary)
                         .contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.7)
                     if let sub {
-                        Text(sub).font(.system(size: MacTextSize.meta, weight: .medium)).foregroundStyle(
+                        Text(sub).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(
                             WidgetInk.secondary
                         )
-                        .lineLimit(1)
+                        .lineLimit(1).minimumScaleFactor(TextSizePrefs.shared.scale > 1 ? 0.7 : 1)
                     }
                 }
             }
@@ -41,6 +41,7 @@ struct RingGauge: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s2)
+        .frame(maxWidth: TextSizePrefs.shared.scale > 1 ? .infinity : nil)
         .onAppear { fill() }
         .onChange(of: value) { _, _ in fill() }
         .accessibilityElement(children: .ignore)

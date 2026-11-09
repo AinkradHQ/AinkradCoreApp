@@ -27,7 +27,7 @@ extension OfficialGlassSection {
                 unionDemo
             }
             item("ConcentricRectangle() + .containerShape(.rect(cornerRadius: 16)): inner = 16 − 8") {
-                Text("Outer 16, inset 8, inner concentric").font(.system(size: MacTextSize.meta))
+                Text("Outer 16, inset 8, inner concentric").coreFont(size: MacTextSize.meta)
                     .padding(Space.s2).frame(maxWidth: .infinity)
                     .glassEffect(.regular, in: ConcentricRectangle())
                     .padding(Space.s2)
@@ -49,12 +49,12 @@ extension OfficialGlassSection {
                 Text("Card tint").padding(Space.s3).coreCard(palette.glassCard, radius: Radius.cardMac)
             }
             Text("CoreUI has no container, morph, union or concentric shape: each coreGlass is a separate glass.")
-                .font(.system(size: MacTextSize.meta)).opacity(0.8)
+                .coreFont(size: MacTextSize.meta).opacity(0.8)
         }
     }
 
     private func card(_ name: String) -> some View {
-        Text(name).font(.system(size: MacTextSize.body)).padding(Space.s4).frame(maxWidth: .infinity)
+        Text(name).coreFont(size: MacTextSize.body).padding(Space.s4).frame(maxWidth: .infinity)
     }
 
     private var morph: some View {

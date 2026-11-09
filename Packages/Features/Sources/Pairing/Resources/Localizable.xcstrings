@@ -1,0 +1,433 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "$ ainkrad bootstrap" : {
+
+    },
+    "%@ come from your Core. This Mac is not connected to one right now." : {
+
+    },
+    "%@ is paired." : {
+
+    },
+    "%@ is the only device that can manage this Core. If you lose it, getting back in needs SSH to the host. Add a second admin device, such as your iPhone." : {
+
+    },
+    "%@ loses access at once and its open connections close. It must be paired again to return. Revoking cannot be undone." : {
+
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@%@, %@, %@, last seen %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@%3$@, %4$@, %5$@, last seen %6$@"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%lld can reach this Core. Revoking signs a device out at once." : {
+
+    },
+    "%lld failed %@ in a row" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld failed %2$@ in a row"
+          }
+        }
+      }
+    },
+    "%lld locks right now" : {
+
+    },
+    "%lld of %lld groups match, now group %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld groups match, now group %3$lld."
+          }
+        }
+      }
+    },
+    "%lld of 10" : {
+
+    },
+    "1 lock right now" : {
+
+    },
+    "1. Enter the address, then the code it printed." : {
+
+    },
+    "10 of 10, ready" : {
+
+    },
+    "2. Compare the check code on this Mac with the one the host prints, and type y there." : {
+
+    },
+    "3. Add a second admin device (your iPhone) afterwards, so losing one never needs SSH." : {
+
+    },
+    "A pairing lasts 5 minutes from when the approver made the code. This Mac isn't told the exact time." : {
+
+    },
+    "A runner holds exactly runner. Revoke it to remove its access." : {
+
+    },
+    "A runner holds exactly runner: it only redeems secret leases." : {
+
+    },
+    "Access it loses" : {
+
+    },
+    "Access narrowed from your own. You can only give less." : {
+
+    },
+    "Active now" : {
+
+    },
+    "All %lld groups match." : {
+
+    },
+    "Approve" : {
+
+    },
+    "Ask an admin device to open **Add device**. The code is 10 characters and valid for 5 minutes." : {
+
+    },
+    "Back" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Cancel pairing" : {
+
+    },
+    "Case doesn't matter. I and L count as 1, O as 0." : {
+
+    },
+    "Check code %@" : {
+
+    },
+    "Check it matches the code on your Core's screen" : {
+
+    },
+    "Check the details, then compare the code with the one on the new device." : {
+
+    },
+    "Checking the Core" : {
+
+    },
+    "Close" : {
+
+    },
+    "Confirm with Touch ID" : {
+
+    },
+    "Continue" : {
+
+    },
+    "Copy QR text" : {
+
+    },
+    "Copy code" : {
+
+    },
+    "Copy the pairing link from the device that added this Mac. It already holds the address and the code." : {
+
+    },
+    "Core fingerprint" : {
+
+    },
+    "Create a new pairing" : {
+
+    },
+    "Create pairing" : {
+
+    },
+    "Didn't match" : {
+
+    },
+    "Didn't say where its key is" : {
+
+    },
+    "Done" : {
+
+    },
+    "Each ends by itself when its time runs out. Clear one to end it now." : {
+
+    },
+    "End this lock now. Asks for Touch ID." : {
+
+    },
+    "Every device that can reach a Core." : {
+
+    },
+    "Everyone can sign in and ask for Touch ID." : {
+
+    },
+    "Expired" : {
+
+    },
+    "Expires in " : {
+
+    },
+    "Fingerprint" : {
+
+    },
+    "Forget it to pair with another Core, or to start this one over from a new code." : {
+
+    },
+    "Found a Core on this Mac" : {
+
+    },
+    "I have a code" : {
+
+    },
+    "It doesn't match" : {
+
+    },
+    "It finishes on the new device once it confirms the check code there." : {
+
+    },
+    "It has to match the code on their screen, every character. If it doesn't, don't go on." : {
+
+    },
+    "It matches" : {
+
+    },
+    "Key kept in a file" : {
+
+    },
+    "Key locked in the device's chip" : {
+
+    },
+    "Last seen %@" : {
+
+    },
+    "Lasts 5 minutes · single use" : {
+
+    },
+    "Loading…" : {
+
+    },
+    "No %@" : {
+
+    },
+    "Not connected to a Core" : {
+
+    },
+    "Not now" : {
+
+    },
+    "Nothing is locked" : {
+
+    },
+    "Nothing is signed or sent from this Mac yet. The Core has to prove who it is first, then this Mac claims the code." : {
+
+    },
+    "Nothing of that kind." : {
+
+    },
+    "On the new device, choose Connect to a Core and enter this code, or scan the QR." : {
+
+    },
+    "Only one admin device" : {
+
+    },
+    "Open Ainkrad" : {
+
+    },
+    "Opens this device's page" : {
+
+    },
+    "Pair this Mac" : {
+
+    },
+    "Pairing code %@" : {
+
+    },
+    "QR code for this pairing" : {
+
+    },
+    "Reject" : {
+
+    },
+    "Revoking signs %@ out at once and closes its open connections. It must be paired again." : {
+
+    },
+    "Revoking this Mac signs it out at once and returns it to Connect to a Core. It must be paired again." : {
+
+    },
+    "Save" : {
+
+    },
+    "Stopped. There is no way to continue from here." : {
+
+    },
+    "Strike %lld. Until %@; the next lock would last twice as long." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Strike %1$lld. Until %2$@; the next lock would last twice as long."
+          }
+        }
+      }
+    },
+    "That doesn't match" : {
+
+    },
+    "The Core answers again in %@." : {
+
+    },
+    "The Core approved it. You are signed in, and the session renews itself in the background." : {
+
+    },
+    "The Core computed this code. The new device must show the same one." : {
+
+    },
+    "The address you gave your Core when you set it up. Add :port only if it uses one." : {
+
+    },
+    "The approver approved. Say it matches to finish." : {
+
+    },
+    "The device stays pending. Read the new device's screen again and retype it, or reject it." : {
+
+    },
+    "The keys stay on this Mac. The Core only ever sees their public halves, and records the storage as a claim." : {
+
+    },
+    "The pairing expired. Make a new code." : {
+
+    },
+    "The pairing was rejected. Its keys were never enrolled." : {
+
+    },
+    "The very first device is created on the host itself, never over the network. Open a terminal on the machine that runs the Core." : {
+
+    },
+    "This Mac creates a one-time code. Whoever enters it still needs your approval." : {
+
+    },
+    "This Mac is paired" : {
+
+    },
+    "This Mac is paired with %@" : {
+
+    },
+    "This Mac keeps its keys in %@" : {
+
+    },
+    "This Mac loses access at once and goes back to Connect to a Core. It must be paired again to return. Revoking cannot be undone." : {
+
+    },
+    "This Mac to %@: stopped" : {
+
+    },
+    "This device can't open the admin pages: settings, secrets, audit, ops and lockouts are hidden." : {
+
+    },
+    "Too many failed tries lock an address or a device for a while. Each new lock lasts twice as long, up to an hour." : {
+
+    },
+    "Too many wrong codes burned this pairing. Make a new one." : {
+
+    },
+    "Touch ID" : {
+
+    },
+    "Touch the sensor" : {
+
+    },
+    "Try again" : {
+
+    },
+    "Type group 1 of %lld." : {
+
+    },
+    "Type this code on the new device" : {
+
+    },
+    "Typing it proves you looked at this device's own screen." : {
+
+    },
+    "Unlocked" : {
+
+    },
+    "Use it" : {
+
+    },
+    "Waiting for Touch ID" : {
+
+    },
+    "Waiting for approval" : {
+
+    },
+    "Waiting for the new device to claim it" : {
+
+    },
+    "Waiting…" : {
+
+    },
+    "What should we call you? Home greets you with it. It stays on this Mac." : {
+
+    },
+    "What this device may do" : {
+
+    },
+    "Where a key is kept is what each device said when it paired. Your Core can't check it." : {
+
+    },
+    "You can take scopes away here. To give more, pair the device again." : {
+
+    },
+    "You will be signed out of this Mac and sent back to Connect." : {
+
+    },
+    "Your Core is the server that runs your agents and terminals. This Mac connects to it to show you everything." : {
+
+    },
+    "• %@" : {
+
+    }
+  },
+  "version" : "1.0"
+}

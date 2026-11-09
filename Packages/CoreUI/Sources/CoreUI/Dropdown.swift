@@ -117,18 +117,18 @@ public struct CoreDropdown<Label: View>: View {
         } label: {
             HStack(spacing: Space.s2) {
                 if checks {
-                    Image(systemName: "checkmark").font(.system(size: MacTextSize.meta, weight: .bold))
+                    Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold)
                         .foregroundStyle(GlassInk.blueInk).frame(width: Space.s3).opacity(item.checked ? 1 : 0)
                         .accessibilityHidden(true)
                 }
                 if let symbol = item.symbol {
-                    Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .medium))
+                    Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .medium)
                         .frame(width: Space.s4).accessibilityHidden(true)
                 }
-                Text(item.title).font(.system(size: MacTextSize.body)).lineLimit(1)
+                Text(item.title).coreFont(size: MacTextSize.body).lineLimit(1)
                 Spacer(minLength: Space.s3)
                 if let note = item.note {
-                    Text(note).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(note).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
             .foregroundStyle(item.destructive ? GlassInk.red : GlassInk.primary)

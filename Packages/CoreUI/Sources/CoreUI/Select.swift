@@ -61,13 +61,13 @@ public struct CoreSelect<Value: Hashable>: View {
     private var field: some View {
         HStack(spacing: Space.s2) {
             if let symbol = current?.symbol {
-                Image(systemName: symbol).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                     .accessibilityHidden(true)
             }
-            Text(current?.title ?? "Choose").font(.system(size: MacTextSize.body)).lineLimit(1)
+            Text(current?.title ?? "Choose").coreFont(size: MacTextSize.body).lineLimit(1)
                 .truncationMode(.tail).foregroundStyle(current == nil ? palette.text2 : palette.text)
             Spacer(minLength: Space.s2)
-            Image(systemName: "chevron.up.chevron.down").font(.system(size: MacTextSize.meta, weight: .semibold))
+            Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(palette.text2).accessibilityHidden(true)
         }
         .padding(.horizontal, Space.s3)

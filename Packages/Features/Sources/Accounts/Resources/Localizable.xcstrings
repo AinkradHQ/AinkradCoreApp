@@ -1,0 +1,627 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "$" : {
+
+    },
+    "%@ %@, %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@, %3$@ %4$@"
+          }
+        }
+      }
+    },
+    "%@ / M" : {
+
+    },
+    "%@ arrived and is in your Core." : {
+
+    },
+    "%@ held by running work" : {
+
+    },
+    "%@ in · %@ out%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ in · %2$@ out%3$@"
+          }
+        }
+      }
+    },
+    "%@ still uses this pool, so it can't be deleted yet. Take it out of the chain first." : {
+
+    },
+    "%@ tokens had no price" : {
+
+    },
+    "%@ used, %lld%%. Warns at %lld%%. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ used, %2$lld%%. Warns at %3$lld%%. %4$@"
+          }
+        }
+      }
+    },
+    "%@ will no longer stop at %@ %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ will no longer stop at %2$@ %3$@."
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%@, %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "%@: %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$lld"
+          }
+        }
+      }
+    },
+    "%@: %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$lld of %3$lld"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld account%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld account%2$@"
+          }
+        }
+      }
+    },
+    "%lld account%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld account%2$@%3$@"
+          }
+        }
+      }
+    },
+    "%lld calls · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld calls · %2$@"
+          }
+        }
+      }
+    },
+    "%lld connection%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld connection%2$@"
+          }
+        }
+      }
+    },
+    "%lld pool%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld pool%2$@%3$@"
+          }
+        }
+      }
+    },
+    "%lld ready, %lld need a look, %lld turned off or other" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld ready, %2$lld need a look, %3$lld turned off or other"
+          }
+        }
+      }
+    },
+    "%lld. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld. %2$@"
+          }
+        }
+      }
+    },
+    "(advanced)…" : {
+
+    },
+    "0.00" : {
+
+    },
+    "A lower limit starts with the next session, resume or top-up. Sessions running now keep the limit they started with." : {
+
+    },
+    "A pool holds accounts of one provider. It starts empty." : {
+
+    },
+    "A running session keeps the chain it started with. Edits apply to new sessions." : {
+
+    },
+    "A session tries the first pool that has an account to give. Running sessions keep the chain they started with." : {
+
+    },
+    "API key" : {
+
+    },
+    "Accounts use this provider, so how it speaks and its key prefix stay as they are." : {
+
+    },
+    "Accounts, in the order they're tried" : {
+
+    },
+    "Add a provider" : {
+
+    },
+    "Add an API key" : {
+
+    },
+    "Add an account to get this pool working." : {
+
+    },
+    "Adds room for %@ only, and clears its alert. The next period starts from the cap again." : {
+
+    },
+    "Agents can't reach it yet." : {
+
+    },
+    "Agents will be able to change things on %@ as you. Saving needs Touch ID." : {
+
+    },
+    "All accounts" : {
+
+    },
+    "All accounts (esc)" : {
+
+    },
+    "Bind agents where you start work: Agents > Agents and chains" : {
+
+    },
+    "Cache" : {
+
+    },
+    "Calls from now on are priced with it. Calls already recorded keep the price they had." : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Chains" : {
+
+    },
+    "Changing the app can make existing %@ sign-ins ask to be signed in again." : {
+
+    },
+    "Choose on github.com" : {
+
+    },
+    "Claude's sign-in runs on %@." : {
+
+    },
+    "Claude's sign-in runs on your best ready runner." : {
+
+    },
+    "Close" : {
+
+    },
+    "Code %@" : {
+
+    },
+    "Copies the command. It has no key in it." : {
+
+    },
+    "Core is checking it again. If it's refused again, the account turns off by itself." : {
+
+    },
+    "Core needs this app before anyone can sign in to %@." : {
+
+    },
+    "Core signs in to %@ with this app. Change a field to replace it." : {
+
+    },
+    "Could not load usage limits. %@" : {
+
+    },
+    "Could not load usage. %@" : {
+
+    },
+    "Couldn't connect Claude" : {
+
+    },
+    "Default pool for its provider" : {
+
+    },
+    "Default: for agents with no chain of their own" : {
+
+    },
+    "Delete %@" : {
+
+    },
+    "Enter this code on github.com. It works for 15 minutes." : {
+
+    },
+    "Every %@ account is already in this pool." : {
+
+    },
+    "GitHub asks for this code after you sign in." : {
+
+    },
+    "Give %@ this return address, exactly:" : {
+
+    },
+    "Hard stop" : {
+
+    },
+    "In" : {
+
+    },
+    "In no pool" : {
+
+    },
+    "It goes last in the fallback order." : {
+
+    },
+    "It runs without a cap after this. Spend already recorded stays in the ledger." : {
+
+    },
+    "It's saved in your Core as %@. Put it in a pool of its own so agents can use it." : {
+
+    },
+    "Its accounts can't join pools or chains yet. Models need a price to count as spend." : {
+
+    },
+    "Its definition is deleted. Core refuses while an account still uses it." : {
+
+    },
+    "Its key is deleted from Core and cannot be recovered. Its leases are dropped.%@" : {
+
+    },
+    "Kept sealed in Core. It can't be shown again." : {
+
+    },
+    "Key saved%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Key saved%1$@%2$@"
+          }
+        }
+      }
+    },
+    "Keys go to it only through Core's gateway, matched by their prefix. Without a test path, a key test answers Can't tell." : {
+
+    },
+    "Limits" : {
+
+    },
+    "List prices read %@" : {
+
+    },
+    "Loading" : {
+
+    },
+    "Loading…" : {
+
+    },
+    "Model" : {
+
+    },
+    "More actions for %@" : {
+
+    },
+    "More you can connect" : {
+
+    },
+    "More: rename, default, who can use it, replace the token" : {
+
+    },
+    "No dollar cap" : {
+
+    },
+    "No usage limit. Add one to cap the tokens or messages this account may use in a window." : {
+
+    },
+    "None" : {
+
+    },
+    "Not used yet, so there is nothing to count." : {
+
+    },
+    "Nothing here. All your accounts are fine." : {
+
+    },
+    "Only if signing in doesn't work for you. Core keeps the token sealed and never shows it again." : {
+
+    },
+    "Only you" : {
+
+    },
+    "Open %@" : {
+
+    },
+    "Open %@'s own page to get a key" : {
+
+    },
+    "Open github.com" : {
+
+    },
+    "Open runners" : {
+
+    },
+    "OpenRouter or another API. Not usable by agents yet: its accounts can't join pools or chains." : {
+
+    },
+    "Opens Settings, Audit, showing only what happened to this connection" : {
+
+    },
+    "Opens the account" : {
+
+    },
+    "Out" : {
+
+    },
+    "Over the limit, new sessions take another account or wait." : {
+
+    },
+    "Past the limit, new work on this account waits until the window moves on." : {
+
+    },
+    "Paste a new token for %@. Core keeps it sealed and never shows it again." : {
+
+    },
+    "Paste the code here" : {
+
+    },
+    "Pick one. You sign in on its own website; Core never asks for a password." : {
+
+    },
+    "Pools" : {
+
+    },
+    "Pools, in the order they're tried" : {
+
+    },
+    "Raised this period" : {
+
+    },
+    "Remove %@" : {
+
+    },
+    "Revoke the key at the provider too. Core cannot do that for you." : {
+
+    },
+    "Same as Settings, Appearance." : {
+
+    },
+    "Sends one free request with the key through a runner. Nothing is spent." : {
+
+    },
+    "Serves agents bound to it" : {
+
+    },
+    "Session %@ · %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Session %1$@ · %2$@%3$@"
+          }
+        }
+      }
+    },
+    "Settings → Core → Feature switches" : {
+
+    },
+    "Showing the newest 100 calls. Costs and usage has the totals." : {
+
+    },
+    "Sign in with your Claude Pro or Max plan. You sign in on claude.ai; Ainkrad never sees your password." : {
+
+    },
+    "Sign in with your Claude plan" : {
+
+    },
+    "Signed in as %@. Now pick which repositories Core may reach. GitHub shows the list." : {
+
+    },
+    "Skip for now" : {
+
+    },
+    "Spend and usage" : {
+
+    },
+    "Subscription" : {
+
+    },
+    "Tested %@ ago" : {
+
+    },
+    "Tested just now" : {
+
+    },
+    "That's every call Core has." : {
+
+    },
+    "The Core answered forbidden_scope to a route this device's scopes allow, so the route is missing." : {
+
+    },
+    "The Core answered forbidden_scope." : {
+
+    },
+    "The chain goes%@. Running sessions keep going. The pools and accounts stay.%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The chain goes%1$@. Running sessions keep going. The pools and accounts stay.%2$@"
+          }
+        }
+      }
+    },
+    "The pool goes. The accounts stay." : {
+
+    },
+    "The provider refused this key once" : {
+
+    },
+    "They count as tokens but not as spend. Set a price for their model to count them from now on." : {
+
+    },
+    "This Mac can only look. Usage and costs need a Mac you allowed to manage the Core." : {
+
+    },
+    "This Mac can only look. Usage limits need a Mac you allowed to manage the Core." : {
+
+    },
+    "This account already has this limit. Saving replaces its numbers." : {
+
+    },
+    "Tried first" : {
+
+    },
+    "Tried if the one above has no account to give" : {
+
+    },
+    "Tried top to bottom. If one stops, the next ready one takes over." : {
+
+    },
+    "Try again" : {
+
+    },
+    "Use this site" : {
+
+    },
+    "Used by the chains that list it" : {
+
+    },
+    "Version %lld · read %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$lld · read %2$@"
+          }
+        }
+      }
+    },
+    "Waiting for GitHub…" : {
+
+    },
+    "Waiting for the key to arrive" : {
+
+    },
+    "Warns only" : {
+
+    },
+    "What your agents may do with %@." : {
+
+    },
+    "When a session reaches either, Core stops it." : {
+
+    },
+    "You and %lld agents" : {
+
+    },
+    "You have access to more than one site. Pick one; connect the other later if you need it." : {
+
+    },
+    "Your Claude plan is connected" : {
+
+    },
+    "Your agents can use it now." : {
+
+    },
+    "Your browser opens %@. Sign in and press Accept, then come back here." : {
+
+    },
+    "Your provider · no accounts yet" : {
+
+    },
+    "id %@" : {
+
+    },
+    "result %@" : {
+
+    },
+    "↑↓ move · ⌘N connect" : {
+
+    },
+    "↩ who can use it · T test · R rename · D default · ⌫ disconnect" : {
+
+    }
+  },
+  "version" : "1.0"
+}

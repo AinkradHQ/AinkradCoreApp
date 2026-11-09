@@ -60,7 +60,7 @@ struct QuickBody: View {
     private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
         VStack(spacing: Space.s1) {
             Image(systemName: symbol).font(.system(size: 22, weight: .medium)).accessibilityHidden(true)
-            Text(key.map { "\(title) \($0)" } ?? title).font(.system(size: MacTextSize.meta, weight: .medium))
+            Text(key.map { "\(title) \($0)" } ?? title).coreFont(size: MacTextSize.meta, weight: .medium)
                 .lineLimit(1).minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, minHeight: wide ? 52 : 64)

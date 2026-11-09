@@ -90,7 +90,7 @@ struct SignalMenu: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text("Signal to send").font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+            Text("Signal to send").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                 palette.text2)
             LazyVGrid(columns: [GridItem(.fixed(Space.s8 * 2.5)), GridItem(.fixed(Space.s8 * 2.5))], spacing: Space.s1)
             {
@@ -99,7 +99,7 @@ struct SignalMenu: View {
                         done()
                         Task { _ = await session.signal(name) }
                     } label: {
-                        Text(name).font(.system(size: MacTextSize.body, design: .monospaced))
+                        Text(name).coreFont(size: MacTextSize.body, design: .monospaced)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlMd)
                             .contentShape(coreShape(Radius.chip))
@@ -108,7 +108,7 @@ struct SignalMenu: View {
                     .accessibilityLabel("Send SIG\(name)")
                 }
             }
-            Text("Needs Touch ID. Covers this action only.").font(.system(size: MacTextSize.meta))
+            Text("Needs Touch ID. Covers this action only.").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(palette.text2)
         }
         .padding(Space.s3)

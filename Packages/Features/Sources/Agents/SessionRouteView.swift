@@ -72,7 +72,7 @@ private struct AttemptList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Text("Attempts of this run").font(.system(size: MacTextSize.meta, weight: .semibold))
+            Text("Attempts of this run").coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.secondary)
             ForEach(attempts) { a in
                 Button {
@@ -87,7 +87,7 @@ private struct AttemptList: View {
                         }
                         Spacer(minLength: 0)
                     }
-                    .font(.system(size: MacTextSize.body)).contentShape(Rectangle())
+                    .coreFont(size: MacTextSize.body).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Open this attempt")

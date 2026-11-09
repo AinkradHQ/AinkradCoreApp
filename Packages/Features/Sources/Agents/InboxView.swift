@@ -22,8 +22,8 @@ struct InboxView: View {
                         }
                         if !decided.isEmpty {
                             VStack(alignment: .leading, spacing: Space.s2) {
-                                Text("Answered since this Mac opened").font(
-                                    .system(size: MacTextSize.headline, weight: .semibold)
+                                Text("Answered since this Mac opened").coreFont(
+                                    size: MacTextSize.headline, weight: .semibold
                                 )
                                 .agentHeading()
                                 ForEach(decided) { r in ApprovalCardView(model: model, request: r) }
@@ -57,7 +57,7 @@ struct InboxView: View {
                         ? "Nothing is waiting on you"
                         : n == 1 ? "1 approval is waiting on you" : "\(n) approvals are waiting on you"
                 )
-                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                .coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                 .contentTransition(.numericText())
                 Label(touchNote, systemImage: elevatedUntil == nil ? "touchid" : "checkmark.shield")
                     .foregroundStyle(GlassInk.secondary)
@@ -86,7 +86,7 @@ struct InboxView: View {
             Text(
                 "\(s.map { AgentWords.harnessName($0.harness) } ?? "An agent") on \(s.map { model.runnerName($0.runner) } ?? "a runner")"
             )
-            .font(.system(size: MacTextSize.body, weight: .semibold))
+            .coreFont(size: MacTextSize.body, weight: .semibold)
             Spacer(minLength: 0)
             AppActionTile(title: "Open session", symbol: "arrow.up.right", key: "", hue: hue) {
                 model.openSession(r.session)
@@ -200,7 +200,7 @@ struct NotificationsSection: View {
                     p == .allowed
                         ? "Banners are on" : p == .notAsked ? "Banners aren't set up yet" : "macOS has banners off"
                 )
-                .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
+                .coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                 Text(
                     p == .allowed
                         ? "macOS shows Ainkrad's banners."
@@ -238,11 +238,11 @@ private struct BannerPreview: View {
         HStack(alignment: .top, spacing: Space.s3) {
             AgentMark(harness: "claude")
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text("claude is waiting on you").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("claude is waiting on you").coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text("It wants to use Bash on mac-studio.").foregroundStyle(palette.text2)
             }
             Spacer(minLength: 0)
-            Text("now").font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            Text("now").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
         .padding(Space.s3).frame(maxWidth: Space.s8 * 12, alignment: .leading)
         .background(.black.opacity(0.25), in: coreShape(Radius.cardMac))

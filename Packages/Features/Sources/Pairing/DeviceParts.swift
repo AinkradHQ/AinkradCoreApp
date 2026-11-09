@@ -11,8 +11,8 @@ struct KeyFact: View {
         HStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 36)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
+                Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -34,9 +34,9 @@ struct FingerprintView: View {
                     a..<(fingerprint.index(a, offsetBy: 4, limitedBy: fingerprint.endIndex) ?? fingerprint.endIndex)])
         }
         VStack(alignment: .leading, spacing: Space.s1) {
-            Label("Fingerprint", systemImage: "touchid").font(.system(size: MacTextSize.meta, weight: .semibold))
+            Label("Fingerprint", systemImage: "touchid").coreFont(size: MacTextSize.meta, weight: .semibold)
                 .foregroundStyle(GlassInk.secondary)
-            Text(groups.joined(separator: " ")).font(.system(size: MacTextSize.body, design: .monospaced))
+            Text(groups.joined(separator: " ")).coreFont(size: MacTextSize.body, design: .monospaced)
                 .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)

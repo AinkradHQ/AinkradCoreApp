@@ -56,7 +56,7 @@ private struct RowBody<Trailing: View>: View {
         HStack(spacing: Space.s3) {
             if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: MacTextSize.title))
+                    .coreFont(size: MacTextSize.title)
                     .foregroundStyle(selected ? palette.navActiveInk : palette.primary)
                     .frame(width: MacSize.controlMd)
                     .coreDimWhenDisabled(enabled)
@@ -64,9 +64,9 @@ private struct RowBody<Trailing: View>: View {
             }
             VStack(alignment: .leading, spacing: 0) {
                 // Disabled dims the control (icon, title, trailing), not the helper line under it.
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).coreDimWhenDisabled(enabled)
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).coreDimWhenDisabled(enabled)
                 if let subtitle {
-                    Text(subtitle).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
             }
             Spacer(minLength: Space.s2)

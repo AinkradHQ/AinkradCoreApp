@@ -4,10 +4,12 @@ import PackageDescription
 
 let package = Package(
     name: "CoreUI",
+    defaultLocalization: "en",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [.library(name: "CoreUI", targets: ["CoreUI"])],
     targets: [
-        .target(name: "CoreUI", swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
+            name: "CoreUI", resources: [.process("Resources")], swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "CoreUITests", dependencies: ["CoreUI"]),
     ]
 )

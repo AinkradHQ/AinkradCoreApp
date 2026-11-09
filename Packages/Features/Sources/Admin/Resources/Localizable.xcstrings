@@ -1,0 +1,279 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    " %@ " : {
+
+    },
+    "%@ is %@ allowed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is %2$@ allowed"
+          }
+        }
+      }
+    },
+    "%@ needs a look" : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, allowed %@ to %@, default %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, allowed %2$@ to %3$@, default %4$@"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%lld bytes · hidden" : {
+
+    },
+    "%lld shown" : {
+
+    },
+    "Anything that looks like a real key is refused, to keep you safe while testing." : {
+
+    },
+    "Arrow keys move between rows" : {
+
+    },
+    "Asks for Touch ID" : {
+
+    },
+    "Audit rows" : {
+
+    },
+    "Back to default" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Change this limit in Core settings (%@)" : {
+
+    },
+    "Change…" : {
+
+    },
+    "Copy name" : {
+
+    },
+    "Copy setting name" : {
+
+    },
+    "Default %@" : {
+
+    },
+    "Delete %@" : {
+
+    },
+    "Delete…" : {
+
+    },
+    "Drivers: %@" : {
+
+    },
+    "Entry %lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Entry %1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "Find a name: a device, secret or setting" : {
+
+    },
+    "Fine" : {
+
+    },
+    "First value" : {
+
+    },
+    "Hide history" : {
+
+    },
+    "History of %@" : {
+
+    },
+    "Key %@ · stored by %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Key %1$@ · stored by %2$@"
+          }
+        }
+      }
+    },
+    "Keys and secrets in Feature switches (secrets.mode = %lld)" : {
+
+    },
+    "Lease %@" : {
+
+    },
+    "Lend…" : {
+
+    },
+    "Lent to %@" : {
+
+    },
+    "Lent to %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Lent to %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "Less safe when on" : {
+
+    },
+    "Loading" : {
+
+    },
+    "Loading…" : {
+
+    },
+    "Needs a look" : {
+
+    },
+    "New value…" : {
+
+    },
+    "No runner may borrow this secret yet." : {
+
+    },
+    "No runners yet. A secret no runner may borrow can't be lent." : {
+
+    },
+    "Nothing can be added or lent until you turn on Test keys." : {
+
+    },
+    "Off" : {
+
+    },
+    "On" : {
+
+    },
+    "Once stored, nobody can show or copy it again. Asks for Touch ID." : {
+
+    },
+    "Pick a row to see everything about it." : {
+
+    },
+    "Real keys open after the external security review (G-SEC)." : {
+
+    },
+    "Real values" : {
+
+    },
+    "Replace the value of %@" : {
+
+    },
+    "Row details" : {
+
+    },
+    "Rows over time, %@ to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rows over time, %1$@ to %2$@"
+          }
+        }
+      }
+    },
+    "Runners can no longer borrow it. This can't be undone." : {
+
+    },
+    "Secrets are off" : {
+
+    },
+    "Show everything" : {
+
+    },
+    "Show history" : {
+
+    },
+    "Show the next %lld older rows" : {
+
+    },
+    "Terminals are off: this runner was started without terminal support." : {
+
+    },
+    "Terminals work on this runner." : {
+
+    },
+    "Test values only" : {
+
+    },
+    "That's the start of the log" : {
+
+    },
+    "Try again" : {
+
+    },
+    "Up to %@. It comes back by itself when the time runs out." : {
+
+    },
+    "Value %lld, replaced %lld×" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Value %1$lld, replaced %2$lld×"
+          }
+        }
+      }
+    },
+    "Value, %lld bytes, hidden" : {
+
+    },
+    "When things happened" : {
+
+    },
+    "Your Core is doing well" : {
+
+    },
+    "Your Core keeps real secrets." : {
+
+    },
+    "Your Core reads this only when it starts." : {
+
+    },
+    "error_id" : {
+
+    },
+    "secrets.mode = %lld" : {
+
+    }
+  },
+  "version" : "1.0"
+}

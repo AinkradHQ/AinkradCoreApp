@@ -55,7 +55,7 @@ struct LedgerPage: View {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     HStack {
                         Text(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                            .font(.system(size: MacTextSize.headline, weight: .semibold))
+                            .coreFont(size: MacTextSize.headline, weight: .semibold)
                         Spacer()
                         let spent = list.compactMap(\.costMicros).reduce(0, +)
                         Text("\(list.count) calls · \(CostWords.usd(spent))").foregroundStyle(GlassInk.secondary)
@@ -70,7 +70,7 @@ struct LedgerPage: View {
                 model.costs.count >= 100
                     ? "Showing the newest 100 calls. Costs and usage has the totals." : "That's every call Core has."
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
     }
 }
@@ -84,13 +84,11 @@ private struct LedgerRow: View {
         let c = cost
         let b = CostWords.basis(c.basis)
         HStack(spacing: Space.s3) {
-            Text(c.at.formatted(date: .omitted, time: .shortened)).font(
-                .system(size: MacTextSize.body).monospacedDigit()
-            )
-            .foregroundStyle(GlassInk.secondary).frame(width: 64, alignment: .leading)
+            Text(c.at.formatted(date: .omitted, time: .shortened)).coreFont(size: MacTextSize.body).monospacedDigit()
+                .foregroundStyle(GlassInk.secondary).frame(width: 64, alignment: .leading)
             VStack(alignment: .leading, spacing: 1) {
-                Text(c.model).font(.system(size: MacTextSize.body, weight: .semibold, design: .monospaced)).lineLimit(1)
-                Text(model.label(ofAccount: c.accountID)).font(.system(size: MacTextSize.meta))
+                Text(c.model).coreFont(size: MacTextSize.body, weight: .semibold, design: .monospaced).lineLimit(1)
+                Text(model.label(ofAccount: c.accountID)).coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
             }
             .frame(minWidth: 180, alignment: .leading)
@@ -98,11 +96,11 @@ private struct LedgerRow: View {
             Text(
                 "\(CostWords.tokens(c.input)) in · \(CostWords.tokens(c.output)) out\(c.cache > 0 ? " · \(CostWords.tokens(c.cache)) cache" : "")"
             )
-            .font(.system(size: MacTextSize.meta).monospacedDigit()).foregroundStyle(GlassInk.secondary)
-            Text(b.title).font(.system(size: MacTextSize.meta, weight: .medium)).foregroundStyle(GlassInk.ink(b.hue))
+            .coreFont(size: MacTextSize.meta).monospacedDigit().foregroundStyle(GlassInk.secondary)
+            Text(b.title).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.ink(b.hue))
                 .frame(width: 150, alignment: .trailing)
             Text(c.costMicros.map { (c.approximate ? "≈ " : "") + CostWords.usd($0) } ?? "—")
-                .font(.system(size: MacTextSize.headline, weight: .bold, design: .rounded).monospacedDigit())
+                .coreFont(size: MacTextSize.headline, weight: .bold, design: .rounded).monospacedDigit()
                 .foregroundStyle(c.costMicros == nil ? GlassInk.orangeInk : GlassInk.primary)
                 .frame(width: 86, alignment: .trailing)
         }
@@ -160,7 +158,7 @@ struct PricesPage: View {
                         Text("Cache").frame(width: 90, alignment: .trailing)
                         Text("").frame(width: 170)
                     }
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                     .padding(.horizontal, Space.s3).padding(.bottom, Space.s1)
                     ForEach(g.value.sorted { $0.model < $1.model }) { p in PriceRow(model: model, price: p) }
                 }
@@ -178,13 +176,13 @@ private struct PriceRow: View {
         let p = price
         HStack(spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(p.model).font(.system(size: MacTextSize.body, weight: .semibold, design: .monospaced))
+                Text(p.model).coreFont(size: MacTextSize.body, weight: .semibold, design: .monospaced)
                 Text("Version \(p.version) · read \(p.pricedAt.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             ForEach([p.input, p.output, p.cache], id: \.self) { v in
-                Text(CostWords.usd(v)).font(.system(size: MacTextSize.headline, weight: .semibold).monospacedDigit())
+                Text(CostWords.usd(v)).coreFont(size: MacTextSize.headline, weight: .semibold).monospacedDigit()
                     .frame(width: 90, alignment: .trailing)
             }
             AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "", hue: GlassInk.blue) {
@@ -265,7 +263,7 @@ struct PriceDialog: View {
                     CoreTextField("Cache", placeholder: "0.30", text: $cache, suffix: "$ / M") { go() }
                 }
                 Text("Calls from now on are priced with it. Calls already recorded keep the price they had.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 if let i = issue, !modelID.isEmpty || editing != nil, !input.isEmpty { AccIssue(text: i) }
                 if let e = model.writeError["price"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)

@@ -66,7 +66,7 @@ struct NewSessionSheet: View {
                         Text("Sandboxed needs the admin scope; the Core refuses it otherwise.").foregroundStyle(
                             palette.text2)
                     } else {
-                        Text(SessionMode.help(mode)).font(.system(size: MacTextSize.meta)).foregroundStyle(
+                        Text(SessionMode.help(mode)).coreFont(size: MacTextSize.meta).foregroundStyle(
                             palette.text2)
                     }
                     field("Runner") { runnerList }
@@ -149,7 +149,7 @@ struct NewSessionSheet: View {
                 options: model.chains.map { CoreSelectOption($0.id, $0.name, note: $0.isDefault ? "default" : nil) })
             if let chain {
                 Text("Tries, in order: \(chain.steps.joined(separator: ", then ")). It sets the harness and model.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         case .agent:
@@ -169,7 +169,7 @@ struct NewSessionSheet: View {
             }
             HStack(spacing: Space.s2) {
                 Text("The chain bound to this agent serves the session, else the default chain.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Button("Agents and chains") {
@@ -224,11 +224,11 @@ struct NewSessionSheet: View {
         ]
         .compactMap { $0 }
         return VStack(alignment: .leading, spacing: Space.s1) {
-            Text(runner == nil ? words : "This will run \(words)").font(
-                .system(size: MacTextSize.headline, weight: .semibold))
+            Text(runner == nil ? words : "This will run \(words)").coreFont(
+                size: MacTextSize.headline, weight: .semibold)
             HStack(spacing: Space.s1) {
                 ForEach(options, id: \.self) { o in
-                    Text(o).font(.system(size: MacTextSize.meta, design: .monospaced))
+                    Text(o).coreFont(size: MacTextSize.meta, design: .monospaced)
                         .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
                         .background(palette.uDim, in: coreShape(Radius.chip))
                 }
@@ -243,7 +243,7 @@ struct NewSessionSheet: View {
         VStack(alignment: .trailing, spacing: Space.s1) {
             promptEditor
             if let w = PromptSize.words(prompt) {
-                Text(w).font(.system(size: MacTextSize.meta))
+                Text(w).coreFont(size: MacTextSize.meta)
                     .foregroundStyle(PromptSize.over(prompt) ? GlassInk.redInk : palette.text2)
             }
         }
@@ -263,7 +263,7 @@ struct NewSessionSheet: View {
                 HStack(spacing: Space.s1) {
                     ForEach(secrets, id: \.self) { s in
                         HStack(spacing: Space.s1) {
-                            Text(s).font(.system(size: MacTextSize.meta, design: .monospaced))
+                            Text(s).coreFont(size: MacTextSize.meta, design: .monospaced)
                             Button {
                                 secrets.removeAll { $0 == s }
                             } label: {
@@ -284,7 +284,7 @@ struct NewSessionSheet: View {
             Text(
                 "Any secret you pass can be read by the agent in that session. Each is leased to the runner at every start."
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).fixedSize(
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
                 horizontal: false, vertical: true)
         }
     }
@@ -323,8 +323,8 @@ private struct RunnerRow: View {
             Image(systemName: chosen ? "checkmark.square.fill" : "square")
                 .foregroundStyle(chosen ? palette.primary : palette.text2).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
-                Text(runner.name).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                Text(runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
             Spacer(minLength: 0)
             if runner.online, let cap = runner.capacity { CoreSlots(used: runner.load, capacity: cap) }

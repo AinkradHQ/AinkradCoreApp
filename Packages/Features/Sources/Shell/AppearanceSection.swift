@@ -11,6 +11,8 @@ struct AppearanceSection: View {
     @State private var advanced = !LookPrefs.shared.custom.isEmpty
     @FocusState private var focus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Bindable private var textSize = TextSizePrefs.shared
+    private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
@@ -18,7 +20,7 @@ struct AppearanceSection: View {
                 "Theme", sub: "The desktop sky and the glass follow it.", symbol: "circle.lefthalf.filled",
                 hue: GlassInk.blue
             ) {
-                Text(now).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                Text(now).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                     .contentTransition(.opacity)
             } content: {
                 HStack(alignment: .top, spacing: Space.s3) {
@@ -28,8 +30,20 @@ struct AppearanceSection: View {
                 }
             }
             GlassSection(
+                "Text size", sub: "How large the words are in every window. 100% is the usual size.",
+                symbol: "textformat.size", hue: GlassInk.blue, index: 1
+            ) {
+                Text(textSize.scale.formatted(.percent.precision(.fractionLength(0))))
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
+            } content: {
+                CoreSegmented(
+                    "Text size",
+                    segments: Self.scales.map { CoreSegment($0, $0.formatted(.percent.precision(.fractionLength(0)))) },
+                    selection: $textSize.scale, fill: true)
+            }
+            GlassSection(
                 "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",
-                symbol: "square.on.square", hue: GlassInk.blue, index: 1
+                symbol: "square.on.square", hue: GlassInk.blue, index: 2
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
@@ -37,7 +51,7 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
-                hue: GlassInk.slate, index: 2
+                hue: GlassInk.slate, index: 3
             ) {
                 AppActionTile(
                     title: advanced ? "Hide" : "Show", symbol: advanced ? "chevron.up" : "chevron.down", key: "",
@@ -55,7 +69,7 @@ struct AppearanceSection: View {
                 IconTile(reduce ? "figure.walk" : "figure.run", hue: GlassInk.slate, size: 32)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(reduce ? "Reduce Motion is on" : "Motion is full")
-                        .font(.system(size: MacTextSize.headline, weight: .semibold))
+                        .coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(
                         reduce
                             ? "Your Mac asks for less movement, so Ainkrad keeps every change and drops the travel."
@@ -79,8 +93,7 @@ struct AppearanceSection: View {
         }
         .foregroundStyle(GlassInk.primary)
         .focusable().focused($focus).focusEffectDisabled()
-        .onKeyPress(.leftArrow) { step(-1) }
-        .onKeyPress(.rightArrow) { step(1) }
+        .coreSideKeys { step($0) }
         .onAppear { focus = true }
     }
 
@@ -135,8 +148,8 @@ private struct ThemeTile: View {
                         coreShape(Radius.cardMac).strokeBorder(
                             selected ? GlassInk.blue : GlassInk.wellEdge, lineWidth: selected ? 2 : 1)
                     }
-                Text(choice.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(line).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(choice.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(Space.s2)
@@ -199,8 +212,8 @@ private struct LookPartRow: View {
             HStack(spacing: Space.s3) {
                 IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.blue, size: 28)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(part.title).font(.system(size: MacTextSize.body, weight: .semibold))
-                    Text(part.sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(part.title).coreFont(size: MacTextSize.body, weight: .semibold)
+                    Text(part.sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s3)
                 AppLookTabs(follow: follow, mode: mode, followTitle: "Same")

@@ -175,14 +175,14 @@ struct ProviderDialog: View {
                         ? "Accounts use this provider, so how it speaks and its key prefix stay as they are."
                         : "Keys go to it only through Core's gateway, matched by their prefix. Without a test path, a key test answers Can't tell."
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 modelsList
                 Label(
                     "Its accounts can't join pools or chains yet. Models need a price to count as spend.",
                     systemImage: "info.circle"
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 if let e = model.writeError["provider"] { AccIssue(text: e) }
                 AccNotice(notice: model.host.elevationNotice)
                 AccDialogButtons(
@@ -200,7 +200,7 @@ struct ProviderDialog: View {
             CoreFieldLabel("Models")
             ForEach($models) { $m in
                 HStack(spacing: Space.s2) {
-                    Text(m.id).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
+                    Text(m.id).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     PriceField(label: "in", micros: $m.input)
                     PriceField(label: "out", micros: $m.output)
@@ -266,7 +266,7 @@ private struct PriceField: View {
                         micros = Int64((d * 1_000_000).rounded())
                     }
                 }
-            Text("\(label) / M").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text("\(label) / M").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s2).frame(height: 28)
         .coreFieldSurface()

@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "Features",
+    defaultLocalization: "en",
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "Shell", targets: ["Shell"]), .library(name: "Pairing", targets: ["Pairing"]),
@@ -21,6 +22,7 @@ let package = Package(
     targets: [
         .target(
             name: "Shell", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Agents",
@@ -29,6 +31,7 @@ let package = Package(
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Terminals",
@@ -38,6 +41,7 @@ let package = Package(
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Admin",
@@ -46,6 +50,7 @@ let package = Package(
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Accounts",
@@ -55,10 +60,12 @@ let package = Package(
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Brain",
             dependencies: ["Shell", "Admin", .product(name: "CoreUI", package: "CoreUI")],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Pairing",
@@ -69,6 +76,7 @@ let package = Package(
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "ShellTests", dependencies: ["Shell"]),
         .testTarget(

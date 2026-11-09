@@ -66,15 +66,15 @@ private struct PoolTab: View {
                 AccTile(provider: pool.provider).scaleEffect(0.8)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 4) {
-                        Text("\(ProviderLook.short(pool.provider, pool.provider)) · \(pool.name)").font(
-                            .system(size: MacTextSize.headline, weight: .semibold)
+                        Text("\(ProviderLook.short(pool.provider, pool.provider)) · \(pool.name)").coreFont(
+                            size: MacTextSize.headline, weight: .semibold
                         ).lineLimit(1)
                         if pool.isDefault {
                             Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orangeInk)
                         }
                     }
                     Text("\(pool.members.count) account\(pool.members.count == 1 ? "" : "s")")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
             }
             .foregroundStyle(GlassInk.primary)
@@ -113,7 +113,7 @@ private struct PoolDetail: View {
                 AccTile(large: true, provider: pool.provider)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(ProviderLook.short(pool.provider, model.providerName(pool.provider))) · \(pool.name)")
-                        .font(.system(size: MacTextSize.large, weight: .bold))
+                        .coreFont(size: MacTextSize.large, weight: .bold)
                     HStack(spacing: Space.s2) {
                         if pool.isDefault {
                             Label("Default pool for its provider", systemImage: "star.fill")
@@ -123,7 +123,7 @@ private struct PoolDetail: View {
                                 GlassInk.secondary)
                         }
                     }
-                    .font(.system(size: MacTextSize.meta, weight: .semibold))
+                    .coreFont(size: MacTextSize.meta, weight: .semibold)
                 }
                 Spacer(minLength: Space.s2)
                 if !pool.isDefault {
@@ -142,8 +142,8 @@ private struct PoolDetail: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 AccPanel(spacing: Space.s2) {
                     HStack {
-                        Label("Accounts, in the order they're tried", systemImage: "list.number").font(
-                            .system(size: MacTextSize.title, weight: .semibold))
+                        Label("Accounts, in the order they're tried", systemImage: "list.number").coreFont(
+                            size: MacTextSize.title, weight: .semibold)
                         Spacer()
                         AccLink(title: "Add · A", symbol: "plus") { AccountDialogs.openAddMember(model, pool: pool) }
                             .disabled(ro)
@@ -158,7 +158,7 @@ private struct PoolDetail: View {
                         AccIssue(text: e)
                     }
                     Text("Tried top to bottom. If one stops, the next ready one takes over.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity)
@@ -182,15 +182,15 @@ private struct MemberRow: View {
         let hue = GlassInk.blue
         let on = model.cursor == "m-\(id)"
         HStack(spacing: Space.s3) {
-            Text("\(index + 1)").font(.system(size: MacTextSize.body, weight: .bold, design: .rounded))
+            Text("\(index + 1)").coreFont(size: MacTextSize.body, weight: .bold, design: .rounded)
                 .foregroundStyle(first ? .white : GlassInk.secondary)
                 .frame(width: 26, height: 26)
                 .background(first ? hue.opacity(0.85) : GlassInk.well, in: coreShape(7))
             AccTile(provider: pool.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
-                Text(a?.label ?? "Account \(id)").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(a?.label ?? "Account \(id)").coreFont(size: MacTextSize.headline, weight: .semibold)
                     .lineLimit(1)
-                Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).font(.system(size: MacTextSize.meta))
+                Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).coreFont(size: MacTextSize.meta)
                     .foregroundStyle(first ? GlassInk.blueInk : GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
@@ -216,5 +216,6 @@ private struct MemberRow: View {
         .id("m-\(id)")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("member-\(a?.label ?? String(id))")
+        .coreActivates { model.cursor = "m-\(id)" }
     }
 }

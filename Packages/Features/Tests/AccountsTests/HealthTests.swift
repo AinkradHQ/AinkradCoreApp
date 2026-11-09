@@ -33,7 +33,8 @@ struct HealthTests {
                 PlanWindowItem(name: "seven_day", utilization: 0.4, resetsAt: now.addingTimeInterval(86_400 * 3)),
             ])
         #expect(
-            AccountHealthWords.line(h, now: now, calendar: utc).text == "Waiting for a limit to reset until 21:50")
+            AccountHealthWords.line(h, now: now, calendar: utc, locale: Locale(identifier: "en_GB")).text
+                == "Waiting for a limit to reset until 21:50")
         #expect(
             AccountHealthWords.line(AccountHealthItem(planStatus: "rejected"), now: now).text
                 == "Waiting for a limit to reset")

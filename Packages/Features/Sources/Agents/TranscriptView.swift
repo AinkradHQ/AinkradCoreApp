@@ -90,8 +90,8 @@ struct TranscriptView: View {
                 Text("Nothing here yet. The first entries arrive when the agent starts.").meta(palette)
                     .frame(maxWidth: .infinity)
             } else {
-                Label("Start of the session", systemImage: "flag.fill").font(
-                    .system(size: MacTextSize.meta, weight: .semibold)
+                Label("Start of the session", systemImage: "flag.fill").coreFont(
+                    size: MacTextSize.meta, weight: .semibold
                 )
                 .foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3).frame(height: 24)
                 .background(GlassInk.well, in: coreShape(6)).frame(maxWidth: .infinity).padding(.top, Space.s2)
@@ -100,8 +100,8 @@ struct TranscriptView: View {
     }
 }
 
-extension Text {
-    fileprivate func meta(_ p: Palette) -> some View { font(.system(size: MacTextSize.body)).foregroundStyle(p.text2) }
+extension View {
+    fileprivate func meta(_ p: Palette) -> some View { coreFont(size: MacTextSize.body).foregroundStyle(p.text2) }
 }
 
 /// Three small squares, the agent working. They rest under Reduce Motion.
@@ -141,7 +141,7 @@ struct EntryRow: View, Equatable {
         case .user(let text):
             HStack {
                 Spacer(minLength: Space.s8)
-                Text(text).font(.system(size: MacTextSize.body)).foregroundStyle(.white)
+                Text(text).coreFont(size: MacTextSize.body).foregroundStyle(.white)
                     .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                     .background(
                         LinearGradient(
@@ -160,7 +160,7 @@ struct EntryRow: View, Equatable {
                     .background(hue.opacity(0.85), in: coreShape(7))
                     .shadow(color: hue.opacity(0.4), radius: 6)
                     .accessibilityHidden(true)
-                Text(text).font(.system(size: MacTextSize.body)).lineSpacing(3).textSelection(.enabled)
+                Text(text).coreFont(size: MacTextSize.body).lineSpacing(3).textSelection(.enabled)
                     .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                     .background(GlassInk.well, in: coreShape(Radius.cardMac))
                     .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
@@ -229,7 +229,7 @@ struct EntryRow: View, Equatable {
     }
 
     private func facts(_ code: Int?, _ ms: Int?) -> String {
-        [code.map { "exit \($0)" }, ms.map { String(format: "%.1f s", Double($0) / 1000) }].compactMap { $0 }
+        [code.map { "exit \($0)" }, ms.map { "\(coreDecimal(Double($0) / 1000, 1)) s" }].compactMap { $0 }
             .joined(separator: " · ")
     }
 
@@ -238,7 +238,7 @@ struct EntryRow: View, Equatable {
             Image(systemName: symbol).foregroundStyle(hue).accessibilityHidden(true)
             Text(text).lineLimit(2)
         }
-        .font(.system(size: MacTextSize.meta, weight: .medium))
+        .coreFont(size: MacTextSize.meta, weight: .medium)
         .foregroundStyle(GlassInk.primary.opacity(0.9))
         .padding(.horizontal, Space.s3).padding(.vertical, 5)
         .background(hue.opacity(0.14), in: coreShape(7))
@@ -262,6 +262,7 @@ private struct ToolCard: View {
     let output: String
     @Binding var expanded: Bool
     @State private var spin = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var hue: Color {
         switch name.lowercased() {
@@ -292,10 +293,10 @@ private struct ToolCard: View {
                     .frame(width: 28, height: 28)
                     .background(hue.opacity(0.85), in: coreShape(7))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(name).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(
+                    Text(name).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                         GlassInk.ink(hue))
                     if !summary.isEmpty {
-                        Text(summary).font(.system(size: 12, design: .monospaced)).lineLimit(2)
+                        Text(summary).coreFont(size: 12, design: .monospaced).lineLimit(2)
                             .truncationMode(.middle).textSelection(.enabled)
                     }
                 }
@@ -306,7 +307,7 @@ private struct ToolCard: View {
             if !output.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text(long && !expanded ? lines.prefix(6).joined(separator: "\n") + "\n…" : output)
-                        .font(.system(size: 12, design: .monospaced)).foregroundStyle(GlassInk.secondary)
+                        .coreFont(size: 12, design: .monospaced).foregroundStyle(GlassInk.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if long {
@@ -317,7 +318,7 @@ private struct ToolCard: View {
                                 expanded ? "Show less" : "Show all \(lines.count) lines",
                                 systemImage: expanded ? "chevron.up" : "chevron.down"
                             )
-                            .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(hue))
+                            .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
                         }
                         .buttonStyle(.plain)
                     }
@@ -339,12 +340,18 @@ private struct ToolCard: View {
         switch status {
         case .running:
             HStack(spacing: 5) {
-                Image(systemName: "arrow.triangle.2.circlepath").rotationEffect(.degrees(spin ? 360 : 0))
-                    .animation(.linear(duration: 1.2).repeatForever(autoreverses: false), value: spin)
+                // Reduce Motion: the glyph breathes instead of turning.
+                Image(systemName: "arrow.triangle.2.circlepath").rotationEffect(.degrees(spin && !reduce ? 360 : 0))
+                    .opacity(spin && reduce ? 0.4 : 1)
+                    .animation(
+                        reduce
+                            ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                            : .linear(duration: 1.2).repeatForever(autoreverses: false), value: spin
+                    )
                     .onAppear { spin = true }
                 Text("running")
             }
-            .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.blueInk)
+            .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.blueInk)
         case .ok(let facts):
             badge("checkmark", facts.isEmpty ? "ok" : "ok · \(facts)", GlassInk.green)
         case .failed(let facts):
@@ -354,10 +361,10 @@ private struct ToolCard: View {
 
     private func badge(_ symbol: String, _ text: String, _ c: Color) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: symbol).symbolEffect(.bounce, value: text)
+            Image(systemName: symbol).coreBounce(text)
             Text(text).monospacedDigit()
         }
-        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.ink(c))
+        .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(c))
         .padding(.horizontal, 7).frame(height: 20)
         .background(c.opacity(0.15), in: coreShape(5))
     }

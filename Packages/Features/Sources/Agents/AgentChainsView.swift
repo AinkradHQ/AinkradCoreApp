@@ -79,7 +79,7 @@ struct AgentChainsSection: View {
             }
             addRow
             HStack(spacing: Space.s2) {
-                Text("Chains are made in Accounts.").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                Text("Chains are made in Accounts.").coreFont(size: MacTextSize.meta).foregroundStyle(
                     palette.text2)
                 Button("Open Accounts, Chains") { openChains() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
@@ -93,7 +93,7 @@ struct AgentChainsSection: View {
             HStack(spacing: Space.s3) {
                 Image(systemName: "sparkles").foregroundStyle(palette.text2).frame(width: Space.s4)
                     .accessibilityHidden(true)
-                Text(agent).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                Text(agent).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                     .truncationMode(.middle).help(agent).layoutPriority(1)
                 Spacer(minLength: Space.s2)
                 CoreSelect(
@@ -132,7 +132,7 @@ struct AgentChainsSection: View {
         let valid = AgentsModel.validAgent(id)
         let chain = model.chains.first { $0.id == newChain } ?? model.defaultChain
         return VStack(alignment: .leading, spacing: Space.s2) {
-            Text("Bind another agent").font(.system(size: MacTextSize.headline, weight: .semibold))
+            Text("Bind another agent").coreFont(size: MacTextSize.headline, weight: .semibold)
             HStack(alignment: .bottom, spacing: Space.s2) {
                 CoreTextField(
                     "Agent id", placeholder: "Agent id, such as atlas", text: $newAgent,

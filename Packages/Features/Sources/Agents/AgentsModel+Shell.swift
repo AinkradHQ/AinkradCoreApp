@@ -223,8 +223,9 @@ extension AgentsModel {
             let id = r.key
             if primed, !announced.contains(id) {
                 announced.insert(id)
+                let h = sessions.session(r.session).map { AgentWords.harnessName($0.harness) } ?? "An agent"
+                CoreAnnounce.settled("approval", "\(h) needs approval")
                 if notifyApprovals {
-                    let h = sessions.session(r.session).map { AgentWords.harnessName($0.harness) } ?? "An agent"
                     notifier.post(
                         id: id, title: "\(h) needs approval", body: "\(r.tool): \(r.input)".prefix(180).description,
                         session: r.session)

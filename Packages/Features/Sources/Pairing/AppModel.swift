@@ -283,6 +283,7 @@ public final class AppModel {
                 pool: { [accounts] in accounts.poolName($0) })
         else { return }
         shell.bell.add(BellItem(id: n.id, kind: n.isAlarm ? .alarm : .event, title: n.title, sub: n.sub, time: "now"))
+        CoreAnnounce.settled("account-\(n.id)", n.title)
         noticeIDs.removeAll { $0 == n.id }
         noticeIDs.append(n.id)
         while noticeIDs.count > 20 { shell.bell.remove(noticeIDs.removeFirst()) }

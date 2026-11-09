@@ -17,15 +17,16 @@ struct OverviewView: View {
             HStack(spacing: Space.s3) {
                 IconTile("square.grid.2x2", hue: GlassInk.blue, size: 40, bounce: shown)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Overview").font(.system(size: MacTextSize.large + 2, weight: .bold))
-                    Text("\(panes.count) apps open · ← → ↑ ↓ choose · ↩ or 1–9 open · esc close")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text("Overview").coreFont(size: MacTextSize.large + 2, weight: .bold)
+                    Text("\(panes.count) apps open · \(coreArrowKeys()) ↑ ↓ choose · ↩ or 1–9 open · esc close")
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: Space.s3)], spacing: Space.s3) {
                 ForEach(Array(panes.enumerated()), id: \.element.id) { i, p in
                     card(p, index: i, on: i == selected)
                         .onTapGesture { open(i) }
+                        .coreActivates { open(i) }
                         .onHover { if $0 { selected = i } }
                         .coreRise(shown, i)
                 }
@@ -36,7 +37,7 @@ struct OverviewView: View {
         .frame(maxWidth: Space.s8 * 34)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0, part: .popups)
         .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
-        .scaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
+        .coreScaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
         .animation(Motion.out(Motion.ui), value: shown)
         .animation(.spring(duration: 0.25), value: selected)
         .onAppear {
@@ -60,16 +61,16 @@ struct OverviewView: View {
                 IconTile(p.symbol, hue: on ? GlassInk.blue : GlassInk.slate, size: 44, bounce: on)
                 Spacer()
                 if index < 9 {
-                    Text("\(index + 1)").font(.system(size: MacTextSize.meta, weight: .bold, design: .rounded))
+                    Text("\(index + 1)").coreFont(size: MacTextSize.meta, weight: .bold, design: .rounded)
                         .frame(width: 22, height: 22).background(.white.opacity(0.14), in: coreShape(6))
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(shell.tabName(p)).font(.system(size: MacTextSize.headline + 1, weight: .semibold)).lineLimit(1)
+                Text(shell.tabName(p)).coreFont(size: MacTextSize.headline + 1, weight: .semibold).lineLimit(1)
                 HStack(spacing: Space.s1) {
                     if let state { coreShape(1.5).fill(state).frame(width: 6, height: 6) }
                     Text([p.title, p.chip?.label].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
             }
         }
@@ -86,7 +87,7 @@ struct OverviewView: View {
                     .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
         }
-        .scaleEffect(on ? 1.03 : 1)
+        .coreScaleEffect(on ? 1.03 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .accessibilityLabel(shell.tabName(p))
         .accessibilityAddTraits(on ? .isSelected : [])

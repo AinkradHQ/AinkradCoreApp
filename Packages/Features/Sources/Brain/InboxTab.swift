@@ -49,19 +49,19 @@ struct InboxTab: View {
     @ViewBuilder private var strip: some View {
         HStack(spacing: Space.s2) {
             if st.list == .noRoom {
-                Text("No room yet").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("No room yet").coreFont(size: MacTextSize.headline, weight: .semibold)
                 BrainChip("Not a room", GlassInk.slate, help: "The unclassified inbox is a sealed pseudo-room.")
                 BrainChip("Never searched", GlassInk.slate)
                 BrainChip("Agents never see it", GlassInk.slate)
                 Spacer(minLength: Space.s2)
-                Text("This Mac and iPhone only").font(.system(size: MacTextSize.meta)).foregroundStyle(
+                Text("This Mac and iPhone only").coreFont(size: MacTextSize.meta).foregroundStyle(
                     GlassInk.secondary)
             } else if let r = model.viewing {
-                Text(r.name).font(.system(size: MacTextSize.headline, weight: .semibold)).help(r.help)
+                Text(r.name).coreFont(size: MacTextSize.headline, weight: .semibold).help(r.help)
                 RoomChips(room: r)
                 Spacer(minLength: Space.s2)
                 Text(r.mounted ? "Shows only this room" : "Name and mode only")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2).frame(maxWidth: .infinity, alignment: .leading)
@@ -233,7 +233,7 @@ private struct DoneList: View {
             }
             .padding(.top, Space.s2)
         } label: {
-            Text("Done this session \(items.count)").font(.system(size: MacTextSize.headline, weight: .semibold))
+            Text("Done this session \(items.count)").coreFont(size: MacTextSize.headline, weight: .semibold)
         }
         .padding(Space.s3).coreWell()
         .accessibilityIdentifier("inbox-done")

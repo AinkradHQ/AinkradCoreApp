@@ -27,15 +27,15 @@ struct SessionHero: View {
                         in: coreShape(13)
                     )
                     .overlay { coreShape(13).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .symbolEffect(.pulse, options: .repeating, isActive: alive)
+                    .corePulse(alive)
                     .scaleEffect(shown || reduce ? 1 : 0.6)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: Space.s2) {
-                        Text(model.title(session)).font(.system(size: MacTextSize.large, weight: .bold)).lineLimit(2)
+                        Text(model.title(session)).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(2)
                             .help(model.title(session) + "\n" + session.id)
                         badge(st.label, st.symbol, state, live: session.live, waiting: waiting)
                     }
-                    Text(subtitle).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
+                    Text(subtitle).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Space.s3)
@@ -80,7 +80,7 @@ struct SessionHero: View {
                         : "Cancelling: it finishes the tool call in flight, then ends. K kills at once.",
                     systemImage: "hourglass"
                 )
-                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.orangeInk)
+                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.orangeInk)
                 .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                 .accessibilityIdentifier("session-stopping")
             }
@@ -144,7 +144,7 @@ struct SessionHero: View {
         } icon: {
             Image(systemName: "clock")
         }
-        .font(.system(size: MacTextSize.meta, weight: .medium)).foregroundStyle(GlassInk.secondary).monospacedDigit()
+        .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.secondary).monospacedDigit()
     }
 
     @ViewBuilder private var actions: some View {
@@ -197,7 +197,7 @@ struct SessionHero: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: waiting && !reduce)
             Text(label).lineLimit(1)
         }
-        .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(.white.opacity(0.95))
+        .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(.white.opacity(0.95))
         .padding(.horizontal, 8).frame(height: 22)
         .background(c.opacity(0.3), in: coreShape(6))
         .overlay { coreShape(6).strokeBorder(c.opacity(0.55), lineWidth: 1) }

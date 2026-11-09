@@ -27,7 +27,7 @@ struct WidgetHead: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             if let symbol {
-                Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                     .foregroundStyle(palette.primary)
                     .coreBounce(shown)
                     .frame(width: MacSize.controlMd, height: MacSize.controlMd)
@@ -35,10 +35,10 @@ struct WidgetHead: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(.system(size: MacTextSize.title - 1, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.title - 1, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
                 if let sub {
-                    Text(sub).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2).lineLimit(1)
+                    Text(sub).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2).lineLimit(1)
                         .contentTransition(.numericText())
                 }
             }
@@ -52,7 +52,7 @@ struct WidgetLabel: View {
     @Environment(\.corePalette) private var palette
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+        Text(text).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
             .padding(.top, Space.s2)
     }
 }
@@ -69,11 +69,11 @@ struct WidgetCalm: View {
     }
     var body: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .medium))
+            Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .medium)
                 .foregroundStyle(palette.primary.opacity(0.9))
                 .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                 .accessibilityHidden(true)
-            Text(text).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+            Text(text).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
         }
         .padding(.vertical, Space.s1)
     }
@@ -90,7 +90,7 @@ struct RollingNumber: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var shown: Double = 0
     var body: some View {
-        Text(format(shown)).font(.system(size: size, weight: .semibold, design: design)).monospacedDigit()
+        Text(format(shown)).coreFont(size: size, weight: .semibold, design: design).monospacedDigit()
             .foregroundStyle(ink ?? palette.text)
             .contentTransition(.numericText(value: shown))
             .lineLimit(1).minimumScaleFactor(0.6)
@@ -114,10 +114,10 @@ struct WidgetBig: View {
             if let n = Double(value) {
                 RollingNumber(value: n, size: small ? 28 : 38)
             } else {
-                Text(value).font(.system(size: small ? 28 : 38, weight: .semibold)).monospacedDigit().lineLimit(1)
+                Text(value).coreFont(size: small ? 28 : 38, weight: .semibold).monospacedDigit().lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
-            Text(caption).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+            Text(caption).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -136,7 +136,7 @@ public struct StatusDot: View {
     public var body: some View {
         coreShape(2).fill(color).frame(width: Space.s2, height: Space.s2)
             .opacity(live && dim ? 0.45 : 1)
-            .animation(live ? .easeInOut(duration: 1.1).repeatForever() : nil, value: dim)
+            .coreLoop(live ? .easeInOut(duration: 1.1).repeatForever() : nil, value: dim)
             .onAppear { if live { dim = true } }
             .accessibilityHidden(true)
     }
@@ -257,9 +257,9 @@ struct WidgetCard: View {
             HStack(spacing: Space.s3) {
                 StatusDot(color: palette.primary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                         .lineLimit(compact ? 1 : 3).multilineTextAlignment(.leading)
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2).lineLimit(1)
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }

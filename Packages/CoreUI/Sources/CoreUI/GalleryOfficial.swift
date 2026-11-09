@@ -30,11 +30,11 @@ struct OfficialGlassSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s6) {
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text("Official Liquid Glass").font(.system(size: MacTextSize.large, weight: .semibold))
+                Text("Official Liquid Glass").coreFont(size: MacTextSize.large, weight: .semibold)
                 Text("Left: Apple's SwiftUI API. Right: the CoreUI component it would replace. Over the Home sky.")
-                    .font(.system(size: MacTextSize.body))
+                    .coreFont(size: MacTextSize.body)
                 Text("Reduce Transparency makes glass opaque; Reduce Motion turns the morph into a fade.")
-                    .font(.system(size: MacTextSize.meta)).opacity(0.8)
+                    .coreFont(size: MacTextSize.meta).opacity(0.8)
             }
             actionButtons
             customSurfaces
@@ -60,8 +60,8 @@ struct OfficialGlassSection: View {
         _ title: String, note: String? = nil, @ViewBuilder official: () -> O, @ViewBuilder core: () -> C
     ) -> some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            if let note { Text(note).font(.system(size: MacTextSize.meta)).opacity(0.8) }
+            Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
+            if let note { Text(note).coreFont(size: MacTextSize.meta).opacity(0.8) }
             HStack(alignment: .top, spacing: Space.s6) {
                 column("Official", official)
                 column("CoreUI", core)
@@ -71,7 +71,7 @@ struct OfficialGlassSection: View {
 
     private func column<C: View>(_ name: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            Text(name).font(.system(size: MacTextSize.meta, weight: .semibold)).opacity(0.8)
+            Text(name).coreFont(size: MacTextSize.meta, weight: .semibold).opacity(0.8)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -81,7 +81,7 @@ struct OfficialGlassSection: View {
     func item<C: View>(_ api: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             content()
-            Text(api).font(.system(size: MacTextSize.meta, design: .monospaced)).opacity(0.75)
+            Text(api).coreFont(size: MacTextSize.meta, design: .monospaced).opacity(0.75)
         }
     }
 

@@ -59,8 +59,10 @@ struct AgentsListView: View {
                 AppStatChip("dollarsign", c, GlassInk.blue)
             }
             Spacer(minLength: 0)
-            Text("↩ open · ← → move · A approvals · C cancel · K kill · R resume").font(.system(size: MacTextSize.meta))
-                .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+            Text("↩ open · \(coreArrowKeys()) move · A approvals · C cancel · K kill · R resume").coreFont(
+                size: MacTextSize.meta
+            )
+            .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
     }
@@ -152,7 +154,7 @@ struct AgentsListView: View {
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s1)
                 if model.sessions.hasMore {
                     Label("Older sessions load as you scroll", systemImage: "arrow.down")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         .padding(Space.s4).frame(maxWidth: .infinity)
                 }
             }
@@ -168,8 +170,7 @@ struct AgentsListView: View {
             }
             .onKeyPress(.downArrow) { move(rows, 1, proxy) }
             .onKeyPress(.upArrow) { move(rows, -1, proxy) }
-            .onKeyPress(.rightArrow) { move(rows, 1, proxy) }
-            .onKeyPress(.leftArrow) { move(rows, -1, proxy) }
+            .coreSideKeys { move(rows, $0, proxy) }
             .onKeyPress(.home) { move(rows, -rows.count, proxy) }
             .onKeyPress(.end) { move(rows, rows.count, proxy) }
             .onKeyPress(.return) { act("o", rows) }
@@ -224,8 +225,8 @@ struct NotificationAsk: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Label("Get told when an agent needs you", systemImage: "bell").font(
-                .system(size: MacTextSize.headline, weight: .semibold))
+            Label("Get told when an agent needs you", systemImage: "bell").coreFont(
+                size: MacTextSize.headline, weight: .semibold)
             Text("Ainkrad can show a macOS banner for each new approval. macOS will ask you to allow it once.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Space.s2) {

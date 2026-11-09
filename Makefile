@@ -13,7 +13,7 @@ FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(f
 
 .DEFAULT_GOAL := generate
 include scripts/guardrails.mk
-.PHONY: dmg generate open build test uitest run lint format format-check sync-client clean
+.PHONY: dmg generate open build test uitest run lint format format-check sync-client strings clean
 
 generate: ## Generate the Xcode project from project.yml
 	xcodegen generate --quiet
@@ -43,6 +43,9 @@ format-check:
 
 sync-client: ## Re-vendor the generated client from ../AinkradCore
 	scripts/sync-client.sh
+
+strings: ## Copy the strings the last build extracted into the String Catalogs (run make build first)
+	scripts/sync-strings.sh
 
 clean:
 	rm -rf build $(PROJECT)

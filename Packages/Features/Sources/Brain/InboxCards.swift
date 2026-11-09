@@ -17,7 +17,7 @@ struct CandidateCard: View {
             QuotedText(text: c.text)
             HStack(spacing: Space.s2) {
                 SourceBadge(source: c.source)
-                Text("Proposed by \(c.by)").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text("Proposed by \(c.by)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             if let flag = c.flag { InboxNote("exclamationmark.triangle", GlassInk.red, flag) }
             if let why = model.inboxState.errors[c.id] {
@@ -83,17 +83,17 @@ struct ConflictCard: View {
 
     private func side(_ s: ConflictSide, _ title: String, _ choice: ConflictChoice) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+            Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).foregroundStyle(GlassInk.secondary)
             QuotedText(text: s.text)
             ChipFlow(spacing: Space.s2) {
                 SourceBadge(source: s.source)
                 BrainChip(s.authority.label, GlassInk.slate, help: "Authority id: \(s.authority.rawValue)")
                 BrainChip("Applies to: \(s.scope)", GlassInk.slate)
             }
-            Text(s.when).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(s.when).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             if let higher = model.overridden(c, choice) {
                 Text("Keeping this one replaces a higher source (\(higher.label)). Touch ID asks.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.orangeInk)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.orangeInk)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -115,7 +115,7 @@ struct BlockedCard: View {
                 Text("Blocked by: \(b.ruleName). ").bold() + Text(b.ruleAbout))
             HStack(spacing: Space.s2) {
                 SourceBadge(source: b.source)
-                Text("Captured by \(b.by)").font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text("Captured by \(b.by)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             if let why = model.inboxState.errors[b.id] { InboxNote("exclamationmark.triangle", GlassInk.red, why) }
             HStack(spacing: Space.s2) {

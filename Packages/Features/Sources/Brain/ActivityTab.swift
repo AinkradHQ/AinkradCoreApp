@@ -177,7 +177,7 @@ private struct EgressView: View {
                 Text(
                     "Everything a model ever received from this room, one row per try. Used for a provider revocation report."
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
             if let why = a.egressFailed {
@@ -219,8 +219,8 @@ private struct EgressView: View {
 
     private func count(_ n: Int, _ text: String) -> some View {
         HStack(spacing: Space.s1) {
-            Text("\(n)").font(.system(size: MacTextSize.title, weight: .semibold)).monospacedDigit()
-            Text(text).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text("\(n)").coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
+            Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
     }
 
@@ -230,6 +230,6 @@ private struct EgressView: View {
             ? "stayed on this Mac" : c.provider == .approvedCloud ? "approved cloud" : "not approved"
         guard c.sent else { return "\(c.target) · \(place)" }
         return
-            "\(c.target) · \(place) · \(String(format: "%.1f", Double(c.bytes) / 1000)) KB out · \(c.redacted) redacted"
+            "\(c.target) · \(place) · \(coreDecimal(Double(c.bytes) / 1000, 1)) KB out · \(c.redacted) redacted"
     }
 }

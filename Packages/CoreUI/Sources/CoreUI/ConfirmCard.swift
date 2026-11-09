@@ -48,7 +48,7 @@ public struct ConfirmCard: View {
         VStack(spacing: Space.s4) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown)
             VStack(spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.large + 4, weight: .bold)).multilineTextAlignment(.center)
+                Text(title).coreFont(size: MacTextSize.large + 4, weight: .bold).multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text(message).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -64,7 +64,7 @@ public struct ConfirmCard: View {
                 }
             }
             .coreRise(shown, 2)
-            Text("← → choose · ↩ run the highlighted · esc cancel").font(.system(size: MacTextSize.meta))
+            Text("\(coreArrowKeys()) choose · ↩ run the highlighted · esc cancel").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary.opacity(0.8))
         }
         .foregroundStyle(GlassInk.primary)
@@ -126,11 +126,11 @@ public struct ChoiceTile: View {
         let hue = choice.destructive ? GlassInk.red : GlassInk.blue
         Button(action: run) {
             HStack(spacing: Space.s2) {
-                Image(systemName: choice.symbol).font(.system(size: MacTextSize.body, weight: .semibold))
+                Image(systemName: choice.symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                     .coreEnterBounce(on)
-                Text(choice.label).font(.system(size: MacTextSize.body, weight: .semibold))
+                Text(choice.label).coreFont(size: MacTextSize.body, weight: .semibold)
                 if let keys {
-                    Text(keys).font(.system(size: MacTextSize.meta, weight: .medium, design: .rounded))
+                    Text(keys).coreFont(size: MacTextSize.meta, weight: .medium, design: .rounded)
                         .padding(.horizontal, 6).frame(minHeight: 20)
                         .background(.white.opacity(0.14), in: coreShape(5))
                 }
@@ -178,12 +178,12 @@ public struct ModalCard: View {
     public var body: some View {
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 56, bounce: shown)
-            Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).multilineTextAlignment(.center)
+            Text(title).coreFont(size: MacTextSize.large + 2, weight: .bold).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(message).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let note {
-                Text(note).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(note).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .multilineTextAlignment(.center)
             }
             // The lead choice (the primary, else the first) answers Return; the others ⌘1, ⌘2… Every key is on its tile.
@@ -259,7 +259,7 @@ public struct ModalHeader: View {
         let look = ModalLook.of(title)
         HStack(spacing: Space.s3) {
             IconTile(symbol ?? look.symbol, hue: look.hue, size: 44, bounce: shown)
-            Text(title).font(.system(size: MacTextSize.large + 2, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text(title).coreFont(size: MacTextSize.large + 2, weight: .bold).accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s2)
             if let close { CoreIconButton(symbol: "xmark", label: "Close", action: close) }
         }

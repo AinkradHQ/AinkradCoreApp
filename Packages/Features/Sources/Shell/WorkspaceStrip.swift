@@ -136,9 +136,9 @@ struct StackBadge: View {
         HStack(spacing: Space.s1) {
             Image(systemName: "square.stack.3d.up.fill").font(.system(size: 10, weight: .semibold))
             Text("\(index) of \(count)").monospacedDigit().contentTransition(.numericText())
-            Text("⌃Tab").font(.system(size: 10, weight: .medium, design: .rounded)).opacity(0.7)
+            Text("⌃Tab").coreFont(size: 10, weight: .medium, design: .rounded).opacity(0.7)
         }
-        .font(.system(size: MacTextSize.meta, weight: .semibold))
+        .coreFont(size: MacTextSize.meta, weight: .semibold)
         .foregroundStyle(.white)
         .padding(.horizontal, Space.s2).frame(height: 22)
         .background(.black.opacity(0.45), in: coreShape(6))

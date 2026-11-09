@@ -71,7 +71,7 @@ struct AgentSettingsView: View {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
             } content: {
                 if prefs.followLook {
-                    Text("Same as Settings, Appearance.").font(.system(size: MacTextSize.meta))
+                    Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                 } else {
                     GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
@@ -124,7 +124,7 @@ private struct ModelField: View {
         HStack(spacing: Space.s2) {
             Image(systemName: text.isEmpty ? "sparkles" : "brain.head.profile")
                 .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.violet)
-                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: text.count)
+                .contentTransition(.symbolEffect(.replace)).coreBounce(text.count)
             TextField("The harness default", text: $text).textFieldStyle(.plain).focused($focused)
                 .autocorrectionDisabled()
             if !text.isEmpty {

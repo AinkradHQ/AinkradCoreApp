@@ -31,7 +31,7 @@ struct AccHeader<Action: View>: View {
         HStack(alignment: .center, spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 48, bounce: shown).shadow(color: hue.opacity(0.45), radius: 12)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text(title).coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
                     .contentTransition(.numericText())
                 Text(detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -51,7 +51,7 @@ struct AccTile: View {
         let hue = provider.map(ProviderLook.hue) ?? GlassInk.slate
         let size = large ? 56.0 : 36.0
         Image(systemName: symbol ?? provider.map(ProviderLook.symbol) ?? "key.fill")
-            .font(.system(size: large ? 24 : 15, weight: .semibold)).foregroundStyle(.white)
+            .coreFont(size: large ? 24 : 15, weight: .semibold).foregroundStyle(.white)
             .frame(width: size, height: size)
             .background(
                 LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
@@ -86,9 +86,10 @@ struct AccLink: View {
         Button(action: action) {
             HStack(spacing: Space.s1) {
                 if let symbol {
-                    Image(systemName: symbol).symbolEffect(.bounce, value: hovering).accessibilityHidden(true)
+                    Image(systemName: symbol).flipsForRightToLeftLayoutDirection(true).coreBounce(hovering)
+                        .accessibilityHidden(true)
                 }
-                Text(title).font(.system(size: MacTextSize.meta, weight: .semibold)).lineLimit(1)
+                Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).lineLimit(1)
             }
             .foregroundStyle(hovering ? .white : danger ? GlassInk.redInk : GlassInk.blueInk)
             .padding(.horizontal, Space.s2).frame(minHeight: 26)
@@ -98,7 +99,7 @@ struct AccLink: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(hovering ? 1.04 : 1)
+        .coreScaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 && enabled }
         .animation(.smooth(duration: 0.25), value: hovering)
         .coreDimWhenDisabled(enabled)
@@ -112,7 +113,7 @@ struct AccIssue: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         Label(text, systemImage: "exclamationmark.triangle")
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.tone(.fail).ink)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.fail).ink)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
     }
@@ -131,8 +132,8 @@ struct AccStateCard<Actions: View>: View {
         let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.orange : GlassInk.blue
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown).shadow(color: hue.opacity(0.5), radius: 18)
-                .scaleEffect(shown ? 1 : 0.6)
-            Text(title).font(.system(size: MacTextSize.large, weight: .bold)).accessibilityAddTraits(.isHeader)
+                .coreScaleEffect(shown ? 1 : 0.6)
+            Text(title).coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
             HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
@@ -164,7 +165,7 @@ struct NotYetCard: View {
             HStack(spacing: Space.s2) {
                 Image(systemName: "hourglass").foregroundStyle(GlassInk.slate)
                     .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
             }
             Text(text).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
         }
@@ -217,7 +218,7 @@ struct GateBanner: View {
                 )
                 .shadow(color: hue.opacity(0.45), radius: 10)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(g.title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                    Text(g.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Space.s3)
@@ -280,7 +281,7 @@ struct AccChip: View {
     let text: String
     var mono = false
     var body: some View {
-        Text(text).font(.system(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default))
+        Text(text).coreFont(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default)
             .padding(.horizontal, Space.s2).frame(minHeight: 22)
             .background(GlassInk.well, in: coreShape(6))
             .overlay { coreShape(6).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
@@ -322,8 +323,8 @@ struct AccPick: View {
                     .frame(width: 26, height: 26).background(on ? hue : hue.opacity(0.15), in: coreShape(7))
                     .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
-                    Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }

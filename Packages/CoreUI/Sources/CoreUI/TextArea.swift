@@ -40,7 +40,7 @@ public struct CoreTextArea: View {
         VStack(alignment: .leading, spacing: Space.s1) {
             if let label { CoreFieldLabel(label) }
             TextEditor(text: $text)
-                .font(.system(size: size)).scrollContentBackground(.hidden)
+                .coreFont(size: size).scrollContentBackground(.hidden)
                 .focused(focus ?? $focused).focusEffectDisabled()
                 .padding(.horizontal, Space.s2).padding(.vertical, Space.s2)
                 .frame(minHeight: minHeight, maxHeight: maxHeight)
@@ -48,7 +48,7 @@ public struct CoreTextArea: View {
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
                         // TextEditor has no placeholder; drawn where its first line sits.
-                        Text(placeholder).font(.system(size: size)).foregroundStyle(palette.text2)
+                        Text(placeholder).coreFont(size: size).foregroundStyle(palette.text2)
                             .padding(.horizontal, Space.s2 + 5).padding(.vertical, Space.s2)
                             .allowsHitTesting(false).accessibilityHidden(true)
                     }

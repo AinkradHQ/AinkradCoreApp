@@ -1,0 +1,456 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    " · %lld %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " · %1$lld %2$@"
+          }
+        }
+      }
+    },
+    " · %lld %@ running" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " · %1$lld %2$@ running"
+          }
+        }
+      }
+    },
+    "%@ widget, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ widget, %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %lld min" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld min"
+          }
+        }
+      }
+    },
+    "%@ · %lld×%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld×%3$lld"
+          }
+        }
+      }
+    },
+    "%@ · right-click for actions, ⌃Tab next tab, ⇧⌘R rename" : {
+
+    },
+    "%@, %lld by %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld by %3$lld"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld apps open · %@ ↑ ↓ choose · ↩ or 1–9 open · esc close" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld apps open · %2$@ ↑ ↓ choose · ↩ or 1–9 open · esc close"
+          }
+        }
+      }
+    },
+    "%lld min" : {
+
+    },
+    "%lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "%lld percent" : {
+
+    },
+    "%lld running" : {
+
+    },
+    "%lld running, %lld waiting. Open notifications" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld running, %2$lld waiting. Open notifications"
+          }
+        }
+      }
+    },
+    "%lld waiting on you" : {
+
+    },
+    "%lld waiting on you. Open notifications" : {
+
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "Actions" : {
+
+    },
+    "Actions…" : {
+
+    },
+    "Add" : {
+
+    },
+    "Add %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Add %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "Add Approval to Bell" : {
+
+    },
+    "Add Widget" : {
+
+    },
+    "Add Widget…" : {
+
+    },
+    "Add a widget" : {
+
+    },
+    "Add your name" : {
+
+    },
+    "Admin unlock" : {
+
+    },
+    "Admin unlock ends early if the Core restarts or this device is revoked." : {
+
+    },
+    "Approvals and alerts from your Core show up here." : {
+
+    },
+    "Back to %@" : {
+
+    },
+    "Clear Bell" : {
+
+    },
+    "Close %@" : {
+
+    },
+    "Close All Panes" : {
+
+    },
+    "Close Other Panes" : {
+
+    },
+    "Close Pane" : {
+
+    },
+    "Confirm Sheet" : {
+
+    },
+    "Copy Name" : {
+
+    },
+    "Demo" : {
+
+    },
+    "Do something with this pane…" : {
+
+    },
+    "Done" : {
+
+    },
+    "Done Editing" : {
+
+    },
+    "Drag onto Home" : {
+
+    },
+    "Drag to move this app" : {
+
+    },
+    "Edit Widgets" : {
+
+    },
+    "Filter shortcuts" : {
+
+    },
+    "Focus Mode" : {
+
+    },
+    "Full Pane" : {
+
+    },
+    "Home" : {
+
+    },
+    "Idle" : {
+
+    },
+    "Keyboard Shortcuts" : {
+
+    },
+    "Launcher" : {
+
+    },
+    "Launcher (⌘K)" : {
+
+    },
+    "Launcher…" : {
+
+    },
+    "Locks in " : {
+
+    },
+    "Motion is full" : {
+
+    },
+    "Move Pane Left" : {
+
+    },
+    "Move Pane Right" : {
+
+    },
+    "Move down" : {
+
+    },
+    "Move left" : {
+
+    },
+    "Move right" : {
+
+    },
+    "Move up" : {
+
+    },
+    "New Agent Session" : {
+
+    },
+    "New Terminal" : {
+
+    },
+    "New Terminal (Advanced)…" : {
+
+    },
+    "Next Pane" : {
+
+    },
+    "Next Tab" : {
+
+    },
+    "No apps in this workspace" : {
+
+    },
+    "Nothing matches “%@”" : {
+
+    },
+    "Nothing needs your approval" : {
+
+    },
+    "Nothing waiting on you" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Offline" : {
+
+    },
+    "Open" : {
+
+    },
+    "Open %@ Pane" : {
+
+    },
+    "Open an app or run a command…" : {
+
+    },
+    "Open one from the launcher with ⌘K." : {
+
+    },
+    "Overview" : {
+
+    },
+    "Pick %lld" : {
+
+    },
+    "Press" : {
+
+    },
+    "Previous Pane" : {
+
+    },
+    "Previous Tab" : {
+
+    },
+    "Reconnect to Core" : {
+
+    },
+    "Reduce Motion is on" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Remove %@" : {
+
+    },
+    "Rename Tab…" : {
+
+    },
+    "Renew with Touch ID" : {
+
+    },
+    "Reopen Closed Pane" : {
+
+    },
+    "Reset Bell" : {
+
+    },
+    "Reset Layout" : {
+
+    },
+    "Resize panes above and below" : {
+
+    },
+    "Resize panes side by side" : {
+
+    },
+    "Same follows the content background above" : {
+
+    },
+    "Sample data" : {
+
+    },
+    "Save" : {
+
+    },
+    "Saved" : {
+
+    },
+    "Saved %@" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Settings…" : {
+
+    },
+    "Show Activity in Status Bar" : {
+
+    },
+    "Size" : {
+
+    },
+    "Switch Day and Night" : {
+
+    },
+    "Tab name" : {
+
+    },
+    "Tile All Panes" : {
+
+    },
+    "Tile Panes" : {
+
+    },
+    "Toast with Undo" : {
+
+    },
+    "Try fewer letters, or the first letters of each word." : {
+
+    },
+    "Turn on Reduce Motion in your Mac's settings to keep every change and drop the travel." : {
+
+    },
+    "Unlock with Touch ID" : {
+
+    },
+    "Unlocked for " : {
+
+    },
+    "When an agent asks to do something, it waits here for you." : {
+
+    },
+    "Workspace" : {
+
+    },
+    "You're all caught up" : {
+
+    },
+    "Your Mac asks for less movement, so Ainkrad keeps every change and drops the travel." : {
+
+    },
+    "collapsed" : {
+
+    },
+    "expanded" : {
+
+    },
+    "of this month's tokens" : {
+
+    },
+    "to open the launcher." : {
+
+    },
+    "· %lld waiting" : {
+
+    },
+    "⌃Tab" : {
+
+    }
+  },
+  "version" : "1.0"
+}

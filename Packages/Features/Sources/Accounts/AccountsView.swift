@@ -31,7 +31,7 @@ struct AccountsView: View {
                         AccNotice(notice: model.host.elevationNotice)
                         content
                     }
-                    .font(.system(size: MacTextSize.body))
+                    .coreFont(size: MacTextSize.body)
                     .foregroundStyle(GlassInk.primary)
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -44,8 +44,7 @@ struct AccountsView: View {
                 .retakeFocus(after: model.host.shell) { paneFocus = true }
                 .onKeyPress(.downArrow) { AccountsKeys.move(model, 1, proxy) }
                 .onKeyPress(.upArrow) { AccountsKeys.move(model, -1, proxy) }
-                .onKeyPress(.rightArrow) { AccountsKeys.side(model, 1, proxy) }
-                .onKeyPress(.leftArrow) { AccountsKeys.side(model, -1, proxy) }
+                .coreSideKeys { AccountsKeys.side(model, $0, proxy) }
                 .onKeyPress(.return) { AccountsKeys.open(model) }
                 .onKeyPress(.escape) { AccountsKeys.back(model) }
                 .onKeyPress(.delete) { AccountsKeys.letter(model, "⌫") }
@@ -146,7 +145,7 @@ struct AccountsView: View {
             }
             AppStatChip("square.grid.2x2.fill", "\(model.pools.count) pools", GlassInk.blue)
             Spacer(minLength: 0)
-            Text(AccountsKeys.hint(model)).font(.system(size: MacTextSize.meta))
+            Text(AccountsKeys.hint(model)).coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)

@@ -46,7 +46,7 @@ struct FirstRunView: View {
 
             }
             .foregroundStyle(palette.text)
-            .font(.system(size: MacTextSize.body))
+            .coreFont(size: MacTextSize.body)
             .padding(Space.s6)
             .coreFrame(radius: Radius.panel, part: .dialogs)
             .frame(width: Space.s8 * 17)
@@ -109,7 +109,7 @@ struct FirstRunView: View {
                 }
                 .accessibilityHidden(true)
             }
-            Text(step.1).font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(palette.text2)
+            Text(step.1).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
                 .accessibilityLabel(step.0 > 0 ? "Step \(step.0) of 4, \(step.1)" : step.1)
         }
     }
@@ -132,7 +132,7 @@ struct FirstRunView: View {
             Image(systemName: symbol).accessibilityHidden(true)
             if let title { Text(title) }
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .padding(.horizontal, Space.s2).frame(minWidth: MacSize.controlMd, minHeight: MacSize.controlMd)
         .accessibilityElement(children: .combine).accessibilityLabel(label)
     }
@@ -147,7 +147,7 @@ struct FirstRunView: View {
     private var keysHome: String { SecureEnclave.isAvailable ? "the Secure Enclave" : "this Mac's Keychain" }
 
     private func title(_ t: String) -> some View {
-        Text(t).font(.system(size: MacTextSize.large, weight: .semibold)).accessibilityAddTraits(.isHeader)
+        Text(t).coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(.isHeader)
     }
 
     private func note(_ t: LocalizedStringKey) -> some View {
@@ -203,7 +203,7 @@ struct FirstRunView: View {
                     "Core address", placeholder: "core.myhome.net", text: $model.endpointText,
                     error: model.endpointError, suffix: addressSuffix, onSubmit: { model.submitAddress() })
                 Text("The address you gave your Core when you set it up. Add :port only if it uses one.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
@@ -226,12 +226,12 @@ struct FirstRunView: View {
     /// A Core answered on this Mac: the easiest way in is one click.
     private func foundLocalCore(_ address: String) -> some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: "checkmark.circle.fill").font(.system(size: MacTextSize.large))
+            Image(systemName: "checkmark.circle.fill").coreFont(size: MacTextSize.large)
                 .foregroundStyle(palette.tone(.run).ink).coreBounce(address)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Found a Core on this Mac").font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(address).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+                Text("Found a Core on this Mac").coreFont(size: MacTextSize.body, weight: .semibold)
+                Text(address).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(palette.text2)
             }
             Spacer(minLength: 0)
             Button("Use it") { model.useLocalCore() }.coreGlassButton(prominent: true)
@@ -254,7 +254,7 @@ struct FirstRunView: View {
             note(
                 "The very first device is created on the host itself, never over the network. Open a terminal on the machine that runs the Core."
             )
-            Text("$ ainkrad bootstrap").font(.system(size: MacTextSize.body, design: .monospaced))
+            Text("$ ainkrad bootstrap").coreFont(size: MacTextSize.body, design: .monospaced)
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
                 .background(palette.glassCard, in: coreShape(Radius.row))
             VStack(alignment: .leading, spacing: Space.s2) {
@@ -281,7 +281,7 @@ struct FirstRunView: View {
                 label: "Pairing code", text: $codeField, error: model.codeError,
                 onSubmit: { Task { await model.submit() } })
             Text("Case doesn't matter. I and L count as 1, O as 0.")
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(spacing: Space.s1) {
                     Text("This Mac keeps its keys in \(keysHome)")
@@ -311,14 +311,14 @@ struct FirstRunView: View {
             Text(
                 "The keys stay on this Mac. The Core only ever sees their public halves, and records the storage as a claim."
             )
-            .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var claiming: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Checking the Core").font(.system(size: MacTextSize.large, weight: .semibold))
+            Text("Checking the Core").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
             Text(
                 "Nothing is signed or sent from this Mac yet. The Core has to prove who it is first, then this Mac claims the code."
@@ -334,10 +334,8 @@ struct FirstRunView: View {
 
     private var sas: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Check it matches the code on your Core's screen").font(
-                .system(size: MacTextSize.large, weight: .semibold)
-            )
-            .accessibilityAddTraits(.isHeader)
+            Text("Check it matches the code on your Core's screen").coreFont(size: MacTextSize.large, weight: .semibold)
+                .accessibilityAddTraits(.isHeader)
             Text("It has to match the code on their screen, every character. If it doesn't, don't go on.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             if let claim = model.claim { SASView(sas: claim.sas) }
@@ -360,15 +358,15 @@ struct FirstRunView: View {
     @ViewBuilder private var statusLine: some View {
         if model.approverApproved && !model.matched {
             Label("The approver approved. Say it matches to finish.", systemImage: "checkmark.seal")
-                .font(.system(size: MacTextSize.body, weight: .semibold))
+                .coreFont(size: MacTextSize.body, weight: .semibold)
         } else {
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreBusyBar().accessibilityHidden(true)
-                Text("Waiting for approval").font(.system(size: MacTextSize.body, weight: .semibold))
+                Text("Waiting for approval").coreFont(size: MacTextSize.body, weight: .semibold)
                 Text(
                     "A pairing lasts 5 minutes from when the approver made the code. This Mac isn't told the exact time."
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
@@ -381,11 +379,11 @@ struct FirstRunView: View {
     private var approved: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(spacing: Space.s3) {
-                Image(systemName: "checkmark").font(.system(size: MacTextSize.large))
+                Image(systemName: "checkmark").coreFont(size: MacTextSize.large)
                     .foregroundStyle(palette.tone(.run).ink)
                     .frame(width: MacSize.controlLg, height: MacSize.controlLg)
                     .background(palette.tone(.run).fill, in: coreShape(Radius.control)).accessibilityHidden(true)
-                Text("This Mac is paired").font(.system(size: MacTextSize.large, weight: .semibold))
+                Text("This Mac is paired").coreFont(size: MacTextSize.large, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
             }
             Text("The Core approved it. You are signed in, and the session renews itself in the background.")

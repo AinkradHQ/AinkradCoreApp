@@ -70,14 +70,15 @@ struct FactRow: View {
     let value: String
     var mono = false
     @Environment(\.corePalette) private var palette
+    private var textScale: Double { TextSizePrefs.shared.scale }
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(key).foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
-            Text(value).font(mono ? .system(size: MacTextSize.body, design: .monospaced) : nil)
+            Text(value).font(mono ? .core(size: MacTextSize.body, design: .monospaced, scale: textScale) : nil)
                 .multilineTextAlignment(.trailing).textSelection(.enabled)
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .accessibilityElement(children: .combine)
     }
 }
@@ -204,7 +205,7 @@ struct DangerButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let t = palette.tone(.fail)
         configuration.label
-            .font(.system(size: MacTextSize.body, weight: .medium))
+            .coreFont(size: MacTextSize.body, weight: .medium)
             .foregroundStyle(t.ink)
             .frame(minHeight: MacSize.controlMd)
             .padding(.horizontal, Space.s3)
@@ -266,7 +267,7 @@ struct CodeBoxes: View {
                     Text("\(chars.count) of 10").foregroundStyle(palette.text2)
                 }
             }
-            .font(.system(size: MacTextSize.meta, design: .monospaced).monospacedDigit())
+            .coreFont(size: MacTextSize.meta, design: .monospaced).monospacedDigit()
             .frame(maxWidth: .infinity, alignment: .center)
             .accessibilityHidden(true)
             if let error { CoreFieldError(error) }
@@ -279,7 +280,7 @@ struct CodeBoxes: View {
             ForEach(range, id: \.self) { i in
                 let active = focused && i == min(chars.count, 9)
                 Text(i < chars.count ? String(chars[i]) : "")
-                    .font(.system(size: MacTextSize.large, weight: .semibold, design: .monospaced))
+                    .coreFont(size: MacTextSize.large, weight: .semibold, design: .monospaced)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .coreFieldSurface(focused: active, error: error != nil)
             }

@@ -87,7 +87,7 @@ struct DevicesSection: View {
             if model.load == .ready || !model.items.isEmpty {
                 DeviceTable(app: app, model: model)
                 Text("Where a key is kept is what each device said when it paired. Your Core can't check it.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -105,7 +105,7 @@ private struct OnlyAdminWarning: View {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(t.ink).frame(width: Space.s4)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text("Only one admin device").font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text("Only one admin device").coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(
                     "\(device.name) is the only device that can manage this Core. If you lose it, getting back in needs SSH to the host. Add a second admin device, such as your iPhone."
                 )
@@ -114,7 +114,7 @@ private struct OnlyAdminWarning: View {
             Spacer(minLength: Space.s2)
             AppActionTile(title: "Add device", symbol: "plus", key: "", hue: GlassInk.orange) { app.openAddDevice() }
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .padding(Space.s3)
         .background(palette.glassCard, in: coreShape(Radius.cardMac))
         .background(t.fill, in: coreShape(Radius.cardMac))
@@ -207,12 +207,12 @@ private struct DeviceCard: View {
                         }
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: Space.s1) {
-                            Text(device.name).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(1)
+                            Text(device.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                             if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
                             if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
                         }
                         Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
-                            .font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                            .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 0)
                 }
@@ -237,7 +237,7 @@ private struct DeviceCard: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .scaleEffect(hovering ? 1.02 : 1)
+        .coreScaleEffect(hovering ? 1.02 : 1)
         .shadow(color: .black.opacity(hovering ? 0.25 : 0), radius: 16, y: 8)
         .onHover { hovering = $0 }
         .animation(.smooth(duration: 0.3), value: hovering)
@@ -283,7 +283,7 @@ struct KeyStorageLabel: View {
         } icon: {
             Image(systemName: software ? "exclamationmark.triangle" : "checkmark.shield")
         }
-        .font(.system(size: MacTextSize.meta))
+        .coreFont(size: MacTextSize.meta)
         .foregroundStyle(software ? palette.tone(.warn).ink : palette.text2)
         .lineLimit(1)
         .help(
@@ -311,7 +311,7 @@ struct LastSeenLine: View {
             }
             Text(fresh ? "Active now" : "Last seen \(DeviceWords.seen(lastUsed))")
         }
-        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
     }
 }
 
@@ -321,7 +321,7 @@ struct Chip: View {
     var tint: Tone?
     @Environment(\.corePalette) private var palette
     var body: some View {
-        Text(text).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1)
+        Text(text).coreFont(size: MacTextSize.meta, design: .monospaced).lineLimit(1)
             .foregroundStyle(tint.map { palette.tone($0).ink } ?? palette.text)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
             .background(palette.uDim, in: coreShape(Radius.chip))
@@ -405,7 +405,7 @@ struct DeviceDetail: View {
                     .shadow(color: hue.opacity(0.45), radius: 16)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s2) {
-                        Text(device.name).font(.system(size: MacTextSize.large + 6, weight: .bold))
+                        Text(device.name).coreFont(size: MacTextSize.large + 6, weight: .bold)
                             .accessibilityAddTraits(.isHeader)
                         if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
                         if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }

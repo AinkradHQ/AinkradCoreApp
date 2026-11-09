@@ -37,7 +37,7 @@ struct TerminalTile: View {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: Space.s1) {
                         Text(model.shell.tabNames["terminal-\(item.id)"] ?? runner)
-                            .font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                            .coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                         if model.rang.contains(item.id) {
                             Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orangeInk)
                         }
@@ -48,7 +48,7 @@ struct TerminalTile: View {
                             item.isEnded ? "ended" : "open \(ago(item.createdAt))", "\(item.attached) attached",
                         ].compactMap { $0 }.joined(separator: " · ")
                     )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
                 }
                 Spacer(minLength: 0)
                 if let session {
@@ -91,8 +91,8 @@ struct TerminalTile: View {
         .accessibilityLabel(
             "Terminal on \(runner), \(chip.label), \(item.cols) by \(item.rows), \(item.attached) attached"
         )
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityAction(named: "Open") { TileAction.run(.open, item.id, model) }
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction { TileAction.run(.open, item.id, model) }
     }
 
     /// The tile's actions on hover: icon tiles that bounce in, each with its key.
@@ -112,7 +112,7 @@ struct TerminalTile: View {
         Button(action: run) {
             VStack(spacing: 1) {
                 Image(systemName: symbol).font(.system(size: 12, weight: .bold)).coreBounce(hovering)
-                Text(key).font(.system(size: 8, weight: .bold, design: .rounded)).opacity(0.85)
+                Text(key).coreFont(size: 8, weight: .bold, design: .rounded).opacity(0.85)
             }
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)
@@ -144,8 +144,8 @@ private struct TileScreen: View {
                 HStack(spacing: 5) {
                     coreShape(1.5).fill(state).frame(width: 6, height: 6)
                         .opacity(!ended && blink ? 0.4 : 1)
-                        .animation(ended ? nil : .easeInOut(duration: 1.1).repeatForever(), value: blink)
-                    Text(label).font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                        .coreLoop(ended ? nil : .easeInOut(duration: 1.1).repeatForever(), value: blink)
+                    Text(label).coreFont(size: 10, weight: .semibold).lineLimit(1)
                 }
                 .foregroundStyle(.white.opacity(0.9))
                 .padding(.horizontal, 7).frame(height: 18)
@@ -161,7 +161,7 @@ private struct TileScreen: View {
                 } else {
                     Rectangle().fill(Color(nsColor: t.caret)).frame(width: 7, height: 14)
                         .opacity(blink ? 0.15 : 1)
-                        .animation(.easeInOut(duration: 0.6).repeatForever(), value: blink)
+                        .coreLoop(.easeInOut(duration: 0.6).repeatForever(), value: blink)
                 }
             }
             .font(Font(prefs.font).weight(.medium))

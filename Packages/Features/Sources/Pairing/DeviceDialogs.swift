@@ -82,7 +82,7 @@ struct ScopesDialog: View {
                     }
                 }
             }
-            .font(.system(size: MacTextSize.body))
+            .coreFont(size: MacTextSize.body)
         }
     }
 }
@@ -140,7 +140,7 @@ struct ScopeWarnings: View {
                 } icon: {
                     Image(systemName: l.symbol).foregroundStyle(palette.tone(l.tone).ink)
                 }
-                .font(.system(size: MacTextSize.body))
+                .coreFont(size: MacTextSize.body)
             }
         }
         .animation(Motion.out(Motion.ui), value: lines.map(\.text))
@@ -173,7 +173,7 @@ struct RevokeDialog: View {
                 }
                 if me {
                     Text("You will be signed out of this Mac and sent back to Connect.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
                 StepUpBanner(app: app)
                 ErrorLine(text: app.devices.dialogError)
@@ -181,7 +181,7 @@ struct RevokeDialog: View {
                     Task { if await app.devices.revoke(device) { app.shell.closeDialog() } }
                 }
             }
-            .font(.system(size: MacTextSize.body))
+            .coreFont(size: MacTextSize.body)
         }
     }
 }

@@ -9,7 +9,7 @@ struct AgentMark: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         Image(systemName: AgentsModel.harnessSymbol(harness))
-            .font(.system(size: MacTextSize.title, weight: .medium))
+            .coreFont(size: MacTextSize.title, weight: .medium)
             .foregroundStyle(palette.btnInk)
             .frame(width: size, height: size)
             .background(harness == "claude" ? palette.btnPrimary : palette.navActive, in: coreShape(Radius.control))
@@ -80,7 +80,7 @@ struct AgentRowButton<Label: View>: View {
             .shadow(
                 color: (waiting ? GlassInk.orange : GlassInk.violet).opacity(hovering || waiting ? 0.3 : 0), radius: 14
             )
-            .scaleEffect(hovering ? 1.015 : 1)
+            .coreScaleEffect(hovering ? 1.015 : 1)
             .animation(Motion.out(Motion.hover), value: hovering)
             .onHover { hovering = $0 }
     }
@@ -96,7 +96,7 @@ struct AgentKeyHint: View {
     let keys: String
     @Environment(\.corePalette) private var palette
     var body: some View {
-        Text(keys).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(palette.text2)
+        Text(keys).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(palette.text2)
             .fixedSize().padding(.horizontal, Space.s1).background(palette.uDim, in: coreShape(Radius.chip / 2))
             .accessibilityHidden(true)
     }

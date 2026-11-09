@@ -32,9 +32,9 @@ public struct CoreStateCard: View {
     }
     public var body: some View {
         VStack(spacing: Space.s3) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.large, weight: .semibold))
+            Image(systemName: symbol).coreFont(size: MacTextSize.large, weight: .semibold)
                 .foregroundStyle(palette.text2).accessibilityHidden(true)
-            Text(title).font(.system(size: MacTextSize.title, weight: .semibold)).multilineTextAlignment(.center)
+            Text(title).coreFont(size: MacTextSize.title, weight: .semibold).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(line).foregroundStyle(palette.text2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)

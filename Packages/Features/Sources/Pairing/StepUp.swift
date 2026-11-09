@@ -144,8 +144,8 @@ struct StepUpBanner: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 IconTile(n.symbol, hue: colours.ink, size: 32, bounce: n.title)
                 VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text(n.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                    Text(n.detail).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                    Text(n.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                    Text(n.detail).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -181,9 +181,9 @@ struct StepUpSheet: View {
                     ForEach(0..<3, id: \.self) { i in
                         coreShape(Radius.cardMac + 10).stroke(hue.opacity(0.5), lineWidth: 1.5)
                             .frame(width: 112, height: 112)
-                            .scaleEffect(ripple ? 1.55 : 1)
+                            .coreScaleEffect(ripple ? 1.55 : 1)
                             .opacity(ripple ? 0 : 0.8)
-                            .animation(
+                            .coreLoop(
                                 .easeOut(duration: 2.1).repeatForever(autoreverses: false).delay(Double(i) * 0.7),
                                 value: ripple)
                     }
@@ -232,7 +232,7 @@ struct StepUpSheet: View {
             .accessibilityHidden(true)
             VStack(spacing: Space.s2) {
                 Text(done ? "Unlocked" : missed ? "Didn't match" : "Touch the sensor")
-                    .font(.system(size: MacTextSize.large + 6, weight: .bold))
+                    .coreFont(size: MacTextSize.large + 6, weight: .bold)
                     .contentTransition(.opacity)
                     .accessibilityAddTraits(.isHeader)
                 Text(
@@ -255,7 +255,7 @@ struct StepUpSheet: View {
                 Button("Cancel") { model.cancel() }.buttonStyle(CoreButtonStyle(.plain)).coreShortcut(.cancel)
                 HStack(spacing: Space.s2) {
                     Image(systemName: "touchid").symbolEffect(.pulse, options: .repeating, isActive: !reduce)
-                    Text("Waiting for Touch ID").font(.system(size: MacTextSize.body, weight: .semibold))
+                    Text("Waiting for Touch ID").coreFont(size: MacTextSize.body, weight: .semibold)
                 }
                 .foregroundStyle(GlassInk.secondary)
                 .accessibilityElement(children: .combine)

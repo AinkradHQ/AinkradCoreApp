@@ -46,9 +46,8 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
         .focusable(enabled)
         .focused($focused)
         .focusEffectDisabled()
-        .onKeyPress(.leftArrow) { move(-1) }
+        .coreSideKeys { move($0) }
         .onKeyPress(.upArrow) { move(-1) }
-        .onKeyPress(.rightArrow) { move(1) }
         .onKeyPress(.downArrow) { move(1) }
         .onKeyPress(.home) { jump(0) }
         .onKeyPress(.end) { jump(segments.count - 1) }
@@ -86,12 +85,12 @@ private struct Segment<ID: Hashable & Sendable>: View {
         Button(action: action) {
             HStack(spacing: Space.s2) {
                 if let symbol = segment.symbol {
-                    Image(systemName: symbol).font(.system(size: MacTextSize.body, weight: .semibold))
-                        .symbolEffect(.bounce, value: selected)
+                    Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
+                        .coreBounce(selected)
                         .coreEnterBounce(hovering)
                         .accessibilityHidden(true)
                 }
-                Text(segment.title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                Text(segment.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
             }
             .foregroundStyle(.white.opacity(selected || hovering ? 1 : 0.8))
             .padding(.horizontal, Space.s3)
@@ -153,16 +152,16 @@ public struct GlassToggleTile: View {
         } label: {
             HStack(spacing: Space.s3) {
                 Image(systemName: isOn ? onSymbol : symbol)
-                    .font(.system(size: sub == nil ? MacTextSize.body : MacTextSize.headline + 2, weight: .semibold))
+                    .coreFont(size: sub == nil ? MacTextSize.body : MacTextSize.headline + 2, weight: .semibold)
                     .contentTransition(.symbolEffect(.replace))
-                    .symbolEffect(.bounce, value: isOn)
+                    .coreBounce(isOn)
                     .symbolEffect(.pulse, options: .repeating, isActive: isOn && !reduce && sub == nil)
                     .frame(width: sub == nil ? nil : 28)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(1)
+                    Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                     if let sub {
-                        Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(.white.opacity(0.7))
+                        Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(.white.opacity(0.7))
                             .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     }
                 }

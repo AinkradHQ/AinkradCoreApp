@@ -37,10 +37,10 @@ public struct CoreNotice<Action: View>: View {
         HStack(alignment: .top, spacing: Space.s3) {
             ToneGlyph(symbol: symbol, ink: c.ink, size: 26)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     .fixedSize(horizontal: false, vertical: true)
                 if !text.isEmpty {
-                    Text(text).font(.system(size: MacTextSize.body)).foregroundStyle(palette.text2)
+                    Text(text).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -81,7 +81,7 @@ public struct CoreDialogPanel<Content: View>: View {
             content
         }
         .foregroundStyle(palette.text)
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .corePanel(radius: Radius.panel, padding: Space.s6)
         .frame(width: width)
         .shadow(color: .black.opacity(0.3), radius: 34, y: 14)

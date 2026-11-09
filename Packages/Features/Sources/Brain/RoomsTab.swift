@@ -55,7 +55,7 @@ private struct RoomCard: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     HStack(spacing: Space.s2) {
-                        Text(room.name).font(.system(size: MacTextSize.title, weight: .semibold)).lineLimit(2)
+                        Text(room.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: Space.s2)
                         if room.id == model.viewingID { BrainChip("Viewing", GlassInk.blue) }
@@ -90,8 +90,8 @@ private struct RoomCard: View {
 
     private func stat(_ title: String, _ value: String, hue: Color? = nil) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(title).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-            Text(value).font(.system(size: MacTextSize.body, weight: .medium)).monospacedDigit()
+            Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(value).coreFont(size: MacTextSize.body, weight: .medium).monospacedDigit()
                 .foregroundStyle(hue ?? GlassInk.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,7 +104,7 @@ private struct SealedRow: View {
     var body: some View {
         HStack(spacing: Space.s3) {
             Image(systemName: "lock").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-            Text(room.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+            Text(room.name).coreFont(size: MacTextSize.headline, weight: .semibold)
             RoomChips(room: room)
             Spacer(minLength: Space.s2)
             Button {
@@ -130,7 +130,7 @@ private struct RoomView: View {
             Button {
                 model.closeInspect()
             } label: {
-                Label("All rooms", systemImage: "chevron.left")
+                Label("All rooms", systemImage: "chevron.backward")
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             if let d = model.inspected, d.room.id == id {
@@ -148,7 +148,7 @@ private struct RoomView: View {
     private func header(_ r: RoomSummary) -> some View {
         HStack(alignment: .top, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text(r.name).font(.system(size: MacTextSize.large, weight: .semibold))
+                Text(r.name).coreFont(size: MacTextSize.large, weight: .semibold)
                 HStack(spacing: Space.s2) {
                     RoomChips(room: r)
                     BrainChip(
@@ -203,8 +203,10 @@ private struct RoomView: View {
                 "Key renewal",
                 sub: "Without renewal the saved copy on a device cannot be read. The technical word is lease."
             ) {
-                Text(BrainWords.unit(d.room.lease.left)).font(.system(size: MacTextSize.large, weight: .semibold))
-                    + Text(" left").foregroundStyle(GlassInk.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(BrainWords.unit(d.room.lease.left)).coreFont(size: MacTextSize.large, weight: .semibold)
+                    Text(" left").foregroundStyle(GlassInk.secondary)
+                }
                 BrainBar(
                     fraction: d.room.lease.fraction, hue: d.room.lease.state == .ok ? GlassInk.blue : GlassInk.orange)
                 Text("Backup: \(d.backup ?? "none. This room never leaves this Mac.")").foregroundStyle(
@@ -228,7 +230,7 @@ private struct StatusBlock: View {
             HStack(alignment: .top, spacing: Space.s5) {
                 ForEach(items, id: \.0) { item in
                     VStack(alignment: .leading, spacing: Space.s1) {
-                        Text(item.1.formatted()).font(.system(size: MacTextSize.large, weight: .semibold))
+                        Text(item.1.formatted()).coreFont(size: MacTextSize.large, weight: .semibold)
                             .monospacedDigit()
                         Text(item.0).foregroundStyle(GlassInk.secondary)
                         BrainBar(fraction: Double(item.1) / Double(max(status.total, 1)), hue: item.2, height: 4)
@@ -246,10 +248,8 @@ private struct CostCard: View {
     var body: some View {
         BrainCard("Cost this month") {
             HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
-                Text(cost.month.formatted(.currency(code: "USD"))).font(
-                    .system(size: MacTextSize.large, weight: .semibold)
-                )
-                .monospacedDigit()
+                Text(cost.month.formatted(.currency(code: "USD"))).coreFont(size: MacTextSize.large, weight: .semibold)
+                    .monospacedDigit()
                 Text("of \(cost.cap.formatted(.currency(code: "USD").precision(.fractionLength(0)))) cap")
                     .foregroundStyle(GlassInk.secondary)
             }

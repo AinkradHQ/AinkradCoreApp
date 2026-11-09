@@ -57,7 +57,7 @@ struct TerminalsListView: View {
             if model.shown.isEmpty {
                 VStack(spacing: Space.s3) {
                     IconTile("terminal", hue: GlassInk.slate, size: 64)
-                    Text("No terminals here").font(.system(size: MacTextSize.title, weight: .semibold))
+                    Text("No terminals here").coreFont(size: MacTextSize.title, weight: .semibold)
                     Text("Open a shell on one of your runners.").foregroundStyle(GlassInk.secondary)
                     Button("New terminal") { model.quickNew() }.buttonStyle(CoreButtonStyle(.prominent))
                         .coreShortcut(.primary)
@@ -83,8 +83,7 @@ struct TerminalsListView: View {
                     .focusEffectDisabled()
                     .onKeyPress(.downArrow) { move(1, proxy) }
                     .onKeyPress(.upArrow) { move(-1, proxy) }
-                    .onKeyPress(.rightArrow) { move(1, proxy) }
-                    .onKeyPress(.leftArrow) { move(-1, proxy) }
+                    .coreSideKeys { move($0, proxy) }
                     .onKeyPress(.return) { act(.open) }
                     .onKeyPress(characters: .letters) { press in
                         switch press.characters.lowercased() {
@@ -127,7 +126,7 @@ struct TerminalsListView: View {
                 stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", RunnerHue.of(r.name))
             }
             Spacer(minLength: 0)
-            Text("↩ open · D detach · E end · S signal · R rename").font(.system(size: MacTextSize.meta))
+            Text("↩ open · D detach · E end · S signal · R rename").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)

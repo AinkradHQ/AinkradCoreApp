@@ -43,7 +43,7 @@ public struct IconTile<Trigger: Equatable>: View {
     }
     public var body: some View {
         Image(systemName: symbol).font(.system(size: size * 0.46, weight: .semibold)).foregroundStyle(.white)
-            .symbolEffect(.bounce, value: bounce)
+            .coreBounce(bounce)
             .frame(width: size, height: size)
             .background(
                 LinearGradient(colors: [hue, hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
@@ -89,9 +89,9 @@ public struct GlassSection<Content: View, Accessory: View>: View {
             HStack(spacing: Space.s3) {
                 IconTile(symbol, hue: hue, bounce: shown)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.system(size: MacTextSize.headline + 1, weight: .semibold))
+                    Text(title).coreFont(size: MacTextSize.headline + 1, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)
-                    if let sub { Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary) }
+                    if let sub { Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary) }
                 }
                 Spacer(minLength: Space.s3)
                 accessory
@@ -160,15 +160,15 @@ public struct InfoRow<Trailing: View>: View {
     }
     public var body: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: symbol).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
+            Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
                 .frame(width: 20).accessibilityHidden(true)
             Text(key).foregroundStyle(GlassInk.secondary)
             Spacer(minLength: Space.s3)
-            Text(value).font(.system(size: MacTextSize.body, weight: .medium, design: mono ? .monospaced : .default))
+            Text(value).coreFont(size: MacTextSize.body, weight: .medium, design: mono ? .monospaced : .default)
                 .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
             trailing
         }
-        .font(.system(size: MacTextSize.body))
+        .coreFont(size: MacTextSize.body)
         .frame(minHeight: MacSize.controlMd)
         .accessibilityElement(children: .combine)
     }
@@ -198,12 +198,12 @@ public struct ScopeTile: View {
         HStack(alignment: .top, spacing: Space.s3) {
             IconTile(symbol, hue: on ? hue : GlassInk.slate.opacity(0.5), bounce: on)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name.capitalized).font(.system(size: MacTextSize.body, weight: .semibold))
-                Text(detail).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(name.capitalized).coreFont(size: MacTextSize.body, weight: .semibold)
+                Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Image(systemName: on ? "checkmark.circle.fill" : "circle").font(.system(size: MacTextSize.title))
+            Image(systemName: on ? "checkmark.circle.fill" : "circle").coreFont(size: MacTextSize.title)
                 .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
                 .accessibilityHidden(true)
         }

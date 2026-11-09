@@ -24,12 +24,12 @@ struct ActivityDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(2)
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(2)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: Space.s2)
                 BrainChip(chip.0, chip.1)
             }
-            Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+            Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             Text(sentence).fixedSize(horizontal: false, vertical: true).padding(.top, Space.s1)
             if let rule {
                 HStack(alignment: .top, spacing: Space.s2) {
@@ -41,12 +41,12 @@ struct ActivityDetail: View {
                     }
                     .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.system(size: MacTextSize.meta))
+                .coreFont(size: MacTextSize.meta)
                 .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
                 .background(GlassInk.red.opacity(0.14), in: coreShape(Radius.control))
                 .help("Rule: \(rule.name)")
             } else if let why {
-                Label(why, systemImage: "exclamationmark.triangle").font(.system(size: MacTextSize.meta))
+                Label(why, systemImage: "exclamationmark.triangle").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.redInk)
             }
             DisclosureGroup(isExpanded: $technical) {
@@ -55,16 +55,16 @@ struct ActivityDetail: View {
                         ForEach(lines + (rule.map { [DetailLine(key: "Rule code", value: $0.code)] } ?? [])) { l in
                             GridRow {
                                 Text(l.key).foregroundStyle(GlassInk.secondary).gridColumnAlignment(.leading)
-                                Text(l.value).font(.system(size: MacTextSize.meta, design: .monospaced))
+                                Text(l.value).coreFont(size: MacTextSize.meta, design: .monospaced)
                                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
                     Label(note, systemImage: "info.circle").foregroundStyle(GlassInk.secondary)
                 }
-                .font(.system(size: MacTextSize.meta)).padding(.top, Space.s2)
+                .coreFont(size: MacTextSize.meta).padding(.top, Space.s2)
             } label: {
-                Text("Technical details").font(.system(size: MacTextSize.meta, weight: .medium))
+                Text("Technical details").coreFont(size: MacTextSize.meta, weight: .medium)
             }
             .padding(.top, Space.s1)
             .help("Event id, action code, result code and the other ids behind this row.")
@@ -93,18 +93,18 @@ struct ActivityRowView: View {
     var body: some View {
         Button(action: pick) {
             HStack(alignment: .top, spacing: Space.s3) {
-                Text(time).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(time).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .frame(width: Space.s8 * 2.6, alignment: .leading).padding(.top, 1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).fontWeight(.semibold)
-                    Text(subtitle).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     if let why {
                         HStack(spacing: Space.s2) {
                             Image(systemName: "shield").accessibilityHidden(true)
                             Text(why)
                             if let blockedBy { Text(blockedBy).fontWeight(.semibold) }
                         }
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.redInk).padding(.top, 2)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.redInk).padding(.top, 2)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,10 +174,10 @@ struct PausedBanner: View {
     var body: some View {
         if model.health == .paused {
             HStack(alignment: .top, spacing: Space.s3) {
-                Image(systemName: "exclamationmark.octagon").font(.system(size: MacTextSize.large))
+                Image(systemName: "exclamationmark.octagon").coreFont(size: MacTextSize.large)
                     .foregroundStyle(GlassInk.redInk).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    Text("Paused").font(.system(size: MacTextSize.title, weight: .semibold))
+                    Text("Paused").coreFont(size: MacTextSize.title, weight: .semibold)
                     Text(BrainWords.pausedWhy).foregroundStyle(GlassInk.secondary)
                     ChipFlow {
                         ForEach(model.pausedNames, id: \.self) { BrainChip($0, GlassInk.red) }

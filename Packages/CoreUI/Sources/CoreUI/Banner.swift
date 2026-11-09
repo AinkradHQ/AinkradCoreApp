@@ -59,8 +59,8 @@ public struct ConnectionBanner: View {
                 }
             }
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text(state.title).font(.system(size: MacTextSize.headline, weight: .semibold))
-                Text(state.detail).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
+                Text(state.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text(state.detail).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let retry, state != .loading {

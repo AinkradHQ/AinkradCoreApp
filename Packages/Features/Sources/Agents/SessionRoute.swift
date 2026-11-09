@@ -85,22 +85,26 @@ public enum SessionCues {
     }
 
     /// `14:00` today, `Nov 9, 14:00` on another day.
-    public static func clock(_ d: Date, now: Date, calendar: Calendar = .current) -> String {
-        let f = DateFormatter()
-        f.calendar = calendar
-        f.timeZone = calendar.timeZone
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = calendar.isDate(d, inSameDayAs: now) ? "HH:mm" : "MMM d, HH:mm"
-        return f.string(from: d)
+    public static func clock(_ d: Date, now: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let same = calendar.isDate(d, inSameDayAs: now)
+        var style =
+            same ? Date.FormatStyle().hour().minute() : Date.FormatStyle().month(.abbreviated).day().hour().minute()
+        style.calendar = calendar
+        style.timeZone = calendar.timeZone
+        style.locale = locale
+        return d.formatted(style)
     }
 
     /// The banner for a session that waits for an account.
-    public static func waiting(_ w: SessionWaiting, now: Date, calendar: Calendar = .current) -> (
+    public static func waiting(
+        _ w: SessionWaiting, now: Date, calendar: Calendar = .current, locale: Locale = .current
+    ) -> (
         title: String, text: String
     ) {
         let why = sentence(w.why) ?? "Every account this chain can use is resting, limited or at its cap."
-        let until = clock(w.until, now: now, calendar: calendar)
-        let since = w.since.map { " It has waited since \(clock($0, now: now, calendar: calendar))." } ?? ""
+        let until = clock(w.until, now: now, calendar: calendar, locale: locale)
+        let since =
+            w.since.map { " It has waited since \(clock($0, now: now, calendar: calendar, locale: locale))." } ?? ""
         return ("Waiting for an account", "\(why) It tries again from \(until).\(since)")
     }
 

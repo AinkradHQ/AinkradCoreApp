@@ -94,7 +94,7 @@ struct SecretFormDialog: View {
                                 CoreSegment($0, Delivery.look($0).title, symbol: Delivery.look($0).symbol)
                             },
                             selection: $form.delivery, fill: true)
-                        Text(Delivery.look(form.delivery).line).font(.system(size: MacTextSize.meta))
+                        Text(Delivery.look(form.delivery).line).coreFont(size: MacTextSize.meta)
                             .foregroundStyle(GlassInk.secondary)
                     }
                     VStack(alignment: .leading, spacing: Space.s1) {
@@ -117,7 +117,7 @@ struct SecretFormDialog: View {
                     }
                 }
                 Label("Once stored, nobody can show or copy it again. Asks for Touch ID.", systemImage: "lock.fill")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 if let i = form.issue { IssueLine(code: nil, text: i.message) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
                 DialogButtons(confirm: form.existing == nil ? "Store" : "Replace value", busy: form.busy, cancel: close)
@@ -165,7 +165,7 @@ struct LeaseDialog: View {
                 Text(
                     "Up to \(SettingWords.duration(model.leaseLimit)). It comes back by itself when the time runs out."
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 GlassToggleTile(
                     "An agent on that runner can read it", sub: "Lend it only to a runner whose agents you trust.",
                     symbol: "exclamationmark.triangle", onSymbol: "checkmark.shield.fill", isOn: $form.understood,

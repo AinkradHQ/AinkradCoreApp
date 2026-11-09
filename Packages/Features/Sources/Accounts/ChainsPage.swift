@@ -53,11 +53,11 @@ private struct ChainTab: View {
             withAnimation(.smooth(duration: 0.3)) { model.chainSelection = chain.id }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                Text(chain.name).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
+                Text(chain.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                 Text(
                     "\(chain.entries.count) pool\(chain.entries.count == 1 ? "" : "s")\(chain.isDefault ? " · default" : "")"
                 )
-                .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
             .foregroundStyle(GlassInk.primary)
             .padding(.horizontal, Space.s3).frame(minHeight: 48)
@@ -89,13 +89,13 @@ private struct ChainDetail: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(alignment: .center, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(chain.name).font(.system(size: MacTextSize.large, weight: .bold))
+                    Text(chain.name).coreFont(size: MacTextSize.large, weight: .bold)
                     Label(
                         chain.isDefault
                             ? "Default: for agents with no chain of their own" : "Serves agents bound to it",
                         systemImage: chain.isDefault ? "checkmark.circle" : "link"
                     )
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s2)
                 if !chain.isDefault {
@@ -115,20 +115,20 @@ private struct ChainDetail: View {
                 .accessibilityIdentifier("chain-delete-button")
             }
             AccPanel(spacing: Space.s2) {
-                Label("Pools, in the order they're tried", systemImage: "list.number").font(
-                    .system(size: MacTextSize.title, weight: .semibold))
+                Label("Pools, in the order they're tried", systemImage: "list.number").coreFont(
+                    size: MacTextSize.title, weight: .semibold)
                 ForEach(Array(chain.entries.enumerated()), id: \.offset) { i, e in
                     EntryRow(model: model, index: i, entry: e)
                 }
                 if let e = model.writeError["chain-default-\(chain.id)"] { AccIssue(text: e) }
                 Text("A running session keeps the chain it started with. Edits apply to new sessions.")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             AccPanel(spacing: Space.s2) {
                 HStack(spacing: Space.s3) {
                     Label("Bind agents where you start work: Agents > Agents and chains", systemImage: "person.2")
-                        .font(.system(size: MacTextSize.body)).fixedSize(horizontal: false, vertical: true)
+                        .coreFont(size: MacTextSize.body).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Space.s2)
                     AppActionTile(title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue) {
                         model.openChainBinding()
@@ -147,18 +147,16 @@ private struct EntryRow: View {
     let entry: ChainEntryItem
     var body: some View {
         HStack(spacing: Space.s3) {
-            Text("\(index + 1)").font(.system(size: MacTextSize.body, weight: .bold, design: .rounded))
+            Text("\(index + 1)").coreFont(size: MacTextSize.body, weight: .bold, design: .rounded)
                 .foregroundStyle(index == 0 ? .white : GlassInk.secondary)
                 .frame(width: 26, height: 26)
                 .background(index == 0 ? GlassInk.blue.opacity(0.85) : GlassInk.well, in: coreShape(7))
             AccTile(provider: entry.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
                 Text("\(model.providerName(entry.provider)) · \(model.pool(entry.pool)?.name ?? "Pool \(entry.pool)")")
-                    .font(
-                        .system(size: MacTextSize.headline, weight: .semibold)
-                    ).lineLimit(1)
+                    .coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                 Text(index == 0 ? "Tried first" : "Tried if the one above has no account to give")
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             AccChip(text: entry.model ?? "Provider's default model", mono: entry.model != nil)

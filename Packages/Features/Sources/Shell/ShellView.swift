@@ -72,6 +72,18 @@ public struct ShellView: View {
             }
         }
         .animation(Motion.out(Motion.ui), value: bannerKey)
+        .onChange(of: bannerKey) { old, new in
+            let words: String?
+            switch new {
+            case "reconnecting": words = "Reconnecting to Core"
+            case "offline": words = "Core is offline"
+            case "rate": words = "Core asked the app to slow down"
+            case "renew": words = "The session is renewing"
+            case "restart": words = "Core restarted"
+            default: words = old == "reconnecting" || old == "offline" ? "Back online" : nil
+            }
+            if let words { CoreAnnounce.settled("link", words) }
+        }
     }
 
     /// Which banner shows now; changes when it comes, goes or is replaced by another.

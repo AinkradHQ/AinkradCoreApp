@@ -34,7 +34,7 @@ struct ConnectionsView: View {
                     }
                     content
                 }
-                .font(.system(size: MacTextSize.body))
+                .coreFont(size: MacTextSize.body)
                 .foregroundStyle(GlassInk.primary)
                 .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -46,9 +46,8 @@ struct ConnectionsView: View {
             .onAppear { paneFocus = true }
             .retakeFocus(after: model.host.shell) { paneFocus = true }
             .onKeyPress(.downArrow) { arrow(1) }
-            .onKeyPress(.rightArrow) { arrow(1) }
+            .coreSideKeys { arrow($0) }
             .onKeyPress(.upArrow) { arrow(-1) }
-            .onKeyPress(.leftArrow) { arrow(-1) }
             .onKeyPress(.return) { model.key("↩") ? .handled : .ignored }
             .onKeyPress(.delete) { model.key("⌫") ? .handled : .ignored }
             .onKeyPress(.escape) {
@@ -68,7 +67,7 @@ struct ConnectionsView: View {
                         model.cursor == nil
                             ? "↑↓ move · ⌘N connect"
                             : "↩ who can use it · T test · R rename · D default · ⌫ disconnect"
-                    ).font(.system(size: MacTextSize.meta))
+                    ).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                 }
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
@@ -136,9 +135,9 @@ struct ConnListPage: View {
                         HStack(spacing: Space.s3) {
                             ConnTile(kind: k.id)
                             VStack(alignment: .leading, spacing: 0) {
-                                Text(k.name).font(.system(size: MacTextSize.headline, weight: .semibold))
+                                Text(k.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                                 let n = model.items.filter { $0.kind == k.id }.count
-                                Text("\(n) connection\(n == 1 ? "" : "s")").font(.system(size: MacTextSize.meta))
+                                Text("\(n) connection\(n == 1 ? "" : "s")").coreFont(size: MacTextSize.meta)
                                     .foregroundStyle(GlassInk.secondary)
                             }
                             Spacer()
@@ -203,7 +202,7 @@ struct ConnListPage: View {
             Image(systemName: "\(n).square.fill").font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(GlassInk.blueInk).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: Space.s2) { c() }
             }
@@ -256,11 +255,11 @@ struct ConnCard: View {
                 ConnTile(kind: item.kind)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: Space.s2) {
-                        Text(item.name).font(.system(size: MacTextSize.body, weight: .semibold)).lineLimit(2)
+                        Text(item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(2)
                             .layoutPriority(1)
                         if item.isDefault { AccChip(text: "Default") }
                     }
-                    Text(item.identity).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                    Text(item.identity).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
@@ -273,16 +272,14 @@ struct ConnCard: View {
             )
             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             if let t = model.tested[item.id] {
-                Label(t, systemImage: "checkmark.seal").font(.system(size: MacTextSize.meta))
+                Label(t, systemImage: "checkmark.seal").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
             }
             HStack {
-                Text(when).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                Text(when).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Spacer()
-                Text(item.users <= 1 ? "Only you" : "You and \(item.users - 1) agents").font(
-                    .system(size: MacTextSize.meta)
-                )
-                .foregroundStyle(GlassInk.secondary)
+                Text(item.users <= 1 ? "Only you" : "You and \(item.users - 1) agents").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary)
             }
             HStack(spacing: Space.s1) {
                 if need {
@@ -300,7 +297,7 @@ struct ConnCard: View {
                 Spacer(minLength: 0)
                 AccLink(title: "Disconnect", symbol: "trash", danger: true) { ConnDialogs.openDisconnect(model, item) }
                 CoreDropdown(items: menuItems, isPresented: $menuOpen) {
-                    Image(systemName: "ellipsis").font(.system(size: MacTextSize.body, weight: .semibold))
+                    Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
                         .foregroundStyle(GlassInk.primary)
                         .frame(width: 30, height: 26)
                         .background(GlassInk.well, in: coreShape(7))

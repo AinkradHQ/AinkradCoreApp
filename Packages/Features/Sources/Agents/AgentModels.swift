@@ -229,29 +229,28 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
 /// Words and numbers for sessions: one place, so the list, the pane and the bell agree.
 public enum AgentWords {
     public static func tokens(_ n: Int64) -> String {
-        n >= 1_000_000
-            ? String(format: "%.1fM", Double(n) / 1e6) : n >= 1000 ? "\(Int((Double(n) / 1e3).rounded()))k" : "\(n)"
+        n.formatted(.number.notation(.compactName))
     }
 
-    public static func cost(_ micros: Int64?) -> String? { micros.map { String(format: "$%.2f", Double($0) / 1e6) } }
+    public static func cost(_ micros: Int64?) -> String? {
+        micros.map { (Double($0) / 1e6).formatted(.currency(code: "USD")) }
+    }
 
     public static func clock(_ seconds: TimeInterval) -> String {
-        let t = max(0, Int(seconds))
-        let (h, m, s) = (t / 3600, (t % 3600) / 60, t % 60)
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+        coreClock(Int(seconds))
     }
 
     public static func ago(_ date: Date, now: Date = Date()) -> String {
         let s = Int(now.timeIntervalSince(date))
-        if s < 45 { return "just now" }
-        if s < 3600 { return "\(max(1, s / 60)) min ago" }
-        if s < 86400 { return "\(s / 3600) h ago" }
-        return "\(s / 86400) d ago"
+        if s < 45 { return String(localized: "just now", bundle: .module) }
+        if s < 3600 { return String(localized: "\(max(1, s / 60)) min ago", bundle: .module) }
+        if s < 86400 { return String(localized: "\(s / 3600) h ago", bundle: .module) }
+        return String(localized: "\(s / 86400) d ago", bundle: .module)
     }
 
     /// The word for a session in a list or head: a pending approval wins over the state.
     public static func status(_ s: AgentSessionInfo, waiting: Bool) -> (label: String, tone: Tone, symbol: String) {
-        if waiting { return ("Waiting on you", .warn, "hand.raised") }
+        if waiting { return (String(localized: "Waiting on you", bundle: .module), .warn, "hand.raised") }
         if case .ended = s.state, s.stoppedByBudget {
             return (endedWords("budget"), .warn, "gauge.with.dots.needle.100percent")
         }
@@ -265,14 +264,14 @@ public enum AgentWords {
     /// How a session ended, in words, for the header, the tile and the transcript's last chip. The raw code goes in `.help` only.
     public static func endedWords(_ kind: String) -> String {
         switch kind {
-        case "succeeded": "Ended: finished"
-        case "failed": "Ended: failed"
-        case "stalled": "Ended: stopped making progress"
-        case "token_cap": "Ended: token limit reached"
-        case "budget": "Ended: budget reached"
-        case "cancelled": "Ended: cancelled"
-        case "lost": "Ended: the runner lost it"
-        case "ended", "": "Ended"
+        case "succeeded": String(localized: "Ended: finished", bundle: .module)
+        case "failed": String(localized: "Ended: failed", bundle: .module)
+        case "stalled": String(localized: "Ended: stopped making progress", bundle: .module)
+        case "token_cap": String(localized: "Ended: token limit reached", bundle: .module)
+        case "budget": String(localized: "Ended: budget reached", bundle: .module)
+        case "cancelled": String(localized: "Ended: cancelled", bundle: .module)
+        case "lost": String(localized: "Ended: the runner lost it", bundle: .module)
+        case "ended", "": String(localized: "Ended", bundle: .module)
         default: "Ended: " + sentence(kind).lowercased()
         }
     }
