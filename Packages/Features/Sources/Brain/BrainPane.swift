@@ -11,12 +11,15 @@ struct BrainPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
-                ForEach(Array(BrainTab.allCases.enumerated()), id: \.offset) { i, t in
-                    AppFilterTile(title: t.title, count: model.tabCount(t), on: model.tab == t, key: "⌘\(i + 1)") {
-                        go(t)
+                // No service attached: nothing to look at, so no tabs over the unavailable card.
+                if model.load != .unavailable {
+                    ForEach(Array(BrainTab.allCases.enumerated()), id: \.offset) { i, t in
+                        AppFilterTile(title: t.title, count: model.tabCount(t), on: model.tab == t, key: "⌘\(i + 1)") {
+                            go(t)
+                        }
+                        .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+                        .accessibilityIdentifier("brain-nav-\(t.rawValue)")
                     }
-                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
-                    .accessibilityIdentifier("brain-nav-\(t.rawValue)")
                 }
             } actions: {
                 if model.tab == .rooms, model.load == .ready {
