@@ -9,6 +9,8 @@ struct TranscriptView: View {
     let session: AgentSessionInfo
     var jump = 0
     @State private var atEnd = true
+    /// A scroll to the end is queued for the next frame: a burst of entries asks once, not once each.
+    @State private var scrollQueued = false
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -30,11 +32,8 @@ struct TranscriptView: View {
                                 model.shell.launcher.entry("connections")?.run()
                             }
                             .equatable().id(e.seq)
-                            .transition(
-                                reduce
-                                    ? .opacity
-                                    : .opacity.combined(with: .move(edge: .bottom)).combined(
-                                        with: .scale(scale: 0.97, anchor: .bottomLeading)))
+                            // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
+                            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
                         }
                         if session.live && store.load == .ready && !model.waiting(session.id) { Thinking() }
                         Color.clear.frame(height: 1).id("end")
@@ -47,18 +46,31 @@ struct TranscriptView: View {
                 .scrollIndicators(.never)
                 .animation(Motion.out(Motion.ui), value: store.entries.count)
                 .onChange(of: store.lastSeq) { _, _ in
-                    if atEnd { withAnimation(.spring(duration: 0.4)) { proxy.scrollTo("end", anchor: .bottom) } }
+                    guard atEnd, !scrollQueued else { return }
+                    scrollQueued = true
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(16))
+                        scrollQueued = false
+                        toEnd(proxy)
+                    }
                 }
-                .onChange(of: jump) { _, _ in
-                    withAnimation(.spring(duration: 0.4)) { proxy.scrollTo("end", anchor: .bottom) }
-                }
+                .onChange(of: jump) { _, _ in toEnd(proxy) }
                 if !atEnd {
                     AppActionTile(title: "Latest", symbol: "arrow.down", key: "↓", hue: GlassInk.blue) {
-                        withAnimation(.spring(duration: 0.4)) { proxy.scrollTo("end", anchor: .bottom) }
+                        toEnd(proxy)
                     }
-                    .padding(Space.s4).transition(.scale.combined(with: .opacity))
+                    .padding(Space.s4).transition(.opacity)
                 }
             }
+        }
+    }
+
+    /// Scrolls to the newest entry: eased, or at once under Reduce Motion.
+    private func toEnd(_ proxy: ScrollViewProxy) {
+        if reduce {
+            proxy.scrollTo("end", anchor: .bottom)
+        } else {
+            withAnimation(Motion.out(Motion.move)) { proxy.scrollTo("end", anchor: .bottom) }
         }
     }
 
@@ -188,14 +200,20 @@ struct EntryRow: View, Equatable {
                 resumed ? "arrow.clockwise" : "play.fill",
                 (resumed ? "Resumed" : "Started") + (h.map { " · \($0)" } ?? ""), GlassInk.blue)
         case .interrupted(let reason):
-            chip("arrow.clockwise", "Interrupted" + (reason.isEmpty ? "" : ": \(reason)"), GlassInk.orange)
+            chip(
+                "arrow.clockwise", "Interrupted" + (reason.isEmpty ? "" : ": \(AgentWords.reasonWords(reason))"),
+                GlassInk.orange)
         case .gap(let from, let to):
             chip("ellipsis", "Entries \(from) to \(to) were not kept", GlassInk.orange)
         case .ended(let kind, let reason):
+            let budget = kind == "budget" || (kind == "cancelled" && reason?.lowercased().contains("budget") == true)
+            let why = budget ? nil : reason.flatMap { $0.isEmpty ? nil : AgentWords.reasonWords($0) }
             chip(
                 kind == "succeeded" ? "flag.checkered" : "stop.fill",
-                "Ended: \(kind)" + (reason.map { $0.isEmpty ? "" : " · \($0)" } ?? ""),
-                kind == "succeeded" ? GlassInk.green : GlassInk.orange)
+                AgentWords.endedWords(budget ? "budget" : kind) + (why.map { " · \($0)" } ?? ""),
+                kind == "succeeded" ? GlassInk.green : GlassInk.orange
+            )
+            .help("Code: \(kind)" + (reason.map { $0.isEmpty ? "" : " · \($0)" } ?? ""))
         case .note(let type, let detail):
             chip(
                 "info.circle.fill", detail.isEmpty ? Self.words(type) : "\(Self.words(type)): \(detail)", GlassInk.slate

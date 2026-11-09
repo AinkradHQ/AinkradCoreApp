@@ -23,7 +23,7 @@ struct ComposerView: View {
         case .running: "Reply to \(session.harness)…"
         case .starting: "Starting. You can write when it is running."
         case .interrupted: "Resuming. You can write again when it is running."
-        default: "This session ended. Resume it to send a message."
+        default: "This session ended. Resume it (top right) to send a message."
         }
     }
 
@@ -50,13 +50,8 @@ struct ComposerView: View {
                     .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
-            if session.over {
-                AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
-                {
-                    model.resume(session.id)
-                }
-                .help("Start this session again from where it stopped")
-            } else {
+            // An ended session has one Resume, in its head; the composer just says so.
+            if !session.over {
                 AppActionTile(title: "Send", symbol: "paperplane.fill", key: "↩", hue: GlassInk.violet, prominent: true)
                 {
                     Task { await model.send(session.id) }

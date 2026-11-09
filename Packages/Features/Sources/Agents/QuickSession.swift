@@ -16,8 +16,11 @@ struct QuickSessionView: View {
         if !prefs.runner.isEmpty, let r = model.runners.first(where: { $0.id == prefs.runner }) { return r }
         return model.runners.first { $0.online && $0.runsAgents && !$0.degraded } ?? model.runners.first { $0.online }
     }
+    /// The chain a plain start uses: the default one, when this device may see chains. It sets the harness and model.
+    private var chain: ChainOption? { model.chains.first { $0.isDefault } ?? model.chains.first }
     private var ready: Bool {
         runner != nil && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy
+            && !PromptSize.over(prompt)
     }
 
     var body: some View {
@@ -38,15 +41,19 @@ struct QuickSessionView: View {
             )
             .coreRise(shown, 1)
             HStack(spacing: Space.s2) {
-                chip("sparkles", prefs.harness, GlassInk.violet)
-                chip(
-                    "hand.raised",
-                    prefs.mode == "ask" ? "asks first" : prefs.mode == "sandboxed" ? "sandboxed" : "accepts edits",
-                    GlassInk.orange)
+                if let chain {
+                    chip("link", chain.name, GlassInk.blue).help(
+                        "Default chain: \(chain.steps.joined(separator: ", then "))")
+                } else {
+                    chip("sparkles", AgentWords.harnessName(prefs.harness), GlassInk.violet)
+                }
+                chip("hand.raised", SessionMode.words(prefs.mode), GlassInk.blue)
                 chip("server.rack", runner?.name ?? "no runner", runner == nil ? GlassInk.red : GlassInk.green)
                 Spacer(minLength: 0)
-                Text(PromptSize.words(prompt)).font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                    .monospacedDigit()
+                if let w = PromptSize.words(prompt) {
+                    Text(w).font(.system(size: MacTextSize.meta)).foregroundStyle(
+                        PromptSize.over(prompt) ? GlassInk.redInk : GlassInk.secondary)
+                }
             }
             .coreRise(shown, 2)
             if let notice { NoticeBanner(notice: notice) }
@@ -94,7 +101,8 @@ struct QuickSessionView: View {
         busy = true
         notice = nil
         let new = NewAgentSession(
-            runner: runner.id, harness: "claude", model: nil, prompt: prompt, mode: "ask", secrets: [])
+            runner: runner.id, harness: prefs.harness, model: chain == nil && !prefs.model.isEmpty ? prefs.model : nil,
+            prompt: prompt, mode: prefs.mode, secrets: [], chain: chain?.id)
         Task {
             let n = await model.create(new)
             busy = false

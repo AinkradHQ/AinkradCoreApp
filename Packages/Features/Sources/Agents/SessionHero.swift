@@ -27,12 +27,12 @@ struct SessionHero: View {
                         in: coreShape(13)
                     )
                     .overlay { coreShape(13).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .shadow(color: hue.opacity(0.6), radius: alive ? 16 : 8)
                     .symbolEffect(.pulse, options: .repeating, isActive: alive)
                     .scaleEffect(shown || reduce ? 1 : 0.6)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: Space.s2) {
-                        Text(session.harness.capitalized).font(.system(size: MacTextSize.large, weight: .bold))
+                        Text(model.title(session)).font(.system(size: MacTextSize.large, weight: .bold)).lineLimit(2)
+                            .help(model.title(session) + "\n" + session.id)
                         badge(st.label, st.symbol, state, live: session.live, waiting: waiting)
                     }
                     Text(subtitle).font(.system(size: MacTextSize.body)).foregroundStyle(GlassInk.secondary)
@@ -42,7 +42,8 @@ struct SessionHero: View {
                 actions
             }
             HStack(spacing: Space.s2) {
-                AppStatChip("server.rack", model.runnerName(session.runner), hue)
+                AppStatChip("sparkles", AgentWords.harnessName(session.harness), hue)
+                AppStatChip("server.rack", model.runnerName(session.runner), hue).help("Runner \(session.runner)")
                 if let m = session.model { AppStatChip("brain", m, GlassInk.violet) }
                 if let r = session.route {
                     if let c = SessionCues.chain(r, name: model.chainName(r)) {
@@ -88,10 +89,11 @@ struct SessionHero: View {
         .padding(Space.s4)
         .background {
             Color(red: 0.05, green: 0.06, blue: 0.1).opacity(0.55)
-                .overlay(alignment: .leading) {
-                    coreShape(60).fill(hue.opacity(0.4)).frame(width: 220, height: 120).blur(radius: 60)
-                        .offset(x: alive && shown ? 100 : 0, y: alive && shown ? 10 : -20)
-                        .animation(alive ? .easeInOut(duration: 3.6).repeatForever() : .default, value: shown)
+                .overlay {
+                    // A still wash of the harness colour: a gradient, no blur and no loop.
+                    RadialGradient(
+                        colors: [hue.opacity(alive ? 0.3 : 0.18), .clear], center: .leading, startRadius: 0,
+                        endRadius: 260)
                 }
                 .clipShape(coreShape(Radius.cardMac))
         }
@@ -114,12 +116,12 @@ struct SessionHero: View {
         switch session.state {
         case .starting: return "Waiting for \(r) to launch \(session.harness). This usually takes a few seconds."
         case .interrupted: return "\(r) restarted. It resumes by itself."
-        case .lost: return "\(r) dropped it and could not resume it. The transcript is kept."
+        case .lost: return "\(r) dropped it and could not resume it. The transcript up to that point is kept."
         case .ended:
             if session.stoppedByBudget {
-                return "A budget ran out, so Core stopped it. Raise the budget, then resume to continue."
+                return "A budget ran out, so Core stopped it. Raise the budget or use another account, then resume."
             }
-            if let why = session.outcomeReason, !why.isEmpty { return why }
+            if let why = session.outcomeReason, !why.isEmpty { return AgentWords.reasonWords(why) }
             switch session.outcome {
             case .succeeded?: return "It finished what it was asked."
             case .failed?: return "It stopped with an error. The last output is below."
@@ -152,23 +154,38 @@ struct SessionHero: View {
                     model.confirmCancel(session.id)
                 }
                 .disabled(model.stopping[session.id] != nil)
-                .help("Ask \(session.harness) to stop after its current tool call")
+                .help(
+                    "Cancel asks \(AgentWords.harnessName(session.harness)) to stop after its current tool call. Safe; try this first."
+                )
                 AppActionTile(title: "Kill", symbol: "xmark.octagon", key: "K", hue: GlassInk.red) {
                     model.confirmKill(session.id)
                 }
-                .help("Stop it at once; can leave files half-written")
+                .help(
+                    "Kill stops it at once on the runner and can leave files half-written. Use it only if Cancel did not work."
+                )
             } else {
                 if case .succeeded? = session.outcome {
                     AppActionTile(title: "Wake", symbol: "alarm", key: "W", hue: GlassInk.violet) {
                         model.wake(session.id)
                     }
-                    .help("Queue another turn for this agent")
+                    .help(
+                        "Wake queues another turn for this finished agent. It keeps the same session. Resume restarts one that stopped."
+                    )
+                }
+                if session.stoppedByBudget {
+                    AppActionTile(title: "Raise budget…", symbol: "arrow.up.circle", key: "", hue: GlassInk.blue) {
+                        model.raiseBudget(session)
+                    }
+                    .help("Open the budget that stopped this session, raise it, then resume")
+                    AppActionTile(title: "Open Accounts", symbol: "creditcard", key: "", hue: GlassInk.slate) {
+                        model.openAccounts()
+                    }
                 }
                 AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
                 {
                     model.resume(session.id)
                 }
-                .help("Start this session again from where it stopped")
+                .help("Resume starts this session again from where it stopped. The transcript is kept.")
             }
         }
     }

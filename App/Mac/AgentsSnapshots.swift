@@ -188,13 +188,21 @@ enum AgentsSnapshots {
             ChainOption(id: 1, name: "daily", isDefault: true, steps: ["claude · sonnet", "codex · default model"]),
             ChainOption(id: 2, name: "careful", isDefault: false, steps: ["claude · opus"]),
         ])
+        a.debugAgents(["atlas", "orion", "scout"])
+        only { a.openNewSession() }
+        await shot("quick-session-default-chain")
+        only { a.openNewSession(advanced: true) }
+        await shot("new-session-advanced")
         for source in ["chain", "agent", "busy"] {
             a.debugSource = source
-            only { a.openNewSession() }
+            shell.closeDialog()
+            try? await Task.sleep(for: .milliseconds(500))
+            only { a.openNewSession(advanced: true) }
             await shot("new-session-\(source)")
         }
         a.debugSource = nil
         a.debugChains([])
+        a.debugAgents([])
         shell.closeDialog()
         shell.toggleLauncher()
         await shot("launcher")

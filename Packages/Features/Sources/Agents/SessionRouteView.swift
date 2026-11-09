@@ -39,8 +39,18 @@ struct SessionRouteCues: View {
                 if let m = SessionCues.moved(r) {
                     CoreNotice(symbol: "arrow.triangle.branch", title: m.title, text: m.text, tone: .queue)
                 }
-                if let e = r.ended, let t = SessionCues.notMoved(e) {
-                    CoreNotice(symbol: "xmark.octagon", title: t.title, text: t.text, tone: .fail)
+                if let e = r.ended, let t = SessionCues.notMoved(e, steps: r.steps) {
+                    CoreNotice(symbol: "xmark.octagon", title: t.title, text: t.text, tone: .fail) {
+                        // The fix, not Resume alone: free an account, then resume.
+                        HStack(spacing: Space.s2) {
+                            Button("Open Accounts") { model.openAccounts() }
+                                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                            if session.over {
+                                Button("Resume") { model.resume(session.id) }
+                                    .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                            }
+                        }
+                    }
                 }
                 if session.live, let u = SessionCues.upstream(r.upstreamClass) {
                     CoreNotice(symbol: "exclamationmark.triangle", title: u, tone: .warn)

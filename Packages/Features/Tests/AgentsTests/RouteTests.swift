@@ -47,7 +47,7 @@ struct RouteTests {
     @Test func aRunThatCouldNotMoveSaysWhy() {
         let e = FailoverEnd(result: "ended", why: "no account is available", reasons: ["entry 1: cooling until 14:00"])
         let t = SessionCues.notMoved(e)
-        #expect(t?.text == "No account is available. Entry 1: cooling until 14:00.")
+        #expect(t?.text == "No account is available. Chain step 1: cooling until 14:00.")
         #expect(SessionCues.notMoved(FailoverEnd(result: "moved")) == nil)
     }
 
@@ -69,7 +69,7 @@ struct RouteTests {
         #expect(s(.cancelled, "The pool Budget ran out").stoppedByBudget)
         #expect(!s(.cancelled, "asked to stop").stoppedByBudget)
         #expect(!s(.tokenCap).stoppedByBudget)
-        #expect(AgentWords.status(s(.cancelled, "budget"), waiting: false).label == "Stopped: budget reached")
+        #expect(AgentWords.status(s(.cancelled, "budget"), waiting: false).label == "Ended: budget reached")
         #expect(AgentWords.status(s(.cancelled), waiting: false).label == "Cancelled")
     }
 

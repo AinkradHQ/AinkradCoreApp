@@ -37,6 +37,7 @@ extension AgentsModel {
             }
             return
         }
+        loadTitle(id)
         let head = head(s)
         shell.openPane(
             PaneSpec(
@@ -48,8 +49,40 @@ extension AgentsModel {
     func head(_ s: AgentSessionInfo) -> (title: String, sub: String, chip: PaneChip) {
         let st = AgentWords.status(s, waiting: waiting(s.id))
         return (
-            s.harness, "\(runnerName(s.runner)) · \(s.shortID)", PaneChip(st.label, tone: st.tone, symbol: st.symbol)
+            // The tab shows `sub`: the prompt's first line. The title (hover, close label) names harness, runner and id.
+            "\(AgentWords.harnessName(s.harness)) on \(runnerName(s.runner)) · \(s.id)", title(s),
+            PaneChip(st.label, tone: st.tone, symbol: st.symbol)
         )
+    }
+
+    /// A session's name: its prompt's first line, else the harness and the id's tail.
+    public func title(_ s: AgentSessionInfo) -> String {
+        if let t = titles[s.id] { return t }
+        if let line = transcripts[s.id]?.entries.lazy.compactMap({ e -> String? in
+            if case .user(let t) = e.kind { return AgentWords.title(prompt: t) }
+            return nil
+        }).first {
+            return line
+        }
+        return AgentWords.fallbackTitle(s)
+    }
+
+    /// Reads the first prompt of a session that has no name yet (once), so a tile can show it.
+    func loadTitle(_ id: String) {
+        guard let api, titles[id] == nil, !titleLoading.contains(id) else { return }
+        titleLoading.insert(id)
+        Task { [weak self] in
+            let page = try? await api.transcript(id, after: 0, limit: 12)
+            guard let self else { return }
+            self.titleLoading.remove(id)
+            for e in page?.entries ?? [] {
+                if case .user(let t) = e.kind, let line = AgentWords.title(prompt: t) {
+                    self.titles[id] = line
+                    self.refreshHeads()
+                    return
+                }
+            }
+        }
     }
 
     var listChip: PaneChip? {
@@ -67,6 +100,18 @@ extension AgentsModel {
         }
         shell.updatePane(Self.listPane, title: nil, sub: nil, chip: .some(listChip))
     }
+
+    // MARK: budget
+
+    /// The budget that stopped a session: the app (L2/L6) sets this to open its Raise dialog; until it does, Accounts opens.
+    public var onRaiseBudget: ((AgentSessionInfo) -> Void)? {
+        get { raiseBudgetHook }
+        set { raiseBudgetHook = newValue }
+    }
+    func raiseBudget(_ s: AgentSessionInfo) {
+        if let hook = raiseBudgetHook { hook(s) } else { openAccounts() }
+    }
+    func openAccounts() { shell.launcher.entry("accounts")?.run() }
 
     // MARK: dialogs
 
@@ -138,8 +183,9 @@ extension AgentsModel {
             let st = AgentWords.status(s, waiting: false).label
             shell.launcher.register(
                 LauncherEntry(
-                    id: "agents.s-\(s.id)", title: "\(s.harness) · \(s.shortID)",
-                    sub: "\(runnerName(s.runner)) · \(st)", symbol: Self.harnessSymbol(s.harness),
+                    id: "agents.s-\(s.id)", title: title(s),
+                    sub: "\(AgentWords.harnessName(s.harness)) · \(runnerName(s.runner)) · \(st)",
+                    symbol: Self.harnessSymbol(s.harness),
                     keywords: ["agent", "session", s.harness, runnerName(s.runner), st]
                 ) { [weak self] in self?.openSession(s.id) })
         }
@@ -166,7 +212,7 @@ extension AgentsModel {
             if primed, !announced.contains(id) {
                 announced.insert(id)
                 if notifyApprovals {
-                    let h = sessions.session(r.session)?.harness ?? "An agent"
+                    let h = sessions.session(r.session).map { AgentWords.harnessName($0.harness) } ?? "An agent"
                     notifier.post(
                         id: id, title: "\(h) needs approval", body: "\(r.tool): \(r.input)".prefix(180).description,
                         session: r.session)
@@ -195,7 +241,7 @@ extension AgentsModel {
         let left = r.remaining(now: now).map { "expires in \(AgentWords.clock($0))" }
         return BellItem(
             id: r.key, kind: .approval,
-            title: "\(s?.harness ?? "An agent") wants to use \(r.tool)",
+            title: "\(s.map { AgentWords.harnessName($0.harness) } ?? "An agent") wants to use \(r.tool)",
             sub: [s.map { runnerName($0.runner) }, r.input.isEmpty ? nil : r.input, left].compactMap { $0 }
                 .joined(separator: " · "),
             time: AgentWords.ago(r.requestedAt, now: now),

@@ -140,7 +140,13 @@ extension AgentsModel {
             syncDerived()
         } catch {
             t.unmark(r.id)
-            approvalNotices[r.id] = Self.notice(error, doing: approved ? "Approving" : "Denying")
+            if let e = CoreError.unwrapping(error), case .http(let status, _, _) = e, status == 404 || status == 409 {
+                approvalNotices[r.id] = InlineNotice(
+                    title: "This request was already answered or expired.", detail: "Nothing was changed.",
+                    symbol: "clock.badge.exclamationmark", tone: .queue)
+            } else {
+                approvalNotices[r.id] = Self.notice(error, doing: approved ? "Approving" : "Denying")
+            }
         }
     }
 
@@ -149,6 +155,7 @@ extension AgentsModel {
     public func loadRunners() async {
         if let api, let r = try? await api.runners() { runners = r }
         if let api { setChains((try? await api.chains()) ?? []) }
+        if let api { agentNames = (try? await api.agents()) ?? [] }
     }
 
     /// Starts a session. The error comes back as words for the sheet; nothing is half done.
@@ -159,6 +166,7 @@ extension AgentsModel {
                 try await api.create(new)
             }
             sessions.upsert(s)
+            if let t = AgentWords.title(prompt: new.prompt) { titles[s.id] = t }
             openSession(s.id)
             shell.showToast("Session created")
             return nil

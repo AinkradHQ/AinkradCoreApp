@@ -43,37 +43,6 @@ struct MeterBar: View {
     }
 }
 
-/// A loading row: bars that rest at a low light, and breathe while Reduce Motion is off.
-struct SkeletonRows: View {
-    var count = 6
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var dim = false
-    var body: some View {
-        VStack(spacing: Space.s2) {
-            ForEach(0..<count, id: \.self) { _ in
-                HStack(alignment: .top, spacing: Space.s3) {
-                    coreShape(Radius.control).fill(palette.uDim).frame(
-                        width: MacSize.controlLg, height: MacSize.controlLg)
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        coreShape(Radius.chip).fill(palette.uDim).frame(width: 180, height: Space.s3)
-                        coreShape(Radius.chip).fill(palette.uDim).frame(width: 110, height: Space.s3 - 2)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(Space.s3)
-                .background(palette.glassCard, in: coreShape(Radius.row))
-            }
-        }
-        .opacity(reduce ? 0.7 : dim ? 0.5 : 0.9)
-        .animation(reduce ? nil : .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true), value: dim)
-        .onAppear { dim = true }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Loading sessions")
-        .accessibilityAddTraits(.updatesFrequently)
-    }
-}
-
 /// A row that is a button: the card tint at rest, lighter on hover, the nav colour when selected, and the one focus ring, drawn
 /// from this row's own focus (a row never shows the ring because another control has it).
 struct AgentRowButton<Label: View>: View {
@@ -143,5 +112,15 @@ extension View {
                 NSPasteboard.general.setString(text, forType: .string)
             }
         }
+    }
+}
+
+/// Which single letters are shortcuts in the Agents panes (A approvals, C cancel, K kill, R resume, W wake). While a text field
+/// has focus, typing never is one. Pure, so a test can hold the rule.
+enum PaneKeys {
+    static let letters: Set<String> = ["a", "c", "k", "r", "w"]
+    static func shortcut(_ typed: String, typing: Bool) -> String? {
+        let k = typed.lowercased()
+        return !typing && letters.contains(k) ? k : nil
     }
 }

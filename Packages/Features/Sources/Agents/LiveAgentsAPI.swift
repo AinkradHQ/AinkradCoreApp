@@ -33,6 +33,14 @@ public struct LiveAgentsAPI: AgentsAPI {
         } catch CoreError.forbiddenScope { return [] }
     }
 
+    public func agents() async throws -> [String] {
+        do {
+            return try await run {
+                Array(Set(try await client.listChainBindings().ok.body.json.map(\.agent))).sorted()
+            }
+        } catch CoreError.forbiddenScope { return [] }
+    }
+
     public func sessions(before: Int64?, limit: Int) async throws -> [AgentSessionInfo] {
         try await run {
             let q = Operations.ListAgentSessions.Input.Query(before: before, limit: Int32(limit))

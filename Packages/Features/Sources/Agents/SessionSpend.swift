@@ -89,7 +89,7 @@ struct SessionSpendStrip: View {
             Spacer(minLength: Space.s2)
             if capped {
                 Label(
-                    session.stoppedByBudget ? "Stopped: budget reached" : "Stopped at its limit",
+                    session.stoppedByBudget ? AgentWords.endedWords("budget") : "Stopped at its limit",
                     systemImage: "gauge.with.dots.needle.100percent"
                 )
                 .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.redInk)

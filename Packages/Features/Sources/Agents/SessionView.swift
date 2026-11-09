@@ -54,7 +54,9 @@ struct SessionView: View {
             .onKeyPress(.downArrow) { latest() }
             .onKeyPress(.end) { latest() }
             .onKeyPress(characters: .letters) { press in
-                switch press.characters.lowercased() {
+                // Letters belong to the field while you write: no shortcut fires from typing.
+                guard let key = PaneKeys.shortcut(press.characters, typing: composing) else { return .ignored }
+                switch key {
                 case "r" where s.over || s.state == .lost: model.resume(s.id)
                 case "w" where s.outcome == .succeeded: model.wake(s.id)
                 case "c" where s.live: model.confirmCancel(s.id)
@@ -108,10 +110,8 @@ struct StateBanner: View {
         case .lost:
             row(
                 "wifi.exclamationmark", .fail, "Session lost",
-                "\(r) dropped it and could not resume it. The transcript up to seq \(session.lastSeq) is kept."
-            ) {
-                Button("Resume") { model.resume(session.id) }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
-            }
+                "\(r) dropped it and could not resume it. The transcript up to that point is kept. Resume is at the top right."
+            )
         default:
             if session.state.unknownRaw != nil {
                 row("questionmark.circle", .queue, session.state.rawValue, "This state is newer than this app.")
