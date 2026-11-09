@@ -15,7 +15,7 @@ public struct AppSurfaceFill: View {
     let tint: Color
     let blur: Bool
     let radius: CGFloat
-    @Environment(\.accessibilityReduceTransparency) private var solidOnly
+    @Environment(\.coreSolidOnly) private var solidOnly
     /// The one tint every app's surface uses (Ahmed, 2026-11-05: the same settings must look the same in every app).
     /// The Terminals app's Deep Blue.
     public static let tint = Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255)

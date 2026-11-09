@@ -25,7 +25,7 @@ extension View {
 }
 
 private struct PanelModifier: ViewModifier {
-    @Environment(\.accessibilityReduceTransparency) private var solid
+    @Environment(\.coreSolidOnly) private var solid
     @Environment(\.corePalette) private var palette
     let radius: CGFloat
     let padding: CGFloat
@@ -49,7 +49,7 @@ private struct GlassModifier: ViewModifier {
     let interactive: Bool
     let tinted: Bool
     let frosted: Bool
-    @Environment(\.accessibilityReduceTransparency) private var solid
+    @Environment(\.coreSolidOnly) private var solid
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if solid {

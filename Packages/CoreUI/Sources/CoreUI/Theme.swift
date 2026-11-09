@@ -86,18 +86,38 @@ extension EnvironmentValues {
     }
 }
 
+private struct SolidOnlyKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// Reduce Transparency, as `coreTheme()` read it (or forced in a Debug build): glass becomes a solid surface.
+    public var coreSolidOnly: Bool {
+        get { self[SolidOnlyKey.self] }
+        set { self[SolidOnlyKey.self] = newValue }
+    }
+}
+
 private struct CoreThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
-    @AppStorage(MacTextSize.scaleKey) private var textScale = 1.0
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    #if DEBUG
+    /// `CORE_FORCE_A11Y=transparency,contrast` pretends the Mac asks for Reduce Transparency and/or Increase Contrast, so the
+    /// solid and high-contrast paths can be looked at without changing System Settings.
+    private static let forced = ProcessInfo.processInfo.environment["CORE_FORCE_A11Y"] ?? ""
+    private var effectiveContrast: ColorSchemeContrast { Self.forced.contains("contrast") ? .increased : contrast }
+    private var solidOnly: Bool { reduceTransparency || Self.forced.contains("transparency") }
+    #else
+    private var effectiveContrast: ColorSchemeContrast { contrast }
+    private var solidOnly: Bool { reduceTransparency }
+    #endif
     func body(content: Content) -> some View {
         content
-            .environment(\.coreTextScale, min(max(textScale, 0.8), 2))
-            .environment(\.corePalette, (scheme == .dark ? Palette.night : Palette.day).contrast(contrast))
+            .environment(\.corePalette, (scheme == .dark ? Palette.night : Palette.day).contrast(effectiveContrast))
+            .environment(\.coreSolidOnly, solidOnly)
             .foregroundStyle((scheme == .dark ? Palette.night : Palette.day).text)
             // System controls (switches, sliders, pickers, glass buttons) follow the app's blue, never the Mac's accent colour.
             .tint((scheme == .dark ? Palette.night : Palette.day).btnPrimary)
-            .font(.system(size: MacTextSize.scaled(MacTextSize.body, by: textScale)))
+            .font(.system(size: MacTextSize.scaled(MacTextSize.body, by: TextSizePrefs.shared.scale)))
             // No focus rings anywhere (Ahmed, 2026-11-05): the system ring and our own both stay off. Keyboard focus
             // still moves; the focused control is the one that answers Space and Return.
             .focusEffectDisabled()
