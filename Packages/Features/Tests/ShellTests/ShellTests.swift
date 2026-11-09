@@ -27,6 +27,14 @@ struct LauncherTests {
 
 @MainActor
 struct ShellModelTests {
+    @Test func onlyTheActivePaneInTheWorkspaceIsFront() {
+        let shell = ShellModel()
+        for id in ["a", "b"] { shell.openPane(PaneSpec(id: id, title: id, symbol: "square") { EmptyView() }) }
+        #expect(shell.isFront("b") && !shell.isFront("a"))
+        shell.surface = .home
+        #expect(!shell.isFront("b"))
+    }
+
     @Test func panesOpenFocusMoveAndClose() {
         let shell = ShellModel()
         for id in ["a", "b", "c"] { shell.openPane(PaneSpec(id: id, title: id, symbol: "square") { EmptyView() }) }

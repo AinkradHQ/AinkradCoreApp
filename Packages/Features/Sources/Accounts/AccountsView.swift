@@ -41,7 +41,7 @@ struct AccountsView: View {
                 .focused($paneFocus)
                 .focusEffectDisabled()
                 .onAppear { paneFocus = true }
-                .retakeFocus(after: model.host.shell) { paneFocus = true }
+                .retakeFocus(after: model.host.shell, pane: "accounts") { paneFocus = true }
                 .onKeyPress(.downArrow) { AccountsKeys.move(model, 1, proxy) }
                 .onKeyPress(.upArrow) { AccountsKeys.move(model, -1, proxy) }
                 .coreSideKeys { AccountsKeys.side(model, $0, proxy) }

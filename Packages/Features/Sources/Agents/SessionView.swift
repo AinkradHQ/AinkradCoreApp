@@ -49,7 +49,7 @@ struct SessionView: View {
             .onAppear {
                 if case .running = s.state { composing = true } else { paneFocus = true }
             }
-            .retakeFocus(after: model.shell) {
+            .retakeFocus(after: model.shell, pane: AgentsModel.paneID(sessionID)) {
                 if case .running = s.state { composing = true } else { paneFocus = true }
             }
             .onKeyPress(.return) { write(s) }

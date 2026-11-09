@@ -447,6 +447,9 @@ public final class ShellModel {
             || topDialog != nil
     }
 
+    /// True when `id` is the pane the person is working in: the workspace is showing and this pane is the focused or active one.
+    public func isFront(_ id: String) -> Bool { surface == .workspace && (focusedPane ?? activePane) == id }
+
     public func present(_ d: ShellDialog) {
         launcherOpen = false
         bellOpen = false
