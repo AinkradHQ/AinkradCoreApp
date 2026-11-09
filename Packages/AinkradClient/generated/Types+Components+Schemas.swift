@@ -33,6 +33,61 @@ extension Components {
                 case runners
             }
         }
+        /// An account's health counters, as the scheduler keeps them.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AccountHealth`.
+        public struct AccountHealth: Codable, Hashable, Sendable {
+            /// A subscription's failed sessions in a row; the third keeps it out of new runs
+            /// (`state_reason` `auth_suspected`) until an admin answers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountHealth/auth_streak`.
+            public var authStreak: Swift.Int64
+            /// Upstream errors counted in the current ten-minute window; three put it out for ten minutes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountHealth/fail_streak`.
+            public var failStreak: Swift.Int64
+            /// The last time a request or a session on it went well.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountHealth/last_success_at`.
+            public var lastSuccessAt: Components.Schemas.Timestamp?
+            /// A subscription's latest plan-limit snapshot, as its harness last said it (harness output:
+            /// it can only cool the account, never disable it).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountHealth/plan_limit`.
+            public var planLimit: Components.Schemas.AccountPlanLimit?
+            /// The last status class its gateway reported on any of its sessions.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountHealth/upstream_class`.
+            public var upstreamClass: Swift.String?
+            /// Creates a new `AccountHealth`.
+            ///
+            /// - Parameters:
+            ///   - authStreak: A subscription's failed sessions in a row; the third keeps it out of new runs
+            ///   - failStreak: Upstream errors counted in the current ten-minute window; three put it out for ten minutes.
+            ///   - lastSuccessAt: The last time a request or a session on it went well.
+            ///   - planLimit: A subscription's latest plan-limit snapshot, as its harness last said it (harness output:
+            ///   - upstreamClass: The last status class its gateway reported on any of its sessions.
+            public init(
+                authStreak: Swift.Int64,
+                failStreak: Swift.Int64,
+                lastSuccessAt: Components.Schemas.Timestamp? = nil,
+                planLimit: Components.Schemas.AccountPlanLimit? = nil,
+                upstreamClass: Swift.String? = nil
+            ) {
+                self.authStreak = authStreak
+                self.failStreak = failStreak
+                self.lastSuccessAt = lastSuccessAt
+                self.planLimit = planLimit
+                self.upstreamClass = upstreamClass
+            }
+            public enum CodingKeys: String, CodingKey {
+                case authStreak = "auth_streak"
+                case failStreak = "fail_streak"
+                case lastSuccessAt = "last_success_at"
+                case planLimit = "plan_limit"
+                case upstreamClass = "upstream_class"
+            }
+        }
         /// Where a sign-in has got to. Never a token or a code.
         ///
         /// - Remark: Generated from `#/components/schemas/AccountLogin`.
@@ -123,6 +178,74 @@ extension Components {
                 case state
                 case updatedAt = "updated_at"
                 case url
+            }
+        }
+        /// A subscription's plan-limit snapshot.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AccountPlanLimit`.
+        public struct AccountPlanLimit: Codable, Hashable, Sendable {
+            /// When the Core stored it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountPlanLimit/at`.
+            public var at: Components.Schemas.Timestamp
+            /// The harness's own word: `allowed`, `allowed_warning`, `rejected`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountPlanLimit/status`.
+            public var status: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AccountPlanLimit/windows`.
+            public var windows: [Components.Schemas.AccountPlanWindow]
+            /// Creates a new `AccountPlanLimit`.
+            ///
+            /// - Parameters:
+            ///   - at: When the Core stored it.
+            ///   - status: The harness's own word: `allowed`, `allowed_warning`, `rejected`.
+            ///   - windows:
+            public init(
+                at: Components.Schemas.Timestamp,
+                status: Swift.String,
+                windows: [Components.Schemas.AccountPlanWindow]
+            ) {
+                self.at = at
+                self.status = status
+                self.windows = windows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case at
+                case status
+                case windows
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AccountPlanWindow`.
+        public struct AccountPlanWindow: Codable, Hashable, Sendable {
+            /// e.g. `five_hour`, `seven_day`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountPlanWindow/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AccountPlanWindow/resets_at`.
+            public var resetsAt: Components.Schemas.Timestamp?
+            /// A fraction of the window's limit, past 1 at the limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountPlanWindow/utilization`.
+            public var utilization: Swift.Double
+            /// Creates a new `AccountPlanWindow`.
+            ///
+            /// - Parameters:
+            ///   - name: e.g. `five_hour`, `seven_day`.
+            ///   - resetsAt:
+            ///   - utilization: A fraction of the window's limit, past 1 at the limit.
+            public init(
+                name: Swift.String,
+                resetsAt: Components.Schemas.Timestamp? = nil,
+                utilization: Swift.Double
+            ) {
+                self.name = name
+                self.resetsAt = resetsAt
+                self.utilization = utilization
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case resetsAt = "resets_at"
+                case utilization
             }
         }
         /// One account's usage. No key, secret name, delivery or runner: it is for a `read` device.
@@ -307,12 +430,51 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/AgentSession`.
         public struct AgentSession: Codable, Hashable, Sendable {
+            /// The account the session holds, whatever its delivery (an API key or a subscription).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/account`.
+            public var account: Swift.Int64?
+            /// The opaque agent id the create named (the key of its chain binding).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/agent`.
+            public var agent: Swift.String?
+            /// Which attempt of its run it is, from 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/attempt`.
+            public var attempt: Swift.Int64?
+            /// The chain as it was when the session began (an edit never moves a running run).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/chain`.
+            public var chain: [Components.Schemas.ChainEntry]?
+            /// The chain the run draws its accounts from; absent for a session that names its account
+            /// itself or uses the runner's own login.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/chain_id`.
+            public var chainId: Swift.Int64?
+            /// The entry of `chain` the run sits on, from 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/chain_pos`.
+            public var chainPos: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/AgentSession/created_at`.
             public var createdAt: Components.Schemas.Timestamp
             /// - Remark: Generated from `#/components/schemas/AgentSession/created_by`.
             public var createdBy: Swift.String
             /// - Remark: Generated from `#/components/schemas/AgentSession/ended_at`.
             public var endedAt: Components.Schemas.Timestamp?
+            /// The attempt that replaced this one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/failed_over_to`.
+            public var failedOverTo: Swift.String?
+            /// Why the run was moved off this attempt (`rate_limited`, `quota`, `auth`, `budget_pool`, …).
+            /// An ended run's last attempt says in `outcome.failover` (`{result, why, reasons}`) why it
+            /// could not move on. Admin only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/failover_class`.
+            public var failoverClass: Swift.String?
+            /// The attempt this one replaced.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/failover_of`.
+            public var failoverOf: Swift.String?
             /// - Remark: Generated from `#/components/schemas/AgentSession/harness`.
             public var harness: Swift.String
             /// The harness's own session id, what a resume continues.
@@ -338,10 +500,19 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/outcome`.
             public var outcome: OpenAPIRuntime.OpenAPIObjectContainer?
+            /// How many accounts a launch refused after the pick before the one it holds (at most 2).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/repicked`.
+            public var repicked: Swift.Int64?
             /// How many times it was resumed.
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/resumes`.
             public var resumes: Swift.Int64?
+            /// The run it belongs to: its first attempt's id. A failover is a new session (an attempt) of
+            /// the same run; filter `listAgentSessions` with `run`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/run`.
+            public var run: Swift.String?
             /// The runner's device id, `d_…`.
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/runner`.
@@ -350,6 +521,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/secrets`.
             public var secrets: [Swift.String]?
+            /// The pools a budget stop took out of the run's chain. Admin only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/skip_pools`.
+            public var skipPools: [Swift.Int64]?
             /// `starting`, `running`, `interrupted` (its runner restarted; it is resumed), `ended`,
             /// `lost`.
             ///
@@ -357,14 +532,33 @@ extension Components {
             public var state: Swift.String
             /// - Remark: Generated from `#/components/schemas/AgentSession/updated_at`.
             public var updatedAt: Components.Schemas.Timestamp
+            /// The last status class its own gateway reported: `ok`, `rate_limited`, `quota`,
+            /// `server_error`, `auth_failed`, …
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/upstream_class`.
+            public var upstreamClass: Swift.String?
             /// - Remark: Generated from `#/components/schemas/AgentSession/usage`.
             public var usage: Components.Schemas.AgentUsage?
+            /// Set while a chain session waits for an account: it stays `starting` until `until`, or
+            /// until `scheduler.wait_max_secs` ends the run.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/waiting`.
+            public var waiting: Components.Schemas.AgentWaiting?
             /// Creates a new `AgentSession`.
             ///
             /// - Parameters:
+            ///   - account: The account the session holds, whatever its delivery (an API key or a subscription).
+            ///   - agent: The opaque agent id the create named (the key of its chain binding).
+            ///   - attempt: Which attempt of its run it is, from 0.
+            ///   - chain: The chain as it was when the session began (an edit never moves a running run).
+            ///   - chainId: The chain the run draws its accounts from; absent for a session that names its account
+            ///   - chainPos: The entry of `chain` the run sits on, from 0.
             ///   - createdAt:
             ///   - createdBy:
             ///   - endedAt:
+            ///   - failedOverTo: The attempt that replaced this one.
+            ///   - failoverClass: Why the run was moved off this attempt (`rate_limited`, `quota`, `auth`, `budget_pool`, …).
+            ///   - failoverOf: The attempt this one replaced.
             ///   - harness:
             ///   - harnessSession: The harness's own session id, what a resume continues.
             ///   - id: `as_…`.
@@ -372,16 +566,30 @@ extension Components {
             ///   - lastSeq: The newest transcript `seq` stored.
             ///   - model:
             ///   - outcome: Once over: `{"kind": "succeeded" | "failed" | "cancelled" | "token_cap" | "stalled" |
+            ///   - repicked: How many accounts a launch refused after the pick before the one it holds (at most 2).
             ///   - resumes: How many times it was resumed.
+            ///   - run: The run it belongs to: its first attempt's id. A failover is a new session (an attempt) of
             ///   - runner: The runner's device id, `d_…`.
             ///   - secrets: The secrets it is leased at each start, by name.
+            ///   - skipPools: The pools a budget stop took out of the run's chain. Admin only.
             ///   - state: `starting`, `running`, `interrupted` (its runner restarted; it is resumed), `ended`,
             ///   - updatedAt:
+            ///   - upstreamClass: The last status class its own gateway reported: `ok`, `rate_limited`, `quota`,
             ///   - usage:
+            ///   - waiting: Set while a chain session waits for an account: it stays `starting` until `until`, or
             public init(
+                account: Swift.Int64? = nil,
+                agent: Swift.String? = nil,
+                attempt: Swift.Int64? = nil,
+                chain: [Components.Schemas.ChainEntry]? = nil,
+                chainId: Swift.Int64? = nil,
+                chainPos: Swift.Int64? = nil,
                 createdAt: Components.Schemas.Timestamp,
                 createdBy: Swift.String,
                 endedAt: Components.Schemas.Timestamp? = nil,
+                failedOverTo: Swift.String? = nil,
+                failoverClass: Swift.String? = nil,
+                failoverOf: Swift.String? = nil,
                 harness: Swift.String,
                 harnessSession: Swift.String? = nil,
                 id: Swift.String,
@@ -389,16 +597,30 @@ extension Components {
                 lastSeq: Swift.Int64,
                 model: Swift.String? = nil,
                 outcome: OpenAPIRuntime.OpenAPIObjectContainer? = nil,
+                repicked: Swift.Int64? = nil,
                 resumes: Swift.Int64? = nil,
+                run: Swift.String? = nil,
                 runner: Swift.String,
                 secrets: [Swift.String]? = nil,
+                skipPools: [Swift.Int64]? = nil,
                 state: Swift.String,
                 updatedAt: Components.Schemas.Timestamp,
-                usage: Components.Schemas.AgentUsage? = nil
+                upstreamClass: Swift.String? = nil,
+                usage: Components.Schemas.AgentUsage? = nil,
+                waiting: Components.Schemas.AgentWaiting? = nil
             ) {
+                self.account = account
+                self.agent = agent
+                self.attempt = attempt
+                self.chain = chain
+                self.chainId = chainId
+                self.chainPos = chainPos
                 self.createdAt = createdAt
                 self.createdBy = createdBy
                 self.endedAt = endedAt
+                self.failedOverTo = failedOverTo
+                self.failoverClass = failoverClass
+                self.failoverOf = failoverOf
                 self.harness = harness
                 self.harnessSession = harnessSession
                 self.id = id
@@ -406,17 +628,31 @@ extension Components {
                 self.lastSeq = lastSeq
                 self.model = model
                 self.outcome = outcome
+                self.repicked = repicked
                 self.resumes = resumes
+                self.run = run
                 self.runner = runner
                 self.secrets = secrets
+                self.skipPools = skipPools
                 self.state = state
                 self.updatedAt = updatedAt
+                self.upstreamClass = upstreamClass
                 self.usage = usage
+                self.waiting = waiting
             }
             public enum CodingKeys: String, CodingKey {
+                case account
+                case agent
+                case attempt
+                case chain
+                case chainId = "chain_id"
+                case chainPos = "chain_pos"
                 case createdAt = "created_at"
                 case createdBy = "created_by"
                 case endedAt = "ended_at"
+                case failedOverTo = "failed_over_to"
+                case failoverClass = "failover_class"
+                case failoverOf = "failover_of"
                 case harness
                 case harnessSession = "harness_session"
                 case id
@@ -424,12 +660,17 @@ extension Components {
                 case lastSeq = "last_seq"
                 case model
                 case outcome
+                case repicked
                 case resumes
+                case run
                 case runner
                 case secrets
+                case skipPools = "skip_pools"
                 case state
                 case updatedAt = "updated_at"
+                case upstreamClass = "upstream_class"
                 case usage
+                case waiting
             }
         }
         /// - Remark: Generated from `#/components/schemas/AgentTranscript`.
@@ -546,6 +787,43 @@ extension Components {
                 case costUsdMicros = "cost_usd_micros"
                 case input
                 case output
+            }
+        }
+        /// Why a chain session has not started: it waits for an account to come back.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AgentWaiting`.
+        public struct AgentWaiting: Codable, Hashable, Sendable {
+            /// Its first wait; it waits `scheduler.wait_max_secs` in all.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentWaiting/since`.
+            public var since: Components.Schemas.Timestamp?
+            /// When the earliest account may be back.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentWaiting/until`.
+            public var until: Components.Schemas.Timestamp
+            /// A fixed phrase: every account the chain can use is cooling, limited or at its cap.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentWaiting/why`.
+            public var why: Swift.String
+            /// Creates a new `AgentWaiting`.
+            ///
+            /// - Parameters:
+            ///   - since: Its first wait; it waits `scheduler.wait_max_secs` in all.
+            ///   - until: When the earliest account may be back.
+            ///   - why: A fixed phrase: every account the chain can use is cooling, limited or at its cap.
+            public init(
+                since: Components.Schemas.Timestamp? = nil,
+                until: Components.Schemas.Timestamp,
+                why: Swift.String
+            ) {
+                self.since = since
+                self.until = until
+                self.why = why
+            }
+            public enum CodingKeys: String, CodingKey {
+                case since
+                case until
+                case why
             }
         }
         /// - Remark: Generated from `#/components/schemas/AgentWake`.
@@ -777,6 +1055,23 @@ extension Components {
                 case nextBefore = "next_before"
             }
         }
+        /// - Remark: Generated from `#/components/schemas/BindChain`.
+        public struct BindChain: Codable, Hashable, Sendable {
+            /// The chain's id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BindChain/chain`.
+            public var chain: Swift.Int64
+            /// Creates a new `BindChain`.
+            ///
+            /// - Parameters:
+            ///   - chain: The chain's id.
+            public init(chain: Swift.Int64) {
+                self.chain = chain
+            }
+            public enum CodingKeys: String, CodingKey {
+                case chain
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Binding`.
         public struct Binding: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/Binding/agent`.
@@ -819,6 +1114,133 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case deleted
+            }
+        }
+        /// An ordered fallback chain of 1 to 4 pools. A new session draws an account from the first
+        /// entry that has one to give.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Chain`.
+        public struct Chain: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Chain/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// In fallback order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Chain/entries`.
+            public var entries: [Components.Schemas.ChainEntry]
+            /// - Remark: Generated from `#/components/schemas/Chain/id`.
+            public var id: Swift.Int64
+            /// The user's default chain serves an agent bound to none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Chain/is_default`.
+            public var isDefault: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/Chain/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Chain/updated_at`.
+            public var updatedAt: Components.Schemas.Timestamp
+            /// Creates a new `Chain`.
+            ///
+            /// - Parameters:
+            ///   - createdAt:
+            ///   - entries: In fallback order.
+            ///   - id:
+            ///   - isDefault: The user's default chain serves an agent bound to none.
+            ///   - name:
+            ///   - updatedAt:
+            public init(
+                createdAt: Components.Schemas.Timestamp,
+                entries: [Components.Schemas.ChainEntry],
+                id: Swift.Int64,
+                isDefault: Swift.Bool,
+                name: Swift.String,
+                updatedAt: Components.Schemas.Timestamp
+            ) {
+                self.createdAt = createdAt
+                self.entries = entries
+                self.id = id
+                self.isDefault = isDefault
+                self.name = name
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case createdAt = "created_at"
+                case entries
+                case id
+                case isDefault = "is_default"
+                case name
+                case updatedAt = "updated_at"
+            }
+        }
+        /// An agent's binding: its sessions get this chain.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ChainBinding`.
+        public struct ChainBinding: Codable, Hashable, Sendable {
+            /// The opaque agent id, 1 to 64 of `[A-Za-z0-9._:-]`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ChainBinding/agent`.
+            public var agent: Swift.String
+            /// The chain's id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ChainBinding/chain`.
+            public var chain: Swift.Int64
+            /// Creates a new `ChainBinding`.
+            ///
+            /// - Parameters:
+            ///   - agent: The opaque agent id, 1 to 64 of `[A-Za-z0-9._:-]`.
+            ///   - chain: The chain's id.
+            public init(
+                agent: Swift.String,
+                chain: Swift.Int64
+            ) {
+                self.agent = agent
+                self.chain = chain
+            }
+            public enum CodingKeys: String, CodingKey {
+                case agent
+                case chain
+            }
+        }
+        /// One step of a chain: the pool tried at this position, and the harness and model its accounts
+        /// run. The harness is the pool's provider's own.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ChainEntry`.
+        public struct ChainEntry: Codable, Hashable, Sendable {
+            /// `claude`, `codex` or `agy`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ChainEntry/harness`.
+            public var harness: Swift.String
+            /// The model for that harness; absent, the harness's default.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ChainEntry/model`.
+            public var model: Swift.String?
+            /// The pool's id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ChainEntry/pool`.
+            public var pool: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/ChainEntry/provider`.
+            public var provider: Swift.String
+            /// Creates a new `ChainEntry`.
+            ///
+            /// - Parameters:
+            ///   - harness: `claude`, `codex` or `agy`.
+            ///   - model: The model for that harness; absent, the harness's default.
+            ///   - pool: The pool's id.
+            ///   - provider:
+            public init(
+                harness: Swift.String,
+                model: Swift.String? = nil,
+                pool: Swift.Int64,
+                provider: Swift.String
+            ) {
+                self.harness = harness
+                self.model = model
+                self.pool = pool
+                self.provider = provider
+            }
+            public enum CodingKeys: String, CodingKey {
+                case harness
+                case model
+                case pool
+                case provider
             }
         }
         /// - Remark: Generated from `#/components/schemas/Challenge`.
@@ -1097,6 +1519,646 @@ extension Components {
                 case key
             }
         }
+        /// A connection: never its credential.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Connection`.
+        public struct Connection: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Connection/auth_method`.
+            public var authMethod: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Connection/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// `admin` devices: the device that made it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/created_by`.
+            public var createdBy: Swift.String?
+            /// The admin's own off switch.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/disabled`.
+            public var disabled: Swift.Bool
+            /// When the access token ends, when known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/expires_at`.
+            public var expiresAt: Components.Schemas.Timestamp?
+            /// `admin` devices: how many grants say who may use it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/grant_count`.
+            public var grantCount: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/Connection/id`.
+            public var id: Swift.Int64
+            /// The account or site the last test read (a GitHub login, an Atlassian account at a site).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/identity`.
+            public var identity: Swift.String?
+            /// The kind's default connection: used when several cover a call.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/is_default`.
+            public var isDefault: Swift.Bool
+            /// `github` or `jira`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/kind`.
+            public var kind: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Connection/label`.
+            public var label: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Connection/last_tested_at`.
+            public var lastTestedAt: Components.Schemas.Timestamp?
+            /// Other devices: what the caller may do with it (the capabilities of the grants that name
+            /// the caller); never anyone else's grants or limits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/my_capabilities`.
+            public var myCapabilities: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/Connection/name`.
+            public var name: Swift.String
+            /// A fixed code: `rate_limited`, `quota`, `upstream_errors`, `auth_suspected`, `auth_failed`,
+            /// `exported`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/state_reason`.
+            public var stateReason: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Connection/state_until`.
+            public var stateUntil: Components.Schemas.Timestamp?
+            /// `active`, `cooling`, `limited`, `unhealthy` or `disabled`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connection/status`.
+            public var status: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Connection/updated_at`.
+            public var updatedAt: Components.Schemas.Timestamp
+            /// Creates a new `Connection`.
+            ///
+            /// - Parameters:
+            ///   - authMethod:
+            ///   - createdAt:
+            ///   - createdBy: `admin` devices: the device that made it.
+            ///   - disabled: The admin's own off switch.
+            ///   - expiresAt: When the access token ends, when known.
+            ///   - grantCount: `admin` devices: how many grants say who may use it.
+            ///   - id:
+            ///   - identity: The account or site the last test read (a GitHub login, an Atlassian account at a site).
+            ///   - isDefault: The kind's default connection: used when several cover a call.
+            ///   - kind: `github` or `jira`.
+            ///   - label:
+            ///   - lastTestedAt:
+            ///   - myCapabilities: Other devices: what the caller may do with it (the capabilities of the grants that name
+            ///   - name:
+            ///   - stateReason: A fixed code: `rate_limited`, `quota`, `upstream_errors`, `auth_suspected`, `auth_failed`,
+            ///   - stateUntil:
+            ///   - status: `active`, `cooling`, `limited`, `unhealthy` or `disabled`.
+            ///   - updatedAt:
+            public init(
+                authMethod: Swift.String,
+                createdAt: Components.Schemas.Timestamp,
+                createdBy: Swift.String? = nil,
+                disabled: Swift.Bool,
+                expiresAt: Components.Schemas.Timestamp? = nil,
+                grantCount: Swift.Int64? = nil,
+                id: Swift.Int64,
+                identity: Swift.String? = nil,
+                isDefault: Swift.Bool,
+                kind: Swift.String,
+                label: Swift.String,
+                lastTestedAt: Components.Schemas.Timestamp? = nil,
+                myCapabilities: [Swift.String]? = nil,
+                name: Swift.String,
+                stateReason: Swift.String? = nil,
+                stateUntil: Components.Schemas.Timestamp? = nil,
+                status: Swift.String,
+                updatedAt: Components.Schemas.Timestamp
+            ) {
+                self.authMethod = authMethod
+                self.createdAt = createdAt
+                self.createdBy = createdBy
+                self.disabled = disabled
+                self.expiresAt = expiresAt
+                self.grantCount = grantCount
+                self.id = id
+                self.identity = identity
+                self.isDefault = isDefault
+                self.kind = kind
+                self.label = label
+                self.lastTestedAt = lastTestedAt
+                self.myCapabilities = myCapabilities
+                self.name = name
+                self.stateReason = stateReason
+                self.stateUntil = stateUntil
+                self.status = status
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case authMethod = "auth_method"
+                case createdAt = "created_at"
+                case createdBy = "created_by"
+                case disabled
+                case expiresAt = "expires_at"
+                case grantCount = "grant_count"
+                case id
+                case identity
+                case isDefault = "is_default"
+                case kind
+                case label
+                case lastTestedAt = "last_tested_at"
+                case myCapabilities = "my_capabilities"
+                case name
+                case stateReason = "state_reason"
+                case stateUntil = "state_until"
+                case status
+                case updatedAt = "updated_at"
+            }
+        }
+        /// Ainkrad's OAuth app for a kind, as configured: never a secret.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionApp`.
+        public struct ConnectionApp: Codable, Hashable, Sendable {
+            /// GitHub: the GitHub App (repositories) is set up.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionApp/app_install_configured`.
+            public var appInstallConfigured: Swift.Bool
+            /// Sign in works for the kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionApp/configured`.
+            public var configured: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ConnectionApp/fields`.
+            public var fields: [Components.Schemas.ConnectionAppField]
+            /// - Remark: Generated from `#/components/schemas/ConnectionApp/kind`.
+            public var kind: Swift.String
+            /// Atlassian: the redirect address to register with Atlassian, exactly.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionApp/redirect_uri`.
+            public var redirectUri: Swift.String?
+            /// Creates a new `ConnectionApp`.
+            ///
+            /// - Parameters:
+            ///   - appInstallConfigured: GitHub: the GitHub App (repositories) is set up.
+            ///   - configured: Sign in works for the kind.
+            ///   - fields:
+            ///   - kind:
+            ///   - redirectUri: Atlassian: the redirect address to register with Atlassian, exactly.
+            public init(
+                appInstallConfigured: Swift.Bool,
+                configured: Swift.Bool,
+                fields: [Components.Schemas.ConnectionAppField],
+                kind: Swift.String,
+                redirectUri: Swift.String? = nil
+            ) {
+                self.appInstallConfigured = appInstallConfigured
+                self.configured = configured
+                self.fields = fields
+                self.kind = kind
+                self.redirectUri = redirectUri
+            }
+            public enum CodingKeys: String, CodingKey {
+                case appInstallConfigured = "app_install_configured"
+                case configured
+                case fields
+                case kind
+                case redirectUri = "redirect_uri"
+            }
+        }
+        /// One field of an app's config.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionAppField`.
+        public struct ConnectionAppField: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectionAppField/name`.
+            public var name: Swift.String
+            /// A secret is write-only: only `set` is ever said.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionAppField/secret`.
+            public var secret: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ConnectionAppField/set`.
+            public var set: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ConnectionAppField/title`.
+            public var title: Swift.String
+            /// The value of a field that is no secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionAppField/value`.
+            public var value: Swift.String?
+            /// Creates a new `ConnectionAppField`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - secret: A secret is write-only: only `set` is ever said.
+            ///   - set:
+            ///   - title:
+            ///   - value: The value of a field that is no secret.
+            public init(
+                name: Swift.String,
+                secret: Swift.Bool,
+                set: Swift.Bool,
+                title: Swift.String,
+                value: Swift.String? = nil
+            ) {
+                self.name = name
+                self.secret = secret
+                self.set = set
+                self.title = title
+                self.value = value
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case secret
+                case set
+                case title
+                case value
+            }
+        }
+        /// A sign-in as it stands: poll it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionFlow`.
+        public struct ConnectionFlow: Codable, Hashable, Sendable {
+            /// Atlassian: what the Mac app opens in the browser.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/authorize_url`.
+            public var authorizeUrl: Swift.String?
+            /// Once `connected`: the connection.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/connection`.
+            public var connection: Swift.Int64?
+            /// When `failed`: a fixed code and a plain sentence with the fix.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/error_code`.
+            public var errorCode: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/error_message`.
+            public var errorMessage: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/expires_in_secs`.
+            public var expiresInSecs: Swift.Int64
+            /// `cf_…`, the flow's own id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/id`.
+            public var id: Swift.String
+            /// Once `connected`: who it is connected as.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/identity`.
+            public var identity: Swift.String?
+            /// GitHub: seconds between polls.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/interval`.
+            public var interval: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/kind`.
+            public var kind: Swift.String
+            /// Atlassian, `choose_site`: the sites to pick from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/sites`.
+            public var sites: [Components.Schemas.ConnectionFlowSite]
+            /// Atlassian: the `state` the redirect must carry; hand it back with the `code`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/state`.
+            public var state: Swift.String?
+            /// `waiting`, `approved`, `choose_site`, `connected`, `expired`, `denied` or `failed`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/step`.
+            public var step: Swift.String
+            /// GitHub: the code to type, large.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/user_code`.
+            public var userCode: Swift.String?
+            /// GitHub: the address to open.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlow/verification_uri`.
+            public var verificationUri: Swift.String?
+            /// Creates a new `ConnectionFlow`.
+            ///
+            /// - Parameters:
+            ///   - authorizeUrl: Atlassian: what the Mac app opens in the browser.
+            ///   - connection: Once `connected`: the connection.
+            ///   - errorCode: When `failed`: a fixed code and a plain sentence with the fix.
+            ///   - errorMessage:
+            ///   - expiresInSecs:
+            ///   - id: `cf_…`, the flow's own id.
+            ///   - identity: Once `connected`: who it is connected as.
+            ///   - interval: GitHub: seconds between polls.
+            ///   - kind:
+            ///   - sites: Atlassian, `choose_site`: the sites to pick from.
+            ///   - state: Atlassian: the `state` the redirect must carry; hand it back with the `code`.
+            ///   - step: `waiting`, `approved`, `choose_site`, `connected`, `expired`, `denied` or `failed`.
+            ///   - userCode: GitHub: the code to type, large.
+            ///   - verificationUri: GitHub: the address to open.
+            public init(
+                authorizeUrl: Swift.String? = nil,
+                connection: Swift.Int64? = nil,
+                errorCode: Swift.String? = nil,
+                errorMessage: Swift.String? = nil,
+                expiresInSecs: Swift.Int64,
+                id: Swift.String,
+                identity: Swift.String? = nil,
+                interval: Swift.Int64? = nil,
+                kind: Swift.String,
+                sites: [Components.Schemas.ConnectionFlowSite],
+                state: Swift.String? = nil,
+                step: Swift.String,
+                userCode: Swift.String? = nil,
+                verificationUri: Swift.String? = nil
+            ) {
+                self.authorizeUrl = authorizeUrl
+                self.connection = connection
+                self.errorCode = errorCode
+                self.errorMessage = errorMessage
+                self.expiresInSecs = expiresInSecs
+                self.id = id
+                self.identity = identity
+                self.interval = interval
+                self.kind = kind
+                self.sites = sites
+                self.state = state
+                self.step = step
+                self.userCode = userCode
+                self.verificationUri = verificationUri
+            }
+            public enum CodingKeys: String, CodingKey {
+                case authorizeUrl = "authorize_url"
+                case connection
+                case errorCode = "error_code"
+                case errorMessage = "error_message"
+                case expiresInSecs = "expires_in_secs"
+                case id
+                case identity
+                case interval
+                case kind
+                case sites
+                case state
+                case step
+                case userCode = "user_code"
+                case verificationUri = "verification_uri"
+            }
+        }
+        /// What the Mac app's loopback listener received. No `Debug`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionFlowCallback`.
+        public struct ConnectionFlowCallback: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlowCallback/code`.
+            public var code: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlowCallback/state`.
+            public var state: Swift.String
+            /// Creates a new `ConnectionFlowCallback`.
+            ///
+            /// - Parameters:
+            ///   - code:
+            ///   - state:
+            public init(
+                code: Swift.String,
+                state: Swift.String
+            ) {
+                self.code = code
+                self.state = state
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code
+                case state
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectionFlowChoice`.
+        public struct ConnectionFlowChoice: Codable, Hashable, Sendable {
+            /// A site's `id` from the flow.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlowChoice/site`.
+            public var site: Swift.String
+            /// Creates a new `ConnectionFlowChoice`.
+            ///
+            /// - Parameters:
+            ///   - site: A site's `id` from the flow.
+            public init(site: Swift.String) {
+                self.site = site
+            }
+            public enum CodingKeys: String, CodingKey {
+                case site
+            }
+        }
+        /// One Jira site to choose.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionFlowSite`.
+        public struct ConnectionFlowSite: Codable, Hashable, Sendable {
+            /// The Atlassian cloud id: what `chooseConnectionSite` takes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlowSite/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlowSite/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ConnectionFlowSite/url`.
+            public var url: Swift.String
+            /// Creates a new `ConnectionFlowSite`.
+            ///
+            /// - Parameters:
+            ///   - id: The Atlassian cloud id: what `chooseConnectionSite` takes.
+            ///   - name:
+            ///   - url:
+            public init(
+                id: Swift.String,
+                name: Swift.String,
+                url: Swift.String
+            ) {
+                self.id = id
+                self.name = name
+                self.url = url
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case url
+            }
+        }
+        /// What someone may do with a connection.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionGrant`.
+        public struct ConnectionGrant: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/capabilities`.
+            public var capabilities: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/grantee`.
+            public var grantee: Swift.String
+            /// `user` (a user id), `role` (`admin`, `member`) or `agent` (an agent id).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/grantee_kind`.
+            public var granteeKind: Swift.String
+            /// The resources it reaches, by the kind's limit key; none: any.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/limits`.
+            public struct LimitsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: [Swift.String]]
+                /// Creates a new `LimitsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: [Swift.String]] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The resources it reaches, by the kind's limit key; none: any.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/limits`.
+            public var limits: Components.Schemas.ConnectionGrant.LimitsPayload
+            /// - Remark: Generated from `#/components/schemas/ConnectionGrant/updated_at`.
+            public var updatedAt: Components.Schemas.Timestamp
+            /// Creates a new `ConnectionGrant`.
+            ///
+            /// - Parameters:
+            ///   - capabilities:
+            ///   - createdAt:
+            ///   - grantee:
+            ///   - granteeKind: `user` (a user id), `role` (`admin`, `member`) or `agent` (an agent id).
+            ///   - limits: The resources it reaches, by the kind's limit key; none: any.
+            ///   - updatedAt:
+            public init(
+                capabilities: [Swift.String],
+                createdAt: Components.Schemas.Timestamp,
+                grantee: Swift.String,
+                granteeKind: Swift.String,
+                limits: Components.Schemas.ConnectionGrant.LimitsPayload,
+                updatedAt: Components.Schemas.Timestamp
+            ) {
+                self.capabilities = capabilities
+                self.createdAt = createdAt
+                self.grantee = grantee
+                self.granteeKind = granteeKind
+                self.limits = limits
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case capabilities
+                case createdAt = "created_at"
+                case grantee
+                case granteeKind = "grantee_kind"
+                case limits
+                case updatedAt = "updated_at"
+            }
+        }
+        /// What a screen draws a kind's setup from.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionKind`.
+        public struct ConnectionKind: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/auth_methods`.
+            public var authMethods: [Components.Schemas.KindAuthMethod]
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/capabilities`.
+            public var capabilities: [Components.Schemas.KindCapability]
+            /// Whether Sign in works: Ainkrad's app for the kind is set up on this Core.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/configured`.
+            public var configured: Swift.Bool
+            /// GitHub: where the person installs the GitHub App to choose repositories, when it is set up.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/install_url`.
+            public var installUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/kind`.
+            public var kind: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/limits`.
+            public var limits: [Components.Schemas.KindLimit]
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/summary`.
+            public var summary: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ConnectionKind/title`.
+            public var title: Swift.String
+            /// Creates a new `ConnectionKind`.
+            ///
+            /// - Parameters:
+            ///   - authMethods:
+            ///   - capabilities:
+            ///   - configured: Whether Sign in works: Ainkrad's app for the kind is set up on this Core.
+            ///   - installUrl: GitHub: where the person installs the GitHub App to choose repositories, when it is set up.
+            ///   - kind:
+            ///   - limits:
+            ///   - summary:
+            ///   - title:
+            public init(
+                authMethods: [Components.Schemas.KindAuthMethod],
+                capabilities: [Components.Schemas.KindCapability],
+                configured: Swift.Bool,
+                installUrl: Swift.String? = nil,
+                kind: Swift.String,
+                limits: [Components.Schemas.KindLimit],
+                summary: Swift.String,
+                title: Swift.String
+            ) {
+                self.authMethods = authMethods
+                self.capabilities = capabilities
+                self.configured = configured
+                self.installUrl = installUrl
+                self.kind = kind
+                self.limits = limits
+                self.summary = summary
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case authMethods = "auth_methods"
+                case capabilities
+                case configured
+                case installUrl = "install_url"
+                case kind
+                case limits
+                case summary
+                case title
+            }
+        }
+        /// A use of a connection, from its audit rows: no payload.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectionUse`.
+        public struct ConnectionUse: Codable, Hashable, Sendable {
+            /// The operation, `github.get_issue`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/action`.
+            public var action: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/agent`.
+            public var agent: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/at`.
+            public var at: Components.Schemas.Timestamp
+            /// The refusal code or the upstream class.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/code`.
+            public var code: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/kind`.
+            public var kind: Swift.String?
+            /// `ok`, `refused` or `error`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/result`.
+            public var result: Swift.String?
+            /// The audit row's number: page with `before`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/seq`.
+            public var seq: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/ConnectionUse/session`.
+            public var session: Swift.String?
+            /// Creates a new `ConnectionUse`.
+            ///
+            /// - Parameters:
+            ///   - action: The operation, `github.get_issue`.
+            ///   - agent:
+            ///   - at:
+            ///   - code: The refusal code or the upstream class.
+            ///   - kind:
+            ///   - result: `ok`, `refused` or `error`.
+            ///   - seq: The audit row's number: page with `before`.
+            ///   - session:
+            public init(
+                action: Swift.String? = nil,
+                agent: Swift.String? = nil,
+                at: Components.Schemas.Timestamp,
+                code: Swift.String? = nil,
+                kind: Swift.String? = nil,
+                result: Swift.String? = nil,
+                seq: Swift.Int64,
+                session: Swift.String? = nil
+            ) {
+                self.action = action
+                self.agent = agent
+                self.at = at
+                self.code = code
+                self.kind = kind
+                self.result = result
+                self.seq = seq
+                self.session = session
+            }
+            public enum CodingKeys: String, CodingKey {
+                case action
+                case agent
+                case at
+                case code
+                case kind
+                case result
+                case seq
+                case session
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/CostEvent`.
         public struct CostEvent: Codable, Hashable, Sendable {
             /// The Core account the attempt used, if it was one of Core's.
@@ -1216,6 +2278,31 @@ extension Components {
                 case pricedAt = "priced_at"
                 case provider
                 case session
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/DefaultConnection`.
+        public struct DefaultConnection: Codable, Hashable, Sendable {
+            /// The connection used when several of the kind cover a call.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DefaultConnection/connection`.
+            public var connection: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/DefaultConnection/kind`.
+            public var kind: Swift.String
+            /// Creates a new `DefaultConnection`.
+            ///
+            /// - Parameters:
+            ///   - connection: The connection used when several of the kind cover a call.
+            ///   - kind:
+            public init(
+                connection: Swift.Int64,
+                kind: Swift.String
+            ) {
+                self.connection = connection
+                self.kind = kind
+            }
+            public enum CodingKeys: String, CodingKey {
+                case connection
+                case kind
             }
         }
         /// A device: who it is and what it may do. Never a key's private half: the Core has none.
@@ -1390,7 +2477,28 @@ extension Components {
             /// What happened: `audit` (an audited change; the payload is the audit row: `audit_seq`,
             /// `action`, `actor_kind`, `actor_id`, `entity_kind`, `entity_id`, `entity_ref`, `details`;
             /// a device is named by its `d_…` id in `entity_ref`, with `entity_id` null), or a kind a
-            /// module writes. The registered kinds are listed in `x-event-kinds`.
+            /// module writes. The registered kinds are listed in `x-event-kinds`. The payload of
+            /// `agent.state` is `{session, state, reason, …}`: a chain session that waits for an account
+            /// says `reason: "waiting"` and `waiting: {until, why, since}` (`until` an RFC 3339 time, `since`
+            /// the first wait in unix seconds), and one whose launch refused its account, so another was
+            /// picked across a provider or harness, says `reason: "repicked"`, and a run a failover moved across
+            /// them says `reason: "failover"`, both with `from` and `to` (each `{provider, harness}`). `account.limited` is `{account, class, until, source}`: an account
+            /// cooled or limited until `until` (`class` `rate_limited`, `quota` or `plan_limit`; `source`
+            /// `gateway` or `harness`). `account.health` is `{account, user, state, reason}`: an account went
+            /// `unhealthy` (`reason` `upstream_errors` or `auth_suspected`). `account.failover` is `{run,
+            /// user, from_session, to_session, from_account, to_account, from_pool, to_pool, class, hop}`: a
+            /// run moved to `to_session`, or ended (`to_session` null: its chain has nothing left, the hop cap
+            /// or the storm guard; `to_account` is null while the successor waits for one). `account.budget` is
+            /// `{subject_kind, subject, state}` for an account's or a pool's budget (`state` `warning` or
+            /// `exhausted`). `account.expired` is `{account, user, reason}`: a key the provider refused was
+            /// confirmed and the account disabled. `alarm.raised` with `alarm` `failover_storm` and a
+            /// `user` says the bound on that user's failovers stopped a run of theirs from moving (once per
+            /// window and user). `connection.health` is `{connection, user, kind, state, reason}`: a connection's
+            /// health changed (`state` `active`, `cooling`, `limited`, `unhealthy` or `disabled`; `reason` a fixed
+            /// code: `rate_limited`, `quota`, `upstream_errors`, `auth_suspected`, `auth_failed`, `recovered`,
+            /// `auth_cleared`). It is visible to `admin` devices only (`x-event-scopes`), never to a `read` device;
+            /// the push for it goes to the owning user's admin devices only. No payload holds a key, a token or an
+            /// upstream's own words.
             ///
             /// - Remark: Generated from `#/components/schemas/Event/kind`.
             public var kind: Swift.String
@@ -1670,6 +2778,140 @@ extension Components {
                 case identityFingerprint = "identity_fingerprint"
                 case serverVersion = "server_version"
                 case supportedMinors = "supported_minors"
+            }
+        }
+        /// One way to sign in to a kind, easiest first.
+        ///
+        /// - Remark: Generated from `#/components/schemas/KindAuthMethod`.
+        public struct KindAuthMethod: Codable, Hashable, Sendable {
+            /// Shown under "Advanced", not as the first choice.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindAuthMethod/advanced`.
+            public var advanced: Swift.Bool
+            /// `false` while the Core lacks what the method needs (Ainkrad's app is not set up yet, an
+            /// admin enters it with `setConnectionApp`): the screen says "not set up yet".
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindAuthMethod/available`.
+            public var available: Swift.Bool
+            /// A plain sentence for the screen.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindAuthMethod/help`.
+            public var help: Swift.String
+            /// `oauth` (the kind's own sign-in), `app_install` (a GitHub App installation) or `token`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindAuthMethod/id`.
+            public var id: Swift.String
+            /// The steps the screen shows, in order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindAuthMethod/steps`.
+            public var steps: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/KindAuthMethod/title`.
+            public var title: Swift.String
+            /// Creates a new `KindAuthMethod`.
+            ///
+            /// - Parameters:
+            ///   - advanced: Shown under "Advanced", not as the first choice.
+            ///   - available: `false` while the Core lacks what the method needs (Ainkrad's app is not set up yet, an
+            ///   - help: A plain sentence for the screen.
+            ///   - id: `oauth` (the kind's own sign-in), `app_install` (a GitHub App installation) or `token`.
+            ///   - steps: The steps the screen shows, in order.
+            ///   - title:
+            public init(
+                advanced: Swift.Bool,
+                available: Swift.Bool,
+                help: Swift.String,
+                id: Swift.String,
+                steps: [Swift.String],
+                title: Swift.String
+            ) {
+                self.advanced = advanced
+                self.available = available
+                self.help = help
+                self.id = id
+                self.steps = steps
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case advanced
+                case available
+                case help
+                case id
+                case steps
+                case title
+            }
+        }
+        /// A named permission of a kind.
+        ///
+        /// - Remark: Generated from `#/components/schemas/KindCapability`.
+        public struct KindCapability: Codable, Hashable, Sendable {
+            /// `read` or `write`: a write capability is only ever granted by naming it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindCapability/class`.
+            public var _class: Swift.String
+            /// - Remark: Generated from `#/components/schemas/KindCapability/name`.
+            public var name: Swift.String
+            /// A plain label.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindCapability/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/KindCapability/write`.
+            public var write: Swift.Bool
+            /// Creates a new `KindCapability`.
+            ///
+            /// - Parameters:
+            ///   - _class: `read` or `write`: a write capability is only ever granted by naming it.
+            ///   - name:
+            ///   - title: A plain label.
+            ///   - write:
+            public init(
+                _class: Swift.String,
+                name: Swift.String,
+                title: Swift.String,
+                write: Swift.Bool
+            ) {
+                self._class = _class
+                self.name = name
+                self.title = title
+                self.write = write
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _class = "class"
+                case name
+                case title
+                case write
+            }
+        }
+        /// A key of the resource limit a grant may carry.
+        ///
+        /// - Remark: Generated from `#/components/schemas/KindLimit`.
+        public struct KindLimit: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/KindLimit/help`.
+            public var help: Swift.String
+            /// `repos` (GitHub), `projects` (Jira).
+            ///
+            /// - Remark: Generated from `#/components/schemas/KindLimit/key`.
+            public var key: Swift.String
+            /// - Remark: Generated from `#/components/schemas/KindLimit/title`.
+            public var title: Swift.String
+            /// Creates a new `KindLimit`.
+            ///
+            /// - Parameters:
+            ///   - help:
+            ///   - key: `repos` (GitHub), `projects` (Jira).
+            ///   - title:
+            public init(
+                help: Swift.String,
+                key: Swift.String,
+                title: Swift.String
+            ) {
+                self.help = help
+                self.key = key
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case help
+                case key
+                case title
             }
         }
         /// The last one-shot test of an account's key.
@@ -2062,10 +3304,30 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/NewAgentSession`.
         public struct NewAgentSession: Codable, Hashable, Sendable {
-            /// `claude`, `codex`, `opencode`, `agy` (what the runner's `agent` driver takes).
+            /// An opaque agent id (1 to 64 of `[A-Za-z0-9._:-]`): its bound chain, else the user's
+            /// default chain, serves the session. Needs `admin`. With no chain either way the session
+            /// runs as a plain one and names its harness.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewAgentSession/agent`.
+            public var agent: Swift.String?
+            /// A fallback chain's id: the session draws its account from it, one at a time. Needs
+            /// `admin`. It must not come with a harness, a model or an `acct.*` secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewAgentSession/chain`.
+            public var chain: Swift.Int64?
+            /// Capability names the session may call through its connections (`read_repo`,
+            /// `issues_write`, `read_issues`, ...; see `listConnectionKinds`). Needs `admin`. Absent: the
+            /// default, read-class capabilities only (write is an explicit grant); an agent's session
+            /// with none has no connection tools. An empty list is refused (400 `empty_allowlist`), and
+            /// so are operation names and `*` (400).
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewAgentSession/connection_access`.
+            public var connectionAccess: [Swift.String]?
+            /// `claude`, `codex`, `opencode`, `agy` (what the runner's `agent` driver takes). Omit it
+            /// (and `model`) when the session draws from a chain: the account the allocator picks sets them.
             ///
             /// - Remark: Generated from `#/components/schemas/NewAgentSession/harness`.
-            public var harness: Swift.String
+            public var harness: Swift.String?
             /// The model id as the provider names it. For a session served by the auth gateway it must be
             /// one of the ids priced for its provider, exactly: the gateway resolves no alias.
             ///
@@ -2093,7 +3355,10 @@ extension Components {
             /// Creates a new `NewAgentSession`.
             ///
             /// - Parameters:
-            ///   - harness: `claude`, `codex`, `opencode`, `agy` (what the runner's `agent` driver takes).
+            ///   - agent: An opaque agent id (1 to 64 of `[A-Za-z0-9._:-]`): its bound chain, else the user's
+            ///   - chain: A fallback chain's id: the session draws its account from it, one at a time. Needs
+            ///   - connectionAccess: Capability names the session may call through its connections (`read_repo`,
+            ///   - harness: `claude`, `codex`, `opencode`, `agy` (what the runner's `agent` driver takes). Omit it
             ///   - model: The model id as the provider names it. For a session served by the auth gateway it must be
             ///   - policy: `{"mode": "ask" | "accept_edits" | "sandboxed", "allow": […]}`; default `ask`.
             ///   - prompt:
@@ -2101,7 +3366,10 @@ extension Components {
             ///   - secrets: At most 16. Each is leased to the runner at each start (secrets broker, gate G-SEC).
             ///   - workspace: The repo and worktree to work in (`{"repo_url", "base_branch", "branch", …}`); absent, a
             public init(
-                harness: Swift.String,
+                agent: Swift.String? = nil,
+                chain: Swift.Int64? = nil,
+                connectionAccess: [Swift.String]? = nil,
+                harness: Swift.String? = nil,
                 model: Swift.String? = nil,
                 policy: OpenAPIRuntime.OpenAPIObjectContainer? = nil,
                 prompt: Swift.String? = nil,
@@ -2109,6 +3377,9 @@ extension Components {
                 secrets: [Components.Schemas.AgentSecret]? = nil,
                 workspace: OpenAPIRuntime.OpenAPIObjectContainer? = nil
             ) {
+                self.agent = agent
+                self.chain = chain
+                self.connectionAccess = connectionAccess
                 self.harness = harness
                 self.model = model
                 self.policy = policy
@@ -2118,6 +3389,9 @@ extension Components {
                 self.workspace = workspace
             }
             public enum CodingKeys: String, CodingKey {
+                case agent
+                case chain
+                case connectionAccess = "connection_access"
                 case harness
                 case model
                 case policy
@@ -2150,6 +3424,175 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case agent
                 case poolId = "pool_id"
+            }
+        }
+        /// A chain to write: `[a-z][a-z0-9._-]{0,63}` and 1 to 4 entries, at most one of them a
+        /// subscription. For an edit this replaces the name and the whole list.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NewChain`.
+        public struct NewChain: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NewChain/entries`.
+            public var entries: [Components.Schemas.NewChainEntry]
+            /// - Remark: Generated from `#/components/schemas/NewChain/name`.
+            public var name: Swift.String
+            /// Creates a new `NewChain`.
+            ///
+            /// - Parameters:
+            ///   - entries:
+            ///   - name:
+            public init(
+                entries: [Components.Schemas.NewChainEntry],
+                name: Swift.String
+            ) {
+                self.entries = entries
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case entries
+                case name
+            }
+        }
+        /// An entry to write: a pool and the model its accounts run.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NewChainEntry`.
+        public struct NewChainEntry: Codable, Hashable, Sendable {
+            /// A valid model id; an API-key pool's must be priced. Absent, the harness's default.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewChainEntry/model`.
+            public var model: Swift.String?
+            /// The pool's id; it must be the caller's user's, of a `claude`, `codex` or `agy` provider,
+            /// and in the chain once.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewChainEntry/pool`.
+            public var pool: Swift.Int64
+            /// Creates a new `NewChainEntry`.
+            ///
+            /// - Parameters:
+            ///   - model: A valid model id; an API-key pool's must be priced. Absent, the harness's default.
+            ///   - pool: The pool's id; it must be the caller's user's, of a `claude`, `codex` or `agy` provider,
+            public init(
+                model: Swift.String? = nil,
+                pool: Swift.Int64
+            ) {
+                self.model = model
+                self.pool = pool
+            }
+            public enum CodingKeys: String, CodingKey {
+                case model
+                case pool
+            }
+        }
+        /// A connection to make with a pasted credential (the Advanced way) or a GitHub App
+        /// installation. No `Debug`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NewConnection`.
+        public struct NewConnection: Codable, Hashable, Sendable {
+            /// `token` or `app_install`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/auth_method`.
+            public var authMethod: Swift.String
+            /// Jira token: the Atlassian account email.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/email`.
+            public var email: Swift.String?
+            /// `app_install`: the GitHub App installation id the setup page returned.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/installation_id`.
+            public var installationId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/NewConnection/kind`.
+            public var kind: Swift.String
+            /// What people see, 1 to 80 characters; absent, the kind's title.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/label`.
+            public var label: Swift.String?
+            /// `[a-z][a-z0-9._-]{0,63}`, unique per kind; absent, `<kind>-<n>`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/name`.
+            public var name: Swift.String?
+            /// Jira token: the site, `acme.atlassian.net`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/site`.
+            public var site: Swift.String?
+            /// The token or API token; written, never read back.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewConnection/token`.
+            public var token: Swift.String?
+            /// Creates a new `NewConnection`.
+            ///
+            /// - Parameters:
+            ///   - authMethod: `token` or `app_install`.
+            ///   - email: Jira token: the Atlassian account email.
+            ///   - installationId: `app_install`: the GitHub App installation id the setup page returned.
+            ///   - kind:
+            ///   - label: What people see, 1 to 80 characters; absent, the kind's title.
+            ///   - name: `[a-z][a-z0-9._-]{0,63}`, unique per kind; absent, `<kind>-<n>`.
+            ///   - site: Jira token: the site, `acme.atlassian.net`.
+            ///   - token: The token or API token; written, never read back.
+            public init(
+                authMethod: Swift.String,
+                email: Swift.String? = nil,
+                installationId: Swift.Int64? = nil,
+                kind: Swift.String,
+                label: Swift.String? = nil,
+                name: Swift.String? = nil,
+                site: Swift.String? = nil,
+                token: Swift.String? = nil
+            ) {
+                self.authMethod = authMethod
+                self.email = email
+                self.installationId = installationId
+                self.kind = kind
+                self.label = label
+                self.name = name
+                self.site = site
+                self.token = token
+            }
+            public enum CodingKeys: String, CodingKey {
+                case authMethod = "auth_method"
+                case email
+                case installationId = "installation_id"
+                case kind
+                case label
+                case name
+                case site
+                case token
+            }
+        }
+        /// A replacement credential; the same fields as [`NewConnection`]'s. No `Debug`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NewConnectionCredential`.
+        public struct NewConnectionCredential: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NewConnectionCredential/email`.
+            public var email: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NewConnectionCredential/installation_id`.
+            public var installationId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/NewConnectionCredential/site`.
+            public var site: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NewConnectionCredential/token`.
+            public var token: Swift.String?
+            /// Creates a new `NewConnectionCredential`.
+            ///
+            /// - Parameters:
+            ///   - email:
+            ///   - installationId:
+            ///   - site:
+            ///   - token:
+            public init(
+                email: Swift.String? = nil,
+                installationId: Swift.Int64? = nil,
+                site: Swift.String? = nil,
+                token: Swift.String? = nil
+            ) {
+                self.email = email
+                self.installationId = installationId
+                self.site = site
+                self.token = token
+            }
+            public enum CodingKeys: String, CodingKey {
+                case email
+                case installationId = "installation_id"
+                case site
+                case token
             }
         }
         /// A lease to grant.
@@ -3121,6 +4564,11 @@ extension Components {
             public var cap: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/created_at`.
             public var createdAt: Components.Schemas.Timestamp
+            /// What the scheduler keeps of its health. Only the reads say it; `state`, `state_reason`
+            /// and `state_until` (a cooldown's end) are above.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProviderAccount/health`.
+            public var health: Components.Schemas.AccountHealth?
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/id`.
             public var id: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/label`.
@@ -3131,6 +4579,11 @@ extension Components {
             public var lastTest: Components.Schemas.LastTest?
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/last_used_at`.
             public var lastUsedAt: Components.Schemas.Timestamp?
+            /// Sessions that hold a slot of its cap now (`starting`, `running`, `interrupted`). Only the
+            /// reads (`listAccounts`, `getAccount`) say it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProviderAccount/live`.
+            public var live: Swift.Int64?
             /// The key's last four characters; empty for a key too short to show any.
             ///
             /// - Remark: Generated from `#/components/schemas/ProviderAccount/masked_tail`.
@@ -3159,10 +4612,12 @@ extension Components {
             ///   - baseUrl: The provider's base URL when the account was stored.
             ///   - cap: Sessions that may hold the account at once; 0 is no cap.
             ///   - createdAt:
+            ///   - health: What the scheduler keeps of its health. Only the reads say it; `state`, `state_reason`
             ///   - id:
             ///   - label:
             ///   - lastTest: The last one-shot test of the key; absent when it was never tested.
             ///   - lastUsedAt:
+            ///   - live: Sessions that hold a slot of its cap now (`starting`, `running`, `interrupted`). Only the
             ///   - maskedTail: The key's last four characters; empty for a key too short to show any.
             ///   - provider: `anthropic`, `openai`, `google` or a user definition's id.
             ///   - sessionLimits: What one session may spend through this account; absent when only the budgets limit it.
@@ -3174,10 +4629,12 @@ extension Components {
                 baseUrl: Swift.String,
                 cap: Swift.Int64,
                 createdAt: Components.Schemas.Timestamp,
+                health: Components.Schemas.AccountHealth? = nil,
                 id: Swift.Int64,
                 label: Swift.String,
                 lastTest: Components.Schemas.LastTest? = nil,
                 lastUsedAt: Components.Schemas.Timestamp? = nil,
+                live: Swift.Int64? = nil,
                 maskedTail: Swift.String,
                 provider: Swift.String,
                 sessionLimits: Components.Schemas.SessionLimits? = nil,
@@ -3189,10 +4646,12 @@ extension Components {
                 self.baseUrl = baseUrl
                 self.cap = cap
                 self.createdAt = createdAt
+                self.health = health
                 self.id = id
                 self.label = label
                 self.lastTest = lastTest
                 self.lastUsedAt = lastUsedAt
+                self.live = live
                 self.maskedTail = maskedTail
                 self.provider = provider
                 self.sessionLimits = sessionLimits
@@ -3205,10 +4664,12 @@ extension Components {
                 case baseUrl = "base_url"
                 case cap
                 case createdAt = "created_at"
+                case health
                 case id
                 case label
                 case lastTest = "last_test"
                 case lastUsedAt = "last_used_at"
+                case live
                 case maskedTail = "masked_tail"
                 case provider
                 case sessionLimits = "session_limits"
@@ -3846,6 +5307,122 @@ extension Components {
                 case cap
             }
         }
+        /// Fields to set (`"name": "value"`) or clear (`"name": null`). No `Debug`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SetConnectionApp`.
+        public struct SetConnectionApp: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SetConnectionApp/fields`.
+            public struct FieldsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Swift.String?]
+                /// Creates a new `FieldsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Swift.String?] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/SetConnectionApp/fields`.
+            public var fields: Components.Schemas.SetConnectionApp.FieldsPayload
+            /// Creates a new `SetConnectionApp`.
+            ///
+            /// - Parameters:
+            ///   - fields:
+            public init(fields: Components.Schemas.SetConnectionApp.FieldsPayload) {
+                self.fields = fields
+            }
+            public enum CodingKeys: String, CodingKey {
+                case fields
+            }
+        }
+        /// Who may use a connection and how far; replaces that grantee's grant.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SetConnectionGrant`.
+        public struct SetConnectionGrant: Codable, Hashable, Sendable {
+            /// Capability names of the kind; absent, its read-only ones. Never `*`: a write capability
+            /// is named.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetConnectionGrant/capabilities`.
+            public var capabilities: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/SetConnectionGrant/grantee`.
+            public var grantee: Swift.String
+            /// `user`, `role` or `agent`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetConnectionGrant/grantee_kind`.
+            public var granteeKind: Swift.String
+            /// Resource limits by the kind's limit key (`repos`: `owner/name` or `owner/*`; `projects`:
+            /// keys); absent or empty, any resource.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetConnectionGrant/limits`.
+            public struct LimitsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: [Swift.String]]
+                /// Creates a new `LimitsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: [Swift.String]] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Resource limits by the kind's limit key (`repos`: `owner/name` or `owner/*`; `projects`:
+            /// keys); absent or empty, any resource.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetConnectionGrant/limits`.
+            public var limits: Components.Schemas.SetConnectionGrant.LimitsPayload?
+            /// Creates a new `SetConnectionGrant`.
+            ///
+            /// - Parameters:
+            ///   - capabilities: Capability names of the kind; absent, its read-only ones. Never `*`: a write capability
+            ///   - grantee:
+            ///   - granteeKind: `user`, `role` or `agent`.
+            ///   - limits: Resource limits by the kind's limit key (`repos`: `owner/name` or `owner/*`; `projects`:
+            public init(
+                capabilities: [Swift.String]? = nil,
+                grantee: Swift.String,
+                granteeKind: Swift.String,
+                limits: Components.Schemas.SetConnectionGrant.LimitsPayload? = nil
+            ) {
+                self.capabilities = capabilities
+                self.grantee = grantee
+                self.granteeKind = granteeKind
+                self.limits = limits
+            }
+            public enum CodingKeys: String, CodingKey {
+                case capabilities
+                case grantee
+                case granteeKind = "grantee_kind"
+                case limits
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SetDefaultConnection`.
+        public struct SetDefaultConnection: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SetDefaultConnection/connection`.
+            public var connection: Swift.Int64
+            /// Creates a new `SetDefaultConnection`.
+            ///
+            /// - Parameters:
+            ///   - connection:
+            public init(connection: Swift.Int64) {
+                self.connection = connection
+            }
+            public enum CodingKeys: String, CodingKey {
+                case connection
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/SetLimit`.
         public struct SetLimit: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/SetLimit/cap`.
@@ -4317,6 +5894,58 @@ extension Components {
                 ])
             }
         }
+        /// A sign-in to start.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StartConnectionFlow`.
+        public struct StartConnectionFlow: Codable, Hashable, Sendable {
+            /// With `connection` on GitHub: replace the credential even when the sign-in is a different
+            /// GitHub account than the connection's. Without it that is refused (`different_account`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartConnectionFlow/confirm_identity_change`.
+            public var confirmIdentityChange: Swift.Bool?
+            /// Sign in again for this connection: its credential is replaced, nothing else changes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartConnectionFlow/connection`.
+            public var connection: Swift.Int64?
+            /// `github` or `jira`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartConnectionFlow/kind`.
+            public var kind: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StartConnectionFlow/label`.
+            public var label: Swift.String?
+            /// Names the connection it makes; absent, `<kind>-<n>`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartConnectionFlow/name`.
+            public var name: Swift.String?
+            /// Creates a new `StartConnectionFlow`.
+            ///
+            /// - Parameters:
+            ///   - confirmIdentityChange: With `connection` on GitHub: replace the credential even when the sign-in is a different
+            ///   - connection: Sign in again for this connection: its credential is replaced, nothing else changes.
+            ///   - kind: `github` or `jira`.
+            ///   - label:
+            ///   - name: Names the connection it makes; absent, `<kind>-<n>`.
+            public init(
+                confirmIdentityChange: Swift.Bool? = nil,
+                connection: Swift.Int64? = nil,
+                kind: Swift.String,
+                label: Swift.String? = nil,
+                name: Swift.String? = nil
+            ) {
+                self.confirmIdentityChange = confirmIdentityChange
+                self.connection = connection
+                self.kind = kind
+                self.label = label
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case confirmIdentityChange = "confirm_identity_change"
+                case connection
+                case kind
+                case label
+                case name
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/StepUpRequest`.
         public struct StepUpRequest: Codable, Hashable, Sendable {
             /// A passkey device's proof: the WebAuthn `PublicKeyCredential` answering the challenge's
@@ -4701,6 +6330,39 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/Timestamp`.
         public typealias Timestamp = Foundation.Date
+        /// What to change about a connection; at least one field.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateConnection`.
+        public struct UpdateConnection: Codable, Hashable, Sendable {
+            /// The admin's off switch.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateConnection/disabled`.
+            public var disabled: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/UpdateConnection/label`.
+            public var label: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/UpdateConnection/name`.
+            public var name: Swift.String?
+            /// Creates a new `UpdateConnection`.
+            ///
+            /// - Parameters:
+            ///   - disabled: The admin's off switch.
+            ///   - label:
+            ///   - name:
+            public init(
+                disabled: Swift.Bool? = nil,
+                label: Swift.String? = nil,
+                name: Swift.String? = nil
+            ) {
+                self.disabled = disabled
+                self.label = label
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case disabled
+                case label
+                case name
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/UsageByCompany`.
         public struct UsageByCompany: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/UsageByCompany/company`.

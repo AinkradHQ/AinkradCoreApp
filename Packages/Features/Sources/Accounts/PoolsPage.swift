@@ -118,10 +118,10 @@ private struct PoolDetail: View {
                         .font(.system(size: MacTextSize.large, weight: .bold))
                     HStack(spacing: Space.s2) {
                         if pool.isDefault {
-                            Label("Default: also serves agents with no binding", systemImage: "star.fill")
+                            Label("Default pool for its provider", systemImage: "star.fill")
                                 .foregroundStyle(GlassInk.orange)
                         } else {
-                            Label("Serves the agents bound to it", systemImage: "link").foregroundStyle(
+                            Label("Used by the chains that list it", systemImage: "link").foregroundStyle(
                                 GlassInk.secondary)
                         }
                     }
@@ -137,7 +137,7 @@ private struct PoolDetail: View {
                         AccountDialogs.openDeletePool(model, pool)
                     }
                     .disabled(ro)
-                    .help("Delete \(pool.name) and its bindings")
+                    .help("Delete \(pool.name)")
                     .accessibilityIdentifier("pool-delete-button")
                 }
             }

@@ -21,6 +21,18 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
     }
 
+    public func chains() async throws -> [ChainOption] {
+        do {
+            return try await run {
+                try await client.listChains().ok.body.json.map { c in
+                    ChainOption(
+                        id: c.id, name: c.name, isDefault: c.isDefault,
+                        steps: c.entries.map { "\($0.harness) · \($0.model ?? "default model")" })
+                }
+            }
+        } catch CoreError.forbiddenScope { return [] }
+    }
+
     public func sessions(before: Int64?, limit: Int) async throws -> [AgentSessionInfo] {
         try await run {
             let q = Operations.ListAgentSessions.Input.Query(before: before, limit: Int32(limit))
@@ -55,8 +67,11 @@ public struct LiveAgentsAPI: AgentsAPI {
     public func create(_ new: NewAgentSession) async throws -> AgentSessionInfo {
         try await run {
             let policy = try OpenAPIObjectContainer(unvalidatedValue: ["mode": new.mode])
+            // From a chain or an agent the account the Core picks sets the harness and model: sending either is a 400.
+            let plain = new.chain == nil && new.agent == nil
             let body = Components.Schemas.NewAgentSession(
-                harness: new.harness, model: new.model, policy: policy, prompt: new.prompt, runner: new.runner,
+                agent: new.agent, chain: new.chain, harness: plain ? new.harness : nil, model: plain ? new.model : nil,
+                policy: policy, prompt: new.prompt, runner: new.runner,
                 secrets: new.secrets.isEmpty ? nil : new.secrets.map { .init(name: $0, _var: $0) })
             switch try await client.createAgentSession(body: .json(body)) {
             case .ok(let o): return Self.session(try o.body.json)

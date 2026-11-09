@@ -60,6 +60,8 @@ enum ServiceEvent: Sendable, Equatable {
     case restarted
     case ended(CoreError)
     case event(kind: String, pairingID: String?, deviceID: String?)
+    /// The payload of an account event, every value as text, for the bell and banners.
+    case notice(kind: String, fields: [String: String])
 }
 
 /// The Core as the pairing screens use it. `LiveCoreService` is the only real one; tests bring their own.
@@ -226,6 +228,9 @@ struct LiveCoreService: CoreService {
                         let p = e.payload.value
                         out.yield(
                             .event(kind: e.kind, pairingID: p["pairing"] as? String, deviceID: p["device"] as? String))
+                        if AccountNotice.kinds.contains(e.kind) {
+                            out.yield(.notice(kind: e.kind, fields: p.compactMapValues { Self.text($0) }))
+                        }
                     }
                 }
                 out.finish()
@@ -235,6 +240,18 @@ struct LiveCoreService: CoreService {
     }
 
     // MARK: mapping
+
+    /// A payload value as text; null and nested values have none.
+    private static func text(_ v: (any Sendable)?) -> String? {
+        switch v {
+        case let s as String: s
+        case let n as Int: String(n)
+        case let n as Int64: String(n)
+        case let n as Double: String(Int64(n))
+        case let b as Bool: String(b)
+        default: nil
+        }
+    }
 
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
 

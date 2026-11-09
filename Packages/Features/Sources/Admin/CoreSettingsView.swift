@@ -250,7 +250,13 @@ private struct LimitEditor: View {
         case "bytes": "bytes"
         case "percent": "%"
         case "per_minute": "a minute"
-        default: setting.key == "alarm.cert_min_days" ? "days" : nil
+        default:
+            switch setting.key {
+            case "alarm.cert_min_days": "days"
+            case "scheduler.max_hops": "switches"
+            case "scheduler.failovers_per_10min": "in 10 min"
+            default: nil
+            }
         }
     }
 }

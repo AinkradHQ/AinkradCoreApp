@@ -133,6 +133,17 @@ struct ModelTests {
         #expect(n.posted.count == 1 && m.pending.count == 5)
     }
 
+    @Test func accountBannersAreForAdminsAndFollowTheirTile() async {
+        let (m, _, _, n) = await make()
+        m.postAccountBanner("account_health", "a1", "Work is not working", "")
+        #expect(n.posted.isEmpty, "a device without admin gets no account banners")
+        m.isAdmin = true
+        m.postAccountBanner("account_health", "a1", "Work is not working", "")
+        m.setNotifies("account_expired", false)
+        m.postAccountBanner("account_expired", "a2", "Work was turned off", "")
+        #expect(n.posted == ["a1"] && m.notifies("account_health") && !m.notifies("account_expired"))
+    }
+
     @Test func aGapRefetchesTheListAndTheTranscripts() async {
         let (m, api, _, _) = await make()
         api.add(
@@ -146,6 +157,8 @@ struct ModelTests {
     @Test func transcriptEventsAppendToAnOpenTranscriptOnly() async {
         let (m, api, _, _) = await make()
         let id = "as_01JC4X7Q3MZ8N5V2K9R001"
+        // The open transcript loads in the background; read its end only once it is there.
+        for _ in 0..<400 where (m.transcripts[id]?.lastSeq ?? 0) == 0 { try? await Task.sleep(for: .milliseconds(5)) }
         let before = m.transcripts[id]?.lastSeq ?? 0
         api.append(id, [.assistant("more")])
         await m.handle(.event(AgentEvent(kind: "agent.transcript", session: id, from: before + 1, to: before + 1)))
@@ -229,9 +242,44 @@ struct ModelTests {
         let (m, api, _, _) = await make()
         api.failNext = CoreError.http(status: 409, code: "runner_offline", message: "mac-studio is not connected")
         let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go"))
-        #expect(n?.title == "That runner is offline" && n?.detail == "mac-studio is not connected")
+        #expect(n?.title == "That runner is offline")
+        #expect(n?.detail == "mac-studio is not connected. Pick another runner, or bring this one back online.")
         let ok = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go"))
         #expect(ok == nil && m.shell.panes.contains { $0.id.hasPrefix("agents.s-as_new") })
+    }
+
+    @Test func chainsLoadForAdminsAndAreEmptyOtherwise() async {
+        let api = FakeAgentsAPI.prototypeWorld()
+        api.chainList = [ChainOption(id: 1, name: "daily", isDefault: true, steps: ["claude · sonnet"])]
+        let (m, _, _, _) = await make(api)
+        await m.loadRunners()
+        #expect(m.chains.map(\.name) == ["daily"])
+        let (plain, _, _, _) = await make()
+        await plain.loadRunners()
+        #expect(plain.chains.isEmpty)
+    }
+
+    @Test func aBusyRunnerSaysWhatToDo() async {
+        let (m, api, _, _) = await make()
+        api.failNext = CoreError.http(status: 503, code: "runner_busy", message: "mac-studio has no free slot")
+        let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go", chain: 1))
+        #expect(n?.title == "That runner is too busy right now")
+        #expect(n?.detail == "mac-studio has no free slot. Wait a moment and choose Try again, or pick another runner.")
+    }
+
+    @Test func aChainForANonAdminIsRefusedPlainly() async {
+        let (m, api, _, _) = await make()
+        api.failNext = CoreError.forbiddenScope
+        let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go", chain: 1))
+        #expect(n?.title == "Only an admin can start a session from a chain or an agent.")
+        #expect(n?.detail.contains("harness") == true)
+    }
+
+    @Test func agentIdsFollowTheCoresRule() {
+        #expect(SessionSource.validAgent("atlas:1.a_b-c"))
+        #expect(!SessionSource.validAgent(""))
+        #expect(!SessionSource.validAgent("two words"))
+        #expect(!SessionSource.validAgent(String(repeating: "a", count: 65)))
     }
 
     @Test func theNotificationQuestionIsAskedOnceInTheAppsWordsFirst() async {

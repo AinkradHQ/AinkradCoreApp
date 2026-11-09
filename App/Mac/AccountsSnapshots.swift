@@ -16,7 +16,8 @@ enum AccountsSnapshots {
         }
         let demo = app.debugAccountsDemo()
         let only = env["CORE_ACC_SCENES"].flatMap { $0.isEmpty ? nil : $0 }?.split(separator: ",").map(String.init)
-        for (i, scene) in AccountsDemo.scenes.enumerated() where only?.contains(scene) ?? true {
+        for (i, scene) in (AccountsDemo.scenes + AccountsDemo.connScenes).enumerated()
+        where only?.contains(scene) ?? true {
             await demo.show(scene)
             try? await Task.sleep(for: .seconds(1.6))
             let file = "\(dir)/\(String(format: "%02d", i + 1))-\(scene)-\(theme)-app.png"
