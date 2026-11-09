@@ -29,10 +29,31 @@ enum AccountsNumbers {
         (Double(micros) / 1_000_000).formatted(.number.precision(.fractionLength(2)).grouping(.never))
     }
 
-    /// A whole number typed with any grouping: `80,000,000`, `80 000 000`, `80_000_000`.
-    static func parseWhole(_ text: String) -> Int64? {
-        let drop = Set(",_ \u{00A0}\u{202F}'").union(Locale.current.groupingSeparator.map(Set.init) ?? [])
-        return Int64(text.filter { !drop.contains($0) })
+    /// A whole number typed with grouping: `80,000,000`, `80 000 000`, `80_000_000`, `80.000.000`. A mark must be a
+    /// grouping mark (one kind, groups of three), so `2,50` is rejected rather than read as 250.
+    static func parseWhole(_ text: String, locale: Locale = .current) -> Int64? {
+        let t = text.filter { !" _'\u{00A0}\u{202F}".contains($0) }
+        guard !t.isEmpty, t.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == "." || $0 == ",") }) else { return nil }
+        let marks = Set(t.filter { $0 == "." || $0 == "," })
+        guard let mark = marks.first else { return Int64(t) }
+        let parts = t.split(separator: mark, omittingEmptySubsequences: false)
+        guard marks.count == 1, (1...3).contains(parts[0].count), parts.dropFirst().allSatisfy({ $0.count == 3 })
+        else { return nil }
+        return Int64(parts.joined())
+    }
+
+    /// A dollar field to millionths of a dollar, or nil when it is not a plain amount. Never scales by a stray mark.
+    static func parseUSDMicros(_ text: String, locale: Locale = .current) -> Int64? {
+        parseDecimal(text, locale: locale).flatMap {
+            $0.isFinite && $0 < 9e12 ? Int64(($0 * 1_000_000).rounded()) : nil
+        }
+    }
+
+    /// What a dollar field reads as, for the line under it: `= US$2.50`; nil when empty or unreadable.
+    static func usdPreview(_ text: String, locale: Locale = .current) -> String? {
+        parseUSDMicros(text, locale: locale).map {
+            "= " + (Double($0) / 1_000_000).formatted(.currency(code: "USD").locale(locale))
+        }
     }
 
     /// A dollar amount typed with the locale's decimal mark, or the other form when it is unambiguous: `2.50`, `2,50`, `1,234.50`.

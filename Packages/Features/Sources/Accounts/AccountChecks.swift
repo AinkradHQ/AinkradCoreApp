@@ -175,20 +175,8 @@ struct LimitsDialog: View {
             initialValue: account.maxUSDMicros.map { AccountsNumbers.dollarsField($0) } ?? "")
     }
 
-    private static func clean(_ s: String) -> String {
-        s.filter { !",_ $".contains($0) }
-    }
-    private var tokenValue: Int64?? {
-        if Self.clean(tokens).isEmpty { return .some(nil) }
-        guard let n = AccountsNumbers.parseWhole(tokens), n >= Self.minTokens else { return nil }
-        return .some(n)
-    }
-    private var usdValue: Int64?? {
-        let t = Self.clean(dollars)
-        if t.isEmpty { return .some(nil) }
-        guard let d = AccountsNumbers.parseDecimal(dollars), d > 0, d < 1_000_000 else { return nil }
-        return .some(Int64((d * 1_000_000).rounded()))
-    }
+    private var tokenValue: Int64?? { BudgetInput.sessionTokens(tokens, min: Self.minTokens) }
+    private var usdValue: Int64?? { BudgetInput.dollars(dollars, below: 1_000_000) }
 
     var body: some View {
         CoreDialogPanel("Each session: \(account.label)", width: Space.s8 * 16) {
@@ -206,6 +194,7 @@ struct LimitsDialog: View {
                         error: usdValue == nil ? "An amount in dollars, like 5 or 2.50." : nil, suffix: "USD"
                     ) { go() }
                 }
+                UsdPreview(text: dollars)
                 Text(
                     "A lower limit starts with the next session, resume or top-up. Sessions running now keep the limit they started with."
                 )

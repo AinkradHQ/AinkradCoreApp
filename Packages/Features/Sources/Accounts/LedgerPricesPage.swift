@@ -224,10 +224,7 @@ struct PriceDialog: View {
     }
 
     private func micros(_ s: String) -> Int64? {
-        let t = s.filter { !", $".contains($0) }
-        return AccountsNumbers.parseDecimal(t).flatMap {
-            $0 >= 0 && $0 < 100_000 ? Int64(($0 * 1_000_000).rounded()) : nil
-        }
+        BudgetInput.price(s)
     }
     private var issue: String? {
         if provider.isEmpty { return "Pick a provider." }

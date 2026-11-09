@@ -11,6 +11,7 @@ struct AppearanceSection: View {
     @State private var advanced = !LookPrefs.shared.custom.isEmpty
     @FocusState private var focus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
     @Bindable private var textSize = TextSizePrefs.shared
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
@@ -97,16 +98,12 @@ struct AppearanceSection: View {
         .onAppear { focus = true }
     }
 
-    /// What the chosen theme shows right now.
-    private var now: String {
-        let dark: Bool =
-            switch shell.theme {
-            case .night: true
-            case .day: false
-            case .sun: !(7..<18).contains(Calendar.current.component(.hour, from: Date()))
-            case .system: NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            }
-        return "Showing \(dark ? "night" : "day") now"
+    /// What the window shows right now: read from the palette the window really uses, so it never disagrees with it.
+    private var now: String { Self.caption(chosen: shell.theme, isDay: palette.isDay) }
+
+    static func caption(chosen: ThemeChoice, isDay: Bool) -> String {
+        chosen == .system
+            ? "Following your Mac: showing \(isDay ? "day" : "night") now" : "Showing \(isDay ? "day" : "night") now"
     }
 
     private func pick(_ c: ThemeChoice) {

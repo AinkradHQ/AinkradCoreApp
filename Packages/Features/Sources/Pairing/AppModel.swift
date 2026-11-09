@@ -428,7 +428,7 @@ public final class AppModel {
         do { return try await op() } catch {
             guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
             shell.elevatedUntil = nil
-            shell.showToast("The Core answered 403 step_up_required. Asking for Touch ID, then retrying.", kind: .warn)
+            shell.showToast("The Core wants Touch ID for this. Asking now, then trying again.", kind: .warn)
             guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true) else {
                 throw StepUpDeclined()
             }

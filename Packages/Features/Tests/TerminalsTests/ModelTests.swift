@@ -126,3 +126,40 @@ struct FailingService: TerminalService {
     func noop(_ runner: String) async throws -> Int { throw CoreError.offline("down") }
     func attach(_ id: String, after: UInt64) async throws -> any TerminalLink { throw CoreError.offline("down") }
 }
+
+@MainActor
+@Suite(.serialized) struct OfflineRunnerTests {
+    private func make(_ runners: [RunnerItem]) async -> (TerminalsModel, FakeService) {
+        let svc = FakeService()
+        svc.runnerList = runners
+        let m = TerminalsModel(host: FakeHost(), service: svc)
+        await m.reload()
+        return (m, svc)
+    }
+
+    @Test func openIsOffWithAPlainReasonWhenTheRunnerIsOffline() async {
+        let (m, _) = await make([runner(online: false)])
+        let form = NewTerminalModel(model: m, runner: "r1")
+        #expect(!form.canOpen && form.blockedReason == "That runner is offline.")
+        await form.submit()  // still asked: it answers in words, not silence
+        #expect(form.error?.title == "That runner is offline.")
+    }
+
+    @Test func noRunnerChosenSaysSo() async {
+        let (m, _) = await make([runner(online: false)])
+        let form = NewTerminalModel(model: m, runner: nil)
+        #expect(form.blockedReason == "Pick a runner to open it on.")
+    }
+
+    @Test func anOnlineRunnerIsNotBlocked() async {
+        let (m, _) = await make([runner()])
+        #expect(NewTerminalModel(model: m, runner: "r1").blockedReason == nil)
+    }
+
+    @Test func theBellSaysItInPlainWords() async {
+        let (m, _) = await make([runner(online: false)])
+        let sub = m.shell.bell.items.first { $0.kind == .runner }?.sub ?? ""
+        #expect(sub == "Its terminals can't be reached until it's back.")
+        #expect(!sub.contains("runner_offline") && !sub.contains("runner."))
+    }
+}

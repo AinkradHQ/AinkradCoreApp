@@ -311,3 +311,23 @@ struct ModelTests {
         #expect(m.shell.bell.items.isEmpty)
     }
 }
+
+@MainActor
+struct RunnerEventTests {
+    @Test func aRunnerEventRefreshesTheRunnerChips() async {
+        let api = FakeAgentsAPI.prototypeWorld()
+        let m = AgentsModel(
+            shell: ShellModel(), notifier: FakeNotifier(), defaults: UserDefaults(suiteName: "rt-\(UUID())")!,
+            host: FakeHost())
+        m.attach(api)
+        await m.reloadAll()
+        #expect(m.runners.first { $0.id == "d_ora" }?.online == true)
+        api.runnerList = api.runnerList.map { r in
+            var r = r
+            if r.id == "d_ora" { r.online = false }
+            return r
+        }
+        await m.handle(.event(AgentEvent(kind: "runner.disconnected")))
+        #expect(m.runners.first { $0.id == "d_ora" }?.online == false)
+    }
+}

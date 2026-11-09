@@ -154,19 +154,19 @@ private struct RunnerDetail: View {
             TermBanner(
                 tone: .warn, title: "Not answering heartbeats",
                 detail:
-                    "The Core has not heard from \(runner.name) for two heartbeats (runner.degraded). It is still listed as connected, but treat the figures below as possibly stale. If it stays silent it shows as disconnected."
+                    "The Core has not heard from \(runner.name) for two heartbeats. It is still listed as connected, but treat the figures below as possibly stale. If it stays silent it shows as disconnected."
             )
         case .off:
             TermBanner(
                 tone: .fail, title: "Disconnected",
                 detail:
-                    "The Core can’t reach \(runner.name), so nothing can start there and its terminals answer runner_offline. Figures below are the last the Core saw. Everything resumes when the runner reconnects."
+                    "The Core can’t reach \(runner.name), so nothing can start there and its terminals can't be reached. Figures below are the last the Core saw. Everything resumes when the runner reconnects."
             )
         case .busy:
             TermBanner(
                 tone: .warn, title: "Too busy for new work",
                 detail:
-                    "Host load is \(coreDecimal(runner.perCore ?? 0, 1)) per core and the default limit is \(Int(RunnerStatus.busyPerCore)), so new terminals and sessions are refused with runner_busy (503). Work already running is not touched. It clears by itself when the load drops."
+                    "Host load is \(coreDecimal(runner.perCore ?? 0, 1)) per core and the default limit is \(Int(RunnerStatus.busyPerCore)), so new terminals and sessions are refused. Work already running is not touched. It clears by itself when the load drops."
             )
         case .ok: EmptyView()
         }
@@ -251,7 +251,7 @@ private struct RunnerDetail: View {
                     case nil:
                         Text(
                             off
-                                ? "Disconnected, so the test would fail with runner_offline."
+                                ? "Disconnected, so the test would fail."
                                 : "Sends an empty round trip to the runner. No work is started.")
                     }
                 }

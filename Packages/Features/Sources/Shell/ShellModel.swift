@@ -197,7 +197,12 @@ public final class ShellModel {
     /// The one "waiting on you" number: approvals nobody answered, supplied by Agents (`AgentsModel.waitingOnYou`). Alerts and Brain
     /// inbox items are not in it; the bell counts them on their own. Until Agents is up, the bell's approval items stand in.
     public var waitingSource: (@MainActor () -> Int)?
-    public var waitingOnYou: Int { waitingSource?() ?? bell.items.filter { $0.kind == .approval }.count }
+    public var waitingOnYou: Int {
+        guard let source = waitingSource else { return bell.items.filter { $0.kind == .approval }.count }
+        return source() + joinRequests
+    }
+    /// A new device asking to join needs an approval too (Pairing's bell items, `pairing-<id>`); Agents does not count them.
+    var joinRequests: Int { bell.items.filter { $0.kind == .approval && $0.id.hasPrefix("pairing-") }.count }
     /// Alarms (backup age, an account turned off...): counted on their own, never added to the approvals.
     public var alertsOnYou: Int { bell.items.filter { $0.kind == .alarm }.count }
 

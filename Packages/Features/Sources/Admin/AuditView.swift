@@ -101,31 +101,66 @@ enum AuditWords {
     ]
 
     /// `You created secret github-token-test`, `The Core cleared the lock on 198.51.100.7`.
-    static func sentence(_ a: AuditItem, title: (String) -> String?) -> (who: String, verb: String, what: String) {
+    static func sentence(
+        _ a: AuditItem, deviceName: (String) -> String? = { _ in nil }, title: (String) -> String?
+    ) -> (who: String, verb: String, what: String) {
         let who = a.actor == .system ? "Your Core" : a.actor.label
         let tail = a.action.split(separator: ".", maxSplits: 1).dropFirst().first.map(String.init) ?? a.action
         let verb = verbs[tail] ?? tail.replacingOccurrences(of: "_", with: " ")
-        if tail == "scopes_set" { return (who, "changed what", object(a, title: title) + " may do") }
-        return (who, verb, object(a, title: title))
+        let what = object(a, deviceName: deviceName, title: title)
+        if tail == "scopes_set" { return (who, "changed what", what + " may do") }
+        return (who, verb, what)
+    }
+
+    /// An opaque id the Core made (`d_71ws…`, `p_1`, `req4k2`): never shown in a sentence, only as hover help.
+    static func isOpaqueID(_ s: String) -> Bool {
+        s.range(
+            of: #"^(?:[a-z]{1,4}_(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{1,}|req[A-Za-z0-9]*\d[A-Za-z0-9]*)$"#,
+            options: .regularExpression)
+            != nil
+    }
+
+    /// The ids behind a row, for its hover help.
+    static func ids(_ a: AuditItem) -> String? {
+        var all = [a.entityRef].compactMap { $0 }
+        if let d = detailsDict(a) { all += d.values.compactMap { $0 as? String }.filter(isOpaqueID) }
+        let seen = all.filter(isOpaqueID)
+        return seen.isEmpty ? nil : seen.joined(separator: ", ")
+    }
+
+    private static func detailsDict(_ a: AuditItem) -> [String: Any]? {
+        (try? JSONSerialization.jsonObject(with: Data(a.details.utf8))) as? [String: Any]
+    }
+
+    private static func thing(_ kind: String) -> String {
+        [
+            "device": "a device", "pairing": "a pairing", "session": "a session", "terminal": "a terminal",
+            "agent": "an agent", "account": "an account", "connection": "a connection",
+        ][kind] ?? "a \(kind)"
     }
 
     /// A row with no entity (`pairing.created`, `api.refused`) names what it was about in its details: `pairing p_1`.
-    static func fromDetails(_ a: AuditItem) -> String? {
-        guard let d = try? JSONSerialization.jsonObject(with: Data(a.details.utf8)) as? [String: Any] else {
-            return nil
-        }
+    static func fromDetails(_ a: AuditItem, deviceName: (String) -> String? = { _ in nil }) -> String? {
+        guard let d = detailsDict(a) else { return nil }
         for key in ["pairing", "device", "account", "agent", "secret", "connection", "terminal", "session"] {
-            if let v = d[key] as? String, !v.isEmpty { return "\(key) \(v)" }
+            if let v = d[key] as? String, !v.isEmpty { return named(key, v, deviceName) }
         }
         return (d["path"] as? String).map { "a request to \($0)" }
     }
 
-    static func object(_ a: AuditItem, title: (String) -> String?) -> String {
-        guard let ref = a.entityRef else { return fromDetails(a) ?? a.entityKind ?? "" }
+    private static func named(_ kind: String, _ ref: String, _ deviceName: (String) -> String?) -> String {
+        if kind == "device", let n = deviceName(ref) { return "“\(n)”" }
+        return isOpaqueID(ref) ? thing(kind) : "\(kind) \(ref)"
+    }
+
+    static func object(_ a: AuditItem, deviceName: (String) -> String? = { _ in nil }, title: (String) -> String?)
+        -> String
+    {
+        guard let ref = a.entityRef else { return fromDetails(a, deviceName: deviceName) ?? a.entityKind ?? "" }
         switch a.entityKind {
         case "setting": return "“\(title(ref) ?? ref)”"
         case "lockout": return ref.split(separator: ":").dropFirst().joined(separator: ":")
-        case let k?: return "\(k) \(ref)"
+        case let k?: return named(k, ref, deviceName)
         case nil: return ref
         }
     }
@@ -277,7 +312,9 @@ private struct AuditList: View {
     private func row(_ a: AuditItem) -> some View {
         let on = model.selected == a.seq
         let area = AuditWords.area(a.action)
-        let s = AuditWords.sentence(a) { admin.registry.item($0).map(SettingWords.title) }
+        let s = AuditWords.sentence(a, deviceName: { admin.deviceNames[$0] }) {
+            admin.registry.item($0).map(SettingWords.title)
+        }
         return HStack(spacing: Space.s3) {
             IconTile(area.symbol, hue: area.hue, size: 28)
             (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
@@ -295,7 +332,7 @@ private struct AuditList: View {
             focused = true
         }
         .animation(.smooth(duration: 0.2), value: on)
-        .help(a.action)
+        .help([a.action, AuditWords.ids(a)].compactMap { $0 }.joined(separator: " · "))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction { model.selected = a.seq }
@@ -311,7 +348,9 @@ private struct AuditDetail: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             if let a = item {
                 let area = AuditWords.area(a.action)
-                let s = AuditWords.sentence(a) { admin.registry.item($0).map(SettingWords.title) }
+                let s = AuditWords.sentence(a, deviceName: { admin.deviceNames[$0] }) {
+                    admin.registry.item($0).map(SettingWords.title)
+                }
                 IconTile(area.symbol, hue: area.hue, size: 44, bounce: a.seq).shadow(
                     color: area.hue.opacity(0.45), radius: 12)
                 (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
