@@ -34,6 +34,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -49,6 +50,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -62,6 +64,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -78,6 +81,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -91,6 +95,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -133,6 +138,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -180,6 +186,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -193,6 +200,7 @@ struct LiveAdminService: AdminService {
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .conflict(let r): throw Self.fail(409, try? r.body.json)
             case .internalServerError(let r): throw Self.fail(500, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }
         }
@@ -205,7 +213,7 @@ struct LiveAdminService: AdminService {
     /// Whatever the generated client threw, as the `CoreError` inside it (an `AdminFailure` passes through).
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch let f as AdminFailure { throw f } catch {
-            throw CoreError.unwrapping(error) ?? Self.unknown
+            throw CoreFailure.of(error) ?? Self.unknown
         }
     }
 
