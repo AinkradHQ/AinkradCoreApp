@@ -234,10 +234,11 @@ struct LiveCoreService: CoreService {
                     case .ended(let e): out.yield(.ended(e))
                     case .event(let e):
                         let p = e.payload.value
+                        let kind = Self.eventKind(e.kind, p)
                         out.yield(
-                            .event(kind: e.kind, pairingID: p["pairing"] as? String, deviceID: p["device"] as? String))
-                        if AccountNotice.kinds.contains(e.kind) {
-                            out.yield(.notice(kind: e.kind, fields: p.compactMapValues { Self.text($0) }))
+                            .event(kind: kind, pairingID: p["pairing"] as? String, deviceID: p["device"] as? String))
+                        if AccountNotice.kinds.contains(kind) {
+                            out.yield(.notice(kind: kind, fields: p.compactMapValues { Self.text($0) }))
                         }
                     }
                 }
@@ -248,6 +249,11 @@ struct LiveCoreService: CoreService {
     }
 
     // MARK: mapping
+
+    /// Core sends every audit row as kind "audit" with the real action in the payload; the app routes on the action.
+    static func eventKind(_ kind: String, _ payload: [String: (any Sendable)?]) -> String {
+        kind == "audit" ? (payload["action"] as? String ?? kind) : kind
+    }
 
     /// A payload value as text; null and nested values have none.
     private static func text(_ v: (any Sendable)?) -> String? {

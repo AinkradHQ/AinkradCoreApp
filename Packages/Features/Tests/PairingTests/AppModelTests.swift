@@ -319,4 +319,27 @@ struct AppModelTests {
         add.kind = "runner"
         #expect(add.effectiveScopes == ["runner"])
     }
+
+    @Test func anAuditRowRoutesByItsAction() async throws {
+        #expect(LiveCoreService.eventKind("audit", ["action": "pairing.claimed"]) == "pairing.claimed")
+        #expect(LiveCoreService.eventKind("audit", [:]) == "audit")
+        #expect(LiveCoreService.eventKind("audit", ["action": 3]) == "audit")
+        #expect(LiveCoreService.eventKind("terminal.opened", ["action": "x"]) == "terminal.opened")
+
+        let s = FakeService()
+        s.deviceList = [FakeService.device("d_me", "Mac")]
+        let m = try app(s)
+        await m.start()
+        await m.handle(
+            .event(
+                kind: LiveCoreService.eventKind("audit", ["action": "pairing.claimed"]), pairingID: "p_1", deviceID: nil
+            ))
+        #expect(m.shell.bell.items.contains { $0.id == "pairing-p_1" })
+        s.deviceList.append(FakeService.device("d_2", "iPhone"))
+        await m.handle(
+            .event(
+                kind: LiveCoreService.eventKind("audit", ["action": "device.revoked"]), pairingID: nil, deviceID: "d_2")
+        )
+        #expect(m.devices.active.map(\.id).contains("d_2"))
+    }
 }
