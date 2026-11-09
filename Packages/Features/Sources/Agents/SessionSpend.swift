@@ -78,7 +78,7 @@ struct SessionSpendStrip: View {
 
     var body: some View {
         let share = ledger.share
-        let capped = session.outcome == .tokenCap
+        let capped = session.outcome == .tokenCap || session.stoppedByBudget
         let hue = capped || (share ?? 0) >= 1 ? GlassInk.red : (share ?? 0) >= 0.8 ? GlassInk.orange : GlassInk.green
         HStack(spacing: Space.s3) {
             if let a = ledger.account {
@@ -88,8 +88,11 @@ struct SessionSpendStrip: View {
             }
             Spacer(minLength: Space.s2)
             if capped {
-                Label("Stopped at its limit", systemImage: "gauge.with.dots.needle.100percent")
-                    .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.red)
+                Label(
+                    session.stoppedByBudget ? "Stopped: budget reached" : "Stopped at its limit",
+                    systemImage: "gauge.with.dots.needle.100percent"
+                )
+                .font(.system(size: MacTextSize.meta, weight: .semibold)).foregroundStyle(GlassInk.red)
             }
             Text(spentWords).font(.system(size: MacTextSize.body, weight: .semibold).monospacedDigit())
                 .help(

@@ -26,6 +26,7 @@ struct SessionView: View {
                     }
                     if let n = model.notices[sessionID] { NoticeBanner(notice: n) }
                     StateBanner(model: model, session: s)
+                    SessionRouteCues(model: model, session: s)
                 }
                 .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
                 TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)

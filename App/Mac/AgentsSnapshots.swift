@@ -76,6 +76,59 @@ enum AgentsSnapshots {
             only { a.openSession(id(n)) }
             await shot("session-\(name)")
         }
+        // Where the scheduler put a session (admin only), and a budget stop.
+        let steps = ["claude · sonnet", "codex · default model", "claude · opus"]
+        let accounts: [Int64: String] = [1: "claude-api-metered", 2: "claude-api-batch"]
+        let run = id(2)
+        let route = SessionRoute(
+            agent: "atlas", chainID: 1, chainPos: 1, steps: steps, account: 1, repicked: 1,
+            upstreamClass: "rate_limited",
+            run: run, attempt: 1, failoverOf: id(12))
+        let first = AgentSessionInfo(
+            id: id(12), runner: "d_ora", harness: "claude", state: .ended, outcome: .cancelled,
+            createdAt: Date().addingTimeInterval(-1500), updatedAt: Date().addingTimeInterval(-600),
+            route: SessionRoute(
+                chainID: 1, chainPos: 0, steps: steps, account: 2, run: run, attempt: 0, failedOverTo: id(2),
+                failoverClass: "rate_limited"))
+        let here = AgentSessionInfo(
+            id: id(2), runner: "d_ora", harness: "claude", state: .running, createdAt: Date(), updatedAt: Date(),
+            route: route)
+        let spend = SessionLedger(
+            costMicros: 1_240_000, tokens: 152_000, unpriced: false, account: "claude-api-metered",
+            maxUSDMicros: 5_000_000)
+        await a.debugRoute(id(2), route: route, attempts: [first, here], accounts: accounts, ledger: spend)
+        only { a.openSession(id(2)) }
+        await shot("route-moved-attempts")
+        await a.debugRoute(id(2), route: nil)
+        let waiting = SessionRoute(
+            agent: "atlas", chainID: 1, chainPos: 0, steps: steps,
+            waiting: SessionWaiting(
+                since: Date().addingTimeInterval(-420), until: Date().addingTimeInterval(1800),
+                why: "every account the chain can use is cooling, limited or at its cap"), run: id(4), attempt: 0)
+        await a.debugRoute(id(4), route: waiting)
+        only { a.openSession(id(4)) }
+        await shot("route-waiting")
+        await a.debugRoute(id(4), route: nil)
+        let noAccount = SessionRoute(
+            chainID: 1, chainPos: 2, steps: steps, account: 2, run: id(9), attempt: 3, failoverOf: id(12),
+            ended: FailoverEnd(
+                result: "ended", why: "no account is available",
+                reasons: ["entry 1: cooling until 14:00", "entry 2: at its cap", "entry 3: budget reached"]))
+        await a.debugRoute(id(9), route: noAccount, accounts: accounts)
+        only { a.openSession(id(9)) }
+        await shot("route-no-account-left")
+        await a.debugRoute(id(9), route: nil)
+        let capped = SessionLedger(
+            costMicros: 5_000_000, tokens: 410_000, unpriced: false, account: "claude-api-metered",
+            maxUSDMicros: 5_000_000)
+        await a.debugRoute(
+            id(7), route: nil, ledger: capped, ended: (.cancelled, "The account's budget ran out"))
+        only { a.openSession(id(7)) }
+        await shot("ended-budget")
+        // A device that is not an admin: the same running session with no chain, account or health.
+        only { a.openSession(id(3)) }
+        await shot("route-none-not-admin")
+
         // Both panes side by side, as the workspace shows them.
         only {
             a.openList()

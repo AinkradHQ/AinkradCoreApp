@@ -332,7 +332,15 @@ struct LiveAccountsService: AccountsService {
             id: a.id, provider: a.provider, label: a.label, maskedTail: a.maskedTail, baseURL: a.baseUrl,
             state: a.state, stateReason: a.stateReason, stateUntil: a.stateUntil, cap: a.cap,
             lastUsedAt: a.lastUsedAt, createdAt: a.createdAt, lastTest: a.lastTest.map { ($0.at, $0.result) },
-            maxTokens: a.sessionLimits?.maxTokens, maxUSDMicros: a.sessionLimits?.maxUsdMicros)
+            maxTokens: a.sessionLimits?.maxTokens, maxUSDMicros: a.sessionLimits?.maxUsdMicros, live: a.live,
+            health: a.health.map {
+                AccountHealthItem(
+                    failStreak: $0.failStreak, authStreak: $0.authStreak, lastSuccessAt: $0.lastSuccessAt,
+                    upstreamClass: $0.upstreamClass, planStatus: $0.planLimit?.status,
+                    windows: ($0.planLimit?.windows ?? []).map {
+                        PlanWindowItem(name: $0.name, utilization: $0.utilization, resetsAt: $0.resetsAt)
+                    })
+            })
     }
 
     static func chain(_ c: Components.Schemas.Chain) -> ChainItem {

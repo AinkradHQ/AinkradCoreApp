@@ -288,6 +288,23 @@ struct AccountCard: View {
             )
             .foregroundStyle(GlassInk.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            if let h = a.health {
+                let line = AccountHealthWords.line(h, now: model.now())
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(line.text, systemImage: line.symbol).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(
+                            line.tone == .run
+                                ? GlassInk.green
+                                : line.tone == .fail
+                                    ? GlassInk.red : line.tone == .warn ? GlassInk.orange : GlassInk.secondary
+                        )
+                        .help(line.help)
+                    if let n = AccountHealthWords.live(a.live) {
+                        Label(n, systemImage: "waveform").foregroundStyle(GlassInk.secondary)
+                    }
+                }
+                .font(.system(size: MacTextSize.meta, weight: .medium))
+            }
             HStack {
                 Label(AccountsWords.used(a.lastUsedAt, now: model.now()), systemImage: "clock")
                 Spacer()

@@ -63,6 +63,9 @@ public final class AgentsModel {
     var api: (any AgentsAPI)?
     /// Each open session's spend from Core's ledger (`SessionSpend.swift`).
     var ledgers: [String: SessionLedger] = [:]
+    /// A run's attempts by run id, and account names by id, for the route cues (`SessionRouteView.swift`).
+    var attempts: [String: [AgentSessionInfo]] = [:]
+    var accountNames: [Int64: String] = [:]
     weak var host: (any AgentsHost)?
     let notifier: any ApprovalNotifier
     let defaults: UserDefaults
