@@ -71,6 +71,8 @@ protocol CoreService: Sendable {
     func close() async
     /// The scopes this device holds (a new device can never be given more).
     func myScopes() async throws -> [String]
+    /// Core's version, the API minor and this device's name and scopes (`GET /me`).
+    func about() async throws -> CoreAbout
     func elevatedUntil() async -> Date?
     func stepUp(reason: String) async throws -> Date
     func devices() async throws -> [DeviceInfo]
@@ -101,6 +103,12 @@ struct LiveCoreService: CoreService {
     func connect() async throws { try await connection.connect() }
     func close() async { await connection.close() }
     func myScopes() async throws -> [String] { try await connection.session().scopes }
+    func about() async throws -> CoreAbout {
+        let me = try await run { try await client.getMe().ok.body.json }
+        return CoreAbout(
+            server: me.versions.server, apiMajor: me.versions.api.major, apiMinor: Int(me.versions.api.minor),
+            build: me.versions.gitSha, device: me.device.name, scopes: try await myScopes())
+    }
     func elevatedUntil() async -> Date? { await connection.elevatedUntil }
     func stepUp(reason: String) async throws -> Date { try await connection.stepUp(reason: reason) }
 

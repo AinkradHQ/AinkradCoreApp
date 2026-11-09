@@ -29,6 +29,8 @@ public final class AppModel {
     var stepUpNotice: StepUpNotice?
     private(set) var devices: DevicesModel!
     private(set) var lockouts: LockoutsModel!
+    /// Core version, API minor and this device's scopes (`GET /me`).
+    let about = AboutModel()
     private(set) var addDevice: AddDeviceModel?
     /// Terminals and runners (E5-05); nil until a Core connection exists.
     public private(set) var terminals: TerminalsModel?
@@ -154,7 +156,13 @@ public final class AppModel {
             shell.elevatedUntil = nil
             startEvents(service)
             if let api = service.agentsAPI { agents.attach(api) }
-            agents.isAdmin = (try? await service.myScopes())?.contains("admin") ?? false
+            about.use { try await service.about() }
+            let me = await about.reload()
+            var admin = me?.isAdmin
+            if admin == nil { admin = (try? await service.myScopes())?.contains("admin") }
+            let isAdmin = admin ?? false
+            agents.isAdmin = isAdmin
+            showAdminPages(isAdmin)
             await refreshAll()
         } catch {
             let f = Failure.from(error)
@@ -174,6 +182,21 @@ public final class AppModel {
                 shell.coreLink = .none
                 phase = .blocked(f)
             }
+        }
+    }
+
+    /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts"]
+    private var stashed: [LauncherEntry] = []
+    func showAdminPages(_ admin: Bool) {
+        shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
+        if admin {
+            stashed.forEach(shell.launcher.register)
+            stashed = []
+        } else {
+            let ids = Set(Self.adminOnly.flatMap { [$0, "admin-\($0)"] })
+            stashed = shell.launcher.entries.filter { ids.contains($0.id) }
+            stashed.forEach { shell.launcher.unregister($0.id) }
         }
     }
 
@@ -241,6 +264,15 @@ public final class AppModel {
     /// An account event in plain words: a bell entry (the newest 20 stay) and, for the push kinds, a macOS banner.
     /// The screens that show the account already refresh on the same event (`accounts.event`).
     public func accountNotice(_ kind: String, _ fields: [String: String]) {
+        if let id = AccountNotice.clearedID(kind: kind, fields: fields) {
+            shell.bell.remove(id)
+            noticeIDs.removeAll { $0 == id }
+            return
+        }
+        if let words = AccountNotice.toast(kind: kind) {
+            shell.showToast(words, kind: .warn)
+            return
+        }
         guard
             let n = AccountNotice.make(
                 kind: kind, fields: fields, account: { [accounts] in accounts.accountName($0) },

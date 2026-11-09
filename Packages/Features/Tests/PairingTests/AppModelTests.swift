@@ -35,6 +35,38 @@ struct AppModelTests {
         #expect(m.devices.active.map(\.id) == ["d_me"])
     }
 
+    @Test func aboutReadsVersionAndScopesAndAdminKeepsItsPages() async throws {
+        let m = try app(FakeService())
+        await m.start()
+        #expect(m.about.about?.server == "0.47.1" && m.about.about?.apiMinor == 47)
+        #expect(m.about.about?.scopes == ["read", "approve", "admin"])
+        #expect(m.shell.settings.hidden.isEmpty)
+    }
+
+    @Test func aDeviceWithoutAdminLosesTheAdminPagesAndGetsThemBack() async throws {
+        let s = FakeService()
+        s.scopes = ["read"]
+        let m = try app(s)
+        await m.start()
+        #expect(m.shell.settings.hidden == Set(AppModel.adminOnly))
+        #expect(m.shell.launcher.entry("lockouts") == nil && m.shell.launcher.entry("admin-ops") == nil)
+        #expect(m.shell.launcher.entry("devices") != nil)
+        m.showAdminPages(true)
+        #expect(m.shell.settings.hidden.isEmpty)
+        #expect(m.shell.launcher.entry("lockouts") != nil && m.shell.launcher.entry("admin-ops") != nil)
+    }
+
+    @Test func aFailedAboutIsAnErrorNotAnAdmin() async throws {
+        let s = FakeService()
+        s.aboutError = CoreError.offline("down")
+        let m = try app(s)
+        await m.start()
+        guard case .failed = m.about.state else {
+            Issue.record("expected failed")
+            return
+        }
+    }
+
     @Test func unreachableShowsOfflineNotAStop() async throws {
         let s = FakeService()
         s.connectError = CoreError.offline("refused")

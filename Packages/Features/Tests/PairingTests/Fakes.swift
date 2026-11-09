@@ -46,7 +46,14 @@ final class FakeService: CoreService, @unchecked Sendable {
 
     func connect() async throws { if let connectError { throw connectError } }
     func close() async {}
-    func myScopes() async throws -> [String] { ["read", "approve", "admin"] }
+    var scopes = ["read", "approve", "admin"]
+    var aboutError: (any Error)?
+    func myScopes() async throws -> [String] { scopes }
+    func about() async throws -> CoreAbout {
+        if let aboutError { throw aboutError }
+        return CoreAbout(
+            server: "0.47.1", apiMajor: "v1", apiMinor: 47, build: "ab12cd3", device: "Ahmed's MacBook", scopes: scopes)
+    }
     func elevatedUntil() async -> Date? { elevated }
     func stepUp(reason: String) async throws -> Date {
         stepUps += 1
