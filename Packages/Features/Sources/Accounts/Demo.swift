@@ -341,7 +341,7 @@ public final class AccountsDemo {
         "settings-gate",
     ]
 
-    private let model: AccountsModel
+    let model: AccountsModel
     private let setNotice: @MainActor (AdminNotice?) -> Void
     public init(model: AccountsModel, setNotice: @escaping @MainActor (AdminNotice?) -> Void) {
         self.model = model
@@ -355,6 +355,7 @@ public final class AccountsDemo {
     }
 
     public func show(_ scene: String) async {
+        if scene.hasPrefix("conn-") { return await showConnections(scene) }
         let shell = model.host.shell
         shell.dialog = nil
         shell.overlay = nil
