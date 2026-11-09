@@ -189,7 +189,7 @@ struct SessionsStoreTests {
         #expect(!PromptSize.over(String(repeating: "a", count: 65_536)))
         #expect(PromptSize.over(String(repeating: "a", count: 65_537)))
         #expect(PromptSize.over(String(repeating: "é", count: 40_000)))  // two bytes each
-        #expect(PromptSize.words("") == "0.0 of 64 KiB")
+        #expect(PromptSize.words("") == nil)
     }
 
     @Test func unknownStatesKeepTheirWord() {

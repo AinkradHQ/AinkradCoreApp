@@ -55,7 +55,7 @@ struct InboxView: View {
                 Text(
                     n == 0
                         ? "Nothing is waiting on you"
-                        : n == 1 ? "1 agent is waiting on you" : "\(n) agents are waiting on you"
+                        : n == 1 ? "1 approval is waiting on you" : "\(n) approvals are waiting on you"
                 )
                 .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
                 .contentTransition(.numericText())
@@ -83,8 +83,10 @@ struct InboxView: View {
         let hue = SessionTile.hue(s?.harness ?? "")
         return HStack(spacing: Space.s2) {
             IconTile(AgentsModel.harnessSymbol(s?.harness ?? ""), hue: hue, size: 26)
-            Text("\((s?.harness ?? "agent").capitalized) on \(s.map { model.runnerName($0.runner) } ?? "a runner")")
-                .font(.system(size: MacTextSize.body, weight: .semibold))
+            Text(
+                "\(s.map { AgentWords.harnessName($0.harness) } ?? "An agent") on \(s.map { model.runnerName($0.runner) } ?? "a runner")"
+            )
+            .font(.system(size: MacTextSize.body, weight: .semibold))
             Spacer(minLength: 0)
             AppActionTile(title: "Open session", symbol: "arrow.up.right", key: "", hue: hue) {
                 model.openSession(r.session)

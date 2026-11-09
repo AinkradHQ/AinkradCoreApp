@@ -27,6 +27,8 @@ public final class TranscriptStore {
     @ObservationIgnored private var dirty = false
     static let tail: Int64 = 200
     static let page = 500
+    /// How many entries are held at once; the oldest fall out of the window and `loadEarlier` pages them back.
+    static let window = 2000
 
     public init(sessionID: String) { self.sessionID = sessionID }
 
@@ -50,7 +52,16 @@ public final class TranscriptStore {
             if case .toolUse(let id, _, _) = e.kind { toolSeq[id] = e.seq }
             if e.visible { entries.append(e) }
         }
+        trim()
         return added
+    }
+
+    /// Keeps the newest `window` entries; what falls off is paged back in by `loadEarlier`.
+    func trim() {
+        guard entries.count > Self.window else { return }
+        let drop = entries.count - Self.window
+        heldAfter = entries[drop - 1].seq
+        entries.removeFirst(drop)
     }
 
     /// A tool's result joins its call's row (one row for the pair, the way the prototype shows it).

@@ -59,6 +59,13 @@ public final class AgentsModel {
     public internal(set) var approvalNotices: [String: InlineNotice] = [:]
     public internal(set) var notifierPermission: NotificationPermission = .notAsked
     public var selected: String?
+    /// Each session's name: the first line of its prompt (Core sends no title yet, KAN-455). Filled on create, from a loaded
+    /// transcript, or by `loadTitle` when a tile shows.
+    public internal(set) var titles: [String: String] = [:]
+    /// Agents a session can be started as (those with a chain bound). Empty for a device that is not an admin.
+    public internal(set) var agentNames: [String] = []
+    @ObservationIgnored var raiseBudgetHook: ((AgentSessionInfo) -> Void)?
+    @ObservationIgnored var titleLoading: Set<String> = []
 
     var api: (any AgentsAPI)?
     /// Each open session's spend from Core's ledger (`SessionSpend.swift`).
@@ -208,6 +215,7 @@ public final class AgentsModel {
         await sessions.reload(api)
         if let r = try? await api.runners() { runners = r }
         setChains((try? await api.chains()) ?? [])
+        agentNames = (try? await api.agents()) ?? []
         for s in sessions.items where s.live && transcripts[s.id] == nil { _ = store(s.id) }
         for (id, t) in transcripts { await t.refresh(api, knownLast: sessions.session(id)?.lastSeq ?? 0) }
         syncDerived()
@@ -311,6 +319,10 @@ public final class AgentsModel {
         let lapsed = over ? nil : all.last { $0.status(now: now, sessionOver: over) == .expired }
         return waiting + (lapsed.map { [$0] } ?? [])
     }
+
+    /// "Waiting on you": approvals nobody has answered, and nothing else. Alerts and Brain-inbox items are counted by their own
+    /// owners. The list header, the filter, the footer and the shell's status bar and bell all read this one number.
+    public var waitingOnYou: Int { pending.count }
 
     public func waiting(_ id: String) -> Bool { pending.contains { $0.session == id } }
 

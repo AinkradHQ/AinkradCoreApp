@@ -11,6 +11,11 @@ extension AgentsModel {
         chains = list
     }
 
+    public func debugAgents(_ names: [String]) {
+        (api as? FakeAgentsAPI)?.agentList = names
+        agentNames = names
+    }
+
     /// A believable climb to each session's token total, so the burn charts have samples in the demo.
     public func debugSeedBurn() {
         for (i, s) in sessions.items.enumerated() {

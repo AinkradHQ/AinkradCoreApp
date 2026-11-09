@@ -49,19 +49,24 @@ struct NewSessionSheet: View {
                             field("Harness") {
                                 CoreSegmented(
                                     "Harness",
-                                    segments: ["claude", "codex", "opencode", "agy"].map { CoreSegment($0, $0) },
+                                    segments: ["claude", "codex", "opencode", "agy"].map {
+                                        CoreSegment($0, AgentWords.harnessName($0))
+                                    },
                                     selection: $harness)
                             }
                         }
-                        field("Policy mode") {
+                        field("What it may do") {
                             CoreSegmented(
-                                "Policy mode",
-                                segments: ["ask", "accept_edits", "sandboxed"].map { CoreSegment($0, $0) },
+                                "What it may do",
+                                segments: SessionMode.all.map { CoreSegment($0, SessionMode.words($0)) },
                                 selection: $mode)
                         }
                     }
                     if mode == "sandboxed" {
                         Text("Sandboxed needs the admin scope; the Core refuses it otherwise.").foregroundStyle(
+                            palette.text2)
+                    } else {
+                        Text(SessionMode.help(mode)).font(.system(size: MacTextSize.meta)).foregroundStyle(
                             palette.text2)
                     }
                     field("Runner") { runnerList }
@@ -69,23 +74,24 @@ struct NewSessionSheet: View {
                         CoreTextField("Model (optional)", placeholder: "the harness default", text: $llm, mono: true)
                     }
                     field("Prompt") { promptField }
-                    Text("Isolation (microVM, memory, disk, network egress): not available yet.")
-                        .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
                     field("Secrets to pass  \(secrets.count) of 16") { secretsField }
                 }
                 .padding(.bottom, Space.s1)
             }
             .frame(maxHeight: Space.s8 * 20)
             preview
-            HStack(spacing: Space.s2) {
-                Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
-                Spacer(minLength: 0)
-                Button("Cancel") { model.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
-                Button(busy ? "Starting…" : notice == nil ? "Start session" : "Try again") { start() }
-                    .buttonStyle(.coreProminent).keyboardShortcut(.return, modifiers: .command).environment(
-                        \.coreKeycap, "⌘↩"
-                    ).disabled(!ready)
-                    .help("Start the session (⌘Return)")
+            Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
+            CoreDialogFooter(
+                cancel: CoreAction("Cancel", key: .cancel) { model.shell.closeDialog() },
+                primary: CoreAction(busy ? "Starting…" : notice == nil ? "Start session" : "Try again", key: nil) {
+                    if ready { start() }
+                }, busy: busy
+            )
+            .opacity(ready || busy ? 1 : 0.7)
+            .help("Start the session (⌘Return)")
+            .background {
+                Button("") { if ready { start() } }.keyboardShortcut(.return, modifiers: .command).opacity(0)
+                    .accessibilityHidden(true)
             }
         }
         .onAppear {
@@ -142,9 +148,20 @@ struct NewSessionSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         case .agent:
-            CoreTextField(
-                "Agent id", placeholder: "atlas", text: $agentID,
-                error: agentID.isEmpty || agentOK ? nil : SessionSource.idRule, mono: true)
+            if model.agentNames.isEmpty {
+                CoreTextField(
+                    "Agent id", placeholder: "atlas", text: $agentID,
+                    error: agentID.isEmpty || agentOK ? nil : SessionSource.idRule, mono: true)
+            } else {
+                CoreSelect(
+                    "Agent",
+                    selection: Binding(
+                        get: { model.agentNames.contains(agentID) ? agentID : model.agentNames[0] },
+                        set: { agentID = $0 }),
+                    options: model.agentNames.map { CoreSelectOption($0, $0) }
+                )
+                .onAppear { if agentID.isEmpty { agentID = model.agentNames[0] } }
+            }
             Text("The chain bound to this agent serves the session, else the default chain.")
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(palette.text2)
         }
@@ -181,13 +198,13 @@ struct NewSessionSheet: View {
     private var preview: some View {
         let what =
             switch source {
-            case .harness: harness
+            case .harness: AgentWords.harnessName(harness)
             case .chain: "chain \(chain?.name ?? "")"
             case .agent: "\(agentID.trimmingCharacters(in: .whitespaces)) on its chain"
             }
         let words = runner.map { "\(what) on \($0.name)" } ?? "Choose a runner to start on"
         let options = [
-            mode, llm.isEmpty || source != .harness ? nil : llm,
+            SessionMode.words(mode), llm.isEmpty || source != .harness ? nil : llm,
             secrets.isEmpty ? nil : "\(secrets.count) secret\(secrets.count == 1 ? "" : "s")",
         ]
         .compactMap { $0 }
@@ -210,8 +227,10 @@ struct NewSessionSheet: View {
     private var promptField: some View {
         VStack(alignment: .trailing, spacing: Space.s1) {
             promptEditor
-            Text(PromptSize.words(prompt)).font(.system(size: MacTextSize.meta, design: .monospaced))
-                .foregroundStyle(PromptSize.over(prompt) ? palette.tone(.fail).ink : palette.text2)
+            if let w = PromptSize.words(prompt) {
+                Text(w).font(.system(size: MacTextSize.meta))
+                    .foregroundStyle(PromptSize.over(prompt) ? GlassInk.redInk : palette.text2)
+            }
         }
     }
 
@@ -317,9 +336,8 @@ enum PromptSize {
     static let limit = 64 * 1024
     static func bytes(_ s: String) -> Int { s.utf8.count }
     static func over(_ s: String) -> Bool { bytes(s) > limit }
-    static func words(_ s: String) -> String {
-        over(s) ? "\(bytes(s)) of 64 KiB: too long" : String(format: "%.1f of 64 KiB", Double(bytes(s)) / 1024)
-    }
+    /// Nil until the prompt nears the limit.
+    static func words(_ s: String) -> String? { AgentWords.promptSizeWords(bytes: bytes(s), limit: limit) }
 }
 
 /// Where a new session's account comes from. The API takes a harness (plain), a chain's id, or an agent id; it takes no pool
@@ -340,6 +358,25 @@ enum SessionSource: String, CaseIterable, Sendable {
         return s.unicodeScalars.allSatisfy {
             ("a"..."z").contains($0) || ("A"..."Z").contains($0) || ("0"..."9").contains($0)
                 || "._:-".unicodeScalars.contains($0)
+        }
+    }
+}
+
+/// Policy modes in plain words.
+enum SessionMode {
+    static let all = ["ask", "accept_edits", "sandboxed"]
+    static func words(_ mode: String) -> String {
+        switch mode {
+        case "ask": "Asks first"
+        case "sandboxed": "Sandboxed"
+        default: "Accepts edits"
+        }
+    }
+    static func help(_ mode: String) -> String {
+        switch mode {
+        case "ask": "Asks you before each tool call that changes something."
+        case "sandboxed": "Runs in a sandbox and asks for nothing. Needs the admin scope."
+        default: "Edits files without asking; still asks before running commands."
         }
     }
 }

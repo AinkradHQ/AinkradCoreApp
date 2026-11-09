@@ -68,6 +68,8 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
 
     public func runners() async throws -> [RunnerInfo] { runnerList }
     public func chains() async throws -> [ChainOption] { chainList }
+    public var agentList: [String] = []
+    public func agents() async throws -> [String] { agentList }
     public func attempts(run: String) async throws -> [AgentSessionInfo] {
         lock.withLock {
             runAttempts[run] ?? order.compactMap { sessionsByID[$0] }.filter { $0.route?.run == run }
@@ -249,36 +251,39 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         func ask(_ id: String, _ tool: String, _ input: String, secs: Int = 300) -> EntryKind {
             .approvalRequest(id: id, tool: tool, input: input, timeoutSecs: secs)
         }
-        func head(_ h: String) -> [EntryKind] { [.started(harness: h, resumed: false), prompt] }
+        func head(_ h: String, _ p: String) -> [EntryKind] { [.started(harness: h, resumed: false), .user(p)] }
 
         // Waiting on you (three, with 292 s, 130 s and 241 s left).
         let a1 = session(1, "claude", "d_mac", .running, age: 38 * 60, tin: 312_400, tout: 101_300, cost: 3_420_000)
         api.add(
             a1,
-            entries: head("claude") + work(12) + [
-                .toolUse(id: "g0", name: "github.get_issue", summary: "#142"),
-                .toolResult(id: "g0", name: "github.get_issue", ok: true, exitCode: nil, output: "", durationMs: 300),
-                .toolUse(id: "g1", name: "github.create_pull_request", summary: ""),
-                .toolResult(
-                    id: "g1", name: "github.create_pull_request", ok: false, exitCode: nil,
-                    output: "Personal GitHub may only read.", durationMs: 200),
-                .assistant("Ready to push the branch. That leaves this machine, so I need your approval."),
-                ask("req_push", "Bash", "git push -u origin feat/e2-14-citadel-bootstrap"),
-            ], endsAt: ago(8))
+            entries: head(
+                "claude", "Bootstrap Citadel on the new Core and open the PR against development.\nUse the e2-14 plan.")
+                + work(12) + [
+                    .toolUse(id: "g0", name: "github.get_issue", summary: "#142"),
+                    .toolResult(
+                        id: "g0", name: "github.get_issue", ok: true, exitCode: nil, output: "", durationMs: 300),
+                    .toolUse(id: "g1", name: "github.create_pull_request", summary: ""),
+                    .toolResult(
+                        id: "g1", name: "github.create_pull_request", ok: false, exitCode: nil,
+                        output: "Personal GitHub may only read.", durationMs: 200),
+                    .assistant("Ready to push the branch. That leaves this machine, so I need your approval."),
+                    ask("req_push", "Bash", "git push -u origin feat/e2-14-citadel-bootstrap"),
+                ], endsAt: ago(8))
         api.ledgerList[a1.id] = SessionLedger(
             costMicros: 3_910_000, tokens: 413_700, unpriced: false, account: "claude-api-metered",
             maxUSDMicros: 5_000_000, maxTokens: 2_000_000)
         let a2 = session(2, "claude", "d_ora", .running, age: 27 * 60, tin: 121_800, tout: 30_200, cost: 870_000)
         api.add(
             a2,
-            entries: head("claude") + work(4) + [
+            entries: head("claude", "Read the plan comments on the PR and fix every blocking one") + work(4) + [
                 .assistant("I need the GitHub token to read the plan comments on the PR."),
                 ask("req_token", "Secrets", "read GH_TOKEN, once", secs: 300),
             ], endsAt: ago(170))
         let a11 = session(3, "codex", "d_lin", .running, age: 12 * 60, tin: 64_200, tout: 18_900, cost: 410_000)
         api.add(
             a11,
-            entries: head("codex") + work(3) + [
+            entries: head("codex", "Add the heartbeat exporter to the runner and wire its metrics") + work(3) + [
                 .assistant("The heartbeat exporter needs one crate that is not in the lockfile yet."),
                 ask("req_crate", "Bash", "cargo add prometheus-client"),
             ], endsAt: ago(59))
@@ -288,26 +293,31 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
             entries: [.started(harness: "claude", resumed: false), prompt])
         api.add(
             session(5, "codex", "d_lin", .interrupted, age: 19 * 60, tin: 88_700, tout: 22_100, cost: 520_000),
-            entries: head("codex") + work(3) + [
+            entries: head("codex", "Run the runner soak test until it passes") + work(3) + [
                 .toolUse(id: "tz", name: "Bash", summary: "cargo test -p runner soak"),
                 .toolResult(id: "tz", name: "Bash", ok: false, exitCode: 1, output: "1 failed", durationMs: 61_000),
                 .interrupted(reason: "the runner restarted"),
             ])
         api.add(
             session(6, "codex", "d_lin", .ended, .succeeded, age: 55 * 60, tin: 402_100, tout: 97_800, cost: 1_210_000),
-            entries: head("codex") + work(8) + [
+            entries: head("codex", "Wire notifications through the push policy") + work(8) + [
                 .assistant("Notifications are wired through the push policy and the PR is open."),
                 .ended(kind: "succeeded", reason: nil),
             ])
         api.add(
             session(7, "claude", "d_ora", .ended, .stalled, age: 72 * 60, tin: 233_900, tout: 41_200, cost: 1_640_000),
-            entries: head("claude") + work(5) + [.ended(kind: "stalled", reason: "no progress for a long while")])
+            entries: head("claude", "Find out why the nightly build stalls after the cache step") + work(5) + [
+                .ended(kind: "stalled", reason: "no progress for a long while")
+            ])
         api.add(
             session(8, "codex", "d_lin", .ended, .tokenCap, age: 123 * 60, tin: 480_000, tout: 20_000, cost: 2_300_000),
-            entries: head("codex") + work(5) + [.ended(kind: "token_cap", reason: nil)])
+            entries: head(
+                "codex",
+                "Migrate the audit log to the new schema, keeping every row, and write the rollback so it can be run twice without losing anything"
+            ) + work(5) + [.ended(kind: "token_cap", reason: nil)])
         api.add(
             session(9, "claude", "d_mac", .ended, .failed, age: 180 * 60, tin: 144_600, tout: 38_400, cost: 960_000),
-            entries: head("claude") + work(5) + [
+            entries: head("claude", "Fix the failing policy tests") + work(5) + [
                 .toolUse(id: "tf", name: "Bash", summary: "cargo test -p policy"),
                 .toolResult(
                     id: "tf", name: "Bash", ok: false, exitCode: 101,
@@ -317,10 +327,14 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
             ])
         api.add(
             session(10, "claude", "d_mac", .ended, .cancelled, age: 300 * 60, tin: 40_100, tout: 9_000, cost: 210_000),
-            entries: head("claude") + work(2) + [.ended(kind: "cancelled", reason: nil)])
+            entries: head("claude", "アカウントの予算が尽きた理由を調べて、上限の引き上げ案をまとめてください") + work(2) + [
+                .ended(kind: "cancelled", reason: nil)
+            ])
         api.add(
             session(11, "claude", "d_ora", .lost, age: 360 * 60, tin: 77_000, tout: 15_100, cost: 480_000),
-            entries: head("claude") + work(4) + [.toolUse(id: "tl", name: "Bash", summary: "ainkrad migrate --dry-run")]
+            entries: head("claude", "Dry-run the migration on a copy of the Home Core") + work(4) + [
+                .toolUse(id: "tl", name: "Bash", summary: "ainkrad migrate --dry-run")
+            ]
         )
         return api
     }

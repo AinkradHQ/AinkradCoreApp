@@ -9,16 +9,17 @@ struct AgentsListView: View {
 
     var body: some View {
         let waitingIDs = Set(model.pending.map(\.session))
+        let waitingCount = model.waitingOnYou
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
-                ForEach(Array(filters(waitingIDs.count).enumerated()), id: \.offset) { i, f in
+                ForEach(Array(filters(waitingCount).enumerated()), id: \.offset) { i, f in
                     AppFilterTile(title: f.1, count: f.2, on: model.filter == f.0, key: "⌘\(i + 1)") {
                         withAnimation(.spring(duration: 0.3)) { model.filter = f.0 }
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
                 }
             } actions: {
-                buttons(waitingIDs.count)
+                buttons(waitingCount)
             }
             if model.shouldAskAboutNotifications {
                 NotificationAsk(model: model).padding([.horizontal, .bottom], Space.s3)
@@ -35,7 +36,7 @@ struct AgentsListView: View {
                     .padding([.horizontal, .bottom], Space.s3)
             }
             content(waitingIDs)
-            footer(waitingIDs.count)
+            if model.sessions.load == .ready { footer(waitingCount) }
         }
         .foregroundStyle(GlassInk.primary)
         // The Terminals app's frame: the pane's glass is a rim, the app's surface sits inside it, rounded.
@@ -47,7 +48,10 @@ struct AgentsListView: View {
     /// The Terminals footer: status chips at the left, the keys at the right.
     private func footer(_ waiting: Int) -> some View {
         HStack(spacing: Space.s2) {
-            if waiting > 0 { AppStatChip("hand.raised.fill", "\(waiting) waiting on you", GlassInk.orange) }
+            if waiting > 0 {
+                AppStatChip("hand.raised.fill", "\(waiting) waiting on you", GlassInk.orange).help(
+                    "Approvals only. Alerts and Brain inbox items are counted separately.")
+            }
             AppStatChip("play.fill", "\(model.count(.active)) active", GlassInk.green)
             if let c = AgentWords.cost(model.sessions.totalCostMicros),
                 model.sessions.items.contains(where: { $0.usage?.costMicros != nil })
@@ -73,7 +77,7 @@ struct AgentsListView: View {
     private func buttons(_ waiting: Int) -> some View {
         AppActionTile(
             title: waiting > 0 ? "Approvals \(waiting)" : "Approvals", symbol: "lock.shield", key: "A",
-            hue: waiting > 0 ? GlassInk.orange : GlassInk.slate, pulse: waiting > 0
+            hue: waiting > 0 ? GlassInk.blue : GlassInk.slate, pulse: waiting > 0
         ) { model.openInbox() }
         .accessibilityLabel(waiting > 0 ? "Approvals, \(waiting) waiting" : "Approvals")
         AppActionTile(title: "New", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
@@ -85,39 +89,50 @@ struct AgentsListView: View {
     private func content(_ waitingIDs: Set<String>) -> some View {
         switch model.sessions.load {
         case .idle, .loading:
-            ScrollView { SkeletonRows().padding(.horizontal, Space.s3) }
+            LazyVGrid(columns: Self.columns, spacing: Space.s3) {
+                ForEach(0..<6, id: \.self) { _ in CoreSkeleton(coreShape(Radius.cardMac)).frame(height: 170) }
+            }
+            .padding(.horizontal, Space.s4).padding(.vertical, Space.s1)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .accessibilityElement(children: .ignore).accessibilityLabel("Loading sessions")
         case .failed(let why):
-            Message(
-                title: "Could not load sessions", text: why, action: "Try again", prominent: false
-            ) { model.retryList() }
+            CoreStateCard(
+                symbol: "exclamationmark.triangle", title: "Could not load sessions", line: why,
+                primary: CoreAction("Try again") { model.retryList() }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .ready:
             let rows = model.shown()
             if model.sessions.items.isEmpty {
-                Message(
-                    title: "No agent sessions yet",
-                    text: "Start one and it runs on a runner of the Home Core. You can close this Mac; it keeps going.",
-                    action: "New session", prominent: true
-                ) { model.openNewSession() }
+                CoreStateCard(
+                    symbol: "sparkles", title: "No agent sessions yet",
+                    line: "Start one and it runs on a runner of the Home Core. You can close this Mac; it keeps going.",
+                    primary: CoreAction("New session") { model.openNewSession() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if rows.isEmpty {
-                Message(title: "Nothing here", text: "No sessions match this filter.", action: nil, prominent: false) {}
+                CoreStateCard(
+                    symbol: "line.3.horizontal.decrease", title: "Nothing here", line: "No sessions match this filter."
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 list(rows, waitingIDs)
             }
         }
     }
 
+    private static let columns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
+
     /// The Terminals list's keyboard model: the grid itself holds focus (taken on arrival), one tile is the cursor and
     /// glows, arrows move it and scroll, Return or Space opens, C K R act on it, A opens approvals.
     private func list(_ rows: [AgentSessionInfo], _ waitingIDs: Set<String>) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)],
-                    spacing: Space.s3
-                ) {
+                LazyVGrid(columns: Self.columns, spacing: Space.s3) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, s in
                         SessionTile(
-                            session: s, runner: model.runnerName(s.runner), waiting: waitingIDs.contains(s.id),
+                            session: s, runner: model.runnerName(s.runner), title: model.title(s),
+                            waiting: waitingIDs.contains(s.id),
                             selected: model.selected == s.id, burn: model.sessions.burn[s.id] ?? []
                         ) { key in act(key, s.id) }
                         .onTapGesture(count: 2) { model.openSession(s.id) }
@@ -130,6 +145,7 @@ struct AgentsListView: View {
                         .accessibilityAction { model.openSession(s.id) }
                         .modifier(RiseIn(index: i))
                         .id(s.id)
+                        .onAppear { model.loadTitle(s.id) }
                         .onAppear { if s.id == rows.last?.id && model.filter == .all { model.loadMore() } }
                     }
                 }
@@ -159,7 +175,7 @@ struct AgentsListView: View {
             .onKeyPress(.return) { act("o", rows) }
             .onKeyPress(.space) { act("o", rows) }
             .onKeyPress(characters: .letters) { press in
-                let key = press.characters.lowercased()
+                guard let key = PaneKeys.shortcut(press.characters, typing: false) else { return .ignored }
                 if key == "a" {
                     model.openInbox()
                     return .handled
@@ -198,29 +214,7 @@ struct AgentsListView: View {
 
     private func label(_ s: AgentSessionInfo, waiting: Bool) -> String {
         let st = AgentWords.status(s, waiting: waiting).label
-        return "\(s.harness) on \(model.runnerName(s.runner)), \(st)"
-    }
-}
-
-private struct Message: View {
-    let title: String
-    let text: String
-    let action: String?
-    let prominent: Bool
-    let run: () -> Void
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        VStack(spacing: Space.s2) {
-            Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
-            Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
-            if let action {
-                Button(action, action: run).buttonStyle(CoreButtonStyle(prominent ? .prominent : .secondary))
-                    .padding(.top, Space.s2)
-            }
-        }
-        .frame(maxWidth: Space.s8 * 10).padding(Space.s4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .contain)
+        return "\(model.title(s)), \(AgentWords.harnessName(s.harness)) on \(model.runnerName(s.runner)), \(st)"
     }
 }
 

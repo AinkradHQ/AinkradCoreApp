@@ -253,10 +253,85 @@ public enum AgentWords {
     public static func status(_ s: AgentSessionInfo, waiting: Bool) -> (label: String, tone: Tone, symbol: String) {
         if waiting { return ("Waiting on you", .warn, "hand.raised") }
         if case .ended = s.state, s.stoppedByBudget {
-            return ("Stopped: budget reached", .warn, "gauge.with.dots.needle.100percent")
+            return (endedWords("budget"), .warn, "gauge.with.dots.needle.100percent")
+        }
+        if case .ended = s.state, case .tokenCap? = s.outcome {
+            return (endedWords("token_cap"), .warn, "gauge.with.dots.needle.100percent")
         }
         if case .ended = s.state, let o = s.outcome { return (o.label, o.tone, o.symbol) }
         return (s.state.label, s.state.tone, s.state.symbol)
+    }
+
+    /// How a session ended, in words, for the header, the tile and the transcript's last chip. The raw code goes in `.help` only.
+    public static func endedWords(_ kind: String) -> String {
+        switch kind {
+        case "succeeded": "Ended: finished"
+        case "failed": "Ended: failed"
+        case "stalled": "Ended: stopped making progress"
+        case "token_cap": "Ended: token limit reached"
+        case "budget": "Ended: budget reached"
+        case "cancelled": "Ended: cancelled"
+        case "lost": "Ended: the runner lost it"
+        case "ended", "": "Ended"
+        default: "Ended: " + sentence(kind).lowercased()
+        }
+    }
+
+    /// A reason the Core or runner gave: a known code becomes a sentence, a snake_case code is spaced, free text stays.
+    public static func reasonWords(_ reason: String) -> String {
+        switch reason {
+        case "host_lost": return "The runner's terminal process was lost"
+        case "token_cap": return "It used all the tokens it was allowed"
+        case "runner_lost": return "The runner went away"
+        case "budget": return "A budget ran out"
+        default:
+            let code = reason.range(of: #"^[a-z0-9]+(_[a-z0-9]+)+$"#, options: .regularExpression) != nil
+            return code ? sentence(reason) : reason
+        }
+    }
+
+    /// `approval_escalated` becomes `Approval escalated`.
+    static func sentence(_ code: String) -> String {
+        let w = code.replacingOccurrences(of: "_", with: " ")
+        return w.prefix(1).uppercased() + w.dropFirst()
+    }
+
+    /// The name people know a harness by: `claude-code` and `claude` are both Claude.
+    public static func harnessName(_ h: String) -> String {
+        switch h.lowercased() {
+        case "claude", "claude-code", "claude_code": "Claude"
+        case "codex": "Codex"
+        case "opencode": "OpenCode"
+        case "agy": "Antigravity"
+        default: h.prefix(1).uppercased() + h.dropFirst()
+        }
+    }
+
+    /// A session's name: the first line of its prompt, cut to fit. Nil when there is no prompt.
+    public static func title(prompt: String?) -> String? {
+        guard
+            let line = prompt?.split(whereSeparator: \.isNewline).map({ $0.trimmingCharacters(in: .whitespaces) })
+                .first(where: { !$0.isEmpty })
+        else { return nil }
+        return line.count > 90 ? String(line.prefix(89)) + "…" : line
+    }
+
+    /// The prompt-less name: the harness and the id's tail, `Claude · K9R003`.
+    public static func fallbackTitle(_ s: AgentSessionInfo) -> String {
+        "\(harnessName(s.harness)) · \(s.id.count > 10 ? String(s.id.suffix(6)) : s.id)"
+    }
+
+    /// Prompt-size words: nothing until the prompt nears the Core's limit.
+    public static func promptSizeWords(bytes: Int, limit: Int) -> String? {
+        if bytes > limit {
+            let pages = max(1, Int((Double(bytes - limit) / 3000).rounded(.up)))
+            return "Too long: shorten it by about \(pages) page\(pages == 1 ? "" : "s")"
+        }
+        if Double(bytes) >= Double(limit) * 0.8 {
+            let left = (limit - bytes) / 1024
+            return left <= 0 ? "Almost at the limit" : "About \(left) KiB left"
+        }
+        return nil
     }
 }
 

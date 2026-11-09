@@ -143,13 +143,22 @@ public enum SessionCues {
     }
 
     /// The last attempt of a run that could not move on.
-    public static func notMoved(_ e: FailoverEnd) -> (title: String, text: String)? {
+    public static func notMoved(_ e: FailoverEnd, steps: [String] = []) -> (title: String, text: String)? {
         guard e.result == "ended" else { return nil }
         let why = sentence(e.why) ?? "No other account was available."
         return (
             "The run ended: no other account was available",
-            ([why] + e.reasons.compactMap(sentence)).joined(separator: " ")
+            ([why] + e.reasons.map { named($0, steps: steps) }.compactMap(sentence)).joined(separator: " ")
         )
+    }
+
+    /// `entry 2: at its cap` becomes `claude · opus: at its cap`: the chain step by name, never by number.
+    static func named(_ reason: String, steps: [String]) -> String {
+        guard let r = reason.range(of: #"^entry (\d+)"#, options: [.regularExpression, .caseInsensitive]),
+            let n = Int(reason[r].dropFirst(6))
+        else { return reason }
+        let name = steps.indices.contains(n - 1) ? steps[n - 1] : "Chain step \(n)"
+        return name + reason[r.upperBound...]
     }
 
     /// `Two accounts refused to start before this one did.`
