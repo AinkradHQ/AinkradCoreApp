@@ -42,7 +42,7 @@ public struct IconTile<Trigger: Equatable>: View {
         self.bounce = bounce
     }
     public var body: some View {
-        Image(systemName: symbol).font(.system(size: size * 0.46, weight: .semibold)).foregroundStyle(.white)
+        Image(systemName: symbol).coreFont(size: size * 0.46, weight: .semibold).foregroundStyle(.white)
             .coreBounce(bounce)
             .frame(width: size, height: size)
             .background(

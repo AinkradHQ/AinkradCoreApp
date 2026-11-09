@@ -7,7 +7,7 @@ struct ToneGlyph: View {
     let ink: Color
     let size: CGFloat
     var body: some View {
-        Image(systemName: symbol).font(.system(size: size * 0.5, weight: .semibold)).foregroundStyle(ink)
+        Image(systemName: symbol).coreFont(size: size * 0.5, weight: .semibold).foregroundStyle(ink)
             .frame(width: size, height: size).accessibilityHidden(true)
     }
 }
