@@ -320,6 +320,19 @@ struct AppModelTests {
         #expect(add.effectiveScopes == ["runner"])
     }
 
+    @Test func anAuditRowKeepsItsIdsUnderDetails() {
+        let claimed: [String: (any Sendable)?] = [
+            "action": "pairing.claimed", "entity_kind": "pairing", "details": ["pairing": "p_1", "device": "d_1"],
+        ]
+        let p = LiveCoreService.flatten(claimed)
+        #expect(p["pairing"] as? String == "p_1")
+        #expect(p["device"] as? String == "d_1")
+        let revoked: [String: (any Sendable)?] = [
+            "action": "device.revoked", "entity_kind": "device", "entity_ref": "d_2", "details": [String: String](),
+        ]
+        #expect(LiveCoreService.flatten(revoked)["device"] as? String == "d_2")
+    }
+
     @Test func anAuditRowRoutesByItsAction() async throws {
         #expect(LiveCoreService.eventKind("audit", ["action": "pairing.claimed"]) == "pairing.claimed")
         #expect(LiveCoreService.eventKind("audit", [:]) == "audit")
