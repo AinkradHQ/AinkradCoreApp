@@ -45,13 +45,10 @@ struct RunChecksSheet: View {
                 CoreSelect(
                     "Test questions", selection: $questions,
                     options: [100, 1000, 5000].map { CoreSelectOption($0, $0.formatted()) })
-                HStack(spacing: Space.s2) {
-                    Spacer()
-                    Button("Cancel", action: close).buttonStyle(CoreButtonStyle(.secondary))
-                        .keyboardShortcut(.cancelAction)
-                    Button("Run", action: go).buttonStyle(CoreButtonStyle(.prominent)).keyboardShortcut(.defaultAction)
-                        .disabled(rooms.isEmpty || (only == nil && checked.isEmpty))
-                }
+                CoreDialogFooter(
+                    cancel: CoreAction("Cancel", key: .cancel, run: close),
+                    primary: CoreAction("Run", key: .primary, run: go),
+                    enabled: !(rooms.isEmpty || (only == nil && checked.isEmpty)))
             }
         }
         .onAppear {

@@ -63,13 +63,6 @@ struct AccTile: View {
     }
 }
 
-extension GlassInk {
-    /// The text colour for a fill hue: red, orange and blue have lighter inks that pass contrast; others keep their colour.
-    static func ink(_ hue: Color) -> Color {
-        hue == red ? redInk : hue == orange ? orangeInk : hue == blue ? blueInk : hue == slate ? secondary : hue
-    }
-}
-
 /// The state badge for an account: the one verdict (`AccountVerdict`), a symbol and its word, never colour alone.
 struct VerdictBadge: View {
     let verdict: AccountVerdict
@@ -260,8 +253,8 @@ struct ReadOnlyBanner: View {
     }
 }
 
-/// The footer of an Accounts dialog, built from the CoreUI buttons: the way back on the left (`Cancel esc`, or `Close esc`
-/// when there is nothing to confirm), the one action on the right (↩, or ⌘↩ when it removes something, so Return alone
+/// The footer of an Accounts dialog: the shared `CoreDialogFooter`, with the way back on the left (`Cancel esc`, or `Close esc`
+/// when there is nothing to confirm) and the one action on the right (↩, or ⌘↩ when it removes something, so Return alone
 /// never destroys). Only Cancel and Close carry the esc keycap.
 struct AccDialogButtons: View {
     var confirm: String?
@@ -272,19 +265,13 @@ struct AccDialogButtons: View {
     let cancel: () -> Void
     var run: () -> Void = {}
     var body: some View {
-        HStack(spacing: Space.s2) {
-            Button(cancelTitle, action: cancel).buttonStyle(CoreButtonStyle(.secondary))
-                .keyboardShortcut(.cancelAction)
-                .environment(\.coreKeycap, ["Cancel", "Close"].contains(cancelTitle) ? "esc" : nil)
-            Spacer(minLength: Space.s3)
-            if let confirm {
-                Button(busy ? "\(confirm)…" : confirm, action: run)
-                    .buttonStyle(CoreButtonStyle(danger ? .danger : .prominent, busy: busy))
-                    .keyboardShortcut(.return, modifiers: danger ? .command : [])
-                    .environment(\.coreKeycap, danger ? "⌘↩" : "↩")
-                    .disabled(!enabled || busy)
-            }
-        }
+        CoreDialogFooter(
+            cancel: CoreAction(
+                cancelTitle, key: ["Cancel", "Close"].contains(cancelTitle) ? .cancel : .escape, run: cancel),
+            primary: confirm.map {
+                CoreAction(busy ? "\($0)…" : $0, key: danger ? .command : .primary, run: run)
+            },
+            danger: danger, busy: busy, enabled: enabled)
     }
 }
 

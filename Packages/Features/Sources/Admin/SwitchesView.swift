@@ -234,7 +234,7 @@ private struct StatePanel<Trailing: View>: View {
                 .contentTransition(.symbolEffect(.replace))
                 .coreBounce(trigger)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(hue)
+                Text(title).font(.system(size: MacTextSize.headline, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                     .contentTransition(.opacity)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }

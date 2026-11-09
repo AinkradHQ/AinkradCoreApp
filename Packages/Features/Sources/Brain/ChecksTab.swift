@@ -201,11 +201,11 @@ private struct CheckDetail: View {
                 small("Target is under \(Int(item.trendLimit ?? 0)) ms.")
             }
             if item.skippedOffline {
-                BrainNotice(
+                CoreNotice(
                     symbol: "wifi.slash", title: "Skipped because this Mac is offline", text: "Nothing was measured.")
             }
             if item.clearedAfter {
-                BrainNotice(
+                CoreNotice(
                     symbol: "info.circle", title: "You cleared Paused after this result",
                     text: "Run the check again to confirm.")
             }

@@ -1,5 +1,17 @@
 import SwiftUI
 
+/// A tone's symbol drawn in the tone's own ink, with no tile behind it. The ink of the light themes is pale, so the old
+/// white glyph on an ink-coloured tile vanished (an empty white square); ink on the tinted surface always reads.
+struct ToneGlyph: View {
+    let symbol: String
+    let ink: Color
+    let size: CGFloat
+    var body: some View {
+        Image(systemName: symbol).font(.system(size: size * 0.5, weight: .semibold)).foregroundStyle(ink)
+            .frame(width: size, height: size).accessibilityHidden(true)
+    }
+}
+
 /// An outcome or warning in place: a symbol, a bold line, a quiet line, an optional action, tinted by tone. The words carry
 /// the state; the tone backs them up. Features use this instead of each drawing their own banner.
 public struct CoreNotice<Action: View>: View {
@@ -23,7 +35,7 @@ public struct CoreNotice<Action: View>: View {
     public var body: some View {
         let c = palette.tone(tone)
         HStack(alignment: .top, spacing: Space.s3) {
-            IconTile(symbol, hue: c.ink, size: 26)
+            ToneGlyph(symbol: symbol, ink: c.ink, size: 26)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(title).font(.system(size: MacTextSize.headline, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)

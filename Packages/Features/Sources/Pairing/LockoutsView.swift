@@ -56,7 +56,7 @@ struct LockoutsSection: View {
                 .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
                 Text(n == 0 ? "Nothing is locked" : n == 1 ? "1 lock right now" : "\(n) locks right now")
-                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(hue)
+                    .font(.system(size: MacTextSize.large, weight: .bold)).foregroundStyle(GlassInk.ink(hue))
                     .contentTransition(.numericText())
                 Text(
                     n == 0
@@ -120,7 +120,7 @@ private struct LockCard: View {
                     Spacer(minLength: Space.s3)
                     Text(left == 0 ? "Ended" : Countdown.text(left))
                         .font(.system(size: MacTextSize.large + 4, weight: .bold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(hue).contentTransition(.numericText(countsDown: true))
+                        .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
                     AppActionTile(
                         title: "Clear", symbol: "lock.open", key: selected ? "⌫" : "", hue: GlassInk.orange,
                         prominent: selected

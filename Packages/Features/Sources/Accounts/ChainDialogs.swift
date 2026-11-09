@@ -31,6 +31,7 @@ private struct ChainDialog: View {
     @State private var name: String
     @State private var entries: [ChainEntryDraft]
     @State private var busy = false
+    @State private var fixing = false
 
     init(model: AccountsModel, editing: ChainItem?, close: @escaping () -> Void) {
         self.model = model
@@ -46,35 +47,54 @@ private struct ChainDialog: View {
 
     var body: some View {
         let error = model.writeError["chain"]
+        // A rule of the Core ("a subscription pool at most once"): the pools have to change, so that is the main action and
+        // "Try again" (the same input) is the quiet one.
+        let rule = error != nil && model.writeRule.contains("chain")
         CoreDialogPanel(editing == nil ? "New chain" : "Edit \(editing?.name ?? "chain")", width: Space.s8 * 17) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    CoreTextField("Name", placeholder: "work", text: $name, autofocus: editing == nil)
-                    CoreFieldLabel("Pools, in the order they're tried")
-                    ForEach(entries.indices, id: \.self) { i in row(i) }
-                    AccLink(title: "Add a pool", symbol: "plus") {
-                        if let p = model.pools.first(where: { p in !entries.contains { $0.pool == p.id } }) {
-                            entries.append(ChainEntryDraft(pool: p.id, model: nil))
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.s3) {
+                        CoreTextField("Name", placeholder: "work", text: $name, autofocus: editing == nil)
+                        CoreFieldLabel("Pools, in the order they're tried").id("chain-pools")
+                        ForEach(entries.indices, id: \.self) { i in row(i) }
+                        AccLink(title: "Add a pool", symbol: "plus") {
+                            if let p = model.pools.first(where: { p in !entries.contains { $0.pool == p.id } }) {
+                                entries.append(ChainEntryDraft(pool: p.id, model: nil))
+                            }
                         }
+                        .disabled(entries.count >= ChainItem.maxEntries || entries.count >= model.pools.count)
+                        Text(
+                            "A session tries the first pool that has an account to give. Running sessions keep the chain they started with."
+                        )
+                        .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
-                    .disabled(entries.count >= ChainItem.maxEntries || entries.count >= model.pools.count)
-                    Text(
-                        "A session tries the first pool that has an account to give. Running sessions keep the chain they started with."
-                    )
-                    .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxHeight: Space.s8 * 14)
+                .onChange(of: fixing) { scroll.scrollTo("chain-pools", anchor: .top) }
             }
-            .frame(maxHeight: Space.s8 * 14)
             if let issue, !name.isEmpty { AccIssue(text: issue) }
             if let error {
-                AccIssue(text: "\(error) Check the pools and try again, or cancel to leave the chain as it was.")
+                AccIssue(
+                    text: rule
+                        ? "\(error) Change the pools, or cancel to leave the chain as it was."
+                        : "\(error) Try again, or cancel to leave the chain as it was.")
             }
             AccNotice(notice: model.host.elevationNotice)
-            AccDialogButtons(
-                confirm: error == nil ? (editing == nil ? "Create chain" : "Save") : "Try again", busy: busy,
-                enabled: issue == nil, cancel: close
-            ) { go() }
+            if rule {
+                CoreDialogFooter(
+                    cancel: CoreAction("Cancel", key: .cancel, run: close),
+                    primary: CoreAction("Change the pools", key: .primary) {
+                        model.note("chain", nil)
+                        fixing.toggle()
+                    },
+                    alternate: CoreAction("Try again", key: .command) { go() }, busy: busy, enabled: issue == nil)
+            } else {
+                AccDialogButtons(
+                    confirm: error == nil ? (editing == nil ? "Create chain" : "Save") : "Try again", busy: busy,
+                    enabled: issue == nil, cancel: close
+                ) { go() }
+            }
         }
         .accessibilityIdentifier("chain")
     }

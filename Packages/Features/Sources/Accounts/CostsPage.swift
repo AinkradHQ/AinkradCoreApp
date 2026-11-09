@@ -178,7 +178,7 @@ struct SpendBarRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(.system(size: MacTextSize.headline, weight: .semibold)).lineLimit(1)
                     Text(sub).font(.system(size: MacTextSize.meta)).foregroundStyle(
-                        warn ? GlassInk.orange : GlassInk.secondary
+                        warn ? GlassInk.orangeInk : GlassInk.secondary
                     )
                     .lineLimit(1)
                 }

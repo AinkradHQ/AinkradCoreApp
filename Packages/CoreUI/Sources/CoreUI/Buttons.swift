@@ -175,12 +175,18 @@ extension EnvironmentValues {
 public enum ModalKey {
     case cancel
     case primary
+    /// ⌘↩: the main action of a dialog that removes something, so Return alone never destroys.
+    case command
+    /// Esc without the keycap, for a way back that is not called Cancel or Close.
+    case escape
     case number(Int)
 
     var label: String {
         switch self {
         case .cancel: "esc"
         case .primary: "↩"
+        case .command: "⌘↩"
+        case .escape: ""
         case .number(let n): "⌘\(n)"
         }
     }
@@ -193,6 +199,8 @@ extension View {
         switch key {
         case .cancel: keyboardShortcut(.cancelAction).environment(\.coreKeycap, key.label)
         case .primary: keyboardShortcut(.defaultAction).environment(\.coreKeycap, key.label)
+        case .command: keyboardShortcut(.return, modifiers: .command).environment(\.coreKeycap, key.label)
+        case .escape: keyboardShortcut(.cancelAction).environment(\.coreKeycap, nil)
         case .number(let n):
             keyboardShortcut(KeyEquivalent(Character("\(n % 10)")), modifiers: .command)
                 .environment(\.coreKeycap, key.label)

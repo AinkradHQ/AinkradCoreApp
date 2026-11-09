@@ -63,7 +63,7 @@ extension BrainSheets {
     static func split(_ m: BrainModel, _ id: String) { show(m, "inbox-split") { SplitSheet(model: m, id: id) } }
 }
 
-/// Cancel left, one named action right.
+/// Cancel left, one named action right (⌘↩, so Return alone never approves).
 private struct SheetButtons: View {
     let model: BrainModel
     let action: String
@@ -72,13 +72,9 @@ private struct SheetButtons: View {
     var busy = false
     let go: () -> Void
     var body: some View {
-        HStack(spacing: Space.s2) {
-            Spacer()
-            Button("Cancel") { model.host.shell.closeDialog() }.buttonStyle(CoreButtonStyle(.secondary))
-                .keyboardShortcut(.cancelAction)
-            Button(action, action: go).buttonStyle(CoreButtonStyle(danger ? .danger : .prominent, busy: busy))
-                .disabled(!enabled || busy).keyboardShortcut(.return, modifiers: .command)
-        }
+        CoreDialogFooter(
+            cancel: CoreAction("Cancel", key: .cancel) { model.host.shell.closeDialog() },
+            primary: CoreAction(action, key: .command, run: go), danger: danger, busy: busy, enabled: enabled)
     }
 }
 
