@@ -34,6 +34,15 @@ public final class ConnectionsModel {
     /// Set by the Debug scenes too (a Touch ID write can't run there), hence not private(set).
     var writeError: [String: String] = [:]
     var busy: String?
+    /// Controls whose last write was refused because connections are off; each shows "Turn on connections".
+    var gated: Set<String> = []
+    /// The "Turn on connections" action: working, done (then the user's action is retried) or refused in words.
+    var turnOn: TurnOn?
+    enum TurnOn: Equatable {
+        case working
+        case done
+        case refused(String)
+    }
     @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
     /// A macOS notification (id, title, body); the app routes it through the Agents notifier.
     @ObservationIgnored public var notify: ((String, String, String) -> Void)?
@@ -156,6 +165,7 @@ public final class ConnectionsModel {
     func startFlow(_ kind: String) async {
         guard let service else { return }
         stopFlow()
+        turnOn = nil
         if let why = host.pausedReason {
             host.shell.showToast(why)
             return
@@ -171,13 +181,43 @@ public final class ConnectionsModel {
         } catch is AdminDeclined {
             failFlow(kind, "Nothing was started.", "Press Try again and confirm with Touch ID.")
         } catch {
-            failFlow(kind, "Couldn't start the sign-in.", ConnSay.plain(error))
+            failFlow(kind, "Couldn't start the sign-in.", ConnSay.plain(error), gated: ConnSay.isGate(error))
         }
     }
 
-    private func failFlow(_ kind: String, _ title: String, _ fix: String) {
+    private func failFlow(_ kind: String, _ title: String, _ fix: String, gated: Bool = false) {
         flow = ConnFlow(
-            id: "", kind: kind, userCode: nil, url: URL(string: "about:blank")!, step: .failed(title: title, fix: fix))
+            id: "", kind: kind, userCode: nil, url: URL(string: "about:blank")!, step: .failed(title: title, fix: fix),
+            gated: gated)
+    }
+
+    /// "Turn on connections": one Touch ID, then `secrets.mode` to at least 1 (never lowered from 2) and
+    /// `secrets.connections` to 1, in that order; then the action that was refused runs again.
+    func turnOnConnections(then retry: @escaping @MainActor () async -> Void) async {
+        guard let service else { return }
+        if let why = host.pausedReason {
+            host.shell.showToast(why)
+            return
+        }
+        turnOn = .working
+        do {
+            try await host.elevated("Turn on connections on your Core.", done: "changed", keepsEdit: false) {
+                if try await service.coreSetting("secrets.mode") < 1 {
+                    try await service.setCoreSetting("secrets.mode", 1)
+                }
+                try await service.setCoreSetting("secrets.connections", 1)
+            }
+        } catch is AdminDeclined {
+            turnOn = .refused("Nothing was changed. Press Turn on connections and confirm with Touch ID.")
+            return
+        } catch {
+            turnOn = .refused(ConnSay.turnOnRefusal(error))
+            return
+        }
+        turnOn = .done
+        gated = []
+        flow?.gated = false
+        await retry()
     }
 
     /// Opens the service's page and follows the sign-in until it needs the person again or ends.
@@ -242,6 +282,7 @@ public final class ConnectionsModel {
             installing = false
         } catch {
             flow?.step = .failed(title: "Couldn't use the repositories you chose.", fix: ConnSay.plain(error))
+            flow?.gated = ConnSay.isGate(error)
         }
     }
 
@@ -280,6 +321,7 @@ public final class ConnectionsModel {
                         await self.reload()
                     } catch {
                         self.flow?.step = .failed(title: "Couldn't finish the sign-in.", fix: ConnSay.plain(error))
+                        self.flow?.gated = ConnSay.isGate(error)
                     }
                 }
             }
@@ -382,6 +424,8 @@ public final class ConnectionsModel {
         }
         busy = key
         writeError[key] = nil
+        gated.remove(key)
+        turnOn = nil
         defer { busy = nil }
         do {
             try await host.elevated(reason, done: "changed", keepsEdit: false) { try await op(service) }
@@ -392,6 +436,7 @@ public final class ConnectionsModel {
             return false
         } catch {
             writeError[key] = ConnSay.plain(error)
+            if ConnSay.isGate(error) { gated.insert(key) }
             return false
         }
     }

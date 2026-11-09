@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Testing
 
@@ -243,5 +244,66 @@ struct ConnectionsGapTests {
         s.failApp = true
         #expect(await m.saveApp("github", fields: ["client_id": "x"]) == false)
         #expect(m.writeError["app-github"]?.contains("Nothing was changed") == true)
+    }
+}
+
+@MainActor
+struct TurnOnConnectionsTests {
+    func make() async -> (ConnectionsModel, SampleConnections, FakeHost) {
+        let host = FakeHost()
+        let m = ConnectionsModel(host: host)
+        let s = SampleConnections()
+        s.gated = true
+        m.use(s)
+        await m.reload()
+        return (m, s, host)
+    }
+
+    @Test func aTurnedOffCoreOffersTheActionThenWritesTheSettingsInOrderAndRetries() async {
+        let (m, s, host) = await make()
+        #expect(await m.addToken(kind: "github", name: "T", fields: [:], token: "x") == false)
+        #expect(m.gated.contains("token"))
+        #expect(m.writeError["token"]?.contains("Turn on connections") == true)
+        #expect(m.writeError["token"]?.localizedCaseInsensitiveContains("ask") == false)
+        var retried = false
+        await m.turnOnConnections {
+            retried = await m.addToken(kind: "github", name: "T", fields: [:], token: "x")
+        }
+        #expect(retried)
+        #expect(
+            s.order == ["addToken refused", "secrets.mode=1", "secrets.connections=1", "addToken"])
+        #expect(m.turnOn == nil)  // the retried write cleared the banner
+        #expect(m.gated.isEmpty)
+        #expect(host.reasons.contains("Turn on connections on your Core."))
+    }
+
+    @Test func aDeclinedTouchIDOrAViewerMacChangesNothingAndSaysWhy() async {
+        let (m, s, host) = await make()
+        host.declines = true
+        await m.turnOnConnections {}
+        guard case .refused(let why)? = m.turnOn else {
+            Issue.record("expected a refusal")
+            return
+        }
+        #expect(why.contains("Touch ID"))
+        host.declines = false
+        s.failSetting = CoreError.forbiddenScope
+        await m.turnOnConnections {}
+        guard case .refused(let why2)? = m.turnOn else {
+            Issue.record("expected a refusal")
+            return
+        }
+        #expect(why2.contains("allowed to manage the Core"))
+        #expect(s.order.isEmpty)
+    }
+
+    @Test func aSignInRefusedByTheGateIsMarkedSoTheSheetOffersTheAction() {
+        let f = LiveConnectionsService.flow(
+            .init(
+                errorCode: "real_secret_refused", expiresInSecs: 0, id: "f", kind: "github", sites: [], step: "failed"),
+            install: nil)
+        #expect(f.gated)
+        #expect(ConnSay.isGate(CoreError.http(status: 409, code: "secrets_disabled", message: "")))
+        #expect(!ConnSay.isGate(CoreError.http(status: 409, code: "other", message: "")))
     }
 }

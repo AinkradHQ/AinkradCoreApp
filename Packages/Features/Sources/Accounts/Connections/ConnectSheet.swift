@@ -107,6 +107,9 @@ struct ConnectSheet: View {
             CoreDialogPanel("Sign-in didn't finish") {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     CoreNotice(symbol: "exclamationmark.triangle", title: title, text: fix, tone: .fail)
+                    if f?.gated == true {
+                        TurnOnConnections(model: model) { await model.startFlow(k.id) }
+                    }
                     AccDialogButtons(confirm: "Try again", cancel: close) {
                         Task { await model.startFlow(k.id) }
                     }
@@ -285,15 +288,20 @@ struct TokenForm: View {
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
                 .background(GlassInk.well, in: coreShape(Radius.cardMac))
                 if let e = model.writeError["token"] { AccIssue(text: e) }
+                if model.gated.contains("token") { TurnOnConnections(model: model) { await connect() } }
                 AccDialogButtons(
                     confirm: "Connect", cancelTitle: "Back", busy: model.busy == "token",
                     enabled: !token.isEmpty && kind.tokenFields.allSatisfy { !(fields[$0] ?? "").isEmpty }, cancel: back
                 ) {
-                    let n = name.isEmpty ? "\(kind.name) (token)" : name
-                    Task { if await model.addToken(kind: kind.id, name: n, fields: fields, token: token) { close() } }
+                    Task { await connect() }
                 }
             }
         }
+    }
+
+    private func connect() async {
+        let n = name.isEmpty ? "\(kind.name) (token)" : name
+        if await model.addToken(kind: kind.id, name: n, fields: fields, token: token) { close() }
     }
 
     private func binding(_ f: String) -> Binding<String> {
@@ -319,5 +327,38 @@ struct RenameSheet: View {
             }
         }
         .onAppear { name = item.name }
+    }
+}
+
+/// Connections are off on the Core: one button turns them on (one Touch ID), then the refused action runs again. It says
+/// what it is doing, what happened, and in words why it could not.
+struct TurnOnConnections: View {
+    let model: ConnectionsModel
+    let retry: @MainActor () async -> Void
+
+    var body: some View {
+        switch model.turnOn {
+        case .working:
+            CoreNotice(
+                symbol: "hourglass", title: "Turning on connections…", text: "Confirm with Touch ID.", tone: .queue)
+        case .done:
+            CoreNotice(symbol: "checkmark.circle", title: "Connections are on", text: "Trying again.", tone: .done)
+        case .refused(let why):
+            CoreNotice(
+                symbol: "exclamationmark.triangle", title: "Couldn't turn on connections", text: why, tone: .fail
+            ) {
+                button("Try again")
+            }
+        case nil:
+            CoreNotice(
+                symbol: "switch.2", title: "Connections are turned off",
+                text: "Turn them on here. You confirm with Touch ID, then it carries on.", tone: .warn
+            ) { button("Turn on connections") }
+        }
+    }
+
+    private func button(_ title: String) -> some View {
+        Button(title) { Task { await model.turnOnConnections(then: retry) } }
+            .buttonStyle(CoreButtonStyle(.prominent)).accessibilityIdentifier("connections-turn-on")
     }
 }
