@@ -47,7 +47,8 @@ public final class AdminDemo {
     }
 
     public static let scenes = [
-        "settings", "settings-editing", "settings-refused", "settings-history", "switches", "secrets", "secrets-new",
+        "settings", "settings-switching", "settings-editing", "settings-refused", "settings-history", "switches",
+        "secrets", "secrets-new",
         "secrets-lease", "secrets-touchid-cancelled", "audit", "audit-selected", "audit-nomatch", "ops",
         "state-loading",
         "state-empty", "state-error", "state-scope", "banner-resuming", "banner-rate", "banner-renewing",
@@ -86,6 +87,14 @@ public final class AdminDemo {
         let first = DemoData.settings[0]
         switch scene {
         case "settings": await open("core")
+        case "settings-switching":
+            await open("core")
+            let wait = DemoData.settings.first { $0.key == "scheduler.wait_max_secs" } ?? first
+            try? await Task.sleep(for: .milliseconds(600))
+            admin.registry.cursor = wait.key
+            try? await Task.sleep(for: .milliseconds(900))  // the list scrolls to it first
+            admin.registry.beginEdit(wait)
+            admin.registry.draft = "900"
         case "settings-editing":
             await open("core")
             admin.registry.beginEdit(first)
