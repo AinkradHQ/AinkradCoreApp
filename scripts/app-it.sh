@@ -277,7 +277,7 @@ if [ "$MODE" = shots ]; then
   OUT=${OUT:-$W/shots}; mkdir -p "$OUT"
   echo "== app self-snapshot walk (${THEME:-dark}) -> $OUT"
   cd "$HERE"
-  TEST_RUNNER_CORE_SHOTS=1 TEST_RUNNER_CORE_PAIR_SNAPSHOT="$OUT" TEST_RUNNER_CORE_THEME="${THEME:-dark}" \
+  TEST_RUNNER_CORE_SHOTS=1 TEST_RUNNER_CORE_ALLOW_CAPTURE=1 TEST_RUNNER_CORE_PAIR_SNAPSHOT="$OUT" TEST_RUNNER_CORE_THEME="${THEME:-dark}" \
     TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
     TEST_RUNNER_CORE_IT_ADD_CODE_FILE="$ADD_CODE_FILE" TEST_RUNNER_CORE_IT_LOCKS_READY="$LOCKS_FILE" \
     nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \

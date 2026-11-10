@@ -54,6 +54,15 @@ targets:
         product: Agents
       - package: Features
         product: Brain
+    # `ainkrad://connect?…` links (the installer's, an Add device QR scanned by the camera app) open this app.
+    info:
+      path: App/Mac/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.ainkrad.core.connect
+            CFBundleURLSchemes: [ainkrad]
     settings:
       base:
         PRODUCT_NAME: Ainkrad

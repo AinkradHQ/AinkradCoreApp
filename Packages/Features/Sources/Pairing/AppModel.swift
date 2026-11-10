@@ -23,6 +23,13 @@ public final class AppModel {
     public let agents: AgentsModel
     var phase: Phase = .starting
     private(set) var firstRun: FirstRunModel!
+    /// The setup wizard is the first screen; the typed-code first run is its fallback (and a pairing left half done).
+    private(set) var wizard: SetupWizardModel!
+    var useTypedCode = false
+    /// Makes device invites (QR). Unavailable until the Core serves them.
+    var invites: any InviteService = UnavailableInviteService()
+    /// Invites that were still live when their dialog went away; withdrawn from the bell.
+    private(set) var leftInvites: [String] = []
     private(set) var service: (any CoreService)?
     let stepUp = StepUpModel()
     /// Why the last elevated action did not run; shown inline by the panel that asked. Cleared by the next attempt.
@@ -80,6 +87,10 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
+        wizard = SetupWizardModel(driver: driver) { [weak self] in
+            guard let self else { return }
+            Task { await self.openDesktop() }
+        }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
@@ -112,8 +123,43 @@ public final class AppModel {
 
     // MARK: launch
 
+    /// An `ainkrad://connect` link was opened: it fills the wizard's paste screen, and the person presses Connect.
+    public func open(url: URL) {
+        guard url.scheme?.lowercased() == "ainkrad" else { return }
+        // A cold launch from a link: wait until `start()` knows whether this Mac is paired.
+        if phase == .starting {
+            pendingURL = url
+            return
+        }
+        guard phase == .firstRun else {
+            shell.showToast(
+                phase == .desktop
+                    ? "This Mac is already connected to a Core." : "Sort out the connection problem first.")
+            return
+        }
+        // Never mid-flow: a typed-code pairing past its form, or a claim in progress, keeps going.
+        guard !useTypedCode || firstRun.stage == .form else {
+            shell.showToast("Finish or cancel the pairing in progress first.")
+            return
+        }
+        if wizard.receive(url: url) {
+            useTypedCode = false
+        } else {
+            shell.showToast("Wait for the connection in progress to finish first.")
+        }
+    }
+
+    /// A link that arrived before launch finished; the secret in it is dropped here as soon as it is applied or refused.
+    private var pendingURL: URL?
+    private func applyPendingURL() {
+        guard let url = pendingURL else { return }
+        pendingURL = nil
+        open(url: url)
+    }
+
     public func start() async {
         guard phase == .starting else { return }
+        defer { applyPendingURL() }
         if demo {
             phase = .desktop
             shell.coreLink = .live
@@ -129,6 +175,7 @@ public final class AppModel {
             } else {
                 phase = .firstRun
                 await firstRun.resume()
+                useTypedCode = firstRun.stage != .form
             }
         } catch { phase = .blocked(Failure.from(error)) }
     }
@@ -147,6 +194,7 @@ public final class AppModel {
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
         }
+        if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop
         await connect()
     }
@@ -424,6 +472,64 @@ public final class AppModel {
             })
     }
 
+    /// Add device, the QR way. Falls back to the typed-code quick flow while the Core cannot make invites.
+    func openInviteDevice() {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        guard invites.isAvailable else { return openAddDevice(quick: true) }
+        stepUpNotice = nil
+        let model = InviteDeviceModel(host: self)
+        shell.present(
+            ShellDialog(
+                id: "invite-device",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    model?.dialogDidClose()
+                }
+            ) {
+                InviteDeviceView(
+                    app: self, model: model, close: { [weak self] in self?.shell.closeDialog() },
+                    typedCode: { [weak self] in
+                        self?.shell.closeDialog()
+                        self?.openAddDevice()
+                    })
+            })
+    }
+
+    /// Add device by QR kept open on purpose: whatever is still live when the dialog goes (Esc, "Close anyway") is handed here and
+    /// stays in the bell until it is withdrawn.
+    func abandonInvites(_ ids: [String]) {
+        for id in ids where !leftInvites.contains(id) { leftInvites.append(id) }
+        shell.bell.add(
+            BellItem(
+                id: "invite-live", kind: .alarm, title: "A device QR is still live",
+                sub: "Anyone who scans it can add a device. Withdraw it here; this will not survive quitting the app.",
+                time: "now",
+                actions: [
+                    BellAction("Withdraw", primary: true) { [weak self] in Task { await self?.withdrawLeftInvites() } }
+                ]))
+    }
+
+    func withdrawLeftInvites() async {
+        let ids = leftInvites
+        guard !ids.isEmpty else { return }
+        do {
+            let service = invites
+            let failed: [String] = try await elevated("Withdraw the device QR.", done: "withdrawn") {
+                try await withdrawInvites(ids, with: service)
+            }
+            leftInvites = failed
+            if failed.isEmpty {
+                shell.bell.remove("invite-live")
+                shell.showToast("The device QR was withdrawn.")
+            } else {
+                shell.showToast("The Core could not be reached, so the QR is still live.", kind: .warn)
+            }
+        } catch { say(error) }
+    }
+
     // MARK: elevation
 
     /// The Core's key fingerprint this Mac paired with, for the new device to compare against.
@@ -520,6 +626,9 @@ public final class AppModel {
         shell.home = .empty
         shell.resetToFresh()
         firstRun.resetAll()
+        leftInvites = []
+        wizard.startOver()
+        useTypedCode = false
         phase = .firstRun
     }
 
