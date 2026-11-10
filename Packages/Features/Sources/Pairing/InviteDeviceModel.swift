@@ -6,12 +6,16 @@ import Observation
 /// so nothing is compared or approved afterwards. Making the QR needs Touch ID.
 @MainActor @Observable
 final class InviteDeviceModel {
-    var name = "New device" { didSet { if name != oldValue { invite = nil } } }
-    var scopes: Set<String> = ["read", "approve"] { didSet { if scopes != oldValue { invite = nil } } }
+    var name = "New device" { didSet { if name != oldValue { reset() } } }
+    var scopes: Set<String> = ["read", "approve"] { didSet { if scopes != oldValue { reset() } } }
     private(set) var mine: [String] = []
     private(set) var invite: DeviceInvite?
     private(set) var busy = false
     private(set) var error: String?
+    /// The Core says a device claimed the invite: the QR is spent.
+    private(set) var used = false
+    /// The invite was taken back (or the Core ended it), so the QR no longer works.
+    private(set) var ended = false
     private weak var host: AppModel?
 
     init(host: AppModel) { self.host = host }
@@ -32,9 +36,17 @@ final class InviteDeviceModel {
         await create()
     }
 
+    private func reset() {
+        invite = nil
+        used = false
+        ended = false
+    }
+
     func create() async {
         guard let host, canCreate else { return }
         error = nil
+        used = false
+        ended = false
         busy = true
         defer { busy = false }
         let label = name.trimmingCharacters(in: .whitespaces)
@@ -46,6 +58,35 @@ final class InviteDeviceModel {
         } catch is StepUpDeclined {
         } catch {
             invite = nil
+            self.error = CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Asks the Core whether the invite was claimed. A failed ask changes nothing: the next poll tries again.
+    func refresh() async {
+        guard let host, let id = invite?.pairingID, !used, !ended,
+            let status = try? await host.invites.status(id)
+        else { return }
+        switch status {
+        case "approved", "claimed": used = true
+        case "rejected", "expired", "burned": ended = true
+        default: break
+        }
+    }
+
+    /// Takes an unused invite back, after Touch ID.
+    func withdraw() async {
+        guard let host, let id = invite?.pairingID, !used else { return }
+        error = nil
+        busy = true
+        defer { busy = false }
+        do {
+            try await host.elevated("Withdraw the QR for \(invite?.name ?? "the device").", done: "withdrawn") {
+                try await host.invites.withdraw(id)
+            }
+            ended = true
+        } catch is StepUpDeclined {
+        } catch {
             self.error = CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription
         }
     }

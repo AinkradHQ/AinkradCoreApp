@@ -8,11 +8,15 @@ private let fp = Wire.b64(Data(repeating: 7, count: 32))
 private let secret = Wire.b64(Data(repeating: 9, count: 16))
 private let good = "ainkrad://connect?host=core.example.com&fp=\(fp)&secret=\(secret)"
 
-private struct FakeInvites: InviteService {
+private final class FakeInvites: InviteService, @unchecked Sendable {
     var isAvailable = true
+    var state = "live"
+    private(set) var withdrawn: [String] = []
+    func status(_ pairingID: String) async throws -> String { state }
+    func withdraw(_ pairingID: String) async throws { withdrawn.append(pairingID) }
     func createInvite(name: String, scopes: [String]) async throws -> DeviceInvite {
         DeviceInvite(
-            name: name, scopes: scopes,
+            pairingID: "p_7", name: name, scopes: scopes,
             link: try ConnectLink(host: "core.example.com", coreFingerprint: fp, secret: Data(repeating: 1, count: 16)))
     }
 }
@@ -185,5 +189,21 @@ struct SetupWizardTests {
         let live = try await app(invites: FakeInvites())
         live.openInviteDevice()
         #expect(live.shell.dialog?.id == "invite-device")
+    }
+
+    @Test func aClaimedInviteShowsUsedAndAWithdrawnOneEnds() async throws {
+        let fake = FakeInvites()
+        let m = try await app(invites: fake)
+        let add = InviteDeviceModel(host: m)
+        await add.quick()
+        await add.refresh()
+        #expect(!add.used && !add.ended)
+        fake.state = "approved"
+        await add.refresh()
+        #expect(add.used)
+        await add.create()
+        #expect(!add.used, "a new code starts unused")
+        await add.withdraw()
+        #expect(add.ended && fake.withdrawn == ["p_7"])
     }
 }

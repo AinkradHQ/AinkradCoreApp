@@ -103,7 +103,7 @@ struct LiveCoreService: CoreService {
     let connection: CoreConnection
     var deviceID: String { connection.identity.deviceID }
     var agentsAPI: (any AgentsAPI)? { LiveAgentsAPI(connection: connection) }
-    private var client: Client { connection.client }
+    var client: Client { connection.client }
 
     func connect() async throws { try await connection.connect() }
     func close() async { await connection.close() }
@@ -168,6 +168,24 @@ struct LiveCoreService: CoreService {
                     throw CoreError.protocolViolation("a pairing without an id or a code")
                 }
                 return NewPairing(id: id, code: code, qr: p.qr, expiresAt: p.expiresAt)
+            case .badRequest(let r): throw Self.fail(r)
+            case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    /// `POST /pairings/invites`: the link and secret come back once. Nothing here logs or keeps them.
+    func createInvite(name: String, scopes: [String]) async throws -> DeviceInvite {
+        try await run {
+            switch try await client.createInvite(body: .json(.init(name: name, scopes: scopes))) {
+            case .ok(let o):
+                let b = try o.body.json
+                guard let id = b.pairingId, let text = b.link else {
+                    throw CoreError.protocolViolation("an invite without an id or a link")
+                }
+                return DeviceInvite(pairingID: id, name: name, scopes: scopes, link: try ConnectLink.parse(text))
             case .badRequest(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
             case .undocumented(let status, let p): throw await Self.status(status, p)

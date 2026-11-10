@@ -168,6 +168,7 @@ public final class AppModel {
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
         }
+        if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop
         await connect()
     }

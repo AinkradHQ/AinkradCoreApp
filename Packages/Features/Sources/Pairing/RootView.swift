@@ -15,7 +15,7 @@ public struct RootView: View {
             case .starting: sky.overlay { CoreBusyBar().frame(width: Space.s8 * 4) }
             case .firstRun:
                 if app.useTypedCode {
-                    FirstRunView(model: app.firstRun)
+                    FirstRunView(model: app.firstRun) { app.useTypedCode = false }
                 } else {
                     SetupWizardView(model: app.wizard) { app.useTypedCode = true }
                 }

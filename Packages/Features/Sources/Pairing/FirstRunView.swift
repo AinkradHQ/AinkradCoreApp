@@ -8,6 +8,8 @@ import SwiftUI
 /// The screen before the desktop: connect to a Core and pair this Mac with it.
 struct FirstRunView: View {
     @Bindable var model: FirstRunModel
+    /// Back to the setup wizard (new Core, or paste a link).
+    var backToSetup: () -> Void = {}
     @Environment(\.corePalette) private var palette
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -112,6 +114,10 @@ struct FirstRunView: View {
             }
             Text(step.1).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
                 .accessibilityLabel(step.0 > 0 ? "Step \(step.0) of 4, \(step.1)" : step.1)
+            if model.stage == .form {
+                Spacer(minLength: 0)
+                LinkButton(title: "Back to setup", action: backToSetup)
+            }
         }
     }
 

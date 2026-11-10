@@ -21,7 +21,7 @@ struct InviteDeviceView: View {
                     qr
                     form
                 }
-                if let invite = model.invite { linkRow(invite) }
+                if let invite = model.invite, !model.used, !model.ended { linkRow(invite) }
                 StepUpBanner(app: app)
                 if let e = model.error {
                     Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(palette.tone(.fail).ink)
@@ -30,6 +30,10 @@ struct InviteDeviceView: View {
                 HStack(spacing: Space.s2) {
                     LinkButton(title: "Use a typed code instead", action: typedCode)
                     Spacer(minLength: 0)
+                    if model.invite?.pairingID != nil, !model.used, !model.ended {
+                        Button("Withdraw") { Task { await model.withdraw() } }
+                            .buttonStyle(.coreSecondary).disabled(model.busy)
+                    }
                     Button(model.invite == nil ? "Make QR" : "New code") { Task { await model.create() } }
                         .buttonStyle(CoreButtonStyle(model.invite == nil ? .prominent : .secondary, busy: model.busy))
                         .disabled(!model.canCreate)
@@ -39,11 +43,22 @@ struct InviteDeviceView: View {
             .coreFont(size: MacTextSize.body)
         }
         .task { await model.quick() }
+        .task(id: model.invite) {
+            // A claimed invite is `approved` at once; the poll covers a dropped event stream.
+            while !Task.isCancelled, model.invite != nil, !model.used, !model.ended {
+                try? await Task.sleep(for: .seconds(2))
+                await model.refresh()
+            }
+        }
     }
 
     private var qr: some View {
         Group {
-            if let invite = model.invite {
+            if model.used {
+                spent("checkmark", "\(model.invite?.name ?? "The device") is connected", palette.tone(.done).ink)
+            } else if model.ended {
+                spent("xmark", "This QR was withdrawn", palette.text2)
+            } else if let invite = model.invite {
                 QRImage(text: invite.link.text)
             } else {
                 coreShape(Radius.cardMac).fill(palette.glassCard)
@@ -52,6 +67,18 @@ struct InviteDeviceView: View {
         }
         .frame(width: Space.s8 * 6, height: Space.s8 * 6)
         .accessibilityIdentifier("invite-qr")
+    }
+
+    /// A used or withdrawn QR is replaced by a plain statement; the secret is not drawn any more.
+    private func spent(_ symbol: String, _ words: String, _ ink: Color) -> some View {
+        VStack(spacing: Space.s2) {
+            Image(systemName: symbol).coreFont(size: MacTextSize.large, weight: .semibold).foregroundStyle(ink)
+                .accessibilityHidden(true)
+            Text(words).coreFont(size: MacTextSize.body, weight: .semibold).multilineTextAlignment(.center)
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .accessibilityElement(children: .combine)
     }
 
     private var form: some View {
