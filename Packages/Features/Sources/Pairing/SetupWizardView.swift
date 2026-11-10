@@ -220,7 +220,6 @@ private struct ChoiceCard: View {
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, minHeight: Space.s8 * 4, alignment: .topLeading)
             .padding(Space.s4)

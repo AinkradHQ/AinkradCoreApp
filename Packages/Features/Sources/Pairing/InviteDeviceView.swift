@@ -13,7 +13,7 @@ struct InviteDeviceView: View {
     @State private var copied = false
 
     var body: some View {
-        DialogCard(title: "Add a device", width: Space.s8 * 19, close: close) {
+        DialogCard(title: "Add a device", width: Space.s8 * 24, close: close) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 Text("Scan this on the new device. It connects directly; there is nothing to approve afterwards.")
                     .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
