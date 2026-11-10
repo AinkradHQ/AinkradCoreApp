@@ -164,6 +164,7 @@ struct SetupWizardView: View {
             )
             .disabled(busy)
             .accessibilityIdentifier("connect-link-field")
+            .background { if !model.linkText.isEmpty { WindowSharingGuard() } }
             if model.receivedFromApp {
                 CoreNotice(
                     symbol: "exclamationmark.triangle", title: "Opened from another app",
@@ -173,7 +174,7 @@ struct SetupWizardView: View {
             }
             if let link = model.link {
                 FactCard {
-                    FactRow(key: "Core", value: link.address, mono: true)
+                    FactRow(key: "Core", value: String(link.address.prefix(80)), mono: true, oneLine: true)
                     if model.receivedFromApp {
                         // The whole fingerprint, wrapped, so it can be compared and not only recognised.
                         VStack(alignment: .leading, spacing: Space.s1 / 2) {

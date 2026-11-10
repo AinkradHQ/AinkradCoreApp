@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Why a pasted or opened link is not a usable connect link, in words a person can act on.
@@ -77,14 +78,22 @@ public struct ConnectLink: Sendable, Equatable, CustomStringConvertible, CustomD
         (self.host, self.port, self.coreFingerprint, self.secret) = (host, port, coreFingerprint, secret)
     }
 
-    /// A DNS name or IPv4 address, or an IPv6 literal in brackets (`[::1]`).
+    /// An allowlist: a DNS name (labels of letters, digits and inner hyphens, a trailing dot allowed), an IPv4 address, or a
+    /// bracketed IPv6 literal. Anything else (controls, backslash, quotes, `<`, `|`, spaces) is refused.
     static func validHost(_ h: String) -> Bool {
         if h.hasPrefix("[") {
-            let inner = h.dropFirst().dropLast()
-            return h.hasSuffix("]") && inner.contains(":")
-                && inner.allSatisfy { $0.isHexDigit || $0 == ":" || $0 == "." }
+            guard h.hasSuffix("]"), h.count > 3 else { return false }
+            var addr = in6_addr()
+            return h.dropFirst().dropLast().withCString { inet_pton(AF_INET6, $0, &addr) == 1 }
         }
-        return !h.isEmpty && !h.contains(where: { "/?#@ :&=[]%".contains($0) })
+        var v4 = in_addr()
+        if h.withCString({ inet_pton(AF_INET, $0, &v4) }) == 1 { return true }
+        let name = h.hasSuffix(".") ? String(h.dropLast()) : h
+        guard (1...253).contains(name.count) else { return false }
+        return name.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
+            (1...63).contains(label.count) && !label.hasPrefix("-") && !label.hasSuffix("-")
+                && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+        }
     }
 
     /// The whole fingerprint, for a link that came from another app: a person can compare it with the Core's own.

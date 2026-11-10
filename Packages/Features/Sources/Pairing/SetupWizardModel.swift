@@ -27,14 +27,16 @@ final class SetupWizardModel {
     var linkText = "" {
         didSet {
             guard linkText != oldValue else { return }
-            if !settingFromURL { receivedFromApp = false }
             reparse()
+            // Editing the text only makes it the person's own when it now means a different link.
+            if receivedFromApp, link != receivedLink { receivedFromApp = false }
         }
     }
+    private var receivedLink: ConnectLink?
     /// The link came in through the `ainkrad://` scheme, not from the person's own paste: the screen says so and asks them to
     /// check the Core before going on.
     private(set) var receivedFromApp = false
-    private var settingFromURL = false
+
     /// The link in `linkText` once it parses; the screen shows its address and fingerprint before anything is sent.
     private(set) var link: ConnectLink?
     /// Why `linkText` is not a link yet. Not shown until something has been typed.
@@ -72,9 +74,9 @@ final class SetupWizardModel {
     @discardableResult
     func receive(url: URL) -> Bool {
         guard stage != .connecting else { return false }
-        settingFromURL = true
+        receivedFromApp = false
         linkText = url.absoluteString
-        settingFromURL = false
+        receivedLink = link
         receivedFromApp = true
         stage = .connect
         return true
@@ -106,6 +108,7 @@ final class SetupWizardModel {
         link = nil
         linkError = nil
         receivedFromApp = false
+        receivedLink = nil
     }
 
     private func claim(_ link: ConnectLink) async {

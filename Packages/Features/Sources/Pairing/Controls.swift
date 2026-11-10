@@ -69,6 +69,8 @@ struct FactRow: View {
     let key: String
     let value: String
     var mono = false
+    /// One line, cut in the middle: for a value that came from outside and must not wrap into the next row.
+    var oneLine = false
     @Environment(\.corePalette) private var palette
     private var textScale: Double { TextSizePrefs.shared.scale }
     var body: some View {
@@ -76,6 +78,7 @@ struct FactRow: View {
             Text(key).foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
             Text(value).font(mono ? .core(size: MacTextSize.body, design: .monospaced, scale: textScale) : nil)
+                .lineLimit(oneLine ? 1 : nil).truncationMode(.middle)
                 .multilineTextAlignment(.trailing).textSelection(.enabled)
         }
         .coreFont(size: MacTextSize.body)

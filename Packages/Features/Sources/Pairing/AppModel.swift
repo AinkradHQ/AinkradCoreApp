@@ -28,6 +28,8 @@ public final class AppModel {
     var useTypedCode = false
     /// Makes device invites (QR). Unavailable until the Core serves them.
     var invites: any InviteService = UnavailableInviteService()
+    /// Invites that were still live when their dialog went away; withdrawn from the bell.
+    private(set) var leftInvites: [String] = []
     private(set) var service: (any CoreService)?
     let stepUp = StepUpModel()
     /// Why the last elevated action did not run; shown inline by the panel that asked. Cleared by the next attempt.
@@ -124,7 +126,12 @@ public final class AppModel {
     /// An `ainkrad://connect` link was opened: it fills the wizard's paste screen, and the person presses Connect.
     public func open(url: URL) {
         guard url.scheme?.lowercased() == "ainkrad" else { return }
-        guard phase != .desktop else {
+        // A cold launch from a link: wait until `start()` knows whether this Mac is paired.
+        if phase == .starting {
+            pendingURL = url
+            return
+        }
+        guard phase == .firstRun else {
             shell.showToast("This Mac is already connected to a Core.")
             return
         }
@@ -133,11 +140,24 @@ public final class AppModel {
             shell.showToast("Finish or cancel the pairing in progress first.")
             return
         }
-        if wizard.receive(url: url) { useTypedCode = false }
+        if wizard.receive(url: url) {
+            useTypedCode = false
+        } else {
+            shell.showToast("Wait for the connection in progress to finish first.")
+        }
+    }
+
+    /// A link that arrived before launch finished; the secret in it is dropped here as soon as it is applied or refused.
+    private var pendingURL: URL?
+    private func applyPendingURL() {
+        guard let url = pendingURL else { return }
+        pendingURL = nil
+        open(url: url)
     }
 
     public func start() async {
         guard phase == .starting else { return }
+        defer { applyPendingURL() }
         if demo {
             phase = .desktop
             shell.coreLink = .live
@@ -460,7 +480,13 @@ public final class AppModel {
         stepUpNotice = nil
         let model = InviteDeviceModel(host: self)
         shell.present(
-            ShellDialog(id: "invite-device", onClose: { [weak self] in self?.stepUpNotice = nil }) {
+            ShellDialog(
+                id: "invite-device",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    model?.dialogDidClose()
+                }
+            ) {
                 InviteDeviceView(
                     app: self, model: model, close: { [weak self] in self?.shell.closeDialog() },
                     typedCode: { [weak self] in
@@ -468,6 +494,39 @@ public final class AppModel {
                         self?.openAddDevice()
                     })
             })
+    }
+
+    /// Add device by QR kept open on purpose: whatever is still live when the dialog goes (Esc, "Close anyway") is handed here and
+    /// stays in the bell until it is withdrawn.
+    func abandonInvites(_ ids: [String]) {
+        for id in ids where !leftInvites.contains(id) { leftInvites.append(id) }
+        shell.bell.add(
+            BellItem(
+                id: "invite-live", kind: .alarm, title: "A device QR is still live",
+                sub: "Anyone who scans it can add a device. It stays valid until it is withdrawn.", time: "now",
+                actions: [
+                    BellAction("Withdraw", primary: true) { [weak self] in Task { await self?.withdrawLeftInvites() } }
+                ]))
+    }
+
+    func withdrawLeftInvites() async {
+        let ids = leftInvites
+        guard !ids.isEmpty else { return }
+        do {
+            let service = invites
+            let failed: [String] = try await elevated("Withdraw the device QR.", done: "withdrawn") {
+                var failed: [String] = []
+                for id in ids { do { try await service.withdraw(id) } catch { failed.append(id) } }
+                return failed
+            }
+            leftInvites = failed
+            if failed.isEmpty {
+                shell.bell.remove("invite-live")
+                shell.showToast("The device QR was withdrawn.")
+            } else {
+                shell.showToast("The Core could not be reached, so the QR is still live.", kind: .warn)
+            }
+        } catch { say(error) }
     }
 
     // MARK: elevation

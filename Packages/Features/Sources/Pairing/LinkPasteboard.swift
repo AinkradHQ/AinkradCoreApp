@@ -19,7 +19,8 @@ final class SystemLinkPasteboard: LinkPasteboard {
 
     var changeCount: Int { board.changeCount }
     func write(secret text: String) -> Int {
-        board.clearContents()
+        // Current host only: Universal Clipboard and Handoff must not carry the secret to the person's other devices.
+        board.prepareForNewContents(with: .currentHostOnly)
         let item = NSPasteboardItem()
         item.setString(text, forType: .string)
         item.setData(Data(), forType: Self.concealed)

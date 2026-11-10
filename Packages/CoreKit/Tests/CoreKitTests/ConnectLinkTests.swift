@@ -127,4 +127,30 @@ private func link(_ q: String) -> String { "ainkrad://connect?\(q)" }
             try ConnectLink.parse(link("host=xn--cre-6ve.example.com&fp=\(fp)&secret=\(secret)"))
         }
     }
+
+    @Test func hostsAreAnAllowlist() {
+        for host in [
+            "core.example.com", "Core.Example.COM", "core.example.com.", "10.0.0.5", "xn--cre-6ve.example.com", "a",
+            "[::1]", "[fd00::5]",
+        ] {
+            #expect(throws: Never.self, "\(host)") {
+                try ConnectLink(host: host, coreFingerprint: fp, secret: Data(repeating: 9, count: 16))
+            }
+        }
+        let long = String(repeating: "a", count: 64) + ".com"
+        for host in [
+            "", "a b", "a\nb", "a\0b", "a\tb", "a\\b", "a<b", "a\"b", "a|b", "-a.com", "a-.com",
+            "a..com", "[:]", "[::1",
+            "[1.2.3.4]", long, "a;b.com", "a%b.com",
+        ] {
+            #expect(throws: ConnectLinkError.self, "\(host.debugDescription)") {
+                try ConnectLink(host: host, coreFingerprint: fp, secret: Data(repeating: 9, count: 16))
+            }
+        }
+        for h in ["a%0Ab.com", "a%00b.com", "a%09b.com"] {
+            #expect(throws: ConnectLinkError.badHost) {
+                try ConnectLink.parse(link("host=\(h)&fp=\(fp)&secret=\(secret)"))
+            }
+        }
+    }
 }

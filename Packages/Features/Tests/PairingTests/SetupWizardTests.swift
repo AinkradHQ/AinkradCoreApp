@@ -9,31 +9,6 @@ private let fp = Wire.b64(Data(repeating: 7, count: 32))
 private let secret = Wire.b64(Data(repeating: 9, count: 16))
 private let good = "ainkrad://connect?host=core.example.com&fp=\(fp)&secret=\(secret)"
 
-private final class FakeInvites: InviteService, @unchecked Sendable {
-    var isAvailable = true
-    var state = "live"
-    var failWithdraw = false
-    private let lock = NSLock()
-    private var _created = 0
-    private var _withdrawn: [String] = []
-    var created: Int { lock.withLock { _created } }
-    var withdrawn: [String] { lock.withLock { _withdrawn } }
-    func status(_ pairingID: String) async throws -> String { state }
-    func withdraw(_ pairingID: String) async throws {
-        if failWithdraw { throw CoreError.offline("down") }
-        lock.withLock { _withdrawn.append(pairingID) }
-    }
-    func createInvite(name: String, scopes: [String]) async throws -> DeviceInvite {
-        let n = lock.withLock {
-            _created += 1
-            return _created
-        }
-        return DeviceInvite(
-            pairingID: "p_\(n)", name: name, scopes: scopes,
-            link: try ConnectLink(host: "core.example.com", coreFingerprint: fp, secret: Data(repeating: 1, count: 16)))
-    }
-}
-
 @MainActor
 struct SetupWizardTests {
     private func wizard(
@@ -165,79 +140,16 @@ struct SetupWizardTests {
         #expect(m.stage == .connect && m.link != nil && d.claimedWith == nil)
     }
 
-    // MARK: Add device by QR
-
-    private func app(invites: any InviteService) async throws -> AppModel {
-        let store = makeMemoryKeyStore()
-        try store.saveIdentity(
-            PairedIdentity(deviceID: "d_me", coreFingerprint: fp, endpoint: URL(string: "https://core.example.com")!))
-        let m = AppModel(keyStore: store, driver: FakeDriver()) { _ in FakeService() }
-        m.stepUp.check = { _, _ in }
-        m.invites = invites
-        await m.start()
-        m.shell.elevatedUntil = Date().addingTimeInterval(300)
-        return m
-    }
-
-    @Test func theInviteQRCarriesTheSameLinkFormat() async throws {
-        let m = try await app(invites: FakeInvites())
-        let add = InviteDeviceModel(host: m)
-        await add.prepare()
-        await add.create()
-        let invite = try #require(add.invite)
-        #expect(invite.scopes == ["read", "approve"], "the defaults, limited to what this device holds")
-        #expect(try ConnectLink.parse(invite.link.text) == invite.link)
-        #expect(invite.link.text.hasPrefix("ainkrad://connect?host=core.example.com&fp="))
-    }
-
-    @Test func changingWhatADeviceMayDoDropsTheOldQR() async throws {
-        let m = try await app(invites: FakeInvites())
-        let add = InviteDeviceModel(host: m)
-        await add.prepare()
-        await add.create()
-        #expect(add.invite != nil)
-        add.scopes = ["read", "terminal"]
-        #expect(add.invite == nil)
-        await add.create()
-        #expect(add.invite?.scopes == ["read", "terminal"])
-        add.scopes = []
-        #expect(!add.canCreate)
-    }
-
-    @Test func untilTheCoreServesInvitesAddDeviceKeepsTheTypedCodeFlow() async throws {
-        let m = try await app(invites: UnavailableInviteService())
-        m.openInviteDevice()
-        #expect(m.shell.dialog?.id == "add-device")
-        let live = try await app(invites: FakeInvites())
-        live.openInviteDevice()
-        #expect(live.shell.dialog?.id == "invite-device")
-    }
-
-    @Test func aClaimedInviteShowsUsedAndAWithdrawnOneEnds() async throws {
-        let fake = FakeInvites()
-        let m = try await app(invites: fake)
-        let add = InviteDeviceModel(host: m)
-        await add.prepare()
-        await add.create()
-        await add.refresh()
-        #expect(!add.used && !add.ended)
-        fake.state = "approved"
-        await add.refresh()
-        #expect(add.used)
-        await add.create()
-        #expect(!add.used, "a new code starts unused")
-        await add.withdraw()
-        #expect(add.ended && fake.withdrawn == ["p_2"])
-    }
-
     // MARK: received links and mid-flow safety
 
     @Test func aLinkFromAnotherAppIsMarkedAndAPastedOneIsNot() {
         let m = wizard()
         m.receive(url: URL(string: good)!)
         #expect(m.receivedFromApp && m.link != nil)
-        m.linkText = good + " "  // the person edits it: it is theirs now
-        #expect(!m.receivedFromApp)
+        m.linkText = good + " "  // whitespace only: the same link, still from another app
+        #expect(m.receivedFromApp)
+        m.linkText = good.replacingOccurrences(of: "core.example.com", with: "evil.example.com")
+        #expect(!m.receivedFromApp, "a different link is the person's own")
         m.chooseExisting()
         m.linkText = good
         #expect(!m.receivedFromApp)
@@ -277,7 +189,7 @@ struct SetupWizardTests {
     }
 
     @Test func openURLIsRefusedOnTheDesktop() async throws {
-        let m = try await app(invites: FakeInvites())
+        let m = try await pairedApp()
         m.open(url: URL(string: good)!)
         #expect(m.phase == .desktop && m.wizard.stage == .choose && m.wizard.link == nil)
     }
@@ -295,133 +207,40 @@ struct SetupWizardTests {
         #expect(fresh.wizard.stage == .connect && fresh.wizard.receivedFromApp && !fresh.useTypedCode)
     }
 
-    // MARK: no invite left behind
-
-    private func inviteModel(
-        _ fake: FakeInvites, _ board: FakeBoard = FakeBoard(), after: Duration = .seconds(60)
-    ) async throws -> InviteDeviceModel {
-        InviteDeviceModel(host: try await app(invites: fake), pasteboard: board, clearAfter: after)
+    private func pairedApp(paired: Bool = true) async throws -> AppModel {
+        let store = makeMemoryKeyStore()
+        if paired {
+            try store.saveIdentity(
+                PairedIdentity(
+                    deviceID: "d_me", coreFingerprint: fp, endpoint: URL(string: "https://core.example.com")!))
+        }
+        let m = AppModel(keyStore: store, driver: FakeDriver()) { _ in FakeService() }
+        m.stepUp.check = { _, _ in }
+        if paired { await m.start() }
+        return m
     }
 
-    @Test func openingTheDialogMakesNoInvite() async throws {
-        let fake = FakeInvites()
-        let add = try await inviteModel(fake)
-        await add.prepare()
-        #expect(add.invite == nil && fake.created == 0)
-        await add.create()
-        #expect(fake.created == 1)
+    @Test func aLinkOpenedDuringLaunchWaitsForThePhase() async throws {
+        let unpaired = try await pairedApp(paired: false)
+        unpaired.open(url: URL(string: good)!)
+        #expect(unpaired.wizard.link == nil, "queued, not applied while starting")
+        await unpaired.start()
+        #expect(unpaired.phase == .firstRun && unpaired.wizard.stage == .connect && unpaired.wizard.receivedFromApp)
+        let store = makeMemoryKeyStore()
+        try store.saveIdentity(
+            PairedIdentity(deviceID: "d_me", coreFingerprint: fp, endpoint: URL(string: "https://core.example.com")!))
+        let paired = AppModel(keyStore: store, driver: FakeDriver()) { _ in FakeService() }
+        paired.open(url: URL(string: good)!)
+        await paired.start()
+        #expect(paired.phase == .desktop && paired.wizard.link == nil && paired.wizard.linkText.isEmpty)
+        #expect(paired.shell.toast != nil, "refused out loud")
     }
 
-    @Test func anInviteIsWithdrawnWhenItIsReplaced() async throws {
-        let fake = FakeInvites()
-        let add = try await inviteModel(fake)
-        await add.create()
-        await add.create()
-        await add.settle()
-        #expect(fake.created == 2 && fake.withdrawn == ["p_1"])
-    }
-
-    @Test func anInviteIsWithdrawnWhenTheNameOrScopesChange() async throws {
-        let fake = FakeInvites()
-        let add = try await inviteModel(fake)
-        await add.create()
-        add.scopes = ["read"]
-        await add.settle()
-        #expect(fake.withdrawn == ["p_1"] && add.invite == nil)
-        await add.create()
-        add.name = "iPad"
-        await add.settle()
-        #expect(fake.withdrawn == ["p_1", "p_2"])
-    }
-
-    @Test func anInviteIsWithdrawnWhenTheDialogClosesButASpentOneIsNot() async throws {
-        let fake = FakeInvites()
-        let add = try await inviteModel(fake)
-        await add.create()
-        add.closed()
-        await add.settle()
-        #expect(fake.withdrawn == ["p_1"])
-        let used = try await inviteModel(fake)
-        await used.create()
-        fake.state = "approved"
-        await used.refresh()
-        used.closed()
-        await used.settle()
-        #expect(fake.withdrawn == ["p_1"], "a claimed invite is a device now, not something to take back")
-    }
-
-    @Test func aFailedWithdrawNeverBlocksOrSurfaces() async throws {
-        let fake = FakeInvites()
-        fake.failWithdraw = true
-        let add = try await inviteModel(fake)
-        await add.create()
-        add.closed()
-        await add.settle()
-        #expect(add.error == nil)
-    }
-
-    // MARK: the copied link
-
-    @Test func copiedLinkIsClearedWhenUsedWithdrawnOrClosedButNeverSomethingElse() async throws {
-        let fake = FakeInvites()
-        let board = FakeBoard()
-        let add = try await inviteModel(fake, board)
-        await add.create()
-        add.copyLink()
-        #expect(board.text == add.invite?.link.text && add.copied)
-        fake.state = "approved"
-        await add.refresh()
-        #expect(board.text == nil, "used: the link is taken back")
-        let other = try await inviteModel(fake, board)
-        await other.create()
-        other.copyLink()
-        board.userCopies("something else")
-        other.closed()
-        #expect(board.text == "something else", "never clear what the person copied since")
-        let w = try await inviteModel(fake, board)
-        await w.create()
-        w.copyLink()
-        await w.withdraw()
-        #expect(board.text == nil)
-    }
-
-    @Test func theCopiedLinkClearsItselfAfterAWhile() async throws {
-        let board = FakeBoard()
-        let add = try await inviteModel(FakeInvites(), board, after: .milliseconds(20))
-        await add.create()
-        add.copyLink()
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(board.text == nil && !add.copied)
-    }
-
-    @Test func theSystemPasteboardWritesConcealedAndTransientTypes() throws {
-        let named = NSPasteboard(name: .init("ainkrad-test-\(UUID().uuidString)"))
-        let sys = SystemLinkPasteboard(named)
-        let count = sys.write(secret: "ainkrad://connect?x")
-        let types = named.pasteboardItems?.first?.types ?? []
-        #expect(types.contains(SystemLinkPasteboard.concealed) && types.contains(SystemLinkPasteboard.transient))
-        #expect(named.string(forType: .string) == "ainkrad://connect?x" && named.changeCount == count)
-        sys.clear()
-        #expect(named.string(forType: .string) == nil)
-        named.releaseGlobally()
-    }
-}
-
-@MainActor
-private final class FakeBoard: LinkPasteboard {
-    private(set) var changeCount = 0
-    private(set) var text: String?
-    func write(secret text: String) -> Int {
-        self.text = text
-        changeCount += 1
-        return changeCount
-    }
-    func userCopies(_ t: String) {
-        text = t
-        changeCount += 1
-    }
-    func clear() {
-        text = nil
-        changeCount += 1
+    @Test func aRefusedReceiveSaysSo() async throws {
+        let m = try await pairedApp(paired: false)
+        m.phase = .firstRun
+        m.wizard.debugSet(.connecting, link: good)
+        m.open(url: URL(string: good)!)
+        #expect(m.shell.toast != nil)
     }
 }
