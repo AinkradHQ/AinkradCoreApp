@@ -146,13 +146,18 @@ struct SetupWizardTests {
         let m = wizard()
         m.receive(url: URL(string: good)!)
         #expect(m.receivedFromApp && m.link != nil)
+        m.linkText = String(m.linkText.dropLast())  // one keystroke: not a link any more
+        #expect(!m.receivedFromApp)
+        m.linkText += String(secret.suffix(1))  // retyped: the same link, so the warning is back
+        #expect(m.receivedFromApp)
         m.linkText = good + " "  // whitespace only: the same link, still from another app
         #expect(m.receivedFromApp)
         m.linkText = good.replacingOccurrences(of: "core.example.com", with: "evil.example.com")
         #expect(!m.receivedFromApp, "a different link is the person's own")
-        m.chooseExisting()
-        m.linkText = good
-        #expect(!m.receivedFromApp)
+        let pasted = wizard()
+        pasted.chooseExisting()
+        pasted.linkText = good
+        #expect(!pasted.receivedFromApp, "a link that never came from another app is not flagged")
     }
 
     @Test func aReceivedLinkIsIgnoredWhileClaiming() {
@@ -242,5 +247,12 @@ struct SetupWizardTests {
         m.wizard.debugSet(.connecting, link: good)
         m.open(url: URL(string: good)!)
         #expect(m.shell.toast != nil)
+    }
+
+    @Test func openingALinkWhileBlockedDoesNotSayAlreadyConnected() async throws {
+        let m = try await pairedApp(paired: false)
+        m.phase = .blocked(Failure(kind: .other("x")))
+        m.open(url: URL(string: good)!)
+        #expect(m.shell.toast?.message.contains("already connected") == false)
     }
 }

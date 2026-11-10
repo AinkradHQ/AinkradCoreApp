@@ -13,10 +13,16 @@ private final class FakeInvites: InviteService, @unchecked Sendable {
     var isAvailable = true
     weak var app: AppModel?
     var failWithdraw = false
+    var createError: (any Error)?
+    var demandStepUpOnce = false
+    var withdrawDelay: Duration?
     var onCreate: (@Sendable (String) async -> Void)?
+    var onWithdraw: (@Sendable (String) async -> Void)?
     private let lock = NSLock()
     private var _log: [String] = []
     private var overrides: [String: String] = [:]
+    private var live: Set<String> = []
+    private var spent: Set<String> = []
     private var gone: Set<String> = []
     private var held: Set<String> = []
     private var _created = 0
@@ -25,6 +31,13 @@ private final class FakeInvites: InviteService, @unchecked Sendable {
     var withdrawn: [String] { log.filter { $0.hasPrefix("withdraw ") }.map { String($0.dropFirst(9)) } }
 
     func set(status: String, for id: String) { lock.withLock { overrides[id] = status } }
+    /// A device claimed it: it is approved, so withdrawing it is a conflict from now on.
+    func markUsed(_ id: String) {
+        lock.withLock {
+            live.remove(id)
+            spent.insert(id)
+        }
+    }
     func hold(_ id: String) { lock.withLock { _ = held.insert(id) } }
     func release(_ id: String) { lock.withLock { _ = held.remove(id) } }
     private func isHeld(_ id: String) -> Bool { lock.withLock { held.contains(id) } }
@@ -33,12 +46,30 @@ private final class FakeInvites: InviteService, @unchecked Sendable {
 
     func status(_ pairingID: String) async throws -> String {
         while isHeld(pairingID) { try await Task.sleep(for: .milliseconds(5)) }
-        return lock.withLock { overrides[pairingID] ?? (gone.contains(pairingID) ? "rejected" : "live") }
+        return lock.withLock {
+            let natural = live.contains(pairingID) ? "live" : spent.contains(pairingID) ? "approved" : "rejected"
+            return overrides[pairingID] ?? natural
+        }
     }
+
+    /// The Core's `reject`: Touch ID window needed; live or claimed only (409 `conflict` for anything else), 404 for unknown.
     func withdraw(_ pairingID: String) async throws {
+        await onWithdraw?(pairingID)
+        if let d = withdrawDelay { try await Task.sleep(for: d) }
         guard await elevated() else { throw CoreError.stepUpRequired }
+        if demandStepUpOnce {
+            demandStepUpOnce = false
+            throw CoreError.stepUpRequired
+        }
         if failWithdraw { throw CoreError.offline("down") }
-        lock.withLock {
+        try lock.withLock {
+            guard live.contains(pairingID) else {
+                if spent.contains(pairingID) || gone.contains(pairingID) {
+                    throw CoreError.http(status: 409, code: "conflict", message: "That pairing is not pending.")
+                }
+                throw CoreError.http(status: 404, code: "not_found", message: "Unknown pairing.")
+            }
+            live.remove(pairingID)
             gone.insert(pairingID)
             _log.append("withdraw \(pairingID)")
         }
@@ -51,6 +82,8 @@ private final class FakeInvites: InviteService, @unchecked Sendable {
             return "p_\(_created)"
         }
         await onCreate?(id)
+        if let createError { throw createError }
+        lock.withLock { _ = live.insert(id) }
         return DeviceInvite(
             pairingID: id, name: name, scopes: scopes,
             link: try ConnectLink(host: "core.example.com", coreFingerprint: fp, secret: Data(repeating: 1, count: 16)))
@@ -191,7 +224,7 @@ struct InviteDeviceTests {
     @Test func aSpentInviteIsNotWithdrawnOnClose() async throws {
         let r = try await rig()
         await r.add.create()
-        r.fake.set(status: "approved", for: "p_1")
+        r.fake.markUsed("p_1")
         await r.add.refresh()
         #expect(await r.add.requestClose() && r.fake.withdrawn.isEmpty)
     }
@@ -263,6 +296,135 @@ struct InviteDeviceTests {
         #expect(r.app.leftInvites == ["p_1"])
     }
 
+    // MARK: spent, gone and racing invites
+
+    @Test func aSpentInviteIsGoneNotAnErrorOnClose() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.fake.markUsed("p_1")  // a device claimed it; the poll has not noticed yet
+        #expect(await r.add.requestClose())
+        #expect(r.add.error == nil && !r.add.stillLive)
+    }
+
+    @Test func replacingAnInviteThatWasClaimedMeanwhileLeavesNothingBehind() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.fake.markUsed("p_1")
+        await r.add.create()
+        #expect(r.add.leftover.isEmpty && !r.add.stillLive && r.add.invite?.pairingID == "p_2")
+        #expect(await r.add.requestClose())
+        #expect(r.fake.withdrawn == ["p_2"])
+    }
+
+    @Test func twoWithdrawsOfTheSameInviteDoNotResurrectIt() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.fake.withdrawDelay = .milliseconds(60)
+        r.add.scopes = ["read"]  // the quiet withdraw starts
+        await r.add.create()  // and this one withdraws the same id inside its elevation
+        await r.add.settle()
+        #expect(r.fake.withdrawn == ["p_1"], "withdrawn once; the second attempt was a conflict")
+        #expect(r.add.leftover.isEmpty && !r.add.stillLive && r.add.invite?.pairingID == "p_2")
+    }
+
+    @Test func theBellWithdrawOnASpentInviteClearsTheItem() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.add.dialogDidClose()
+        #expect(r.app.shell.bell.items.contains { $0.id == "invite-live" })
+        r.fake.markUsed("p_1")
+        await r.app.withdrawLeftInvites()
+        #expect(r.app.leftInvites.isEmpty && !r.app.shell.bell.items.contains { $0.id == "invite-live" })
+    }
+
+    @Test func theBellItemSaysItDoesNotSurviveQuitting() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.add.abandon()
+        let item = try #require(r.app.shell.bell.items.first { $0.id == "invite-live" })
+        #expect(item.sub?.contains("will not survive quitting the app") == true)
+    }
+
+    @Test func theWithdrawButtonOnASpentInviteSaysUsedNotAnError() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.fake.markUsed("p_1")
+        await r.add.withdraw()
+        #expect(r.add.error == nil && r.add.used && !r.add.live)
+    }
+
+    @Test func touchIDBeingNeededIsAskedAgainNotSwallowed() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.add.abandon()
+        r.fake.demandStepUpOnce = true
+        await r.app.withdrawLeftInvites()
+        #expect(r.app.leftInvites.isEmpty && r.fake.withdrawn == ["p_1"] && r.service.stepUps == 1)
+    }
+
+    // MARK: closing while something is in flight
+
+    @Test func doneDuringACreateThatFailsHandsTheOldQRToTheBell() async throws {
+        let r = try await rig()
+        let add = r.add
+        await add.create()
+        r.fake.createError = CoreError.offline("down")
+        r.fake.onCreate = { _ in _ = await add.requestClose() }
+        await add.create()
+        #expect(r.app.leftInvites == ["p_1"] && r.app.shell.bell.items.contains { $0.id == "invite-live" })
+    }
+
+    @Test func doneWhileTouchIDIsOpenForACreateHandsTheOldQRToTheBell() async throws {
+        let r = try await rig()
+        let add = r.add
+        await add.create()
+        expire(r)
+        r.app.stepUp.check = { _, _ in _ = await add.requestClose() }
+        await add.create()
+        #expect(r.app.leftInvites == ["p_1"] && r.fake.created == 1)
+    }
+
+    @Test func doneDuringAWithdrawThatFailsHandsTheQRToTheBell() async throws {
+        let r = try await rig()
+        let add = r.add
+        await add.create()
+        r.fake.failWithdraw = true
+        r.fake.onWithdraw = { _ in _ = await add.requestClose() }
+        await add.withdraw()
+        #expect(r.app.leftInvites == ["p_1"])
+    }
+
+    @Test func aSecondDoneWhileTheFirstIsAskingTouchIDIsIgnored() async throws {
+        let r = try await rig()
+        await r.add.create()
+        expire(r)
+        r.app.stepUp.check = { _, _ in try? await Task.sleep(for: .milliseconds(50)) }
+        async let first = r.add.requestClose()
+        async let second = r.add.requestClose()
+        let results = await [first, second]
+        #expect(results.filter { $0 }.count == 1 && r.fake.withdrawn == ["p_1"])
+    }
+
+    @Test func theStillLiveNoticeGoesAwayOnceTheQRIsWithdrawn() async throws {
+        let r = try await rig()
+        await r.add.create()
+        expire(r)
+        r.fake.failWithdraw = true
+        #expect(await r.add.requestClose() == false)
+        #expect(r.add.stillLive)
+        r.fake.failWithdraw = false
+        await r.add.withdraw()
+        #expect(!r.add.stillLive)
+    }
+
+    @Test func forgettingTheCoreForgetsTheBellsInvites() async throws {
+        let r = try await rig()
+        await r.add.create()
+        r.add.abandon()
+        await r.app.forgetCore()
+        #expect(r.app.leftInvites.isEmpty)
+    }
+
     // MARK: the copied link
 
     @Test func copiedLinkIsClearedWhenUsedWithdrawnOrClosedButNeverSomethingElse() async throws {
@@ -270,7 +432,7 @@ struct InviteDeviceTests {
         await a.add.create()
         a.add.copyLink()
         #expect(a.board.text == a.add.invite?.link.text && a.add.copied)
-        a.fake.set(status: "approved", for: "p_1")
+        a.fake.markUsed("p_1")
         await a.add.refresh()
         #expect(a.board.text == nil, "used: the link is taken back")
         let b = try await rig()

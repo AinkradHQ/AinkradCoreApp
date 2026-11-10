@@ -140,14 +140,14 @@ private func link(_ q: String) -> String { "ainkrad://connect?\(q)" }
         let long = String(repeating: "a", count: 64) + ".com"
         for host in [
             "", "a b", "a\nb", "a\0b", "a\tb", "a\\b", "a<b", "a\"b", "a|b", "-a.com", "a-.com",
-            "a..com", "[:]", "[::1",
+            "a..com", "[:]", "[::1", "127.0.0.1\0x", "[::1\0x]", "1.2.3", "0x7f.1", "999.1.1.1", "1.2.3.4.5",
             "[1.2.3.4]", long, "a;b.com", "a%b.com",
         ] {
             #expect(throws: ConnectLinkError.self, "\(host.debugDescription)") {
                 try ConnectLink(host: host, coreFingerprint: fp, secret: Data(repeating: 9, count: 16))
             }
         }
-        for h in ["a%0Ab.com", "a%00b.com", "a%09b.com"] {
+        for h in ["a%0Ab.com", "a%00b.com", "a%09b.com", "127.0.0.1%00x", "[::1%00x]"] {
             #expect(throws: ConnectLinkError.badHost) {
                 try ConnectLink.parse(link("host=\(h)&fp=\(fp)&secret=\(secret)"))
             }

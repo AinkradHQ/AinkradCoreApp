@@ -62,3 +62,32 @@ struct SampleInviteService: InviteService {
     func withdraw(_ pairingID: String) async throws {}
 }
 #endif
+
+extension CoreError {
+    /// The Core no longer has a live invite by that id: unknown (404), or not live or claimed any more (409: already used,
+    /// already withdrawn, or expired). Withdrawing it again can only fail, so it counts as withdrawn.
+    var inviteIsGone: Bool {
+        switch self {
+        case .http(let status, _, _): status == 404 || status == 409
+        case .pairingExpired: true
+        default: false
+        }
+    }
+}
+
+/// Withdraws `ids` one by one, inside an elevation. Returns the ids that are still live: an id the Core says is gone is not one
+/// of them. Touch ID being needed is rethrown (so `elevated` asks again) unless `rethrowStepUp` is false.
+func withdrawInvites(
+    _ ids: [String], with service: any InviteService, rethrowStepUp: Bool = true
+) async throws -> [String] {
+    var live: [String] = []
+    for id in ids {
+        do { try await service.withdraw(id) } catch {
+            let e = CoreError.unwrapping(error)
+            if e?.inviteIsGone == true { continue }
+            if rethrowStepUp, e == .stepUpRequired { throw error }
+            live.append(id)
+        }
+    }
+    return live
+}

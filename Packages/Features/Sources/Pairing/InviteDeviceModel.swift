@@ -36,6 +36,7 @@ final class InviteDeviceModel {
     /// Bumped by anything that makes an in-flight `create()` obsolete: closing, editing the form.
     private var generation = 0
     private var closed = false
+    private var closing = false
 
     init(
         host: AppModel, pasteboard: any LinkPasteboard = SystemLinkPasteboard(), clearAfter: Duration = .seconds(60)
@@ -54,7 +55,7 @@ final class InviteDeviceModel {
     /// A QR that is on screen and not spent.
     var live: Bool { invite?.pairingID != nil && !used && !ended }
     /// What to say loudly: a QR that is still live and that this dialog could not take back.
-    var stillLive: Bool { closeBlocked || !leftover.isEmpty }
+    var stillLive: Bool { !leftover.isEmpty || (closeBlocked && live) }
     private var currentID: String? { live ? invite?.pairingID : nil }
 
     /// The dialog opened: learn what this Mac may hand on. Nothing is created until the person asks for the QR.
@@ -80,17 +81,20 @@ final class InviteDeviceModel {
         quiet.append(
             Task { [weak self] in
                 var gone: [String] = []
-                for id in ids { if (try? await service.withdraw(id)) != nil { gone.append(id) } }
+                for id in ids {
+                    do {
+                        try await service.withdraw(id)
+                        gone.append(id)
+                    } catch { if CoreError.unwrapping(error)?.inviteIsGone == true { gone.append(id) } }
+                }
                 self?.leftover.removeAll { gone.contains($0) }
             })
     }
 
-    /// Withdraws `ids`, one by one; returns the ones that did not go. Called inside an elevation.
-    private func withdrawAll(_ ids: [String]) async -> [String] {
+    /// Withdraws `ids` inside an elevation; returns the ones still live (see `withdrawInvites`).
+    private func withdrawAll(_ ids: [String], rethrowStepUp: Bool = true) async throws -> [String] {
         guard let service = host?.invites else { return ids }
-        var failed: [String] = []
-        for id in ids { do { try await service.withdraw(id) } catch { failed.append(id) } }
-        return failed
+        return try await withdrawInvites(ids, with: service, rethrowStepUp: rethrowStepUp)
     }
 
     func create() async {
@@ -99,14 +103,18 @@ final class InviteDeviceModel {
         let token = generation
         error = nil
         busy = true
-        defer { busy = false }
+        // Closed while this ran: whatever is still live afterwards (the old QR when this failed) goes to the bell.
+        defer {
+            busy = false
+            if closed { abandon() }
+        }
         let label = name.trimmingCharacters(in: .whitespaces)
         let granted = effectiveScopes
         do {
             // The new invite and the withdrawal of the old ones share one Touch ID, the old ones only after the new exists.
             let reason = "Make a QR for \(label)."
             let (made, failed): (DeviceInvite?, [String]) = try await host.elevated(reason, done: "made") {
-                guard generation == token else { return (nil, leftover) }
+                guard generation == token else { return (nil, leftover + (currentID.map { [$0] } ?? [])) }
                 let new = try await host.invites.createInvite(name: label, scopes: granted)
                 var ids = leftover
                 if let id = currentID { ids.append(id) }
@@ -116,7 +124,7 @@ final class InviteDeviceModel {
                     ids.append(id)
                     keep = nil
                 }
-                return (keep, await withdrawAll(ids))
+                return (keep, try await withdrawAll(ids, rethrowStepUp: false))
             }
             leftover = failed
             if let made {
@@ -126,7 +134,6 @@ final class InviteDeviceModel {
             } else if currentID != nil {
                 invite = nil
             }
-            if closed, !leftover.isEmpty { abandon() }
         } catch is StepUpDeclined {
         } catch {
             self.error = CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription
@@ -155,13 +162,23 @@ final class InviteDeviceModel {
         guard let host, let id = currentID else { return }
         error = nil
         busy = true
-        defer { busy = false }
+        defer {
+            busy = false
+            if closed { abandon() }
+        }
         do {
-            try await host.elevated("Withdraw the QR for \(invite?.name ?? "the device").", done: "withdrawn") {
-                try await host.invites.withdraw(id)
+            let reason = "Withdraw the QR for \(invite?.name ?? "the device")."
+            let left = try await host.elevated(reason, done: "withdrawn") {
+                try await withdrawInvites([id], with: host.invites)
             }
-            ended = true
-            takeBackLink()
+            if left.isEmpty {
+                // Gone is gone: withdrawn now, or a device used it first.
+                let status = try? await host.invites.status(id)
+                if status == "approved" || status == "claimed" { used = true } else { ended = true }
+                takeBackLink()
+            } else {
+                error = "The Core could not be reached, so this QR is still live. Try again."
+            }
         } catch is StepUpDeclined {
         } catch {
             self.error = CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription
@@ -173,7 +190,8 @@ final class InviteDeviceModel {
     /// Done or the close button. True when the dialog may close: nothing is live any more. Otherwise it stays, with the
     /// reason (`stillLive`, or `error` when the Core could not be reached).
     func requestClose() async -> Bool {
-        // A create in flight sees the new generation and withdraws what it made inside its own elevation.
+        if closing { return false }
+        // A create or withdraw in flight handles the rest itself (see their `defer`).
         if busy {
             didClose()
             return true
@@ -183,18 +201,24 @@ final class InviteDeviceModel {
             didClose()
             return true
         }
+        closing = true
+        busy = true
+        defer {
+            closing = false
+            busy = false
+            if closed { abandon() }
+        }
         do {
             let reason = "Withdraw the QR for \(invite?.name ?? "the device")."
             let failed = try await host.elevated(reason, done: "withdrawn") {
-                await withdrawAll(ids)
+                try await withdrawInvites(ids, with: host.invites)
             }
-            if let id = currentID, !failed.contains(id) {
-                ended = true
-                takeBackLink()
-            }
+            if let id = currentID, !failed.contains(id) { ended = true }
             if failed.isEmpty {
                 leftover = []
                 invite = nil
+                closeBlocked = false
+                takeBackLink()
                 didClose()
                 return true
             }

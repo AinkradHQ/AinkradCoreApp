@@ -81,15 +81,23 @@ public struct ConnectLink: Sendable, Equatable, CustomStringConvertible, CustomD
     /// An allowlist: a DNS name (labels of letters, digits and inner hyphens, a trailing dot allowed), an IPv4 address, or a
     /// bracketed IPv6 literal. Anything else (controls, backslash, quotes, `<`, `|`, spaces) is refused.
     static func validHost(_ h: String) -> Bool {
+        // `inet_pton` stops at the first NUL, and query values are percent-decoded: no control character may get that far.
+        guard !h.utf8.contains(where: { $0 < 0x21 || $0 == 0x7f }) else { return false }
         if h.hasPrefix("[") {
             guard h.hasSuffix("]"), h.count > 3 else { return false }
             var addr = in6_addr()
-            return h.dropFirst().dropLast().withCString { inet_pton(AF_INET6, $0, &addr) == 1 }
+            let inner = String(h.dropFirst().dropLast())
+            // No zone id (`%25en0`) and nothing but what an address is made of.
+            guard inner.allSatisfy({ $0.isHexDigit || $0 == ":" || $0 == "." }) else { return false }
+            return inner.withCString { inet_pton(AF_INET6, $0, &addr) == 1 }
         }
         var v4 = in_addr()
         if h.withCString({ inet_pton(AF_INET, $0, &v4) }) == 1 { return true }
         let name = h.hasSuffix(".") ? String(h.dropLast()) : h
         guard (1...253).contains(name.count) else { return false }
+        // A name that ends in a number (`1.2.3`, `0x7f.1`, `999.1.1.1`) is an address in disguise, never a DNS name.
+        let last = name.split(separator: ".", omittingEmptySubsequences: false).last.map(String.init) ?? ""
+        if last.allSatisfy(\.isNumber) || last.lowercased().hasPrefix("0x") { return false }
         return name.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
             (1...63).contains(label.count) && !label.hasPrefix("-") && !label.hasSuffix("-")
                 && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }

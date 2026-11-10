@@ -132,7 +132,9 @@ public final class AppModel {
             return
         }
         guard phase == .firstRun else {
-            shell.showToast("This Mac is already connected to a Core.")
+            shell.showToast(
+                phase == .desktop
+                    ? "This Mac is already connected to a Core." : "Sort out the connection problem first.")
             return
         }
         // Never mid-flow: a typed-code pairing past its form, or a claim in progress, keeps going.
@@ -503,7 +505,8 @@ public final class AppModel {
         shell.bell.add(
             BellItem(
                 id: "invite-live", kind: .alarm, title: "A device QR is still live",
-                sub: "Anyone who scans it can add a device. It stays valid until it is withdrawn.", time: "now",
+                sub: "Anyone who scans it can add a device. Withdraw it here; this will not survive quitting the app.",
+                time: "now",
                 actions: [
                     BellAction("Withdraw", primary: true) { [weak self] in Task { await self?.withdrawLeftInvites() } }
                 ]))
@@ -515,9 +518,7 @@ public final class AppModel {
         do {
             let service = invites
             let failed: [String] = try await elevated("Withdraw the device QR.", done: "withdrawn") {
-                var failed: [String] = []
-                for id in ids { do { try await service.withdraw(id) } catch { failed.append(id) } }
-                return failed
+                try await withdrawInvites(ids, with: service)
             }
             leftInvites = failed
             if failed.isEmpty {
@@ -625,6 +626,7 @@ public final class AppModel {
         shell.home = .empty
         shell.resetToFresh()
         firstRun.resetAll()
+        leftInvites = []
         wizard.startOver()
         useTypedCode = false
         phase = .firstRun

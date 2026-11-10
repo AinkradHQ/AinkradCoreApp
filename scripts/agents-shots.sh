@@ -8,7 +8,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${OUT:-/private/tmp/claude-501/agents-shots}
 mkdir -p "$OUT"
 cd "$HERE"
-TEST_RUNNER_CORE_SHOTS=1 TEST_RUNNER_CORE_DEMO=1 TEST_RUNNER_CORE_AGENTS_SNAPSHOT="$OUT" TEST_RUNNER_CORE_THEME="${THEME:-dark}" \
+TEST_RUNNER_CORE_SHOTS=1 TEST_RUNNER_CORE_ALLOW_CAPTURE=1 TEST_RUNNER_CORE_DEMO=1 TEST_RUNNER_CORE_AGENTS_SNAPSHOT="$OUT" TEST_RUNNER_CORE_THEME="${THEME:-dark}" \
   nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
   -only-testing:AinkradCoreMacUITests/SnapshotWalkUITests test 2>&1 | grep -E "Test Case|error:|\*\* TEST" || true
 pkill -f "$HERE/build/Build/Products/Debug/Ainkrad.app/Contents/MacOS" 2>/dev/null || true
