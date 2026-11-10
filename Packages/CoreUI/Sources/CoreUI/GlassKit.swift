@@ -203,8 +203,14 @@ public struct ScopeTile: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Image(systemName: on ? "checkmark.circle.fill" : "circle").coreFont(size: MacTextSize.title)
-                .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
+            // A rounded square, not a circle (rounded rectangles only). Same footprint as the 15 pt symbol it replaces.
+            Image(systemName: "checkmark").coreFont(size: 11, weight: .bold).foregroundStyle(.white)
+                .opacity(on ? 1 : 0)
+                .frame(width: 18, height: 18)
+                .background(on ? GlassInk.blue : Color.clear, in: coreShape(Radius.chip))
+                .overlay {
+                    coreShape(Radius.chip).strokeBorder(on ? .white.opacity(0.25) : GlassInk.track, lineWidth: 1.5)
+                }
                 .accessibilityHidden(true)
         }
         .padding(Space.s3)
