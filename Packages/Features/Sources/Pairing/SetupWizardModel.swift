@@ -24,7 +24,17 @@ final class SetupWizardModel {
 
     private(set) var stage: Stage = .choose
     /// What was pasted: the whole installer output is fine, the link is found in it.
-    var linkText = "" { didSet { if linkText != oldValue { reparse() } } }
+    var linkText = "" {
+        didSet {
+            guard linkText != oldValue else { return }
+            if !settingFromURL { receivedFromApp = false }
+            reparse()
+        }
+    }
+    /// The link came in through the `ainkrad://` scheme, not from the person's own paste: the screen says so and asks them to
+    /// check the Core before going on.
+    private(set) var receivedFromApp = false
+    private var settingFromURL = false
     /// The link in `linkText` once it parses; the screen shows its address and fingerprint before anything is sent.
     private(set) var link: ConnectLink?
     /// Why `linkText` is not a link yet. Not shown until something has been typed.
@@ -57,10 +67,17 @@ final class SetupWizardModel {
 
     /// The `ainkrad://connect` URL was opened (a link clicked, or handed over by the system): fill it in and show it, but wait
     /// for the person to press Connect.
-    func receive(url: URL) {
-        task?.cancel()
+    /// Ignored while a claim is running: cancelling it after the Core answered would spend the one-time invite. Returns whether
+    /// the link was taken.
+    @discardableResult
+    func receive(url: URL) -> Bool {
+        guard stage != .connecting else { return false }
+        settingFromURL = true
         linkText = url.absoluteString
+        settingFromURL = false
+        receivedFromApp = true
         stage = .connect
+        return true
     }
 
     var canConnect: Bool { link != nil && stage != .connecting }
@@ -78,21 +95,36 @@ final class SetupWizardModel {
     /// Back to the very first screen, nothing kept (after a Core that was not the expected one).
     func startOver() {
         task?.cancel()
-        linkText = ""
+        scrub()
         installed = false
         stage = .choose
+    }
+
+    /// Forgets the link and its secret.
+    private func scrub() {
+        linkText = ""
+        link = nil
+        linkError = nil
+        receivedFromApp = false
     }
 
     private func claim(_ link: ConnectLink) async {
         do {
             _ = try await driver.claim(link.credential, endpoint: nil)
-            var outcome = try await driver.awaitApproval()
-            // A link pins the Core, so there is no check code to compare; this only guards a driver that asks anyway.
-            if outcome == .awaitingConfirmation {
-                try await driver.confirmSAS()
-                outcome = try await driver.awaitApproval()
+            let outcome = try await driver.awaitApproval()
+            // A link pins the Core, so a pairing that still wants a check code did not get its pin from the link: trust nothing.
+            guard outcome == .paired else {
+                _ = try? await driver.cancel()
+                scrub()
+                stage = .failed(
+                    Failure(
+                        kind: .other(
+                            "This Core did not confirm the identity in your link, so nothing was trusted. Start over with a fresh link."
+                        )))
+                return
             }
-            if outcome == .paired { onPaired() }
+            scrub()
+            onPaired()
         } catch is CancellationError {
         } catch { fail(error) }
     }
@@ -100,6 +132,12 @@ final class SetupWizardModel {
     private func fail(_ error: any Error) {
         var f = Failure.from(error)
         if f.kind == .badCode { f = Failure(kind: .badInvite) }
+        // Nothing was sent (or the Core was never reached) only for these: the link stays for another try. Any other end
+        // may have spent the invite, so the link and its secret go.
+        switch f.kind {
+        case .offline, .rateLimited, .clockSkew, .unproven, .oldApp: break
+        default: scrub()
+        }
         stage = .failed(f)
     }
 

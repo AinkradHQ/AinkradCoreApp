@@ -7,6 +7,7 @@ public enum ConnectLinkError: Error, Equatable, LocalizedError {
     case missing(String)
     case duplicate(String)
     case badHost
+    case nonASCIIHost
     case badFingerprint
     case badSecret
 
@@ -17,6 +18,8 @@ public enum ConnectLinkError: Error, Equatable, LocalizedError {
         case .missing(let f): "The link is missing its \(Self.word(f)). Copy the whole link again."
         case .duplicate(let f): "The link has its \(Self.word(f)) twice. Copy the whole link again."
         case .badHost: "The link's address is not valid. Copy the whole link again."
+        case .nonASCIIHost:
+            "The link's address has characters that can look like others, so Ainkrad refuses it. Only use a link from your own Core."
         case .badFingerprint: "The link's Core fingerprint is damaged. Copy the whole link again."
         case .badSecret: "The link's secret is damaged. Copy the whole link again."
         }
@@ -65,15 +68,27 @@ public struct ConnectLink: Sendable, Equatable, CustomStringConvertible, CustomD
     public var address: String { port == 443 ? host : "\(host):\(port)" }
 
     public init(host: String, port: Int = 443, coreFingerprint: String, secret: Data) throws {
-        guard !host.isEmpty, !host.contains(where: { "/?#@ :&=".contains($0) }), (1...65535).contains(port) else {
-            throw ConnectLinkError.badHost
-        }
+        guard host.allSatisfy(\.isASCII) else { throw ConnectLinkError.nonASCIIHost }
+        guard Self.validHost(host), (1...65535).contains(port) else { throw ConnectLinkError.badHost }
         guard coreFingerprint.count == 43, Wire.unb64(coreFingerprint) != nil else {
             throw ConnectLinkError.badFingerprint
         }
         guard secret.count == 16 else { throw ConnectLinkError.badSecret }
         (self.host, self.port, self.coreFingerprint, self.secret) = (host, port, coreFingerprint, secret)
     }
+
+    /// A DNS name or IPv4 address, or an IPv6 literal in brackets (`[::1]`).
+    static func validHost(_ h: String) -> Bool {
+        if h.hasPrefix("[") {
+            let inner = h.dropFirst().dropLast()
+            return h.hasSuffix("]") && inner.contains(":")
+                && inner.allSatisfy { $0.isHexDigit || $0 == ":" || $0 == "." }
+        }
+        return !h.isEmpty && !h.contains(where: { "/?#@ :&=[]%".contains($0) })
+    }
+
+    /// The whole fingerprint, for a link that came from another app: a person can compare it with the Core's own.
+    public var fingerprintFull: String { coreFingerprint }
 
     /// The link as text, secret included: for the Add device QR and its Copy button. Never log it.
     public var text: String {
@@ -96,7 +111,16 @@ public struct ConnectLink: Sendable, Equatable, CustomStringConvertible, CustomD
         for name in ["host", "fp", "secret"] where (fields[name] ?? "").isEmpty { throw ConnectLinkError.missing(name) }
         var host = fields["host"]!
         var port = 443
-        if let colon = host.lastIndex(of: ":") {
+        guard host.allSatisfy(\.isASCII) else { throw ConnectLinkError.nonASCIIHost }
+        // A bracketed IPv6 literal keeps its colons; a port follows the closing bracket.
+        let portAt: String.Index? =
+            host.hasPrefix("[")
+            ? host.firstIndex(of: "]").flatMap { i in
+                let next = host.index(after: i)
+                return host[next...].first == ":" ? next : nil
+            }
+            : host.lastIndex(of: ":")
+        if let colon = portAt {
             guard let p = Int(host[host.index(after: colon)...]) else { throw ConnectLinkError.badHost }
             (host, port) = (String(host[..<colon]), p)
         }

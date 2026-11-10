@@ -10,7 +10,6 @@ struct InviteDeviceView: View {
     let close: () -> Void
     let typedCode: () -> Void
     @Environment(\.corePalette) private var palette
-    @State private var copied = false
 
     var body: some View {
         DialogCard(title: "Add a device", width: Space.s8 * 24, close: close) {
@@ -34,7 +33,7 @@ struct InviteDeviceView: View {
                         Button("Withdraw") { Task { await model.withdraw() } }
                             .buttonStyle(.coreSecondary).disabled(model.busy)
                     }
-                    Button(model.invite == nil ? "Make QR" : "New code") { Task { await model.create() } }
+                    Button(model.invite == nil ? "Show QR" : "New code") { Task { await model.create() } }
                         .buttonStyle(CoreButtonStyle(model.invite == nil ? .prominent : .secondary, busy: model.busy))
                         .disabled(!model.canCreate)
                     Button("Done", action: close).buttonStyle(.coreProminent).coreShortcut(.primary)
@@ -42,7 +41,9 @@ struct InviteDeviceView: View {
             }
             .coreFont(size: MacTextSize.body)
         }
-        .task { await model.quick() }
+        .task { await model.prepare() }
+        .onDisappear { model.closed() }
+        .background(WindowSharingGuard())
         .task(id: model.invite) {
             // A claimed invite is `approved` at once; the poll covers a dropped event stream.
             while !Task.isCancelled, model.invite != nil, !model.used, !model.ended {
@@ -110,15 +111,34 @@ struct InviteDeviceView: View {
                 .coreFont(size: MacTextSize.body, design: .monospaced).foregroundStyle(palette.text2)
                 .lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
-            Button(copied ? "Copied" : "Copy link") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(invite.link.text, forType: .string)
-                copied = true
-            }
-            .buttonStyle(.coreSecondary).accessibilityHint("Copies the connect link, including its one-time secret")
+            Button(model.copied ? "Copied" : "Copy link") { model.copyLink() }
+                .buttonStyle(.coreSecondary)
+                .accessibilityHint("Copies the link and its one-time secret; cleared after a minute.")
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .background(palette.glassCard, in: coreShape(Radius.row))
-        .onChange(of: invite) { copied = false }
     }
+}
+
+/// Keeps the window out of screenshots and screen sharing while a QR (a one-time secret) may be on it. Not in Debug: the
+/// snapshot walk and the Air rig capture this window.
+private struct WindowSharingGuard: NSViewRepresentable {
+    final class Anchor: NSView {
+        private var before: NSWindow.SharingType = .readOnly
+        private weak var held: NSWindow?
+        override func viewWillMove(toWindow new: NSWindow?) {
+            #if !DEBUG
+            if let new {
+                before = new.sharingType
+                new.sharingType = .none
+                held = new
+            } else if let held {
+                held.sharingType = before
+            }
+            #endif
+            super.viewWillMove(toWindow: new)
+        }
+    }
+    func makeNSView(context: Context) -> Anchor { Anchor() }
+    func updateNSView(_ view: Anchor, context: Context) {}
 }

@@ -29,7 +29,11 @@ final class FakeDriver: PairingDriver, @unchecked Sendable {
         }
         return try next.get()
     }
-    func cancel() async throws -> PairingCancel { cancelResult }
+    private(set) var cancelled = false
+    func cancel() async throws -> PairingCancel {
+        cancelled = true
+        return cancelResult
+    }
 }
 
 /// The Core, as scripted.

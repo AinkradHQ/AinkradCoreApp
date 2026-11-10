@@ -159,14 +159,32 @@ struct SetupWizardView: View {
             note("Paste the link the installer printed. It starts with ainkrad://connect.")
             CoreTextField(
                 "Link", placeholder: "ainkrad://connect?host=…", text: $model.linkText,
-                error: model.linkError, mono: true, autofocus: true, onSubmit: { model.connect() }
+                error: model.linkError, mono: true, autofocus: !model.receivedFromApp,
+                onSubmit: { if !model.receivedFromApp { model.connect() } }
             )
             .disabled(busy)
             .accessibilityIdentifier("connect-link-field")
+            if model.receivedFromApp {
+                CoreNotice(
+                    symbol: "exclamationmark.triangle", title: "Opened from another app",
+                    text: "Only continue if this is your Core. Compare the address and fingerprint with your Core's.",
+                    tone: .warn
+                ) {}
+            }
             if let link = model.link {
                 FactCard {
                     FactRow(key: "Core", value: link.address, mono: true)
-                    FactRow(key: "Fingerprint", value: link.fingerprintHint, mono: true)
+                    if model.receivedFromApp {
+                        // The whole fingerprint, wrapped, so it can be compared and not only recognised.
+                        VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                            Text("Fingerprint").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            Text(link.fingerprintFull).coreFont(size: MacTextSize.body, design: .monospaced)
+                                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                    } else {
+                        FactRow(key: "Fingerprint", value: link.fingerprintHint, mono: true)
+                    }
                 }
                 .transition(.opacity)
             }
@@ -181,9 +199,10 @@ struct SetupWizardView: View {
             HStack {
                 Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel).disabled(busy)
                 Spacer()
+                // A link from another app is never connected by Return: the person has to press the button.
                 Button("Connect") { model.connect() }
                     .buttonStyle(CoreButtonStyle(.prominent, size: .large, busy: busy))
-                    .coreShortcut(.primary).disabled(!model.canConnect)
+                    .modifier(PrimaryKey(on: !model.receivedFromApp)).disabled(!model.canConnect)
             }
         }
     }
@@ -231,5 +250,12 @@ private struct ChoiceCard: View {
         .onHover { hover = $0 }
         .animation(reduce ? nil : Motion.out(Motion.ui), value: hover)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct PrimaryKey: ViewModifier {
+    let on: Bool
+    func body(content: Content) -> some View {
+        if on { content.coreShortcut(.primary) } else { content }
     }
 }

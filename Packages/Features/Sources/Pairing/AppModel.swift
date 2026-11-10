@@ -128,8 +128,12 @@ public final class AppModel {
             shell.showToast("This Mac is already connected to a Core.")
             return
         }
-        useTypedCode = false
-        wizard.receive(url: url)
+        // Never mid-flow: a typed-code pairing past its form, or a claim in progress, keeps going.
+        guard !useTypedCode || firstRun.stage == .form else {
+            shell.showToast("Finish or cancel the pairing in progress first.")
+            return
+        }
+        if wizard.receive(url: url) { useTypedCode = false }
     }
 
     public func start() async {
