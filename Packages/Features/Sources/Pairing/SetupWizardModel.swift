@@ -19,8 +19,12 @@ final class SetupWizardModel {
     }
 
     /// The one line the Core's installer is run with: the hosted bootstrap is a GitHub release asset.
-    static let installCommand =
-        "curl -fsSL https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh | sudo sh"
+    static let installURL = "https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh"
+    /// The oldest Core this app works with: the installer refuses anything older.
+    static let minCoreVersion = "0.2.1"
+    /// Never piped into `sudo`: that stops the installer at its first question (SIGTTIN) and Ctrl-C does nothing. `sh -c` with
+    /// the script as an argument keeps the terminal for its questions.
+    static let installCommand = "sudo AINKRAD_MIN_VERSION=\(minCoreVersion) sh -c \"$(curl -fsSL \(installURL))\""
 
     private(set) var stage: Stage = .choose
     /// What was pasted: the whole installer output is fine, the link is found in it.

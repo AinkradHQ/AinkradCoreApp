@@ -123,7 +123,7 @@ struct SetupWizardView: View {
             VStack(alignment: .leading, spacing: Space.s1) {
                 note("1. Open a terminal on any Linux machine you control.")
                 note("2. Paste this command and press Return.")
-                note("3. When it finishes it prints a link and a code. Come back here and paste the link.")
+                note("3. It asks two questions, then prints a link at the end. Come back here and paste the link.")
             }
             HStack(alignment: .top, spacing: Space.s2) {
                 Text(SetupWizardModel.installCommand).coreFont(size: MacTextSize.body, design: .monospaced)
