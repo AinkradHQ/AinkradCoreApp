@@ -1,19 +1,13 @@
 import CoreUI
 import SwiftUI
 
-/// New terminal (advanced): where it runs, what it starts, a live preview of what Open will do. The quick New terminal
+/// New terminal (advanced): where it runs, and a live preview of what Open will do. It always starts the Ainkrad shell. The quick New terminal
 /// skips this sheet. A refusal lands inline with the Core's own code.
 struct NewTerminalView: View {
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     @Namespace private var pick
     @State private var shown = false
-
-    /// The shells offered as tiles. Empty means the runner's login shell.
-    private static let shells: [(id: String, title: String, symbol: String)] = [
-        ("", "Login shell", "person.crop.square"), ("zsh", "zsh", "terminal"), ("bash", "bash", "terminal.fill"),
-        ("sh", "sh", "chevron.left.forwardslash.chevron.right"),
-    ]
 
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
@@ -22,7 +16,7 @@ struct NewTerminalView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("New terminal").coreFont(size: MacTextSize.large + 4, weight: .bold)
                         .accessibilityAddTraits(.isHeader)
-                    Text("Pick where it runs and what it starts.").foregroundStyle(GlassInk.secondary)
+                    Text("Pick where it runs.").foregroundStyle(GlassInk.secondary)
                 }
             }
             .coreRise(shown, 0)
@@ -40,24 +34,7 @@ struct NewTerminalView: View {
                     }
                 }
             }
-            step("What", "chevron.left.forwardslash.chevron.right", index: 2) {
-                HStack(spacing: Space.s2) {
-                    ForEach(Array(Self.shells.enumerated()), id: \.element.id) { i, sh in
-                        ShellTile(title: sh.title, symbol: sh.symbol, on: form.program == sh.id) {
-                            form.program = sh.id
-                        }
-                        .coreTileKey("⌃\(i + 1)", key: Character("\(i + 1)"), modifiers: .control)
-                    }
-                }
-                TextField("Or any command, for example htop", text: $form.program)
-                    .textFieldStyle(.plain).coreFont(size: MacTextSize.body, design: .monospaced)
-                    .autocorrectionDisabled()
-                    .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
-                    .coreFieldSurface()
-                    .onSubmit { Task { await form.submit() } }
-                    .accessibilityLabel("Program to start")
-            }
-            preview.coreRise(shown, 3)
+            preview.coreRise(shown, 2)
             Label(
                 "Runs as the runner's user in a sandbox: sudo, su and ping don't work. The terminal scope counts as admin-level today.",
                 systemImage: "info.circle"
@@ -94,7 +71,6 @@ struct NewTerminalView: View {
         .foregroundStyle(GlassInk.primary)
         .onAppear { shown = true }
         .animation(Motion.out(Motion.ui), value: form.runner)
-        .animation(Motion.out(Motion.ui), value: form.program)
     }
 
     private func step<C: View>(_ title: String, _ symbol: String, index: Int, @ViewBuilder _ content: () -> C)
@@ -110,10 +86,9 @@ struct NewTerminalView: View {
 
     /// What Open will do, as a small terminal: the runner, the program, a blinking cursor.
     private var preview: some View {
-        let program = form.program.trimmingCharacters(in: .whitespaces)
-        return HStack(spacing: Space.s3) {
+        HStack(spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(form.chosen?.name ?? "no runner") $ \(program.isEmpty ? "login shell" : program)")
+                Text("\(form.chosen?.name ?? "no runner") $ ainkrad shell")
                     .coreFont(size: MacTextSize.body, design: .monospaced)
                     .contentTransition(.opacity)
                 HStack(spacing: 0) {
@@ -129,7 +104,7 @@ struct NewTerminalView: View {
         .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Opens \(program.isEmpty ? "the login shell" : program) on \(form.chosen?.name ?? "no runner")")
+            "Opens the Ainkrad shell on \(form.chosen?.name ?? "no runner")")
     }
 }
 
@@ -160,7 +135,7 @@ private struct RunnerTile: View {
                     HStack {
                         Text(runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         Spacer()
-                        Image(systemName: on ? "checkmark.circle.fill" : "circle").foregroundStyle(
+                        Image(systemName: on ? "checkmark.square.fill" : "square").foregroundStyle(
                             on ? GlassInk.blue : GlassInk.track
                         )
                         .contentTransition(.symbolEffect(.replace))
@@ -193,37 +168,6 @@ private struct RunnerTile: View {
         .onHover { hovering = $0 }
         .animation(.spring(duration: 0.25), value: hovering)
         .accessibilityLabel("\(runner.name), \(st.label)\(warn.map { ", \($0)" } ?? "")")
-        .accessibilityAddTraits(on ? .isSelected : [])
-    }
-}
-
-/// One shell to start with, as a small tile that lights up when chosen.
-private struct ShellTile: View {
-    let title: String
-    let symbol: String
-    let on: Bool
-    let pick: () -> Void
-    @State private var hovering = false
-    var body: some View {
-        Button(action: pick) {
-            VStack(spacing: Space.s1) {
-                Image(systemName: symbol).font(.system(size: 18, weight: .semibold)).coreEnterBounce(on)
-                Text(title).coreFont(size: MacTextSize.meta, weight: .medium, design: .monospaced).lineLimit(1)
-            }
-            .foregroundStyle(GlassInk.primary)
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .background(
-                on ? GlassInk.blue.opacity(0.22) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.row)
-            )
-            .overlay {
-                coreShape(Radius.row).strokeBorder(on ? GlassInk.blue.opacity(0.55) : GlassInk.wellEdge, lineWidth: 1)
-            }
-            .contentShape(coreShape(Radius.row))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityLabel("Start with \(title)")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

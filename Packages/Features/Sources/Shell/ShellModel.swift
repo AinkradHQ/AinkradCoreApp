@@ -51,17 +51,20 @@ public struct PaneMenuItem: Identifiable {
     public let symbol: String
     public let destructive: Bool
     public let enabled: Bool
-    /// Items in a submenu (Send signal ▸ INT, TERM…); empty for a plain action.
+    /// One plain line shown as the item's tooltip.
+    public let help: String?
+    /// Items in a submenu (Running command ▸ Stop it, Pause it…); empty for a plain action.
     public let children: [PaneMenuItem]
     public let run: @MainActor () -> Void
     public init(
         _ title: String, symbol: String, destructive: Bool = false, enabled: Bool = true,
-        children: [PaneMenuItem] = [], run: @escaping @MainActor () -> Void = {}
+        help: String? = nil, children: [PaneMenuItem] = [], run: @escaping @MainActor () -> Void = {}
     ) {
         self.title = title
         self.symbol = symbol
         self.destructive = destructive
         self.enabled = enabled
+        self.help = help
         self.children = children
         self.run = run
     }
@@ -227,6 +230,16 @@ public final class ShellModel {
         }
     }
 
+    /// ⌃⌘D and the launcher entry: flip what the window shows now, and say how to go back.
+    public func switchDayAndNight(isDark: Bool? = nil) {
+        let dark = isDark ?? (NSApp?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+        theme = theme.toggled(isDark: dark)
+        showToast(
+            dark
+                ? "Day look. Settings, Appearance changes it back to Follow the Mac."
+                : "Night look. Settings, Appearance changes it back to Follow the Mac.")
+    }
+
     public init(defaults: UserDefaults = .coreStore()) {
         self.defaults = defaults
         profile = UserProfile(defaults: defaults)
@@ -254,6 +267,12 @@ public final class ShellModel {
                 id: "shortcuts", title: "Keyboard Shortcuts", sub: "All keyboard shortcuts",
                 symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
             ) { [weak self] in self?.open(.shortcuts) })
+        launcher.register(
+            LauncherEntry(
+                id: "day-night", title: "Switch Day and Night", sub: "Flip the look of the app",
+                symbol: "circle.lefthalf.filled", keywords: ["theme", "dark", "light", "appearance"], isAction: true,
+                tile: .slate
+            ) { [weak self] in self?.switchDayAndNight() })
         launcher.register(
             LauncherEntry(
                 id: "widgets.add", title: "Add Widget…", sub: "Put a widget on Home", symbol: "plus",

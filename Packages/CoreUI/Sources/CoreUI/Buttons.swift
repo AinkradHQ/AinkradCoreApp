@@ -212,7 +212,7 @@ extension View {
     /// A choice tile's key: runs it with `key` (+ `modifiers`) and shows `label` in its top-right corner.
     public func coreTileKey(_ label: String, key: Character, modifiers: EventModifiers = .command) -> some View {
         keyboardShortcut(KeyEquivalent(key), modifiers: modifiers)
-            .overlay(alignment: .topTrailing) {
+            .overlay(alignment: .bottomTrailing) {
                 Text(label).coreFont(size: 10, weight: .semibold, design: .rounded)
                     .foregroundStyle(.white.opacity(0.85))
                     .padding(.horizontal, 5).frame(minHeight: 16)

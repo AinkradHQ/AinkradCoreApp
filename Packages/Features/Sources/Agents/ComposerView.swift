@@ -13,17 +13,16 @@ struct ComposerView: View {
     }
     private var bytes: Int { (model.drafts[session.id] ?? "").utf8.count }
     private var over: Bool { bytes > AgentsModel.messageLimit }
-    private var enabled: Bool {
-        if case .running = session.state { return true }
-        return false
-    }
+    private var enabled: Bool { model.canReply(session) }
 
     private var placeholder: String {
         switch session.state {
         case .running: "Reply to \(session.harness)…"
         case .starting: "Starting. You can write when it is running."
         case .interrupted: "Resuming. You can write again when it is running."
-        default: "This session ended. Resume it (top right) to send a message."
+        case .ended where session.outcome == .succeeded: "Reply to \(session.harness)…"
+        case .ended: "This session ended. Start again to continue."
+        default: "This session was lost. Resume it (top right) to send a message."
         }
     }
 
@@ -50,8 +49,8 @@ struct ComposerView: View {
                     .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
-            // An ended session has one Resume, in its head; the composer just says so.
-            if !session.over {
+            // A session that cannot take a message has its one action in its head; the composer just says so.
+            if !session.over || enabled {
                 AppActionTile(title: "Send", symbol: "paperplane.fill", key: "↩", hue: GlassInk.violet, prominent: true)
                 {
                     Task { await model.send(session.id) }

@@ -306,14 +306,32 @@ final class TerminalSession {
 
     // MARK: actions
 
-    func signal(_ name: String) async -> Bool {
+    /// Whether the running command was paused from here (Pause it → Resume it).
+    private(set) var paused = false
+
+    func run(_ cmd: RunningCommand) async -> Bool {
+        guard await signal(cmd.signal, done: cmd.done) else { return false }
+        if cmd == .pause {
+            paused = true
+        } else if cmd == .resume || cmd == .forceQuit || cmd == .stop {
+            paused = false
+        }
+        return true
+    }
+
+    /// Only KILL asks for Touch ID up front. The others go straight; a Core that still wants the step-up for them gets it then.
+    func signal(_ name: String, done: String? = nil) async -> Bool {
+        let reason = "Send SIG\(name) to the terminal on \(machine). This covers this action only."
         do {
-            try await host.elevated(
-                "Send SIG\(name) to the terminal on \(machine). This covers this action only.", done: "sent"
-            ) {
-                try await self.service.signal(self.id, name)
+            if name == "KILL" {
+                try await host.elevated(reason, done: "sent") { try await self.service.signal(self.id, name) }
+            } else {
+                do { try await service.signal(id, name) } catch {
+                    guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
+                    try await host.elevated(reason, done: "sent") { try await self.service.signal(self.id, name) }
+                }
             }
-            host.shell.showToast("Sent SIG\(name) to the terminal on \(machine)")
+            host.shell.showToast("\(done ?? "Sent SIG\(name) to the terminal") on \(machine)")
             return true
         } catch is ElevationDeclined { return false } catch {
             host.shell.showToast(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription)

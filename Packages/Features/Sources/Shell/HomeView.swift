@@ -186,11 +186,9 @@ struct HomeView: View {
     }
 }
 
-/// "Good morning, Ahmed" and the launcher hint. Without a name it offers to take one (the name is kept on this Mac only).
+/// "Good morning, Ahmed" and the launcher hint. Without a name it greets without one (the name is kept on this Mac only).
 struct GreetingView: View {
     @Bindable var profile: UserProfile
-    @State private var asking = false
-    @State private var draft = ""
     @State private var shown = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -214,7 +212,6 @@ struct GreetingView: View {
                 Text("to open the launcher.")
             }
             .coreFont(size: 14).opacity(0.85)
-            if !profile.hasName { nameAsk }
         }
         .foregroundStyle(ink)
         .shadow(
@@ -226,23 +223,5 @@ struct GreetingView: View {
         .animation(reduce ? .easeOut(duration: 0.3) : Motion.out(1.0), value: shown)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
-    }
-
-    @ViewBuilder private var nameAsk: some View {
-        if asking {
-            HStack(spacing: Space.s2) {
-                CoreTextField("Your name", placeholder: "Ahmed", text: $draft, autofocus: true, onSubmit: save)
-                    .frame(width: 200)
-                Button("Save") { save() }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                    .disabled(UserProfile.clean(draft).isEmpty)
-            }
-        } else {
-            Button("Add your name") { asking = true }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
-        }
-    }
-
-    private func save() {
-        profile.set(draft)
-        asking = false
     }
 }

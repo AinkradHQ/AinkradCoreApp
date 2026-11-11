@@ -73,9 +73,7 @@ final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
     init(_ task: URLSessionWebSocketTask) { self.task = task }
     func start() { task.resume() }
     func ping() async throws {
-        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
-            task.sendPing { error in c.resume(with: error.map { .failure($0) } ?? .success(())) }
-        }
+        try await resumeOnce { done in task.sendPing(pongReceiveHandler: done) }
     }
     func receive() async throws -> Data {
         switch try await task.receive() {
@@ -89,6 +87,22 @@ final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
     var closeCode: Int { task.closeCode.rawValue }
     var closeReason: String { task.closeReason.flatMap { String(data: $0, encoding: .utf8) } ?? "" }
     var responseStatus: Int? { (task.response as? HTTPURLResponse)?.statusCode }
+}
+
+/// Bridges a callback API that may call its handler more than once (`sendPing` does when the connection fails: once with the
+/// network error, again on cancel). A second resume of a checked continuation traps, so only the first call counts.
+func resumeOnce(_ start: (@escaping @Sendable ((any Error)?) -> Void) -> Void) async throws {
+    let once = OSAllocatedUnfairLock(initialState: false)
+    try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
+        start { error in
+            let first = once.withLock { done -> Bool in
+                defer { done = true }
+                return !done
+            }
+            guard first else { return }
+            c.resume(with: error.map { .failure($0) } ?? .success(()))
+        }
+    }
 }
 
 /// The consumer's buffer is full: the cursor stays before the event that did not fit, and the stream replays after a pause.

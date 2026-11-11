@@ -2,12 +2,11 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// One terminal pane: banner and screen (or the card that stands in for it). Its actions (signal, detach, end) live in the
+/// One terminal pane: banner and screen (or the card that stands in for it). Its actions (running command, detach, end) live in the
 /// pane's tab menu.
 struct TerminalPaneView: View {
     let model: TerminalsModel
     let session: TerminalSession
-    @State private var signals = false
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -79,39 +78,5 @@ struct TerminalPaneView: View {
         case .closePane: model.closePane(session.id)
         case .newTerminal: model.openNew(runner: session.item.runner)
         }
-    }
-}
-
-/// The signals a terminal's process group can be sent: a grid of names, each one a button.
-struct SignalMenu: View {
-    let session: TerminalSession
-    let done: () -> Void
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text("Signal to send").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
-                palette.text2)
-            LazyVGrid(columns: [GridItem(.fixed(Space.s8 * 2.5)), GridItem(.fixed(Space.s8 * 2.5))], spacing: Space.s1)
-            {
-                ForEach(TerminalSignals.all, id: \.self) { name in
-                    Button {
-                        done()
-                        Task { _ = await session.signal(name) }
-                    } label: {
-                        Text(name).coreFont(size: MacTextSize.body, design: .monospaced)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlMd)
-                            .contentShape(coreShape(Radius.chip))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Send SIG\(name)")
-                }
-            }
-            Text("Needs Touch ID. Covers this action only.").coreFont(size: MacTextSize.meta)
-                .foregroundStyle(palette.text2)
-        }
-        .padding(Space.s3)
-        .coreTheme()
     }
 }

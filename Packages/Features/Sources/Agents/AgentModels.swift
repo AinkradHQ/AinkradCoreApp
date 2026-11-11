@@ -232,8 +232,14 @@ public enum AgentWords {
         n.formatted(.number.notation(.compactName))
     }
 
+    /// Under one cent is "< $0.01", not "$0.00" (that reads as a missing price); `exactCost` has the real figure.
     public static func cost(_ micros: Int64?) -> String? {
-        micros.map { (Double($0) / 1e6).formatted(.currency(code: "USD")) }
+        micros.map { $0 > 0 && $0 < 10_000 ? "< $0.01" : (Double($0) / 1e6).formatted(.currency(code: "USD")) }
+    }
+
+    /// The tooltip for a small cost, to four places: "$0.0020".
+    public static func exactCost(_ micros: Int64?) -> String? {
+        micros.map { (Double($0) / 1e6).formatted(.currency(code: "USD").precision(.fractionLength(4))) }
     }
 
     public static func clock(_ seconds: TimeInterval) -> String {

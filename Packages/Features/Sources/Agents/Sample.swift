@@ -184,7 +184,10 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         return try await session(id)
     }
 
-    public func wake(_ id: String, key: String) async throws { try record("wake") }
+    public func wake(_ id: String, key: String, text: String?) async throws {
+        try record("wake")
+        if let text { append(id, [.user(text)]) }
+    }
 
     public func decide(_ id: String, request: String, approved: Bool) async throws -> AgentSessionInfo {
         try record("decide:\(approved)")

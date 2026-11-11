@@ -69,7 +69,9 @@ struct DevicesSection: View {
                 )
                 .fixedSize()
             }
-            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(
+                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+            ) {
                 app.openAddDevice()
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(app.service == nil)
@@ -94,6 +96,36 @@ struct DevicesSection: View {
     }
 }
 
+/// A device page's header, shown in the Settings title bar beside the back tile (N11).
+private struct DeviceHeader: View {
+    let app: AppModel
+    let device: DeviceInfo
+    @State private var shown = false
+
+    private var hue: Color {
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.violet : GlassInk.blue
+    }
+
+    var body: some View {
+        HStack(spacing: Space.s4) {
+            IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 56, bounce: shown)
+                .shadow(color: hue.opacity(0.45), radius: 12)
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                HStack(spacing: Space.s2) {
+                    Text(device.name).coreFont(size: MacTextSize.large + 6, weight: .bold)
+                        .accessibilityAddTraits(.isHeader)
+                    if app.devices.isMe(device) { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
+                    if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
+                }
+                Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
+                    .foregroundStyle(GlassInk.secondary)
+                if !device.cutOff { LastSeenLine(lastUsed: device.lastUsed) }
+            }
+        }
+        .onAppear { shown = true }
+    }
+}
+
 private struct OnlyAdminWarning: View {
     let app: AppModel
     let device: DeviceInfo
@@ -112,7 +144,9 @@ private struct OnlyAdminWarning: View {
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s2)
-            AppActionTile(title: "Add device", symbol: "plus", key: "", hue: GlassInk.orange) { app.openAddDevice() }
+            AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.orange) {
+                app.openAddDevice(admin: true)
+            }
         }
         .coreFont(size: MacTextSize.body)
         .padding(Space.s3)
@@ -394,30 +428,9 @@ struct DeviceDetail: View {
     @Environment(\.corePalette) private var palette
     @State private var shown = false
 
-    private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.violet : GlassInk.blue
-    }
-
     var body: some View {
         let me = app.devices.isMe(device)
         VStack(alignment: .leading, spacing: Space.s4) {
-            // Hero: back, the device's picture, its name and what it is.
-            HStack(spacing: Space.s4) {
-                IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 72, bounce: shown)
-                    .shadow(color: hue.opacity(0.45), radius: 16)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    HStack(spacing: Space.s2) {
-                        Text(device.name).coreFont(size: MacTextSize.large + 6, weight: .bold)
-                            .accessibilityAddTraits(.isHeader)
-                        if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
-                        if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
-                    }
-                    Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
-                        .foregroundStyle(GlassInk.secondary)
-                    if !device.cutOff { LastSeenLine(lastUsed: device.lastUsed) }
-                }
-            }
-            .coreRise(shown, 0)
             GlassSection(
                 "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.blue, index: 1
             ) {
@@ -494,7 +507,13 @@ struct DeviceDetail: View {
         .onAppear {
             shown = true
             // The way back sits in the Settings title bar, beside the Devices icon.
-            app.shell.settings.back = SettingsBack(title: "Devices") { app.devices.detailID = nil }
+            // The device's own header replaces the section's: icon, name, badges, kind and last seen.
+            app.shell.settings.back = SettingsBack(
+                title: "Devices",
+                header: { [app, id = device.id] in
+                    AnyView(DeviceHeader(app: app, device: app.devices.items.first { $0.id == id } ?? device))
+                }
+            ) { app.devices.detailID = nil }
         }
         .onDisappear { app.shell.settings.back = nil }
         .accessibilityElement(children: .contain)

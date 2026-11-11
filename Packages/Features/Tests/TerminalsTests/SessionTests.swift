@@ -112,11 +112,14 @@ import Testing
 
     @Test func signalAndEndNeedElevationAndReport() async {
         let (s, svc, host) = make()
-        #expect(await s.signal("INT"))
-        #expect(svc.signals == ["INT"] && host.reasons.last?.contains("SIGINT") == true)
+        #expect(await s.run(.stop))
+        #expect(svc.signals == ["INT"] && host.reasons.isEmpty)
+        #expect(await s.run(.pause) && s.paused)
+        #expect(await s.run(.resume) && !s.paused && svc.signals == ["INT", "TSTP", "CONT"])
         host.declines = true
-        #expect(!(await s.signal("KILL")) && svc.signals == ["INT"])
+        #expect(!(await s.run(.forceQuit)) && svc.signals == ["INT", "TSTP", "CONT"])
         host.declines = false
+        #expect(await s.run(.forceQuit) && host.reasons.last?.contains("SIGKILL") == true)
         #expect(await s.end() && svc.closed == ["t_1"] && s.item.status == "exited")
     }
 }

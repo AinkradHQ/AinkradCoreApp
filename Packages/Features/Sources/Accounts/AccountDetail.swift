@@ -56,8 +56,14 @@ struct AccountDetailView: View {
                 if a.lastTest?.result == "auth_failed", a.phase != .disabled { confirming }
                 HStack(alignment: .top, spacing: Space.s3) {
                     keyTile(a)
-                    tile("Key test", "checkmark.shield.fill") { TestTile(model: model, account: a, hue: GlassInk.blue) }
+                    if a.isPlan {
+                        tile("Sign-in", "person.badge.key.fill") { SignInTile(model: model, account: a) }.id("keytest")
+                    } else {
+                        tile("Key test", "checkmark.shield.fill") {
+                            TestTile(model: model, account: a, hue: GlassInk.blue)
+                        }
                         .id("keytest")
+                    }
                     poolsTile(a, pools).id("pools")
                 }
                 .fixedSize(horizontal: false, vertical: true)

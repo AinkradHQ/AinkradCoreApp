@@ -175,10 +175,12 @@ struct ModelTests {
         #expect(m.sessions.items.count == 11)
     }
 
-    @Test func theComposerSendsOnlyWhileRunning() async throws {
+    @Test func theComposerSendsOnlyWhileRunningOrFinishedWell() async throws {
         let (m, api, host, _) = await make()
         let running = "as_01JC4X7Q3MZ8N5V2K9R001"
         let ended = "as_01JC4X7Q3MZ8N5V2K9R006"
+        api.update(ended) { $0.outcome = .failed }
+        await m.reloadAll()
         m.drafts[running] = "hello"
         m.drafts[ended] = "hello"
         #expect(m.canSend(running) && !m.canSend(ended))
@@ -236,6 +238,20 @@ struct ModelTests {
         m.wake("as_01JC4X7Q3MZ8N5V2K9R006")
         try await Task.sleep(for: .milliseconds(200))
         #expect(api.calls.contains("resume") && api.calls.contains("wake") && host?.asked.count == 2)
+    }
+
+    @Test func aFinishedSessionTakesTheNextMessageThroughWake() async throws {
+        let (m, api, _, _) = await make()
+        let id = "as_01JC4X7Q3MZ8N5V2K9R006"
+        m.drafts[id] = "list the files"
+        #expect(m.canSend(id))
+        await m.send(id)
+        #expect(api.calls.contains("wake") && !api.calls.contains("send"))
+        #expect(m.drafts[id] == "")
+        api.update(id) { $0.outcome = .failed }
+        await m.reloadAll()
+        m.drafts[id] = "again"
+        #expect(!m.canSend(id))
     }
 
     @Test func aRefusedNewSessionComesBackAsWords() async {

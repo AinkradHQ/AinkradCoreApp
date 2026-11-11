@@ -18,6 +18,8 @@ struct AgentLabelAuditTests {
     @Test func clocksTokensAndMoneyUseSystemFormats() {
         #expect(AgentWords.clock(75) == "1:15" && AgentWords.clock(3725) == "1:02:05")
         #expect(AgentWords.cost(2_500_000) == "$2.50" && AgentWords.cost(nil) == nil)
+        #expect(AgentWords.cost(2_000) == "< $0.01" && AgentWords.cost(0) == "$0.00")
+        #expect(AgentWords.exactCost(2_000) == "$0.0020")
         #expect(AgentWords.tokens(999) == "999" && AgentWords.tokens(1_500_000).hasSuffix("M"))
     }
 

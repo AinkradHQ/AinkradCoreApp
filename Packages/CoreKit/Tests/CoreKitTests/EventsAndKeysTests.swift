@@ -9,6 +9,22 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
 }
 
 @Suite struct EventTests {
+    /// URLSessionWebSocketTask.sendPing calls its handler twice when the network drops; the second resume used to trap (N13).
+    @Test func aPingHandlerCalledTwiceResumesOnce() async throws {
+        struct Down: Error {}
+        await #expect(throws: Down.self) {
+            try await resumeOnce { done in
+                done(Down())
+                done(nil)
+                done(Down())
+            }
+        }
+        try await resumeOnce { done in
+            done(nil)
+            done(Down())
+        }
+    }
+
     @Test func decodesEventsAndSkipsWhatItCannot() {
         let ok = jsonBody(event(5))
         #expect(EventWire.decode(ok)?.seq == 5)
