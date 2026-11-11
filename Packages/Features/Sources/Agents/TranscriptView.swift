@@ -160,7 +160,7 @@ struct EntryRow: View, Equatable {
                     .background(hue.opacity(0.85), in: coreShape(7))
                     .shadow(color: hue.opacity(0.4), radius: 6)
                     .accessibilityHidden(true)
-                Text(text).coreFont(size: MacTextSize.body).lineSpacing(3).textSelection(.enabled)
+                MarkdownText(text)
                     .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                     .background(GlassInk.well, in: coreShape(Radius.cardMac))
                     .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }

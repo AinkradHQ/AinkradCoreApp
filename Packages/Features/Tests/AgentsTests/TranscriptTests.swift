@@ -220,3 +220,20 @@ struct SessionsStoreTests {
         #expect(st.items.count == 60 && !st.hasMore)
     }
 }
+
+struct MarkdownTests {
+    @Test func parsesEveryBlockKind() {
+        let src = "# Title\n\nSome **bold** and `code`.\n\n- one\n- two\n1. first\n\n```swift\nlet x = 1\n```\nafter"
+        #expect(
+            MarkdownBlock.parse(src) == [
+                .heading("Title"), .paragraph("Some **bold** and `code`."),
+                .item(marker: "•", text: "one"), .item(marker: "•", text: "two"), .item(marker: "1.", text: "first"),
+                .code(language: "swift", text: "let x = 1"), .paragraph("after"),
+            ])
+    }
+
+    @Test func onlyWebLinksStayLinks() {
+        let a = MarkdownBlock.inline("[ok](https://example.com) [bad](file:///etc/passwd)")
+        #expect(a.runs.compactMap(\.link).map(\.scheme) == ["https"])
+    }
+}
