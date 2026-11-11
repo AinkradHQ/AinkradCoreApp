@@ -141,16 +141,16 @@ private struct AccountRow: View {
     @ViewBuilder private var spend: some View {
         if account.isPlan {
             Text("Included in your Claude plan").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-        } else if let b = model.monthBudget(of: account), let cap = b.usdCap {
+        } else if let m = MonthSpend.of(account, budget: model.monthBudget(of: account)), let cap = m.cap {
             VStack(alignment: .leading, spacing: Space.s1) {
                 HStack {
-                    Text("\(ModelPriceItem.usd(b.usdSpent)) of \(Placement.limitWords(cap + b.raisedUSD))")
+                    Text("\(ModelPriceItem.usd(m.spent)) of \(Placement.limitWords(cap))")
                         .monospacedDigit().fontWeight(.semibold)
                     Spacer(minLength: 0)
                     Text("this month").foregroundStyle(GlassInk.secondary)
                 }
                 .coreFont(size: MacTextSize.meta)
-                CoreMeter(b.usdShare ?? 0, low: b.standing != .fine, label: "Spent this month")
+                CoreMeter(min(1, m.share ?? 0), low: m.low, label: "Spent this month")
             }
         } else {
             Text("No monthly limit").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
