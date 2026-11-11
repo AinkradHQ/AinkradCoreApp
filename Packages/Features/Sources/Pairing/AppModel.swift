@@ -39,6 +39,9 @@ public final class AppModel {
     /// Core version, API minor and this device's scopes (`GET /me`).
     let about = AboutModel()
     private(set) var addDevice: AddDeviceModel?
+    /// The typed pairing of the Add wizard, so the Core's events refresh it like the plain one.
+    private(set) var wizardPairing: AddDeviceModel?
+    private(set) var addWizard: AddWizardModel?
     /// Terminals and runners (E5-05); nil until a Core connection exists.
     public private(set) var terminals: TerminalsModel?
     /// Core settings, Feature switches, Secrets, Audit and Ops (E5-07); its screens say "not connected" until a Core is open.
@@ -431,6 +434,7 @@ public final class AppModel {
 
     private func pairingEvent(_ kind: String, _ id: String) async {
         await addDevice?.refreshIfCurrent(id)
+        await wizardPairing?.refreshIfCurrent(id)
         switch kind {
         case "pairing.claimed":
             guard let info = try? await service?.pairing(id) else { return }
@@ -480,6 +484,35 @@ public final class AppModel {
                 AddDeviceView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
             })
     }
+
+    /// Add a device or a runner: one guided flow (N17). `kind` skips the first screen (a runner's own Add button).
+    func openAddWizard(kind: AddKind? = nil) {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        stepUpNotice = nil
+        let model = AddWizardModel(app: self, kind: kind)
+        if kind != nil { model.step = .install }
+        addWizard = model
+        shell.present(
+            ShellDialog(
+                id: "add-wizard",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    model?.dialogDidClose()
+                    self?.addWizard = nil
+                }
+            ) {
+                AddWizardView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
+            })
+    }
+
+    func watch(typed m: AddDeviceModel) { wizardPairing = m }
+    func unwatch(typed m: AddDeviceModel?) { if wizardPairing === m { wizardPairing = nil } }
+
+    /// The runner's no-op test, in words.
+    func testRunner(_ id: String) async -> String { await terminals?.test(runner: id) ?? "Not connected to a Core." }
 
     /// Add device, the QR way. Falls back to the typed-code quick flow while the Core cannot make invites.
     func openInviteDevice() {
@@ -543,6 +576,8 @@ public final class AppModel {
 
     /// The Core's key fingerprint this Mac paired with, for the new device to compare against.
     var coreFingerprint: String? { (try? keyStore.loadIdentity())??.coreFingerprint }
+    /// The Core's address (`https://host:port`), for the command a runner runs to pair.
+    var coreURL: String? { (try? keyStore.loadIdentity())??.endpoint.absoluteString }
 
     var isElevated: Bool { shell.elevatedUntil.map { $0 > Date() } ?? false }
 
