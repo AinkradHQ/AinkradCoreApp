@@ -71,6 +71,12 @@ public final class TerminalsModel {
     var shown: [TerminalItem] { items.filter(filter.matches) }
     func runner(_ id: String) -> RunnerItem? { runners.first { $0.id == id } }
     /// What a terminal is called on screen: the tab name the person gave it, else the machine it runs on.
+    /// A fresh look at the runners the Core lists, by name (the Add runner wizard watches this for the new one).
+    public func freshRunnerNames() async -> [String] {
+        await reload()
+        return runners.map(\.name)
+    }
+
     public func displayName(ofTerminal id: String) -> String? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
         return shell.tabNames["terminal-\(id)"] ?? name(of: item.runner)

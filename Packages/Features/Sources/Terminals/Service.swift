@@ -31,6 +31,24 @@ struct DriverItem: Equatable, Sendable {
     var slots: [String: Int] = [:]
 }
 
+/// Whether agents on a runner can use the user's accounts, and why not (`GET /runners` `accounts`).
+struct RunnerAccountFacts: Equatable, Sendable {
+    var gateway: Bool
+    var subscriptionEnv: Bool
+    var egressFilter: Bool
+    var gatewayReason: String?
+    var subscriptionEnvReason: String?
+    var egressFilterReason: String?
+}
+
+/// Used and capacity per driver; capacity nil means that driver is off.
+struct RunnerSlotFacts: Equatable, Sendable {
+    var agentsUsed: Int
+    var agentsCapacity: Int?
+    var terminalsUsed: Int
+    var terminalsCapacity: Int?
+}
+
 struct RunnerItem: Identifiable, Equatable, Sendable {
     let id: String
     var name: String
@@ -45,6 +63,19 @@ struct RunnerItem: Identifiable, Equatable, Sendable {
     var lastSeen: Date?
     var drivers: [DriverItem]
     var isolationTiers: [String]?
+    // Facts from Core API minor 51: all nil for an old or offline runner.
+    var osPretty: String?
+    var os: String?
+    var sandbox: String?
+    var runsAsUser: String?
+    var runsAsRoot: Bool?
+    var connectedSince: Date?
+    var updateAvailable: Bool?
+    var builtIn = false
+    var accounts: RunnerAccountFacts?
+    var slots: RunnerSlotFacts?
+    /// Harness name to version, e.g. `claude` to `2.1.318`.
+    var tools: [String: String] = [:]
 
     var hasPty: Bool { drivers.contains { $0.name == "pty" } }
     var perCore: Double? { avg1.flatMap { a in cores.flatMap { $0 > 0 ? a / Double($0) : nil } } }
@@ -198,6 +229,20 @@ struct LiveTerminalService: TerminalService {
                 DriverItem(
                     name: $0.name ?? "", commands: $0.commands ?? [], capacity: $0.capacity.map(Int.init),
                     slots: ($0.slots?.additionalProperties ?? [:]).mapValues(Int.init))
-            }, isolationTiers: r.isolation?.tiers)
+            }, isolationTiers: r.isolation?.tiers, osPretty: r.osPretty, os: r.os, sandbox: r.sandbox,
+            runsAsUser: r.runsAs?.user, runsAsRoot: r.runsAs?.root, connectedSince: r.connectedSince,
+            updateAvailable: r.updateAvailable, builtIn: r.builtIn ?? false,
+            accounts: r.accounts.map {
+                RunnerAccountFacts(
+                    gateway: $0.gateway, subscriptionEnv: $0.subscriptionEnv, egressFilter: $0.egressFilter,
+                    gatewayReason: $0.gatewayReason, subscriptionEnvReason: $0.subscriptionEnvReason,
+                    egressFilterReason: $0.egressFilterReason)
+            },
+            slots: r.slots.map {
+                RunnerSlotFacts(
+                    agentsUsed: Int($0.agentsUsed), agentsCapacity: $0.agentsCapacity.map(Int.init),
+                    terminalsUsed: Int($0.terminalsUsed), terminalsCapacity: $0.terminalsCapacity.map(Int.init))
+            },
+            tools: r.tools?.additionalProperties ?? [:])
     }
 }

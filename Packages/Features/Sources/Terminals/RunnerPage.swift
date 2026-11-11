@@ -53,6 +53,7 @@ struct RunnerPage: View {
             IconTile("server.rack", hue: off ? GlassInk.slate : RunnerHue.of(runner.name), size: 32)
             Text(runner.name).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
+            if runner.builtIn { BuiltInBadge() }
             RunnerChip(facts: facts)
             Spacer(minLength: Space.s3)
             Button {
@@ -91,17 +92,7 @@ struct RunnerPage: View {
                     .foregroundStyle(palette.text2)
             } else {
                 let terminals = here.count
-                HStack(alignment: .top, spacing: Space.s4) {
-                    RunnerBar(
-                        text: "\(runner.load) of \(runner.capacity) work slots",
-                        value: runner.capacity > 0 ? Double(runner.load) / Double(runner.capacity) : 0,
-                        warn: runner.capacity > 0 && runner.load >= runner.capacity)
-                    if let cap = facts.terminalCapacity {
-                        RunnerBar(
-                            text: "\(terminals) of \(cap) terminals",
-                            value: cap > 0 ? Double(terminals) / Double(cap) : 0)
-                    }
-                }
+                RunnerBars(facts: facts, terminalsHere: terminals)
                 VStack(spacing: Space.s2) {
                     ForEach(work) { w in
                         workRow("sparkles", w.title, w.detail, bar: min(Double(w.minutes) / 60, 1)) {
@@ -201,13 +192,25 @@ struct RunnerPage: View {
                 Image(systemName: "key").frame(width: 20).foregroundStyle(palette.text2).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Can use your accounts").coreFont(size: MacTextSize.body, weight: .medium)
-                    Text("The Core does not say yet whether agents here can use your accounts.")
+                    Text(accountsHelp)
                         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
                 Spacer(minLength: Space.s2)
-                StateBadge("Not reported yet", tone: .queue, symbol: "questionmark")
+                if let yes = facts.canUseAccounts {
+                    StateBadge(yes ? "Yes" : "No", tone: yes ? .run : .warn, symbol: yes ? "checkmark" : "xmark")
+                } else {
+                    StateBadge("Not reported yet", tone: .queue, symbol: "questionmark")
+                }
             }
             .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var accountsHelp: String {
+        switch facts.accountsAnswer {
+        case nil: "The Core does not say yet whether agents here can use your accounts."
+        case "Yes": "Agents here use your accounts without the key leaving this runner."
+        case let no?: no
         }
     }
 
@@ -230,10 +233,20 @@ struct RunnerPage: View {
         card("Machine") {
             Grid(alignment: .leading, horizontalSpacing: Space.s3, verticalSpacing: Space.s2) {
                 row("System", facts.system)
-                row("Runner version", runner.version)
-                row("Runs as", nil)
+                GridRow {
+                    Text("Runner version").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    if let v = runner.version {
+                        HStack(spacing: Space.s2) {
+                            Text(v)
+                            if facts.updateAvailable { StateBadge("Update available", tone: .run, symbol: "arrow.up") }
+                        }
+                    } else {
+                        Text("Not reported yet").foregroundStyle(palette.text2)
+                    }
+                }
+                row("Runs as", facts.runsAs)
                 row("Isolation", runner.isolationTiers.flatMap { $0.isEmpty ? nil : $0.joined(separator: ", ") })
-                row("Connected since", nil)
+                row("Connected since", runner.connectedSince.map { $0.formatted(date: .abbreviated, time: .shortened) })
                 GridRow {
                     Text("Last heartbeat").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     if let d = runner.lastSeen {
