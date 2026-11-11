@@ -19,10 +19,58 @@ struct RunnerFacts: Equatable {
 
     var terminalsOn: Bool { runner.hasPty }
     var agentsOn: Bool { runner.drivers.contains { $0.name == "agent" } }
-    /// The tools an agent can run here, from the agent driver's slots (`claude`, `codex`).
-    var tools: [String] { (runner.drivers.first { $0.name == "agent" }?.slots.keys.sorted()) ?? [] }
+    /// The tools an agent can run here with their versions ("claude 2.1.318"), else the harness names the agent driver lists.
+    var tools: [String] {
+        if !runner.tools.isEmpty {
+            return runner.tools.keys.sorted().map { k in
+                let v = runner.tools[k] ?? ""
+                return v.isEmpty ? k : "\(k) \(v)"
+            }
+        }
+        return (runner.drivers.first { $0.name == "agent" }?.slots.keys.sorted()) ?? []
+    }
     var commandsOn: Bool { runner.drivers.contains { $0.commands.contains("exec.run") } }
-    var terminalCapacity: Int? { runner.drivers.first { $0.name == "pty" }?.capacity }
+    var terminalCapacity: Int? {
+        runner.slots != nil ? runner.slots?.terminalsCapacity : runner.drivers.first { $0.name == "pty" }?.capacity
+    }
+
+    /// The agents bar, from `slots`; nil when the agent driver is off or the Core did not report slots.
+    var agentBar: (text: String, value: Double, full: Bool)? {
+        guard let s = runner.slots, let cap = s.agentsCapacity else { return nil }
+        let n = s.agentsUsed
+        return ("\(n) of \(cap) agents", cap > 0 ? min(1, Double(n) / Double(cap)) : 0, cap > 0 && n >= cap)
+    }
+
+    /// The terminals bar; `fallbackUsed` is the count this Mac listed when the Core sent no `slots`.
+    func terminalBar(fallbackUsed: Int) -> (text: String, value: Double)? {
+        guard let cap = terminalCapacity else { return nil }
+        let n = runner.slots?.terminalsUsed ?? fallbackUsed
+        return ("\(n) of \(cap) terminals", cap > 0 ? min(1, Double(n) / Double(cap)) : 0)
+    }
+
+    /// "Runs as" row: "ainkrad-runner (sandboxed)", "root (no sandbox)"; nil when the Core did not say who.
+    var runsAs: String? {
+        let who = runner.runsAsRoot == true ? "root" : runner.runsAsUser
+        guard let who, !who.isEmpty else { return nil }
+        switch runner.sandbox {
+        case "process": return "\(who) (sandboxed)"
+        case "none": return "\(who) (no sandbox)"
+        default: return who
+        }
+    }
+
+    /// "Yes", or "No (reason)"; nil when the Core did not report it.
+    var accountsAnswer: String? {
+        guard let a = runner.accounts else { return nil }
+        let checks: [(Bool, String?, String)] = [
+            (a.gateway, a.gatewayReason, "it cannot reach the account gateway"),
+            (a.subscriptionEnv, a.subscriptionEnvReason, "it cannot pass a plan sign-in to agents"),
+            (a.egressFilter, a.egressFilterReason, "it cannot limit where agents connect"),
+        ]
+        guard let bad = checks.first(where: { !$0.0 }) else { return "Yes" }
+        return "No (\(bad.1 ?? bad.2))"
+    }
+    var canUseAccounts: Bool? { accountsAnswer.map { $0 == "Yes" } }
 
     /// The sentence under the name when the runner is not simply fine.
     var say: String? {
@@ -38,8 +86,18 @@ struct RunnerFacts: Equatable {
         }
     }
 
-    /// "Linux aarch64" is not reported (no OS), only the CPU architecture.
-    var system: String? { runner.arch }
+    /// "Ubuntu 24.04 aarch64": the OS name and the CPU architecture, whichever the runner reported.
+    var system: String? {
+        let parts = [runner.osPretty ?? runner.os, runner.arch].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    var updateAvailable: Bool { runner.updateAvailable == true }
+
+    /// The list order: this Core's built-in runner first, the rest as they came.
+    static func ordered(_ runners: [RunnerItem]) -> [RunnerItem] {
+        runners.filter(\.builtIn) + runners.filter { !$0.builtIn }
+    }
 
     /// What revoking stops, in the confirm card: "2 agents and 3 terminals".
     static func stops(agents: Int, terminals: Int) -> String {

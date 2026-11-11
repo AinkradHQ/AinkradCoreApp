@@ -33,7 +33,8 @@ struct SpendingPage: View {
 
     /// From the month budgets of the accounts: what the limits count. Without any, from the calls the ledger shows.
     private var monthSpent: Int64 {
-        monthBudgets.isEmpty
+        if let t = MonthSpend.total(model.accounts) { return t.spent }
+        return monthBudgets.isEmpty
             ? ledgerThisMonth.compactMap(\.costMicros).reduce(0, +) : monthBudgets.reduce(0) { $0 + $1.usdSpent }
     }
 
@@ -43,7 +44,9 @@ struct SpendingPage: View {
     }
 
     private var summary: some View {
-        let cap = monthBudgets.reduce(0) { $0 + ($1.usdCap ?? 0) + $1.raisedUSD }
+        let cap =
+            MonthSpend.total(model.accounts).map { $0.cap ?? 0 }
+            ?? monthBudgets.reduce(0) { $0 + ($1.usdCap ?? 0) + $1.raisedUSD }
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {

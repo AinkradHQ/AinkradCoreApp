@@ -49,6 +49,9 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var maxUSDMicros: Int64?
     /// Sessions holding a slot now, and the scheduler's health counters (admin only; nil for any other device).
     var live: Int64?
+    /// This calendar month's cost and the monthly dollar cap, in millionths of a dollar (admin reads only; nil otherwise).
+    var monthSpendUSDMicros: Int64?
+    var monthLimitUSDMicros: Int64?
     var health: AccountHealthItem?
     var phase: AccountPhase { AccountPhase(state) }
     /// A Claude plan: a signed-in token the runner is lent, never an API key the gateway can test.
@@ -61,6 +64,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.createdAt == r.createdAt && l.lastTest?.at == r.lastTest?.at
             && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
             && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
+            && l.monthSpendUSDMicros == r.monthSpendUSDMicros && l.monthLimitUSDMicros == r.monthLimitUSDMicros
     }
 }
 

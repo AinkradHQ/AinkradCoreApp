@@ -420,6 +420,7 @@ struct LiveAccountsService: AccountsService {
             state: a.state, stateReason: a.stateReason, stateUntil: a.stateUntil, cap: a.cap,
             lastUsedAt: a.lastUsedAt, createdAt: a.createdAt, lastTest: a.lastTest.map { ($0.at, $0.result) },
             maxTokens: a.sessionLimits?.maxTokens, maxUSDMicros: a.sessionLimits?.maxUsdMicros, live: a.live,
+            monthSpendUSDMicros: a.monthSpendUsdMicros, monthLimitUSDMicros: a.monthLimitUsdMicros,
             health: a.health.map {
                 AccountHealthItem(
                     failStreak: $0.failStreak, authStreak: $0.authStreak, lastSuccessAt: $0.lastSuccessAt,

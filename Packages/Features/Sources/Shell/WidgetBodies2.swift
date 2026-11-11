@@ -194,19 +194,19 @@ struct CoreBody: View {
             case .m:
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 HStack(alignment: .top, spacing: Space.s5) {
-                    stat("Connection", s.word)
-                    stat("Alarms", "\(alarms)")
+                    stat("Certificate", h.health?.certificate ?? "Not reported yet")
+                    stat("Backup", h.health?.backupAge(now: Date()) ?? "Not reported yet")
                     stat("Runners", "\(h.machinesOnline) of \(h.machines.count)")
                     Spacer(minLength: 0)
                 }
                 Spacer(minLength: 0)
-                WGap(label: "Certificate and backup")
+                WCaption(h.health.map { "Core \($0.version) · up \($0.uptime)" } ?? h.coreName)
             default:
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 VStack(alignment: .leading, spacing: 0) {
                     Text(s.tone == .done ? "Healthy" : s.word).coreFont(size: 34, weight: .bold)
                         .foregroundStyle(WidgetInk.primary)
-                    WCaption(h.coreName)
+                    WCaption(h.health.map { "\(h.coreName) · version \($0.version) · up \($0.uptime)" } ?? h.coreName)
                 }
                 if size == .x {
                     HStack(alignment: .top, spacing: Space.s4) {
@@ -233,8 +233,20 @@ struct CoreBody: View {
         WBarRow(
             label: "Alarms", value: alarms == 0 ? "None" : "\(alarms)", fill: min(Double(alarms) / 5, 1),
             tint: WidgetInk.orange)
-        WGap(label: "Certificate")
-        WGap(label: "Backup")
+        if let c = h.health?.certificate, let health = h.health {
+            WBarRow(
+                label: "Certificate", value: c + (health.certDaysLeft ?? 0 > 0 ? " left" : ""),
+                fill: health.certificateShare, tint: health.certificateLow ? WidgetInk.orange : WidgetInk.green)
+        } else {
+            WGap(label: "Certificate")
+        }
+        if let b = h.health?.backup(now: Date()), let at = h.health?.lastBackupAt {
+            WBarRow(
+                label: "Backup", value: b, fill: max(0, 1 - Date().timeIntervalSince(at) / (2 * 86_400)),
+                tint: WidgetInk.green)
+        } else {
+            WGap(label: "Backup")
+        }
     }
 
     private func stat(_ k: String, _ v: String) -> some View {

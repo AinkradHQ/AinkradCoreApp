@@ -22,6 +22,14 @@ protocol InviteService: Sendable {
     func status(_ pairingID: String) async throws -> String
     /// Takes an unused invite back.
     func withdraw(_ pairingID: String) async throws
+    /// A one-time runner invite (API 1.51): lasts 15 minutes, comes with a `token` for the runner's command, no check code.
+    func createRunnerInvite(name: String) async throws -> RunnerInvite
+}
+
+extension InviteService {
+    func createRunnerInvite(name: String) async throws -> RunnerInvite {
+        throw CoreError.invalidInput("This Core cannot make a runner invite yet. Use a typed code instead.")
+    }
 }
 
 /// The Core's own invite route (API v1.48). The Core hands the link out once, so it lives only in the model that shows it.
@@ -33,6 +41,9 @@ struct LiveInviteService: InviteService {
     }
     func status(_ pairingID: String) async throws -> String { try await service.pairing(pairingID).status }
     func withdraw(_ pairingID: String) async throws { _ = try await service.reject(pairingID) }
+    func createRunnerInvite(name: String) async throws -> RunnerInvite {
+        try await service.createRunnerInvite(name: name)
+    }
 }
 
 /// Release default until the Core serves invites. Says so, plainly.

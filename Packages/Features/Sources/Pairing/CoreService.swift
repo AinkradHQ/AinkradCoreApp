@@ -194,6 +194,25 @@ struct LiveCoreService: CoreService {
         }
     }
 
+    /// `POST /pairings/invites` with `kind: runner`: the token comes back once and lives only in the model that shows it.
+    func createRunnerInvite(name: String) async throws -> RunnerInvite {
+        try await run {
+            switch try await client.createInvite(body: .json(.init(kind: "runner", name: name))) {
+            case .ok(let o):
+                let b = try o.body.json
+                guard let id = b.pairingId, let token = b.token else {
+                    throw CoreError.protocolViolation("a runner invite without an id or a token")
+                }
+                return RunnerInvite(
+                    pairingID: id, name: name, token: token, expiresAt: b.expiresAt ?? Date().addingTimeInterval(900))
+            case .badRequest(let r): throw Self.fail(r)
+            case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
     func pairing(_ id: String) async throws -> PairingInfo {
         try await run {
             switch try await client.getPairing(path: .init(id: id)) {

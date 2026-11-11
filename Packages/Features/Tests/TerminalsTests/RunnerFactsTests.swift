@@ -59,3 +59,83 @@ struct RunnerFactsTests {
         #expect(RunnerFacts.Filter.offline.matches(off) && !RunnerFacts.Filter.offline.matches(busy))
     }
 }
+
+/// What the Core reports since API 1.51, in words (N18, N19).
+struct RunnerNewFactsTests {
+    private func facts(_ edit: (inout RunnerItem) -> Void) -> RunnerFacts {
+        var r = runner()
+        edit(&r)
+        return RunnerFacts(runner: r)
+    }
+
+    @Test func runsAsSaysWhoAndTheSandbox() {
+        #expect(
+            facts {
+                $0.runsAsUser = "ainkrad-runner"
+                $0.sandbox = "process"
+            }.runsAs == "ainkrad-runner (sandboxed)")
+        #expect(
+            facts {
+                $0.runsAsUser = "root"
+                $0.runsAsRoot = true
+                $0.sandbox = "none"
+            }.runsAs == "root (no sandbox)")
+        #expect(facts { $0.runsAsUser = "ahmed" }.runsAs == "ahmed")
+        #expect(facts { _ in }.runsAs == nil)
+    }
+
+    @Test func systemJoinsTheOSNameAndTheArchitecture() {
+        #expect(facts { $0.osPretty = "Ubuntu 24.04" }.system == "Ubuntu 24.04 aarch64")
+        #expect(
+            facts {
+                $0.osPretty = nil
+                $0.os = "linux"
+            }.system == "linux aarch64")
+        #expect(facts { $0.arch = nil }.system == nil)
+    }
+
+    @Test func accountsAnswerYesOrNoWithTheReason() {
+        #expect(facts { _ in }.accountsAnswer == nil && facts { _ in }.canUseAccounts == nil)
+        let ok = RunnerAccountFacts(gateway: true, subscriptionEnv: true, egressFilter: true)
+        #expect(facts { $0.accounts = ok }.accountsAnswer == "Yes")
+        let no = RunnerAccountFacts(
+            gateway: false, subscriptionEnv: true, egressFilter: true, gatewayReason: "the gateway is off")
+        #expect(facts { $0.accounts = no }.accountsAnswer == "No (the gateway is off)")
+        #expect(facts { $0.accounts = no }.canUseAccounts == false)
+        let blank = RunnerAccountFacts(gateway: true, subscriptionEnv: true, egressFilter: false)
+        #expect(facts { $0.accounts = blank }.accountsAnswer?.hasPrefix("No (") == true)
+    }
+
+    @Test func agentAndTerminalBarsComeFromSlots() {
+        let f = facts {
+            $0.slots = RunnerSlotFacts(agentsUsed: 2, agentsCapacity: 2, terminalsUsed: 3, terminalsCapacity: 16)
+        }
+        #expect(f.agentBar?.text == "2 of 2 agents" && f.agentBar?.full == true)
+        #expect(f.terminalBar(fallbackUsed: 9)?.text == "3 of 16 terminals")
+        let off = facts {
+            $0.slots = RunnerSlotFacts(agentsUsed: 0, agentsCapacity: nil, terminalsUsed: 0, terminalsCapacity: nil)
+        }
+        #expect(off.agentBar == nil && off.terminalBar(fallbackUsed: 0) == nil)
+        // No slots from the Core: the old pty capacity and this Mac's own count.
+        #expect(facts { _ in }.agentBar == nil)
+        #expect(facts { _ in }.terminalBar(fallbackUsed: 2)?.text == "2 of 16 terminals")
+    }
+
+    @Test func toolsCarryTheirVersions() {
+        #expect(facts { $0.tools = ["codex": "0.9", "claude": "2.1.318"] }.tools == ["claude 2.1.318", "codex 0.9"])
+    }
+
+    @Test func theBuiltInRunnerComesFirst() {
+        var a = runner("a")
+        var b = runner("b")
+        b.builtIn = true
+        #expect(RunnerFacts.ordered([a, b]).map(\.id) == ["b", "a"])
+        a.builtIn = true
+        #expect(RunnerFacts.ordered([a, b]).map(\.id) == ["a", "b"])
+    }
+
+    @Test func updateChipOnlyWhenTheCoreSaysSo() {
+        #expect(!facts { _ in }.updateAvailable)
+        #expect(facts { $0.updateAvailable = true }.updateAvailable)
+    }
+}

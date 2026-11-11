@@ -151,6 +151,11 @@ enum AddWizardPlan {
         return c + " --pair \(core) --code \(code)"
     }
 
+    /// The one command for a Linux server with a runner invite: installs the runner and connects it. Contains the secret token.
+    static func runnerInviteCommand(token: String) -> String {
+        "sudo sh -c \"$(curl -fsSL https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh)\" sh --runner --invite \(token)"
+    }
+
     /// For a Mac runner: pair, then serve the Core with what was chosen.
     static func macCommands(core: String, code: String, terminals: Bool, agents: Bool) -> [String] {
         var connect = "ainkrad-runner connect"

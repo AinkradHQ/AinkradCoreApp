@@ -31,7 +31,7 @@ struct RunnersView: View {
         }
     }
 
-    private var shown: [RunnerItem] { model.runners.filter(model.runnerFilter.matches) }
+    private var shown: [RunnerItem] { RunnerFacts.ordered(model.runners.filter(model.runnerFilter.matches)) }
 
     @ViewBuilder private var fleet: some View {
         switch model.load {
@@ -106,6 +106,37 @@ struct OfferChip: View {
     }
 }
 
+/// "This Core (built-in)": the runner that lives inside this Core.
+struct BuiltInBadge: View {
+    var body: some View {
+        Text("This Core (built-in)").coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.blue)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .background(GlassInk.blue.opacity(0.18), in: coreShape(Radius.chip)).lineLimit(1).fixedSize()
+    }
+}
+
+/// The agent and terminal bars, separate, from `slots`; the old single work-slot bar when the Core sent none.
+struct RunnerBars: View {
+    let facts: RunnerFacts
+    let terminalsHere: Int
+    var body: some View {
+        let r = facts.runner
+        HStack(alignment: .top, spacing: Space.s3) {
+            if let a = facts.agentBar {
+                RunnerBar(text: a.text, value: a.value, warn: a.full)
+            } else if r.slots == nil {
+                RunnerBar(
+                    text: "\(r.load) of \(r.capacity) work slots",
+                    value: r.capacity > 0 ? Double(r.load) / Double(r.capacity) : 0,
+                    warn: r.capacity > 0 && r.load >= r.capacity)
+            }
+            if let t = facts.terminalBar(fallbackUsed: terminalsHere) {
+                RunnerBar(text: t.text, value: t.value)
+            }
+        }
+    }
+}
+
 /// A runner's state as a badge with the plain word.
 struct RunnerChip: View {
     let facts: RunnerFacts
@@ -148,8 +179,11 @@ private struct RunnerCard: View {
                     IconTile(
                         "server.rack", hue: facts.status == .off ? GlassInk.slate : RunnerHue.of(runner.name), size: 40)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-                        Text(runner.arch ?? "System not reported yet").coreFont(size: MacTextSize.meta)
+                        HStack(spacing: Space.s2) {
+                            Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                            if runner.builtIn { BuiltInBadge() }
+                        }
+                        Text(facts.system ?? "System not reported yet").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(palette.text2)
                     }
                     Spacer(minLength: Space.s2)
@@ -165,17 +199,7 @@ private struct RunnerCard: View {
                     OfferChip(symbol: "terminal", title: "Terminals", on: facts.terminalsOn)
                     OfferChip(symbol: "sparkles", title: "Agents", on: facts.agentsOn)
                 }
-                HStack(alignment: .top, spacing: Space.s3) {
-                    RunnerBar(
-                        text: "\(runner.load) of \(runner.capacity) work slots",
-                        value: runner.capacity > 0 ? Double(runner.load) / Double(runner.capacity) : 0,
-                        warn: runner.capacity > 0 && runner.load >= runner.capacity)
-                    if let cap = facts.terminalCapacity {
-                        RunnerBar(
-                            text: "\(terminals) of \(cap) terminals",
-                            value: cap > 0 ? Double(terminals) / Double(cap) : 0)
-                    }
-                }
+                RunnerBars(facts: facts, terminalsHere: terminals)
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Load, while this Mac watched").coreFont(size: MacTextSize.meta).foregroundStyle(
