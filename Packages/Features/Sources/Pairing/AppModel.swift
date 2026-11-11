@@ -452,13 +452,15 @@ public final class AppModel {
     }
 
     /// `quick` makes the code at once with the defaults; otherwise the form opens (advanced).
-    func openAddDevice(existing id: String? = nil, quick: Bool = false) {
+    /// `admin` opens the form with the admin scopes already chosen (read, approve, admin).
+    func openAddDevice(existing id: String? = nil, quick: Bool = false, admin: Bool = false) {
         guard service != nil else {
             shell.showToast("Connect to a Core first.")
             return
         }
         stepUpNotice = nil
         let model = AddDeviceModel(host: self, existing: id, quickMode: quick)
+        if admin { model.scopes = ["read", "approve", "admin"] }
         addDevice = model
         shell.present(
             ShellDialog(

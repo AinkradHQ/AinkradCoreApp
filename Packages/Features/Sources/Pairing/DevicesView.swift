@@ -69,7 +69,7 @@ struct DevicesSection: View {
                 )
                 .fixedSize()
             }
-            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
                 app.openAddDevice()
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(app.service == nil)
@@ -112,7 +112,9 @@ private struct OnlyAdminWarning: View {
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s2)
-            AppActionTile(title: "Add device", symbol: "plus", key: "", hue: GlassInk.orange) { app.openAddDevice() }
+            AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.orange) {
+                app.openAddDevice(admin: true)
+            }
         }
         .coreFont(size: MacTextSize.body)
         .padding(Space.s3)
