@@ -71,6 +71,8 @@ public struct HomeSnapshot: Sendable {
     public var spendByDay: [Double] = []
     /// Spend since the first of this month, from the same events.
     public var monthSpend: Double = 0
+    /// From `GET /core/health`; nil until the Core answered it.
+    public var health: CoreHealthFacts?
 
     public var runningAgents: Int { running.count }
     public var machinesOnline: Int { machines.filter(\.online).count }

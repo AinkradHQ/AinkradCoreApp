@@ -22,6 +22,11 @@ private struct FakeHome: HomeSource {
     }
     func utilisation() async throws -> Double { share }
     func audit() async throws -> [HomeAudit] { auditList }
+    func health() async throws -> CoreHealthFacts {
+        if let healthFacts { return healthFacts }
+        throw URLError(.cannotConnectToHost)
+    }
+    var healthFacts: CoreHealthFacts?
 }
 
 @MainActor @Suite struct HomeFeedTests {
@@ -53,6 +58,22 @@ private struct FakeHome: HomeSource {
         #expect(h.monthTokensUsed == 0.4)
         #expect(h.events.first?.text == "Device revoked")
         #expect(h.events.first?.minutesAgo == 5)
+    }
+
+    @Test func coreHealthBecomesTheWidgetValues() async {
+        let shell = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
+        var src = FakeHome()
+        src.healthFacts = CoreHealthFacts(
+            version: "0.2.1", uptimeSecs: 90_000, certDaysLeft: 62, lastBackupAt: now.addingTimeInterval(-3 * 3600),
+            lastBackupBytes: 4_000_000)
+        await HomeFeed(shell: shell, source: src, now: { [now] in now }).refresh()
+        let h = shell.home.health
+        #expect(h?.version == "0.2.1" && h?.certificate == "62 days" && h?.uptime == "1 day 1 hour")
+        #expect(h?.backupAge(now: now) == "3 hours ago")
+        // A Core that does not answer /core/health leaves the rest of Home showing.
+        let none = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
+        await HomeFeed(shell: none, source: FakeHome(), now: { [now] in now }).refresh()
+        #expect(none.home.health == nil)
     }
 
     @Test func aRefusedReadLeavesTheRestShowing() async {

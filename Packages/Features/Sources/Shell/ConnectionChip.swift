@@ -159,6 +159,14 @@ struct ConnectionPanel: View {
                 row("Last contact", lastContact(state, now: now))
                 row("Next try", nextTry(state, now: now))
                 if state != .online { row("Meanwhile", "Showing the last data") }
+                if let h = shell.home.health {
+                    row("Core version", h.version)
+                    row("Up for", h.uptime)
+                    row(
+                        "Certificate",
+                        h.certificate.map { $0 + (h.certDaysLeft ?? 0 > 0 ? " left" : "") } ?? "Not reported yet")
+                    row("Last backup", h.backup(now: now) ?? "Not reported yet")
+                }
             }
             if state != .online {
                 Button {

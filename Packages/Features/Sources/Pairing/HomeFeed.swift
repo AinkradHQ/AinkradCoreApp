@@ -30,6 +30,7 @@ protocol HomeSource: Sendable {
     /// The tightest usage limit across accounts, 0...1.
     func utilisation() async throws -> Double
     func audit() async throws -> [HomeAudit]
+    func health() async throws -> CoreHealthFacts
 }
 
 struct LiveHomeSource: HomeSource {
@@ -73,6 +74,15 @@ struct LiveHomeSource: HomeSource {
                 }
                 return HomeAudit(seq: $0.seq, at: $0.at, action: $0.action, actor: who)
             }
+        }
+    }
+
+    func health() async throws -> CoreHealthFacts {
+        try await run {
+            let h = try await client.getCoreHealth().ok.body.json
+            return CoreHealthFacts(
+                version: h.version, uptimeSecs: h.uptimeSecs, certDaysLeft: h.certDaysLeft.map(Int.init),
+                lastBackupAt: h.lastBackupAt, lastBackupBytes: h.lastBackupBytes)
         }
     }
 
@@ -147,6 +157,7 @@ final class HomeFeed {
                     minutesAgo: max(0, Int(at.timeIntervalSince($0.at) / 60)), symbol: "list.bullet")
             }
         }
+        if let h = try? await source.health() { home.health = h }
         shell.home = home
     }
 
