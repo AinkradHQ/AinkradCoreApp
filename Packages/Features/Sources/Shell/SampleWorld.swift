@@ -32,7 +32,7 @@ extension HomeSnapshot {
                 symbol: "checkmark"),
         ],
         board: Board(todo: 2, doing: 2, review: 2, blocked: 1, done: 3), loadSampleSeconds: 3, spendToday: 18.60,
-        monthTokensUsed: 0.77)
+        monthTokensUsed: 0.77, spendByDay: [3.1, 5.4, 2.2, 6.8, 4.0, 1.2, 3.2, 18.6], monthSpend: 142.4)
 }
 
 @MainActor

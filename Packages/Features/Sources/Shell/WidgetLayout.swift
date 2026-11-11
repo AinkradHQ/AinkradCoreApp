@@ -1,21 +1,31 @@
 import CoreGraphics
 import Foundation
 
-/// A widget's footprint on the Home grid (`widgets.js` SZ): s 1x1, m 2x1, t 1x2, l 2x2, x 2x3.
+/// A widget's footprint on the Home grid, in the macOS widget sizes (N9), counted in 16 x 8 grid units:
+/// small 2x2, medium 4x2, large 4x4, extra large 8x4. There is no tall size on macOS.
 public enum WidgetSize: String, CaseIterable, Codable, Sendable {
-    case s, m, t, l, x
-    public var cols: Int { self == .m || self == .l || self == .x ? 2 : 1 }
-    public var rows: Int { self == .t || self == .l ? 2 : self == .x ? 3 : 1 }
+    case s, m, l, x
+    public var cols: Int { self == .s ? 2 : self == .x ? 8 : 4 }
+    public var rows: Int { self == .s || self == .m ? 2 : 4 }
     public var title: String {
         switch self {
         case .s: "Small"
-        case .m: "Wide"
-        case .t: "Tall"
+        case .m: "Medium"
         case .l: "Large"
-        case .x: "XL"
+        case .x: "Extra Large"
         }
     }
     var area: Int { cols * rows }
+
+    /// A size saved by an earlier build (8 x 5 grid: s 1x1, m 2x1, t 1x2, l 2x2, x 2x3) on today's grid. The removed
+    /// tall size becomes small, and the old extra large (two cells wide) becomes large.
+    static func migrated(_ raw: String) -> WidgetSize? {
+        switch raw {
+        case "t": .s
+        case "x": .l
+        default: WidgetSize(rawValue: raw)
+        }
+    }
 }
 
 public struct WidgetItem: Identifiable, Codable, Equatable, Sendable {
@@ -33,19 +43,20 @@ public struct WidgetItem: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// The widget desk as pure data: an 8 x 5 grid of 150 pt cells, widgets that never overlap, and the moves the prototype allows
+/// The widget desk as pure data: a 16 x 8 grid of small units, widgets that never overlap, and the moves the prototype allows
 /// (drag, resize, add, remove). A move pushes whatever is in the way to the nearest free cell, or is refused (nil) when there is none.
 public struct WidgetLayout: Equatable, Sendable {
-    public static let cols = 8
-    public static let rows = 5
+    public static let cols = 16
+    public static let rows = 8
     public var items: [WidgetItem]
     public init(items: [WidgetItem] = []) { self.items = items }
 
-    /// The prototype's first layout.
+    /// The first layout: the desk of the N9 mockup.
     public static func standard() -> WidgetLayout {
         let d: [(WidgetKind, WidgetSize, Int, Int)] = [
-            (.today, .x, 0, 0), (.clock, .s, 0, 3), (.spend, .s, 1, 3), (.quick, .m, 0, 4),
-            (.machines, .l, 6, 0), (.board, .m, 6, 2), (.events, .m, 6, 3),
+            (.running, .x, 0, 0), (.spend, .l, 8, 0), (.machines, .l, 12, 0), (.needs, .m, 0, 4), (.core, .m, 4, 4),
+            (.events, .l, 8, 4), (.clock, .s, 12, 4), (.quick, .s, 14, 4), (.today, .m, 4, 6),
+            (.board, .m, 0, 6),
         ].filter { $0.0 != .board || WidgetKind.boardShown }
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
     }
@@ -176,10 +187,10 @@ public struct WidgetLayout: Equatable, Sendable {
         return true
     }
 
-    // MARK: persistence (`{ v: 1, items: [{ t, s, x, y }] }`)
+    // MARK: persistence (`{ v: 2, items: [{ t, s, x, y }] }`; v1 was the 8 x 5 grid)
 
     private struct Stored: Codable {
-        var v = 1
+        var v = 2
         var items: [Row]
         struct Row: Codable {
             var t: String
@@ -195,31 +206,43 @@ public struct WidgetLayout: Equatable, Sendable {
     }
 
     /// nil for anything unreadable; rows that name an unknown widget or size, or do not fit or overlap, are dropped.
+    /// A v1 layout moves to the new grid: cells double, sizes migrate (`WidgetSize.migrated`), and a widget that no longer
+    /// fits where it was takes the nearest free spot (dropped only when the desk has no room).
     public static func decoded(_ data: Data) -> WidgetLayout? {
-        guard let s = try? JSONDecoder().decode(Stored.self, from: data), s.v == 1 else { return nil }
+        guard let s = try? JSONDecoder().decode(Stored.self, from: data), s.v == 1 || s.v == 2 else { return nil }
         var out: [WidgetItem] = []
-        for r in s.items {
-            guard let k = WidgetKind(rawValue: r.t), let z = WidgetSize(rawValue: r.s), k.sizes.contains(z) else {
-                continue
+        let ordered = s.v == 1 ? s.items.sorted { ($0.y, $0.x) < ($1.y, $1.x) } : s.items
+        for r in ordered {
+            guard let k = WidgetKind(rawValue: r.t),
+                let z = s.v == 1 ? WidgetSize.migrated(r.s) : WidgetSize(rawValue: r.s)
+            else { continue }
+            let size = k.sizes.contains(z) ? z : k.sizes[0]
+            if s.v == 1 {
+                var i = WidgetItem(kind: k, size: size, x: r.x * 2, y: r.y * 2)
+                i.y = min(i.y, rows - size.rows)
+                i.x = min(i.x, cols - size.cols)
+                if let spot = spot(i, out) { out.append(spot) }
+            } else {
+                guard k.sizes.contains(z) else { continue }
+                let i = WidgetItem(kind: k, size: z, x: r.x, y: r.y)
+                if isFree(i, out) { out.append(i) }
             }
-            let i = WidgetItem(kind: k, size: z, x: r.x, y: r.y)
-            if isFree(i, out) { out.append(i) }
         }
         return WidgetLayout(items: out)
     }
 }
 
-/// Stage geometry (`widgets.js`: 150 pt cells, 14 pt gaps, origin 71 / 50), in the 1440 x 900 design stage.
+/// Stage geometry in the 1440 x 900 design stage: square 76 pt units, 12 pt gaps. A small widget is 164 pt, medium
+/// 340 x 164, large 340 x 340, extra large 692 x 340.
 public enum DeskGrid {
     /// Side margin on the 1440 x 900 stage (Ahmed, 2026-11-05: as little empty space at the screen edges as the bottom
     /// margin; the prototype had 71).
     public static let originX: CGFloat = 20
     public static let originY: CGFloat = 50
-    public static let gap: CGFloat = 14
-    /// The eight columns fill the width between the side margins; the five rows fill the height under the top bar with
-    /// a 20 pt floor, so a cell is a little wider than tall.
-    public static let cellW: CGFloat = (1440 - 2 * originX - 7 * gap) / 8
-    public static let cellH: CGFloat = (900 - originY - 20 - 4 * gap) / 5
+    public static let gap: CGFloat = 12
+    /// The 16 columns fill the width between the side margins; the units are square, as macOS widgets are.
+    public static let cellW: CGFloat = (1440 - 2 * originX - 15 * gap) / 16
+    public static let cellH: CGFloat = cellW
     public static var stepX: CGFloat { cellW + gap }
     public static var stepY: CGFloat { cellH + gap }
 

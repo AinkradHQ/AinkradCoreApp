@@ -1,8 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Quick actions. Buttons use the one CoreUI button (ghost: glass edge, `u-dim` on hover, 0.97 press), tiles stack the icon over
-/// the label in the wide size and list in the large one; they rise in one after another when the widget arrives.
+/// Quick actions in the four macOS sizes. Tiles use the glass well style and rise in one after another when the widget arrives.
 struct QuickBody: View {
     @Bindable var shell: ShellModel
     let size: WidgetSize
@@ -25,45 +24,76 @@ struct QuickBody: View {
         }
     }
 
-    var body: some View {
-        let tiles: [(String, String, String)] = [
-            ("agents.new", "New agent session", "play"), ("new-terminal", "New terminal", "terminal"),
-            ("add-device", "Add device", "plus"),
+    private var tiles: [(id: String, title: String, symbol: String, key: String?)] {
+        [
+            ("agents.new", "New agent session", "play", nil), ("new-terminal", "New terminal", "terminal", nil),
+            ("add-device", "Add device", "plus", nil), ("launcher", "Launcher", "magnifyingglass", "⌘K"),
         ]
-        let wide = size == .m
+    }
+
+    private func go(_ t: (id: String, title: String, symbol: String, key: String?)) {
+        if t.id == "launcher" { shell.toggleLauncher() } else { run(t.id, t.title) }
+    }
+
+    /// Small: four icons in a square. Medium: one row with labels. Large: a list with keys. Extra large: big tiles.
+    var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            let cols = [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())]
-            LazyVGrid(columns: cols, spacing: Space.s2) {
-                ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
-                    Button {
-                        run(t.0, t.1)
-                    } label: {
-                        label(t.2, t.1, wide: wide)
+            if size != .s { WHead("bolt", "Quick actions") }
+            switch size {
+            case .s:
+                grid(columns: 2, labels: false)
+            case .m:
+                grid(columns: 4, labels: true)
+            case .l:
+                VStack(spacing: Space.s2) {
+                    ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
+                        Button {
+                            go(t)
+                        } label: {
+                            HStack(spacing: Space.s3) {
+                                Image(systemName: t.symbol).foregroundStyle(WidgetInk.blue).frame(width: 20)
+                                Text(t.title).coreFont(size: MacTextSize.body, weight: .medium)
+                                Spacer(minLength: 0)
+                                if let k = t.key {
+                                    Text(k).coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
+                                }
+                            }
+                            .padding(.horizontal, Space.s3).frame(
+                                maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                        }
+                        .buttonStyle(QuickTileStyle(prominent: false)).rise(arrived, i, reduce)
                     }
-                    .buttonStyle(QuickTileStyle(prominent: false)).rise(arrived, i, reduce)
-                    .environment(\.coreForcedInteraction, forcedHover(i))
+                    Spacer(minLength: 0)
                 }
-                Button {
-                    shell.toggleLauncher()
-                } label: {
-                    label("magnifyingglass", "Launcher", wide: wide, key: "⌘K")
-                }
-                .buttonStyle(QuickTileStyle(prominent: true)).rise(arrived, tiles.count, reduce)
+            case .x:
+                grid(columns: 4, labels: true)
             }
-            if !wide { Spacer(minLength: 0) }
         }
-        .frame(maxHeight: .infinity, alignment: wide ? .center : .top)
         .onAppear { arrived = true }
     }
 
-    /// A big icon over a short label, Apple style; the launcher tile adds its key.
-    private func label(_ symbol: String, _ title: String, wide: Bool, key: String? = nil) -> some View {
-        VStack(spacing: Space.s1) {
-            Image(systemName: symbol).font(.system(size: 22, weight: .medium)).accessibilityHidden(true)
-            Text(key.map { "\(title) \($0)" } ?? title).coreFont(size: MacTextSize.meta, weight: .medium)
-                .lineLimit(1).minimumScaleFactor(0.8)
+    private func grid(columns: Int, labels: Bool) -> some View {
+        let cols = Array(repeating: GridItem(.flexible(), spacing: Space.s2), count: columns)
+        return LazyVGrid(columns: cols, spacing: Space.s2) {
+            ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
+                Button {
+                    go(t)
+                } label: {
+                    VStack(spacing: Space.s1) {
+                        Image(systemName: t.symbol).font(.system(size: 20, weight: .medium)).accessibilityHidden(true)
+                        if labels {
+                            Text(t.title).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(2)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: size == .s ? 52 : size == .x ? 120 : 76)
+                }
+                .buttonStyle(QuickTileStyle(prominent: t.id == "launcher")).rise(arrived, i, reduce)
+                .environment(\.coreForcedInteraction, forcedHover(i))
+                .accessibilityLabel(t.title)
+                .help(t.title)
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: wide ? 52 : 64)
     }
 }
 

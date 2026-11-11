@@ -145,6 +145,7 @@ public struct StatusDot: View {
 /// A bar that fills from empty when it appears, with a soft glow along its leading edge.
 struct Meter: View {
     let value: Double
+    var tint: Color?
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var shown = 0.0
@@ -155,11 +156,10 @@ struct Meter: View {
                     coreShape(3)
                         .fill(
                             LinearGradient(
-                                colors: [palette.primary.opacity(0.6), palette.primary], startPoint: .leading,
-                                endPoint: .trailing)
+                                colors: [(tint ?? palette.primary).opacity(0.6), tint ?? palette.primary],
+                                startPoint: .leading, endPoint: .trailing)
                         )
                         .frame(width: max(0, g.size.width * min(max(shown, 0), 1)))
-                        .shadow(color: palette.primary.opacity(0.6), radius: 4)
                 }
             }
             .onAppear {

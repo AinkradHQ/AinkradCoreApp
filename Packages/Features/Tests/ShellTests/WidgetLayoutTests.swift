@@ -17,7 +17,7 @@ struct WidgetLayoutTests {
 
     @Test func standardLayoutIsValid() {
         let l = WidgetLayout.standard()
-        #expect(l.items.count == 7)
+        #expect(l.items.count == 10)
         #expect(noOverlap(l.items))
     }
 
@@ -54,7 +54,7 @@ struct WidgetLayoutTests {
     }
 
     @Test func resizeOnlyToSizesTheWidgetHas() throws {
-        var l = WidgetLayout(items: [WidgetItem(kind: .quick, size: .m, x: 0, y: 0)])
+        var l = WidgetLayout(items: [WidgetItem(kind: .clock, size: .m, x: 0, y: 0)])
         let id = l.items[0].id
         let ok6350 = l.resize(id, to: .x)
         #expect(!ok6350)
@@ -66,8 +66,10 @@ struct WidgetLayoutTests {
     @Test func resizeIsRefusedWhenThereIsNoRoom() {
         // A full desk of 1x1 widgets: growing one has nowhere to push the rest.
         var items: [WidgetItem] = []
-        for y in 0..<WidgetLayout.rows {
-            for x in 0..<WidgetLayout.cols { items.append(WidgetItem(kind: .clock, size: .s, x: x, y: y)) }
+        for y in stride(from: 0, to: WidgetLayout.rows, by: 2) {
+            for x in stride(from: 0, to: WidgetLayout.cols, by: 2) {
+                items.append(WidgetItem(kind: .clock, size: .s, x: x, y: y))
+            }
         }
         var l = WidgetLayout(items: items)
         let before = l
@@ -91,7 +93,7 @@ struct WidgetLayoutTests {
         let board = try #require(l.items.first { $0.kind == .board })
         let removed = l.remove(board.id)
         let gone = try #require(removed)
-        #expect(l.items.count == 6)
+        #expect(l.items.count == 9)
         let ok1904 = l.restore(gone)
         #expect(ok1904)
         #expect(l.items.contains { $0.id == board.id })
@@ -99,7 +101,9 @@ struct WidgetLayoutTests {
     }
 
     @Test func insertFromTheGalleryMakesRoom() throws {
-        var l = WidgetLayout.standard()
+        var l = WidgetLayout(items: [
+            WidgetItem(kind: .clock, size: .s, x: 0, y: 0), WidgetItem(kind: .spend, size: .m, x: 4, y: 0),
+        ])
         let n = WidgetItem(kind: .running, size: .l, x: 0, y: 0)
         let ok5535 = l.insert(n, at: 0, 0)
         #expect(ok5535)
@@ -115,11 +119,33 @@ struct WidgetLayoutTests {
             back.items.map { [$0.kind.rawValue, $0.size.rawValue, "\($0.x)", "\($0.y)"] }
                 == l.items.map { [$0.kind.rawValue, $0.size.rawValue, "\($0.x)", "\($0.y)"] })
         let bad =
-            #"{"v":1,"items":[{"t":"clock","s":"s","x":0,"y":0},{"t":"nope","s":"s","x":1,"y":0},{"t":"clock","s":"s","x":0,"y":0},{"t":"today","s":"x","x":7,"y":0},{"t":"quick","s":"x","x":2,"y":0}]}"#
+            #"{"v":2,"items":[{"t":"clock","s":"s","x":0,"y":0},{"t":"nope","s":"s","x":1,"y":0},{"t":"clock","s":"s","x":0,"y":0},{"t":"today","s":"x","x":15,"y":0},{"t":"quick","s":"t","x":2,"y":0}]}"#
         let d = try #require(WidgetLayout.decoded(Data(bad.utf8)))
         #expect(d.items.count == 1)  // unknown kind, overlap, off-grid and a size the widget lacks are all dropped
-        #expect(WidgetLayout.decoded(Data("{\"v\":2,\"items\":[]}".utf8)) == nil)
+        #expect(WidgetLayout.decoded(Data("{\"v\":3,\"items\":[]}".utf8)) == nil)
         #expect(WidgetLayout.decoded(Data("garbage".utf8)) == nil)
+    }
+
+    @Test func aSavedV1LayoutMovesToTheNewGrid() throws {
+        // v1: an 8 x 5 grid with the removed tall size and the old extra large.
+        let old =
+            #"{"v":1,"items":[{"t":"today","s":"x","x":0,"y":0},{"t":"clock","s":"s","x":0,"y":3},{"t":"machines","s":"t","x":6,"y":0},{"t":"events","s":"l","x":6,"y":2},{"t":"quick","s":"m","x":0,"y":4}]}"#
+        let l = try #require(WidgetLayout.decoded(Data(old.utf8)))
+        #expect(l.items.count == 5)
+        #expect(noOverlap(l.items))
+        let today = try #require(l.items.first { $0.kind == .today })
+        #expect(today.size == .l && today.x == 0 && today.y == 0)  // old extra large is large
+        let machines = try #require(l.items.first { $0.kind == .machines })
+        #expect(machines.size == .s && machines.x == 12)  // the tall size is gone: small
+        #expect(WidgetSize.migrated("t") == .s && WidgetSize.migrated("m") == .m && WidgetSize.migrated("q") == nil)
+        let events = try #require(l.items.first { $0.kind == .events })
+        #expect(events.size == .l && events.y + events.size.rows <= WidgetLayout.rows)
+    }
+
+    @Test func noWidgetHasTheTallSize() {
+        #expect(WidgetSize.allCases.map(\.rawValue) == ["s", "m", "l", "x"])
+        #expect(WidgetKind.allCases.allSatisfy { !$0.sizes.isEmpty && $0.sizes.allSatisfy { $0.rawValue != "t" } })
+        #expect(WidgetSize.x.cols == 8 && WidgetSize.x.rows == 4 && WidgetSize.m.cols == 4 && WidgetSize.s.rows == 2)
     }
 
     @Test func gridMathSnapsToCells() {
@@ -127,7 +153,7 @@ struct WidgetLayoutTests {
         let c = DeskGrid.cell(at: CGPoint(x: o.x + 20, y: o.y - 30), size: .s)
         #expect(c.x == 2 && c.y == 1)
         let far = DeskGrid.cell(at: CGPoint(x: 5000, y: 5000), size: .l)
-        #expect(far.x == WidgetLayout.cols - 2 && far.y == WidgetLayout.rows - 2)
+        #expect(far.x == WidgetLayout.cols - 4 && far.y == WidgetLayout.rows - 4)
     }
 }
 
@@ -161,8 +187,8 @@ struct HomePrefsTests {
         #expect(!ShellModel(defaults: d).widgets.items.contains { $0.kind == .board })
         shell.toast?.undo?()
         #expect(shell.widgets.items.contains { $0.kind == .board })
-        shell.resizeWidget(try #require(shell.widgets.items.first { $0.kind == .quick }).id, to: .l)
-        #expect(ShellModel(defaults: d).widgets.items.first { $0.kind == .quick }?.size == .l)
+        shell.resizeWidget(try #require(shell.widgets.items.first { $0.kind == .clock }).id, to: .m)
+        #expect(ShellModel(defaults: d).widgets.items.first { $0.kind == .clock }?.size == .m)
     }
 
     @Test func resetGoesBackToTheDefault() {
@@ -170,6 +196,29 @@ struct HomePrefsTests {
         let shell = ShellModel(defaults: d)
         shell.addWidget(.core, .s)
         shell.resetWidgets()
-        #expect(shell.widgets == .standard() || shell.widgets.items.count == 7)
+        #expect(shell.widgets == .standard() || shell.widgets.items.count == 10)
+    }
+}
+
+struct WidgetDataTests {
+    @Test func spendDaysBucketsCostEventsByDay() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let now = Date(timeIntervalSince1970: 1_700_000_000)  // 2023-11-14 22:13 UTC
+        let day: TimeInterval = 86_400
+        let ev: [(at: Date, micros: Int64)] = [
+            (now, 2_000_000), (now.addingTimeInterval(-60), 1_000_000), (now.addingTimeInterval(-day), 500_000),
+            (now.addingTimeInterval(-40 * day), 9_000_000),
+        ]
+        let d = HomeSnapshot.spendDays(ev, now: now, days: 7, calendar: cal)
+        #expect(d.count == 7 && d[6] == 3 && d[5] == 0.5 && d.reduce(0, +) == 3.5)  // the 40-day-old event is ignored
+        #expect(HomeSnapshot.monthSpend(ev, now: now, calendar: cal) == 3.5)
+    }
+
+    @Test func runnerStates() {
+        typealias M = HomeSnapshot.Machine
+        #expect(HomeSnapshot.state(M(id: "a", os: "x", online: false, slots: 2, used: 0)) == .offline)
+        #expect(HomeSnapshot.state(M(id: "a", os: "x", online: true, slots: 2, used: 2)) == .busy)
+        #expect(HomeSnapshot.state(M(id: "a", os: "x", online: true, slots: 2, used: 1)) == .online)
     }
 }
