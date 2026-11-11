@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Top right: Home/Workspace, layout, what is running, the admin-unlocked chip (only while unlocked), the bell, the Core's state when it is not connected, and the emblem.
+/// Top right: Home/Workspace, layout, what is running, the admin-unlocked chip (only while unlocked), the bell, the Core connection chip, and the emblem.
 struct StatusCluster: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
@@ -27,12 +27,7 @@ struct StatusCluster: View {
                 label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
                 on: shell.bellOpen, bounce: reduce ? nil : shell.bell.count
             ) { shell.toggleBell() }
-            // The Core is reached from the launcher; the bar names it only when the link is not live.
-            if shell.coreLink != .live {
-                StatusButton(title: coreTitle, symbol: nil, label: "\(shell.home.coreName), \(coreWord)", gem: gem) {
-                    if shell.coreLink == .offline, let retry = shell.retryConnection { retry() }
-                }
-            }
+            ConnectionChip(shell: shell)
             Button {
                 shell.toggleLauncher()
             } label: {
@@ -46,33 +41,7 @@ struct StatusCluster: View {
         .padding(.horizontal, Space.s4)
         .frame(height: ShellMetrics.topBar, alignment: .center)
         .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-
-    private var coreWord: String {
-        switch shell.coreLink {
-        case .none: "not connected"
-        case .connecting: "connecting"
-        case .live: "connected"
-        case .reconnecting: "reconnecting"
-        case .offline: "offline"
-        }
-    }
-    private var coreTitle: String {
-        switch shell.coreLink {
-        case .live: shell.home.coreName
-        case .none: "Not connected"
-        case .connecting: "Connecting"
-        case .reconnecting: "Reconnecting"
-        case .offline: "Offline"
-        }
-    }
-    /// The gem beside the Core's name: blue and beating while connected, amber while it comes back, grey when it is not there.
-    private var gem: CoreGem {
-        switch shell.coreLink {
-        case .live: .live
-        case .connecting, .reconnecting: .waiting
-        case .none, .offline: .away
-        }
+        .task { shell.watchNetwork() }
     }
 
     /// "2 running · 1 waiting" (Settings → Activity can hide it). A click opens the bell, where the waiting items are.
@@ -105,14 +74,11 @@ struct StatusCluster: View {
     }
 }
 
-enum CoreGem { case live, waiting, away }
-
 private struct StatusButton: View {
     let title: String?
     let symbol: String?
     let label: String
     var on = false
-    var gem: CoreGem?
     /// Changes when something new arrives: the symbol bounces once (a flash for Reduce Motion is the count itself).
     var bounce: Int?
     var meter: (value: Double, low: Bool)?
@@ -124,9 +90,7 @@ private struct StatusButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s1) {
-                if let gem {
-                    GemMark(state: gem)
-                } else if let symbol {
+                if let symbol {
                     Image(systemName: symbol).coreBounce(bounce ?? 0).accessibilityHidden(true)
                 }
                 if let title { Text(title).lineLimit(1).contentTransition(.numericText()) }
@@ -234,29 +198,5 @@ struct ElevationPanel: View {
 
     private func text(_ s: String) -> some View {
         Text(s).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-/// The blue mark beside "Home Core": a rounded diamond. Connected, it beats once every 3.6 s; Reduce Motion: a slow fade instead.
-private struct GemMark: View {
-    let state: CoreGem
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var beat = false
-
-    var body: some View {
-        coreShape(Space.s1 / 2)
-            .fill(
-                state == .live ? palette.primary : state == .waiting ? palette.warning : palette.text2.opacity(0.6)
-            )
-            .frame(width: Space.s2 + Space.s1, height: Space.s2 + Space.s1)
-            .rotationEffect(.degrees(45))
-            .scaleEffect(state == .live && beat && !reduce ? 1.18 : 1)
-            .opacity(state == .live && beat && reduce ? 0.55 : 1)
-            .animation(
-                state == .live ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : .default, value: beat
-            )
-            .onAppear { beat = true }
-            .accessibilityHidden(true)
     }
 }

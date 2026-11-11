@@ -180,6 +180,26 @@ public final class ShellModel {
     public var coreLink: CoreLink = .none {
         didSet { if oldValue == .live && coreLink != .live { lastLiveAt = Date() } }
     }
+    /// What the Mac's network path says (`NWPathMonitor`), for telling "no network" from "Core not answering".
+    public var networkUp = true
+    /// Retries since the link dropped, when the next one starts, and how long the wait is: the chip and its panel say them.
+    public var retryAttempt = 0
+    public var nextRetryAt: Date?
+    public var retrySpan: TimeInterval?
+    /// The panel under the connection chip.
+    public var connectionPanelOpen = false
+    @ObservationIgnored let networkWatch = NetworkWatch()
+    public var chipState: ConnectionChipState? {
+        ConnectionChipState.of(link: coreLink, networkUp: networkUp, attempt: retryAttempt)
+    }
+    /// Starts watching the network once.
+    public func watchNetwork() { networkWatch.start { [weak self] up in self?.networkUp = up } }
+    public func toggleConnectionPanel() {
+        launcherOpen = false
+        bellOpen = false
+        elevationPanelOpen = false
+        connectionPanelOpen.toggle()
+    }
     /// When the Core was last reachable: what the "resuming" banner says the screen is current to.
     public private(set) var lastLiveAt: Date?
     /// A connection state beyond `coreLink`: the Core says slow down, the session is renewing, the Core restarted.
@@ -435,12 +455,14 @@ public final class ShellModel {
     public func toggleLauncher() {
         bellOpen = false
         elevationPanelOpen = false
+        connectionPanelOpen = false
         launcherOpen.toggle()
     }
 
     public func toggleBell() {
         launcherOpen = false
         elevationPanelOpen = false
+        connectionPanelOpen = false
         bellOpen.toggle()
     }
 
@@ -459,6 +481,8 @@ public final class ShellModel {
             if top.dismissible { closeTopDialog() }
         } else if let dialog {
             if dialog.dismissible { closeDialog() }
+        } else if connectionPanelOpen {
+            connectionPanelOpen = false
         } else if elevationPanelOpen {
             elevationPanelOpen = false
         } else if launcherOpen {
@@ -483,7 +507,8 @@ public final class ShellModel {
 
     /// Anything the shell shows over Home or the workspace.
     public var coverOpen: Bool {
-        sheet != nil || launcherOpen || elevationPanelOpen || bellOpen || overlay != nil || dialog != nil
+        sheet != nil || launcherOpen || elevationPanelOpen || connectionPanelOpen || bellOpen || overlay != nil
+            || dialog != nil
             || topDialog != nil
     }
 

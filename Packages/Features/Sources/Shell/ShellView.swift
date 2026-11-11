@@ -144,6 +144,14 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var covers: some View {
+        if shell.connectionPanelOpen {
+            Color.clear.contentShape(Rectangle()).onTapGesture { shell.connectionPanelOpen = false }
+                .accessibilityHidden(true)
+            ConnectionPanel(shell: shell)
+                .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .transition(.opacity)
+        }
         if shell.elevationPanelOpen {
             Color.clear.contentShape(Rectangle()).onTapGesture { shell.elevationPanelOpen = false }
                 .accessibilityHidden(true)
