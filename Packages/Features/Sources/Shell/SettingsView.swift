@@ -48,9 +48,15 @@ public struct SettingsSection: Identifiable {
 
 public struct SettingsBack {
     public let title: String
+    /// The page's own header (icon, name, badges, lines). When set, the title bar shows it instead of the section's icon,
+    /// title and sub-title. Built again on each redraw, so it follows what the page's model says.
+    public let header: (@MainActor () -> AnyView)?
     public let run: @MainActor () -> Void
-    public init(title: String, run: @escaping @MainActor () -> Void) {
+    public init(
+        title: String, header: (@MainActor () -> AnyView)? = nil, run: @escaping @MainActor () -> Void
+    ) {
         self.title = title
+        self.header = header
         self.run = run
     }
 }
@@ -142,32 +148,36 @@ struct SettingsView: View {
                     if let back = shell.settings.back {
                         SettingsBackTile(back: back).transition(.opacity.combined(with: .move(edge: .leading)))
                     }
-                    if let current {
-                        // The section's own icon, large, bouncing in each time the section changes.
-                        Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .coreBounce(current.id)
-                            .contentTransition(.symbolEffect(.replace))
-                            .frame(width: 56, height: 56)
-                            .background(
-                                LinearGradient(
-                                    colors: [current.group.hue, current.group.hue.opacity(0.6)], startPoint: .top,
-                                    endPoint: .bottom),
-                                in: coreShape(Radius.control + 4)
-                            )
-                            .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                            .shadow(color: current.group.hue.opacity(0.5), radius: 12)
-                            .accessibilityHidden(true)
-                    }
-                    VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                        Text(current?.title ?? "").coreFont(size: MacTextSize.large + 6, weight: .bold)
-                            .accessibilityAddTraits(.isHeader)
-                        if let sub = current?.sub {
-                            Text(sub).foregroundStyle(WidgetInk.secondary)
+                    if let header = shell.settings.back?.header {
+                        header().transition(.opacity.combined(with: .offset(y: reduce ? 0 : 6 * dir)))
+                    } else {
+                        if let current {
+                            // The section's own icon, large, bouncing in each time the section changes.
+                            Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .coreBounce(current.id)
+                                .contentTransition(.symbolEffect(.replace))
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    LinearGradient(
+                                        colors: [current.group.hue, current.group.hue.opacity(0.6)], startPoint: .top,
+                                        endPoint: .bottom),
+                                    in: coreShape(Radius.control + 4)
+                                )
+                                .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                                .shadow(color: current.group.hue.opacity(0.5), radius: 12)
+                                .accessibilityHidden(true)
                         }
+                        VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                            Text(current?.title ?? "").coreFont(size: MacTextSize.large + 6, weight: .bold)
+                                .accessibilityAddTraits(.isHeader)
+                            if let sub = current?.sub {
+                                Text(sub).foregroundStyle(WidgetInk.secondary)
+                            }
+                        }
+                        .id("title-\(current?.id ?? "")")
+                        .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 6 * dir)))
                     }
-                    .id("title-\(current?.id ?? "")")
-                    .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 6 * dir)))
                     Spacer()
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")
