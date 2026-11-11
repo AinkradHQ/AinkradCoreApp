@@ -316,6 +316,11 @@ extension ShellModel {
         later("notifications", .notifications, "Notifications", "bell", 0, "Notification settings")
         settings.section(
             SettingsSection(
+                id: "you", group: .mac, title: "You", sub: "The name Home greets you with", symbol: "person",
+                order: 1
+            ) { YouSection(profile: profile) })
+        settings.section(
+            SettingsSection(
                 id: "appearance", group: .mac, title: "Appearance", sub: "Night, day, or with the sun",
                 symbol: "circle.lefthalf.filled"
             ) { AppearanceSection(shell: self) })

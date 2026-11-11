@@ -87,7 +87,7 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        wizard = SetupWizardModel(driver: driver) { [weak self] in
+        wizard = SetupWizardModel(driver: driver, profile: shell.profile) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }

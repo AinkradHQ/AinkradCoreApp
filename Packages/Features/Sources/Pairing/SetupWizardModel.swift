@@ -1,4 +1,5 @@
 import CoreKit
+import AppKit
 import Foundation
 import Observation
 
@@ -15,6 +16,8 @@ final class SetupWizardModel {
         /// Paste the link the installer printed.
         case connect
         case connecting
+        /// Paired. Asked once, only when this Mac has no name yet.
+        case name
         case failed(Failure)
     }
 
@@ -46,12 +49,16 @@ final class SetupWizardModel {
     /// Why `linkText` is not a link yet. Not shown until something has been typed.
     private(set) var linkError: String?
 
+    /// The name the person gives on the `.name` step; starts as the first word of the Mac's full name.
+    var nameText = ""
+    private let profile: UserProfile?
     private let driver: any PairingDriver
     private let onPaired: @MainActor () -> Void
     private var task: Task<Void, Never>?
 
-    init(driver: any PairingDriver, onPaired: @escaping @MainActor () -> Void) {
+    init(driver: any PairingDriver, profile: UserProfile? = nil, onPaired: @escaping @MainActor () -> Void) {
         self.driver = driver
+        self.profile = profile
         self.onPaired = onPaired
     }
 
@@ -128,9 +135,20 @@ final class SetupWizardModel {
                 return
             }
             scrub()
-            onPaired()
+            if let profile, !profile.hasName {
+                nameText = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+                stage = .name
+            } else {
+                onPaired()
+            }
         } catch is CancellationError {
         } catch { fail(error) }
+    }
+
+    /// "Continue" or "Not now" on the name step. An empty name is fine: Home then greets without one.
+    func finishName(save: Bool) {
+        if save { profile?.set(nameText) }
+        onPaired()
     }
 
     private func fail(_ error: any Error) {

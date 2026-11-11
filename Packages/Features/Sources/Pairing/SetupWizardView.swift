@@ -26,6 +26,7 @@ struct SetupWizardView: View {
                     case .choose: choose
                     case .install: install
                     case .connect, .connecting: connect
+                    case .name: nameStep
                     case .failed(let f): failed(f)
                     }
                 }
@@ -46,12 +47,13 @@ struct SetupWizardView: View {
 
     /// The screen a stage belongs to (connecting stays on the paste screen).
     private enum Stage: Hashable {
-        case choose, install, connect, failed
+        case choose, install, connect, name, failed
         init(_ s: SetupWizardModel.Stage) {
             switch s {
             case .choose: self = .choose
             case .install: self = .install
             case .connect, .connecting: self = .connect
+            case .name: self = .name
             case .failed: self = .failed
             }
         }
@@ -62,6 +64,7 @@ struct SetupWizardView: View {
         case .choose: (1, "Welcome")
         case .install: (2, "Install Core")
         case .connect, .connecting: (3, "Connect")
+        case .name: (0, "Connected")
         case .failed: (0, "Connect to a Core")
         }
     }
@@ -111,6 +114,24 @@ struct SetupWizardView: View {
             HStack {
                 LinkButton(title: "Pair with a typed code instead", action: useCode)
                 Spacer()
+            }
+        }
+    }
+
+    // MARK: after the claim, who you are
+
+    private var nameStep: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            title("What should we call you?")
+            note("Home greets you with it. It stays on this Mac. You can change it later in Settings, Mac.")
+            CoreTextField(
+                "Your name", placeholder: "Ahmed", text: $model.nameText, autofocus: true,
+                onSubmit: { model.finishName(save: true) })
+            HStack {
+                Button("Not now") { model.finishName(save: false) }.coreGlassButton().coreShortcut(.cancel)
+                Spacer()
+                Button("Continue") { model.finishName(save: true) }.coreGlassButton(prominent: true)
+                    .coreShortcut(.primary)
             }
         }
     }
