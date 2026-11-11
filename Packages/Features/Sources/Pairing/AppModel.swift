@@ -207,6 +207,8 @@ public final class AppModel {
         do {
             try await service.connect()
             shell.coreLink = .live
+            shell.retryAttempt = 0
+            shell.nextRetryAt = nil
             shell.elevatedUntil = nil
             startEvents(service)
             if let api = service.agentsAPI { agents.attach(api) }
@@ -230,6 +232,9 @@ public final class AppModel {
                     noteRateLimit(after)
                     wait = max(wait, after ?? 0)
                 }
+                shell.retryAttempt += 1
+                shell.retrySpan = wait
+                shell.nextRetryAt = Date().addingTimeInterval(wait)
                 retry = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(wait))
                     if !Task.isCancelled { await self?.connect() }
@@ -278,6 +283,8 @@ public final class AppModel {
         switch e {
         case .live:
             shell.coreLink = .live
+            shell.retryAttempt = 0
+            shell.nextRetryAt = nil
             if shell.linkNotice == .renewing {
                 shell.linkNotice = nil
                 shell.showToast("Session renewed. Nothing was lost.")

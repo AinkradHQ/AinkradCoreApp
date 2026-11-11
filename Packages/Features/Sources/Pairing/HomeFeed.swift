@@ -136,6 +136,8 @@ final class HomeFeed {
         if let c = try? await source.costs() {
             let micros = c.filter { Calendar.current.isDate($0.at, inSameDayAs: at) }.reduce(0) { $0 + $1.micros }
             home.spendToday = Double(micros) / 1_000_000
+            home.spendByDay = HomeSnapshot.spendDays(c, now: at)
+            home.monthSpend = HomeSnapshot.monthSpend(c, now: at)
         }
         if let u = try? await source.utilisation() { home.monthTokensUsed = u }
         if let a = try? await source.audit() {

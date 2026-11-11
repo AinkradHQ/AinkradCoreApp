@@ -67,6 +67,10 @@ public struct HomeSnapshot: Sendable {
     public var loadSampleSeconds: Int?
     public var spendToday: Double
     public var monthTokensUsed: Double
+    /// Spend per day from the Core's cost events, oldest first, the last entry today (at most 30 days).
+    public var spendByDay: [Double] = []
+    /// Spend since the first of this month, from the same events.
+    public var monthSpend: Double = 0
 
     public var runningAgents: Int { running.count }
     public var machinesOnline: Int { machines.filter(\.online).count }
@@ -78,8 +82,11 @@ public struct HomeSnapshot: Sendable {
 
     public init(
         greetingName: String?, coreName: String, machines: [Machine], running: [Run], events: [Event], board: Board,
-        loadSampleSeconds: Int? = nil, spendToday: Double, monthTokensUsed: Double
+        loadSampleSeconds: Int? = nil, spendToday: Double, monthTokensUsed: Double, spendByDay: [Double] = [],
+        monthSpend: Double = 0
     ) {
+        self.spendByDay = spendByDay
+        self.monthSpend = monthSpend
         self.loadSampleSeconds = loadSampleSeconds
         self.greetingName = greetingName
         self.coreName = coreName
@@ -145,15 +152,12 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .clock: "clock"
         }
     }
-    /// The sizes this widget has a composition for (`widgets-set.js`); the first is its default.
+    /// The macOS sizes this widget has a layout for; the first is its default.
     public var sizes: [WidgetSize] {
         switch self {
-        case .today: [.s, .m, .t, .l, .x]
-        case .needs, .running: [.s, .m, .t, .l]
-        case .spend, .clock: [.s, .m, .t, .l]
-        case .machines, .events: [.m, .t, .l]
-        case .board, .core: [.s, .m, .l]
-        case .quick: [.m, .l]
+        case .clock: [.s, .m, .l]
+        case .quick, .board: [.s, .m, .l, .x]
+        default: [.m, .s, .l, .x]
         }
     }
     public var category: String {

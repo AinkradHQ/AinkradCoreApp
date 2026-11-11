@@ -27,13 +27,11 @@ struct TranscriptView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Space.s3) {
                         header(store)
-                        ForEach(store.entries) { e in
-                            EntryRow(entry: e, harness: session.harness) {
-                                model.shell.launcher.entry("connections")?.run()
-                            }
-                            .equatable().id(e.seq)
-                            // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
-                            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
+                        ForEach(Self.visible(store.entries)) { e in
+                            row(e, store)
+                                .id(e.seq)
+                                // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
+                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
                         }
                         if session.live && store.load == .ready && !model.waiting(session.id) { Thinking() }
                         Color.clear.frame(height: 1).id("end")
@@ -62,6 +60,32 @@ struct TranscriptView: View {
                     .padding(Space.s4).transition(.opacity)
                 }
             }
+        }
+    }
+
+    /// What the column shows: an answer folds into its request's card, and the Core's "approval escalated" notes say
+    /// nothing the card does not (N33: one approval, one card).
+    static func visible(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {
+        entries.filter {
+            switch $0.kind {
+            case .approvalDecided: false
+            case .note(let type, _): !type.hasPrefix("approval")
+            default: true
+            }
+        }
+    }
+
+    @ViewBuilder private func row(_ e: TranscriptEntry, _ store: TranscriptStore) -> some View {
+        if case .approvalRequest(let id, _, _, _) = e.kind, let r = store.approvals[id] {
+            ApprovalEntryCard(model: model, request: r)
+                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
+        } else {
+            EntryRow(entry: e, harness: session.harness) {
+                model.shell.launcher.entry("connections")?.run()
+            }
+            .equatable()
+            // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
+            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
         }
     }
 
@@ -124,8 +148,8 @@ private struct Thinking: View {
     }
 }
 
-/// One entry, visual (Ahmed, 2026-11-05): the agent speaks beside its glyph, you in a blue bubble at the right, each tool
-/// call as a card with its own icon and a live status, its output folded inside; events as tinted chips. Equatable, so
+/// One entry (N33, one column): the agent speaks at the left, you in a blue bubble at the right, each tool call as one
+/// compact row that opens to its output, events as thin quiet dividers. Equatable, so
 /// SwiftUI skips rows whose entry did not change.
 struct EntryRow: View, Equatable {
     let entry: TranscriptEntry
@@ -148,18 +172,11 @@ struct EntryRow: View, Equatable {
                             colors: [GlassInk.blue, GlassInk.blue.opacity(0.75)], startPoint: .top, endPoint: .bottom),
                         in: coreShape(Radius.cardMac)
                     )
-                    .shadow(color: GlassInk.blue.opacity(0.3), radius: 8, y: 2)
                     .agentCopyMenu(text)
             }
             .accessibilityLabel("You: \(text)")
         case .assistant(let text):
             HStack(alignment: .top, spacing: Space.s2) {
-                let hue = SessionTile.hue(harness)
-                Image(systemName: AgentsModel.harnessSymbol(harness)).coreFont(size: 12, weight: .bold)
-                    .foregroundStyle(.white).frame(width: 26, height: 26)
-                    .background(hue.opacity(0.85), in: coreShape(7))
-                    .shadow(color: hue.opacity(0.4), radius: 6)
-                    .accessibilityHidden(true)
                 MarkdownText(text)
                     .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                     .background(GlassInk.well, in: coreShape(Radius.cardMac))
@@ -181,43 +198,26 @@ struct EntryRow: View, Equatable {
             ToolCard(name: name, summary: summary, status: .running, output: "", expanded: $expanded)
         case .toolDone(_, let name, let summary, let ok, let code, let output, let ms):
             ToolCard(
-                name: name, summary: summary, status: ok ? .ok(facts(code, ms)) : .failed(facts(code, ms)),
+                name: name, summary: summary, status: ok ? .ok(facts(nil, ms)) : .failed(facts(code, ms)),
                 output: output, expanded: $expanded)
         case .toolResult(_, let name, let ok, let code, let output, let ms):
             ToolCard(
-                name: name ?? "Result", summary: "", status: ok ? .ok(facts(code, ms)) : .failed(facts(code, ms)),
+                name: name ?? "Result", summary: "", status: ok ? .ok(facts(nil, ms)) : .failed(facts(code, ms)),
                 output: output, expanded: $expanded)
-        case .approvalRequest(_, let tool, let input, _):
-            chip(
-                "lock.shield.fill", "Asked to \(ApprovalWords.ask(tool).verb)\(input.isEmpty ? "" : ": \(input)")",
-                GlassInk.orange)
-        case .approvalDecided(_, let approved):
-            chip(
-                approved ? "checkmark.shield.fill" : "xmark.shield.fill", approved ? "Approved" : "Denied",
-                approved ? GlassInk.green : GlassInk.red)
+        case .approvalRequest, .approvalDecided: EmptyView()  // drawn as one card by the transcript
         case .started(let h, let resumed):
-            chip(
-                resumed ? "arrow.clockwise" : "play.fill",
-                (resumed ? "Resumed" : "Started") + (h.map { " · \($0)" } ?? ""), GlassInk.blue)
+            chip(resumed ? "woke up" : "started" + (h.map { " · \($0)" } ?? ""))
         case .interrupted(let reason):
-            chip(
-                "arrow.clockwise", "Interrupted" + (reason.isEmpty ? "" : ": \(AgentWords.reasonWords(reason))"),
-                GlassInk.orange)
+            chip("interrupted" + (reason.isEmpty ? "" : ": \(AgentWords.reasonWords(reason))"))
         case .gap(let from, let to):
-            chip("ellipsis", "Entries \(from) to \(to) were not kept", GlassInk.orange)
+            chip("entries \(from) to \(to) were not kept")
         case .ended(let kind, let reason):
             let budget = kind == "budget" || (kind == "cancelled" && reason?.lowercased().contains("budget") == true)
             let why = budget ? nil : reason.flatMap { $0.isEmpty ? nil : AgentWords.reasonWords($0) }
-            chip(
-                kind == "succeeded" ? "flag.checkered" : "stop.fill",
-                AgentWords.endedWords(budget ? "budget" : kind) + (why.map { " · \($0)" } ?? ""),
-                kind == "succeeded" ? GlassInk.green : GlassInk.orange
-            )
-            .help("Code: \(kind)" + (reason.map { $0.isEmpty ? "" : " · \($0)" } ?? ""))
+            chip(Self.endedLine(budget ? "budget" : kind) + (why.map { " · \($0)" } ?? ""))
+                .help("Code: \(kind)" + (reason.map { $0.isEmpty ? "" : " · \($0)" } ?? ""))
         case .note(let type, let detail):
-            chip(
-                "info.circle.fill", detail.isEmpty ? Self.words(type) : "\(Self.words(type)): \(detail)", GlassInk.slate
-            )
+            chip((detail.isEmpty ? Self.words(type) : "\(Self.words(type)): \(detail)").lowercased())
         case .hidden: EmptyView()
         }
     }
@@ -233,23 +233,24 @@ struct EntryRow: View, Equatable {
             .joined(separator: " · ")
     }
 
-    private func chip(_ symbol: String, _ text: String, _ hue: Color) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: symbol).foregroundStyle(hue).accessibilityHidden(true)
-            Text(text).lineLimit(2)
-        }
-        .coreFont(size: MacTextSize.meta, weight: .medium)
-        .foregroundStyle(GlassInk.primary.opacity(0.9))
-        .padding(.horizontal, Space.s3).padding(.vertical, 5)
-        .background(hue.opacity(0.14), in: coreShape(7))
-        .overlay { coreShape(7).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .accessibilityElement(children: .combine)
+    /// "Ended: finished" reads as "finished" in a divider.
+    static func endedLine(_ kind: String) -> String {
+        let w = AgentWords.endedWords(kind)
+        return w.hasPrefix("Ended: ") ? String(w.dropFirst(7)) : w.lowercased()
+    }
+
+    /// An event as a thin, quiet divider (N33): small text with its time, no pill, no colour.
+    private func chip(_ text: String) -> some View {
+        Text("— \(text) · \(entry.at.formatted(date: .omitted, time: .shortened)) —")
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary.opacity(0.8))
+            .lineLimit(1).truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s1)
+            .accessibilityElement(children: .combine)
     }
 }
 
-/// A tool call as a card: an icon tile for the tool, the command in mono, a live status at the right (a spinner while it
-/// runs, a green or red mark when done), and its output folded under, six lines and a way to the rest.
+/// A tool call as one compact row in the agent's column (N33): chevron, tool icon, a short summary, the time it took and a
+/// state mark. It opens to the full command and output, which animate in; a long command never shows in full by default.
 private struct ToolCard: View {
     enum Status {
         case running
@@ -261,18 +262,8 @@ private struct ToolCard: View {
     let status: Status
     let output: String
     @Binding var expanded: Bool
-    @State private var spin = false
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    private var hue: Color {
-        switch name.lowercased() {
-        case "bash", "shell": GlassInk.green
-        case "read", "glob", "grep", "ls": GlassInk.blue
-        case "edit", "write", "multiedit": GlassInk.orange
-        case "webfetch", "websearch": GlassInk.violet
-        default: GlassInk.slate
-        }
-    }
     private var symbol: String {
         switch name.lowercased() {
         case "bash", "shell": "terminal"
@@ -285,87 +276,84 @@ private struct ToolCard: View {
     }
 
     var body: some View {
-        let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
-        let long = lines.count > 6
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: Space.s3) {
-                Image(systemName: symbol).coreFont(size: 13, weight: .bold).foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(hue.opacity(0.85), in: coreShape(7))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
-                        GlassInk.ink(hue))
-                    if !summary.isEmpty {
-                        Text(summary).coreFont(size: 12, design: .monospaced).lineLimit(2)
-                            .truncationMode(.middle).textSelection(.enabled)
+        HStack {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    if reduce {
+                        expanded.toggle()
+                    } else {
+                        withAnimation(.smooth(duration: 0.25)) { expanded.toggle() }
                     }
+                } label: {
+                    HStack(spacing: Space.s2) {
+                        Image(systemName: "chevron.right").coreFont(size: 10, weight: .semibold)
+                            .foregroundStyle(GlassInk.secondary).rotationEffect(.degrees(expanded ? 90 : 0))
+                            .frame(width: 12)
+                        Image(systemName: symbol).foregroundStyle(GlassInk.blue).frame(width: 16)
+                        Text(PathWords.short(summary.isEmpty ? name : summary))
+                            .coreFont(size: MacTextSize.body).lineLimit(1).truncationMode(.middle)
+                        Spacer(minLength: Space.s2)
+                        trailing
+                    }
+                    .padding(.horizontal, Space.s2).frame(minHeight: 32)
+                    .contentShape(Rectangle())
                 }
-                Spacer(minLength: Space.s2)
-                statusView
-            }
-            .padding(Space.s2)
-            if !output.isEmpty {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(long && !expanded ? lines.prefix(6).joined(separator: "\n") + "\n…" : output)
-                        .coreFont(size: 12, design: .monospaced).foregroundStyle(GlassInk.secondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if long {
-                        Button {
-                            withAnimation(.spring(duration: 0.35)) { expanded.toggle() }
-                        } label: {
-                            Label(
-                                expanded ? "Show less" : "Show all \(lines.count) lines",
-                                systemImage: expanded ? "chevron.up" : "chevron.down"
-                            )
-                            .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
+                .buttonStyle(.plain)
+                .help(summary.isEmpty ? name : summary)
+                if expanded {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        if !summary.isEmpty {
+                            Text("$ " + summary).coreFont(size: 12, design: .monospaced)
+                                .foregroundStyle(GlassInk.primary)
                         }
-                        .buttonStyle(.plain)
+                        if !output.isEmpty {
+                            Text(output).coreFont(size: 12, design: .monospaced).foregroundStyle(GlassInk.secondary)
+                        }
                     }
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Space.s3)
+                    .frame(maxHeight: 160, alignment: .top)
+                    .background(.black.opacity(0.25), in: coreShape(Radius.control))
+                    .padding([.horizontal, .bottom], Space.s2)
+                    .agentCopyMenu(output.isEmpty ? summary : output)
+                    .transition(.opacity)
                 }
-                .padding(Space.s3)
-                .background(.black.opacity(0.25))
-                .agentCopyMenu(output)
             }
+            .foregroundStyle(GlassInk.primary)
+            .frame(maxWidth: 560)
+            .background(GlassInk.well, in: coreShape(Radius.control + 2))
+            .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .clipShape(coreShape(Radius.control + 2))
+            Spacer(minLength: Space.s8)
         }
-        .background(GlassInk.well)
-        .clipShape(coreShape(Radius.control + 2))
-        .overlay(alignment: .leading) { coreShape(2).fill(hue).frame(width: 3).padding(.vertical, Space.s2) }
-        .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
     }
 
-    @ViewBuilder private var statusView: some View {
+    @ViewBuilder private var trailing: some View {
         switch status {
         case .running:
-            HStack(spacing: 5) {
-                // Reduce Motion: the glyph breathes instead of turning.
-                Image(systemName: "arrow.triangle.2.circlepath").rotationEffect(.degrees(spin && !reduce ? 360 : 0))
-                    .opacity(spin && reduce ? 0.4 : 1)
-                    .animation(
-                        reduce
-                            ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                            : .linear(duration: 1.2).repeatForever(autoreverses: false), value: spin
-                    )
-                    .onAppear { spin = true }
-                Text("running")
+            // A small spinner while it runs; under Reduce Motion a still word.
+            if reduce {
+                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            } else {
+                ProgressView().controlSize(.small).scaleEffect(0.7)
             }
-            .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.blueInk)
         case .ok(let facts):
-            badge("checkmark", facts.isEmpty ? "ok" : "ok · \(facts)", GlassInk.green)
+            HStack(spacing: Space.s2) {
+                if !facts.isEmpty {
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                }
+                Image(systemName: "checkmark").foregroundStyle(GlassInk.green)
+            }
         case .failed(let facts):
-            badge("xmark", facts.isEmpty ? "failed" : "failed · \(facts)", GlassInk.red)
+            HStack(spacing: Space.s2) {
+                if !facts.isEmpty {
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                }
+                Image(systemName: "xmark").foregroundStyle(GlassInk.red)
+            }
         }
-    }
-
-    private func badge(_ symbol: String, _ text: String, _ c: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol).coreBounce(text)
-            Text(text).monospacedDigit()
-        }
-        .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(c))
-        .padding(.horizontal, 7).frame(height: 20)
-        .background(c.opacity(0.15), in: coreShape(5))
     }
 }

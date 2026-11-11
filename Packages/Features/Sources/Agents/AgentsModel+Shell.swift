@@ -117,9 +117,10 @@ extension AgentsModel {
     // MARK: dialogs
 
     /// Quick by default (one prompt, the defaults); `advanced` opens the full sheet (Ahmed, 2026-11-05).
-    public func openNewSession(advanced: Bool = false) {
+    public func openNewSession(advanced: Bool = false, runner: String? = nil) {
         Task { await loadRunners() }
-        if advanced {
+        newSessionRunner = runner
+        if advanced || runner != nil {
             shell.present(ShellDialog(id: "agents.new") { NewSessionSheet(model: self) })
         } else {
             shell.present(ShellDialog(id: "agents.quick") { QuickSessionView(model: self) })

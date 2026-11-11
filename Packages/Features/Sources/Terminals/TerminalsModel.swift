@@ -42,6 +42,7 @@ public final class TerminalsModel {
     var selected: String?
     /// The runner whose page is open in the Runners pane (nil: the fleet).
     var runnerDetail: String?
+    var runnerFilter: RunnerFacts.Filter = .all
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Terminals whose bell rang since they were last opened.
@@ -243,7 +244,7 @@ public final class TerminalsModel {
         Task { await reload() }
     }
 
-    func openRunners(_ id: String? = nil) {
+    public func openRunners(_ id: String? = nil) {
         runnerDetail = id
         shell.openPane(
             PaneSpec(id: "runners", title: "Runners", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
@@ -425,6 +426,38 @@ public final class TerminalsModel {
             shell.focusedPane = "terminal-\(t.id)"
         }
         shell.showToast("A terminal opened on \(name(of: t.runner))")
+    }
+
+    // MARK: runner management (N18, N19)
+
+    func confirmRename(_ r: RunnerItem) {
+        shell.present(ShellDialog(id: "runner-rename") { RenameRunnerDialog(model: self, runner: r) })
+    }
+
+    func confirmRevoke(_ r: RunnerItem) {
+        let agents = host.runnerHost?.agentWork(on: r.id).count ?? 0
+        shell.present(
+            ShellDialog(id: "runner-revoke", onClose: { [weak self] in self?.host.clearElevationNotice() }) {
+                RevokeRunnerDialog(model: self, runner: r, agents: agents, terminals: self.onRunner(r.id))
+            })
+    }
+
+    /// nil when it worked, else why not.
+    func renameRunner(_ id: String, to name: String) async -> String? {
+        guard let h = host.runnerHost else { return "This build cannot rename runners." }
+        let why = await h.renameRunner(id, to: name)
+        if why == nil { await reload() }
+        return why
+    }
+
+    func revokeRunner(_ id: String) async -> String? {
+        guard let h = host.runnerHost else { return "This build cannot revoke runners." }
+        let why = await h.revokeRunner(id)
+        if why == nil {
+            runnerDetail = nil
+            await reload()
+        }
+        return why
     }
 
     // MARK: runner no-op

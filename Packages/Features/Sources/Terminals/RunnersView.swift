@@ -1,21 +1,23 @@
 import CoreUI
 import SwiftUI
 
-/// The Runners pane: one tile per machine, or one machine's page. Only what runners report: work slots, load per core, drivers.
+/// The Runners pane: the machines that do the work for your Core, as cards, or one machine's page (N19). Only what runners
+/// report: state, what they offer, work slots, load per core.
 struct RunnersView: View {
-    let model: TerminalsModel
+    @Bindable var model: TerminalsModel
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if let id = model.runnerDetail, let r = model.runner(id) {
-                    RunnerDetail(model: model, runner: r)
+                    RunnerPage(model: model, runner: r)
                 } else {
                     fleet
                 }
             }
-            .padding(Space.s3)
+            .padding(Space.s4)
         }
         .task {
             // Load and heartbeat move without events: look again while this pane is open.
@@ -29,277 +31,176 @@ struct RunnersView: View {
         }
     }
 
+    private var shown: [RunnerItem] { model.runners.filter(model.runnerFilter.matches) }
+
     @ViewBuilder private var fleet: some View {
         switch model.load {
         case .failed(let m): ConnectionBanner(.error(m), retry: { Task { await model.reload() } })
         default:
+            toolbar
             if model.runners.isEmpty {
-                if model.load == .ready {
-                    VStack(spacing: Space.s2) {
-                        Text("No runners").coreFont(size: MacTextSize.title, weight: .semibold)
-                        Text("Pair a runner to open terminals.").foregroundStyle(palette.text2)
+                if model.load == .ready { empty } else { CoreBusyBar() }
+            } else {
+                Text("Machines that do the work for your Core: terminals and agents.").foregroundStyle(palette.text2)
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s3, alignment: .top)],
+                    spacing: Space.s3
+                ) {
+                    ForEach(shown) { r in
+                        RunnerCard(model: model, runner: r).transition(
+                            reduce ? .opacity : .scale(scale: 0.97).combined(with: .opacity))
                     }
-                    .frame(maxWidth: .infinity).padding(.top, Space.s8)
-                } else {
-                    CoreBusyBar()
+                }
+                .animation(Motion.calm(.smooth(duration: 0.3), reduce), value: shown.map(\.id))
+                if shown.isEmpty {
+                    Text("No runners match this filter.").foregroundStyle(palette.text2)
                 }
             }
-            ForEach(model.runners) { r in RunnerTile(model: model, runner: r) }
-            Text("Runners report work slots and load per core; memory and disk are not reported.")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
+    }
+
+    private var toolbar: some View {
+        HStack(spacing: Space.s2) {
+            Text("Runners").coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: Space.s3)
+            if !model.runners.isEmpty {
+                CoreSegmented(
+                    "Show",
+                    segments: RunnerFacts.Filter.allCases.map { f in
+                        CoreSegment(f, "\(f.rawValue) \(model.runners.filter(f.matches).count)")
+                    }, selection: $model.runnerFilter
+                )
+                .fixedSize()
+            }
+            AppActionTile(title: "Add runner", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                model.host.runnerHost?.addRunner()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .help("Pair a new machine as a runner")
+        }
+    }
+
+    private var empty: some View {
+        VStack(spacing: Space.s3) {
+            IconTile("server.rack", hue: GlassInk.slate, size: 52)
+            Text("No runners yet").coreFont(size: MacTextSize.large, weight: .bold)
+            Text("A runner is a machine that runs terminals and agents for your Core. Add the first one.")
+                .foregroundStyle(palette.text2).multilineTextAlignment(.center)
+                .frame(maxWidth: Space.s8 * 8)
+        }
+        .frame(maxWidth: .infinity).padding(.top, Space.s8)
     }
 }
 
-private struct RunnerTile: View {
+/// What a runner offers, as a chip: on is blue, off is quiet. Symbol and word, so colour is never the only cue.
+struct OfferChip: View {
+    let symbol: String
+    let title: String
+    let on: Bool
+    var body: some View {
+        Label("\(title) \(on ? "on" : "off")", systemImage: symbol)
+            .coreFont(size: MacTextSize.meta, weight: .medium)
+            .foregroundStyle(on ? GlassInk.blue : GlassInk.secondary)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip + 4)
+            .background(on ? GlassInk.blue.opacity(0.18) : GlassInk.well, in: coreShape(Radius.chip))
+    }
+}
+
+/// A runner's state as a badge with the plain word.
+struct RunnerChip: View {
+    let facts: RunnerFacts
+    var body: some View {
+        let s = facts.status
+        StateBadge(facts.chip, tone: s.tone, symbol: s.symbol)
+    }
+}
+
+/// A labelled bar: the words say the numbers, the bar shows the share.
+struct RunnerBar: View {
+    let text: String
+    let value: Double
+    var warn = false
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                .contentTransition(.numericText())
+            CoreMeter(value, low: warn, label: text)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct RunnerCard: View {
     let model: TerminalsModel
     let runner: RunnerItem
     @Environment(\.corePalette) private var palette
     @State private var hovering = false
 
     var body: some View {
-        let st = RunnerStatus(runner)
+        let facts = RunnerFacts(runner: runner)
+        let terminals = model.onRunner(runner.id)
         Button {
             model.runnerDetail = runner.id
         } label: {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                HStack(spacing: Space.s2) {
-                    Text(runner.name).coreFont(size: MacTextSize.headline, weight: .semibold, design: .monospaced)
-                    Spacer(minLength: Space.s2)
-                    if let v = runner.version {
-                        Text("v\(v)").coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(
-                            palette.text2)
-                    }
-                    StateBadge(st.label, tone: st.tone, symbol: st.symbol)
-                }
-                if let a = runner.arch { Text(a).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2) }
-                labelled(
-                    "Work running\(st == .off ? " · last known" : "")", "\(runner.load) of \(runner.capacity) slots"
-                ) {
-                    CoreSlots(used: runner.load, capacity: runner.capacity)
-                }
-                if let p = runner.perCore {
-                    labelled("Host load per core", coreDecimal(p, 2)) {
-                        Meter(value: p, max: 6, limit: RunnerStatus.busyPerCore, warn: p > RunnerStatus.busyPerCore)
-                    }
-                    if let s = model.loadSamples[runner.id], s.count >= 2 {
-                        CoreSpark(s, tone: st == .busy ? .warn : .run, ceiling: max(0.5, s.max() ?? 0.5))
-                        Text("Load sampled on this Mac while it watched.").coreFont(size: MacTextSize.meta)
+            VStack(alignment: .leading, spacing: Space.s3) {
+                HStack(spacing: Space.s3) {
+                    IconTile(
+                        "server.rack", hue: facts.status == .off ? GlassInk.slate : RunnerHue.of(runner.name), size: 40)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                        Text(runner.arch ?? "System not reported yet").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(palette.text2)
                     }
+                    Spacer(minLength: Space.s2)
+                    RunnerChip(facts: facts)
+                }
+                if let say = facts.say {
+                    Text(say).coreFont(size: MacTextSize.meta).fixedSize(horizontal: false, vertical: true)
+                        .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            palette.tone(facts.status == .off ? .queue : .warn).fill, in: coreShape(Radius.control))
                 }
                 HStack(spacing: Space.s2) {
-                    ForEach(runner.drivers, id: \.name) { d in
-                        Text(d.name).coreFont(size: MacTextSize.meta, weight: .medium, design: .monospaced)
-                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-                            .background(palette.uDim, in: coreShape(Radius.chip))
+                    OfferChip(symbol: "terminal", title: "Terminals", on: facts.terminalsOn)
+                    OfferChip(symbol: "sparkles", title: "Agents", on: facts.agentsOn)
+                }
+                HStack(alignment: .top, spacing: Space.s3) {
+                    RunnerBar(
+                        text: "\(runner.load) of \(runner.capacity) work slots",
+                        value: runner.capacity > 0 ? Double(runner.load) / Double(runner.capacity) : 0,
+                        warn: runner.capacity > 0 && runner.load >= runner.capacity)
+                    if let cap = facts.terminalCapacity {
+                        RunnerBar(
+                            text: "\(terminals) of \(cap) terminals",
+                            value: cap > 0 ? Double(terminals) / Double(cap) : 0)
                     }
-                    if runner.drivers.isEmpty {
-                        Text("No drivers reported yet").coreFont(size: MacTextSize.meta).foregroundStyle(
+                }
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Load, while this Mac watched").coreFont(size: MacTextSize.meta).foregroundStyle(
                             palette.text2)
+                        if let s = model.loadSamples[runner.id], s.count >= 2 {
+                            CoreSpark(s, tone: facts.status == .busy ? .warn : .run, ceiling: max(0.5, s.max() ?? 0.5))
+                                .frame(height: 30)
+                        } else {
+                            Text("Not reported yet").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                        }
                     }
-                    Spacer(minLength: 0)
-                    Text(model.onRunner(runner.id) == 1 ? "1 terminal" : "\(model.onRunner(runner.id)) terminals")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    Spacer(minLength: Space.s2)
+                    Label("Open", systemImage: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
+                        .foregroundStyle(palette.text2).opacity(hovering ? 1 : 0)
                 }
             }
-            .padding(Space.s3)
+            .padding(Space.s4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? palette.rowHover : palette.glassCard, in: coreShape(Radius.row))
-            .contentShape(coreShape(Radius.row))
+            .background(hovering ? palette.rowHover : palette.glassCard, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
-        .accessibilityLabel("\(runner.name), \(st.label), \(runner.load) of \(runner.capacity) slots in use")
-    }
-
-    private func labelled<V: View>(_ title: String, _ value: String, @ViewBuilder bar: () -> V) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            HStack {
-                Text(title).foregroundStyle(palette.text2)
-                Spacer(minLength: Space.s2)
-                Text(value).coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
-            }
-            .coreFont(size: MacTextSize.meta)
-            bar()
-        }
-    }
-}
-
-/// One runner: load, drivers, isolation, what runs here, and the no-op test.
-private struct RunnerDetail: View {
-    let model: TerminalsModel
-    let runner: RunnerItem
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        let st = RunnerStatus(runner)
-        let off = st == .off
-        Button {
-            model.runnerDetail = nil
-        } label: {
-            Label("All runners", systemImage: "chevron.backward")
-        }
-        .buttonStyle(CoreButtonStyle(.plain, size: .small))
-        .keyboardShortcut(.escape, modifiers: [])
-        HStack(spacing: Space.s2) {
-            Text(runner.name).coreFont(size: MacTextSize.large, weight: .semibold, design: .monospaced)
-            StateBadge(st.label, tone: st.tone, symbol: st.symbol)
-        }
-        Text([runner.arch, runner.version.map { "runner v\($0)" }].compactMap { $0 }.joined(separator: " · "))
-            .foregroundStyle(palette.text2)
-        switch st {
-        case .degraded:
-            TermBanner(
-                tone: .warn, title: "Not answering heartbeats",
-                detail:
-                    "The Core has not heard from \(runner.name) for two heartbeats. It is still listed as connected, but treat the figures below as possibly stale. If it stays silent it shows as disconnected."
-            )
-        case .off:
-            TermBanner(
-                tone: .fail, title: "Disconnected",
-                detail:
-                    "The Core can’t reach \(runner.name), so nothing can start there and its terminals can't be reached. Figures below are the last the Core saw. Everything resumes when the runner reconnects."
-            )
-        case .busy:
-            TermBanner(
-                tone: .warn, title: "Too busy for new work",
-                detail:
-                    "Host load is \(coreDecimal(runner.perCore ?? 0, 1)) per core and the default limit is \(Int(RunnerStatus.busyPerCore)), so new terminals and sessions are refused. Work already running is not touched. It clears by itself when the load drops."
-            )
-        case .ok: EmptyView()
-        }
-        card("Load\(off ? " · last known" : "")") {
-            fact("Work running", "\(runner.load) of \(runner.capacity)")
-            CoreSlots(used: runner.load, capacity: runner.capacity)
-            if let a = runner.avg1, let c = runner.cores {
-                fact("Host load, 1 min average", "\(coreDecimal(a, 1)) on \(c) cores")
-                fact("Per core", coreDecimal(runner.perCore ?? 0, 2))
-                Meter(value: runner.perCore ?? 0, max: 6, limit: RunnerStatus.busyPerCore, warn: st == .busy)
-                Text(
-                    "The marker is the limit: above \(Int(RunnerStatus.busyPerCore)) per core the runner refuses new work (default)."
-                )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            } else {
-                Text("This runner has not reported host load.").foregroundStyle(palette.text2)
-            }
-        }
-        card("Drivers") {
-            if runner.drivers.isEmpty { Text("None reported yet.").foregroundStyle(palette.text2) }
-            ForEach(runner.drivers, id: \.name) { d in
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Text(d.name).coreFont(size: MacTextSize.body, weight: .semibold, design: .monospaced)
-                        Spacer()
-                        if let c = d.capacity { Text("\(c) at once").foregroundStyle(palette.text2) }
-                    }
-                    if !d.commands.isEmpty {
-                        Text(d.commands.joined(separator: ", ")).coreFont(size: MacTextSize.meta).foregroundStyle(
-                            palette.text2)
-                    }
-                }
-            }
-            if !runner.hasPty && !runner.drivers.isEmpty {
-                Text("Terminals are off here. Turn them on on the machine that runs this runner.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            }
-        }
-        card("Isolation") {
-            if let tiers = runner.isolationTiers, !tiers.isEmpty {
-                fact("Isolation tiers", tiers.joined(separator: ", "))
-            } else {
-                note(
-                    "Isolation tier: not reported",
-                    "This Core does not tell clients this runner’s isolation tier yet, so this app can’t say what \(runner.name) can or can’t meet."
-                )
-            }
-            note(
-                "Shells and the runner share one user",
-                "That is why the terminal scope counts as admin-level today. Don’t read “sandboxed” as “isolated”.")
-        }
-        let here = model.items.filter { $0.runner == runner.id && !$0.isEnded }
-        card("\(off ? "Was running" : "Running here") · \(here.count) \(here.count == 1 ? "item" : "items")") {
-            if here.isEmpty { Text("Nothing running.").foregroundStyle(palette.text2) }
-            ForEach(here) { t in
-                Button {
-                    model.openTerminal(t.id, attach: false)
-                } label: {
-                    HStack {
-                        Text("Terminal").coreFont(size: MacTextSize.meta, weight: .medium)
-                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-                            .background(palette.uDim, in: coreShape(Radius.chip))
-                        Text(t.id).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1)
-                        Spacer()
-                        Text(t.attached == 0 ? "not attached" : "\(t.attached) attached").foregroundStyle(palette.text2)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        card("Check it") {
-            let n = model.noop[runner.id]
-            HStack(spacing: Space.s3) {
-                Button("Run no-op test") { Task { await model.runNoop(runner.id) } }
-                    .buttonStyle(CoreButtonStyle(.secondary)).disabled(off || n == .running)
-                Group {
-                    switch n {
-                    case .running: Text("Waiting for the runner…")
-                    case .answered(let ms)?: Text("The runner answered in \(ms) ms. No work was started.")
-                    case .failed(let m)?: Text(m)
-                    case nil:
-                        Text(
-                            off
-                                ? "Disconnected, so the test would fail."
-                                : "Sends an empty round trip to the runner. No work is started.")
-                    }
-                }
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            }
-            if n == .running { CoreBusyBar() }
-            Text("Needs the read and agent scopes.").coreFont(size: MacTextSize.meta).foregroundStyle(
-                palette.text2)
-            HStack(spacing: Space.s3) {
-                Button("Open a terminal here") { model.openNew(runner: runner.id) }
-                    .buttonStyle(CoreButtonStyle(.secondary)).disabled(off || st == .busy || !runner.hasPty)
-                Text(
-                    off
-                        ? "Not available while disconnected."
-                        : st == .busy
-                            ? "Refused while the host is over its load limit."
-                            : !runner.hasPty ? "Terminals are off on this runner." : ""
-                )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            }
-        }
-    }
-
-    private func card<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).accessibilityAddTraits(.isHeader)
-            content()
-        }
-        .coreFont(size: MacTextSize.body)
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func fact(_ k: String, _ v: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(k).foregroundStyle(palette.text2)
-            Spacer(minLength: Space.s3)
-            Text(v).monospacedDigit()
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func note(_ title: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
-            Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        .accessibilityLabel(
+            "\(runner.name), \(facts.chip), \(runner.load) of \(runner.capacity) work slots in use")
     }
 }

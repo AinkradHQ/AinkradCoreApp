@@ -16,7 +16,8 @@ enum DeviceFilter: String, CaseIterable, Identifiable {
     /// By the Core's `kind` word. A kind this app does not know shows only under All, as its own word.
     func matches(_ kind: String) -> Bool {
         switch self {
-        case .all: true
+        // N18: runners are machines that work, not people's devices; they have their own page and the Runners chip.
+        case .all: kind != "runner"
         case .devices: kind == "device"
         case .runners: kind == "runner"
         case .passkeys: kind == "passkey"

@@ -169,7 +169,9 @@ struct AppModelTests {
         m.devices.filter = .devices
         #expect(m.devices.shown.map(\.id) == ["d_me"], "an unknown kind is not a device")
         m.devices.filter = .all
-        #expect(m.devices.shown.count == 3 && m.devices.shown.contains { $0.kind == "satellite" })
+        // Runners have their own page and chip: All is people's devices, and an unknown kind still shows here.
+        #expect(m.devices.shown.count == 2 && m.devices.shown.contains { $0.kind == "satellite" })
+        #expect(!m.devices.shown.contains { $0.kind == "runner" })
         var second = FakeService.device("d_2", "iPhone", scopes: ["read", "admin"])
         second.stepup = true
         s.deviceList.append(second)

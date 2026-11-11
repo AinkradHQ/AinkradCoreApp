@@ -12,8 +12,6 @@ struct SessionView: View {
 
     var body: some View {
         if let s = model.sessions.session(sessionID) {
-            let mine = model.cards(for: sessionID)
-            let keysHere = model.shell.activePane == AgentsModel.paneID(sessionID) && !model.shell.coverOpen
             VStack(alignment: .leading, spacing: 0) {
                 SessionHero(model: model, session: s)
                 VStack(spacing: Space.s2) {
@@ -30,14 +28,6 @@ struct SessionView: View {
                 }
                 .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
                 TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
-                if !mine.isEmpty {
-                    VStack(spacing: Space.s2) {
-                        ForEach(Array(mine.enumerated()), id: \.element.id) { i, r in
-                            ApprovalCardView(model: model, request: r, keys: keysHere && i == 0)
-                        }
-                    }
-                    .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
-                }
                 ComposerView(model: model, session: s, focused: $composing)
                 keyHints(s)
             }

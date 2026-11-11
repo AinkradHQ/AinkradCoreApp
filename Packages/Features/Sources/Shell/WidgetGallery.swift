@@ -46,7 +46,7 @@ struct WidgetGallery: View {
         .accessibilityLabel("Add a widget")
     }
 
-    private func size(_ k: WidgetKind) -> WidgetSize { sel[k] ?? k.sizes[min(1, k.sizes.count - 1)] }
+    private func size(_ k: WidgetKind) -> WidgetSize { sel[k] ?? k.sizes[0] }
 
     private func card(_ kind: WidgetKind) -> some View {
         let s = size(kind)
