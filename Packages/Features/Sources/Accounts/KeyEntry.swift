@@ -26,6 +26,8 @@ final class KeyEntryFlow {
     var gateNote: String?
     /// The account a key goes to: the one being rotated, or the one just made whose test failed.
     var target: AccountItem?
+    /// Where a new account goes and its monthly limit; nil leaves both to the Core's defaults.
+    var placement: AccountPlacement?
 
     init(target: AccountItem? = nil) { self.target = target }
 
@@ -102,8 +104,16 @@ final class KeyEntryFlow {
             } else {
                 let rs = runner.map { [$0] } ?? []
                 let reason = "Add \(who) to \(name). Its key is stored in your Core."
+                let (pools, chains, pname, place) = (m.pools, m.chains, m.providerName(provider), placement)
                 let made = try await m.host.elevated(reason, done: "changed", keepsEdit: true) {
-                    try await svc.createAccount(provider: provider, label: who, key: value, runners: rs)
+                    guard let place else {
+                        return try await svc.createAccount(provider: provider, label: who, key: value, runners: rs)
+                    }
+                    // A new pool or order is made first, in this one Touch ID, then the account goes into it.
+                    let resolved = try await Self.resolve(
+                        svc, place, provider: provider, providerName: pname, pools: pools, chains: chains)
+                    return try await svc.createAccount(
+                        provider: provider, label: who, key: value, runners: rs, placement: resolved)
                 }
                 id = made.id
                 target = made
@@ -130,6 +140,36 @@ final class KeyEntryFlow {
         } catch {
             stage = .failed(Self.testWords(error), account: id)
         }
+    }
+
+    /// Turns the person's choices into ids. A pick of "standard" stays nil: the Core makes its own default. A new pool or a
+    /// new order is created here first, with the existing pool and chain calls.
+    static func resolve(
+        _ svc: any AccountsService, _ p: AccountPlacement, provider: String, providerName: String, pools: [PoolItem],
+        chains: [ChainItem]
+    ) async throws -> ResolvedPlacement {
+        var pool: Int64?
+        switch p.pool {
+        case .standard: pool = pools.first { $0.provider == provider && $0.isDefault }?.id
+        case .existing(let id): pool = id
+        case .new(let name): pool = try await svc.createPool(name: slug(name), provider: provider).id
+        }
+        var chain: Int64?
+        switch p.chain {
+        case .standard: chain = chains.first { $0.isDefault }?.id
+        case .existing(let id): chain = id
+        case .new(let name):
+            // An order needs a place to start from: the pool the account goes to (made now when it does not exist).
+            var seat = pool
+            if seat == nil { seat = try await svc.createPool(name: slug(providerName), provider: provider).id }
+            guard let seat else {
+                return ResolvedPlacement(pool: nil, chain: nil, position: nil, monthlyLimitMicros: nil)
+            }
+            pool = seat
+            chain = try await svc.createChain(name: slug(name), entries: [ChainEntryDraft(pool: seat, model: nil)]).id
+        }
+        return ResolvedPlacement(
+            pool: pool, chain: chain, position: p.position, monthlyLimitMicros: p.monthlyLimitMicros)
     }
 
     /// Removes the account whose key failed its test.

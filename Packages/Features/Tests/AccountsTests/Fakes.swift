@@ -175,6 +175,13 @@ final class FakeService: AccountsService, @unchecked Sendable {
         accountList.append(a)
         return a
     }
+    var placements: [ResolvedPlacement] = []
+    func createAccount(
+        provider: String, label: String, key: String, runners: [String], placement: ResolvedPlacement
+    ) async throws -> AccountItem {
+        placements.append(placement)
+        return try await createAccount(provider: provider, label: label, key: key, runners: runners)
+    }
     func replaceSecret(account id: Int64, key: String, runners: [String]?) async throws {
         try note("replaceSecret \(id) \(runners == nil ? "keep" : "set")")
         lastKey = key
