@@ -12,6 +12,14 @@ extension Components {
         public struct AccountDetail: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/AccountDetail/account`.
             public var account: Components.Schemas.ProviderAccount
+            /// The chain that holds the pool (set by `createAccount`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountDetail/chain`.
+            public var chain: Swift.Int64?
+            /// The pool the account joined (set by `createAccount`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountDetail/pool`.
+            public var pool: Swift.Int64?
             /// Runner device ids, explicit (never a wildcard).
             ///
             /// - Remark: Generated from `#/components/schemas/AccountDetail/runners`.
@@ -20,16 +28,24 @@ extension Components {
             ///
             /// - Parameters:
             ///   - account:
+            ///   - chain: The chain that holds the pool (set by `createAccount`).
+            ///   - pool: The pool the account joined (set by `createAccount`).
             ///   - runners: Runner device ids, explicit (never a wildcard).
             public init(
                 account: Components.Schemas.ProviderAccount,
+                chain: Swift.Int64? = nil,
+                pool: Swift.Int64? = nil,
                 runners: [Swift.String]
             ) {
                 self.account = account
+                self.chain = chain
+                self.pool = pool
                 self.runners = runners
             }
             public enum CodingKeys: String, CodingKey {
                 case account
+                case chain
+                case pool
                 case runners
             }
         }
@@ -2780,6 +2796,185 @@ extension Components {
                 case supportedMinors = "supported_minors"
             }
         }
+        /// A program installed on the host, as the helper's manifest and checks say.
+        ///
+        /// - Remark: Generated from `#/components/schemas/HostBinary`.
+        public struct HostBinary: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HostBinary/name`.
+            public var name: Swift.String
+            /// The first 12 hex characters of the file's SHA-256.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostBinary/sha256_12`.
+            public var sha25612: Swift.String?
+            /// `ok`, `differs` (not the file the manifest lists) or `unsafe` (a link, or writable).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostBinary/state`.
+            public var state: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HostBinary/version`.
+            public var version: Swift.String?
+            /// Creates a new `HostBinary`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - sha25612: The first 12 hex characters of the file's SHA-256.
+            ///   - state: `ok`, `differs` (not the file the manifest lists) or `unsafe` (a link, or writable).
+            ///   - version:
+            public init(
+                name: Swift.String,
+                sha25612: Swift.String? = nil,
+                state: Swift.String? = nil,
+                version: Swift.String? = nil
+            ) {
+                self.name = name
+                self.sha25612 = sha25612
+                self.state = state
+                self.version = version
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case sha25612 = "sha256_12"
+                case state
+                case version
+            }
+        }
+        /// The Core machine as the host helper reports it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/HostStatus`.
+        public struct HostStatus: Codable, Hashable, Sendable {
+            /// `/usr/local/bin` is root-owned and not group or other writable.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostStatus/bin_dir_safe`.
+            public var binDirSafe: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/HostStatus/binaries`.
+            public var binaries: [Components.Schemas.HostBinary]?
+            /// `present` (it answered), `absent` (no socket: not installed) or `error` (it did not answer
+            /// well: stopped, busy, too slow, refused).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostStatus/helper`.
+            public var helper: Swift.String
+            /// - Remark: Generated from `#/components/schemas/HostStatus/helper_version`.
+            public var helperVersion: Swift.String?
+            /// The host's random id, set at install; an app pins it at first sight.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostStatus/host_id`.
+            public var hostId: Swift.String?
+            /// `ok`, `absent` or `invalid`: the state of the root-written manifest of installed programs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostStatus/manifest`.
+            public var manifest: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HostStatus/units`.
+            public var units: Components.Schemas.HostUnits?
+            /// Creates a new `HostStatus`.
+            ///
+            /// - Parameters:
+            ///   - binDirSafe: `/usr/local/bin` is root-owned and not group or other writable.
+            ///   - binaries:
+            ///   - helper: `present` (it answered), `absent` (no socket: not installed) or `error` (it did not answer
+            ///   - helperVersion:
+            ///   - hostId: The host's random id, set at install; an app pins it at first sight.
+            ///   - manifest: `ok`, `absent` or `invalid`: the state of the root-written manifest of installed programs.
+            ///   - units:
+            public init(
+                binDirSafe: Swift.Bool? = nil,
+                binaries: [Components.Schemas.HostBinary]? = nil,
+                helper: Swift.String,
+                helperVersion: Swift.String? = nil,
+                hostId: Swift.String? = nil,
+                manifest: Swift.String? = nil,
+                units: Components.Schemas.HostUnits? = nil
+            ) {
+                self.binDirSafe = binDirSafe
+                self.binaries = binaries
+                self.helper = helper
+                self.helperVersion = helperVersion
+                self.hostId = hostId
+                self.manifest = manifest
+                self.units = units
+            }
+            public enum CodingKeys: String, CodingKey {
+                case binDirSafe = "bin_dir_safe"
+                case binaries
+                case helper
+                case helperVersion = "helper_version"
+                case hostId = "host_id"
+                case manifest
+                case units
+            }
+        }
+        /// A systemd unit.
+        ///
+        /// - Remark: Generated from `#/components/schemas/HostUnit`.
+        public struct HostUnit: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HostUnit/restarts`.
+            public var restarts: Swift.Int64?
+            /// When it entered its state, as systemd prints it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostUnit/since`.
+            public var since: Swift.String?
+            /// systemd's `ActiveState`: `active`, `inactive`, `failed`, `activating`…
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostUnit/state`.
+            public var state: Swift.String?
+            /// systemd's `SubState`: `running`, `dead`…
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostUnit/sub`.
+            public var sub: Swift.String?
+            /// Creates a new `HostUnit`.
+            ///
+            /// - Parameters:
+            ///   - restarts:
+            ///   - since: When it entered its state, as systemd prints it.
+            ///   - state: systemd's `ActiveState`: `active`, `inactive`, `failed`, `activating`…
+            ///   - sub: systemd's `SubState`: `running`, `dead`…
+            public init(
+                restarts: Swift.Int64? = nil,
+                since: Swift.String? = nil,
+                state: Swift.String? = nil,
+                sub: Swift.String? = nil
+            ) {
+                self.restarts = restarts
+                self.since = since
+                self.state = state
+                self.sub = sub
+            }
+            public enum CodingKeys: String, CodingKey {
+                case restarts
+                case since
+                case state
+                case sub
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HostUnits`.
+        public struct HostUnits: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HostUnits/backup_timer`.
+            public var backupTimer: Components.Schemas.HostUnit?
+            /// - Remark: Generated from `#/components/schemas/HostUnits/core`.
+            public var core: Components.Schemas.HostUnit?
+            /// Absent when no local runner is installed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostUnits/runner`.
+            public var runner: Components.Schemas.HostUnit?
+            /// Creates a new `HostUnits`.
+            ///
+            /// - Parameters:
+            ///   - backupTimer:
+            ///   - core:
+            ///   - runner: Absent when no local runner is installed.
+            public init(
+                backupTimer: Components.Schemas.HostUnit? = nil,
+                core: Components.Schemas.HostUnit? = nil,
+                runner: Components.Schemas.HostUnit? = nil
+            ) {
+                self.backupTimer = backupTimer
+                self.core = core
+                self.runner = runner
+            }
+            public enum CodingKeys: String, CodingKey {
+                case backupTimer = "backup_timer"
+                case core
+                case runner
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/InviteCreated`.
         public struct InviteCreated: Codable, Hashable, Sendable {
             /// `ainkrad://connect?host=…&fp=<core_fp>&secret=…`, for a QR code: shown once.
@@ -3221,6 +3416,62 @@ extension Components {
                 case key
                 case lockedUntil = "locked_until"
                 case strikes
+            }
+        }
+        /// A page of a service's log, redacted by the helper, newest entries at the end.
+        ///
+        /// - Remark: Generated from `#/components/schemas/LogLine`.
+        public struct LogLine: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LogLine/at`.
+            public var at: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LogLine/level`.
+            public var level: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LogLine/text`.
+            public var text: Swift.String?
+            /// Creates a new `LogLine`.
+            ///
+            /// - Parameters:
+            ///   - at:
+            ///   - level:
+            ///   - text:
+            public init(
+                at: Swift.String? = nil,
+                level: Swift.String? = nil,
+                text: Swift.String? = nil
+            ) {
+                self.at = at
+                self.level = level
+                self.text = text
+            }
+            public enum CodingKeys: String, CodingKey {
+                case at
+                case level
+                case text
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LogPage`.
+        public struct LogPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LogPage/lines`.
+            public var lines: [Components.Schemas.LogLine]
+            /// Pass as `before` for the next older page; absent on the last.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LogPage/next_before`.
+            public var nextBefore: Swift.String?
+            /// Creates a new `LogPage`.
+            ///
+            /// - Parameters:
+            ///   - lines:
+            ///   - nextBefore: Pass as `before` for the next older page; absent on the last.
+            public init(
+                lines: [Components.Schemas.LogLine],
+                nextBefore: Swift.String? = nil
+            ) {
+                self.lines = lines
+                self.nextBefore = nextBefore
+            }
+            public enum CodingKeys: String, CodingKey {
+                case lines
+                case nextBefore = "next_before"
             }
         }
         /// The approval code the user pasted. No `Debug`: it is a one-time secret.
@@ -3846,8 +4097,24 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NewProviderAccount/cap`.
             public var cap: Swift.Int64?
+            /// An existing chain to put the pool in; default: the user's default chain (made if missing).
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewProviderAccount/chain`.
+            public var chain: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/NewProviderAccount/label`.
             public var label: Swift.String
+            /// The monthly dollar limit in micro-dollars; default 20000000 ($20); 0 is no limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewProviderAccount/monthly_limit_usd_micros`.
+            public var monthlyLimitUsdMicros: Swift.Int64?
+            /// An existing pool of the provider to join; default: the provider's default pool (made if missing).
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewProviderAccount/pool`.
+            public var pool: Swift.Int64?
+            /// 0-based seat of the pool in the chain; default: last.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewProviderAccount/position`.
+            public var position: Swift.Int32?
             /// - Remark: Generated from `#/components/schemas/NewProviderAccount/provider`.
             public var provider: Swift.String
             /// Runner device ids it may be leased to; default none.
@@ -3862,26 +4129,42 @@ extension Components {
             ///
             /// - Parameters:
             ///   - cap: Default 4; 0 is no cap.
+            ///   - chain: An existing chain to put the pool in; default: the user's default chain (made if missing).
             ///   - label:
+            ///   - monthlyLimitUsdMicros: The monthly dollar limit in micro-dollars; default 20000000 ($20); 0 is no limit.
+            ///   - pool: An existing pool of the provider to join; default: the provider's default pool (made if missing).
+            ///   - position: 0-based seat of the pool in the chain; default: last.
             ///   - provider:
             ///   - runners: Runner device ids it may be leased to; default none.
             ///   - value: The API key; written, never read back.
             public init(
                 cap: Swift.Int64? = nil,
+                chain: Swift.Int64? = nil,
                 label: Swift.String,
+                monthlyLimitUsdMicros: Swift.Int64? = nil,
+                pool: Swift.Int64? = nil,
+                position: Swift.Int32? = nil,
                 provider: Swift.String,
                 runners: [Swift.String]? = nil,
                 value: Swift.String
             ) {
                 self.cap = cap
+                self.chain = chain
                 self.label = label
+                self.monthlyLimitUsdMicros = monthlyLimitUsdMicros
+                self.pool = pool
+                self.position = position
                 self.provider = provider
                 self.runners = runners
                 self.value = value
             }
             public enum CodingKeys: String, CodingKey {
                 case cap
+                case chain
                 case label
+                case monthlyLimitUsdMicros = "monthly_limit_usd_micros"
+                case pool
+                case position
                 case provider
                 case runners
                 case value
@@ -4909,6 +5192,50 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case runners
                 case value
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RestartBody`.
+        public struct RestartBody: Codable, Hashable, Sendable {
+            /// `core` or `runner` (the local runner).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RestartBody/target`.
+            public var target: Swift.String
+            /// Creates a new `RestartBody`.
+            ///
+            /// - Parameters:
+            ///   - target: `core` or `runner` (the local runner).
+            public init(target: Swift.String) {
+                self.target = target
+            }
+            public enum CodingKeys: String, CodingKey {
+                case target
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.target = try container.decode(
+                    Swift.String.self,
+                    forKey: .target
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "target"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Restarted`.
+        public struct Restarted: Codable, Hashable, Sendable {
+            /// The id the restart is audited under (`host.restart_requested`, `host.action_result`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Restarted/request_id`.
+            public var requestId: Swift.String
+            /// Creates a new `Restarted`.
+            ///
+            /// - Parameters:
+            ///   - requestId: The id the restart is audited under (`host.restart_requested`, `host.action_result`).
+            public init(requestId: Swift.String) {
+                self.requestId = requestId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case requestId = "request_id"
             }
         }
         /// A rotation: the new value, and optionally a new scope or delivery. No `Debug`.
