@@ -276,6 +276,9 @@ public enum ThemeChoice: String, CaseIterable, Sendable {
         case .sun: NSAppearance(named: (7..<18).contains(hour) ? .aqua : .darkAqua)
         }
     }
+    /// The choice that flips what is on the screen: dark now gives Day, light now gives Night. Reads the look shown, not the stored
+    /// choice, so "Follow the Mac" on a dark Mac switches on the first push (N10).
+    func toggled(isDark: Bool) -> ThemeChoice { isDark ? .day : .night }
     public static func stored(_ defaults: UserDefaults = .standard) -> ThemeChoice {
         #if DEBUG
         // Shot runs: the theme they ask for holds for the whole run (FullScreen re-applies this after the walks set it).

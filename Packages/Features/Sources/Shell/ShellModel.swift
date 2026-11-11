@@ -227,6 +227,15 @@ public final class ShellModel {
         }
     }
 
+    /// ⌃⌘D and the launcher entry: flip what the window shows now, and say how to go back.
+    public func switchDayAndNight(isDark: Bool? = nil) {
+        let dark = isDark ?? (NSApp?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+        theme = theme.toggled(isDark: dark)
+        showToast(
+            dark ? "Day look. Settings, Appearance changes it back to Follow the Mac."
+                : "Night look. Settings, Appearance changes it back to Follow the Mac.")
+    }
+
     public init(defaults: UserDefaults = .coreStore()) {
         self.defaults = defaults
         profile = UserProfile(defaults: defaults)
@@ -254,6 +263,12 @@ public final class ShellModel {
                 id: "shortcuts", title: "Keyboard Shortcuts", sub: "All keyboard shortcuts",
                 symbol: "keyboard", keywords: ["keys", "help", "commands"], isAction: true, tile: .slate
             ) { [weak self] in self?.open(.shortcuts) })
+        launcher.register(
+            LauncherEntry(
+                id: "day-night", title: "Switch Day and Night", sub: "Flip the look of the app",
+                symbol: "circle.lefthalf.filled", keywords: ["theme", "dark", "light", "appearance"], isAction: true,
+                tile: .slate
+            ) { [weak self] in self?.switchDayAndNight() })
         launcher.register(
             LauncherEntry(
                 id: "widgets.add", title: "Add Widget…", sub: "Put a widget on Home", symbol: "plus",

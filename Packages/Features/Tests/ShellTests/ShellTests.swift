@@ -207,3 +207,11 @@ struct WidgetCountAndCaptionTests {
         #expect(AppearanceSection.caption(chosen: .system, isDay: true) == "Following your Mac: showing day now")
     }
 }
+
+@Suite struct DayNightToggleTests {
+    @Test func followTheMacOnADarkMacGivesDayOnTheFirstPush() {
+        #expect(ThemeChoice.system.toggled(isDark: true) == .day)
+        #expect(ThemeChoice.system.toggled(isDark: false) == .night)
+        #expect(ThemeChoice.sun.toggled(isDark: true) == .day)
+    }
+}
