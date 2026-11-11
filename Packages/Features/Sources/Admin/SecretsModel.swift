@@ -12,6 +12,10 @@ final class SecretForm {
     private(set) var value = ""
     var delivery = "env"
     var runners: Set<String> = []
+    /// The new-secret wizard: 0 type, 1 value, 2 details.
+    var step = 0
+    /// Only text is stored by the Core today (`SecretWords.Kind`).
+    var kind = SecretWords.Kind.text
     private(set) var issue: FieldIssue?
     private(set) var busy = false
 
