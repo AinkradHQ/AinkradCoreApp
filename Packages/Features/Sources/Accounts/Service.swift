@@ -30,6 +30,10 @@ protocol AccountsService: Sendable {
     func deleteAccount(_ id: Int64) async throws
     /// Adds an account with its key (`admin`, step-up). The key goes to the Core and is never read back.
     func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem
+    /// The same with where it goes (pool, chain, seat) and its monthly limit. A pool or chain that is new must exist first.
+    func createAccount(
+        provider: String, label: String, key: String, runners: [String], placement: ResolvedPlacement
+    ) async throws -> AccountItem
     /// Replaces an account's key; `runners` nil keeps the ones it has (`admin`, step-up).
     func replaceSecret(account: Int64, key: String, runners: [String]?) async throws
     /// Sets one of the two `secrets.*` switches (`admin`, step-up).
@@ -65,10 +69,31 @@ protocol AccountsService: Sendable {
     func deleteProvider(_ id: String) async throws
 }
 
+/// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).
+struct ResolvedPlacement: Equatable, Sendable {
+    var pool: Int64?
+    var chain: Int64?
+    var position: Int?
+    var monthlyLimitMicros: Int64?
+}
+
+extension AccountsService {
+    /// Fakes that do not care where an account goes.
+    func createAccount(
+        provider: String, label: String, key: String, runners: [String], placement: ResolvedPlacement
+    ) async throws -> AccountItem {
+        try await createAccount(provider: provider, label: label, key: key, runners: runners)
+    }
+}
+
 struct AccountRunner: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let online: Bool
+    /// What the runner advertised: the command ops of every driver (`gateway`, `login`, `subscription-env`…) and the
+    /// driver names (`agent`, `pty`…). Empty until it first connects.
+    var commands: Set<String> = []
+    var drivers: Set<String> = []
 }
 
 struct TestedItem: Equatable, Sendable {
@@ -170,10 +195,20 @@ struct LiveAccountsService: AccountsService {
         try await run { _ = try await client.deleteAccount(path: .init(id: String(id))).ok }
     }
     func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {
+        try await createAccount(
+            provider: provider, label: label, key: key, runners: runners,
+            placement: ResolvedPlacement(pool: nil, chain: nil, position: nil, monthlyLimitMicros: nil))
+    }
+    func createAccount(
+        provider: String, label: String, key: String, runners: [String], placement p: ResolvedPlacement
+    ) async throws -> AccountItem {
         try await run {
             Self.account(
                 try await client.createAccount(
-                    body: .json(.init(label: label, provider: provider, runners: runners, value: key))
+                    body: .json(
+                        .init(
+                            chain: p.chain, label: label, monthlyLimitUsdMicros: p.monthlyLimitMicros, pool: p.pool,
+                            position: p.position.map(Int32.init), provider: provider, runners: runners, value: key))
                 ).ok.body.json.account)
         }
     }
@@ -214,7 +249,10 @@ struct LiveAccountsService: AccountsService {
     func runners() async throws -> [AccountRunner] {
         try await run {
             try await client.listRunners().ok.body.json.map {
-                AccountRunner(id: $0.id, name: $0.name, online: $0.online ?? false)
+                let ds = $0.drivers ?? []
+                return AccountRunner(
+                    id: $0.id, name: $0.name, online: $0.online ?? false,
+                    commands: Set(ds.flatMap { $0.commands ?? [] }), drivers: Set(ds.compactMap(\.name)))
             }
         }
     }

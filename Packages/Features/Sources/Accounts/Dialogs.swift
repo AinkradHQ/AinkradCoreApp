@@ -20,11 +20,17 @@ enum AccountDialogs {
             ) { v { shell.closeDialog() } })
     }
 
+    /// A new account opens the wizard (N22); a new key for an account, or a scripted flow, opens the one-page dialog.
     static func openConnect(
-        _ m: AccountsModel, provider: String?, replacing: AccountItem? = nil, flow: KeyEntryFlow? = nil
+        _ m: AccountsModel, provider: String?, replacing: AccountItem? = nil, flow: KeyEntryFlow? = nil,
+        advanced: Bool = false
     ) {
         present(m, "account-connect") { close in
-            ConnectDialog(model: m, provider: provider, replacing: replacing, flow: flow, close: close)
+            if replacing == nil && flow == nil {
+                ConnectWizard(model: m, provider: provider, advanced: advanced, close: close)
+            } else {
+                ConnectDialog(model: m, provider: provider, replacing: replacing, flow: flow, close: close)
+            }
         }
     }
     static func openDelete(_ m: AccountsModel, _ a: AccountItem) {
@@ -301,7 +307,7 @@ struct AccountsLinkSection: View {
                     title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
                 ) {
                     model.host.shell.overlay = nil
-                    model.show(.overview)
+                    model.show(.accounts)
                 }
             } content: {
                 EmptyView()

@@ -73,14 +73,20 @@ final class AdminLiveUITests: XCTestCase {
         let new = app.buttons["New secret…"].firstMatch
         XCTAssertTrue(new.waitForExistence(timeout: 20), "an empty Core offers New secret")
         new.click()
-        let name = app.textFields["Name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 10), "the New secret dialog opens")
-        name.click()
-        name.typeText(Self.secretName)
-        let value = app.secureTextFields["Value (write-only)"]
+        // The wizard (N24): Text is the type, then the value, then the name.
+        let nextButton = app.buttons["Next"]
+        XCTAssertTrue(nextButton.waitForExistence(timeout: 10), "the New secret wizard opens")
+        nextButton.click()
+        let value = app.secureTextFields["Value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 10), "the value step opens")
         value.click()
         value.typeText(Self.dummyValue)
-        app.buttons["Store"].click()
+        nextButton.click()
+        let name = app.textFields["Name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "the details step opens")
+        name.click()
+        name.typeText(Self.secretName)
+        app.buttons["Seal secret"].click()
         let card = element("secret-\(Self.secretName)")
         XCTAssertTrue(card.waitForExistence(timeout: 30), "the secret is listed by name")
         let note = app.descendants(matching: .any).matching(

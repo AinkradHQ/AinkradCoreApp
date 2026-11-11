@@ -12,8 +12,8 @@ struct SpendHeader: View {
         AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.green) {
             CoreSegmented(
                 "Spend",
-                segments: [AccountsPage.budgets, .costs, .ledger, .prices].map {
-                    CoreSegment($0, $0 == .costs ? "Costs" : $0.title, symbol: $0.symbol)
+                segments: [AccountsPage.spending, .budgets, .costs, .ledger, .prices].map {
+                    CoreSegment($0, $0 == .costs ? "Costs" : $0 == .spending ? "Summary" : $0.title, symbol: $0.symbol)
                 },
                 selection: Binding(
                     get: { model.page },

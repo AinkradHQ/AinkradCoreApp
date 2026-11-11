@@ -25,7 +25,7 @@ public final class AccountsModel {
     var load: AccountsLoad = .loading
     /// A write came back `forbidden_scope`: this device can read but not change.
     var readOnly = false
-    var page: AccountsPage = .overview
+    var page: AccountsPage = .accounts
     var filter: AccountFilter = .all
     /// The account whose page is open in Accounts (nil: the list).
     var detail: Int64?
@@ -516,7 +516,7 @@ public final class AccountsModel {
     public func raiseBudget(forAccount account: Int64?) {
         let spent = budgets.filter(\.exhausted)
         let mine = account.flatMap { id in spent.first { $0.kind == "account" && $0.subject == String(id) } }
-        show(.budgets)
+        show(.spending)
         if let b = mine ?? (spent.count == 1 ? spent.first : nil) { AccountDialogs.openRaise(self, b) }
     }
 
@@ -529,6 +529,8 @@ public final class AccountsModel {
         case .budgets: AccountDialogs.openBudget(self, editing: nil)
         case .prices: AccountDialogs.openPrice(self, editing: nil)
         case .costs, .ledger: break
+        case .spending: AccountDialogs.openBudget(self, editing: nil)
+        case .connections: if connections.service != nil { ConnDialogs.openConnect(connections, kind: nil) }
         default: AccountDialogs.openConnect(self, provider: nil)
         }
     }
@@ -564,10 +566,10 @@ public final class AccountsModel {
                 })
         }
         entry(
-            "core", "Accounts overview", "Accounts, pools and chains", "creditcard",
+            "core", "Accounts", "Your accounts and the order agents use them", "creditcard",
             ["provider", "claude", "codex", "gemini", "budget"]
         ) {
-            $0.show(.overview)
+            $0.show(.accounts)
         }
         entry("accounts", "Accounts", "Provider accounts by provider", "creditcard", ["api key", "provider", "limits"])
         {

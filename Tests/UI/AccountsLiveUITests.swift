@@ -45,7 +45,7 @@ final class AccountsLiveUITests: XCTestCase {
         defer { app.terminate() }
         try LivePairing.pair(app, env: env)
 
-        // Overview: no accounts, and the gate says what the Core will accept.
+        // Accounts: no accounts, and the gate says what the Core will accept.
         openFromLauncher("accounts", expect: "accounts-pane")
         let first = app.staticTexts["No accounts yet"]
         _ = first.waitForExistence(timeout: 20)
@@ -55,7 +55,7 @@ final class AccountsLiveUITests: XCTestCase {
         XCTAssertTrue(element("gate-banner").exists, "the gate's state is shown")
 
         // Pools: the Core's own lists (whatever default pools it has), then a new one.
-        element("nav-pools").click()
+        openPools()
         XCTAssertTrue(element("pools").waitForExistence(timeout: 20), "the pools page opens")
         let name = app.textFields["Name"]
         for _ in 0..<3 where !name.exists {  // the first click can land while the page is still loading
@@ -85,7 +85,7 @@ final class AccountsLiveUITests: XCTestCase {
         shot("two-pools")
 
         // Delete the pool again.
-        element("nav-pools").click()
+        openPools()
         element("pool-tab-e5-08-test").click()
         XCTAssertTrue(app.buttons["Delete pool…"].firstMatch.isEnabled, "a pool that is not the default can be deleted")
         app.buttons["Delete pool…"].firstMatch.click()
@@ -95,5 +95,14 @@ final class AccountsLiveUITests: XCTestCase {
         app.buttons["Delete pool…"].firstMatch.click()
         app.buttons["Delete pool"].click()
         wait({ !self.element("pool-tab-e5-08-second").exists }, "the second pool is deleted")
+    }
+
+    /// Pools live under Accounts, Advanced (N35): open the disclosure, then the link.
+    private func openPools() {
+        element("nav-accounts").click()
+        let pools = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Pools'")).firstMatch
+        if !pools.exists { app.buttons["Advanced"].firstMatch.click() }
+        _ = pools.waitForExistence(timeout: 10)
+        pools.click()
     }
 }

@@ -370,7 +370,10 @@ public final class AccountsDemo {
         }
         func runners() async throws -> [AccountRunner] {
             [
-                AccountRunner(id: "r_linux01", name: "linux-01", online: true),
+                AccountRunner(
+                    id: "r_linux01", name: "linux-01", online: true,
+                    commands: ["gateway", "login", "subscription-env"],
+                    drivers: ["agent"]),
                 AccountRunner(id: "r_mac", name: "studio-mac", online: true),
                 AccountRunner(id: "r_old", name: "old-box", online: false),
             ]
@@ -512,7 +515,7 @@ public final class AccountsDemo {
             case "price-new": .prices
             case "provider-new", "provider-edit": .accounts
             case "budget-new", "budget-edit", "budget-raise", "budgets-empty": .budgets
-            default: .overview
+            default: .accounts
             }
         let detail: Int64? =
             switch scene {

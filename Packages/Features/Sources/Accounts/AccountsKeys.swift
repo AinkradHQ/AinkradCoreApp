@@ -8,12 +8,8 @@ enum AccountsKeys {
     /// The cursor keys on the page now, in reading order.
     static func items(_ m: AccountsModel) -> [String] {
         switch m.page {
-        case .overview:
-            var seen = Set<Int64>()
-            return (m.needLook + m.accounts.filter { $0.phase != .disabled }.prefix(6))
-                .filter { seen.insert($0.id).inserted }.map { "a-\($0.id)" }
         case .accounts where m.detail == nil:
-            return m.providersByUse.flatMap { $0.1 }.map { "a-\($0.id)" }
+            return m.accountsInOrder.map { "a-\($0.id)" }
         case .pools: return m.selectedPool.map { $0.members.map { "m-\($0)" } } ?? []
         case .budgets:
             let mine = m.budgets.filter { ["account", "pool"].contains($0.kind) }
@@ -107,13 +103,6 @@ enum AccountsKeys {
             }
             return .handled
         }
-        if m.page == .accounts, key == "f" {
-            let all = AccountFilter.allCases
-            withAnimation(.smooth(duration: 0.3)) {
-                m.filter = all[((all.firstIndex(of: m.filter) ?? 0) + 1) % all.count]
-            }
-            return .handled
-        }
         if m.page == .chains, let c = m.selectedChain, !ro {
             switch key {
             case "d" where !c.isDefault: Task { await m.makeDefault(c) }
@@ -140,14 +129,13 @@ enum AccountsKeys {
     /// The keys this page answers, for the foot of the app.
     static func hint(_ m: AccountsModel) -> String {
         switch m.page {
-        case .overview: "⌘1–5 pages · ↑↓ move · ↩ open · ⌘N connect"
         case .accounts where m.detail != nil:
             "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
-        case .accounts: "↑↓ move · ↩ open · F filter · ⌘N connect"
+        case .accounts: "↑↓ move · ↩ open · ⌘N add an account"
         case .pools: "\(coreArrowKeys()) pool · ↑↓ account · D default · A add · ⌫ remove"
         case .chains: "\(coreArrowKeys()) chain · D default · E edit · ⌘N new chain"
         case .budgets: "↑↓ move · E edit · R raise · ⌫ remove · ⌘N new budget"
-        default: "⌘1–5 pages · ⌘J audit"
+        default: "⌘1–3 tabs"
         }
     }
 }

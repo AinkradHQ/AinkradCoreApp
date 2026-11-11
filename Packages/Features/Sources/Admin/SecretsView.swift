@@ -2,11 +2,14 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// Settings, Security, Secrets: what your Core keeps, in plain words. Values go in and never come back. One card is the
-/// cursor (arrows); L lends it to a runner, E gives it a new value, ⌫ deletes it, ⌘N adds one.
+/// Settings, Security, Secrets (N24): what your Core keeps, as sections with one row per secret. Values go in and never come
+/// back. Arrows move the cursor row; ↩ lets a runner use it, E gives it a new value, ⌫ deletes it, ⌘N adds one.
 struct SecretsSection: View {
     let admin: AdminModel
     @State private var cursor: String?
+    @State private var query = ""
+    @State private var runner: String?
+    @State private var closed: Set<String> = []
     @FocusState private var focus: Bool
 
     var body: some View {
@@ -14,36 +17,22 @@ struct SecretsSection: View {
         AdminScreen(
             admin: admin, what: "Secrets",
             intro:
-                "Values go in and never come back: nobody can show or copy them, not even you. Runners borrow them for a short time.",
+                "Values go in and never come back: nobody can show or copy them, not even you. Runners use them for a short time.",
             state: model.state,
-            empty: ("No secrets yet", "Add a test value, then lend it to a runner.", "key"),
+            empty: ("No secrets yet", "Add a test value, then let a runner use it.", "key"),
             emptyAction: ("New secret…", { SecretDialogs.openNew(admin) }),
             retry: { Task { await model.reload() } }
         ) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 ModePanel(admin: admin, mode: model.mode)
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
-                GlassSection(
-                    "Your secrets", sub: "\(model.items.count) kept. Each asks for Touch ID to change.",
-                    symbol: "key.fill", hue: GlassInk.orange, index: 1
-                ) {
-                    AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.orange, prominent: true)
-                    {
-                        SecretDialogs.openNew(admin)
-                    }
-                    .keyboardShortcut("n", modifiers: .command)
-                } content: {
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 3),
-                        spacing: Space.s3
-                    ) {
-                        ForEach(model.items) { s in
-                            SecretCard(admin: admin, model: model, secret: s, selected: cursor == s.name) {
-                                cursor = s.name
-                                focus = true
-                            }
-                        }
-                    }
+                toolbar(model)
+                let shown = model.items.filter { SecretWords.matches($0, query: query, runner: runner) }
+                if shown.isEmpty {
+                    Text("No secret matches.").foregroundStyle(GlassInk.secondary)
+                }
+                ForEach(SecretSections.sections(shown)) { section in
+                    sectionView(section, model)
                 }
             }
             .foregroundStyle(GlassInk.primary)
@@ -60,16 +49,66 @@ struct SecretsSection: View {
         .accessibilityIdentifier("secrets")
     }
 
+    private func toolbar(_ model: SecretsModel) -> some View {
+        HStack(spacing: Space.s2) {
+            CoreTextField("", placeholder: "Search secrets", text: $query).frame(maxWidth: Space.s8 * 8)
+            Menu(runner.map(model.runnerName) ?? "All runners") {
+                Button("All runners") { runner = nil }
+                ForEach(model.runners) { r in Button(r.name) { runner = r.id } }
+            }
+            .fixedSize()
+            Spacer(minLength: 0)
+            AppActionTile(title: "New group", symbol: "folder.badge.plus", key: "", hue: GlassInk.slate) {}
+                .disabled(true).help("Groups: \(SecretWords.comingNext)")
+            AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.orange, prominent: true) {
+                SecretDialogs.openNew(admin)
+            }
+            .keyboardShortcut("n", modifiers: .command)
+        }
+    }
+
+    private func sectionView(_ section: SecretSectionItem, _ model: SecretsModel) -> some View {
+        let open = !closed.contains(section.id)
+        return VStack(alignment: .leading, spacing: Space.s2) {
+            Button {
+                withAnimation(.smooth(duration: 0.25)) {
+                    if open { closed.insert(section.id) } else { closed.remove(section.id) }
+                }
+            } label: {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: open ? "chevron.down" : "chevron.right").frame(width: 14)
+                    Image(systemName: section.symbol).foregroundStyle(GlassInk.orange)
+                    Text(section.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                    Text("\(section.items.count)").foregroundStyle(GlassInk.secondary)
+                    Text("Groups: \(SecretWords.comingNext)").coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).focusable(false)
+            .accessibilityLabel("\(section.title), \(section.items.count) secrets")
+            .accessibilityValue(open ? "Expanded" : "Collapsed")
+            if open {
+                ForEach(section.items) { s in
+                    SecretRow(admin: admin, model: model, secret: s, selected: cursor == s.name) {
+                        cursor = s.name
+                        focus = true
+                    }
+                    .transition(.opacity)
+                }
+            }
+        }
+    }
+
     private func keys(_ press: KeyPress, _ model: SecretsModel) -> KeyPress.Result {
-        let list = model.items
+        let list = model.items.filter { SecretWords.matches($0, query: query, runner: runner) }
         let at = list.firstIndex { $0.name == cursor } ?? 0
         guard list.indices.contains(at) else { return .ignored }
         let step: Int? =
             switch press.key {
-            case .leftArrow: -1
-            case .rightArrow: 1
-            case .upArrow: -3
-            case .downArrow: 3
+            case .upArrow, .leftArrow: -1
+            case .downArrow, .rightArrow: 1
             default: nil
             }
         if let step {
@@ -136,16 +175,21 @@ private struct ModePanel: View {
 enum Delivery {
     static let all = ["env", "file", "askpass"]
     static func look(_ d: String) -> (title: String, line: String, symbol: String, hue: Color) {
-        switch d {
-        case "env": ("Variable", "As an environment variable", "terminal.fill", GlassInk.blue)
-        case "file": ("File", "As a file only it can read", "doc.fill", GlassInk.green)
-        case "askpass": ("Prompt", "Answers git's password prompt", "key.horizontal.fill", GlassInk.violet)
-        default: (d, d, "questionmark", GlassInk.slate)
-        }
+        let w = SecretWords.delivery(d)
+        let hue: Color =
+            switch d {
+            case "env": GlassInk.blue
+            case "file": GlassInk.green
+            case "askpass": GlassInk.violet
+            default: GlassInk.slate
+            }
+        return (w.title, w.line, w.symbol, hue)
     }
 }
 
-private struct SecretCard: View {
+/// One secret as a row: its type icon, name and how an agent gets it, who uses it, when it changed, and its sealed size.
+/// Actions fade in on hover or with the cursor, and are in the context menu too.
+private struct SecretRow: View {
     let admin: AdminModel
     let model: SecretsModel
     let secret: SecretItem
@@ -154,59 +198,51 @@ private struct SecretCard: View {
     @State private var hovering = false
 
     var body: some View {
-        let look = Delivery.look(secret.delivery)
-        VStack(alignment: .leading, spacing: Space.s3) {
+        let kind = SecretWords.Kind.text
+        let names = secret.runners.map(model.runnerName)
+        VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
-                IconTile("key.fill", hue: GlassInk.orange, size: 36)
+                IconTile(kind.symbol, hue: GlassInk.orange, size: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(secret.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         .lineLimit(1).truncationMode(.middle)
-                    Text(
-                        secret.version == 1 ? "First value" : "Value \(secret.version), replaced \(secret.version - 1)×"
-                    )
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    Text(SecretWords.delivery(secret.delivery).line).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
-                Spacer(minLength: 0)
-            }
-            SealedValue(size: secret.size, hue: GlassInk.orange)
-            VStack(alignment: .leading, spacing: Space.s2) {
-                fact(look.symbol, look.hue, look.line)
-                if secret.runners.isEmpty {
-                    fact("server.rack", GlassInk.slate, "No runner may borrow it yet")
-                } else {
-                    fact(
-                        "server.rack", GlassInk.green,
-                        "May borrow: \(secret.runners.map(model.runnerName).joined(separator: ", "))")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Used by").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    Text(SecretWords.usedBy(names)).lineLimit(1)
                 }
+                .frame(width: Space.s8 * 5, alignment: .leading)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(SecretWords.changed(secret)).coreFont(size: MacTextSize.meta).foregroundStyle(
+                        GlassInk.secondary)
+                    Text("Sealed · \(SecretWords.size(secret.size))").coreFont(size: MacTextSize.meta, weight: .medium)
+                        .padding(.horizontal, Space.s2).padding(.vertical, 1)
+                        .background(GlassInk.wellHover, in: coreShape(5))
+                }
+                .frame(width: Space.s8 * 4, alignment: .trailing)
+                HStack(spacing: Space.s1) {
+                    AppActionTile(title: "", symbol: "arrow.triangle.2.circlepath", key: "", hue: GlassInk.slate) {
+                        SecretDialogs.openReplace(admin, secret)
+                    }
+                    .help("New value (E)").accessibilityLabel("Replace the value of \(secret.name)")
+                    AppActionTile(title: "", symbol: "server.rack", key: "", hue: GlassInk.orange) {
+                        SecretDialogs.openLease(admin, secret)
+                    }
+                    .help("Let a runner use it (L)").accessibilityLabel("Let a runner use \(secret.name)")
+                    AppActionTile(title: "", symbol: "trash", key: "", hue: GlassInk.red) {
+                        SecretDialogs.openDelete(admin, secret)
+                    }
+                    .help("Delete \(secret.name) (⌫)").accessibilityLabel("Delete \(secret.name)")
+                }
+                .opacity(selected || hovering ? 1 : 0)
             }
             if let lease = model.leases.first(where: { $0.secret == secret.name }) { LeaseLine(lease: lease) }
             if let e = model.rowError[secret.name] { IssueLine(code: nil, text: e) }
-            HStack(spacing: Space.s2) {
-                AppActionTile(title: "", symbol: "trash", key: selected ? "⌫" : "", hue: GlassInk.red) {
-                    SecretDialogs.openDelete(admin, secret)
-                }
-                .help("Delete \(secret.name)")
-                .accessibilityLabel("Delete \(secret.name)")
-                Spacer(minLength: 0)
-                AppActionTile(
-                    title: "New value", symbol: "arrow.triangle.2.circlepath", key: selected ? "E" : "",
-                    hue: GlassInk.slate
-                ) {
-                    SecretDialogs.openReplace(admin, secret)
-                }
-                .accessibilityLabel("Replace the value of \(secret.name)")
-                AppActionTile(
-                    title: "Lend", symbol: "arrow.up.forward", key: selected ? "L" : "", hue: GlassInk.orange,
-                    prominent: selected
-                ) {
-                    SecretDialogs.openLease(admin, secret)
-                }
-                .accessibilityLabel("Lease \(secret.name)")
-            }
-            .opacity(selected || hovering ? 1 : 0.55)
         }
-        .padding(Space.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .background(
             selected ? GlassInk.orange.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
             in: coreShape(Radius.cardMac)
@@ -215,15 +251,14 @@ private struct SecretCard: View {
             coreShape(Radius.cardMac).strokeBorder(
                 selected ? GlassInk.orange.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
         }
-        .shadow(color: GlassInk.orange.opacity(selected ? 0.3 : 0), radius: 12)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: selected)
         .animation(.smooth(duration: 0.2), value: hovering)
+        .animation(.smooth(duration: 0.3), value: selected)
         .help("Key \(secret.keyID) · stored by \(secret.owner)")
         .contextMenu {
-            Button("Lend…") { SecretDialogs.openLease(admin, secret) }
+            Button("Let a runner use it…") { SecretDialogs.openLease(admin, secret) }
             Button("New value…") { SecretDialogs.openReplace(admin, secret) }
             Button("Delete…") { SecretDialogs.openDelete(admin, secret) }
             Button("Copy name") {
@@ -234,38 +269,6 @@ private struct SecretCard: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("secret-\(secret.name)")
         .coreActivates(pick)
-    }
-
-    private func fact(_ symbol: String, _ hue: Color, _ text: String) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(hue)
-                .frame(width: 22, height: 22).background(hue.opacity(0.16), in: coreShape(6))
-            Text(text).lineLimit(2)
-        }
-        .coreFont(size: MacTextSize.body)
-    }
-}
-
-/// The value as a sealed strip: a lock, one block per four bytes (its length, never its content) and the size.
-private struct SealedValue: View {
-    let size: Int64
-    let hue: Color
-
-    var body: some View {
-        let n = Int(min(max((size + 3) / 4, 1), 14))
-        HStack(spacing: Space.s2) {
-            Image(systemName: "lock.fill").foregroundStyle(hue)
-            HStack(spacing: 2) {
-                ForEach(0..<n, id: \.self) { _ in coreShape(2).fill(.white.opacity(0.35)).frame(width: 7, height: 12) }
-            }
-            Spacer(minLength: 0)
-            Text("\(size) bytes · hidden").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-        }
-        .padding(.horizontal, Space.s3).frame(height: 34)
-        .background(.black.opacity(0.22), in: coreShape(Radius.control))
-        .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Value, \(size) bytes, hidden")
     }
 }
 
@@ -279,7 +282,7 @@ private struct LeaseLine: View {
             let hue = left > 0 ? GlassInk.green : GlassInk.slate
             VStack(alignment: .leading, spacing: Space.s1) {
                 HStack {
-                    Label("Lent to \(lease.runner)", systemImage: "arrow.up.forward.circle.fill")
+                    Label("Allowed on \(lease.runner)", systemImage: "arrow.up.forward.circle.fill")
                         .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
                     Spacer()
                     Text(left > 0 ? Countdown.text(Int(left.rounded(.up))) : "Returned")
@@ -301,7 +304,7 @@ private struct LeaseLine: View {
             .help(lease.lease)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "Lent to \(lease.runner), \(left > 0 ? "\(Int(left.rounded(.up))) seconds left" : "returned")")
+                "Allowed on \(lease.runner), \(left > 0 ? "\(Int(left.rounded(.up))) seconds left" : "returned")")
         }
     }
 }

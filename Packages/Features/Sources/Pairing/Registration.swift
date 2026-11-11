@@ -37,9 +37,9 @@ enum Registration {
             ) { openSettings(shell, "devices") })
         shell.launcher.register(
             LauncherEntry(
-                id: "add-device", title: "Add device", sub: "Makes a pairing code at once · needs Touch ID",
+                id: "add-device", title: "Add device", sub: "A device or a runner, step by step · needs Touch ID",
                 symbol: "plus.rectangle", keywords: ["pair", "qr", "code", "approve"], isAction: true
-            ) { app.openInviteDevice() })
+            ) { app.openAddWizard() })
         shell.launcher.register(
             LauncherEntry(
                 id: "add-device-advanced", title: "Add device (advanced)…",

@@ -462,6 +462,16 @@ public final class TerminalsModel {
 
     // MARK: runner no-op
 
+    /// The runner's no-op test, answered in a line (the Add flow's last screen).
+    public func test(runner id: String) async -> String {
+        await runNoop(id)
+        switch noop[id] {
+        case .answered(let ms)?: return "It answered in \(ms) ms."
+        case .failed(let why)?: return "The test did not go through. \(why)"
+        default: return "The test did not finish."
+        }
+    }
+
     func runNoop(_ id: String) async {
         noop[id] = .running
         do { noop[id] = .answered(ms: try await service.noop(id)) } catch {
