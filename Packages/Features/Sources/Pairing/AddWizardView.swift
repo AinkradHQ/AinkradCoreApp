@@ -66,9 +66,11 @@ struct AddWizardView: View {
                     : "Scan with the other Mac's camera, or open the link there."
         case .access: "Pick the closest. You can change it later."
         case .connect:
-            model.usesInvite
-                ? "Nothing to type. The QR is the proof, and it works once."
-                : "Type nothing on the new device but the command. Then compare the check code here."
+            model.usesRunnerInvite
+                ? "Nothing to compare. The command has a one-time token and works for 15 minutes."
+                : model.usesInvite
+                    ? "Nothing to type. The QR is the proof, and it works once."
+                    : "Type nothing on the new device but the command. Then compare the check code here."
         case .settings: "How the runner works. These are set on the machine for now."
         case .done: "Agents and terminals can use it now."
         }
@@ -204,7 +206,26 @@ struct AddWizardView: View {
         }
     }
 
-    private var runnerInstall: some View {
+    @ViewBuilder private var runnerInstall: some View {
+        if model.usesRunnerInvite {
+            card {
+                HStack(spacing: Space.s3) {
+                    mark("terminal")
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("One command does it all").fontWeight(.semibold)
+                        Text(
+                            "On the next screen Core shows one command with a one-time token in it. Run it on the server with sudo. It installs the runner and connects it to this Core."
+                        )
+                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        } else {
+            typedRunnerInstall
+        }
+    }
+
+    private var typedRunnerInstall: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             card {
                 HStack(spacing: Space.s3) {
@@ -299,7 +320,9 @@ struct AddWizardView: View {
     // MARK: 4 connect
 
     @ViewBuilder private var connect: some View {
-        if model.usesInvite {
+        if model.usesRunnerInvite {
+            runnerConnect
+        } else if model.usesInvite {
             inviteConnect
         } else {
             typedConnect
@@ -357,6 +380,75 @@ struct AddWizardView: View {
                 await model.poll()
             }
         }
+    }
+
+    /// A Linux server with a runner invite: the command, a 15 minute countdown, and who answered.
+    private var runnerConnect: some View {
+        let m = model.runnerInvite
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            if let m, let command = m.command, m.live {
+                Text("Run this one command on the server:").foregroundStyle(palette.text2)
+                command_(command, copied: m.copied) { m.copy() }
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    HStack(spacing: Space.s3) {
+                        Label {
+                            Text("Valid for \(RunnerInviteModel.clock(m.secondsLeft(now: ctx.date))) · works once")
+                                .monospacedDigit()
+                        } icon: {
+                            Image(systemName: "clock")
+                        }
+                        .foregroundStyle(palette.text2)
+                        .onChange(of: m.secondsLeft(now: ctx.date)) { _, _ in m.tick(now: ctx.date) }
+                    }
+                }
+                HStack(spacing: Space.s2) {
+                    CoreBusyBar().frame(maxWidth: Space.s8 * 4)
+                    Text("Waiting for the runner…").fontWeight(.semibold)
+                }
+                Button("Withdraw the invite") { Task { await m.withdraw() } }.buttonStyle(.coreSecondary)
+                DisclosureGroup("Advanced") {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        Text(
+                            "A typed code, if the command cannot run there. Core then asks you to compare a check code."
+                        )
+                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                        Button("Use a typed code instead") { Task { await model.useTypedCode() } }
+                            .buttonStyle(.coreSecondary)
+                    }
+                    .padding(.top, Space.s2)
+                }
+            } else if let m, case .connected(let name) = m.phase {
+                stamp("checkmark", "Connected: \(name)", palette.tone(.done).ink).frame(height: Space.s8 * 3)
+            } else if let m, m.phase == .expired || m.phase == .withdrawn {
+                Text(m.phase == .expired ? "The invite ran out." : "The invite was withdrawn.")
+                    .foregroundStyle(palette.text2)
+                Button("Make a new invite") { Task { await model.again() } }.buttonStyle(.coreProminent)
+            } else {
+                HStack {
+                    CoreBusyBar().frame(maxWidth: Space.s8 * 4)
+                    Text("Making the invite…")
+                }
+            }
+            if let e = m?.error {
+                Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(palette.tone(.fail).ink)
+            }
+        }
+        .task(id: m?.invite?.pairingID) {
+            while !Task.isCancelled, model.step == .connect, !model.connectedYet, !model.ended {
+                try? await Task.sleep(for: .seconds(2))
+                await model.poll()
+            }
+        }
+    }
+
+    private func command_(_ text: String, copied: Bool, copy: @escaping () -> Void) -> some View {
+        HStack(alignment: .top, spacing: Space.s2) {
+            Text(text).coreFont(size: MacTextSize.meta, design: .monospaced).textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(copied ? "Copied" : "Copy", action: copy).buttonStyle(.coreSecondary)
+        }
+        .padding(Space.s3).background(.black.opacity(0.25), in: coreShape(Radius.control))
+        .accessibilityHint("The command has a one-time secret; the copy is cleared after a minute.")
     }
 
     private func stamp(_ symbol: String, _ words: String, _ ink: Color) -> some View {
@@ -555,7 +647,8 @@ struct AddWizardView: View {
 
     private var nextTitle: String {
         switch model.step {
-        case .install: model.kind?.isRunner == true ? "I ran it" : "Installed"
+        case .install:
+            model.usesRunnerInvite ? "Show the command" : model.kind?.isRunner == true ? "I ran it" : "Installed"
         case .access: "Add"
         case .settings: "Next"
         default: "Next"

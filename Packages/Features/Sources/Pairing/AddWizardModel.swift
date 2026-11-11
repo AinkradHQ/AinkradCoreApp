@@ -16,6 +16,9 @@ final class AddWizardModel {
     var agents = true
     private(set) var invite: InviteDeviceModel?
     private(set) var typed: AddDeviceModel?
+    private(set) var runnerInvite: RunnerInviteModel?
+    /// Under Advanced: the typed code, for a Linux server that the invite cannot serve.
+    private(set) var typedInstead = false
     /// The device that answered, by the Core's list: its name and id.
     private(set) var connected: DeviceInfo?
     private(set) var testLine: String?
@@ -30,6 +33,8 @@ final class AddWizardModel {
 
     var steps: [AddStep] { kind.map(AddWizardPlan.steps) ?? [.what] }
     var usesInvite: Bool { kind?.isRunner == false && app?.invites.isAvailable == true }
+    /// A Linux server connects with a one-time runner invite: one command, 15 minutes, no check code.
+    var usesRunnerInvite: Bool { kind == .linuxRunner && app?.invites.isAvailable == true && !typedInstead }
     /// The scopes the new device will get: what was chosen, cut to what this Mac holds.
     var granted: [String] {
         AddWizardPlan.narrowed(ScopeText.all.filter(scopes.contains), mine: held).granted
@@ -38,6 +43,7 @@ final class AddWizardModel {
     var onlyOneAdmin: Bool { app?.devices?.onlyAdmin != nil }
     var coreURL: String { app?.coreURL ?? "https://<your-core>" }
     var ended: Bool {
+        if usesRunnerInvite { return runnerInvite.map { $0.phase == .expired || $0.phase == .withdrawn } ?? false }
         if usesInvite { return invite?.ended == true }
         if case .ended = typed?.stage { return true }
         return false
@@ -71,6 +77,7 @@ final class AddWizardModel {
     }
 
     var connectedYet: Bool {
+        if usesRunnerInvite { return runnerInvite?.done == true }
         if usesInvite { return invite?.used == true }
         switch typed?.stage {
         case .approved?: return true
@@ -96,7 +103,12 @@ final class AddWizardModel {
     func startConnect() async {
         guard let app, let kind else { return }
         let label = name.trimmingCharacters(in: .whitespaces)
-        if usesInvite {
+        if usesRunnerInvite {
+            guard runnerInvite == nil || ended else { return }
+            let m = runnerInvite ?? RunnerInviteModel(deps: runnerDeps(app))
+            runnerInvite = m
+            await m.create(name: label)
+        } else if usesInvite {
             guard invite == nil || ended else { return }
             let m = InviteDeviceModel(host: app)
             await m.prepare()
@@ -119,13 +131,48 @@ final class AddWizardModel {
         }
     }
 
+    private func runnerDeps(_ app: AppModel) -> RunnerInviteDeps {
+        RunnerInviteDeps(
+            create: { name in
+                try await app.elevated("Make a runner invite for \(name).", done: "made") {
+                    try await app.invites.createRunnerInvite(name: name)
+                }
+            },
+            status: { try await app.invites.status($0) },
+            withdraw: { id in
+                try await app.elevated("Withdraw the runner invite.", done: "withdrawn") {
+                    try await app.invites.withdraw(id)
+                }
+            },
+            runnerNames: { await app.terminals?.freshRunnerNames() ?? [] })
+    }
+
+    /// Advanced: give up the invite and use the typed code instead.
+    func useTypedCode() async {
+        guard usesRunnerInvite else { return }
+        if let m = runnerInvite, !(await m.requestClose()) { return }
+        runnerInvite = nil
+        typedInstead = true
+        await startConnect()
+    }
+
     /// The poll while the connect screen is open.
     func poll() async {
-        if usesInvite { await invite?.refresh() } else { await typed?.refresh() }
+        if usesRunnerInvite {
+            await runnerInvite?.poll()
+        } else if usesInvite {
+            await invite?.refresh()
+        } else {
+            await typed?.refresh()
+        }
         if connectedYet { await findConnected() }
     }
 
     func again() async {
+        if usesRunnerInvite {
+            await runnerInvite?.again(name: name.trimmingCharacters(in: .whitespaces))
+            return
+        }
         invite = nil
         typed?.restart()
         typed = nil
@@ -151,12 +198,14 @@ final class AddWizardModel {
 
     /// True when nothing is left live: the dialog may close. A live QR is withdrawn first (see `InviteDeviceModel`).
     func requestClose() async -> Bool {
+        if let runnerInvite { return await runnerInvite.requestClose() }
         if let invite { return await invite.requestClose() }
         if case .code = typed?.stage { await typed?.reject() }
         return true
     }
 
     func dialogDidClose() {
+        runnerInvite?.takeBackCopy()
         invite?.dialogDidClose()
         app?.unwatch(typed: typed)
     }
