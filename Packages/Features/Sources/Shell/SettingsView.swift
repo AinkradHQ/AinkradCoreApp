@@ -164,7 +164,9 @@ struct SettingsView: View {
                                         endPoint: .bottom),
                                     in: coreShape(Radius.control + 4)
                                 )
-                                .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                                .overlay {
+                                    coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                                }
                                 .shadow(color: current.group.hue.opacity(0.5), radius: 12)
                                 .accessibilityHidden(true)
                         }

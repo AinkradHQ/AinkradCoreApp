@@ -87,7 +87,8 @@ struct SessionSpendStrip: View {
         HStack(spacing: Space.s3) {
             if let a = ledger.account {
                 Label(
-                    ledger.isPlan ? "\(a) · Claude plan · signed-in token lent to this run" : "\(a) · key held by the runner",
+                    ledger.isPlan
+                        ? "\(a) · Claude plan · signed-in token lent to this run" : "\(a) · key held by the runner",
                     systemImage: "lock.shield.fill"
                 )
                 .foregroundStyle(GlassInk.secondary)

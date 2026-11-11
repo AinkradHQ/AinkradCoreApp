@@ -311,7 +311,11 @@ final class TerminalSession {
 
     func run(_ cmd: RunningCommand) async -> Bool {
         guard await signal(cmd.signal, done: cmd.done) else { return false }
-        if cmd == .pause { paused = true } else if cmd == .resume || cmd == .forceQuit || cmd == .stop { paused = false }
+        if cmd == .pause {
+            paused = true
+        } else if cmd == .resume || cmd == .forceQuit || cmd == .stop {
+            paused = false
+        }
         return true
     }
 

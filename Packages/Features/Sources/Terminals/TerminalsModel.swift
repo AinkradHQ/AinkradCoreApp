@@ -301,7 +301,11 @@ public final class TerminalsModel {
                 children: commands.map { cmd in
                     PaneMenuItem(cmd.title, symbol: cmd.symbol, destructive: cmd == .forceQuit, help: cmd.help) {
                         [weak self] in
-                        if cmd == .forceQuit { self?.confirmForceQuit(session) } else { Task { _ = await session.run(cmd) } }
+                        if cmd == .forceQuit {
+                            self?.confirmForceQuit(session)
+                        } else {
+                            Task { _ = await session.run(cmd) }
+                        }
                     }
                 }))
         items.append(PaneMenuItem("Detach", symbol: "eject", enabled: live) { session.detach() })

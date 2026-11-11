@@ -23,7 +23,8 @@ extension ShellModel {
                 for c in item.children {
                     out.append(
                         LauncherEntry(
-                            id: "pane.\(item.title).\(c.title)", title: "\(item.title): \(c.title)", sub: c.help ?? spec.title,
+                            id: "pane.\(item.title).\(c.title)", title: "\(item.title): \(c.title)",
+                            sub: c.help ?? spec.title,
                             symbol: item.symbol, isAction: true, run: c.run))
                 }
             }

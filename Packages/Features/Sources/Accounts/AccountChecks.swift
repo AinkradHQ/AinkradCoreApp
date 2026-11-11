@@ -95,9 +95,11 @@ struct SignInTile: View {
             }
             Text("\(account.label) · since \(account.createdAt.formatted(date: .abbreviated, time: .shortened))")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            Text("A plan has no key to test. Its token is lent to a runner for each session and uses the plan's quota, not money.")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "A plan has no key to test. Its token is lent to a runner for each session and uses the plan's quota, not money."
+            )
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

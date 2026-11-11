@@ -176,7 +176,7 @@ public struct ShellCommands: Commands {
             Button("Notifications") { shell.toggleBell() }.keyboardShortcut("n", modifiers: [.command, .shift])
             Divider()
             Button("Switch Day and Night") { shell.switchDayAndNight() }
-            .keyboardShortcut("d", modifiers: [.control, .command])
+                .keyboardShortcut("d", modifiers: [.control, .command])
             Button("Reconnect to Core") { shell.retryConnection?() }.keyboardShortcut("r").disabled(!coreOffline)
             Toggle("Show Activity in Status Bar", isOn: Binding(get: { chipOn }, set: { shell.showActivityChip = $0 }))
             Divider()

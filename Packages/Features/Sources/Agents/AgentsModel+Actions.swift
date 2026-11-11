@@ -122,7 +122,8 @@ extension AgentsModel {
                 try await api.wake(id, key: UUID().uuidString, text: text)
             }
             if text != nil { drafts[id] = "" }
-            shell.showToast(text == nil ? "Wake sent. The session starts again from its last turn." : "Waiting for the agent…")
+            shell.showToast(
+                text == nil ? "Wake sent. The session starts again from its last turn." : "Waiting for the agent…")
             await refreshSession(id)
         } catch { note(id, Self.notice(error, doing: "Waking")) }
     }
@@ -134,7 +135,11 @@ extension AgentsModel {
             if case .user(let t) = e.kind { return t } else { return nil }
         }.first
         guard let prompt, !prompt.isEmpty else {
-            note(id, InlineNotice(title: "Starting again did not go through.", detail: "The first message is not loaded. Scroll the transcript to its start and try again."))
+            note(
+                id,
+                InlineNotice(
+                    title: "Starting again did not go through.",
+                    detail: "The first message is not loaded. Scroll the transcript to its start and try again."))
             return
         }
         let agent = s.route?.agent

@@ -1,7 +1,8 @@
-import CoreKit
 import AppKit
+import CoreKit
 import Foundation
 import Observation
+import Shell
 
 /// The first-run wizard: set up a new Core or use an existing one, then paste the connect link and claim it.
 /// Claiming is `DevicePairing`'s (the link is an invite credential and carries the Core fingerprint, so the Core must prove

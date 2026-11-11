@@ -65,7 +65,8 @@ enum MarkdownBlock: Equatable {
         var out =
             (try? AttributedString(
                 markdown: text,
-                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
+                options: .init(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
             )) ?? AttributedString(text)
         for run in out.runs {
             if let url = run.link, !["http", "https"].contains(url.scheme?.lowercased() ?? "") {

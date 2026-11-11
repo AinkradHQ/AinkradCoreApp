@@ -235,7 +235,8 @@ public final class ShellModel {
         let dark = isDark ?? (NSApp?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
         theme = theme.toggled(isDark: dark)
         showToast(
-            dark ? "Day look. Settings, Appearance changes it back to Follow the Mac."
+            dark
+                ? "Day look. Settings, Appearance changes it back to Follow the Mac."
                 : "Night look. Settings, Appearance changes it back to Follow the Mac.")
     }
 

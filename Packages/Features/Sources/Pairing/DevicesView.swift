@@ -69,7 +69,9 @@ struct DevicesSection: View {
                 )
                 .fixedSize()
             }
-            AppActionTile(title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(
+                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+            ) {
                 app.openAddDevice()
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(app.service == nil)

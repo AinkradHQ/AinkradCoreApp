@@ -61,7 +61,8 @@ struct SessionHero: View {
                     "arrow.up.circle", "\(session.usage.map { AgentWords.tokens($0.output) } ?? "0") out",
                     GlassInk.green)
                 if let c = AgentWords.cost(session.usage?.costMicros), model.ledgers[session.id]?.isPlan != true {
-                    AppStatChip("dollarsign", c, GlassInk.orange).help(AgentWords.exactCost(session.usage?.costMicros) ?? c)
+                    AppStatChip("dollarsign", c, GlassInk.orange).help(
+                        AgentWords.exactCost(session.usage?.costMicros) ?? c)
                 }
                 if let r = session.resumes, r > 0 {
                     AppStatChip("arrow.clockwise", "resumed \(r)×", GlassInk.slate)
@@ -184,14 +185,16 @@ struct SessionHero: View {
                     }
                 }
                 if session.state == .lost {
-                    AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
-                    {
+                    AppActionTile(
+                        title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true
+                    ) {
                         model.resume(session.id)
                     }
                     .help("Resume starts this session again from where it stopped. The transcript is kept.")
                 } else {
-                    AppActionTile(title: "Start again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
-                    {
+                    AppActionTile(
+                        title: "Start again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true
+                    ) {
                         model.startAgain(session.id)
                     }
                     .help("Start a new session with the same first message, runner and agent. This one stays as it is.")

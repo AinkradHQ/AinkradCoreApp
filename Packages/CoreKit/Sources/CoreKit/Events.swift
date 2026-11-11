@@ -95,7 +95,11 @@ func resumeOnce(_ start: (@escaping @Sendable ((any Error)?) -> Void) -> Void) a
     let once = OSAllocatedUnfairLock(initialState: false)
     try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
         start { error in
-            guard once.withLock({ let first = !$0; $0 = true; return first }) else { return }
+            let first = once.withLock { done -> Bool in
+                defer { done = true }
+                return !done
+            }
+            guard first else { return }
             c.resume(with: error.map { .failure($0) } ?? .success(()))
         }
     }
