@@ -22,6 +22,7 @@ public final class TranscriptStore {
     public private(set) var approvals: [String: ApprovalRequest] = [:]
     /// Decisions seen before their request was (an earlier page loads later).
     private var earlyDecisions: [String: Bool] = [:]
+    private var earlyDecidedAt: [String: Date] = [:]
     /// Tool calls still waiting for their result, by tool id.
     private var toolSeq: [String: Int64] = [:]
     @ObservationIgnored private var inflight: Task<Void, Never>?
@@ -112,16 +113,29 @@ public final class TranscriptStore {
             var r = ApprovalRequest(
                 id: id, session: sessionID, tool: tool, input: input, requestedAt: e.at, timeoutSecs: timeout)
             r.decision = approvals[id]?.decision ?? earlyDecisions[id]
+            r.decidedAt = approvals[id]?.decidedAt ?? earlyDecidedAt[id]
             approvals[id] = r
         case .approvalDecided(let id, let approved):
-            if approvals[id] != nil { approvals[id]?.decision = approved } else { earlyDecisions[id] = approved }
+            if approvals[id] != nil {
+                approvals[id]?.decision = approved
+                if approvals[id]?.decidedAt == nil { approvals[id]?.decidedAt = e.at }
+            } else {
+                earlyDecisions[id] = approved
+                earlyDecidedAt[id] = e.at
+            }
         default: break
         }
     }
 
     /// The person's choice shown at once; `unmark` takes it back when the Core refuses.
-    func mark(_ id: String, approved: Bool) { approvals[id]?.decision = approved }
-    func unmark(_ id: String) { approvals[id]?.decision = nil }
+    func mark(_ id: String, approved: Bool) {
+        approvals[id]?.decision = approved
+        approvals[id]?.decidedAt = Date()
+    }
+    func unmark(_ id: String) {
+        approvals[id]?.decision = nil
+        approvals[id]?.decidedAt = nil
+    }
 
     // MARK: fetching
 

@@ -208,6 +208,8 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
     public let requestedAt: Date
     public let timeoutSecs: Int?
     public var decision: Bool?
+    /// When the answer was recorded.
+    public var decidedAt: Date?
 
     /// One approval, everywhere it is keyed (bell, macOS notification, "already announced"). The request id is only unique within
     /// its session (a stand-in agent always says `req1`), so the session is part of it.
