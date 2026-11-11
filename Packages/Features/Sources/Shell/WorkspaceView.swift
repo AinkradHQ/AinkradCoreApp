@@ -301,7 +301,12 @@ private struct PaneTab: View {
                 .disabled(!item.enabled)
             } else {
                 Menu {
-                    ForEach(item.children) { c in Button(c.title, action: c.run) }
+                    ForEach(item.children) { c in
+                        Button(role: c.destructive ? .destructive : nil, action: c.run) {
+                            Label(c.title, systemImage: c.symbol)
+                        }
+                        .help(c.help ?? "")
+                    }
                 } label: {
                     Label(item.title, systemImage: item.symbol)
                 }

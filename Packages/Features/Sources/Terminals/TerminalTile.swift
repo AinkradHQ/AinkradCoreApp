@@ -83,7 +83,7 @@ struct TerminalTile: View {
         .contextMenu {
             Button("Open") { TileAction.run(.open, item.id, model) }
             Button("Detach") { TileAction.run(.detach, item.id, model) }.disabled(session == nil)
-            Button("Send Signal…") { TileAction.run(.signal, item.id, model) }.disabled(item.isEnded)
+            Button("Running command…") { TileAction.run(.signal, item.id, model) }.disabled(item.isEnded)
             Button("Rename…") { TileAction.run(.rename, item.id, model) }
             Divider()
             Button("End Terminal…", role: .destructive) { TileAction.run(.end, item.id, model) }.disabled(item.isEnded)

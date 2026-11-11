@@ -284,7 +284,7 @@ public final class TerminalsModel {
         }
     }
 
-    /// A terminal pane's tab menu: what it is, then signal, detach and end, enabled by the pane's state.
+    /// A terminal pane's tab menu: what it is, then running command, detach and end, enabled by the pane's state.
     func menu(for session: TerminalSession) -> [PaneMenuItem] {
         let v = session.view
         let live = v.controls == .running
@@ -294,11 +294,15 @@ public final class TerminalsModel {
             items.append(PaneMenuItem("Close Pane", symbol: "xmark") { [weak self] in self?.closePane(session.id) })
             return items
         }
+        let commands: [RunningCommand] = [.stop, session.paused ? .resume : .pause, .forceQuit]
         items.append(
             PaneMenuItem(
-                "Send Signal", symbol: "bolt", enabled: live,
-                children: TerminalSignals.all.map { name in
-                    PaneMenuItem("SIG\(name)", symbol: "bolt") { Task { _ = await session.signal(name) } }
+                "Running command…", symbol: "bolt", enabled: live,
+                children: commands.map { cmd in
+                    PaneMenuItem(cmd.title, symbol: cmd.symbol, destructive: cmd == .forceQuit, help: cmd.help) {
+                        [weak self] in
+                        if cmd == .forceQuit { self?.confirmForceQuit(session) } else { Task { _ = await session.run(cmd) } }
+                    }
                 }))
         items.append(PaneMenuItem("Detach", symbol: "eject", enabled: live) { session.detach() })
         items.append(
@@ -327,6 +331,17 @@ public final class TerminalsModel {
                 ShellSheetAction("Keep it"),
                 ShellSheetAction("End terminal", destructive: true) { Task { _ = await session.end() } },
             ], symbol: "stop.circle")
+    }
+
+    func confirmForceQuit(_ session: TerminalSession) {
+        shell.presentSheet(
+            title: "Force quit the running command?",
+            message:
+                "\(RunningCommand.forceQuit.help) Try Stop it first. The terminal on \(session.machine) stays open. This needs Touch ID.",
+            actions: [
+                ShellSheetAction("Keep it running"),
+                ShellSheetAction("Force quit", destructive: true) { Task { _ = await session.run(.forceQuit) } },
+            ], symbol: "xmark.octagon")
     }
 
     func paneChanged(_ id: String) {

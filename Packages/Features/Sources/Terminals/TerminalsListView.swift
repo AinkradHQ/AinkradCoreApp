@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// The Terminals app: its own surface (Settings, Terminal, App surface), the filter, a mini-terminal tile per terminal,
-/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S signal, R rename, ⌥⌘N new.
+/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S running command, R rename, ⌥⌘N new.
 /// The Core keeps no output, so a tile shows the shell, not its screen.
 struct TerminalsListView: View {
     let model: TerminalsModel
@@ -127,7 +127,7 @@ struct TerminalsListView: View {
                 stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", RunnerHue.of(r.name))
             }
             Spacer(minLength: 0)
-            Text("↩ open · D detach · E end · S signal · R rename").coreFont(size: MacTextSize.meta)
+            Text("↩ open · D detach · E end · S running command · R rename").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)

@@ -242,7 +242,50 @@ struct PaneView: Equatable {
     }
 }
 
-/// The signals the protocol takes (spec §2).
-enum TerminalSignals {
-    static let all = ["HUP", "INT", "QUIT", "TERM", "KILL", "USR1", "USR2", "CONT", "STOP", "TSTP", "WINCH"]
+/// What the app offers for the command running in a terminal (N21), in plain words. The protocol takes more signals; they stay
+/// for `ainkradctl`. Stop and Pause do what Ctrl-C and Ctrl-Z do at the keyboard, so only Force quit asks for Touch ID.
+enum RunningCommand: CaseIterable {
+    case stop, pause, resume, forceQuit
+
+    var signal: String {
+        switch self {
+        case .stop: "INT"
+        case .pause: "TSTP"
+        case .resume: "CONT"
+        case .forceQuit: "KILL"
+        }
+    }
+    var title: String {
+        switch self {
+        case .stop: "Stop it"
+        case .pause: "Pause it"
+        case .resume: "Resume it"
+        case .forceQuit: "Force quit…"
+        }
+    }
+    var help: String {
+        switch self {
+        case .stop: "Stops the command that is running, like Ctrl-C. The terminal stays open."
+        case .pause: "Pauses the command. Resume continues it from the same point."
+        case .resume: "Continues the paused command from the same point."
+        case .forceQuit: "Use only when Stop does not work. The command ends at once and can lose unsaved work."
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .stop: "stop"
+        case .pause: "pause"
+        case .resume: "play"
+        case .forceQuit: "xmark.octagon"
+        }
+    }
+    var done: String {
+        switch self {
+        case .stop: "Stopped the running command"
+        case .pause: "Paused the running command"
+        case .resume: "Resumed the command"
+        case .forceQuit: "Force quit the running command"
+        }
+    }
+    var needsTouchID: Bool { self == .forceQuit }
 }
