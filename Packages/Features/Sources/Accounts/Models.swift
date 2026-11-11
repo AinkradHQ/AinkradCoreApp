@@ -51,6 +51,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var live: Int64?
     var health: AccountHealthItem?
     var phase: AccountPhase { AccountPhase(state) }
+    /// A Claude plan: a signed-in token the runner is lent, never an API key the gateway can test.
+    var isPlan: Bool { provider == "claude-sub" }
 
     static func == (l: Self, r: Self) -> Bool {
         l.id == r.id && l.provider == r.provider && l.label == r.label && l.maskedTail == r.maskedTail

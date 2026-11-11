@@ -60,7 +60,8 @@ struct SessionView: View {
                 // Letters belong to the field while you write: no shortcut fires from typing.
                 guard let key = PaneKeys.shortcut(press.characters, typing: composing) else { return .ignored }
                 switch key {
-                case "r" where s.over || s.state == .lost: model.resume(s.id)
+                case "r" where s.state == .lost: model.resume(s.id)
+                case "r" where s.over: model.startAgain(s.id)
                 case "w" where s.outcome == .succeeded: model.wake(s.id)
                 case "c" where s.live: model.confirmCancel(s.id)
                 case "k" where s.live: model.confirmKill(s.id)
@@ -78,7 +79,7 @@ struct SessionView: View {
     }
 
     private func write(_ s: AgentSessionInfo) -> KeyPress.Result {
-        guard case .running = s.state else { return .ignored }
+        guard model.canReply(s) else { return .ignored }
         composing = true
         return .handled
     }
@@ -96,7 +97,8 @@ struct SessionView: View {
         let keys: [String] =
             s.live
             ? ["↩ reply", "esc leave field", "C cancel", "K kill", "↓ latest"]
-            : ["R resume"] + (s.outcome == .succeeded ? ["W wake"] : []) + ["↓ latest"]
+            : [s.state == .lost ? "R resume" : "R start again"] + (s.outcome == .succeeded ? ["W wake"] : [])
+                + ["↓ latest"]
         let line = keys.joined(separator: " · ")
         // With other panes open this one can be the front of a stack, whose "2 of 3 ⌃Tab" badge sits over the bottom right
         // corner: the hints stop short of it (and cut with an ellipsis, full line on hover) instead of running under it.

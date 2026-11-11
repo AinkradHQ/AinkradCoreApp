@@ -41,11 +41,17 @@ extension AgentsModel {
 
     // MARK: composer
 
+    /// A running session takes a reply; a finished one (it succeeded) takes the next turn, which wakes it.
+    public func canReply(_ s: AgentSessionInfo) -> Bool {
+        if case .running = s.state { return true }
+        if case .ended = s.state, s.outcome == .succeeded { return true }
+        return false
+    }
+
     public func canSend(_ id: String) -> Bool {
         let text = drafts[id] ?? ""
-        var running = false
-        if case .running? = sessions.session(id)?.state { running = true }
-        return running && !text.isEmpty && text.utf8.count <= Self.messageLimit && !sending.contains(id)
+        guard let s = sessions.session(id) else { return false }
+        return canReply(s) && !text.isEmpty && text.utf8.count <= Self.messageLimit && !sending.contains(id)
     }
     public static let messageLimit = 16 * 1024
 
@@ -54,6 +60,10 @@ extension AgentsModel {
         sending.insert(id)
         note(id, nil)
         defer { sending.remove(id) }
+        if case .ended? = sessions.session(id)?.state {
+            await wake(id, text: text)
+            return
+        }
         do {
             let s = try await elevated("Send a message to \(sessions.session(id)?.harness ?? "the agent").") {
                 try await api.send(id, text: text)
@@ -99,18 +109,40 @@ extension AgentsModel {
 
     public func resume(_ id: String) { run(id, "Resuming") { try await $0.resume(id) } }
 
-    public func wake(_ id: String) {
+    /// Wake with no message: the session continues from its last turn.
+    public func wake(_ id: String) { Task { await wake(id, text: nil) } }
+
+    /// The next turn on a finished session (the harness runs one turn at a time). With `text` the draft is cleared once the
+    /// Core takes it.
+    func wake(_ id: String, text: String?) async {
         guard let api else { return }
         note(id, nil)
+        do {
+            try await elevated("Wake \(sessions.session(id)?.harness ?? "the agent").") {
+                try await api.wake(id, key: UUID().uuidString, text: text)
+            }
+            if text != nil { drafts[id] = "" }
+            shell.showToast(text == nil ? "Wake sent. The session starts again from its last turn." : "Waiting for the agent…")
+            await refreshSession(id)
+        } catch { note(id, Self.notice(error, doing: "Waking")) }
+    }
+
+    /// An ended session cannot be resumed: start a new one with the same prompt, runner and agent.
+    public func startAgain(_ id: String) {
+        guard let s = sessions.session(id) else { return }
+        let prompt = transcripts[id]?.entries.lazy.compactMap { e -> String? in
+            if case .user(let t) = e.kind { return t } else { return nil }
+        }.first
+        guard let prompt, !prompt.isEmpty else {
+            note(id, InlineNotice(title: "Starting again did not go through.", detail: "The first message is not loaded. Scroll the transcript to its start and try again."))
+            return
+        }
+        let agent = s.route?.agent
+        let new = NewAgentSession(
+            runner: s.runner, harness: s.harness, model: s.model, prompt: prompt,
+            chain: agent == nil ? s.route?.chainID : nil, agent: agent)
         Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await self.elevated("Wake \(self.sessions.session(id)?.harness ?? "the agent").") {
-                    try await api.wake(id, key: UUID().uuidString)
-                }
-                self.shell.showToast("Wake sent. The session starts again from its last turn.")
-                await self.refreshSession(id)
-            } catch { self.note(id, Self.notice(error, doing: "Waking")) }
+            if let n = await self?.create(new) { self?.note(id, n) }
         }
     }
 

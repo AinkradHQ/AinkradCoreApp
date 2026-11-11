@@ -172,9 +172,9 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
     }
 
-    public func wake(_ id: String, key: String) async throws {
+    public func wake(_ id: String, key: String, text: String?) async throws {
         try await run {
-            switch try await client.wakeAgentSession(path: .init(id: id), body: .json(.init(key: key))) {
+            switch try await client.wakeAgentSession(path: .init(id: id), body: .json(.init(key: key, text: text))) {
             case .ok: return
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)

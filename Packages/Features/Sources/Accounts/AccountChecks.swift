@@ -75,6 +75,33 @@ enum LimitWords {
     }
 }
 
+/// A Claude plan has no key to test: the Core's key test goes through the gateway, which never serves a plan's token. This
+/// says who is signed in and since when, and offers the sign-in again.
+struct SignInTile: View {
+    let model: AccountsModel
+    let account: AccountItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                Image(systemName: "checkmark.shield.fill").font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(GlassInk.ink(GlassInk.green))
+                Text("Signed in").coreFont(size: MacTextSize.title, weight: .semibold)
+                Spacer(minLength: 0)
+                AccLink(title: "Sign in again", symbol: "arrow.clockwise") {
+                    AccountDialogs.openConnect(model, provider: account.provider, replacing: account)
+                }
+                .disabled(model.readOnly)
+            }
+            Text("\(account.label) · since \(account.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text("A plan has no key to test. Its token is lent to a runner for each session and uses the plan's quota, not money.")
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 /// The key test tile: the last answer, when, and Test now (resting for a minute after each test).
 struct TestTile: View {
     let model: AccountsModel

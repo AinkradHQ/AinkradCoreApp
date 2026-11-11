@@ -60,7 +60,9 @@ struct SessionHero: View {
                 AppStatChip(
                     "arrow.up.circle", "\(session.usage.map { AgentWords.tokens($0.output) } ?? "0") out",
                     GlassInk.green)
-                if let c = AgentWords.cost(session.usage?.costMicros) { AppStatChip("dollarsign", c, GlassInk.orange) }
+                if let c = AgentWords.cost(session.usage?.costMicros), model.ledgers[session.id]?.isPlan != true {
+                    AppStatChip("dollarsign", c, GlassInk.orange).help(AgentWords.exactCost(session.usage?.costMicros) ?? c)
+                }
                 if let r = session.resumes, r > 0 {
                     AppStatChip("arrow.clockwise", "resumed \(r)×", GlassInk.slate)
                 }
@@ -169,7 +171,7 @@ struct SessionHero: View {
                         model.wake(session.id)
                     }
                     .help(
-                        "Wake queues another turn for this finished agent. It keeps the same session. Resume restarts one that stopped."
+                        "Wake queues another turn for this finished agent, with no new message. It keeps the same session."
                     )
                 }
                 if session.stoppedByBudget {
@@ -181,11 +183,19 @@ struct SessionHero: View {
                         model.openAccounts()
                     }
                 }
-                AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
-                {
-                    model.resume(session.id)
+                if session.state == .lost {
+                    AppActionTile(title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
+                    {
+                        model.resume(session.id)
+                    }
+                    .help("Resume starts this session again from where it stopped. The transcript is kept.")
+                } else {
+                    AppActionTile(title: "Start again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true)
+                    {
+                        model.startAgain(session.id)
+                    }
+                    .help("Start a new session with the same first message, runner and agent. This one stays as it is.")
                 }
-                .help("Resume starts this session again from where it stopped. The transcript is kept.")
             }
         }
     }

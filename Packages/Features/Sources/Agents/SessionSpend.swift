@@ -14,10 +14,13 @@ public struct SessionLedger: Equatable, Sendable {
     public var account: String?
     public var maxUSDMicros: Int64?
     public var maxTokens: Int64?
+    /// The account is a Claude plan: no money per call, and its token is lent to the run.
+    public var isPlan: Bool
     public init(
         costMicros: Int64, tokens: Int64, unpriced: Bool, account: String? = nil, maxUSDMicros: Int64? = nil,
-        maxTokens: Int64? = nil
+        maxTokens: Int64? = nil, isPlan: Bool = false
     ) {
+        self.isPlan = isPlan
         self.costMicros = costMicros
         self.tokens = tokens
         self.unpriced = unpriced
@@ -54,6 +57,7 @@ extension LiveAgentsAPI {
             l.account = a.label
             l.maxUSDMicros = a.sessionLimits?.maxUsdMicros
             l.maxTokens = a.sessionLimits?.maxTokens
+            l.isPlan = a.provider == "claude-sub"
         }
         return l
     }
@@ -82,9 +86,15 @@ struct SessionSpendStrip: View {
         let hue = capped || (share ?? 0) >= 1 ? GlassInk.red : (share ?? 0) >= 0.8 ? GlassInk.orange : GlassInk.green
         HStack(spacing: Space.s3) {
             if let a = ledger.account {
-                Label("\(a) · key held by the runner", systemImage: "lock.shield.fill")
-                    .foregroundStyle(GlassInk.secondary)
-                    .help("The key is used by the runner's gateway and never enters the agent's sandbox.")
+                Label(
+                    ledger.isPlan ? "\(a) · Claude plan · signed-in token lent to this run" : "\(a) · key held by the runner",
+                    systemImage: "lock.shield.fill"
+                )
+                .foregroundStyle(GlassInk.secondary)
+                .help(
+                    ledger.isPlan
+                        ? "The plan's token is lent to the runner for this session only."
+                        : "The key is used by the runner's gateway and never enters the agent's sandbox.")
             }
             Spacer(minLength: Space.s2)
             if capped {
@@ -96,8 +106,12 @@ struct SessionSpendStrip: View {
             }
             Text(spentWords).coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
                 .help(
-                    ledger.unpriced
-                        ? "Some calls had no price: their tokens count, their cost doesn't." : "From Core's ledger")
+                    ledger.isPlan
+                        ? "A plan costs no money per call. It uses the plan's quota."
+                        : ledger.unpriced
+                            ? "Some calls had no price: their tokens count, their cost doesn't."
+                            : AgentWords.exactCost(ledger.costMicros).map { "From Core's ledger · \($0)" }
+                                ?? "From Core's ledger")
             if let share {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
@@ -115,6 +129,7 @@ struct SessionSpendStrip: View {
     }
 
     private var spentWords: String {
+        if ledger.isPlan { return "Included in your Claude plan · \(AgentWords.tokens(ledger.tokens)) tokens" }
         let spent = AgentWords.cost(ledger.costMicros) ?? "$0.00"
         let star = ledger.unpriced ? " + unpriced" : ""
         if let m = ledger.maxUSDMicros, m > 0 { return "\(spent)\(star) of \(AgentWords.cost(m) ?? "") this session" }

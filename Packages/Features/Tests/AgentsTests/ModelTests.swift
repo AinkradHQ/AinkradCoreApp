@@ -238,6 +238,20 @@ struct ModelTests {
         #expect(api.calls.contains("resume") && api.calls.contains("wake") && host?.asked.count == 2)
     }
 
+    @Test func aFinishedSessionTakesTheNextMessageThroughWake() async throws {
+        let (m, api, _, _) = await make()
+        let id = "as_01JC4X7Q3MZ8N5V2K9R006"
+        m.drafts[id] = "list the files"
+        #expect(m.canSend(id))
+        await m.send(id)
+        #expect(api.calls.contains("wake") && !api.calls.contains("send"))
+        #expect(m.drafts[id] == "")
+        api.update(id) { $0.outcome = .failed }
+        await m.reloadAll()
+        m.drafts[id] = "again"
+        #expect(!m.canSend(id))
+    }
+
     @Test func aRefusedNewSessionComesBackAsWords() async {
         let (m, api, _, _) = await make()
         api.failNext = CoreError.http(status: 409, code: "runner_offline", message: "mac-studio is not connected")
