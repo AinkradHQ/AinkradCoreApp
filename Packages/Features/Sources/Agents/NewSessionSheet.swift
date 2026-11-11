@@ -184,7 +184,11 @@ struct NewSessionSheet: View {
 
     private func pickRunner() {
         if runner == nil {
-            runnerID = (model.runners.first { $0.online && $0.runsAgents } ?? model.runners.first { $0.online })?.id
+            // Asked for one runner (the runner page's Start an agent here): wait for the list if it is not loaded yet.
+            if let want = model.newSessionRunner, !model.runners.contains(where: { $0.id == want }) { return }
+            runnerID =
+                model.newSessionRunner
+                ?? (model.runners.first { $0.online && $0.runsAgents } ?? model.runners.first { $0.online })?.id
         }
     }
 

@@ -467,21 +467,39 @@ struct DeviceDetail: View {
                 }
                 if let fp = device.fingerprint { FingerprintView(fingerprint: fp) }
             }
-            GlassSection(
-                "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
-                symbol: "lock.shield", hue: GlassInk.violet, index: 3
-            ) {
-                if !device.revoked {
-                    SectionAction("Edit access", symbol: "slider.horizontal.3") {
-                        present("scopes", ScopesDialog(app: app, device: device))
+            if device.kind == "runner" {
+                // N18: a runner does the work the Core sends; it does not ask for anything, so scopes do not describe it.
+                GlassSection(
+                    "Access", sub: "A runner does work; it does not ask for it.", symbol: "server.rack",
+                    hue: GlassInk.violet, index: 3
+                ) {
+                    SectionAction("Open runner page", symbol: "arrow.right") {
+                        app.shell.launcher.entry("runners")?.run()
+                        app.terminals?.openRunners(device.id)
                     }
+                } content: {
+                    Text(
+                        "Connection: runner. It can only receive work from this Core. What it offers, what runs on it and who may use it are on its runner page."
+                    )
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-            } content: {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: Space.s2)], spacing: Space.s2) {
-                    ForEach(ScopeText.all, id: \.self) { s in
-                        ScopeTile(
-                            symbol: ScopeText.symbol(s), name: s, detail: ScopeText.text(s), hue: ScopeText.hue(s),
-                            on: device.scopes.contains(s))
+            } else {
+                GlassSection(
+                    "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
+                    symbol: "lock.shield", hue: GlassInk.violet, index: 3
+                ) {
+                    if !device.revoked {
+                        SectionAction("Edit access", symbol: "slider.horizontal.3") {
+                            present("scopes", ScopesDialog(app: app, device: device))
+                        }
+                    }
+                } content: {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: Space.s2)], spacing: Space.s2) {
+                        ForEach(ScopeText.all, id: \.self) { s in
+                            ScopeTile(
+                                symbol: ScopeText.symbol(s), name: s, detail: ScopeText.text(s), hue: ScopeText.hue(s),
+                                on: device.scopes.contains(s))
+                        }
                     }
                 }
             }

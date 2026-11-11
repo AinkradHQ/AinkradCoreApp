@@ -27,6 +27,8 @@ struct DriverItem: Equatable, Sendable {
     var name: String
     var commands: [String]
     var capacity: Int?
+    /// `agent`: how many sessions each harness may run at once. The harnesses named here are the tools found.
+    var slots: [String: Int] = [:]
 }
 
 struct RunnerItem: Identifiable, Equatable, Sendable {
@@ -193,7 +195,9 @@ struct LiveTerminalService: TerminalService {
             capacity: Int(r.capacity ?? 0), avg1: r.hostLoad?.avg1, cores: r.hostLoad.map { Int($0.cores) },
             version: r.version, arch: r.arch, lastSeen: r.lastSeen,
             drivers: (r.drivers ?? []).map {
-                DriverItem(name: $0.name ?? "", commands: $0.commands ?? [], capacity: $0.capacity.map(Int.init))
+                DriverItem(
+                    name: $0.name ?? "", commands: $0.commands ?? [], capacity: $0.capacity.map(Int.init),
+                    slots: ($0.slots?.additionalProperties ?? [:]).mapValues(Int.init))
             }, isolationTiers: r.isolation?.tiers)
     }
 }

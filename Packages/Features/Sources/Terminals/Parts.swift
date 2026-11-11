@@ -68,30 +68,6 @@ struct TermCard: View {
     }
 }
 
-/// A bar for a value against a maximum, with an optional limit mark.
-struct Meter: View {
-    let value: Double
-    let max: Double
-    var limit: Double?
-    var warn = false
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                coreShape(Space.s1 / 2).fill(palette.track)
-                coreShape(Space.s1 / 2).fill(warn ? palette.warning : palette.primary)
-                    .frame(width: geo.size.width * Swift.min(1, Swift.max(0, value / Swift.max(max, 0.001))))
-                if let limit {
-                    Rectangle().fill(palette.text.opacity(0.8)).frame(width: 2)
-                        .offset(x: geo.size.width * Swift.min(1, limit / Swift.max(max, 0.001)))  // grid: ok limit mark
-                }
-            }
-        }
-        .frame(height: Space.s2)
-        .accessibilityHidden(true)
-    }
-}
-
 /// The inline outcome of a Touch ID that did not elevate.
 struct ElevationBanner: View {
     let notice: ElevationNotice

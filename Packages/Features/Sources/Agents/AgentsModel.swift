@@ -66,6 +66,8 @@ public final class AgentsModel {
     public internal(set) var approvalNotices: [String: InlineNotice] = [:]
     public internal(set) var notifierPermission: NotificationPermission = .notAsked
     public var selected: String?
+    /// The runner the New session sheet starts on (set by the runner page); nil: the best ready one.
+    public var newSessionRunner: String?
     /// Each session's name: the first line of its prompt (Core sends no title yet, KAN-455). Filled on create, from a loaded
     /// transcript, or by `loadTitle` when a tile shows.
     public internal(set) var titles: [String: String] = [:]
