@@ -95,6 +95,22 @@ public struct SyncStatusWire: Codable, Sendable, Equatable {
     }
 }
 
+/// A runner as a source sees it: online, the tools it offers, and whether it was started to share its history.
+public struct RunnerNowWire: Codable, Sendable, Equatable {
+    public var online: Bool
+    public var tools: [String]
+    public var historyOffered: Bool
+    enum CodingKeys: String, CodingKey {
+        case online, tools
+        case historyOffered = "history_offered"
+    }
+    public init(online: Bool, tools: [String] = [], historyOffered: Bool = false) {
+        self.online = online
+        self.tools = tools
+        self.historyOffered = historyOffered
+    }
+}
+
 /// One collector with its switch, roots and cursor (`GET /sources`).
 public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var id: String
@@ -104,10 +120,12 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var roots: [String]
     public var cursor: SourceCursor
     public var lastRun: String?
-    /// Items this source has stored. TODO(brain-m3-core): confirm the Core sends it on `/sources`; blank until then.
+    /// Items this source has delivered to the Brain.
     public var items: Int?
+    /// For a `runner-<id>` source: the runner now.
+    public var runner: RunnerNowWire?
     enum CodingKeys: String, CodingKey {
-        case id, device, kind, enabled, roots, cursor, items
+        case id, device, kind, enabled, roots, cursor, items, runner
         case lastRun = "last_run"
     }
     public init(
@@ -134,6 +152,7 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
         cursor = (try? c.decodeIfPresent(SourceCursor.self, forKey: .cursor)) ?? .init()
         lastRun = try c.decodeIfPresent(String.self, forKey: .lastRun)
         items = try c.decodeIfPresent(Int.self, forKey: .items)
+        runner = try c.decodeIfPresent(RunnerNowWire.self, forKey: .runner)
     }
 
     /// The Core's own AI-session collector.

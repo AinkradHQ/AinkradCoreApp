@@ -52,14 +52,8 @@ struct RoomSettings: View {
                 + "has a local model yet. They are distilled as soon as one is ready.",
             tone: .warn
         ) {
-            HStack(spacing: Space.s2) {
-                Button("Choose a model") {
-                    c.runnerHint()
-                }
+            Button("Use Cloud") { Task { await c.setModel(room.id, .cloud) } }
                 .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                Button("Use Cloud") { Task { await c.setModel(room.id, .cloud) } }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            }
         }
         .accessibilityIdentifier("room-queued")
     }
@@ -90,22 +84,26 @@ struct RoomSettings: View {
         }
     }
 
+    /// What the Core says, on the field surface without the chevrons: it is shown, not chosen here.
+    private func shown(_ text: String, dim: Bool = false) -> some View {
+        Text(text).coreFont(size: MacTextSize.body).foregroundStyle(dim ? GlassInk.secondary : GlassInk.primary)
+            .lineLimit(1).padding(.horizontal, Space.s3)
+            .frame(maxWidth: .infinity, minHeight: MacSize.controlLg, alignment: .leading)
+            .coreFieldSurface(focused: false)
+    }
+
     @ViewBuilder private func cloud(_ p: RoomPolicy) -> some View {
         GridRow(alignment: .top) {
             label("Provider")
-            field(
-                CoreSelect(
-                    nil, selection: .constant(p.provider), options: p.providers.map { CoreSelectOption($0, $0) }),
-                "Only approved providers are listed.")
+            field(shown(p.provider), "Only approved providers are listed.")
         }
-        if !p.accounts.isEmpty {
-            GridRow(alignment: .top) {
-                label("Account")
-                field(
-                    CoreSelect(
-                        nil, selection: .constant(p.account), options: p.accounts.map { CoreSelectOption($0, $0) }),
-                    "The whole chain, runner to account, is checked before every run.")
-            }
+        GridRow(alignment: .top) {
+            label("Account")
+            field(
+                shown(
+                    p.accounts.isEmpty ? "None set up yet" : p.accounts.joined(separator: ", "), dim: p.accounts.isEmpty
+                ),
+                "The whole chain, runner to account, is checked before every run.")
         }
     }
 
@@ -114,14 +112,7 @@ struct RoomSettings: View {
         GridRow(alignment: .top) {
             label("Local model")
             field(
-                CoreSelect(
-                    nil,
-                    selection: Binding(
-                        get: { p.localModel ?? "" }, set: { n in Task { await c.setLocalModel(room.id, n) } }),
-                    options: none
-                        ? [CoreSelectOption("", "None available yet")] : p.localModels.map { CoreSelectOption($0, $0) }
-                )
-                .disabled(none),
+                shown(none ? "None available yet" : p.localModels.joined(separator: ", "), dim: none),
                 none
                     ? "A runner with a local model appears here. No cloud account is ever used for this room."
                     : "Run by a runner on your devices. No cloud account is ever used for this room.")
@@ -144,7 +135,7 @@ struct RoomSettings: View {
             row(
                 "Accept candidates automatically",
                 p.autoAccept
-                    ? "These kinds go straight into the room. You can undo them from the Inbox for 14 days."
+                    ? "These kinds go straight into the room."
                     : "Everything waits in the Inbox until you accept it.",
                 dim: false
             ) {
@@ -152,27 +143,40 @@ struct RoomSettings: View {
                     "",
                     isOn: Binding(get: { p.autoAccept }, set: { on in Task { await c.setAutoAccept(room.id, on) } }))
             }
-            ForEach(CandidateKind.allCases, id: \.self) { k in
-                row(k.plural, k.about, dim: !p.autoAccept || !p.autoKindsAllowed.contains(k), inline: true) {
+            ForEach(CandidateKind.autoRows, id: \.self) { k in
+                row(k.plural, Self.autoAbout(k), dim: !p.autoAccept, inline: true) {
                     CoreCheckbox(
                         "",
                         isOn: Binding(
                             get: { p.kinds.contains(k) }, set: { _ in Task { await c.toggleKind(room.id, k) } }),
                         spoken: k.plural)
                 }
-                .disabled(!p.autoAccept || !p.autoKindsAllowed.contains(k))
+                .disabled(!p.autoAccept)
             }
-            row("Only with at least", nil, dim: !p.autoAccept || !p.minSourcesServed, inline: true) {
+            row("Only with at least", nil, dim: !p.autoAccept, inline: true) {
                 CoreSelect(
                     nil,
                     selection: Binding(get: { p.minSources }, set: { n in Task { await c.setMinSources(room.id, n) } }),
-                    options: (1...3).map { CoreSelectOption($0, BrainWords.plural($0, "source", "sources")) }
+                    options: Self.minChoices(p.minSources).map {
+                        CoreSelectOption($0, BrainWords.plural($0, "source", "sources"))
+                    }
                 )
                 .frame(width: Space.s8 * 4)
-                .disabled(!p.autoAccept || !p.minSourcesServed)
+                .disabled(!p.autoAccept)
             }
         }
     }
+
+    /// Auto-accept filters by type, so the two tagged kinds say how wide they are.
+    private static func autoAbout(_ k: CandidateKind) -> String {
+        switch k {
+        case .landmine: "A trap to avoid. Takes every rule"
+        case .openThread: "A question still open. Takes every task"
+        default: k.about
+        }
+    }
+
+    private static func minChoices(_ current: Int) -> [Int] { Set([1, 2, 3, 5, 10, current]).sorted() }
 
     private func row<T: View>(
         _ title: String, _ sub: String?, dim: Bool, inline: Bool = false, @ViewBuilder trailing: () -> T

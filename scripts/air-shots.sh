@@ -14,6 +14,9 @@ esac
 [ "$THEME" = night ] && T=dark || T=light
 REMOTE=/Users/alhasani/rig/walk-$WALK
 mkdir -p "$OUT"
+# One walk at a time on the Air: parallel lanes killed each other's app (pkill) and broke each other's rsync.
+until ssh air 'mkdir /tmp/ainkrad-air-walk.lock' 2>/dev/null; do echo "waiting for the Air (another walk is running)" >&2; sleep 15; done
+trap "ssh air 'rmdir /tmp/ainkrad-air-walk.lock' 2>/dev/null || true" EXIT
 ssh air "pkill -x Ainkrad 2>/dev/null; rm -rf /tmp/ainkrad-snap.log $REMOTE ~/rig/walk-app ~/Library/Saved\\ Application\\ State/com.ainkrad.core.savedState; mkdir -p $REMOTE ~/rig/walk-app"
 # The Air's GUI launchd domain keeps CORE_* vars from older rig runs (launchctl setenv). The app runs the FIRST walk whose
 # var is set (gallery before admin), so a stale CORE_GALLERY_SNAPSHOT made every other walk run the gallery. Clear them.

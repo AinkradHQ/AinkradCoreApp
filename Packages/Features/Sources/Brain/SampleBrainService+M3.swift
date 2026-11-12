@@ -59,7 +59,8 @@ struct SampleM3: Sendable {
     ) -> InboxCandidate {
         InboxCandidate(
             id: id, room: room, roomName: name, kind: k, text: text, app: app, date: date, distilled: "today, 14:02",
-            account: "Claude, Max account", sources: src)
+            account: "Claude, Max account", sources: src,
+            tags: k.marker.map { [$0] } ?? [])
     }
 
     private static func src(_ id: String, _ title: String, _ place: String, _ quote: String) -> CandidateSource {
@@ -134,24 +135,23 @@ struct SampleM3: Sendable {
     private static func policy(_ s: SampleBrainService.Scenario, local: Bool, auto: Bool = false) -> RoomPolicy {
         var p = RoomPolicy()
         p.model = local ? .localOnly : .cloud
-        p.accounts = ["Claude Max, personal"]
-        p.account = "Claude Max, personal"
+        p.accounts = local ? [] : ["Claude Max, personal"]
         p.localModels = s.noLocalModel ? [] : [model]
-        p.localModel = s.noLocalModel ? nil : model
         p.autoAccept = auto
         p.kinds = auto ? [.fact, .openThread] : []
+        p.minSources = 2
         return p
     }
 
     private static func runnerList() -> [RunnerHistory] {
-        func tools(_ a: Int?, _ b: Int?, _ c: Int?, on: Bool = false) -> [RunnerTool] {
+        func tools(_ a: Int?, _ b: Int?, _ c: Int?) -> [RunnerTool] {
             [("claude_code", "Claude Code", a), ("codex", "Codex", b), ("opencode", "OpenCode", c)].map {
-                RunnerTool(id: $0.0, name: $0.1, found: $0.2, on: on && $0.2 != nil)
+                RunnerTool(id: $0.0, name: $0.1, found: $0.2, installed: $0.2 != nil)
             }
         }
         return [
             RunnerHistory(
-                id: "air", name: "MacBook Air", enabled: true, tools: tools(300, 80, 12, on: true), items: 148,
+                id: "air", name: "MacBook Air", enabled: true, tools: tools(300, 80, 12), items: 148,
                 lastRun: "1 hour ago"),
             RunnerHistory(id: "vps-1", name: "vps-1 (Azure)", tools: tools(412, 87, nil)),
             RunnerHistory(
@@ -205,7 +205,6 @@ extension SampleBrainService {
         if let a = change.autoAccept { p.autoAccept = a }
         if let k = change.kinds { p.kinds = k }
         if let n = change.minSources { p.minSources = n }
-        if let l = change.localModel { p.localModel = l }
         if p.model == .cloud { p.queued = 0 }
         m3.policies[room] = p
         return p
@@ -213,15 +212,11 @@ extension SampleBrainService {
 
     public func runners() async throws -> [RunnerHistory] { m3.runners }
 
-    public func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory {
+    public func setRunnerHistory(_ id: String, enabled: Bool) async throws -> RunnerHistory {
         guard let i = m3.runners.firstIndex(where: { $0.id == id }) else {
             throw BrainFailure("That runner is gone.", code: "not_found")
         }
         m3.runners[i].enabled = enabled
-        for j in m3.runners[i].tools.indices {
-            let t = m3.runners[i].tools[j]
-            m3.runners[i].tools[j].on = enabled && tools.contains(t.id)
-        }
         return m3.runners[i]
     }
 }

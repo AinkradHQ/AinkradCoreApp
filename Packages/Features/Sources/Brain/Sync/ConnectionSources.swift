@@ -130,7 +130,8 @@ struct RunnerSources: View {
     }
 }
 
-/// "Collect history on vps-1?": what is read, what is never sent, and Turn On (Touch ID, every time).
+/// "Collect history on vps-1?": what is read, what is never sent, and Turn On (Touch ID, every time). One Touch ID
+/// covers both steps at the Core: the runner's history sharing, then the source's switch.
 struct RunnerHistorySheet: View {
     let model: BrainModel
     @State private var busy = false
@@ -140,40 +141,33 @@ struct RunnerHistorySheet: View {
     ]
 
     var body: some View {
-        if let s = c.runnerSheet {
+        if let r = c.runnerSheet {
             CoreDialogPanel("", width: Space.s8 * 15) {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     HStack {
-                        Text("Collect history on \(s.runner.name)?")
+                        Text("Collect history on \(r.name)?")
                             .coreFont(size: MacTextSize.title, weight: .semibold)
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: Space.s3)
                         CoreIconButton(symbol: "xmark", label: "Close") { close() }
                     }
                     Text(
-                        "\(s.runner.name) reads these AI tool histories and sends the text to your Core, "
+                        "\(r.name) reads these AI tool histories and sends the text to your Core, "
                             + "where it is cleaned and filed into rooms."
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                     block("Read") {
-                        if s.runner.tools.isEmpty {
-                            Text("The AI tool histories stored on this runner")
-                                .padding(.horizontal, Space.s3).frame(minHeight: Space.s8, alignment: .leading)
+                        if r.tools.isEmpty {
+                            line("The AI tool histories stored on this runner")
                         }
-                        ForEach(s.runner.tools) { t in
+                        ForEach(r.tools) { t in
                             HStack(spacing: Space.s3) {
-                                CoreCheckbox(
-                                    "", isOn: Binding(get: { s.tools.contains(t.id) }, set: { _ in toggle(t.id) }),
-                                    spoken: t.name
-                                )
-                                .disabled(t.found == nil)
+                                Image(systemName: t.installed ? "checkmark.square.fill" : "square")
+                                    .foregroundStyle(t.installed ? GlassInk.blue : GlassInk.secondary)
+                                    .accessibilityHidden(true)
                                 HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                                     Text(t.name).coreFont(size: MacTextSize.body, weight: .medium)
-                                    Text(
-                                        t.found.map { BrainWords.plural($0, "session found", "sessions found") }
-                                            ?? "Not installed"
-                                    )
-                                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                                    Text(note(t)).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                                 }
                                 Spacer(minLength: 0)
                             }
@@ -212,10 +206,13 @@ struct RunnerHistorySheet: View {
         }
     }
 
-    private func toggle(_ id: String) {
-        guard var s = c.runnerSheet else { return }
-        if !s.tools.insert(id).inserted { s.tools.remove(id) }
-        c.runnerSheet = s
+    private func note(_ t: RunnerTool) -> String {
+        guard t.installed else { return "Not installed" }
+        return t.found.map { BrainWords.plural($0, "session found", "sessions found") } ?? "On this runner"
+    }
+
+    private func line(_ s: String) -> some View {
+        Text(s).padding(.horizontal, Space.s3).frame(minHeight: Space.s8, alignment: .leading)
     }
 
     private func close() {

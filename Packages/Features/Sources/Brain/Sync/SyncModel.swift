@@ -121,18 +121,18 @@ public final class SyncModel {
             guard let row = rows.first(where: { $0.id == Self.sourceID(src.id) }) else { continue }
             syncAt = i
             syncSource = SyncWords.title(src.id, sourceList())
-            let since = row.cursor.date
             let began = now()
-            guard await src.newCount(since: since) > 0 else { continue }
+            let next = src.cursorAfter(row.cursor, began: began)
+            guard await src.newCount(cursor: row.cursor) > 0 else { continue }
             let run = try await routes.startRun(kind: "incremental", sources: [src.id])
             let uploader = Uploader(transport: RoutesImportTransport(routes: routes), pause: pause)
-            _ = try await src.streamNew(since: since, run: run, uploader: uploader, uploaded: .init())
+            _ = try await src.streamNew(cursor: row.cursor, run: run, uploader: uploader, uploaded: .init())
             do { _ = try await routes.collected(run: run, source: src.id) } catch let e as BrainHTTPError
                 where e.status == 409
             {}
             try await confirmed(run, routes)
             // Only now: the Core has the run. `began` (not now) so a file written while reading is taken next time.
-            _ = try await service.putSource(row, enabled: nil, cursor: SourceCursor(date: began))
+            _ = try await service.putSource(row, enabled: nil, cursor: next)
         }
     }
 

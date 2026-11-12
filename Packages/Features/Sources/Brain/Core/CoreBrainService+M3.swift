@@ -27,16 +27,31 @@ extension CoreBrainService {
     }
 
     static func candidate(_ w: InboxRecordWire, room: RoomViewWire) -> InboxCandidate {
-        let date = SyncWords.date(w.createdAt)
+        let date = SyncWords.date(w.distilledAt)
         return InboxCandidate(
-            id: w.id, room: room.id, roomName: room.name, kind: CandidateKind(wire: w.type), text: w.body,
+            id: w.id, room: room.id, roomName: room.name, kind: CandidateKind(type: w.type, tags: w.tags),
+            text: w.body, app: w.tool.map(Self.toolName) ?? "",
             date: date.map { $0.formatted(.dateTime.day().month(.abbreviated)) } ?? "",
             distilled: date.map(Self.when) ?? "",
-            // TODO(brain-m3-core): confirm the Core names each source's tool, title, quote and the distilling account.
-            sources: w.sources.enumerated().map {
-                CandidateSource(id: $0.element, title: "Source \($0.offset + 1)", place: room.name)
+            account: w.distilledBy.map { "\($0.provider.capitalized), \($0.account)" } ?? "",
+            sources: w.sources.map { src in
+                let at = SyncWords.date(src.startedAt).map(Self.when) ?? ""
+                return CandidateSource(
+                    id: src.itemID, title: src.title,
+                    place: ([src.room ?? room.name] + (at.isEmpty ? [] : [at])).joined(separator: " · "),
+                    quote: src.quote)
             },
-            sortKey: w.createdAt)
+            tags: w.tags, sortKey: w.distilledAt)
+    }
+
+    /// The harness name the Core sends (`claude`, `codex`) as the screens say it.
+    static func toolName(_ tool: String) -> String {
+        switch tool {
+        case "claude", "claude_code": "Claude Code"
+        case "codex": "Codex"
+        case "opencode": "OpenCode"
+        default: tool.capitalized
+        }
     }
 
     /// "today, 14:02" or "11 Nov, 14:02".
@@ -51,7 +66,8 @@ extension CoreBrainService {
             switch decision {
             case .accept: DecisionBody(action: "accept")
             case .reject: DecisionBody(action: "reject")
-            case .edit(let kind, let text): DecisionBody(action: "edit", body: text, type: kind.wire)
+            case .edit(let kind, let text, let tags):
+                DecisionBody(action: "edit", body: text, type: kind.wireType, tags: kind.retag(tags))
             }
         _ = try await wrap { try await routes.decide(room: room, id: id, body) }
     }
@@ -71,10 +87,12 @@ extension CoreBrainService {
         var p = RoomPolicy()
         p.model = w.model == "local_only" ? .localOnly : .cloud
         p.autoAccept = !w.autoAccept.isEmpty
-        p.kinds = w.autoAccept.isEmpty ? [] : [.fact]
-        // The Core accepts only facts, preferences and summaries without a review, and keeps no source minimum yet.
-        p.autoKindsAllowed = [.fact]
-        p.minSourcesServed = false
+        p.kinds = Set(w.autoAccept.compactMap(CandidateKind.init(autoType:)))
+        p.otherAuto = w.autoAccept.filter { CandidateKind(autoType: $0) == nil }
+        p.minSources = w.minSources
+        p.provider = w.accounts.first.map { $0.provider.capitalized } ?? "Anthropic"
+        p.accounts = w.accounts.map(\.name)
+        p.localModels = w.localModels
         p.queued = queued
         return p
     }
@@ -83,43 +101,75 @@ extension CoreBrainService {
         try await wrap {
             let now = try await policy(room: room)
             let on = change.autoAccept ?? now.autoAccept
-            let kinds = (change.kinds ?? now.kinds).intersection(now.autoKindsAllowed)
+            let kinds = change.kinds ?? now.kinds
+            // Auto-accept filters by type: Landmines is every rule and Open threads is every task.
+            let types = Array(Set(kinds.map(\.wireType) + now.otherAuto)).sorted()
+            let touchesAuto = change.autoAccept != nil || change.kinds != nil
             let body = PolicyPatchBody(
-                model: change.model?.rawValue,
-                autoAccept: change.autoAccept != nil || change.kinds != nil
-                    ? (on && kinds.contains(.fact) ? ["fact", "preference", "summary"] : []) : nil)
-            var p = Self.policy(try await routes.patchPolicy(room: room, body), queued: now.queued)
-            p.minSources = change.minSources ?? now.minSources
-            return p
+                model: change.model?.rawValue, autoAccept: touchesAuto ? (on ? types : []) : nil,
+                minSources: change.minSources)
+            return Self.policy(try await routes.patchPolicy(room: room, body), queued: now.queued)
         }
     }
 
     // MARK: runner history
 
-    /// A runner's history is one source on `/sources`, `runner-<id>`, off until you turn it on. The runner must also
-    /// run with history sharing on, or a sync of it answers `no_connection`.
+    /// A runner's history is one source on `/sources`, `runner-<id>`, off until you turn it on.
     public func runners() async throws -> [RunnerHistory] {
-        try await wrap { try await routes.sources().compactMap(Self.runner) }
+        try await wrap {
+            let names = Dictionary(
+                ((try? await routes.runners()) ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+            return try await routes.sources().compactMap(Self.runner).map { r in
+                var r = r
+                if let n = names[r.id] { r.name = n }
+                return r
+            }
+        }
     }
 
-    public func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory {
+    /// Turning it on sets the runner's history sharing first when it is not on, then the source's switch; the caller's
+    /// one Touch ID covers both. Turning it off only switches the source off.
+    public func setRunnerHistory(_ id: String, enabled: Bool) async throws -> RunnerHistory {
         try await wrap {
             let key = Self.runnerPrefix + id
-            guard let row = try await routes.sources().first(where: { $0.id == key }) else {
-                throw BrainFailure("That runner is gone.", code: "not_found")
+            let rows = try await routes.sources()
+            var restarting = false
+            if enabled, rows.first(where: { $0.id == key })?.runner?.historyOffered != true {
+                restarting = try await shareHistory(id)
             }
-            return Self.runner(try await routes.putSource(row, enabled: enabled))
+            let row =
+                rows.first { $0.id == key }
+                ?? SourceWire(id: key, device: id, kind: "claude_code", enabled: false)
+            var out =
+                try await Self.runner(routes.putSource(row, enabled: enabled))
                 ?? RunnerHistory(id: id, name: row.device)
+            out.restarting = restarting
+            return out
         }
+    }
+
+    /// `PUT /runners/{id}/policy` takes the whole policy: the runner's own, with history sharing on. True when the
+    /// runner restarts to apply it.
+    private func shareHistory(_ id: String) async throws -> Bool {
+        guard let policy = try await routes.runners().first(where: { $0.id == id })?.policy else {
+            throw BrainFailure("That runner is not paired any more.", code: "not_found")
+        }
+        guard policy.shareHistory != true else { return false }
+        var next = policy
+        next.shareHistory = true
+        return try await routes.setRunnerPolicy(id, next).restarting == true
     }
 
     static let runnerPrefix = "runner-"
 
     static func runner(_ w: SourceWire) -> RunnerHistory? {
         guard w.id.hasPrefix(runnerPrefix) else { return nil }
-        // TODO(brain-m3-core): the Core does not say which tools a runner has, or whether it is online.
+        // The Core reads a runner's Claude Code history only, so that is the one tool listed.
+        let tools =
+            w.runner?.tools.contains("claude") == true ? [RunnerTool(id: "claude_code", name: "Claude Code")] : []
         return RunnerHistory(
-            id: String(w.id.dropFirst(runnerPrefix.count)), name: w.device, enabled: w.enabled, items: w.items ?? 0,
+            id: String(w.id.dropFirst(runnerPrefix.count)), name: w.device, online: w.runner?.online ?? true,
+            enabled: w.enabled, tools: tools, items: w.items ?? 0,
             lastRun: SyncWords.date(w.lastRun).map { SyncWords.ago($0) })
     }
 }

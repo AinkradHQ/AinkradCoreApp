@@ -13,12 +13,6 @@ public struct CandidateDraft: Sendable, Equatable {
     var canSave: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 }
 
-/// The runner whose history collection the sheet is about to turn on, and the tools you left ticked.
-public struct RunnerSheet: Sendable, Equatable {
-    public var runner: RunnerHistory
-    public var tools: Set<String>
-}
-
 /// Brain M3 state: the Inbox across rooms, each room's policy, and the runners' history collection. Candidate text lives
 /// here only while the Brain is open on this Mac, and is cleared on detach and on a locked Mac.
 @MainActor @Observable
@@ -39,7 +33,8 @@ public final class BrainCandidates {
     public internal(set) var policies: [String: RoomPolicy] = [:]
     public var paneMode: RoomPaneMode = .items
     public internal(set) var runners: [RunnerHistory] = []
-    public var runnerSheet: RunnerSheet?
+    /// The runner whose history collection the sheet is about to turn on.
+    public var runnerSheet: RunnerHistory?
     /// The last failure in words, shown in the Inbox until it is dismissed.
     public internal(set) var notice: String?
 
@@ -135,7 +130,7 @@ public final class BrainCandidates {
     public func saveEdit() async -> Bool {
         guard let d = draft, d.canSave, let c = items.first(where: { $0.id == d.id }) else { return false }
         let text = d.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard await settle(c, .edit(kind: d.kind, text: text)) else { return false }
+        guard await settle(c, .edit(kind: d.kind, text: text, tags: c.tags)) else { return false }
         draft = nil
         brain?.host.shell.showToast("Saved and accepted. Filed in \(c.roomName).")
         return true
@@ -205,36 +200,24 @@ public final class BrainCandidates {
 
     public func setAutoAccept(_ room: String, _ on: Bool) async {
         guard let p = policies[room], p.autoAccept != on else { return }
-        // Turning it on starts with the kinds that are low risk; the person can change them after.
-        let start = Set([CandidateKind.fact, .openThread]).intersection(p.autoKindsAllowed)
+        // Turning it on starts with Facts, the lowest risk; the person adds more after.
         await change(
-            room, PolicyChange(autoAccept: on, kinds: on && p.kinds.isEmpty ? start : nil),
+            room, PolicyChange(autoAccept: on, kinds: on && p.kinds.isEmpty ? [.fact] : nil),
             reason: on
                 ? "Accept candidates in this room without a review."
                 : "Review every candidate in this room again.")
     }
 
     public func toggleKind(_ room: String, _ kind: CandidateKind) async {
-        guard let p = policies[room], p.autoAccept, p.autoKindsAllowed.contains(kind) else { return }
+        guard let p = policies[room], p.autoAccept else { return }
         var kinds = p.kinds
         if !kinds.insert(kind).inserted { kinds.remove(kind) }
         await change(room, PolicyChange(kinds: kinds), reason: "Change what this room accepts without a review.")
     }
 
     public func setMinSources(_ room: String, _ n: Int) async {
-        guard let p = policies[room], p.minSourcesServed, p.minSources != n else { return }
+        guard let p = policies[room], p.minSources != n else { return }
         await change(room, PolicyChange(minSources: n), reason: "Change what this room accepts without a review.")
-    }
-
-    /// "Choose a model" with none to choose: say where one comes from instead of doing nothing.
-    func runnerHint() {
-        brain?.host.shell.showToast(
-            "No runner has a local model yet. One appears under Local model when a runner reports it.", kind: .info)
-    }
-
-    public func setLocalModel(_ room: String, _ name: String) async {
-        await change(
-            room, PolicyChange(localModel: name), reason: "Choose the local model that reads this room.")
     }
 
     // MARK: runner history
@@ -248,9 +231,9 @@ public final class BrainCandidates {
     public func toggleRunner(_ id: String) async {
         guard let r = runners.first(where: { $0.id == id }), r.online else { return }
         if r.enabled {
-            await apply(r, enabled: false, tools: [])
+            await apply(r, enabled: false)
         } else {
-            runnerSheet = RunnerSheet(runner: r, tools: Set(r.tools.filter { $0.found != nil }.map(\.id)))
+            runnerSheet = r
         }
     }
 
@@ -262,9 +245,12 @@ public final class BrainCandidates {
         guard let s = runnerSheet, let service, let host = brain?.host else { return false }
         do {
             let saved = try await host.elevated(
-                "Collect AI tool history on \(s.runner.name).", done: "turned on", keepsEdit: false
-            ) { try await service.setRunnerHistory(s.runner.id, enabled: true, tools: s.tools.sorted()) }
+                "Collect AI tool history on \(s.name).", done: "turned on", keepsEdit: false
+            ) { try await service.setRunnerHistory(s.id, enabled: true) }
             if let i = runners.firstIndex(where: { $0.id == saved.id }) { runners[i] = saved }
+            if saved.restarting {
+                brain?.host.shell.showToast("\(saved.name) is restarting to share its history.", kind: .info)
+            }
             runnerSheet = nil
             return true
         } catch is AdminDeclined {
@@ -275,10 +261,10 @@ public final class BrainCandidates {
         }
     }
 
-    private func apply(_ r: RunnerHistory, enabled: Bool, tools: [String]) async {
+    private func apply(_ r: RunnerHistory, enabled: Bool) async {
         guard let service else { return }
         do {
-            let saved = try await service.setRunnerHistory(r.id, enabled: enabled, tools: tools)
+            let saved = try await service.setRunnerHistory(r.id, enabled: enabled)
             if let i = runners.firstIndex(where: { $0.id == saved.id }) { runners[i] = saved }
         } catch { notice = BrainWords.failure(error) }
     }

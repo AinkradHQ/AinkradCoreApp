@@ -260,8 +260,7 @@ struct ModelTests {
         await m.remove(m.account(1)!, from: m.pool(2)!)
         #expect(m.pool(2)?.members == [])
         m.host.shell.toast?.undo?()
-        try? await Task.sleep(for: .milliseconds(200))
-        #expect(m.pool(2)?.members == [1])
+        #expect(await until { m.pool(2)?.members == [1] })
         #expect(svc.log.filter { $0.hasPrefix("add 2 1") }.count == 2)
     }
 
@@ -318,8 +317,7 @@ struct ModelTests {
         await m.makeDefault(m.chain(2)!)
         #expect(m.chains.first { $0.isDefault }?.id == 2)
         m.host.shell.toast?.undo?()
-        try? await Task.sleep(for: .milliseconds(200))
-        #expect(m.chains.first { $0.isDefault }?.id == 1)
+        #expect(await until { m.chains.first { $0.isDefault }?.id == 1 })
         #expect(await m.delete(m.chain(2)!))
         #expect(m.chainBindings.isEmpty)
         svc.failure = CoreError.http(status: 409, code: "conflict", message: "pool in use")

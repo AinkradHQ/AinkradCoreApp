@@ -71,7 +71,7 @@ public protocol BrainService: Sendable {
     func setPolicy(room: String, _ change: PolicyChange) async throws -> RoomPolicy
     func runners() async throws -> [RunnerHistory]
     /// Turns a runner's history collection on or off. The caller has already asked for Touch ID when turning it on.
-    func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory
+    func setRunnerHistory(_ id: String, enabled: Bool) async throws -> RunnerHistory
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -109,7 +109,7 @@ extension BrainService {
         throw BrainFailure("Room policy comes later.", code: "not_served")
     }
     public func runners() async throws -> [RunnerHistory] { [] }
-    public func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory {
+    public func setRunnerHistory(_ id: String, enabled: Bool) async throws -> RunnerHistory {
         throw BrainFailure("Runner history comes later.", code: "not_served")
     }
 }
