@@ -147,6 +147,25 @@ enum SnapshotRunner {
         shell.overlay = nil
         shell.editingWidgets = true
         await shot("11-home-edit")
+        shell.editingWidgets = false
+        for scene in AppModel.addWizardScenes {
+            app.debugAddWizard(scene)
+            await shot("13-add-\(scene)")
+        }
+        shell.closeDialog()
+        // The connection chip and its pop-up (N14), one per state.
+        for (name, link, network) in [
+            ("live", CoreLink.live, true), ("reconnecting", .reconnecting, true), ("no-network", .offline, false),
+            ("no-answer", .offline, true),
+        ] {
+            shell.coreLink = link
+            shell.networkUp = network
+            shell.retryAttempt = link == .live ? 0 : 3
+            shell.nextRetryAt = link == .live ? nil : Date().addingTimeInterval(8)
+            shell.connectionPanelOpen = true
+            await shot("14-chip-\(name)")
+        }
+        shell.connectionPanelOpen = false
         NSApp.terminate(nil)
     }
 

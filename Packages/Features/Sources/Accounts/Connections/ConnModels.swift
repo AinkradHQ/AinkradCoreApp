@@ -168,15 +168,6 @@ struct ConnTile: View {
     let kind: String
     var large = false
     var body: some View {
-        let hue = ConnLook.hue(kind)
-        let size: CGFloat = large ? 48 : 34
-        Image(systemName: ConnLook.symbol(kind)).coreFont(size: large ? 20 : 15, weight: .semibold)
-            .foregroundStyle(.white).frame(width: size, height: size)
-            .background(
-                LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(large ? 12 : 8)
-            )
-            .overlay { coreShape(large ? 12 : 8).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-            .accessibilityHidden(true)
+        IconTile(ConnLook.symbol(kind), hue: ConnLook.hue(kind), size: large ? 48 : 36)
     }
 }

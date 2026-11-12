@@ -101,7 +101,7 @@ struct ConnectDialog: View {
                 .coreFont(size: MacTextSize.meta).foregroundStyle(flow.labelOK ? GlassInk.secondary : GlassInk.red)
             }
             HStack(alignment: .bottom, spacing: Space.s2) {
-                CoreSecureField("Key", placeholder: "Paste your key", text: $flow.key, autofocus: true)
+                CoreSecureField("Key", placeholder: "Paste your key", text: $flow.key, autofocus: flow.key.isEmpty)
                     .accessibilityIdentifier("account-key")
                 AccLink(title: "Paste", symbol: "doc.on.clipboard") { flow.paste() }
             }

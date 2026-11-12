@@ -26,10 +26,15 @@ final class AgentPrefs {
         opacity = d.object(forKey: "agents.opacity") as? Double ?? 0.55
         blur = d.object(forKey: "agents.blur") as? Bool ?? true
         followLook = d.object(forKey: "agents.followLook") as? Bool ?? true
-        harness = d.string(forKey: "agents.harness") ?? "claude"
+        harness = Self.harness(d.string(forKey: "agents.harness"))
         mode = d.string(forKey: "agents.mode") ?? "ask"
         runner = d.string(forKey: "agents.runner") ?? ""
         model = d.string(forKey: "agents.model") ?? ""
+    }
+
+    /// A saved tool the app no longer offers (agy) falls back to Claude Code, so ⌘N never starts it.
+    static func harness(_ saved: String?) -> String {
+        saved.flatMap { NewSessionSheet.tools.contains($0) ? $0 : nil } ?? "claude"
     }
 
     private func save() {
@@ -88,7 +93,6 @@ struct AgentSettingsView: View {
                             CoreSegment("claude", "claude", symbol: "sparkles"),
                             CoreSegment("codex", "codex", symbol: "chevron.left.forwardslash.chevron.right"),
                             CoreSegment("opencode", "opencode", symbol: "curlybraces"),
-                            CoreSegment("agy", "agy", symbol: "atom"),
                         ], selection: $prefs.harness, fill: true)
                 }
                 SettingRow("Mode", symbol: "hand.raised") {

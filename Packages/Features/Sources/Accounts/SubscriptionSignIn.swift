@@ -165,15 +165,7 @@ struct SubscriptionSignIn: View {
 
     private func done(_ account: Int64?) -> some View {
         VStack(spacing: Space.s3) {
-            Image(systemName: "checkmark.seal.fill").font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.white).frame(width: 72, height: 72)
-                .background(
-                    LinearGradient(
-                        colors: [GlassInk.green, GlassInk.green.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(18)
-                )
-                .shadow(color: GlassInk.green.opacity(0.55), radius: 18)
-                .coreBounce(account)
+            IconTile("checkmark.seal.fill", hue: GlassInk.green, size: 64, bounce: account)
             Text("Your Claude plan is connected").coreFont(size: MacTextSize.large, weight: .bold)
             Text(
                 "It's saved in your Core as \(model.signIn?.label ?? "your plan"). Put it in a pool of its own so AI sessions can use it."

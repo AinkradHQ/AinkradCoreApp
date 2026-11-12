@@ -116,7 +116,7 @@ private struct AccountRow: View {
         }
         .padding(Space.s3)
         .background(
-            on ? GlassInk.blue.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well,
+            on || hovering ? GlassInk.wellHover : GlassInk.well,
             in: coreShape(Radius.cardMac)
         )
         .overlay {
@@ -126,7 +126,7 @@ private struct AccountRow: View {
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.25), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .coreRise(shown, index)
         .onAppear { shown = true }
         .accessibilityElement(children: .combine)
@@ -174,7 +174,7 @@ private struct OrderList: View {
     var body: some View {
         let seats = model.orderSeats
         VStack(alignment: .leading, spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Space.s1) {
                 Text("AI sessions try these accounts in this order").coreFont(
                     size: MacTextSize.headline, weight: .semibold)
                 Text("Drag to change it. If one is over its limit or fails, the next one takes over.")
@@ -190,9 +190,9 @@ private struct OrderList: View {
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if !seats.isEmpty {
+                // Plain text, not a well inside the well (audit: well-in-well).
                 Text(Placement.preview(seats)).fixedSize(horizontal: false, vertical: true)
-                    .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GlassInk.wellHover, in: coreShape(Radius.control))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(Space.s4)
@@ -209,10 +209,8 @@ private struct OrderList: View {
             } ?? false
         return HStack(spacing: Space.s2) {
             Image(systemName: "line.3.horizontal").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-            Text("\(i + 1)").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(.white)
-                .frame(width: 22, height: 22).background(GlassInk.blue, in: coreShape(6))
-            AccTile(provider: seat.provider)
-                .scaleEffect(0.75).frame(width: 28, height: 28)
+            CountBadge(i + 1)
+            IconTile(ProviderLook.symbol(seat.provider), hue: ProviderLook.hue(seat.provider), size: 28)
             VStack(alignment: .leading, spacing: 0) {
                 Text(seat.title).fontWeight(.semibold).lineLimit(1)
                 Text(model.providerName(seat.provider)).coreFont(size: MacTextSize.meta)
@@ -223,7 +221,7 @@ private struct OrderList: View {
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s2)
         .background(
-            dragging == seat.id ? GlassInk.blue.opacity(0.18) : GlassInk.wellHover, in: coreShape(Radius.control)
+            dragging == seat.id ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control)
         )
         .opacity(dragging == seat.id ? 0.6 : 1)
         .draggable(seat.id) {

@@ -29,7 +29,7 @@ struct AccHeader<Action: View>: View {
     @State private var shown = false
     var body: some View {
         HStack(alignment: .center, spacing: Space.s3) {
-            IconTile(symbol, hue: hue, size: 48, bounce: shown).shadow(color: hue.opacity(0.45), radius: 12)
+            IconTile(symbol, hue: hue, size: 48, bounce: shown)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
                     .contentTransition(.numericText())
@@ -42,24 +42,16 @@ struct AccHeader<Action: View>: View {
     }
 }
 
-/// The mark of an account: a rounded tile in its provider's colour and symbol.
+/// The mark of an account: CoreUI's icon tile in the one blue (slate when `dim`), no shadow at rest.
 struct AccTile: View {
     var symbol: String?
     var large = false
     var provider: String?
+    var dim = false
     var body: some View {
-        let hue = provider.map(ProviderLook.hue) ?? GlassInk.slate
-        let size = large ? 56.0 : 36.0
-        Image(systemName: symbol ?? provider.map(ProviderLook.symbol) ?? "key.fill")
-            .coreFont(size: large ? 24 : 15, weight: .semibold).foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(
-                LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(large ? 13 : 9)
-            )
-            .overlay { coreShape(large ? 13 : 9).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-            .shadow(color: hue.opacity(0.4), radius: large ? 14 : 6)
-            .accessibilityHidden(true)
+        IconTile(
+            symbol ?? provider.map(ProviderLook.symbol) ?? "key.fill",
+            hue: dim ? GlassInk.slate : provider.map(ProviderLook.hue) ?? GlassInk.slate, size: large ? 56 : 32)
     }
 }
 
@@ -72,37 +64,19 @@ struct VerdictBadge: View {
     }
 }
 
-/// A small glass action: icon and words, lifting and lighting in its colour on hover (red when it removes something).
+/// A small worded action: CoreUI's small secondary button (the quiet danger one when it removes something), with its
+/// hover, press and disabled states.
 struct AccLink: View {
     let title: String
     var symbol: String?
     var danger = false
     var help: String?
     let action: () -> Void
-    @Environment(\.isEnabled) private var enabled
-    @State private var hovering = false
     var body: some View {
-        let hue = danger ? GlassInk.red : GlassInk.blue
         Button(action: action) {
-            HStack(spacing: Space.s1) {
-                if let symbol {
-                    Image(systemName: symbol).flipsForRightToLeftLayoutDirection(true).coreBounce(hovering)
-                        .accessibilityHidden(true)
-                }
-                Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).lineLimit(1)
-            }
-            .foregroundStyle(hovering ? .white : danger ? GlassInk.redInk : GlassInk.blueInk)
-            .padding(.horizontal, Space.s2).frame(minHeight: 26)
-            .background(hovering ? hue.opacity(0.7) : hue.opacity(0.12), in: coreShape(7))
-            .overlay { coreShape(7).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
-            .contentShape(coreShape(7))
+            if let symbol { Label(title, systemImage: symbol) } else { Text(title) }
         }
-        .buttonStyle(.plain)
-        .focusable(false)
-        .coreScaleEffect(hovering ? 1.04 : 1)
-        .onHover { hovering = $0 && enabled }
-        .animation(.smooth(duration: 0.25), value: hovering)
-        .coreDimWhenDisabled(enabled)
+        .buttonStyle(CoreButtonStyle(danger ? .quietDanger : .secondary, size: .small))
         .help(help ?? title)
     }
 }
@@ -131,7 +105,7 @@ struct AccStateCard<Actions: View>: View {
     var body: some View {
         let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.amber : GlassInk.blue
         VStack(spacing: Space.s3) {
-            IconTile(symbol, hue: hue, size: 64, bounce: shown).shadow(color: hue.opacity(0.5), radius: 18)
+            IconTile(symbol, hue: hue, size: 64, bounce: shown)
                 .coreScaleEffect(shown ? 1 : 0.6)
             Text(title).coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
@@ -216,7 +190,6 @@ struct GateBanner: View {
                     g.kind == .off ? "lock.fill" : g.kind == .throwaway ? "testtube.2" : "questionmark", hue: hue,
                     size: 44, bounce: shown
                 )
-                .shadow(color: hue.opacity(0.45), radius: 10)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(g.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(g.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
