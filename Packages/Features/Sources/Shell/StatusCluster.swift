@@ -34,7 +34,7 @@ struct StatusCluster: View {
                 Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd - Space.s1)
                     .frame(width: MacSize.controlLg, height: MacSize.controlLg)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(StatusBarStyle())
             .help("Launcher (⌘K)")
             .accessibilityLabel("Launcher")
         }
@@ -63,9 +63,8 @@ struct StatusCluster: View {
                 .coreFont(size: MacTextSize.body)
                 .padding(.horizontal, Space.s2)
                 .frame(minHeight: MacSize.controlMd)
-                .contentShape(coreShape(Radius.control))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(StatusBarStyle())
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: running)
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: waiting)
             .help(waiting > 0 ? "\(waiting) waiting on you. Open notifications" : "Nothing waiting on you")
@@ -83,10 +82,6 @@ private struct StatusButton: View {
     var bounce: Int?
     var meter: (value: Double, low: Bool)?
     let action: () -> Void
-    @Environment(\.corePalette) private var palette
-    @FocusState private var focused: Bool
-    @State private var hovering = false
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s1) {
@@ -101,17 +96,46 @@ private struct StatusButton: View {
             .coreFont(size: MacTextSize.body)
             .padding(.horizontal, Space.s2)
             .frame(minWidth: MacSize.controlMd, minHeight: MacSize.controlMd)
-            .background(on ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.control))
-            .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain)
-        .focused($focused)
-        .focusEffectDisabled()
-        .coreFocusRing(focused, radius: Radius.control, palette: palette)
-        .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .buttonStyle(StatusBarStyle(on: on))
         .help(label)
         .accessibilityLabel(label)
+    }
+}
+
+/// The status bar's buttons: quiet until hovered (a well), lit while their panel is open, pressed in on click (darkened
+/// under Reduce Motion). No focus ring. `fill` is a chip's own tone, which the hover lifts.
+// Local: CoreUI's tile press (`CoreTilePress`) is internal and CoreButtonStyle pads and inks its label. Proposal: make
+// CoreTilePress public with a hover fill.
+struct StatusBarStyle: ButtonStyle {
+    var on = false
+    var fill: Color = .clear
+    func makeBody(configuration: Configuration) -> some View {
+        StatusBarSurface(configuration: configuration, on: on, fill: fill)
+    }
+
+    private struct StatusBarSurface: View {
+        let configuration: ButtonStyleConfiguration
+        let on: Bool
+        let fill: Color
+        @Environment(\.corePalette) private var palette
+        @Environment(\.accessibilityReduceMotion) private var reduce
+        @State private var hovering = false
+        var body: some View {
+            let shape = coreShape(Radius.control)
+            let pressed = configuration.isPressed
+            configuration.label
+                .background(on ? palette.navActive : fill, in: shape)
+                .background { if hovering && !on { shape.fill(palette.uDim) } }
+                .overlay { if hovering && fill != .clear { shape.fill(palette.uDim) } }
+                .overlay { shape.fill(.black.opacity(pressed && reduce ? 0.18 : 0)) }
+                .contentShape(shape)
+                .scaleEffect(pressed && !reduce ? 0.97 : 1)
+                .animation(Motion.press(Motion.press), value: pressed)
+                .animation(Motion.out(Motion.hover), value: hovering)
+                .onHover { hovering = $0 }
+                .focusEffectDisabled()
+        }
     }
 }
 
