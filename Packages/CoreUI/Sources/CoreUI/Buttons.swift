@@ -73,7 +73,8 @@ private struct CoreButtonBody: View {
             }
             // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
             if let keycap {
-                Text(keycap).coreFont(size: 10, weight: .medium, design: .rounded)
+                // fixedSize: a keycap never gives way to its label ("Deny ⌘⌫" drew as "⌘…" on a small button).
+                Text(keycap).coreFont(size: 10, weight: .medium, design: .rounded).fixedSize()
                     .padding(.horizontal, 5).frame(minHeight: 16)
                     .background(.white.opacity(0.16), in: coreShape(5))
                     .accessibilityHidden(true)
