@@ -42,7 +42,7 @@ struct RunnersView: View {
                 if model.load == .ready { empty } else { CoreBusyBar() }
             } else {
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s3, alignment: .top)],
+                    columns: [GridItem(.adaptive(minimum: Space.s8 * 16), spacing: Space.s3, alignment: .top)],
                     spacing: Space.s3
                 ) {
                     ForEach(shown) { r in
@@ -238,7 +238,7 @@ private struct RunnerCard: View {
                             Text("Not reported yet").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         }
                     }
-                    Spacer(minLength: Space.s2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     Label("Open", systemImage: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
                         .foregroundStyle(palette.text2).opacity(hovering ? 1 : 0)
                 }
