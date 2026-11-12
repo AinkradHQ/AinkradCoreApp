@@ -39,7 +39,6 @@ final class TerminalPrefs {
 
     /// Defaults for the quick New terminal and for what opening one does.
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
-    var defaultShell: String { didSet { save() } }  // "" = the runner's login shell
     var openFullPane: Bool { didSet { save() } }
     var confirmEnd: Bool { didSet { save() } }
 
@@ -47,7 +46,15 @@ final class TerminalPrefs {
 
     private let defaults = UserDefaults.standard
     private init() {
-        fontName = defaults.string(forKey: "terminal.font") ?? TerminalPrefs.systemMono
+        TerminalFonts.register()
+        // The bundled Nerd Font is the default (N20): the Powerlevel10k prompt needs its symbols. A Mac that still holds the
+        // old default (SF Mono) moves to it once; a font the person chose themselves stays.
+        var stored = defaults.string(forKey: "terminal.font")
+        if defaults.object(forKey: "terminal.fontDefaultV2") == nil {
+            defaults.set(true, forKey: "terminal.fontDefaultV2")
+            if stored == TerminalPrefs.systemMono { stored = nil }
+        }
+        fontName = stored ?? TerminalFonts.family
         fontSize = defaults.object(forKey: "terminal.size") as? Double ?? 12
         themeID = defaults.string(forKey: "terminal.theme") ?? TermTheme.all[0].id
         cursor = CursorShape(rawValue: defaults.string(forKey: "terminal.cursor") ?? "") ?? .block
@@ -59,7 +66,6 @@ final class TerminalPrefs {
             Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "").map { $0 == .frosted ? .clear : $0 }
             ?? .theme
         defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
-        defaultShell = defaults.string(forKey: "terminal.defaultShell") ?? ""
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
         confirmEnd = defaults.object(forKey: "terminal.confirmEnd") as? Bool ?? true
     }
@@ -110,13 +116,15 @@ final class TerminalPrefs {
         }
     }
 
-    /// The monospaced families on this Mac, SF Mono first.
+    /// The monospaced families on this Mac, the bundled Nerd Font and SF Mono first.
     static let families: [String] = {
+        TerminalFonts.register()
         let mono = NSFontManager.shared.availableFontFamilies.filter { family in
             guard let f = NSFont(name: family, size: 12) else { return false }
             return f.isFixedPitch || f.fontDescriptor.symbolicTraits.contains(.monoSpace)
         }
-        return [systemMono] + mono.filter { $0 != systemMono }.sorted()
+        let rest = mono.filter { $0 != systemMono && $0 != TerminalFonts.family }.sorted()
+        return (NSFont(name: TerminalFonts.family, size: 12) != nil ? [TerminalFonts.family] : []) + [systemMono] + rest
     }()
 
     private func save() {
@@ -130,7 +138,6 @@ final class TerminalPrefs {
         defaults.set(followLook, forKey: "terminal.followLook")
         defaults.set(screen.rawValue, forKey: "terminal.screen")
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
-        defaults.set(defaultShell, forKey: "terminal.defaultShell")
         defaults.set(openFullPane, forKey: "terminal.openFull")
         defaults.set(confirmEnd, forKey: "terminal.confirmEnd")
         NotificationCenter.default.post(name: Self.changed, object: nil)
@@ -186,4 +193,22 @@ struct TermTheme: Identifiable, Equatable {
                 0x5D6270, 0xE0566A, 0x3FA56C, 0xC48A1A, 0x5A8EF2, 0xA674E0, 0x2BA7B3, 0xFFFFFF,
             ])),
     ]
+}
+
+/// The Nerd Font that ships inside the app (MesloLGS NF, licence in `Resources/Fonts`). It is registered for this process only,
+/// so nothing is installed on the Mac.
+enum TerminalFonts {
+    static let family = "MesloLGS NF"
+    private static let once: Void = {
+        guard let dir = Bundle.module.resourceURL else { return }
+        let urls = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        for u in urls where u.pathExtension == "ttf" {
+            CTFontManagerRegisterFontsForURL(u as CFURL, .process, nil)
+        }
+        // `.process` resources may sit in a Fonts folder, depending on how the package was built.
+        let nested = dir.appendingPathComponent("Fonts")
+        for u in (try? FileManager.default.contentsOfDirectory(at: nested, includingPropertiesForKeys: nil)) ?? []
+        where u.pathExtension == "ttf" { CTFontManagerRegisterFontsForURL(u as CFURL, .process, nil) }
+    }()
+    static func register() { _ = once }
 }
