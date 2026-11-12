@@ -29,6 +29,22 @@ public struct FolderSource: ImportSource {
         return report
     }
 
+    public var incremental: Bool { true }
+    public func newCount(since: Date?) async -> Int {
+        guard let since else { return 0 }
+        return collector.candidates(under: root).filter {
+            (collector.files.modified(of: $0) ?? .distantPast) > since
+                && PreFilter.skipReason(path: $0.path.replacingOccurrences(of: root.path, with: "")) == nil
+        }.count
+    }
+    public func streamNew(
+        since: Date?, run: String, uploader: Uploader, uploaded: Uploader.Progress
+    ) async throws -> CollectReport {
+        try await ImportStreamer(collector: collector, uploader: uploader).run(
+            root: root, runID: run, resume: .init(), uploaded: uploaded, since: since, save: { _ in },
+            onProgress: { _ in })
+    }
+
     public func stream(
         run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void

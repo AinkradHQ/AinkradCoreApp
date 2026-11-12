@@ -23,6 +23,8 @@ public final class ImportModel {
 
     let host: any AdminHost
     let routes: BrainRoutes
+    /// Set by the pane: after a commit the imported Mac collectors are registered for incremental sync.
+    @ObservationIgnored var service: (any BrainService)?
     let sources: [String: any ImportSource]
     let poll: Duration
     let pause: @Sendable (Int) async -> Void
@@ -253,6 +255,23 @@ public final class ImportModel {
         job = nil
     }
 
+    /// Opens the review step for a run the Core already holds (a sync that left rooms or Unsorted items to review).
+    /// False when another import is in progress.
+    @discardableResult
+    public func reviewExisting(_ id: String) async -> Bool {
+        if run == id, step == .review { return true }
+        guard !isActive else { return false }
+        do {
+            try await review.load(run: id)
+            run = id
+            step = .review
+            return true
+        } catch {
+            failure = BrainWords.failure(error)
+            return false
+        }
+    }
+
     // MARK: step 4
 
     public func commit() async {
@@ -265,6 +284,9 @@ public final class ImportModel {
             result = r
             await review.refresh()
             resume?.clear()
+            if let since = started, let service {
+                await SyncModel.register(chosen.map(\.id), from: Array(sources.values), since: since, service: service)
+            }
             step = .done
         } catch is AdminDeclined {
             step = .review

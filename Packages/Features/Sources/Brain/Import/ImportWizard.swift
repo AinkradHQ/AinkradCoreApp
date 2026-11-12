@@ -5,10 +5,35 @@ import SwiftUI
 
 extension BrainModel {
     /// Opens the Import wizard over the shell. A run already under way is picked up where it stands.
+    /// A run waiting for review (from a sync) opens the wizard on its review step.
+    public func openReview(_ run: String) async {
+        guard let routes = service?.importRoutes else { return }
+        if importer == nil || importer?.step == .done {
+            importer = ImportModel(host: host, routes: routes, sources: importSources(), resume: .standard())
+            importer?.service = service
+        }
+        guard let importer, await importer.reviewExisting(run) else {
+            sync?.notice = "Finish the import in progress first."
+            return
+        }
+        openImport()
+    }
+
+    /// `brain.inbox`: one notice, then the lists refresh.
+    public func inboxNotice(unsorted: Int, newRooms: Int) {
+        var parts: [String] = []
+        if newRooms > 0 { parts.append(BrainWords.plural(newRooms, "new room", "new rooms")) }
+        if unsorted > 0 { parts.append("\(unsorted) unsorted") }
+        host.shell.showToast(
+            "New AI sessions are waiting for review" + (parts.isEmpty ? "." : ": \(parts.joined(separator: ", "))."))
+        Task { await sync?.reload() }
+    }
+
     public func openImport() {
         guard let routes = service?.importRoutes, setup == .ready || setup == .notSetUp else { return }
         if importer == nil || importer?.step == .done {
             importer = ImportModel(host: host, routes: routes, sources: importSources(), resume: .standard())
+            importer?.service = service
         }
         guard let importer else { return }
         let shell = host.shell

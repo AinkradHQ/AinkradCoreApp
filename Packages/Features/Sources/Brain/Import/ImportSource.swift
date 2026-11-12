@@ -17,10 +17,31 @@ public protocol ImportSource: Sendable {
         run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
     ) async throws -> CollectReport
+
+    /// A source that can read just what changed after a cursor (E7-2). Others are only collected by the wizard.
+    var incremental: Bool { get }
+    /// How many files changed after `since` (and pass the pre-filter); 0 when there is no cursor.
+    func newCount(since: Date?) async -> Int
+    /// Uploads only what changed after `since` into an incremental run; `newest` of the report is the newest file time.
+    func streamNew(since: Date?, run: String, uploader: Uploader, uploaded: Uploader.Progress) async throws
+        -> CollectReport
 }
 
 extension ImportSource {
     public var notReadable: String? { nil }
+    public var incremental: Bool { false }
+    public func newCount(since: Date?) async -> Int { 0 }
+    public func streamNew(
+        since: Date?, run: String, uploader: Uploader, uploaded: Uploader.Progress
+    ) async throws -> CollectReport { CollectReport() }
+}
+
+/// What a Mac collector remembers on the Core: the newest file time it has taken. Opaque to the Core.
+public struct SourceCursor: Codable, Sendable, Equatable {
+    public var mtime: Double?
+    public init(mtime: Double? = nil) { self.mtime = mtime }
+    public init(date: Date) { mtime = date.timeIntervalSince1970 }
+    public var date: Date? { mtime.map { Date(timeIntervalSince1970: $0) } }
 }
 
 /// Claude Code sessions, `<root>/<project>/<session>.jsonl`.
@@ -53,6 +74,22 @@ public struct ClaudeCodeSource: ImportSource {
             }
         }
         return report
+    }
+
+    public var incremental: Bool { true }
+    public func newCount(since: Date?) async -> Int {
+        guard let since else { return 0 }
+        return files.listFiles(under: root).filter {
+            $0.pathExtension == "jsonl" && (files.modified(of: $0) ?? .distantPast) > since
+                && PreFilter.skipReason(path: $0.path.replacingOccurrences(of: root.path, with: "")) == nil
+        }.count
+    }
+    public func streamNew(
+        since: Date?, run: String, uploader: Uploader, uploaded: Uploader.Progress
+    ) async throws -> CollectReport {
+        try await ImportStreamer(collector: ClaudeCodeCollector(device: device, files: files), uploader: uploader).run(
+            root: root, runID: run, resume: .init(), uploaded: uploaded, since: since, save: { _ in },
+            onProgress: { _ in })
     }
 
     public func stream(

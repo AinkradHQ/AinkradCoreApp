@@ -26,7 +26,7 @@ public struct BrainRoutes: Sendable {
     let transport: any BrainTransport
     public init(transport: any BrainTransport) { self.transport = transport }
 
-    private func call<T: Decodable>(
+    func call<T: Decodable>(
         _ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type = T.self
     ) async throws -> T {
         let data = try await raw(method, path, body)

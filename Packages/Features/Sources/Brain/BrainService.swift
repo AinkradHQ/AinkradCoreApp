@@ -1,3 +1,4 @@
+import BrainImport
 import Foundation
 
 /// What the Brain screens ask for. Method names mirror the screens, so swapping the sample service for the generated Core
@@ -42,6 +43,20 @@ public protocol BrainService: Sendable {
     func setup() async throws -> BrainSetup
     /// The import routes, or nil when the service cannot import (the sample).
     var importRoutes: BrainRoutes? { get }
+
+    // MARK: sync, sources, search, rules (M2)
+
+    func syncStatus() async throws -> SyncStatusWire
+    /// Every collector with its switch and cursor.
+    func sources() async throws -> [SourceWire]
+    /// Switches a collector, or moves its cursor (nil keeps the Core's value).
+    func putSource(_ s: SourceWire, enabled: Bool?, cursor: SourceCursor?) async throws -> SourceWire
+    /// The Core's own sync (`POST /sync`); the Mac collectors are run by `SyncModel` first.
+    func syncNow() async throws -> SyncResultWire
+    func search(room: String, query: String) async throws -> [SearchHit]
+    func rules() async throws -> [RuleWire]
+    /// The caller has already asked for Touch ID.
+    func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -60,6 +75,15 @@ extension BrainService {
     public func setup() async throws -> BrainSetup { .ready }
     /// The import routes of a real Core; nil for a stand-in.
     public var importRoutes: BrainRoutes? { nil }
+    public func syncStatus() async throws -> SyncStatusWire { SyncStatusWire() }
+    public func sources() async throws -> [SourceWire] { [] }
+    public func putSource(_ s: SourceWire, enabled: Bool?, cursor: SourceCursor?) async throws -> SourceWire { s }
+    public func syncNow() async throws -> SyncResultWire { SyncResultWire() }
+    public func search(room: String, query: String) async throws -> [SearchHit] { [] }
+    public func rules() async throws -> [RuleWire] { [] }
+    public func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire {
+        throw BrainFailure("Rules come later.", code: "not_served")
+    }
 }
 
 /// A failure the screens can word.
