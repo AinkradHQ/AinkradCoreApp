@@ -116,8 +116,8 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .today: "Today"
         case .needs: "Needs you"
-        case .running: "Running agents"
-        case .spend: "Agent spend"
+        case .running: "Running AI sessions"
+        case .spend: "AI spend"
         case .machines: "Machines"
         case .board: "Citadel board"
         case .events: "Recent events"
@@ -130,7 +130,7 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .today: "What needs you, what is running, how the machines are."
         case .needs: "Approvals waiting on a person."
-        case .running: "Agent sessions working now, and for how long."
+        case .running: "AI sessions working now, and for how long."
         case .spend: "Spend today and the month token meter."
         case .machines: "Runner slots in use and host load, sampled on this Mac."
         case .board: "Issues by state across the board."

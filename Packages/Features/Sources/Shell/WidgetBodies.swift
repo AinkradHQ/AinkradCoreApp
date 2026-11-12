@@ -66,12 +66,12 @@ struct RunningBody: View {
             waiting > 0 ? StateBadge("\(waiting) needs you", tone: .warn, symbol: "hand.raised") : nil
         VStack(alignment: .leading, spacing: Space.s2) {
             if runs.isEmpty {
-                WHead("sparkles", "Agents")
-                WEmpty(symbol: "sparkles", text: "No agents running")
+                WHead("text.cursor", "AI sessions")
+                WEmpty(symbol: "sparkles", text: "No AI sessions running")
             } else {
                 switch size {
                 case .s:
-                    WHead("sparkles", "Agents")
+                    WHead("text.cursor", "AI sessions")
                     WFigure(value: Double(runs.count), caption: "running")
                     Spacer(minLength: 0)
                     HStack(spacing: Space.s1) {
@@ -80,18 +80,18 @@ struct RunningBody: View {
                         }
                     }
                 case .m:
-                    WHead("sparkles", "Running agents") { needs }
+                    WHead("text.cursor", "Running AI sessions") { needs }
                     HStack(alignment: .top, spacing: Space.s4) {
                         WFigure(value: Double(runs.count), caption: "running now").frame(width: 100)
                         list(runs.prefix(2), tool: false)
                     }
                 case .l:
-                    WHead("sparkles", "Running agents") { needs }
+                    WHead("text.cursor", "Running AI sessions") { needs }
                     WFigure(value: Double(runs.count), caption: "running")
                     list(runs.prefix(5), tool: true)
                     Spacer(minLength: 0)
                 case .x:
-                    WHead("sparkles", "Running agents")
+                    WHead("text.cursor", "Running AI sessions")
                     HStack(alignment: .top, spacing: Space.s4) {
                         VStack(alignment: .leading, spacing: Space.s3) {
                             HStack {
@@ -151,7 +151,7 @@ struct SpendBody: View {
                     Meter(value: home.monthTokensUsed)
                     WCaption(tightest)
                 case .m:
-                    WHead("dollarsign", "Agent spend")
+                    WHead("dollarsign", "AI spend")
                     HStack(alignment: .top, spacing: Space.s4) {
                         VStack(alignment: .leading, spacing: Space.s2) {
                             WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
@@ -161,7 +161,7 @@ struct SpendBody: View {
                         WColumns(values: week, labels: weekLabels)
                     }
                 case .l:
-                    WHead("dollarsign", "Agent spend")
+                    WHead("dollarsign", "AI spend")
                     HStack(alignment: .firstTextBaseline) {
                         WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
                         Spacer(minLength: 0)
@@ -174,7 +174,7 @@ struct SpendBody: View {
                     }
                     WGap(label: "Spend by account")
                 case .x:
-                    WHead("dollarsign", "Agent spend")
+                    WHead("dollarsign", "AI spend")
                     HStack(alignment: .top, spacing: Space.s4) {
                         VStack(alignment: .leading, spacing: Space.s3) {
                             WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
@@ -223,7 +223,7 @@ struct WMachineRow: View {
                 Text(machine.id).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 WRunnerBadge(machine: machine)
                 Spacer(minLength: Space.s2)
-                Text("\(machine.used) of \(machine.slots) agents").coreFont(size: MacTextSize.meta)
+                Text("\(machine.used) of \(machine.slots) AI sessions").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(WidgetInk.secondary).monospacedDigit().lineLimit(1)
             }
             .foregroundStyle(WidgetInk.primary)

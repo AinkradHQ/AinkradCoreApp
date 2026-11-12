@@ -20,6 +20,13 @@ enum Registration {
                 DevicesSection(app: app)
             })
         shell.settings.section(
+            SettingsSection(
+                id: "mac-runner", group: .mac, title: "This Mac as a runner",
+                sub: "Terminals and agents that run on this Mac for your Core", symbol: "laptopcomputer", order: 5
+            ) {
+                MacRunnerSection(model: app.macRunner)
+            })
+        shell.settings.section(
             SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
                 ForgetSection(app: app)
             })

@@ -28,7 +28,7 @@ struct ApprovalCardView: View {
 
     private var elevated: Bool { model.shell.elevatedUntil.map { $0 > Date() } ?? false }
     private var who: String {
-        model.sessions.session(request.session).map { AgentWords.harnessName($0.harness) } ?? "An agent"
+        model.sessions.session(request.session).map { AgentWords.harnessName($0.harness) } ?? "An AI session"
     }
     private var ask: ApprovalWords.Ask { ApprovalWords.ask(request.tool) }
 
@@ -158,7 +158,7 @@ struct ApprovalCardView: View {
                 Text("Nobody answered in time: \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
                 Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced)
                     .foregroundStyle(GlassInk.secondary).lineLimit(2)
-                Text("The agent stopped waiting for this. Ask it again from the composer if you still want it.")
+                Text("The AI session stopped waiting for this. Ask it again from the composer if you still want it.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: 0)

@@ -41,12 +41,8 @@ extension AgentsModel {
 
     // MARK: composer
 
-    /// A running session takes a reply; a finished one (it succeeded) takes the next turn, which wakes it.
-    public func canReply(_ s: AgentSessionInfo) -> Bool {
-        if case .running = s.state { return true }
-        if case .ended = s.state, s.outcome == .succeeded { return true }
-        return false
-    }
+    /// A live session takes a message at any time (it queues while a turn runs). Wake and Resume are recovery only.
+    public func canReply(_ s: AgentSessionInfo) -> Bool { canWrite(s) }
 
     public func canSend(_ id: String) -> Bool {
         let text = drafts[id] ?? ""
@@ -60,15 +56,14 @@ extension AgentsModel {
         sending.insert(id)
         note(id, nil)
         defer { sending.remove(id) }
-        if case .ended? = sessions.session(id)?.state {
-            await wake(id, text: text)
-            return
-        }
         do {
-            let s = try await elevated("Send a message to \(sessions.session(id)?.harness ?? "the agent").") {
+            let s = try await elevated(
+                "Send a message to \(AgentWords.toolName(sessions.session(id)?.harness ?? "the AI"))."
+            ) {
                 try await api.send(id, text: text)
             }
             drafts[id] = ""
+            nameFromFirstMessage(id, text)
             sessions.upsert(s)
             if let t = transcripts[id] { await t.refresh(api, knownLast: s.lastSeq) }
         } catch {
@@ -118,12 +113,12 @@ extension AgentsModel {
         guard let api else { return }
         note(id, nil)
         do {
-            try await elevated("Wake \(sessions.session(id)?.harness ?? "the agent").") {
+            try await elevated("Wake \(sessions.session(id)?.harness ?? "the AI session").") {
                 try await api.wake(id, key: UUID().uuidString, text: text)
             }
             if text != nil { drafts[id] = "" }
             shell.showToast(
-                text == nil ? "Wake sent. The session starts again from its last turn." : "Waiting for the agent…")
+                text == nil ? "Wake sent. The session starts again from its last turn." : "Waiting for the AI session…")
             await refreshSession(id)
         } catch { note(id, Self.notice(error, doing: "Waking")) }
     }
@@ -157,7 +152,7 @@ extension AgentsModel {
     ) {
         guard let api else { return }
         note(id, nil)
-        let h = sessions.session(id)?.harness ?? "the agent"
+        let h = sessions.session(id)?.harness ?? "the AI session"
         if let stop { stopping[id] = stop }
         Task { [weak self] in
             guard let self else { return }
@@ -183,7 +178,8 @@ extension AgentsModel {
         let t = store(r.session)
         defer { deciding.remove(r.id) }
         do {
-            _ = try await elevated("\(sessions.session(r.session)?.harness ?? "An agent") asks to use \(r.tool).") {
+            _ = try await elevated("\(sessions.session(r.session)?.harness ?? "An AI session") asks to use \(r.tool).")
+            {
                 t.mark(r.id, approved: approved)
                 return try await api.decide(r.session, request: r.id, approved: approved)
             }
@@ -219,7 +215,7 @@ extension AgentsModel {
             sessions.upsert(s)
             if let t = AgentWords.title(prompt: new.prompt) { titles[s.id] = t }
             openSession(s.id)
-            shell.showToast("Session created")
+            shell.showToast("AI session started")
             return nil
         } catch {
             if let e = CoreError.unwrapping(error) {
@@ -229,9 +225,9 @@ extension AgentsModel {
                 }
                 if case .forbiddenScope = e {
                     return InlineNotice(
-                        title: "Only an admin can start a session from a chain or an agent.",
+                        title: "Only an admin can start an AI session from an account order.",
                         detail:
-                            "Use a device that holds the admin scope, or start a plain session by choosing a harness.")
+                            "Use a device that holds the admin scope, or start a plain AI session by choosing a tool.")
                 }
             }
             return Self.notice(error, doing: "Starting the session")
@@ -242,7 +238,7 @@ extension AgentsModel {
     static func refusal(_ code: String) -> String {
         switch code {
         case "runner_offline": "That runner is offline"
-        case "unsupported_command": "That runner cannot run agents"
+        case "unsupported_command": "That runner cannot run AI sessions"
         case "runner_busy": "That runner is too busy right now"
         default: "The Core refused: \(code)"
         }
@@ -252,7 +248,7 @@ extension AgentsModel {
     static func fix(_ code: String) -> String {
         switch code {
         case "runner_offline": "Pick another runner, or bring this one back online."
-        case "unsupported_command": "Pick a runner that can run agents."
+        case "unsupported_command": "Pick a runner that can run AI sessions."
         case "runner_busy": "Wait a moment and choose Try again, or pick another runner."
         default: "Check what you chose and choose Try again."
         }

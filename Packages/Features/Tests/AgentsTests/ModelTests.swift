@@ -240,18 +240,53 @@ struct ModelTests {
         #expect(api.calls.contains("resume") && api.calls.contains("wake") && host?.asked.count == 2)
     }
 
-    @Test func aFinishedSessionTakesTheNextMessageThroughWake() async throws {
+    @Test func aLiveSessionTakesMessagesAndAFinishedOneDoesNot() async throws {
         let (m, api, _, _) = await make()
-        let id = "as_01JC4X7Q3MZ8N5V2K9R006"
-        m.drafts[id] = "list the files"
-        #expect(m.canSend(id))
-        await m.send(id)
-        #expect(api.calls.contains("wake") && !api.calls.contains("send"))
-        #expect(m.drafts[id] == "")
-        api.update(id) { $0.outcome = .failed }
+        let live = "as_01JC4X7Q3MZ8N5V2K9R004"
+        api.update(live) { $0.state = .waiting }
         await m.reloadAll()
-        m.drafts[id] = "again"
-        #expect(!m.canSend(id))
+        m.drafts[live] = "list the files"
+        #expect(m.canSend(live))
+        await m.send(live)
+        #expect(api.calls.contains("send") && !api.calls.contains("wake"))
+        #expect(m.drafts[live] == "")
+        // The first message names a session nobody named.
+        #expect(m.title(m.sessions.session(live)!) != "")
+        let done = "as_01JC4X7Q3MZ8N5V2K9R006"
+        m.drafts[done] = "again"
+        #expect(!m.canSend(done))
+    }
+
+    @Test func stopTurnKeepsTheSessionOpenAndEndSessionClosesIt() async throws {
+        let (m, api, _, _) = await make()
+        let id = "as_01JC4X7Q3MZ8N5V2K9R004"
+        api.update(id) { $0.state = .running }
+        await m.reloadAll()
+        m.stopTurn(id)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(api.calls.contains("stopTurn") && m.sessions.session(id)?.idle == true)
+        #expect(m.canWrite(m.sessions.session(id)!) && !m.canStopTurn(m.sessions.session(id)!))
+        m.end(id)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(api.calls.contains("end") && m.sessions.session(id)?.live == false)
+    }
+
+    @Test func aNewLiveSessionOpensWithNoPromptAndWaits() async throws {
+        let (m, api, _, _) = await make()
+        let n = await m.startLiveSession()
+        #expect(n == nil)
+        #expect(api.calls.contains("create"))
+        let made = try #require(m.sessions.items.first { $0.id.hasPrefix("as_new") })
+        #expect(made.idle && m.selected == made.id)
+    }
+
+    @Test func pinAndArchiveAreKeptAcrossModels() async {
+        let (m, _, _, _) = await make()
+        m.togglePin("a")
+        m.toggleArchive("b")
+        #expect(m.pinned == ["a"] && m.archived == ["b"])
+        m.toggleArchive("b")
+        #expect(m.archived.isEmpty)
     }
 
     @Test func aRefusedNewSessionComesBackAsWords() async {
@@ -287,8 +322,8 @@ struct ModelTests {
         let (m, api, _, _) = await make()
         api.failNext = CoreError.forbiddenScope
         let n = await m.create(NewAgentSession(runner: "d_mac", harness: "claude", prompt: "go", chain: 1))
-        #expect(n?.title == "Only an admin can start a session from a chain or an agent.")
-        #expect(n?.detail.contains("harness") == true)
+        #expect(n?.title == "Only an admin can start an AI session from an account order.")
+        #expect(n?.detail.contains("tool") == true)
     }
 
     @Test func agentIdsFollowTheCoresRule() {
@@ -318,7 +353,7 @@ struct ModelTests {
         #expect(m.shell.launcher.entry("agents.list") != nil && m.shell.launcher.entry("agents.new")?.isAction == true)
         #expect(m.shell.launcher.entries.filter { $0.id.hasPrefix("agents.s-") }.count == 11)
         m.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
-        #expect(m.shell.panes.first?.chip?.label == "Waiting on you")
+        #expect(m.shell.panes.first?.chip?.label == "Needs you")
     }
 
     @Test func detachClearsTheBell() async {

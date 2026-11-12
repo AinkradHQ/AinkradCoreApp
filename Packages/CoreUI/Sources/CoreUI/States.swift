@@ -51,12 +51,14 @@ public enum AccountState: CoreState {
 
 /// `AgentSession.state`.
 public enum SessionState: CoreState {
-    case starting, running, interrupted, ended, lost
+    case starting, running, waiting, interrupted, ended, lost
     case unknown(String)
     public var unknownRaw: String? { if case .unknown(let r) = self { r } else { nil } }
     public static let table: [Entry] = [
         (.starting, "starting", "Starting", .done, "hourglass"),
         (.running, "running", "Running", .run, "waveform"),
+        // A live AI session between turns: the process is up and waits for your next message.
+        (.waiting, "waiting", "Waiting for you", .done, "text.cursor"),
         (.interrupted, "interrupted", "Resuming", .warn, "arrow.clockwise"),
         (.ended, "ended", "Ended", .queue, "stop.circle"),
         (.lost, "lost", "Lost", .fail, "wifi.exclamationmark"),

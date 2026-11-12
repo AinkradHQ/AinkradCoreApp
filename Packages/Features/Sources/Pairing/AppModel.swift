@@ -36,6 +36,8 @@ public final class AppModel {
     var stepUpNotice: StepUpNotice?
     private(set) var devices: DevicesModel!
     private(set) var lockouts: LockoutsModel!
+    /// The runner inside this app: "Use this Mac as a runner" (N16).
+    private(set) var macRunner: MacRunnerModel!
     /// Core version, API minor and this device's scopes (`GET /me`).
     let about = AboutModel()
     private(set) var addDevice: AddDeviceModel?
@@ -79,6 +81,7 @@ public final class AppModel {
 
     init(
         keyStore: any KeyStore, driver: any PairingDriver, demo: Bool = false,
+        macControl: any MacRunnerControl = LiveMacRunnerControl(),
         makeService: @escaping @MainActor (any KeyStore) throws -> any CoreService,
         sasSink: (@MainActor (String) -> Void)? = nil
     ) {
@@ -86,11 +89,25 @@ public final class AppModel {
         self.keyStore = keyStore
         self.demo = demo
         self.makeService = makeService
+        macRunner = MacRunnerModel(
+            control: demo ? NoMacRunner() : macControl,
+            deps: MacRunnerDeps(
+                coreURL: { [weak self] in self?.coreURL.flatMap { URL(string: $0) } },
+                makeInvite: { [weak self] name in
+                    guard let self else { throw CancellationError() }
+                    return try await self.elevated("Add this Mac to the Core as a runner.", done: "added") {
+                        try await self.invites.createRunnerInvite(name: name)
+                    }
+                },
+                revoke: { [weak self] id in
+                    guard let self else { return "Not connected to a Core." }
+                    return await TerminalHostAdapter(app: self).revokeRunner(id)
+                }))
         firstRun = FirstRunModel(driver: driver, profile: shell.profile, sasSink: sasSink) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        wizard = SetupWizardModel(driver: driver, profile: shell.profile) { [weak self] in
+        wizard = SetupWizardModel(driver: driver, profile: shell.profile, macRunner: macRunner) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }
@@ -226,7 +243,10 @@ public final class AppModel {
             showAdminPages(isAdmin)
             await refreshAll()
             await homeFeed?.refresh()
-            if isAdmin { await syncPendingPairings() }
+            if isAdmin {
+                await syncPendingPairings()
+                await macRunner.reconcile()
+            }
         } catch {
             let f = Failure.from(error)
             switch f.kind {
@@ -252,7 +272,7 @@ public final class AppModel {
     }
 
     /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
-    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts"]
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts", "mac-runner"]
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
         shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
@@ -655,6 +675,7 @@ public final class AppModel {
         homeFeed = nil
         agents.detach()
         await service?.close()
+        await macRunner.coreForgotten()
         service = nil
         // A key that stays behind would pin the old Core again on the next launch, so a refused delete stops here.
         do { try keyStore.wipe() } catch {

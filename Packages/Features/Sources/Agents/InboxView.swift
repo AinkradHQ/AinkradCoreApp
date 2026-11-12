@@ -84,7 +84,7 @@ struct InboxView: View {
         return HStack(spacing: Space.s2) {
             IconTile(AgentsModel.harnessSymbol(s?.harness ?? ""), hue: hue, size: 26)
             Text(
-                "\(s.map { AgentWords.harnessName($0.harness) } ?? "An agent") on \(s.map { model.runnerName($0.runner) } ?? "a runner")"
+                "\(s.map { AgentWords.harnessName($0.harness) } ?? "An AI session") on \(s.map { model.runnerName($0.runner) } ?? "a runner")"
             )
             .coreFont(size: MacTextSize.body, weight: .semibold)
             Spacer(minLength: 0)
@@ -130,7 +130,8 @@ struct NotificationsSection: View {
                 ) {
                     GlassToggleTile(
                         "An approval is waiting",
-                        sub: allowed ? "An agent asks to use a tool and waits for you." : "Allow banners above first.",
+                        sub: allowed
+                            ? "An AI session asks to use a tool and waits for you." : "Allow banners above first.",
                         symbol: "hand.raised", onSymbol: "hand.raised.fill", isOn: $model.notifyApprovals, fill: true
                     )
                     .disabled(!allowed)

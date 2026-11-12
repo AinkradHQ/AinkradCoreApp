@@ -1,7 +1,9 @@
 import CoreUI
 import SwiftUI
 
-/// One session's pane: run header, a banner for its state, the streamed transcript, pending approvals, the composer.
+/// One AI session's conversation (N42): a compact header, one column of messages and tool rows, the composer. Adaptive: at
+/// 1300 pt and wider the side panel shows beside it; at medium widths the Details strip toggles under the header; narrow
+/// windows keep one column and tighten the header.
 struct SessionView: View {
     @Bindable var model: AgentsModel
     let sessionID: String
@@ -10,38 +12,27 @@ struct SessionView: View {
     @FocusState private var composing: Bool
     @State private var jump = 0
 
+    static let panelWidth: CGFloat = 1300
+    static let narrow: CGFloat = 720
+
     var body: some View {
         if let s = model.sessions.session(sessionID) {
-            VStack(alignment: .leading, spacing: 0) {
-                SessionHero(model: model, session: s)
-                VStack(spacing: Space.s2) {
-                    if model.link == .reconnecting {
-                        NoticeBanner(
-                            notice: InlineNotice(
-                                title: "Reconnecting",
-                                detail: "What you see stays visible; it resumes from where it left off.",
-                                symbol: "arrow.triangle.2.circlepath"))
+            GeometryReader { geo in
+                let wide = geo.size.width >= Self.panelWidth
+                HStack(alignment: .top, spacing: 0) {
+                    conversation(s, wide: wide, narrow: geo.size.width < Self.narrow)
+                    if wide {
+                        SessionSidePanel(model: model, session: s).frame(width: 320).padding(.trailing, Space.s3)
+                            .padding(.top, Space.s2).transition(.opacity)
                     }
-                    if let n = model.notices[sessionID] { NoticeBanner(notice: n) }
-                    StateBanner(model: model, session: s)
-                    SessionRouteCues(model: model, session: s)
                 }
-                .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
-                TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
-                ComposerView(model: model, session: s, focused: $composing)
-                keyHints(s)
             }
-            // Keyboard first: the pane holds focus when you are not writing. ↩ or / writes (Esc leaves the field),
-            // R resume, W wake, C cancel, K kill, ↓ or End jumps to the latest.
+            // The pane holds focus when you are not writing. A live session opens with the cursor in the composer.
             .focusable()
             .focused($paneFocus)
             .focusEffectDisabled()
-            .onAppear {
-                if case .running = s.state { composing = true } else { paneFocus = true }
-            }
-            .retakeFocus(after: model.shell, pane: AgentsModel.paneID(sessionID)) {
-                if case .running = s.state { composing = true } else { paneFocus = true }
-            }
+            .onAppear { focusStart(s) }
+            .retakeFocus(after: model.shell, pane: AgentsModel.paneID(sessionID)) { focusStart(s) }
             .onKeyPress(.return) { write(s) }
             .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in write(s) }
             .onKeyPress(.downArrow) { latest() }
@@ -53,19 +44,44 @@ struct SessionView: View {
                 case "r" where s.state == .lost: model.resume(s.id)
                 case "r" where s.over: model.startAgain(s.id)
                 case "w" where s.outcome == .succeeded: model.wake(s.id)
-                case "c" where s.live: model.confirmCancel(s.id)
-                case "k" where s.live: model.confirmKill(s.id)
                 default: return .ignored
                 }
                 return .handled
             }
-            // The same look as the Agents app: its surface inside the pane's glass rim.
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {
-            Text("This session is not in the list anymore.").foregroundStyle(palette.text2).padding(Space.s4)
+            Text("This AI session is not in the list anymore.").foregroundStyle(palette.text2).padding(Space.s4)
         }
+    }
+
+    private func conversation(_ s: AgentSessionInfo, wide: Bool, narrow: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SessionHero(model: model, session: s, panel: wide)
+            VStack(spacing: Space.s2) {
+                if model.link == .reconnecting {
+                    NoticeBanner(
+                        notice: InlineNotice(
+                            title: "Reconnecting",
+                            detail: "What you see stays visible; it resumes from where it left off.",
+                            symbol: "arrow.triangle.2.circlepath"))
+                }
+                if let n = model.notices[sessionID] { NoticeBanner(notice: n) }
+                StateBanner(model: model, session: s)
+                SessionRouteCues(model: model, session: s)
+            }
+            .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
+            TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
+                // A comfortable reading width, centred, on wide windows.
+                .frame(maxWidth: 820).frame(maxWidth: .infinity)
+            ComposerView(model: model, session: s, focused: $composing)
+                .frame(maxWidth: 820).frame(maxWidth: .infinity)
+        }
+    }
+
+    private func focusStart(_ s: AgentSessionInfo) {
+        if s.live { composing = true } else { paneFocus = true }
     }
 
     private func write(_ s: AgentSessionInfo) -> KeyPress.Result {
@@ -77,26 +93,6 @@ struct SessionView: View {
     private func latest() -> KeyPress.Result {
         jump += 1
         return .handled
-    }
-
-    /// The keys this pane answers, for what this session can do now.
-    /// The stack badge's width (icon, "3 of 3", "⌃Tab", padding), growing with the app's text size like the badge.
-    private var badgeRoom: CGFloat { 116 * CGFloat(TextSizePrefs.shared.scale) }
-
-    private func keyHints(_ s: AgentSessionInfo) -> some View {
-        let keys: [String] =
-            s.live
-            ? ["↩ reply", "esc leave field", "C cancel", "K kill", "↓ latest"]
-            : [s.state == .lost ? "R resume" : "R start again"] + (s.outcome == .succeeded ? ["W wake"] : [])
-                + ["↓ latest"]
-        let line = keys.joined(separator: " · ")
-        // With other panes open this one can be the front of a stack, whose "2 of 3 ⌃Tab" badge sits over the bottom right
-        // corner: the hints stop short of it (and cut with an ellipsis, full line on hover) instead of running under it.
-        return Text(line).coreFont(size: MacTextSize.meta)
-            .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).help(line)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.leading, Space.s4).padding(.trailing, Space.s4 + (model.shell.panes.count > 1 ? badgeRoom : 0))
-            .padding(.bottom, Space.s2)
     }
 }
 
@@ -112,10 +108,19 @@ struct StateBanner: View {
         case .lost:
             row(
                 "wifi.exclamationmark", .fail, "Session lost",
-                "\(r) dropped it and could not resume it. The transcript up to that point is kept. Resume is at the top right."
+                "\(r) dropped it. The transcript up to that point is kept. Send a message to bring it back, or use Resume at the top right."
             )
         default:
-            if session.state.unknownRaw != nil {
+            if session.idleEnded {
+                row(
+                    "moon.zzz", .queue, "Ended (idle)",
+                    "Nobody came back, so it ended. Send a message to continue in the same conversation.")
+            } else if session.keepsOpen == false && !session.over {
+                row(
+                    "info.circle", .warn, "One answer, then it ends",
+                    "\(r) runs an older version that cannot keep the conversation open. Update the runner for live AI sessions."
+                )
+            } else if session.state.unknownRaw != nil {
                 row("questionmark.circle", .queue, session.state.rawValue, "This state is newer than this app.")
             }
         }

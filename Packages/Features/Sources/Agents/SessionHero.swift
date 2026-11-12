@@ -7,6 +7,8 @@ import SwiftUI
 struct SessionHero: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
+    /// The window is wide: the side panel carries the details, so no strip and no Details button.
+    var panel = false
     @AppStorage("agents.detailsStrip") private var showDetails = true
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -28,11 +30,11 @@ struct SessionHero: View {
                     .truncationMode(.tail).help(model.title(session) + "\n" + session.id)
                 StateBadge(st.label, tone: st.tone, symbol: st.symbol).help(subtitle)
                 Spacer(minLength: Space.s3)
-                detailsButton
+                if !panel { detailsButton }
                 actions
             }
             .frame(minHeight: 40)
-            if showDetails {
+            if showDetails && !panel {
                 strip(hue: hue, tone: st.tone).transition(
                     reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
@@ -116,6 +118,7 @@ struct SessionHero: View {
         if model.waiting(session.id) { return "Waiting for your approval below." }
         switch session.state {
         case .starting: return "Waiting for \(r) to launch \(session.harness). This usually takes a few seconds."
+        case .waiting: return "It finished its turn. Type your next message."
         case .interrupted: return "\(r) restarted. It resumes by itself."
         case .lost: return "\(r) dropped it and could not resume it. The transcript up to that point is kept."
         case .ended:
@@ -148,30 +151,23 @@ struct SessionHero: View {
         .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.secondary).monospacedDigit()
     }
 
+    /// A live session has one action: End session. A finished one has recovery only (Wake, Resume, Start again).
     @ViewBuilder private var actions: some View {
         HStack(spacing: Space.s2) {
             if session.live {
-                AppActionTile(title: "Stop", symbol: "stop.fill", key: "C", hue: GlassInk.orange) {
-                    model.confirmCancel(session.id)
+                AppActionTile(title: "End session", symbol: "stop.fill", key: "", hue: GlassInk.red) {
+                    model.confirmEnd(session.id)
                 }
                 .disabled(model.stopping[session.id] != nil)
                 .help(
-                    "Cancel asks \(AgentWords.harnessName(session.harness)) to stop after its current tool call. Safe; try this first."
-                )
-                AppActionTile(title: "Kill", symbol: "xmark.octagon", key: "K", hue: GlassInk.red) {
-                    model.confirmKill(session.id)
-                }
-                .help(
-                    "Kill stops it at once on the runner and can leave files half-written. Use it only if Cancel did not work."
+                    "Ends the session: the CLI exits and the composer closes. The transcript stays. Esc stops only the current turn."
                 )
             } else {
                 if case .succeeded? = session.outcome {
                     AppActionTile(title: "Wake", symbol: "alarm", key: "W", hue: GlassInk.violet) {
                         model.wake(session.id)
                     }
-                    .help(
-                        "Wake queues another turn for this finished agent, with no new message. It keeps the same session."
-                    )
+                    .help("Recovery: bring the process back on its runner, with the same conversation.")
                 }
                 if session.stoppedByBudget {
                     AppActionTile(title: "Raise budget…", symbol: "arrow.up.circle", key: "", hue: GlassInk.blue) {
@@ -188,14 +184,14 @@ struct SessionHero: View {
                     ) {
                         model.resume(session.id)
                     }
-                    .help("Resume starts this session again from where it stopped. The transcript is kept.")
+                    .help("Recovery: the runner lost it. Resume continues the conversation in the same folder.")
                 } else {
                     AppActionTile(
                         title: "Start again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true
                     ) {
                         model.startAgain(session.id)
                     }
-                    .help("Start a new session with the same first message, runner and agent. This one stays as it is.")
+                    .help("Start a new AI session with the same first message and runner. This one stays as it is.")
                 }
             }
         }

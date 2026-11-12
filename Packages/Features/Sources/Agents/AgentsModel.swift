@@ -81,6 +81,11 @@ public final class AgentsModel {
     public internal(set) var bindingBusy: String?
     /// A write came back `forbidden_scope`: this device can read but not change.
     public internal(set) var bindingsReadOnly = false
+    /// The AI Sessions sidebar entry, the filters, and what the person pinned or archived by hand (kept on this Mac).
+    var scope: SessionScope = .active
+    var filters = SessionFilters()
+    public internal(set) var pinned: Set<String> = []
+    public internal(set) var archived: Set<String> = []
     @ObservationIgnored var raiseBudgetHook: ((AgentSessionInfo) -> Void)?
     @ObservationIgnored var titleLoading: Set<String> = []
 
@@ -116,6 +121,8 @@ public final class AgentsModel {
         self.notifier = notifier
         self.defaults = defaults
         self.host = host
+        pinned = Set(defaults.stringArray(forKey: "aisessions.pinned") ?? [])
+        archived = Set(defaults.stringArray(forKey: "aisessions.archived") ?? [])
         registerBase()
         notifier.onOpen = { [weak self] id in
             if id == "connections" {
@@ -289,7 +296,7 @@ public final class AgentsModel {
         }
         guard let id = e.session else { return }
         switch e.kind {
-        case "agent.created", "agent.state", "agent.ended", "agent.message":
+        case "agent.created", "agent.state", "agent.ended", "agent.message", "agent.turn_ended", "agent.title":
             await refreshSession(id)
             if e.kind != "agent.created", let t = transcripts[id] { await t.refresh(api, knownLast: lastSeq(id)) }
         case "agent.transcript":

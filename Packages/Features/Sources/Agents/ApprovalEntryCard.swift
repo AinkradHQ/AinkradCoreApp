@@ -17,7 +17,7 @@ struct ApprovalEntryCard: View {
     }
 
     private var who: String {
-        model.sessions.session(request.session).map { AgentWords.harnessName($0.harness) } ?? "An agent"
+        model.sessions.session(request.session).map { AgentWords.harnessName($0.harness) } ?? "An AI session"
     }
     private var ask: ApprovalWords.Ask { ApprovalWords.ask(request.tool) }
     private var elevated: Bool { model.shell.elevatedUntil.map { $0 > Date() } ?? false }

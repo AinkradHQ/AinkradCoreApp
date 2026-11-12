@@ -37,7 +37,7 @@ struct EntryParserTests {
     }
 
     @Test func bookkeepingIsHiddenAndUnknownKeepsItsWord() {
-        for t in ["session_started", "usage", "turn_ended", "approval_requested"] {
+        for t in ["session_started", "turn_ended", "waiting", "approval_requested"] {
             #expect(EntryParser.kind(["type": t]) == .hidden)
         }
         #expect(

@@ -19,6 +19,8 @@ final class SetupWizardModel {
         case connecting
         /// Paired. Asked once, only when this Mac has no name yet.
         case name
+        /// "Ready: 2 machines" (only when this build has a runner inside).
+        case ready
         case failed(Failure)
     }
 
@@ -55,11 +57,17 @@ final class SetupWizardModel {
     private let profile: UserProfile?
     private let driver: any PairingDriver
     private let onPaired: @MainActor () -> Void
+    /// The runner inside the app; its end screen shows only when it is there.
+    let macRunner: MacRunnerModel?
     private var task: Task<Void, Never>?
 
-    init(driver: any PairingDriver, profile: UserProfile? = nil, onPaired: @escaping @MainActor () -> Void) {
+    init(
+        driver: any PairingDriver, profile: UserProfile? = nil, macRunner: MacRunnerModel? = nil,
+        onPaired: @escaping @MainActor () -> Void
+    ) {
         self.driver = driver
         self.profile = profile
+        self.macRunner = macRunner
         self.onPaired = onPaired
     }
 
@@ -140,7 +148,7 @@ final class SetupWizardModel {
                 nameText = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
                 stage = .name
             } else {
-                onPaired()
+                finishSetup()
             }
         } catch is CancellationError {
         } catch { fail(error) }
@@ -149,7 +157,12 @@ final class SetupWizardModel {
     /// "Continue" or "Not now" on the name step. An empty name is fine: Home then greets without one.
     func finishName(save: Bool) {
         if save { profile?.set(nameText) }
-        onPaired()
+        finishSetup()
+    }
+
+    /// The last screen, when there is one; then the desktop.
+    func finishSetup() {
+        if macRunner?.isAvailable == true, stage != .ready { stage = .ready } else { onPaired() }
     }
 
     private func fail(_ error: any Error) {
