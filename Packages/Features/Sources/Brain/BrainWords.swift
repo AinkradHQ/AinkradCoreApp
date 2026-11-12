@@ -41,6 +41,15 @@ public enum BrainWords {
         return (error as? BrainFailure)?.sentence ?? "Something went wrong. Nothing was changed."
     }
 
+    /// The Core answered 404 for a Brain route: it is an older Core, built without the Brain.
+    public static let notOnCore = "The Brain isn't on this Core yet. Update the Core."
+
+    /// `failure`, for the first load of the pane: a 404 there means the Core has no Brain, not that something is gone.
+    public static func loadFailure(_ error: Error) -> String {
+        if let e = error as? BrainHTTPError, e.status == 404 { return notOnCore }
+        return failure(error)
+    }
+
     public static let unavailableTitle = "Brain is coming"
     public static let unavailableText = "It will keep what your AI sessions learn, in rooms, on your Core."
     public static let sampleLabel = "Sample data. Core does not serve the Brain yet."
