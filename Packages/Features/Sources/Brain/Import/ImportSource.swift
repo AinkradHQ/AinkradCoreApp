@@ -8,7 +8,12 @@ public protocol ImportSource: Sendable {
     var title: String { get }
     /// What is there and what a rule already skips, from file names alone: no file is opened.
     func scan() async -> CollectReport
-    func collect() async -> (items: [ImportItem], report: CollectReport)
+    /// Reads and uploads file by file, so memory never depends on how much there is. Files in `resume`
+    /// are not read again; `save` is told what is finished.
+    func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport
 }
 
 /// Claude Code sessions, `<root>/<project>/<session>.jsonl`.
@@ -43,10 +48,13 @@ public struct ClaudeCodeSource: ImportSource {
         return report
     }
 
-    public func collect() async -> (items: [ImportItem], report: CollectReport) {
-        var report = CollectReport()
-        let items = ClaudeCodeCollector(device: device, files: files).collect(root: root, report: &report)
-        return (items, report)
+    public func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport {
+        let streamer = ImportStreamer(collector: ClaudeCodeCollector(device: device, files: files), uploader: uploader)
+        return try await streamer.run(
+            root: root, runID: run, resume: resume, uploaded: uploaded, save: save, onProgress: onProgress)
     }
 }
 
@@ -69,6 +77,17 @@ public enum ImportWords {
         var by: [String: Int] = [:]
         for (k, n) in skipped { by[skip(k), default: 0] += n }
         return by.sorted { $0.key < $1.key }.map { "\($0.value) \($0.key)" }.joined(separator: ", ")
+    }
+
+    /// The file name only, cut in the middle past 28 characters.
+    public static func shortName(_ path: String) -> String {
+        let name = path.split(separator: "/").last.map(String.init) ?? path
+        guard name.count > 28 else { return name }
+        return name.prefix(14) + "…" + name.suffix(13)
+    }
+
+    public static func bytes(_ n: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
     }
 
     public static func left(seconds: Int) -> String {

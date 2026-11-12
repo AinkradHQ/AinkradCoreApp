@@ -34,7 +34,10 @@ struct FakeSource: ImportSource {
         r.skipped = ["deprecated:GitScope": 1]
         return r
     }
-    func collect() async -> (items: [ImportItem], report: CollectReport) {
+    func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport {
         let items = (0..<2).map { i -> ImportItem in
             let json: [String: Any] = [
                 "item_id": ItemFormat.itemID(seed: "t\(i)"), "source_kind": "claude_code",
@@ -46,10 +49,17 @@ struct FakeSource: ImportSource {
             // swiftlint:disable:next force_try
             return try! JSONDecoder().decode(ImportItem.self, from: JSONSerialization.data(withJSONObject: json))
         }
+        try await uploader.upload(items, run: run, progress: uploaded)
+        var p = StreamProgress()
+        p.filesDone = 2
+        p.filesTotal = 2
+        p.bytesDone = 20
+        p.bytesTotal = 20
+        await onProgress(p)
         var r = CollectReport()
         r.found = 2
         r.items = 2
-        return (items, r)
+        return r
     }
 }
 
@@ -97,6 +107,8 @@ struct BrainImportFlowTests {
         await m.scan()
         #expect(m.choices.first?.found == 3 && m.choices.first?.skipped == ["deprecated:GitScope": 1])
         #expect(ImportWords.skips(["deprecated:GitScope": 1]) == "1 a refused project")
+        #expect(ImportWords.shortName("/-p1/" + String(repeating: "a", count: 60) + ".jsonl").count == 28)
+        #expect(ImportWords.shortName("/-p1/s1.jsonl") == "s1.jsonl")
     }
 
     @Test func collectUploadsThenReportsDoneThenReachesReview() async {
@@ -108,7 +120,7 @@ struct BrainImportFlowTests {
         #expect(m.step == .review && m.run == "r1")
         #expect(t.count("POST /modules/brain/v1/imports/r1/items") == 1)
         #expect(t.count("POST /modules/brain/v1/imports/r1/collected") == 1)
-        #expect(m.counts.stored == 2 && m.toSend == 2)
+        #expect(m.counts.stored == 2 && m.itemsFound == 2 && m.fraction == 1)
         #expect(m.review.visible.map(\.id) == ["alpha", "acme", "unsorted"])
     }
 
@@ -211,6 +223,26 @@ struct BrainImportFlowTests {
         #expect(m.step == .done && host.reasons.count == 2)
         #expect(m.result?.rooms.first?.sources == 2 && m.result?.held == ["acme"])
         #expect(m.heldCards().map(\.id) == ["acme"] && ReviewWords.held == "Held until the room backup exists.")
+    }
+
+    @Test func aSavedRunIsPickedUpAfterARestartInsteadOfStartingOver() async throws {
+        let t = FakeBrainTransport()
+        let store = ResumeStore(
+            url: FileManager.default.temporaryDirectory.appendingPathComponent("brain-state-\(UUID().uuidString).json"))
+        var saved = ResumeState()
+        saved.run = "r1"
+        store.save(saved)
+        t.routes["POST /modules/brain/v1/imports"] = { _ in throw BrainHTTPError(status: 500, code: "no new run") }
+        t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in ["results": []] }
+        t.routes["POST /modules/brain/v1/imports/r1/collected"] = { _ in runView("discovering", stored: 2) }
+        t.routes["GET /modules/brain/v1/imports/r1"] = { _ in runView("review", stored: 2) }
+        t.routes["GET /modules/brain/v1/imports/r1/proposals"] = { _ in [card("alpha")] }
+        let m = ImportModel(
+            host: FakeHost(), routes: BrainRoutes(transport: t), sources: [FakeSource()], poll: .milliseconds(1),
+            resume: store, pause: { _ in })
+        m.start()
+        await untilStep(m, .review)
+        #expect(m.step == .review && m.run == "r1" && t.count("POST /modules/brain/v1/imports") == 0)
     }
 
     @Test func statusLineReadsTheCoresCounts() async {

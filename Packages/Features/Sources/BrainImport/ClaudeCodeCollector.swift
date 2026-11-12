@@ -3,7 +3,11 @@ import Foundation
 /// Reads files for a collector. Injected so a test can prove which files were opened.
 public protocol FileAccess: Sendable {
     func listFiles(under root: URL) -> [URL]
-    func read(_ url: URL) throws -> Data
+    /// The size from file attributes; the file is not opened.
+    func size(of url: URL) -> UInt64
+    /// Calls `each` with every line (no line end), reading `chunk` bytes at a time. A line longer than
+    /// `maxLine` is dropped, never held. `each` returns false to stop reading this file.
+    func readLines(_ url: URL, chunk: Int, maxLine: Int, _ each: (Data) async throws -> Bool) async throws
 }
 
 public struct DiskFiles: FileAccess {
@@ -16,94 +20,120 @@ public struct DiskFiles: FileAccess {
             (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
         }
     }
-    public func read(_ url: URL) throws -> Data { try Data(contentsOf: url) }
+
+    public func size(of url: URL) -> UInt64 {
+        ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.uint64Value ?? 0
+    }
+
+    public func readLines(_ url: URL, chunk: Int, maxLine: Int, _ each: (Data) async throws -> Bool) async throws {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var line = Data()
+        var dropping = false
+        while true {
+            guard let buf = try handle.read(upToCount: chunk), !buf.isEmpty else { break }
+            var start = buf.startIndex
+            while start < buf.endIndex {
+                if let nl = buf[start...].firstIndex(of: 10) {
+                    if !dropping {
+                        line.append(buf[start..<nl])
+                        if !line.isEmpty, line.count <= maxLine, try await !each(line) { return }
+                    }
+                    line = Data()
+                    dropping = false
+                    start = nl + 1
+                } else {
+                    if !dropping {
+                        line.append(buf[start...])
+                        if line.count > maxLine {
+                            line = Data()
+                            dropping = true
+                        }
+                    }
+                    start = buf.endIndex
+                }
+            }
+        }
+        if !dropping, !line.isEmpty { _ = try await each(line) }
+    }
+}
+
+/// Test instrument: the bytes the collector holds at once, by slot, and the highest sum seen.
+public final class BufferGauge: @unchecked Sendable {
+    private let lock = NSLock()
+    private var slots: [String: Int] = [:]
+    private var top = 0
+    public init() {}
+    func set(_ slot: String, _ bytes: Int) {
+        lock.withLock {
+            slots[slot] = bytes
+            top = max(top, slots.values.reduce(0, +))
+        }
+    }
+    public var peak: Int { lock.withLock { top } }
 }
 
 /// Claude Code sessions: `<root>/<encoded project dir>/<session>.jsonl`, one JSON record per line.
-/// One session becomes one item (or ordered parts when it is large): the user and assistant text,
-/// with tool output trimmed. Records of an unknown shape are skipped, never guessed at.
+/// A session becomes one item (or ordered parts when it is large): the user and assistant text, with
+/// tool output trimmed. It is read as a stream, so memory is bounded by a chunk, a line, and a part,
+/// never by the file. Records of an unknown shape are skipped, never guessed at.
 public struct ClaudeCodeCollector: Sendable {
     public let device: String
     public let files: any FileAccess
+    public let chunk: Int
+    public let maxLine: Int
+    public let gauge: BufferGauge?
     /// Tool output longer than this many characters is cut.
     public static let toolOutputLimit = 400
+    public static let defaultChunk = 1 << 20
+    public static let defaultMaxLine = 4 << 20
 
-    public init(device: String, files: any FileAccess = DiskFiles()) {
+    public init(
+        device: String, files: any FileAccess = DiskFiles(), chunk: Int = defaultChunk,
+        maxLine: Int = defaultMaxLine, gauge: BufferGauge? = nil
+    ) {
         self.device = device
         self.files = files
+        self.chunk = chunk
+        self.maxLine = maxLine
+        self.gauge = gauge
     }
 
-    public func collect(root: URL, report: inout CollectReport) -> [ImportItem] {
-        var out: [ImportItem] = []
-        for url in files.listFiles(under: root).sorted(by: { $0.path < $1.path }) where url.pathExtension == "jsonl" {
-            report.found += 1
-            // Decided by the path alone, before the file is opened.
-            if let why = PreFilter.skipReason(path: url.path.replacingOccurrences(of: root.path, with: "")) {
-                report.skipped[why, default: 0] += 1
-                continue
+    /// Reads one session file and hands each item to `sink` as soon as it is complete. Returns the
+    /// reason the file was skipped, or nil. An error from `sink` (a failed upload) is thrown.
+    public func stream(file url: URL, sink: (ImportItem) async throws -> Void) async throws -> String? {
+        var s = SessionStream(path: url.path, device: device, gauge: gauge)
+        var failure: Error?
+        var skip: String?
+        func emit(_ items: [ImportItem]) async -> Bool {
+            for i in items {
+                do { try await sink(i) } catch {
+                    failure = error
+                    return false
+                }
             }
-            guard let data = try? files.read(url) else {
-                report.skipped["unreadable", default: 0] += 1
-                continue
-            }
-            switch parse(data, path: url.path) {
-            case .skip(let why): report.skipped[why, default: 0] += 1
-            case .items(let items):
-                report.items += items.count
-                out += items
-            }
+            return true
         }
-        return out
-    }
-
-    enum Parsed {
-        case items([ImportItem])
-        case skip(String)
-    }
-
-    func parse(_ data: Data, path: String) -> Parsed {
-        var cwd: String?
-        var first: String?
-        var last: String?
-        var lines: [String] = []
-        var title: String?
-        for raw in String(decoding: data, as: UTF8.self).split(separator: "\n") {
-            let json = try? JSONSerialization.jsonObject(with: Data(raw.utf8))
-            guard let obj = json as? [String: Any] else { continue }
-            if cwd == nil, let c = obj["cwd"] as? String { cwd = c }
-            if let t = obj["timestamp"] as? String {
-                if first == nil { first = t }
-                last = t
+        do {
+            try await files.readLines(url, chunk: chunk, maxLine: maxLine) { line in
+                gauge?.set("reader", chunk + line.count)
+                switch s.add(line: line) {
+                case .skip(let why):
+                    skip = why
+                    return false
+                case .items(let items): return await emit(items)
+                }
             }
-            guard let type = obj["type"] as? String, type == "user" || type == "assistant",
-                let message = obj["message"] as? [String: Any]
-            else { continue }
-            let text = Self.text(of: message["content"])
-            guard !text.isEmpty else { continue }
-            if title == nil, type == "user" { title = text }
-            lines.append("\(type == "user" ? "User" : "Assistant"): \(text)")
+        } catch {
+            gauge?.set("reader", 0)
+            return "unreadable"
         }
-        // The working directory is only known after reading; a deprecated project still stops here.
-        if let cwd, let p = PreFilter.deprecatedProject(in: cwd) { return .skip("deprecated:\(p)") }
-        if let cwd, PreFilter.isRestricted(cwd) { return .skip("restricted") }
-        guard let first, !lines.isEmpty else { return .skip("empty") }
-        let body = lines.joined(separator: "\n\n")
-        let parts = ItemFormat.split(body)
-        let headline = String((title ?? "Claude Code session").split(separator: "\n").first ?? "").prefix(80)
-        let items = parts.enumerated().map { i, part in
-            ImportItem(
-                item_id: ItemFormat.itemID(seed: "\(path)#\(i)"),
-                source_kind: "claude_code",
-                content_hash: ItemFormat.hash(part),
-                origin: .init(
-                    device: device, path: path,
-                    range: parts.count > 1 ? [UInt64(i), UInt64(parts.count)] : nil),
-                project_hint: cwd,
-                author: .init(kind: "person", name: "me"),
-                title: parts.count > 1 ? "\(headline) (part \(i + 1) of \(parts.count))" : String(headline),
-                text: part, links: [], started_at: first, ended_at: last == first ? nil : last)
-        }
-        return .items(items)
+        gauge?.set("reader", 0)
+        if let failure { throw failure }
+        if let skip { return skip }
+        if case .items(let items) = s.finish() { _ = await emit(items) }
+        if let failure { throw failure }
+        return s.emitted == 0 ? "empty" : nil
     }
 
     static func text(of content: Any?) -> String {
