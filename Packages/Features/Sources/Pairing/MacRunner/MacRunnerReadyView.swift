@@ -27,17 +27,16 @@ struct MacRunnerReadyView: View {
                     ? "Terminals and AI sessions with your accounts, once it connects."
                     : "Off. You can turn it on in Settings, Mac.",
                 enabled: on)
-            Toggle("Use this Mac as a runner", isOn: $on).toggleStyle(.switch)
-                .onChange(of: on) { _, v in macRunner.setPreference(v) }
-                .accessibilityIdentifier("ready-mac-runner-switch")
-            if on {
-                Text("Ainkrad asks for Touch ID once to add this Mac. \(MacRunnerModel.terminalsWarning)")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
-                        horizontal: false, vertical: true)
-            }
+            GlassToggleTile(
+                "Use this Mac as a runner",
+                sub: on ? "Asks for Touch ID once. \(MacRunnerModel.terminalsWarning)" : nil,
+                symbol: "laptopcomputer", isOn: $on, fill: true
+            )
+            .onChange(of: on) { _, v in macRunner.setPreference(v) }
+            .accessibilityIdentifier("ready-mac-runner-switch")
             HStack {
                 Spacer()
-                Button("Continue", action: finish).coreGlassButton(prominent: true).coreShortcut(.primary)
+                Button("Continue", action: finish).buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(.primary)
             }
         }
     }
@@ -54,7 +53,7 @@ struct MacRunnerReadyView: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.row))
+        .coreWell(radius: Radius.row)
         .accessibilityElement(children: .combine)
     }
 }

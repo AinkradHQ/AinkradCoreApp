@@ -21,7 +21,7 @@ struct CandidateCard: View {
             }
             if let flag = c.flag { InboxNote("exclamationmark.triangle", GlassInk.red, flag) }
             if let why = model.inboxState.errors[c.id] {
-                InboxNote("exclamationmark.triangle", GlassInk.red, Text("\(why) "))
+                InboxNote("exclamationmark.triangle", GlassInk.red, why)
                 Button("Try again", action: approve).buttonStyle(CoreButtonStyle(.plain, size: .small))
             }
             HStack(spacing: Space.s2) {
@@ -55,7 +55,7 @@ struct ConflictCard: View {
     var body: some View {
         let busy = model.busy != nil
         InboxCardFrame {
-            CardHeader(chip: "Conflict", hue: GlassInk.amber, title: c.title, age: c.age)
+            CardHeader(chip: "Conflict", hue: GlassInk.blue, title: c.title, age: c.age)
             if model.inboxState.later.contains(c.id) {
                 InboxNote("bell", GlassInk.slate, "Asked again later. It stays here and in the bell.")
             }
@@ -110,9 +110,7 @@ struct BlockedCard: View {
     var body: some View {
         InboxCardFrame {
             CardHeader(chip: "Blocked", hue: GlassInk.red, title: b.title, age: b.age)
-            InboxNote(
-                "shield", GlassInk.red,
-                Text("Blocked by: \(b.ruleName). ").bold() + Text(b.ruleAbout))
+            InboxNote("shield", GlassInk.red, "Blocked by \(b.ruleName)", b.ruleAbout)
             HStack(spacing: Space.s2) {
                 SourceBadge(source: b.source)
                 Text("Captured by \(b.by)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

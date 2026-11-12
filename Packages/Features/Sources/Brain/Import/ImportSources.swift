@@ -71,6 +71,25 @@ public struct OpenCodeSource: ImportSource {
 
     public func scan() async -> CollectReport { collector.scan() }
 
+    public var incremental: Bool { true }
+    static func mark(_ c: SourceCursor) -> Int64? { c.ocMessageMs ?? c.mtime.map { Int64($0 * 1000) } }
+    public func newCount(cursor: SourceCursor) async -> Int {
+        guard let m = Self.mark(cursor) else { return 0 }
+        return collector.newCount(after: m)
+    }
+    public func streamNew(cursor: SourceCursor, run: String, uploader: Uploader, uploaded: Uploader.Progress)
+        async throws -> CollectReport
+    {
+        guard let m = Self.mark(cursor) else { return CollectReport() }
+        return try await collector.run(
+            after: m, run: run, uploader: uploader, uploaded: uploaded, resume: .init(), save: { _ in },
+            onProgress: { _ in })
+    }
+    public func cursorAfter(_ cursor: SourceCursor, began: Date) -> SourceCursor {
+        let old = Self.mark(cursor) ?? Int64(began.timeIntervalSince1970 * 1000)
+        return SourceCursor(ocMessageMs: max(old, collector.newestMessage() ?? 0))
+    }
+
     public func stream(
         run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
@@ -85,10 +104,13 @@ public struct NotReadableSource: ImportSource {
     public let id: String
     public let title: String
     public let notReadable: String?
+    /// Nothing of this tool is on this Mac, so its format could not even be checked.
+    public let absent: Bool
 
-    public init(id: String, title: String, reason: String) {
+    public init(id: String, title: String, reason: String, absent: Bool = false) {
         self.id = id
         self.title = title
+        self.absent = absent
         self.notReadable = reason
     }
 
@@ -127,7 +149,7 @@ public enum ImportSources {
                 reason: "Its conversations are stored as binary records with no published format."),
             NotReadableSource(
                 id: "kimi", title: "Kimi sessions",
-                reason: "No Kimi history was found on this Mac, so its format could not be checked."),
+                reason: "No Kimi history was found on this Mac, so its format could not be checked.", absent: true),
             FolderSource(id: "doc", title: "Project docs", root: projects, collector: markdown(.projectDocs)),
             FolderSource(
                 id: "vault", title: "Notes vault (Ainkrad)", root: home.appending(path: "Ainkrad"),
@@ -136,7 +158,7 @@ public enum ImportSources {
                 id: "agents_md", title: "AGENTS.md and CLAUDE.md files", root: projects,
                 collector: markdown(.agentFiles)),
             FolderSource(
-                id: "chat", title: "Chat exports (Documents/Chat exports)", root: chatExportsFolder,
+                id: "chat", title: "Chat exports", root: chatExportsFolder,
                 collector: ChatExportCollector(device: device)),
         ]
     }

@@ -88,13 +88,26 @@ public struct OpenCodeReader {
         }
     }
 
-    /// The session's turns in order, tool output trimmed like Claude Code's.
-    public func turns(of session: String) -> [(role: String, text: String, at: Int64)] {
+    /// The newest message time (ms); nil when there is none.
+    public func newestMessage() -> Int64? {
+        rows("SELECT max(time_created) FROM message")?.first?.first.flatMap { $0 }.flatMap { Int64($0) }
+    }
+
+    /// Ids of the sessions with a message newer than `after` (ms).
+    public func sessions(withMessagesAfter after: Int64) -> Set<String> {
+        Set(
+            (rows("SELECT DISTINCT session_id FROM message WHERE time_created > CAST(?1 AS INTEGER)", ["\(after)"])
+                ?? [])
+                .compactMap { $0[0] })
+    }
+
+    /// The session's turns in order, tool output trimmed like Claude Code's. `after`: only messages newer than it (ms).
+    public func turns(of session: String, after: Int64? = nil) -> [(role: String, text: String, at: Int64)] {
         var out: [(String, String, Int64)] = []
         let messages =
             rows(
-                "SELECT id, time_created, json_extract(data, '$.role') FROM message WHERE session_id = ?1 ORDER BY time_created, id",
-                [session]) ?? []
+                "SELECT id, time_created, json_extract(data, '$.role') FROM message WHERE session_id = ?1 AND time_created > CAST(?2 AS INTEGER) ORDER BY time_created, id",
+                [session, "\(after ?? Int64.min)"]) ?? []
         for m in messages {
             guard let id = m[0], let role = m[2], role == "user" || role == "assistant" else { continue }
             var texts: [String] = []
@@ -130,9 +143,10 @@ public struct OpenCodeCollector: Sendable {
 
     /// Returns the skip reason, or nil.
     public func stream(
-        session: OpenCodeReader.SessionRow, reader: OpenCodeReader, sink: (ImportItem) async throws -> Void
+        session: OpenCodeReader.SessionRow, reader: OpenCodeReader, after: Int64? = nil,
+        sink: (ImportItem) async throws -> Void
     ) async throws -> String? {
-        let turns = reader.turns(of: session.id)
+        let turns = reader.turns(of: session.id, after: after)
         var s = SessionStream(
             path: "\(dbPath)#\(session.id)", device: device, gauge: nil, kind: "opencode",
             defaultTitle: "OpenCode session",
@@ -174,8 +188,27 @@ extension OpenCodeCollector {
         return report
     }
 
+    /// How many sessions have messages newer than `after` (ms) and pass the folder rule; 0 when the file is unknown.
+    public func newCount(after: Int64) -> Int {
+        guard FileManager.default.fileExists(atPath: dbPath), let reader = OpenCodeReader(path: dbPath) else {
+            return 0
+        }
+        defer { reader.close() }
+        guard reader.isKnownFormat() else { return 0 }
+        let fresh = reader.sessions(withMessagesAfter: after)
+        return reader.sessions().filter { fresh.contains($0.id) && PreFilter.skipReason(path: $0.directory) == nil }
+            .count
+    }
+
+    public func newestMessage() -> Int64? {
+        guard let reader = OpenCodeReader(path: dbPath) else { return nil }
+        defer { reader.close() }
+        return reader.isKnownFormat() ? reader.newestMessage() : nil
+    }
+
+    /// `after`: an incremental run, only the messages newer than it (ms), only in the sessions that have any.
     public func run(
-        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        after: Int64? = nil, run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
     ) async throws -> CollectReport {
         var report = CollectReport()
@@ -191,7 +224,9 @@ extension OpenCodeCollector {
         }
         var rows: [String: OpenCodeReader.SessionRow] = [:]
         var units: [ImportStreamer.Unit] = []
+        let fresh = after.map { reader.sessions(withMessagesAfter: $0) }
         for s in reader.sessions() {
+            if let fresh, !fresh.contains(s.id) { continue }
             report.found += 1
             // Decided by the folder alone, before a message is read.
             if let why = PreFilter.skipReason(path: s.directory) {
@@ -207,7 +242,7 @@ extension OpenCodeCollector {
             onProgress: onProgress
         ) { unit, sink in
             guard let row = rows[unit.key] else { return "unreadable" }
-            return try await stream(session: row, reader: reader, sink: sink)
+            return try await stream(session: row, reader: reader, after: after, sink: sink)
         }
     }
 }

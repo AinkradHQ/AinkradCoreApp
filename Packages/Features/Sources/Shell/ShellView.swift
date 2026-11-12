@@ -104,25 +104,26 @@ public struct ShellView: View {
         }
     }
 
-    @ViewBuilder private var banner: some View {
-        let width = ShellMetrics.bellWidth * 1.5
+    /// The banner floats over the widget grid, so it sits on the opaque theme surface: on clear glass alone the
+    /// widgets' words showed through it.
+    private var banner: some View {
+        bannerBody
+            .background(palette.surface, in: coreShape(Radius.cardMac))
+            .frame(maxWidth: ShellMetrics.bellWidth * 1.5).padding(.top, Space.s1)
+    }
+
+    @ViewBuilder private var bannerBody: some View {
         if let notice = shell.linkNotice {
             switch notice {
-            case .rateLimited(let until):
-                LinkBanner(.rateLimited(until: until)).frame(maxWidth: width).padding(.top, Space.s1)
-            case .renewing: LinkBanner(.renewing).frame(maxWidth: width).padding(.top, Space.s1)
-            case .restarted:
-                LinkBanner(.restarted, dismiss: { shell.linkNotice = nil }).frame(maxWidth: width).padding(
-                    .top, Space.s1)
+            case .rateLimited(let until): LinkBanner(.rateLimited(until: until))
+            case .renewing: LinkBanner(.renewing)
+            case .restarted: LinkBanner(.restarted, dismiss: { shell.linkNotice = nil })
             }
         } else {
             switch shell.coreLink {
             case .reconnecting:
                 LinkBanner(.resuming(since: shell.lastLiveAt), retry: shell.retryConnection.map { r in { r() } })
-                    .frame(maxWidth: width).padding(.top, Space.s1)
-            case .offline:
-                ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
-                    .frame(maxWidth: width).padding(.top, Space.s1)
+            case .offline: ConnectionBanner(.offline, retry: shell.retryConnection.map { r in { r() } })
             default: EmptyView()
             }
         }

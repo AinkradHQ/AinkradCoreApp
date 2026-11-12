@@ -27,6 +27,18 @@ struct SecretsTests {
         return f
     }
 
+    @Test("Secrets are off only once the registry has loaded with mode 0, never while it loads or after it failed")
+    func offOnlyWhenKnown() async {
+        let (off, _, _) = await world(mode: 0)
+        #expect(off.secrets.isOff)
+        off.registry.state = .loading
+        #expect(!off.secrets.isOff, "mode reads 0 while loading; the list and New buttons stay")
+        off.registry.state = .failed(code: "error", message: "No answer.", errorID: nil)
+        #expect(!off.secrets.isOff)
+        let (on, _, _) = await world(mode: 1)
+        #expect(!on.secrets.isOff)
+    }
+
     @Test("a stored secret shows name and metadata, and the value is wiped from the form once it is sent")
     func store() async {
         let (admin, service, host) = await world()

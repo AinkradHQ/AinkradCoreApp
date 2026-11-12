@@ -162,6 +162,9 @@ final class SecretsModel {
     init(hub: AdminModel) { self.hub = hub }
 
     var mode: Int { hub?.registry.secretsMode ?? 0 }
+    /// Off only once the registry has loaded and says so: while it loads, or when it failed, `mode` reads as 0 and must
+    /// not hide the secrets or lock the New buttons.
+    var isOff: Bool { hub?.registry.state == .ready && mode == 0 }
     var leaseLimit: Int64 { hub?.registry.item("secrets.lease_secs")?.value ?? 120 }
 
     func reset() {

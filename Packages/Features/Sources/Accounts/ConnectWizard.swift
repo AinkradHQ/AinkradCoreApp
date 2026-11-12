@@ -27,6 +27,11 @@ final class ConnectWizardState {
     var runners: [AccountRunner] = []
     var labelTouched = false
 
+    #if DEBUG
+    /// Snapshot walk only: the step the next wizard opens on.
+    static var debugStep: Step?
+    #endif
+
     init(provider: String, advanced: Bool) {
         self.provider = provider
         self.advanced = advanced
@@ -116,7 +121,17 @@ struct ConnectWizard: View {
         let first =
             provider ?? ProviderLook.ordered(model.providers).first { ProviderSites.page($0.id) != nil }?.id
             ?? model.providers.first?.id ?? ""
-        _w = State(initialValue: ConnectWizardState(provider: first, advanced: advanced))
+        let state = ConnectWizardState(provider: first, advanced: advanced)
+        #if DEBUG
+        // Snapshot walk only: open on a later step with a key typed, so every step gets a picture.
+        if let step = ConnectWizardState.debugStep {
+            ConnectWizardState.debugStep = nil
+            state.step = step
+            state.flow.key = "sk-ant-demo-0000"
+            state.suggestName(model)
+        }
+        #endif
+        _w = State(initialValue: state)
     }
 
     private var plan: Bool { w.isPlan(model) }
@@ -238,8 +253,12 @@ struct ConnectWizard: View {
             }
             if w.flow.needsGate { gateCard }
             HStack(alignment: .bottom, spacing: Space.s2) {
-                CoreSecureField("Your key", placeholder: "Paste your key", text: $w.flow.key, autofocus: true)
-                    .accessibilityIdentifier("account-key")
+                CoreSecureField(
+                    "Your key", placeholder: "Paste your key", text: $w.flow.key,
+                    // Focus only an empty field: focusing a filled one selects the whole key.
+                    autofocus: w.flow.key.isEmpty
+                )
+                .accessibilityIdentifier("account-key")
                 AccLink(title: "Paste", symbol: "doc.on.clipboard") { w.flow.paste() }
             }
             if let shape {

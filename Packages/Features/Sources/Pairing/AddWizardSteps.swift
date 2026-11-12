@@ -203,9 +203,12 @@ extension AddWizardView {
             }
             .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.cardMac))
             CoreTextField("Name", placeholder: model.kind?.defaultName ?? "runner", text: $model.name)
+            // fill: both tiles take the dialog's width, so their edges line up.
             GlassToggleTile(
-                "Terminals", sub: "Open a shell on this runner.", symbol: "terminal", isOn: $model.terminals)
-            GlassToggleTile("AI sessions", sub: "Let AI sessions work here.", symbol: "sparkles", isOn: $model.agents)
+                "Terminals", sub: "Open a shell on this runner.", symbol: "terminal", isOn: $model.terminals,
+                fill: true)
+            GlassToggleTile(
+                "AI sessions", sub: "Let AI sessions work here.", symbol: "sparkles", isOn: $model.agents, fill: true)
         }
     }
 

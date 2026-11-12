@@ -121,8 +121,14 @@ extension AgentsModel {
 
     /// Quick by default (one prompt, the defaults); `advanced` opens the full sheet (Ahmed, 2026-11-05).
     public func openNewSession(advanced: Bool = false, runner: String? = nil) {
+        openNewSession(advanced: advanced, runner: runner, place: nil)
+    }
+
+    /// The same, opening the advanced sheet on a repo and branch (the empty session's project tiles).
+    func openNewSession(advanced: Bool, runner: String?, place: ConversationWords.Place?) {
         Task { await loadRunners() }
         newSessionRunner = runner
+        newSessionPlace = place
         if advanced || runner != nil {
             shell.present(ShellDialog(id: "agents.new") { NewSessionSheet(model: self) })
         } else {

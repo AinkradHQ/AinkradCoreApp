@@ -28,6 +28,13 @@ public protocol ImportSource: Sendable {
 }
 
 extension ImportSource {
+    /// Cursor-aware forms; the default is the file-time cursor. A source with another kind of mark overrides them.
+    public func newCount(cursor: SourceCursor) async -> Int { await newCount(since: cursor.date) }
+    public func streamNew(cursor: SourceCursor, run: String, uploader: Uploader, uploaded: Uploader.Progress)
+        async throws -> CollectReport
+    { try await streamNew(since: cursor.date, run: run, uploader: uploader, uploaded: uploaded) }
+    /// The cursor to store once the Core has the run. Taken before reading, so what arrives meanwhile is read next time.
+    public func cursorAfter(_ cursor: SourceCursor, began: Date) -> SourceCursor { SourceCursor(date: began) }
     public var notReadable: String? { nil }
     public var incremental: Bool { false }
     public func newCount(since: Date?) async -> Int { 0 }
@@ -39,7 +46,16 @@ extension ImportSource {
 /// What a Mac collector remembers on the Core: the newest file time it has taken. Opaque to the Core.
 public struct SourceCursor: Codable, Sendable, Equatable {
     public var mtime: Double?
-    public init(mtime: Double? = nil) { self.mtime = mtime }
+    /// OpenCode: the newest message `time_created` (ms) already taken. Absent: `mtime` in ms stands in for it.
+    public var ocMessageMs: Int64?
+    public init(mtime: Double? = nil, ocMessageMs: Int64? = nil) {
+        self.mtime = mtime
+        self.ocMessageMs = ocMessageMs
+    }
+    enum CodingKeys: String, CodingKey {
+        case mtime
+        case ocMessageMs = "oc_msg"
+    }
     public init(date: Date) { mtime = date.timeIntervalSince1970 }
     public var date: Date? { mtime.map { Date(timeIntervalSince1970: $0) } }
 }
