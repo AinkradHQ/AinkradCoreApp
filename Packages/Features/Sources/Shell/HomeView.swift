@@ -18,6 +18,7 @@ struct HomeView: View {
     @Bindable var shell: ShellModel
     @State private var drag: DeskDrag?
     @State private var arrived = false
+    @State private var greeting: CGRect = .zero
     @FocusState private var focus: UUID?
     @Environment(\.corePalette) private var palette
     @Environment(\.colorScheme) private var scheme
@@ -48,8 +49,17 @@ struct HomeView: View {
                     Button("Reset Layout") { shell.resetWidgets() }
                 }
             ZStack(alignment: .topLeading) {
-                GreetingView(profile: shell.profile).frame(maxWidth: .infinity).padding(.top, Self.greetingTop)
-                    .allowsHitTesting(true)
+                GreetingView(profile: shell.profile)
+                    .onGeometryChange(for: CGRect.self) {
+                        $0.frame(in: .named(Self.stageSpace))
+                    } action: {
+                        greeting = $0
+                    }
+                    .frame(maxWidth: .infinity).padding(.top, Self.greetingTop)
+                    // Clear glass would show it through a widget: it steps away while any widget covers it.
+                    .opacity(greetingCovered ? 0 : 1)
+                    .animation(.easeOut(duration: 0.2), value: greetingCovered)
+                    .accessibilityHidden(greetingCovered)
                 ghost
                 ForEach(sorted) { item in card(item) }
             }
@@ -91,6 +101,12 @@ struct HomeView: View {
     private static let greetingTop = ShellMetrics.designSize.height * 0.24
 
     // MARK: layout
+
+    private var greetingCovered: Bool {
+        shown.contains {
+            CGRect(origin: DeskGrid.origin($0.x, $0.y), size: DeskGrid.frameSize($0.size)).intersects(greeting)
+        }
+    }
 
     /// Where each widget is drawn: the live layout, or the preview while one is held.
     private var shown: [WidgetItem] {

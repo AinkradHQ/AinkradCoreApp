@@ -183,7 +183,7 @@ private struct ClockLine: View {
     }
 }
 
-/// The digital clock widget. Small: the time and the day. Wide: the time, the day and the date. Tall: hours over
+/// The digital clock widget. Small and Wide: the time, the day and the date. Tall: hours over
 /// minutes, the day and date under them. Large: the time, the day and date, and home and UTC. Seconds (Settings →
 /// Clocks) follow the minutes in a smaller, secondary size. Digits change in place; Reduce Motion swaps them without
 /// the roll.
@@ -200,7 +200,7 @@ struct DigitalClockBody: View {
             case .s:
                 VStack(alignment: .leading, spacing: Space.s1) {
                     time(d, 38)
-                    ClockLine(d, .dateTime.weekday(.wide))
+                    date(d)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             case .t:

@@ -20,10 +20,9 @@ struct DeskWidget: View {
         let size = DeskGrid.frameSize(item.size)
         ZStack(alignment: .topLeading) {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
-                .padding(Space.s4).padding(.top, editing ? Space.s8 : 0)
+                .padding(Space.s4)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
-                // The edit padding snaps (re-laying out a widget every frame was the cost); the fade below still animates.
-                .transaction(value: editing) { $0.animation = nil }
+                // The edit chrome floats over the content; nothing moves, so nothing is cut off at the bottom.
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
                 .animation(.easeOut(duration: 0.2), value: editing)
