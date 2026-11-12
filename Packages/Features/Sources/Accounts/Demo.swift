@@ -368,11 +368,13 @@ public final class AccountsDemo {
                     provider: p.provider, model: p.model, input: p.input, output: p.output, cache: p.cache, version: v,
                     pricedAt: p.pricedAt))
         }
+        /// The `connect-installing` scene: linux-01 cannot sign in to a plan yet, so that row offers the install.
+        var noLogin = false
         func runners() async throws -> [AccountRunner] {
             [
                 AccountRunner(
                     id: "r_linux01", name: "linux-01", online: true,
-                    commands: ["gateway", "login", "subscription-env"],
+                    commands: noLogin ? ["gateway"] : ["gateway", "login", "subscription-env"],
                     drivers: ["agent"]),
                 AccountRunner(id: "r_mac", name: "studio-mac", online: true),
                 AccountRunner(id: "r_old", name: "old-box", online: false),
@@ -429,7 +431,8 @@ public final class AccountsDemo {
 
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
-        "account-ready", "account-at-limit", "connect-arrived", "connect-key", "connect-name", "connect-place",
+        "account-ready", "account-at-limit", "connect-arrived", "connect-installing", "connect-key", "connect-name",
+        "connect-place",
         "key-add", "key-filled", "key-gate", "key-working",
         "key-done", "key-failed", "key-test-failed", "key-rotate", "accounts-not-admin",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
@@ -474,8 +477,10 @@ public final class AccountsDemo {
         model.chainSelection = scene == "chains-second" || scene == "chain-delete" ? 2 : nil
         model.opener = { _ in }
         model.signIn = nil
+        model.installs = [:]
         switch scene {
         case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
+        case "connect-installing": svc.noLogin = true
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
         case "overview-empty":
@@ -502,7 +507,7 @@ public final class AccountsDemo {
             switch scene {
             case "accounts", "accounts-need", "accounts-not-admin", "account-ready", "account-cooling",
                 "account-unhealthy", "account-at-limit", "connect-arrived", "connect-key", "connect-name",
-                "connect-place",
+                "connect-place", "connect-installing",
                 "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
                 "cap", "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit",
                 "usage-limit-clear", "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
@@ -541,6 +546,9 @@ public final class AccountsDemo {
             ConnectWizardState.debugStep =
                 scene == "connect-key" ? .key : scene == "connect-name" ? .name : .place
             AccountDialogs.openConnect(model, provider: "anthropic", advanced: scene == "connect-place")
+        case "connect-installing":
+            AccountDialogs.openConnect(model, provider: "anthropic")
+            model.installs["r_linux01|claude"] = ToolProgress(state: .running, percent: 64, step: "Downloading…")
         case "connect-arrived":
             AccountDialogs.openConnect(model, provider: "anthropic")
             try? await Task.sleep(for: .milliseconds(300))

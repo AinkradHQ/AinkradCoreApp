@@ -17,11 +17,15 @@ struct ProviderInstall: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: Space.s1) {
             if let progress, progress.state == .running, let target {
-                CoreMeter(Double(progress.percent) / 100, label: "Installing \(ProviderWords.title(provider))")
-                    .frame(width: ConnectWizardWords.barWidth)
+                CoreMeter(
+                    Double(progress.percent) / 100, height: ConnectWizardWords.barHeight,
+                    label: "Installing \(ProviderWords.title(provider))"
+                )
+                .frame(width: ConnectWizardWords.barWidth)
                 meta(ConnectWizardWords.installing(on: target.name, percent: progress.percent))
             } else if turningOn || progress?.state == .done {
-                CoreMeter(1, label: "Installed").frame(width: ConnectWizardWords.barWidth)
+                CoreMeter(1, height: ConnectWizardWords.barHeight, label: "Installed").frame(
+                    width: ConnectWizardWords.barWidth)
                 meta(turningOn ? "Turning on AI sessions…" : "Installed. Checking the runner…")
             } else if let target {
                 Button("Install on \(target.name)") {

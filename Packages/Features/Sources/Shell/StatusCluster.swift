@@ -103,37 +103,27 @@ private struct StatusButton: View {
     }
 }
 
-/// The status bar's buttons: quiet until hovered (a well), lit while their panel is open, pressed in on click (darkened
-/// under Reduce Motion). No focus ring. `fill` is a chip's own tone, which the hover lifts.
-// Local: CoreUI's tile press (`CoreTilePress`) is internal and CoreButtonStyle pads and inks its label. Proposal: make
-// CoreTilePress public with a hover fill.
+/// The status bar's buttons: CoreUI's quiet press with its hover well, lit while their panel is open. No focus ring.
+/// `fill` is a chip's own tone, which the hover lifts.
 struct StatusBarStyle: ButtonStyle {
     var on = false
     var fill: Color = .clear
     func makeBody(configuration: Configuration) -> some View {
-        StatusBarSurface(configuration: configuration, on: on, fill: fill)
+        Lit(on: on, fill: fill) {
+            CoreQuietPressStyle(radius: Radius.control, scale: 0.97, hoverFill: true).makeBody(
+                configuration: configuration)
+        }
     }
 
-    private struct StatusBarSurface: View {
-        let configuration: ButtonStyleConfiguration
+    private struct Lit<Content: View>: View {
         let on: Bool
         let fill: Color
+        @ViewBuilder let content: Content
         @Environment(\.corePalette) private var palette
-        @Environment(\.accessibilityReduceMotion) private var reduce
-        @State private var hovering = false
         var body: some View {
-            let shape = coreShape(Radius.control)
-            let pressed = configuration.isPressed
-            configuration.label
-                .background(on ? palette.navActive : fill, in: shape)
-                .background { if hovering && !on { shape.fill(palette.uDim) } }
-                .overlay { if hovering && fill != .clear { shape.fill(palette.uDim) } }
-                .overlay { shape.fill(.black.opacity(pressed && reduce ? 0.18 : 0)) }
-                .contentShape(shape)
-                .scaleEffect(pressed && !reduce ? 0.97 : 1)
-                .animation(Motion.press(Motion.press), value: pressed)
-                .animation(Motion.out(Motion.hover), value: hovering)
-                .onHover { hovering = $0 }
+            content
+                .background(on ? palette.navActive : fill, in: coreShape(Radius.control))
+                .contentShape(coreShape(Radius.control))
                 .focusEffectDisabled()
         }
     }

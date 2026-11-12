@@ -253,8 +253,12 @@ struct ConnectWizard: View {
             }
             if w.flow.needsGate { gateCard }
             HStack(alignment: .bottom, spacing: Space.s2) {
-                CoreSecureField("Your key", placeholder: "Paste your key", text: $w.flow.key, autofocus: true)
-                    .accessibilityIdentifier("account-key")
+                CoreSecureField(
+                    "Your key", placeholder: "Paste your key", text: $w.flow.key,
+                    // Focus only an empty field: focusing a filled one selects the whole key.
+                    autofocus: w.flow.key.isEmpty
+                )
+                .accessibilityIdentifier("account-key")
                 AccLink(title: "Paste", symbol: "doc.on.clipboard") { w.flow.paste() }
             }
             if let shape {
