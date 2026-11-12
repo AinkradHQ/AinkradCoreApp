@@ -307,7 +307,9 @@ struct LeaseDialog: View {
     var body: some View {
         let model = admin.secrets!
         CoreDialogPanel(
-            form.isGroup ? "Let a runner use all of \(form.name)" : "Let a runner use \(form.name)",
+            form.isGroup
+                ? "Let a runner use all of \(SecretWords.unbroken(form.name))"
+                : "Let a runner use \(SecretWords.unbroken(form.name))",
             width: Space.s8 * 15
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -323,8 +325,7 @@ struct LeaseDialog: View {
                     }
                 }
                 CoreTextField(
-                    "For how long", placeholder: "\(model.leaseLimit)", text: $form.ttl, suffix: "seconds",
-                    autofocus: true
+                    "For how long", placeholder: "\(model.leaseLimit)", text: $form.ttl, suffix: "seconds"
                 ) { go(model) }
                 Text(
                     "Up to \(SettingWords.duration(model.leaseLimit)). It comes back by itself when the time runs out."

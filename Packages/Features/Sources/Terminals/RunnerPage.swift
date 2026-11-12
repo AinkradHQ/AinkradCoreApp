@@ -154,12 +154,7 @@ struct RunnerPage: View {
 
     private var offers: some View {
         card("What it offers") {
-            if let policy = runner.policy {
-                controls(policy)
-            } else {
-                offer("terminal", "Terminals", "Open a shell on this runner", on: facts.terminalsOn)
-                offer("bubble.left", "AI sessions", aiLine, on: facts.agentsOn)
-            }
+            controls(runner.policy)
             HStack(spacing: Space.s3) {
                 Image(systemName: "key").frame(width: Space.s5).foregroundStyle(palette.text2)
                     .accessibilityHidden(true)
@@ -187,21 +182,38 @@ struct RunnerPage: View {
 
     private var busyPolicy: Bool { model.policyBusy.contains(runner.id) }
 
-    private func controls(_ p: RunnerPolicy) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            GlassToggleTile(
-                "Terminals", sub: "Open a shell on this runner", symbol: "terminal",
-                isOn: Binding(get: { p.terminals }, set: { v in Task { await model.setPolicy(runner, terminals: v) } }),
-                fill: true
-            )
-            .disabled(busyPolicy || off)
-            GlassToggleTile(
-                "AI sessions", sub: aiLine, symbol: "bubble.left",
-                isOn: Binding(get: { p.agents }, set: { v in Task { await model.setPolicy(runner, agents: v) } }),
-                fill: true
-            )
-            .disabled(busyPolicy || off)
-            if p.agents { capacity(p) }
+    /// Terminals and AI sessions as switches, then the AI-sessions-at-once stepper once the runner reports its policy.
+    /// Before it does, the switches show what it offers and the first flip sends a policy (`setPolicy` fills the rest).
+    private func controls(_ known: RunnerPolicy?) -> some View {
+        let p = known ?? RunnerPolicy(terminals: facts.terminalsOn, agents: facts.agentsOn, capacity: 2)
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            offer("terminal", "Terminals", "Open a shell on this runner") {
+                CoreSwitch(
+                    "",
+                    isOn: Binding(
+                        get: { p.terminals }, set: { v in Task { await model.setPolicy(runner, terminals: v) } })
+                )
+                .accessibilityLabel("Terminals")
+                .disabled(busyPolicy || off)
+            }
+            offer("bubble.left", "AI sessions", aiLine) {
+                CoreSwitch(
+                    "",
+                    isOn: Binding(get: { p.agents }, set: { v in Task { await model.setPolicy(runner, agents: v) } })
+                )
+                .accessibilityLabel("AI sessions")
+                .disabled(busyPolicy || off)
+            }
+            if known != nil, p.agents {
+                offer("list.bullet", "AI sessions at the same time", "The runner restarts when this changes") {
+                    CoreNumberStepper(value: p.capacity, in: 1...8, noun: "AI sessions at the same time") { n in
+                        Task { await model.setPolicy(runner, capacity: n) }
+                    }
+                    .disabled(busyPolicy || off)
+                }
+                .accessibilityIdentifier("runner-capacity")
+                .transition(.opacity)
+            }
             if let n = model.policyNote[runner.id] {
                 Label(n.text, systemImage: n.refused ? "exclamationmark.triangle" : "arrow.triangle.2.circlepath")
                     .coreFont(size: MacTextSize.meta)
@@ -211,26 +223,6 @@ struct RunnerPage: View {
             }
         }
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: p)
-    }
-
-    private func capacity(_ p: RunnerPolicy) -> some View {
-        HStack(spacing: Space.s3) {
-            Image(systemName: "list.bullet").frame(width: Space.s5).foregroundStyle(palette.text2)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("AI sessions at the same time").coreFont(size: MacTextSize.body, weight: .medium)
-                Text("The runner restarts when this changes").coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(palette.text2)
-            }
-            Spacer(minLength: Space.s2)
-            CountStepper(value: p.capacity, range: 1...8, noun: "AI sessions at the same time") { n in
-                Task { await model.setPolicy(runner, capacity: n) }
-            }
-            .disabled(busyPolicy || off)
-        }
-        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("runner-capacity")
     }
 
     /// Tools found on the host, each with an Install button when missing and live progress while installing.
@@ -286,7 +278,10 @@ struct RunnerPage: View {
         }
     }
 
-    private func offer(_ symbol: String, _ title: String, _ help: String, on: Bool) -> some View {
+    /// One "What it offers" row: icon, name and help on the left, its control on the right.
+    private func offer<T: View>(
+        _ symbol: String, _ title: String, _ help: String, @ViewBuilder trailing: () -> T
+    ) -> some View {
         HStack(spacing: Space.s3) {
             Image(systemName: symbol).frame(width: Space.s5).foregroundStyle(palette.text2)
                 .accessibilityHidden(true)
@@ -296,10 +291,10 @@ struct RunnerPage: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s2)
-            StateBadge(on ? "On" : "Off", tone: on ? .run : .queue, symbol: on ? "checkmark" : "minus")
+            trailing()
         }
         .padding(.horizontal, Space.s3)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private var machine: some View {
@@ -395,42 +390,7 @@ struct RunnerPage: View {
         Button(action: run) {
             Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(CoreButtonStyle(danger ? .danger : .secondary))
+        .buttonStyle(CoreButtonStyle(danger ? .quietDanger : .secondary))
         .disabled(disabled)
-    }
-}
-
-/// A whole number with − and + beside it, in one quiet well (the AI-sessions-at-once row). Each press sends the new value;
-/// the ends of the range disable their button.
-// ponytail: local until CoreUI has a number stepper (proposal in the PR); AddWizardView keeps its own copy for now.
-struct CountStepper: View {
-    let value: Int
-    let range: ClosedRange<Int>
-    let noun: String
-    let set: (Int) -> Void
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Button {
-                set(value - 1)
-            } label: {
-                Image(systemName: "minus").frame(width: MacSize.controlMd)
-            }
-            .disabled(value <= range.lowerBound).help("Fewer \(noun)").accessibilityLabel("Fewer \(noun)")
-            Text("\(value)").coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
-                .frame(minWidth: Space.s6).contentTransition(.numericText())
-            Button {
-                set(value + 1)
-            } label: {
-                Image(systemName: "plus").frame(width: MacSize.controlMd)
-            }
-            .disabled(value >= range.upperBound).help("More \(noun)").accessibilityLabel("More \(noun)")
-        }
-        .buttonStyle(CoreButtonStyle(.plain, size: .small))
-        .coreWell(radius: Radius.control)
-        .fixedSize()
-        .accessibilityElement(children: .contain)
-        .accessibilityValue("\(value)")
     }
 }

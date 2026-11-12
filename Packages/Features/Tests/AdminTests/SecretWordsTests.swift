@@ -19,6 +19,13 @@ struct SecretWordsTests {
         #expect(SecretWords.Kind.file.blurb.contains("1 MB") && SecretWords.fileLimit == 1_048_576)
     }
 
+    @Test func dialogTitlesKeepANameInOnePiece() {
+        #expect(SecretWords.unbroken("aws-prod") == "aws\u{2011}prod")
+        #expect(SecretWords.unbroken("my key") == "my\u{00A0}key")
+        let long = SecretWords.unbroken("abcdefghijklmnopqrstuvwxyz0123456789", max: 11)
+        #expect(long == "abcde…56789" && long.count == 11)
+    }
+
     @Test func rowsShowLastUsedAndUseCount() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         var s = item()

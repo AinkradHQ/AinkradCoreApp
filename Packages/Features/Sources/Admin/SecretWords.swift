@@ -5,6 +5,14 @@ enum SecretWords {
     /// A file secret is at most 1 MiB (decision G1).
     static let fileLimit = 1_048_576
 
+    /// A name for a dialog title: never wrapped inside (hyphens and spaces become their no-break forms) and cut in the
+    /// middle past `max` characters, so `aws-production-deploy-key` stays one piece and both ends stay readable.
+    static func unbroken(_ name: String, max: Int = 32) -> String {
+        let cut =
+            name.count <= max ? name : "\(name.prefix((max - 1) / 2))…\(name.suffix(max - 1 - (max - 1) / 2))"
+        return cut.replacingOccurrences(of: "-", with: "\u{2011}").replacingOccurrences(of: " ", with: "\u{00A0}")
+    }
+
     /// What a secret can be (`kind` on the Core).
     enum Kind: CaseIterable, Equatable {
         case text, multiline, file, env

@@ -137,9 +137,12 @@ struct SecretsSection: View {
                                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
                         }
                     }
+                    .frame(minHeight: MacSize.controlMd)
+                    .padding(.horizontal, Space.s1)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(SectionToggleStyle()).focusable(false)
+                .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.99, hoverFill: true)).focusable(false)
+                .padding(.horizontal, -Space.s1)  // grid: ok the fill bleeds 4 pt; the chevron stays on the rows' edge
                 .accessibilityLabel("\(section.title), \(section.items.count) secrets")
                 .accessibilityValue(open ? "Expanded" : "Collapsed")
                 .help(section.group?.description ?? "")
@@ -201,30 +204,6 @@ enum SecretColumn {
     static let used: CGFloat = Space.s8 * 6
     static let last: CGFloat = Space.s8 * 5 - Space.s2
     static let size: CGFloat = Space.s8 * 3
-}
-
-/// A group header's collapse button: the row hover, a darker well while pressed. Local until CoreUI has a quiet row press.
-private struct SectionToggleStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { PressBody(configuration: configuration) }
-
-    private struct PressBody: View {
-        let configuration: ButtonStyleConfiguration
-        @Environment(\.corePalette) private var palette
-        @State private var hovering = false
-        var body: some View {
-            configuration.label
-                .frame(minHeight: MacSize.controlMd)
-                .padding(.horizontal, Space.s1)
-                .background(
-                    configuration.isPressed ? palette.uDimHover : hovering ? palette.rowHover : .clear,
-                    in: coreShape(Radius.chip)
-                )
-                .padding(.horizontal, -Space.s1)  // grid: ok the fill bleeds 4 pt; the chevron stays on the rows' edge
-                .onHover { hovering = $0 }
-                .animation(Motion.out(Motion.hover), value: hovering)
-                .animation(Motion.out(Motion.press), value: configuration.isPressed)
-        }
-    }
 }
 
 /// The quiet column names above the rows.
@@ -372,7 +351,7 @@ private struct SecretRow: View {
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             Button("Delete") { SecretDialogs.openDelete(admin, secret) }
                 .environment(\.coreKeycap, "⌫").help("Delete \(secret.name) (⌫)")
-                .buttonStyle(CoreButtonStyle(.danger, size: .small))
+                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
         }
         .fixedSize()
     }
