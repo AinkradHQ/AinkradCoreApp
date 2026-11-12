@@ -179,7 +179,7 @@ struct LiveSessionsTests {
                 == .toolEdit(id: "e", name: "Edit", path: "/p", old: "a", new: "b", ok: true, durationMs: 100))
     }
 
-    @Test func cumulativeCostBecomesEachTurnsOwn() {
+    @MainActor @Test func cumulativeCostBecomesEachTurnsOwn() {
         let store = TranscriptStore(sessionID: "s")
         let t = Date()
         func usage(_ seq: Int64, _ micros: Int64?) -> TranscriptEntry {

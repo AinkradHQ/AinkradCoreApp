@@ -123,11 +123,11 @@ public final class TranscriptStore {
     /// Entries from before the first one held.
     func prepend(_ page: [TranscriptEntry], after: Int64) {
         let first = entries.first?.seq ?? lastSeq + 1
-        let older = page.filter { $0.seq < first }.sorted { $0.seq < $1.seq }
-        for e in older { absorb(e) }
+        let raw = page.filter { $0.seq < first }.sorted { $0.seq < $1.seq }
+        for e in raw { absorb(e) }
         let latest = costSoFar
         costSoFar = nil
-        let older = older.map(perTurn)
+        let older = raw.map(perTurn)
         costSoFar = latest
         var seen = Set<String>()
         let shown = older.filter(\.visible).filter { e in
