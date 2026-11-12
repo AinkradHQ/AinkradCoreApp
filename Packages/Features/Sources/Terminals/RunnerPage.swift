@@ -110,7 +110,7 @@ struct RunnerPage: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .animation(Motion.calm(.smooth(duration: 0.35), reduce), value: work.map(\.id) + here.map(\.id))
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + here.map(\.id))
                 loadChart
             }
             if let n = model.noop[runner.id] { noopLine(n) }
@@ -170,7 +170,7 @@ struct RunnerPage: View {
                 }
                 Spacer(minLength: Space.s2)
                 if let yes = facts.canUseAccounts {
-                    StateBadge(yes ? "Yes" : "No", tone: yes ? .run : .warn, symbol: yes ? "checkmark" : "xmark")
+                    StateBadge(yes ? "Yes" : "No", tone: yes ? .run : .queue, symbol: yes ? "checkmark" : "xmark")
                 } else {
                     StateBadge("Not reported yet", tone: .queue, symbol: "questionmark")
                 }
@@ -210,7 +210,7 @@ struct RunnerPage: View {
                     .accessibilityIdentifier("runner-policy-note")
             }
         }
-        .animation(Motion.calm(.smooth(duration: 0.25), reduce), value: p)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: p)
     }
 
     private func capacity(_ p: RunnerPolicy) -> some View {
@@ -311,7 +311,7 @@ struct RunnerPage: View {
                     if let v = runner.version {
                         HStack(spacing: Space.s2) {
                             Text(v)
-                            if facts.updateAvailable { StateBadge("Update available", tone: .run, symbol: "arrow.up") }
+                            if facts.updateAvailable { StateBadge("Update available", tone: .done, symbol: "arrow.up") }
                         }
                     } else {
                         Text("Not reported yet").foregroundStyle(palette.text2)

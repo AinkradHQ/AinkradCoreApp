@@ -19,7 +19,7 @@ struct SecretsSection: View {
         let model = admin.secrets!
         VStack(alignment: .leading, spacing: Space.s4) {
             header(model)
-            if admin.isConnected && model.mode == 0 {
+            if admin.isConnected && model.isOff {
                 CoreStateCard(
                     symbol: "lock", title: "Secrets are off", line: "Turn on test values to add one.",
                     primary: CoreAction("Open Feature switches") { admin.host.shell.settings.selected = "switches" }
@@ -56,7 +56,7 @@ struct SecretsSection: View {
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             .help("Keep related secrets together and give them to runners in one step")
-            .disabled(model.mode == 0)
+            .disabled(model.isOff)
             Button {
                 SecretDialogs.openNew(admin)
             } label: {
@@ -65,7 +65,7 @@ struct SecretsSection: View {
             .buttonStyle(CoreButtonStyle(.prominent, size: .small))
             .keyboardShortcut("n", modifiers: .command).environment(\.coreKeycap, "⌘N")
             .help("Add a secret (⌘N)")
-            .disabled(model.mode == 0)
+            .disabled(model.isOff)
         }
     }
 
@@ -139,7 +139,7 @@ struct SecretsSection: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).focusable(false)
+                .buttonStyle(SectionToggleStyle()).focusable(false)
                 .accessibilityLabel("\(section.title), \(section.items.count) secrets")
                 .accessibilityValue(open ? "Expanded" : "Collapsed")
                 .help(section.group?.description ?? "")
@@ -201,6 +201,30 @@ enum SecretColumn {
     static let used: CGFloat = Space.s8 * 6
     static let last: CGFloat = Space.s8 * 5 - Space.s2
     static let size: CGFloat = Space.s8 * 3
+}
+
+/// A group header's collapse button: the row hover, a darker well while pressed. Local until CoreUI has a quiet row press.
+private struct SectionToggleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { PressBody(configuration: configuration) }
+
+    private struct PressBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.corePalette) private var palette
+        @State private var hovering = false
+        var body: some View {
+            configuration.label
+                .frame(minHeight: MacSize.controlMd)
+                .padding(.horizontal, Space.s1)
+                .background(
+                    configuration.isPressed ? palette.uDimHover : hovering ? palette.rowHover : .clear,
+                    in: coreShape(Radius.chip)
+                )
+                .padding(.horizontal, -Space.s1)  // grid: ok the fill bleeds 4 pt; the chevron stays on the rows' edge
+                .onHover { hovering = $0 }
+                .animation(Motion.out(Motion.hover), value: hovering)
+                .animation(Motion.out(Motion.press), value: configuration.isPressed)
+        }
+    }
 }
 
 /// The quiet column names above the rows.
@@ -287,15 +311,22 @@ private struct SecretRow: View {
                     }
                 }
                 .frame(width: SecretColumn.used, alignment: .leading)
-                ZStack(alignment: .trailing) {
-                    HStack(spacing: Space.s3) {
-                        Text(SecretWords.lastUsedShort(secret)).frame(width: SecretColumn.last, alignment: .leading)
-                            .help(SecretWords.lastUsed(secret))
-                        Text(SecretWords.size(secret.size)).coreFont(size: MacTextSize.meta).monospacedDigit()
-                            .foregroundStyle(palette.text2).frame(width: SecretColumn.size, alignment: .trailing)
-                    }
-                    .opacity(selected ? 0 : 1)
-                    if selected { actions.transition(.opacity) }
+                HStack(spacing: Space.s3) {
+                    Text(SecretWords.lastUsedShort(secret)).frame(width: SecretColumn.last, alignment: .leading)
+                        .help(SecretWords.lastUsed(secret))
+                    Text(SecretWords.size(secret.size)).coreFont(size: MacTextSize.meta).monospacedDigit()
+                        .foregroundStyle(palette.text2).frame(width: SecretColumn.size, alignment: .trailing)
+                }
+                .opacity(selected ? 0 : 1)
+            }
+            // The worded actions float over the row's trailing end (secrets.html `.acts`), so they never widen the row
+            // and push Used by out of its column.
+            .overlay(alignment: .trailing) {
+                if selected {
+                    actions.padding(Space.s1)
+                        .background(palette.panelStrong, in: coreShape(Radius.chip + Space.s1))
+                        .overlay { coreShape(Radius.chip + Space.s1).strokeBorder(palette.edge, lineWidth: 1) }
+                        .transition(.opacity)
                 }
             }
             if let e = model.rowError[secret.name] {

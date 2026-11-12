@@ -50,7 +50,7 @@ struct RunnersView: View {
                             reduce ? .opacity : .scale(scale: 0.97).combined(with: .opacity))
                     }
                 }
-                .animation(Motion.calm(.smooth(duration: 0.3), reduce), value: shown.map(\.id))
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shown.map(\.id))
                 if shown.isEmpty {
                     Text("No runners match this filter.").foregroundStyle(palette.text2)
                 }
@@ -103,7 +103,7 @@ struct OfferChip: View {
             .coreFont(size: MacTextSize.meta, weight: .medium)
             .foregroundStyle(on ? palette.primary : palette.text2)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(on ? palette.tone(.run).fill : palette.uDim, in: coreShape(Radius.chip))
+            .background(on ? palette.tone(.done).fill : palette.uDim, in: coreShape(Radius.chip))
     }
 }
 
@@ -124,7 +124,7 @@ private struct RunnerTag: View {
     var body: some View {
         Text(text).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(palette.primary)
             .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(palette.tone(.run).fill, in: coreShape(Radius.chip)).lineLimit(1).fixedSize()
+            .background(palette.tone(.done).fill, in: coreShape(Radius.chip)).lineLimit(1).fixedSize()
     }
 }
 
@@ -248,11 +248,31 @@ private struct RunnerCard: View {
             .coreWell(active: hovering)
             .contentShape(coreShape(Radius.cardMac))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPress())
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .help("Open \(runner.name)")
         .accessibilityLabel(
             "\(runner.name), \(facts.chip), \(runner.load) of \(runner.capacity) work slots in use")
+    }
+}
+
+/// A runner card's press: scale 0.98 with the press curve; Reduce Motion darkens the card instead. Hover stays with the
+/// card's well. Local until CoreUI makes its tile press public.
+private struct CardPress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { PressBody(configuration: configuration) }
+
+    private struct PressBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.accessibilityReduceMotion) private var reduce
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduce ? 0.98 : 1)
+                .overlay {
+                    coreShape(Radius.cardMac).fill(.black.opacity(configuration.isPressed && reduce ? 0.18 : 0))
+                        .allowsHitTesting(false)
+                }
+                .animation(Motion.press(Motion.press), value: configuration.isPressed)
+        }
     }
 }
