@@ -30,6 +30,8 @@ struct TerminalTile: View {
             TileScreen(
                 runner: runner, accent: accent, state: state, label: chip.label, ended: item.isEnded, blink: shown
             )
+            // A terminal screen is dark in both themes (its tokens resolve as night).
+            .environment(\.colorScheme, .dark)
             .overlay(alignment: .bottomTrailing) {
                 if hovering { actions.transition(.opacity.combined(with: .move(edge: .trailing))) }
             }
@@ -135,6 +137,7 @@ private struct TileScreen: View {
     let ended: Bool
     let blink: Bool
     @Bindable private var prefs = TerminalPrefs.shared
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let t = prefs.theme
@@ -172,6 +175,10 @@ private struct TileScreen: View {
         .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
         .background {
             ZStack {
+                // Day: a deep base so the screen stays dark over the light well (night draws nothing here).
+                if palette.isDay {
+                    coreShape(Radius.row).fill(Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255).opacity(0.8))
+                }
                 if prefs.lookBlur { coreShape(Radius.row).fill(.ultraThinMaterial).environment(\.colorScheme, .dark) }
                 coreShape(Radius.row).fill(Color(nsColor: prefs.screenColor))
             }
