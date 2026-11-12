@@ -81,6 +81,11 @@ public final class TerminalsModel {
         return runners.map(\.name)
     }
 
+    /// "Yes" or "No (reason)": whether AI sessions on this runner can use the Core's accounts; nil when not reported.
+    public func accountsAnswer(forRunner id: String) -> String? {
+        runners.first { $0.id == id }.flatMap { RunnerFacts(runner: $0).accountsAnswer }
+    }
+
     public func displayName(ofTerminal id: String) -> String? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
         return shell.tabNames["terminal-\(id)"] ?? name(of: item.runner)

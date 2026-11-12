@@ -3,7 +3,9 @@
 <plist version="1.0">
 <dict>
 	<!-- The runner inside the app, started at login by SMAppService (MacRunnerControl). Terminals are off in this one;
-	     com.ainkrad.core.runner.terminals.plist differs only in --enable-pty. A plist cannot change after signing, so the
+	     com.ainkrad.core.runner.terminals.plist differs only in --enable-pty. Both offer agent sessions with the egress
+	     filter on (the runner advertises egress-filter only then); add a provider host to AINKRAD_AGENT_EGRESS_HOSTS in
+	     BOTH files (comma separated; MacRunnerPlistTests keeps them equal). A plist cannot change after signing, so the
 	     "Terminals on this Mac" switch registers one or the other. No --state: the runner's default is
 	     $HOME/.ainkrad-runner/core, and a plist cannot know the home folder. -->
 	<key>Label</key>
@@ -14,11 +16,16 @@
 	<array>
 		<string>ainkrad-runner</string>
 		<string>connect</string>
+		<string>--enable-agents</string>
 	</array>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
 		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>AINKRAD_AGENT_NETWORK</key>
+		<string>filtered</string>
+		<key>AINKRAD_AGENT_EGRESS_HOSTS</key>
+		<string>api.anthropic.com</string>
 	</dict>
 	<key>RunAtLoad</key>
 	<true/>
