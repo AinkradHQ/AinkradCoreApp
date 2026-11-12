@@ -62,6 +62,9 @@ final class FakeService: TerminalService, @unchecked Sendable {
     private(set) var signals: [String] = []
     private(set) var closed: [String] = []
     private(set) var created: [(runner: String, program: String?)] = []
+    var policyResult: Result<(policy: RunnerPolicy, restarting: Bool), CoreError>?
+    private(set) var policies: [RunnerPolicy] = []
+    private(set) var installed: [String] = []
 
     func terminals() async throws -> [TerminalItem] { lock.withLock { terminalList } }
     func terminal(_ id: String) async throws -> TerminalItem {
@@ -83,6 +86,14 @@ final class FakeService: TerminalService, @unchecked Sendable {
     }
     func signal(_ id: String, _ name: String) async throws { lock.withLock { signals.append(name) } }
     func noop(_ runner: String) async throws -> Int { 31 }
+    func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {
+        lock.withLock { policies.append(policy) }
+        return try lock.withLock { policyResult }?.get() ?? (policy, true)
+    }
+    func installTool(_ runner: String, tool: String) async throws -> String {
+        lock.withLock { installed.append(tool) }
+        return "op_1"
+    }
     func attach(_ id: String, after: UInt64) async throws -> any TerminalLink {
         let r = lock.withLock { () -> Result<FakeLink, CoreError> in
             attachAfters.append(after)

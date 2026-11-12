@@ -1,6 +1,7 @@
 import CoreKit
 import Foundation
 import Observation
+import Terminals
 
 /// Add a device or a runner, one guided flow (N17). It owns the choices and drives the two ways the Core can pair:
 /// an invite QR (a device: nothing to compare afterwards) and the typed code (a runner, and a device when the Core cannot
@@ -74,6 +75,15 @@ final class AddWizardModel {
         case .connect: connectedYet
         case .settings, .done: true
         }
+    }
+
+    /// The runner that connected, with what it offers now (the Settings step edits it).
+    var runnerSettings: RunnerSettings? {
+        connected.flatMap { c in app?.terminals?.runnerSettings(named: c.name) }
+    }
+
+    func changeRunner(_ id: String, terminals: Bool? = nil, agents: Bool? = nil, capacity: Int? = nil) {
+        Task { await app?.terminals?.changeRunner(id, terminals: terminals, agents: agents, capacity: capacity) }
     }
 
     var connectedYet: Bool {

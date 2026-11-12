@@ -36,7 +36,7 @@ enum NoopOutcome: Equatable {
 @MainActor @Observable
 public final class TerminalsModel {
     private(set) var items: [TerminalItem] = []
-    private(set) var runners: [RunnerItem] = []
+    var runners: [RunnerItem] = []
     private(set) var load: Load = .idle
     var filter: TerminalFilter = .all
     var selected: String?
@@ -51,6 +51,10 @@ public final class TerminalsModel {
     /// only the current value, so the chart is what was sampled while the app watched.
     private(set) var loadSamples: [String: [Double]] = [:]
     var newTerminal: NewTerminalModel?
+    /// Runner control (N17, N19): the policy being applied, why one was refused, and each runner's tool installs.
+    var policyBusy: Set<String> = []
+    var policyNote: [String: RunnerNote] = [:]
+    var installs: [String: [String: ToolInstall]] = [:]
 
     let host: any TerminalHost
     let service: any TerminalService
@@ -393,14 +397,13 @@ public final class TerminalsModel {
 
     // MARK: new terminal
 
-    /// New terminal with the defaults: the first ready runner, its login shell, opened after Touch ID with no sheet. When
+    /// New terminal with the defaults: the first ready runner, the Ainkrad shell, opened after Touch ID with no sheet. When
     /// nothing is ready or the Core refuses, the advanced sheet opens with the reason.
     func quickNew() {
         Task {
             if runners.isEmpty { await reload() }
             let prefs = TerminalPrefs.shared
             let m = NewTerminalModel(model: self, runner: prefs.defaultRunner.isEmpty ? nil : prefs.defaultRunner)
-            m.program = prefs.defaultShell
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }

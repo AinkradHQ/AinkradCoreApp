@@ -64,6 +64,8 @@ enum ServiceEvent: Sendable, Equatable {
     case event(kind: String, pairingID: String?, deviceID: String?)
     /// The payload of an account event, every value as text, for the bell and banners.
     case notice(kind: String, fields: [String: String])
+    /// `runner.tool_install`: `{op, runner, tool, state, percent, step, reason}` as text, for the runner page and the Connect wizard.
+    case toolInstall(fields: [String: String])
 }
 
 /// The Core as the pairing screens use it. `LiveCoreService` is the only real one; tests bring their own.
@@ -301,6 +303,9 @@ struct LiveCoreService: CoreService {
                         let kind = Self.eventKind(e.kind, p)
                         out.yield(
                             .event(kind: kind, pairingID: p["pairing"] as? String, deviceID: p["device"] as? String))
+                        if kind == "runner.tool_install" {
+                            out.yield(.toolInstall(fields: p.compactMapValues { Self.text($0) }))
+                        }
                         if AccountNotice.kinds.contains(kind) {
                             out.yield(.notice(kind: kind, fields: p.compactMapValues { Self.text($0) }))
                         }

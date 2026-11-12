@@ -49,6 +49,24 @@ struct RunnerSlotFacts: Equatable, Sendable {
     var terminalsCapacity: Int?
 }
 
+/// What a runner offers now (`GET /runners` `policy`): terminals, AI sessions, and how many sessions at once.
+struct RunnerPolicy: Equatable, Sendable {
+    var terminals: Bool
+    var agents: Bool
+    var capacity: Int
+}
+
+/// An install of a host tool on a runner, as `runner.tool_install` events report it.
+struct ToolInstall: Equatable, Sendable {
+    enum State: String, Sendable { case running, done, failed }
+    var op: String
+    var tool: String
+    var state: State
+    var percent: Int
+    var step: String
+    var reason: String?
+}
+
 struct RunnerItem: Identifiable, Equatable, Sendable {
     let id: String
     var name: String
@@ -76,6 +94,8 @@ struct RunnerItem: Identifiable, Equatable, Sendable {
     var slots: RunnerSlotFacts?
     /// Harness name to version, e.g. `claude` to `2.1.318`.
     var tools: [String: String] = [:]
+    /// What the runner offers now; nil for an old runner or one that never connected.
+    var policy: RunnerPolicy?
 
     var hasPty: Bool { drivers.contains { $0.name == "pty" } }
     var perCore: Double? { avg1.flatMap { a in cores.flatMap { $0 > 0 ? a / Double($0) : nil } } }
@@ -106,6 +126,17 @@ protocol TerminalService: Sendable {
     /// Milliseconds the runner took to answer an empty round trip.
     func noop(_ runner: String) async throws -> Int
     func attach(_ id: String, after: UInt64) async throws -> any TerminalLink
+    /// `PUT /runners/{id}/policy` (admin, step-up). `restarting`: the runner restarts to read it.
+    func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool)
+    /// `POST /runners/{id}/tools` (admin, step-up): the id of the install operation.
+    func installTool(_ runner: String, tool: String) async throws -> String
+}
+
+extension TerminalService {
+    func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {
+        (policy, false)
+    }
+    func installTool(_ runner: String, tool: String) async throws -> String { "op" }
 }
 
 struct LiveTerminalService: TerminalService {
@@ -190,6 +221,40 @@ struct LiveTerminalService: TerminalService {
         try await run { try await connection.attachTerminal(id, after: after) }
     }
 
+    func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {
+        try await run {
+            let body = Components.Schemas.RunnerPolicyBody(
+                agentCapacity: Int32(policy.capacity), agents: policy.agents, terminals: policy.terminals)
+            switch try await client.setRunnerPolicy(path: .init(id: runner), body: .json(body)) {
+            case .ok(let o):
+                let r = try o.body.json
+                return (r.policy.map(Self.policy) ?? policy, r.restarting ?? false)
+            case .badRequest(let r): throw Self.fail(400, try? r.body.json)
+            case .notFound(let r): throw Self.fail(404, try? r.body.json)
+            case .conflict(let r): throw Self.fail(409, try? r.body.json)
+            case .undocumented(let status, let payload): throw await Self.fail(status, payload)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    func installTool(_ runner: String, tool: String) async throws -> String {
+        try await run {
+            switch try await client.installRunnerTool(path: .init(id: runner), body: .json(.init(tool: tool))) {
+            case .accepted(let o): return try o.body.json.op ?? ""
+            case .badRequest(let r): throw Self.fail(400, try? r.body.json)
+            case .notFound(let r): throw Self.fail(404, try? r.body.json)
+            case .conflict(let r): throw Self.fail(409, try? r.body.json)
+            case .undocumented(let status, let payload): throw await Self.fail(status, payload)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    static func policy(_ p: Components.Schemas.RunnerPolicyBody) -> RunnerPolicy {
+        RunnerPolicy(terminals: p.terminals, agents: p.agents, capacity: Int(p.agentCapacity))
+    }
+
     // MARK: mapping
 
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
@@ -243,6 +308,6 @@ struct LiveTerminalService: TerminalService {
                     agentsUsed: Int($0.agentsUsed), agentsCapacity: $0.agentsCapacity.map(Int.init),
                     terminalsUsed: Int($0.terminalsUsed), terminalsCapacity: $0.terminalsCapacity.map(Int.init))
             },
-            tools: r.tools?.additionalProperties ?? [:])
+            tools: r.tools?.additionalProperties ?? [:], policy: r.policy.map(Self.policy))
     }
 }

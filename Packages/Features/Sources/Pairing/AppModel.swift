@@ -319,6 +319,9 @@ public final class AppModel {
             shell.coreLink = .none
             phase = .blocked(f)
         case .notice(let kind, let fields): accountNotice(kind, fields)
+        case .toolInstall(let fields):
+            terminals?.toolInstall(fields)
+            accounts.toolInstall(fields)
         case .event(let kind, let pairing, _):
             terminals?.event(kind: kind)
             admin.event(kind: kind)
