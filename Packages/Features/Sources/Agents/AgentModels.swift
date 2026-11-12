@@ -152,9 +152,11 @@ public struct NewAgentSession: Equatable, Sendable {
     public var model: String?
     /// Empty opens a live session that waits for the first message, like typing `claude` in a terminal.
     public var prompt: String
-    /// A folder or repo and branch the session works in; nil is a fresh folder.
+    /// A repo (a URL, or a path to a git repo on the runner) and the branch the session works on; nil is a fresh folder. `base` is
+    /// what the copy is cut from: the Core's workspace has all three.
     public var project: String?
     public var branch: String?
+    public var base: String?
     /// `ask`, `accept_edits` or `sandboxed`.
     public var mode: String
     public var secrets: [String]
@@ -164,10 +166,13 @@ public struct NewAgentSession: Equatable, Sendable {
     public var agent: String?
     public init(
         runner: String, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
-        secrets: [String] = [], chain: Int64? = nil, agent: String? = nil, project: String? = nil, branch: String? = nil
+        secrets: [String] = [], chain: Int64? = nil, agent: String? = nil, project: String? = nil,
+        branch: String? = nil,
+        base: String? = nil
     ) {
         self.project = project
         self.branch = branch
+        self.base = base
         self.chain = chain
         self.agent = agent
         self.runner = runner
@@ -192,7 +197,8 @@ public enum EntryKind: Equatable, Sendable {
     case toolEdit(id: String, name: String, path: String, old: String, new: String, ok: Bool?, durationMs: Int?)
     /// The CLI's todo list (TodoWrite), drawn as a checklist.
     case toolTodos(id: String, items: [TodoItem])
-    /// A turn is over: the harness is waiting for you. Carries what the turn cost, when the Core says.
+    /// A turn is over: the harness is waiting for you. Carries what the turn cost, when the Core says. As parsed the cost is the
+    /// session's total so far; in the store it is this turn's (`TranscriptStore.perTurn`).
     case turnEnded(costMicros: Int64?, tokens: Int64?)
     /// A tool call and its result as one row: the store folds a `toolResult` into the `toolUse` it answers.
     case toolDone(

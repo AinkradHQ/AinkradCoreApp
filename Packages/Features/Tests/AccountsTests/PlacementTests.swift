@@ -28,8 +28,8 @@ struct PlacementTests {
 
     @Test func thePreviewReadsLikeTheDesign() {
         let seats = [seat("a", ["tech"]), seat("b", ["creative"])]
-        #expect(Placement.preview(seats) == "Agents will try: 1. tech → 2. creative")
-        #expect(Placement.preview([]) == "Agents will try: nothing yet")
+        #expect(Placement.preview(seats) == "AI sessions will try: 1. tech → 2. creative")
+        #expect(Placement.preview([]) == "AI sessions will try: nothing yet")
     }
 
     @Test func positionsAndUsedWords() {

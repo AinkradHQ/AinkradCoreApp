@@ -7,8 +7,6 @@ struct SessionSidePanel: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     @State private var openFile: String?
-    /// The context window the bar is drawn against. ponytail: one size for every model until the Core reports the real one.
-    static let contextTokens: Int64 = 200_000
 
     var body: some View {
         let files = model.filesTouched(session.id)
@@ -46,8 +44,9 @@ struct SessionSidePanel: View {
                 }
                 card("chart.bar", "Context") {
                     let used = session.usage?.tokens ?? 0
-                    ProgressBar(value: min(1, Double(used) / Double(Self.contextTokens)))
-                    Text("\(AgentWords.tokens(used)) of \(AgentWords.tokens(Self.contextTokens)) tokens used")
+                    let window = ContextWindow.tokens(model: session.model)
+                    ProgressBar(value: min(1, Double(used) / Double(window)))
+                    Text("\(AgentWords.tokens(used)) of \(AgentWords.tokens(window)) tokens used")
                         .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 card("dollarsign", "Cost") {

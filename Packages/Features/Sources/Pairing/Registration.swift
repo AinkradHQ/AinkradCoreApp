@@ -22,7 +22,7 @@ enum Registration {
         shell.settings.section(
             SettingsSection(
                 id: "mac-runner", group: .mac, title: "This Mac as a runner",
-                sub: "Terminals and agents that run on this Mac for your Core", symbol: "laptopcomputer", order: 5
+                sub: "Terminals and AI sessions that run on this Mac for your Core", symbol: "laptopcomputer", order: 5
             ) {
                 MacRunnerSection(model: app.macRunner)
             })

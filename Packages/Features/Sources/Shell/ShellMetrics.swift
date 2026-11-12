@@ -7,6 +7,8 @@ enum ShellMetrics {
     /// scrolls sideways.
     static let paneMinWidth: CGFloat = 460
     static let paneMinHeight: CGFloat = 560
+    /// Below this window width the pane tabs shrink to an icon rail.
+    static let railBelow: CGFloat = 900
     static let paneGap = Space.s3
     static let paneInset = Space.s3
     /// Top strip the status cluster lives in; panes and widgets start below it.

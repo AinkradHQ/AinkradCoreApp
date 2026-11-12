@@ -189,7 +189,7 @@ struct FirstRunView: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             title("Where is your Core?")
             note(
-                "Your Core is the server that runs your agents and terminals. This Mac connects to it to show you everything."
+                "Your Core is the server that runs your AI sessions and terminals. This Mac connects to it to show you everything."
             )
             if let local = model.localCore, !pasteQR {
                 foundLocalCore(local)

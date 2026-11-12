@@ -111,7 +111,8 @@ public struct LiveAgentsAPI: AgentsAPI {
             let body = Components.Schemas.NewAgentSession(
                 agent: new.agent, chain: new.chain, harness: plain ? new.harness : nil, model: plain ? new.model : nil,
                 policy: policy, prompt: new.prompt.isEmpty ? nil : new.prompt, runner: new.runner,
-                secrets: new.secrets.isEmpty ? nil : new.secrets.map { .init(name: $0, _var: $0) })
+                secrets: new.secrets.isEmpty ? nil : new.secrets.map { .init(name: $0, _var: $0) },
+                workspace: try Self.workspace(new))
             switch try await client.createAgentSession(body: .json(body)) {
             case .ok(let o): return Self.session(try o.body.json)
             case .badRequest(let r): throw Self.fail(r)
@@ -260,6 +261,23 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
     }
 
+    /// The Core's workspace (`{"repo", "base", "branch"}`): the repo to copy, the branch it is cut from, and the branch the session
+    /// works on (the base itself when none is named). Nil for a fresh folder.
+    static func workspace(_ new: NewAgentSession) throws -> OpenAPIObjectContainer? {
+        guard let repo = new.project, !repo.isEmpty else { return nil }
+        let base = new.base.flatMap { $0.isEmpty ? nil : $0 } ?? "main"
+        return try OpenAPIObjectContainer(
+            unvalidatedValue: [
+                "repo": repo, "base": base, "branch": new.branch.flatMap { $0.isEmpty ? nil : $0 } ?? base,
+            ])
+    }
+
+    /// The project's name for lists: the last part of the repo's URL or path, without `.git`.
+    static func projectName(_ repo: String) -> String {
+        let last = repo.split(whereSeparator: { $0 == "/" || $0 == ":" }).last.map(String.init) ?? repo
+        return last.hasSuffix(".git") ? String(last.dropLast(4)) : last
+    }
+
     static func session(_ s: Components.Schemas.AgentSession) -> AgentSessionInfo {
         let outcome = s.outcome?.value
         let u = s.usage
@@ -273,7 +291,8 @@ public struct LiveAgentsAPI: AgentsAPI {
                     input: $0.input, output: $0.output, cacheRead: $0.cacheRead, cacheWrite: $0.cacheWrite,
                     costMicros: $0.costUsdMicros)
             }, resumes: s.resumes.map(Int.init), index: s.index, route: route(s, outcome), title: s.title,
-            keepsOpen: s.live, idleSince: s.idleSince)
+            project: (s.workspace?.value["repo"] as? String).map(projectName),
+            branch: s.workspace?.value["branch"] as? String, keepsOpen: s.live, idleSince: s.idleSince)
     }
 
     /// Everything the scheduler adds to a session; nil when the Core gave none of it (not an admin, or no chain).

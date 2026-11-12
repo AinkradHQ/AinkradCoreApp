@@ -112,7 +112,7 @@ struct ScopeWarnings: View {
             out.append(
                 (
                     .warn, "exclamationmark.triangle",
-                    "It can no longer decide agent approvals. Waiting ones need another device."
+                    "It can no longer decide AI session approvals. Waiting ones need another device."
                 ))
         }
         if gone.contains("read") {

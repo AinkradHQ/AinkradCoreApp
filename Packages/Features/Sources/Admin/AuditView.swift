@@ -74,7 +74,7 @@ enum AuditWords {
         Area(id: "account.", title: "Accounts", symbol: "person.crop.circle.fill", hue: GlassInk.green),
         Area(id: "connection.", title: "Connections", symbol: "link", hue: GlassInk.blue),
         Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.green),
-        Area(id: "agent.", title: "Agents", symbol: "sparkles", hue: GlassInk.violet),
+        Area(id: "agent.", title: "AI sessions", symbol: "sparkles", hue: GlassInk.violet),
     ]
 
     static func area(_ action: String) -> Area {

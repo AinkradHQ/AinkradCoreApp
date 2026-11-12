@@ -50,6 +50,7 @@ public final class TranscriptStore {
             lastSeq = e.seq
             added += 1
             absorb(e)
+            let e = perTurn(e)
             if foldResult(e) { continue }
             switch e.kind {
             case .toolUse(let id, _, _), .toolEdit(let id, _, _, _, _, _, _), .toolTodos(let id, _): toolSeq[id] = e.seq
@@ -59,6 +60,21 @@ public final class TranscriptStore {
         }
         trim()
         return added
+    }
+
+    /// The session's cost at the last turn seen, to turn the cumulative figure of the next one into that turn's own.
+    private var costSoFar: Int64?
+
+    /// A `usage` entry carries the session's cost so far; this swaps it for what the turn cost. The first turn held has no
+    /// earlier figure to subtract from, so it shows none rather than the whole total.
+    func perTurn(_ e: TranscriptEntry) -> TranscriptEntry {
+        guard case .turnEnded(let total?, let tokens) = e.kind else { return e }
+        defer { costSoFar = total }
+        guard let before = costSoFar else {
+            return TranscriptEntry(seq: e.seq, at: e.at, kind: .turnEnded(costMicros: nil, tokens: tokens))
+        }
+        return TranscriptEntry(
+            seq: e.seq, at: e.at, kind: .turnEnded(costMicros: max(0, total - before), tokens: tokens))
     }
 
     /// The Core records one approval twice (the answer the app sent, and the one the harness reports): one row is enough.
@@ -109,6 +125,10 @@ public final class TranscriptStore {
         let first = entries.first?.seq ?? lastSeq + 1
         let older = page.filter { $0.seq < first }.sorted { $0.seq < $1.seq }
         for e in older { absorb(e) }
+        let latest = costSoFar
+        costSoFar = nil
+        let older = older.map(perTurn)
+        costSoFar = latest
         var seen = Set<String>()
         let shown = older.filter(\.visible).filter { e in
             guard case .approvalDecided(let id, _) = e.kind else { return true }

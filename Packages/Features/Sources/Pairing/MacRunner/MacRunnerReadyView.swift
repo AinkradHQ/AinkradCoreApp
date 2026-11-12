@@ -20,11 +20,11 @@ struct MacRunnerReadyView: View {
             Text("Ready: 2 machines").coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(
                 .isHeader)
             Text("This Core (built-in) and This Mac").foregroundStyle(palette.text2)
-            machine("server.rack", "This Core (built-in)", "Terminals and agents, always on.", enabled: true)
+            machine("server.rack", "This Core (built-in)", "Terminals and AI sessions, always on.", enabled: true)
             machine(
                 "laptopcomputer", "This Mac",
                 on
-                    ? "Terminals now; agents when the Core supports accounts on macOS."
+                    ? "Terminals now; AI sessions when the Core supports accounts on macOS."
                     : "Off. You can turn it on in Settings, Mac.",
                 enabled: on)
             Toggle("Use this Mac as a runner", isOn: $on).toggleStyle(.switch)

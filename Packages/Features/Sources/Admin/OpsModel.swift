@@ -99,7 +99,7 @@ final class OpsModel {
     /// The figures worth a tile, in this order, when the Core sends them.
     static let tiles: [(name: String, title: String)] = [
         ("ainkrad_uptime_seconds", "Uptime"), ("ainkrad_devices_active", "Devices"), ("ainkrad_runners", "Runners"),
-        ("ainkrad_terminals", "Terminals"), ("ainkrad_agent_sessions", "Agent sessions"),
+        ("ainkrad_terminals", "Terminals"), ("ainkrad_agent_sessions", "AI sessions"),
         ("ainkrad_disk_free_percent", "Disk free"), ("ainkrad_db_size_bytes", "Database size"),
         ("ainkrad_backup_age_seconds", "Backup age"), ("ainkrad_certificate_days_left", "Certificate"),
         ("ainkrad_events_head_seq", "Event sequence"), ("ainkrad_audit_head_seq", "Audit sequence"),

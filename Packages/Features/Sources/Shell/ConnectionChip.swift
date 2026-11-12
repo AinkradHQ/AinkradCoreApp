@@ -63,7 +63,7 @@ public enum ConnectionChipState: Equatable, Sendable {
             "The connection dropped\(since.map { " \(Self.ago($0, now)) ago" } ?? ""). Ainkrad is trying again by itself."
         case .noNetwork: "This Mac is not connected to the internet. Ainkrad tries again when the network is back."
         case .coreNotAnswering:
-            "This Mac is online, but \(core) did not answer\(since.map { " for \(Self.ago($0, now))" } ?? ""). Your agents keep working."
+            "This Mac is online, but \(core) did not answer\(since.map { " for \(Self.ago($0, now))" } ?? ""). Your AI sessions keep working."
         }
     }
 
