@@ -42,32 +42,53 @@ struct ProviderChoiceRow<Trailing: View>: View {
     let pick: () -> Void
     @ViewBuilder let trailing: Trailing
     @State private var hovering = false
+    @State private var pressed = false
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         let shape = coreShape(Radius.row)
+        // The row is a Button (keyboard, press), the trailing state sits beside it: it holds buttons of its own.
         HStack(spacing: Space.s3) {
-            AccTile(provider: provider, dim: dim)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1)
-                Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+            Button {
+                if !dim { pick() }
+            } label: {
+                HStack(spacing: Space.s3) {
+                    AccTile(provider: provider, dim: dim)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1)
+                        Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, Space.s3).padding(.vertical, Space.s1)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: Space.s3)
-            trailing.frame(minWidth: Space.s8 * 6, alignment: .trailing)
+            .buttonStyle(PressReporting(pressed: $pressed))
+            .accessibilityLabel("\(title), \(line)")
+            .accessibilityAddTraits(selected ? .isSelected : [])
+            trailing.frame(minWidth: Space.s8 * 6, alignment: .trailing).padding(.trailing, Space.s3)
         }
-        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2 - 2)
         .frame(minHeight: Space.s8 + Space.s4)
-        .background(selected ? palette.uDimHover : hovering && !dim ? palette.uDim : .clear, in: shape)
+        .background(
+            selected || (pressed && !dim) ? palette.uDimHover : hovering && !dim ? palette.uDim : .clear, in: shape
+        )
         .overlay { if selected { shape.strokeBorder(palette.primary, lineWidth: 1.5) } }
-        .contentShape(shape)
-        .onTapGesture { if !dim { pick() } }
+        .scaleEffect(pressed && !dim && !reduce ? 0.99 : 1)
         .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.press), value: pressed)
         .animation(reduce ? nil : Motion.out(Motion.hover), value: hovering)
         .animation(reduce ? nil : Motion.out(Motion.hover), value: selected)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(title), \(line)")
-        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
-        .accessibilityAction { if !dim { pick() } }
+    }
+}
+
+/// A plain button that hands its pressed state up, so the whole row (not just the button) can press in.
+private struct PressReporting: ButtonStyle {
+    @Binding var pressed: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, now in pressed = now }
     }
 }

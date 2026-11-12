@@ -35,7 +35,7 @@ struct AddWizardView: View {
                 StepUpBanner(app: app)
                 footer
             }
-            .animation(reduce ? .easeOut(duration: Motion.hover) : .smooth(duration: 0.3), value: model.step)
+            .animation(reduce ? .easeOut(duration: Motion.hover) : Motion.out(Motion.ui), value: model.step)
         }
         .background(WindowSharingGuard())
         .accessibilityIdentifier("add-wizard")
@@ -122,6 +122,9 @@ struct AddWizardView: View {
                     title: "This Mac does not hold \(model.dropped.joined(separator: ", ")), so it cannot hand it on.",
                     tone: .warn)
             }
+            if let e = model.accessError {
+                CoreNotice(symbol: "exclamationmark.triangle", title: e, tone: .fail)
+            }
             DisclosureGroup("Advanced · \(ScopeText.all.count) separate switches") {
                 Grid(horizontalSpacing: Space.s2, verticalSpacing: Space.s2) {
                     ForEach(Array(stride(from: 0, to: ScopeText.all.count, by: 2)), id: \.self) { i in
@@ -158,7 +161,12 @@ struct AddWizardView: View {
                         .foregroundStyle(palette.text2)
                 }
                 Spacer(minLength: 0)
-                StateBadge("Online", tone: .done, symbol: "checkmark")
+                if d != nil {
+                    StateBadge("Online", tone: .done, symbol: "checkmark")
+                } else {
+                    StateBadge("Not listed yet", tone: .queue, symbol: "clock")
+                        .help("The Core does not list it under this name yet. Check Devices in a moment.")
+                }
             }
             .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.cardMac))
             if model.kind?.isRunner == true, d != nil {
@@ -182,7 +190,7 @@ struct AddWizardView: View {
     private var footer: some View {
         HStack(spacing: Space.s2) {
             if model.step == .done {
-                Button("Add another") { model.step = .what }.buttonStyle(.corePlain)
+                Button("Add another") { Task { await model.startOver() } }.buttonStyle(.corePlain)
                 Spacer(minLength: 0)
                 Button("Done", action: attemptClose).buttonStyle(.coreProminent).coreShortcut(.primary)
             } else {

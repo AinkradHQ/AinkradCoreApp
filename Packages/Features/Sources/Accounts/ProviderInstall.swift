@@ -40,7 +40,7 @@ struct ProviderInstall: View {
                 StateBadge("No runner offers it", tone: .queue, symbol: "minus")
             }
         }
-        .animation(reduce ? nil : .smooth(duration: 0.25), value: progress)
+        .animation(reduce ? nil : Motion.out(Motion.ui), value: progress)
         .onChange(of: progress?.state) { _, state in
             guard state == .done, let r = target else { return }
             Task {

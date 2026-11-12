@@ -120,6 +120,57 @@ struct AddWizardModelTests {
         _ = await w.requestClose()
     }
 
+    @Test func accessIsNotReportedAsSetWhenTheDeviceIsNotListed() async throws {
+        let (m, _) = try await app()
+        let w = AddWizardModel(app: m, kind: .mac)
+        w.step = .access
+        await w.next()
+        #expect(w.step == .access, "the choice was never applied, so the wizard stays")
+        #expect(w.accessError != nil)
+    }
+
+    @Test func aRefusedAccessChangeIsShownOnTheStep() async throws {
+        let (m, service) = try await app()
+        service.deviceList = [FakeService.device("d_new", "Mac", scopes: ["read"])]
+        service.scopesError = CoreError.forbiddenScope
+        let w = AddWizardModel(app: m, kind: .mac)
+        w.step = .access
+        await w.next()
+        #expect(w.step == .access)
+        #expect(w.accessError != nil)
+        service.scopesError = nil
+        await w.next()
+        #expect(w.step == .done && w.accessError == nil)
+        #expect(Set(w.connected?.scopes ?? []) == Set(w.granted))
+    }
+
+    @Test func pickingAnotherKindTakesBackTheEarlierCode() async throws {
+        let (m, _) = try await app()
+        let w = AddWizardModel(app: m, kind: .macRunner)
+        w.step = .install
+        await w.next()
+        #expect(w.typed != nil)
+        w.back()
+        w.back()
+        #expect(w.step == .what)
+        w.choose(.mac)
+        await w.next()
+        #expect(w.step == .install && w.typed == nil)
+    }
+
+    @Test func addAnotherStartsClean() async throws {
+        let (m, service) = try await app()
+        service.deviceList = [FakeService.device("d_new", "mac-runner")]
+        let w = AddWizardModel(app: m, kind: .macRunner)
+        w.step = .install
+        await w.next()
+        await w.findConnected()
+        #expect(w.connected != nil && w.typed != nil)
+        w.step = .done
+        await w.startOver()
+        #expect(w.step == .what && w.kind == nil && w.connected == nil && w.typed == nil && w.name.isEmpty)
+    }
+
     @Test func thePhoneFlowStopsAtComingSoon() async throws {
         let (m, _) = try await app()
         let w = AddWizardModel(app: m, kind: .phone)

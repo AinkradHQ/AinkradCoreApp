@@ -27,6 +27,10 @@ final class AddWizardModel {
     private(set) var held: [String] = []
     /// True while the Access step's choice is being sent to the Core.
     private(set) var applying = false
+    /// Why the Access step's choice did not go through; shown on the step.
+    private(set) var accessError: String?
+    /// The kind the live invite or code was made for: picking another kind takes it back first.
+    private var connectKind: AddKind?
     private weak var app: AppModel?
 
     init(app: AppModel, kind: AddKind? = nil) {
@@ -99,6 +103,7 @@ final class AddWizardModel {
 
     func next() async {
         guard let kind, canGoNext, let n = AddWizardPlan.next(after: step, kind) else { return }
+        if step == .what, connectKind != nil, connectKind != kind, !(await dropConnect()) { return }
         if step == .access, !(await applyAccess()) { return }
         step = n
         // A Linux server's install step already shows the one command, so its invite is made on the way in.
@@ -118,13 +123,14 @@ final class AddWizardModel {
     func startConnect() async {
         guard let app, let kind else { return }
         let label = name.trimmingCharacters(in: .whitespaces)
+        connectKind = kind
         if usesRunnerInvite {
-            guard runnerInvite == nil || ended else { return }
+            guard runnerInvite == nil || ended || makeFailed else { return }
             let m = runnerInvite ?? RunnerInviteModel(deps: runnerDeps(app))
             runnerInvite = m
             await m.create(name: label)
         } else if usesInvite {
-            guard invite == nil || ended else { return }
+            guard invite == nil || ended || makeFailed else { return }
             let m = InviteDeviceModel(host: app)
             await m.prepare()
             held = m.mine
@@ -149,12 +155,21 @@ final class AddWizardModel {
     /// The Access step, after the device connected with its kind's standard access: when the choice differs from what the
     /// device holds, it is changed (behind Touch ID, with Undo in the toast). False keeps the wizard on the step.
     func applyAccess() async -> Bool {
+        accessError = nil
         if connected == nil { await findConnected() }
-        guard let d = connected, AddWizardPlan.needsChange(holds: d.scopes, chosen: granted), let devices = app?.devices
-        else { return true }
+        guard let d = connected else {
+            accessError = "\(name) is not listed on the Core yet, so its access was not set. Try again in a moment."
+            return false
+        }
+        guard AddWizardPlan.needsChange(holds: d.scopes, chosen: granted), let devices = app?.devices else {
+            return true
+        }
         applying = true
         defer { applying = false }
-        guard await devices.setScopes(d, granted) else { return false }
+        guard await devices.setScopes(d, granted) else {
+            accessError = devices.dialogError ?? "Touch ID did not go through, so the access was not changed."
+            return false
+        }
         connected?.scopes = granted
         return true
     }
@@ -182,6 +197,13 @@ final class AddWizardModel {
         runnerInvite = nil
         typedInstead = true
         await startConnect()
+    }
+
+    /// Making the invite failed or Touch ID was cancelled: nothing is live and nothing is on its way. Try again remakes it.
+    var makeFailed: Bool {
+        if usesRunnerInvite, let m = runnerInvite { return m.phase == .idle && m.invite == nil }
+        if usesInvite, let m = invite { return m.invite == nil && !m.busy && !m.ended }
+        return false
     }
 
     /// The poll while the connect screen is open.
@@ -226,10 +248,37 @@ final class AddWizardModel {
 
     /// True when nothing is left live: the dialog may close. A live QR is withdrawn first (see `InviteDeviceModel`).
     func requestClose() async -> Bool {
-        if let runnerInvite { return await runnerInvite.requestClose() }
-        if let invite { return await invite.requestClose() }
+        if let runnerInvite, !(await runnerInvite.requestClose()) { return false }
+        if let invite, !(await invite.requestClose()) { return false }
         if case .code = typed?.stage { await typed?.reject() }
         return true
+    }
+
+    /// Takes back what an earlier pass made (a live invite holds a one-time secret) and forgets the device it found.
+    /// False when an invite is still live (Touch ID cancelled, Core unreachable): the wizard stays where it is.
+    private func dropConnect() async -> Bool {
+        guard await requestClose() else { return false }
+        dialogDidClose()
+        runnerInvite = nil
+        invite = nil
+        typed = nil
+        typedInstead = false
+        connected = nil
+        connectKind = nil
+        testLine = nil
+        accessError = nil
+        return true
+    }
+
+    /// Done → Add another: a clean start, so the next device is not reported as the last one.
+    func startOver() async {
+        guard await dropConnect() else { return }
+        kind = nil
+        name = ""
+        pick(.work)
+        terminals = true
+        agents = true
+        step = .what
     }
 
     func dialogDidClose() {

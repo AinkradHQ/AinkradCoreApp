@@ -226,6 +226,7 @@ struct ConnCard: View {
     let model: ConnectionsModel
     let item: ConnItem
     @State private var menuOpen = false
+    @State private var moreHover = false
 
     /// The rarer actions: Test and Disconnect stay on the card.
     private var menuItems: [CoreDropdownItem] {
@@ -290,8 +291,12 @@ struct ConnCard: View {
                     Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
                         .foregroundStyle(GlassInk.primary)
                         .frame(width: MacSize.controlMd, height: MacSize.controlSm)
-                        .background(GlassInk.well, in: coreShape(Radius.chip))
+                        .background(
+                            moreHover || menuOpen ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.chip)
+                        )
                         .contentShape(coreShape(Radius.chip))
+                        .onHover { moreHover = $0 }
+                        .animation(Motion.out(Motion.hover), value: moreHover)
                 }
                 .help("More: rename, default, who can use it, replace the token, history")
                 .accessibilityLabel("More actions for \(item.name)")

@@ -148,7 +148,7 @@ struct ConnectWizard: View {
                 }
                 .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .trailing)))
             }
-            .animation(reduce ? .easeOut(duration: Motion.hover) : .smooth(duration: 0.3), value: w.step)
+            .animation(reduce ? .easeOut(duration: Motion.hover) : Motion.out(Motion.ui), value: w.step)
         }
         .accessibilityIdentifier("account-connect")
         .task {

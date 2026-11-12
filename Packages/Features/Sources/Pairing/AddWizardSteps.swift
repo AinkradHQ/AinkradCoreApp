@@ -171,6 +171,10 @@ extension AddWizardView {
                 }
             } else if let m, m.done {
                 CoreNotice(symbol: "checkmark", title: "The runner connected.", tone: .done)
+            } else if model.makeFailed {
+                CoreNotice(symbol: "exclamationmark.triangle", title: "The invite was not made.") {
+                    Button("Try again") { Task { await model.startConnect() } }.buttonStyle(.coreSecondary)
+                }
             } else {
                 HStack(spacing: Space.s2) {
                     CoreBusyBar().frame(maxWidth: Space.s8 * 4)
@@ -273,7 +277,7 @@ extension AddWizardView {
                         QRImage(text: invite.link.text)
                     } else {
                         coreShape(Radius.cardMac).fill(palette.uDim)
-                            .overlay { if m?.invite == nil { CoreBusyBar().padding(Space.s4) } }
+                            .overlay { if m?.invite == nil, !model.makeFailed { CoreBusyBar().padding(Space.s4) } }
                     }
                 }
                 .frame(width: Space.s8 * 5, height: Space.s8 * 5)
@@ -303,6 +307,11 @@ extension AddWizardView {
                 CoreNotice(symbol: "checkmark", title: "Connected: \(m?.invite?.name ?? model.name)", tone: .done)
             }
             if let e = m?.error { CoreNotice(symbol: "exclamationmark.triangle", title: e, tone: .fail) }
+            if model.makeFailed {
+                CoreNotice(symbol: "exclamationmark.triangle", title: "The invite was not made.") {
+                    Button("Try again") { Task { await model.startConnect() } }.buttonStyle(.coreSecondary)
+                }
+            }
             if model.ended {
                 CoreNotice(symbol: "xmark", title: "This invite was withdrawn.") {
                     Button("Make a new invite") { Task { await model.again() } }.buttonStyle(.coreSecondary)
