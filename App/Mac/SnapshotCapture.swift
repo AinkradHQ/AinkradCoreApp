@@ -13,9 +13,18 @@ enum SnapshotCapture {
                 + "occluded=\(!window.occlusionState.contains(.visible)) onActiveSpace=\(window.isOnActiveSpace) "
                 + "sharing=\(window.sharingType.rawValue) frame=\(window.frame.size) -> \(path)")
         window.orderFrontRegardless()
-        if let image = CGWindowListCreateImage(
-            .null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .nominalResolution])
-        {
+        // A hollow or missing window-server image is often a frame in flight (a dialog still opening): wait and ask
+        // again before falling back to the offscreen render, which has no blur and no dialog (delete-pool, night).
+        var shot: CGImage?
+        for attempt in 1...4 {
+            shot = CGWindowListCreateImage(
+                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
+                [.boundsIgnoreFraming, .nominalResolution])
+            if let s = shot, !isBlank(s) { break }
+            log("  attempt \(attempt): window server image not ready")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        if let image = shot {
             if isBlank(image) {
                 log("  window server image is blank \(image.width)x\(image.height), falling back")
             } else if let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) {

@@ -137,13 +137,13 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
                 id: 2, connection: 1, who: "claude · fix-login", what: "Open a pull request", ok: false,
                 result: "Not allowed", at: now.addingTimeInterval(-240)),
             .init(
-                id: 3, connection: 3, who: "claude · fix-login", what: "Read KAN-142", ok: true, result: "Done",
+                id: 3, connection: 3, who: "claude · fix-login", what: "Read SHOP-142", ok: true, result: "Done",
                 at: now.addingTimeInterval(-360)),
             .init(
                 id: 4, connection: 2, who: "Core", what: "Checked the sign-in", ok: false, result: "Expired",
                 at: now.addingTimeInterval(-3600)),
             .init(
-                id: 5, connection: 3, who: "codex · triage", what: "Moved KAN-140 to In Review", ok: true,
+                id: 5, connection: 3, who: "codex · triage", what: "Moved SHOP-140 to In Review", ok: true,
                 result: "Done", at: now.addingTimeInterval(-10800)),
             .init(
                 id: 6, connection: 1, who: "You", what: "Connected", ok: true, result: "Done",
@@ -154,7 +154,7 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
 
     func resources(_ id: Int64) async throws -> [String] {
         lock.withLock { list.first { $0.id == id }?.kind } == "jira"
-            ? ["KAN", "OPS", "WEB"]
+            ? ["SHOP", "OPS", "WEB"]
             : ["sample/core", "sample/app", "sample/site", "sample/docs", "sample/infra", "sample/tap"]
     }
 
