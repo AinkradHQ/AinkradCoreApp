@@ -24,7 +24,7 @@ struct MacRunnerReadyView: View {
             machine(
                 "laptopcomputer", "This Mac",
                 on
-                    ? "Terminals now; AI sessions when the Core supports accounts on macOS."
+                    ? "Terminals and AI sessions with your accounts, once it connects."
                     : "Off. You can turn it on in Settings, Mac.",
                 enabled: on)
             Toggle("Use this Mac as a runner", isOn: $on).toggleStyle(.switch)

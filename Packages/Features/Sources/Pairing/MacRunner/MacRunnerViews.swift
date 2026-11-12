@@ -4,6 +4,8 @@ import SwiftUI
 /// Settings, Mac: "Use this Mac as a runner", its state, and the terminals switch with its warning (N16, D1, D2, D3).
 struct MacRunnerSection: View {
     let model: MacRunnerModel
+    /// "Yes" or "No (reason)" from the runner's own report; nil when the Core has not said.
+    var accounts: String?
     @Environment(\.corePalette) private var palette
 
     var body: some View {
@@ -13,7 +15,7 @@ struct MacRunnerSection: View {
             )
             .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             MacRunnerSwitches(model: model)
-            if model.isAvailable { MacRunnerStatus(model: model) }
+            if model.isAvailable { MacRunnerStatus(model: model, accounts: accounts) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -55,6 +57,7 @@ struct MacRunnerSwitches: View {
 /// What the runner is doing now, and what this Mac cannot do yet.
 struct MacRunnerStatus: View {
     let model: MacRunnerModel
+    var accounts: String?
     @Environment(\.corePalette) private var palette
 
     var body: some View {
@@ -88,8 +91,10 @@ struct MacRunnerStatus: View {
                 )
                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
                     horizontal: false, vertical: true)
-                Text(MacRunnerModel.agentsNote).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(MacRunnerModel.accountsLine(accounts)).coreFont(size: MacTextSize.meta).foregroundStyle(
+                    palette.text2
+                )
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

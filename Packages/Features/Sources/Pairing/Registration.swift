@@ -24,7 +24,9 @@ enum Registration {
                 id: "mac-runner", group: .mac, title: "This Mac as a runner",
                 sub: "Terminals and AI sessions that run on this Mac for your Core", symbol: "laptopcomputer", order: 5
             ) {
-                MacRunnerSection(model: app.macRunner)
+                MacRunnerSection(
+                    model: app.macRunner,
+                    accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) })
             })
         shell.settings.section(
             SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
