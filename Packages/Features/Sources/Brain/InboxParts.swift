@@ -16,7 +16,10 @@ struct InboxNote: View {
     var body: some View {
         CoreNotice(
             symbol: symbol, title: title, text: text,
-            tone: hue == GlassInk.red ? .fail : hue == GlassInk.amber ? .warn : hue == GlassInk.blue ? .run : .queue)
+            tone: hue == GlassInk.red
+                ? .fail
+                : hue == GlassInk.amber
+                    ? .warn : hue == GlassInk.blue ? .done : hue == GlassInk.green ? .run : .queue)
     }
 }
 

@@ -15,12 +15,12 @@ struct BrainChip: View {
     }
     private var tone: Tone {
         hue == GlassInk.green
-            ? .done
+            ? .run
             : hue == GlassInk.red
                 ? .fail
                 : hue == GlassInk.amber
                     ? .warn
-                    : hue == GlassInk.blue ? .run : .queue
+                    : hue == GlassInk.blue ? .done : .queue
     }
     var body: some View {
         let c = palette.tone(tone)
@@ -161,5 +161,18 @@ struct BrainConditions: View {
                 }
             }
         }
+    }
+}
+
+/// The quiet well a Brain list row shows under the pointer (source, rule and search-hit rows, as in the mockups).
+/// A colour change only, so it needs no Reduce Motion path.
+struct BrainRowHover: ViewModifier {
+    var enabled = true
+    @State private var hovering = false
+    func body(content: Content) -> some View {
+        content
+            .background(hovering && enabled ? GlassInk.well : .clear, in: coreShape(Radius.control))
+            .onHover { hovering = $0 }
+            .animation(Motion.out(Motion.hover), value: hovering)
     }
 }

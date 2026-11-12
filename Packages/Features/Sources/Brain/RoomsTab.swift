@@ -171,7 +171,7 @@ private struct RoomPane: View {
             }
             if let c = d.cost, c.capReached {
                 CoreNotice(
-                    symbol: "dollarsign.circle", title: "Monthly cost cap reached",
+                    symbol: "dollarsign", title: "Monthly cost cap reached",
                     text: "Meaning search is paused for this room. Exact search still works.", tone: .warn)
             }
         }
@@ -251,7 +251,6 @@ private struct RoomSearch: View {
 private struct HitRow: View {
     let hit: SearchHit
     let room: String
-    @State private var hovering = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
@@ -266,9 +265,7 @@ private struct HitRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-        .background(hovering ? GlassInk.well : .clear, in: coreShape(Radius.control))
-        .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .modifier(BrainRowHover())
         .accessibilityElement(children: .combine)
     }
 
@@ -344,5 +341,9 @@ struct RuleRow: View {
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .frame(minHeight: Space.s8 + Space.s4)
+        // The whole row is the switch's target, as in the mockup; the switch stays the keyboard path.
+        .contentShape(Rectangle())
+        .onTapGesture { if !rule.locked { Task { await sync.toggleRule(rule, on: !rule.enabled) } } }
+        .modifier(BrainRowHover(enabled: !rule.locked))
     }
 }

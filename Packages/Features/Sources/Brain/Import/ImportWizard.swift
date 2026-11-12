@@ -174,7 +174,7 @@ private struct CollectStep: View {
     let close: () -> Void
 
     var body: some View {
-        let total = model.filesDone
+        let total = model.itemsDone
         VStack(alignment: .leading, spacing: Space.s3) {
             CoreMeter(
                 model.phase == .discovering ? 1 : total.total == 0 ? 0 : Double(total.done) / Double(total.total),
@@ -201,7 +201,7 @@ private struct CollectStep: View {
             }
             .padding(.horizontal, Space.s3)
             if let why = model.failure {
-                CoreNotice(symbol: "exclamationmark.circle", title: why, tone: .fail) {
+                CoreNotice(symbol: "exclamationmark.triangle", title: why, tone: .fail) {
                     Button("Try again") { model.retry() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
             }
@@ -232,7 +232,7 @@ private struct ImportingStep: View {
             VStack(spacing: 2) {
                 ForEach(model.review.accepted) { c in
                     CoreRow(c.name, subtitle: BrainWords.plural(c.itemCount, "item", "items"), symbol: "folder") {
-                        ProgressView().controlSize(.small)
+                        CoreBusyBar().frame(width: Space.s8 * 2).accessibilityHidden(true)
                     }
                 }
             }

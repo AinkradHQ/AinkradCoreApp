@@ -58,7 +58,7 @@ public enum SyncWords {
         case .nothingNew(let n, let mins):
             return (
                 "Nothing new",
-                "All \(BrainWords.plural(n, "source", "sources")) checked just now. Next sync in \(mins) minutes."
+                "All \(BrainWords.plural(n, "source", "sources")) checked just now. Next sync in \(BrainWords.plural(mins, "minute", "minutes"))."
             )
         case .waiting(let n):
             return (

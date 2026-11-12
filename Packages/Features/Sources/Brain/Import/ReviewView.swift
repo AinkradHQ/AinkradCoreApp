@@ -10,7 +10,7 @@ struct ReviewStep: View {
         let r = model.review
         VStack(alignment: .leading, spacing: Space.s3) {
             if let n = r.notice {
-                CoreNotice(symbol: "exclamationmark.circle", title: n, tone: .fail) {
+                CoreNotice(symbol: "exclamationmark.triangle", title: n, tone: .fail) {
                     Button("Dismiss") { r.notice = nil }.buttonStyle(CoreButtonStyle(.plain, size: .small))
                 }
             }
@@ -63,7 +63,10 @@ struct ProposalRow: View {
                         selection: Binding(get: { choice }, set: pick)
                     )
                     .help(
-                        review.acceptBlock(card) ?? "Accept puts it in the import. Refuse leaves it out, next time too."
+                        review.acceptBlock(card)
+                            ?? (card.isAccepted
+                                ? "Click Accept again to take it out of the import."
+                                : "Accept puts it in the import. Refuse leaves it out, next time too.")
                     )
                 }
                 Button {
@@ -82,14 +85,5 @@ struct ProposalRow: View {
 
     private var choice: String { card.isAccepted ? "accept" : card.state == "refused" ? "refuse" : "" }
 
-    private func pick(_ v: String) {
-        guard v != choice else { return }
-        Task {
-            if v == "accept", review.acceptBlock(card) == nil {
-                await review.accept(card.id)
-            } else if v == "refuse" {
-                await review.refuse(card.id)
-            }
-        }
-    }
+    private func pick(_ v: String) { Task { await review.choose(card.id, v) } }
 }

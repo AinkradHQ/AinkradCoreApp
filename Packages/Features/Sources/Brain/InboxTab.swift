@@ -23,7 +23,7 @@ struct InboxTab: View {
                     ForEach(Array(InboxList.allCases.enumerated()), id: \.offset) { i, l in
                         let n = st.count(l)
                         AppFilterTile(title: l.title, count: n > 0 ? n : -1, on: st.list == l, key: "⌥\(i + 1)") {
-                            withAnimation(.smooth(duration: 0.25)) { st.list = l }
+                            withAnimation(Motion.out(Motion.ui)) { st.list = l }
                         }
                         .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .option)
                         .accessibilityIdentifier("inbox-list-\(l.rawValue)")
@@ -129,7 +129,7 @@ struct InboxTab: View {
                     "When two memories in this room disagree, you see them side by side here.")
             }
             InboxNote(
-                "info.circle", GlassInk.slate, "Two rooms that disagree are not a conflict",
+                "info", GlassInk.slate, "Two rooms that disagree are not a conflict",
                 "Only disagreements inside this room show here.")
         case .blocked:
             if let d = st.data, !d.blocked.isEmpty {

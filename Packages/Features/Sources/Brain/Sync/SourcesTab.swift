@@ -94,6 +94,7 @@ struct SourcesTab: View {
         }
         .padding(.horizontal, Space.s3)
         .frame(minHeight: Space.s8 + Space.s2)
+        .modifier(BrainRowHover(enabled: l.source != nil))
         .help(l.source.map { "\($0.device)\($0.roots.isEmpty ? "" : ": " + $0.roots.joined(separator: ", "))" } ?? "")
         .accessibilityElement(children: .contain)
     }
@@ -148,7 +149,7 @@ struct SyncBannerView: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             if let n = sync.notice {
-                CoreNotice(symbol: "exclamationmark.circle", title: n, tone: .fail) {
+                CoreNotice(symbol: "exclamationmark.triangle", title: n, tone: .fail) {
                     Button("Dismiss") { sync.notice = nil }.buttonStyle(CoreButtonStyle(.plain, size: .small))
                 }
             }
@@ -173,7 +174,7 @@ struct SyncBannerView: View {
                 }
             }
         case .synced(_, _, _, let review):
-            CoreNotice(symbol: "checkmark", title: words.title, text: words.text, tone: .run) {
+            CoreNotice(symbol: "checkmark", title: words.title, text: words.text, tone: .done) {
                 HStack(spacing: Space.s2) {
                     if review > 0, let run = sync.review.first {
                         Button("Review \(review)") { Task { await brain.openReview(run) } }
@@ -183,7 +184,7 @@ struct SyncBannerView: View {
                 }
             }
         case .nothingNew, .message:
-            CoreNotice(symbol: "checkmark", title: words.title, text: words.text, tone: .run) { dismiss }
+            CoreNotice(symbol: "checkmark", title: words.title, text: words.text, tone: .done) { dismiss }
         case .waiting:
             CoreNotice(symbol: "tray", title: words.title, text: words.text, tone: .warn) {
                 if let run = sync.review.first {

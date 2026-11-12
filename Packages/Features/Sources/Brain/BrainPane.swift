@@ -114,7 +114,7 @@ struct BrainPane: View {
     }
 
     private func go(_ t: BrainTab) {
-        withAnimation(.smooth(duration: 0.3)) {
+        withAnimation(Motion.out(Motion.ui)) {
             model.closeInspect()
             model.tab = t
         }
@@ -122,7 +122,7 @@ struct BrainPane: View {
     }
 
     private func notice(_ text: String) -> some View {
-        CoreNotice(symbol: "exclamationmark.circle", title: text, tone: .fail) {
+        CoreNotice(symbol: "exclamationmark.triangle", title: text, tone: .fail) {
             Button("Dismiss") { model.dismissNotice() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
     }

@@ -40,21 +40,25 @@ struct OverviewTab: View {
         switch model.health {
         case .paused:
             CoreNotice(
-                symbol: "pause.circle", title: "Paused, \(n)", text: BrainWords.pausedLine(names: model.pausedNames),
+                symbol: "pause", title: "Paused", text: BrainWords.pausedLine(names: model.pausedNames),
                 tone: .fail
             ) {
-                Button("Clear pause with Touch ID") { Task { await model.clearPaused() } }
-                    .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(model.busy != nil)
+                HStack(spacing: Space.s2) {
+                    CountBadge(n, tone: .needsYou, label: "paused")
+                    Button("Clear pause with Touch ID") { Task { await model.clearPaused() } }
+                        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(model.busy != nil)
+                }
             }
         case .needsYou:
             CoreNotice(
-                symbol: "hand.raised", title: "Needs you, \(n)",
+                symbol: "hand.raised", title: "Needs you",
                 text: "Some things wait for a decision. Nothing is wrong.",
-                tone: .warn)
+                tone: .warn
+            ) { CountBadge(n, tone: .needsYou, label: "need you") }
         case .healthy:
             CoreNotice(
-                symbol: "checkmark.circle", title: "Healthy", text: "Nothing waits for you. Every check is in date.",
-                tone: .done)
+                symbol: "checkmark", title: "Healthy", text: "Nothing waits for you. Every check is in date.",
+                tone: .run)
         }
     }
 }
@@ -66,7 +70,7 @@ private struct NeedTile: View {
     @State private var hovering = false
     var body: some View {
         Button {
-            withAnimation(.smooth(duration: 0.3)) { model.tab = need.tab }
+            withAnimation(Motion.out(Motion.ui)) { model.tab = need.tab }
         } label: {
             HStack(spacing: Space.s3) {
                 Text("\(need.n)").coreFont(size: MacTextSize.large, weight: .bold).monospacedDigit()

@@ -40,6 +40,7 @@ struct BrainScreensTests {
         await m.reload()
         #expect(m.banner == .waiting(2))
         #expect(SyncWords.banner(.waiting(2)).title == "2 imports waiting for review")
+        #expect(SyncWords.banner(.nothingNew(sources: 1, nextMinutes: 1)).text.hasSuffix("Next sync in 1 minute."))
         await m.syncNow()
         #expect(m.banner == .synced(new: 12, went: 9, rooms: 2, review: 3))
         #expect(SyncWords.banner(m.banner) == ("12 new items", "9 went to 2 rooms, 3 need review."))
@@ -97,6 +98,20 @@ struct BrainScreensTests {
         m.start()
         for _ in 0..<500 where m.step != .review { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(m.sourceRows.map(\.state) == [.done] && m.sourceRows.first?.fraction == 1)
+    }
+
+    @Test func aReadingRowCountsItemsNotFiles() {
+        var c = ImportModel.Choice(id: "chat", title: "Chat exports")
+        c.found = 300
+        var p = StreamProgress()
+        p.filesDone = 1
+        p.filesTotal = 3
+        let r = ImportModel.row(c, done: false, reading: p)
+        #expect(r.state == .reading && r.done == 100 && r.total == 300, "a third of the files is a third of the items")
+        p.filesDone = 3
+        #expect(ImportModel.row(c, done: false, reading: p).fraction == 1, "no stall short of the end")
+        #expect(ImportModel.row(c, done: true, reading: nil).done == 300)
+        #expect(ImportModel.row(c, done: false, reading: nil).state == .waiting)
     }
 
     @Test func reviewWordsCountOnlyWhatIsThere() {

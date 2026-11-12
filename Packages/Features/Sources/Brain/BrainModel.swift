@@ -130,12 +130,12 @@ public final class BrainModel {
         }
     }
 
-    /// The pane head chip: Paused (red), Needs you with its count (blue), or Healthy (green).
+    /// The pane head chip: Paused (red), Needs you with its count (amber), or Healthy (green).
     var chip: PaneChip {
         switch health {
-        case .paused: PaneChip("Paused, \(needsTotal)", tone: .fail, symbol: "pause.circle")
-        case .needsYou: PaneChip("Needs you, \(needsTotal)", tone: .run, symbol: "hand.raised")
-        case .healthy: PaneChip("Healthy", tone: .done, symbol: "checkmark.circle")
+        case .paused: PaneChip("Paused, \(needsTotal)", tone: .fail, symbol: "pause")
+        case .needsYou: PaneChip("Needs you, \(needsTotal)", tone: .warn, symbol: "hand.raised")
+        case .healthy: PaneChip("Healthy", tone: .run, symbol: "checkmark")
         }
     }
 

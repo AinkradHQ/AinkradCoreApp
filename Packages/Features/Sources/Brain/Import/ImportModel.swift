@@ -29,7 +29,7 @@ public final class ImportModel {
         public let id: String
         public let title: String
         public let state: State
-        /// Files read so far over the files the scan found.
+        /// Items read so far over the items the scan found.
         public let done: Int
         public let total: Int
         public var fraction: Double { total == 0 ? (state == .done ? 1 : 0) : min(1, Double(done) / Double(total)) }
@@ -245,21 +245,24 @@ public final class ImportModel {
 
     /// The collect step's lines, one per chosen source.
     public var sourceRows: [SourceRow] {
-        chosen.map { c in
-            let total = c.found ?? 0
-            if collectedSources.contains(c.id) {
-                return SourceRow(id: c.id, title: c.title, state: .done, done: total, total: total)
-            }
-            if c.id == current {
-                let t = max(progress.filesTotal, total)
-                return SourceRow(id: c.id, title: c.title, state: .reading, done: progress.filesDone, total: t)
-            }
-            return SourceRow(id: c.id, title: c.title, state: .waiting, done: 0, total: total)
-        }
+        chosen.map { Self.row($0, done: collectedSources.contains($0.id), reading: $0.id == current ? progress : nil) }
     }
 
-    /// Files read over files found, across every chosen source.
-    public var filesDone: (done: Int, total: Int) {
+    /// One line, always in items (what the scan found). Reading progress comes in files, so it is turned into the same
+    /// share of the items: mixing the two made a bar stall short and then jump, and the total add files to items.
+    static func row(_ c: Choice, done: Bool, reading: StreamProgress?) -> SourceRow {
+        let total = c.found ?? 0
+        if done { return SourceRow(id: c.id, title: c.title, state: .done, done: total, total: total) }
+        guard let p = reading else {
+            return SourceRow(id: c.id, title: c.title, state: .waiting, done: 0, total: total)
+        }
+        let share = p.filesTotal == 0 ? 0 : min(1, Double(p.filesDone) / Double(p.filesTotal))
+        return SourceRow(
+            id: c.id, title: c.title, state: .reading, done: Int((Double(total) * share).rounded(.down)), total: total)
+    }
+
+    /// Items read over items found, across every chosen source.
+    public var itemsDone: (done: Int, total: Int) {
         sourceRows.reduce((0, 0)) { ($0.0 + $1.done, $0.1 + $1.total) }
     }
 

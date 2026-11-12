@@ -198,7 +198,7 @@ struct PausedBanner: View {
                         .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.busy != nil).help("Needs Touch ID")
                     }
                 } else {
-                    Button("Open Checks") { withAnimation(.smooth(duration: 0.3)) { model.tab = .checks } }
+                    Button("Open Checks") { withAnimation(Motion.out(Motion.ui)) { model.tab = .checks } }
                         .buttonStyle(CoreButtonStyle(.secondary))
                 }
             }

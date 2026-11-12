@@ -81,6 +81,17 @@ public final class ReviewModel {
     }
 
     public func unaccept(_ id: String) async { await patch(id, ProposalPatchBody(state: "proposed")) }
+
+    /// The row's Accept / Refuse control. Accept on an accepted room takes it back out (the old "Undo accept"); a
+    /// blocked Accept says why in the notice instead of snapping back silently. Refuse sticks, so it never toggles.
+    public func choose(_ id: String, _ choice: String) async {
+        guard let c = cards.first(where: { $0.id == id }) else { return }
+        switch choice {
+        case "accept": c.isAccepted ? await unaccept(id) : await accept(id)
+        case "refuse" where c.state != "refused": await refuse(id)
+        default: break
+        }
+    }
     public func rename(_ id: String, to name: String) async {
         let n = name.trimmingCharacters(in: .whitespaces)
         guard !n.isEmpty else { return }
