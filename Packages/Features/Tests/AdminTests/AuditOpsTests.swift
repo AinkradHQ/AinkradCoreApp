@@ -234,3 +234,34 @@ struct AuditDetailWordsTests {
         #expect(r.technical.contains { $0 == ("Action", "pairing.approved") })
     }
 }
+
+@MainActor
+@Suite("Audit origin")
+struct AuditOriginTests {
+    @Test("a row says what started it; a row from before origins says Unknown; a chain names its first link")
+    func words() {
+        let session = AuditOrigin(kind: "ai_session", reference: "as_1", rootKind: "person", rootReference: "d_1")
+        let schedule = AuditOrigin(kind: "schedule", reference: "brain/sync", rootKind: "schedule", rootReference: nil)
+        #expect(AuditWords.origin(nil).label == "Unknown")
+        #expect(AuditWords.originSentence(nil) == "Unknown")
+        #expect(AuditWords.originSentence(schedule) == "A schedule")
+        #expect(AuditWords.originSentence(session) == "An AI session, started by a person")
+        #expect(!schedule.watched && !session.watched)
+        #expect(AuditOrigin(kind: "person", reference: "d_1", rootKind: "person", rootReference: "d_1").watched)
+    }
+
+    @Test("Nobody watching is a filter the Core is asked for, and clears with the others")
+    func filter() async {
+        let s = FakeService()
+        s.auditRows = [audit(1)]
+        let (admin, service, _) = await makeAdmin(s)
+        let a = admin.audit!
+        #expect(a.filter.isEmpty)
+        a.filter.nobodyWatching = true
+        #expect(!a.filter.isEmpty)
+        await a.reload()
+        #expect(service.auditQueries.last?.filter.nobodyWatching == true)
+        a.clearFilters()
+        #expect(!a.filter.nobodyWatching)
+    }
+}

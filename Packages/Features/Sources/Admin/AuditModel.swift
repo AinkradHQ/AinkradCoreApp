@@ -2,8 +2,8 @@ import CoreUI
 import Foundation
 import Observation
 
-/// Settings, Security, Audit: a searchable, paged list of what was done, newest first. Only `kind`, `target` and `actor`
-/// can be filtered; the Core pages by sequence (`before`).
+/// Settings, Security, Audit: a searchable, paged list of what was done, newest first. Only `kind`, `target`, `actor` and
+/// "nobody watching" can be filtered; the Core pages by sequence (`before`).
 @MainActor @Observable
 final class AuditModel {
     static let pageSize = 50

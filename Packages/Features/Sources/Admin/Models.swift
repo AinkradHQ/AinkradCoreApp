@@ -146,6 +146,18 @@ struct AuditItem: Identifiable, Equatable, Sendable {
     let entityRef: String?
     /// The row's `details`, as pretty JSON (rows are content free: never terminal bytes or secret values).
     let details: String
+    /// What started it; nil on rows from before the Core recorded origins ("unknown").
+    var origin: AuditOrigin? = nil
+}
+
+/// What started an audited change and the first link of its chain (a person, a schedule, Brain, an AI session).
+struct AuditOrigin: Equatable, Sendable {
+    let kind: String
+    let reference: String?
+    let rootKind: String
+    let rootReference: String?
+    /// A person is watching; everything else runs without one.
+    var watched: Bool { kind == "person" }
 }
 
 struct AuditPageItem: Equatable, Sendable {
@@ -157,7 +169,9 @@ struct AuditFilter: Equatable, Sendable {
     var kind = ""
     var target = ""
     var actor: ActorFilter = .any
-    var isEmpty: Bool { kind.isEmpty && target.isEmpty && actor == .any }
+    /// Only rows a person did not start (the Core's "nobody watching" filter).
+    var nobodyWatching = false
+    var isEmpty: Bool { kind.isEmpty && target.isEmpty && actor == .any && !nobodyWatching }
 }
 
 enum ActorFilter: String, CaseIterable, Sendable {

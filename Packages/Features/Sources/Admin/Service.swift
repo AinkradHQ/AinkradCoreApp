@@ -223,7 +223,8 @@ struct LiveAdminService: AdminService {
             let q = Operations.ListAudit.Input.Query(
                 before: before, limit: Int32(limit), kind: filter.kind.isEmpty ? nil : filter.kind,
                 target: filter.target.isEmpty ? nil : filter.target,
-                actor: filter.actor == .any ? nil : filter.actor.rawValue)
+                actor: filter.actor == .any ? nil : filter.actor.rawValue,
+                nobodyWatching: filter.nobodyWatching ? true : nil)
             switch try await client.listAudit(query: q) {
             case .ok(let o):
                 let page = try o.body.json
@@ -306,6 +307,10 @@ struct LiveAdminService: AdminService {
         let text = (try? enc.encode(e.details)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         return AuditItem(
             seq: e.seq, at: e.at, action: e.action, actor: actor(e.actor), entityKind: e.entityKind,
-            entityRef: e.entityRef, details: text)
+            entityRef: e.entityRef, details: text,
+            origin: e.origin.map {
+                AuditOrigin(
+                    kind: $0.kind, reference: $0.reference, rootKind: $0.rootKind, rootReference: $0.rootReference)
+            })
     }
 }
