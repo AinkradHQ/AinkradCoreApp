@@ -13,6 +13,10 @@ enum SnapshotRunner {
     static func runIfRequested(_ app: AppModel) async {
         let shell = app.shell
         let env = ProcessInfo.processInfo.environment
+        let asked = env.keys.filter { $0.hasPrefix("CORE_") }.sorted()
+        if asked.contains(where: { $0.hasSuffix("SNAPSHOT") || $0.hasSuffix("AUDIT") || $0 == "CORE_ESC_CHECK" }) {
+            SnapshotCapture.log("walk requested env=\(asked) active=\(NSApp.isActive) windows=\(NSApp.windows.count)")
+        }
         if env["CORE_EXIT_FS_ATTEMPT"] != nil {
             try? await Task.sleep(for: .seconds(3))
             NSApp.windows.first { $0.title == "Ainkrad" }?.toggleFullScreen(nil)
@@ -58,7 +62,7 @@ enum SnapshotRunner {
         // The full-screen toggle above must not undo the theme.
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
-        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else {
+        guard let window = await SnapshotCapture.mainWindow() else {
             return log("no main window")
         }
         log("fullscreen=\(window.styleMask.contains(.fullScreen)) size=\(window.frame.size)")
@@ -148,13 +152,7 @@ enum SnapshotRunner {
 
     /// The window's own pixels through the window server: needs no screen-recording permission.
     private static func capture(_ window: NSWindow, to path: String) -> Bool {
-        guard
-            let image = CGWindowListCreateImage(
-                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
-                [.boundsIgnoreFraming, .nominalResolution]),
-            let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
-        else { return false }
-        return (try? png.write(to: URL(fileURLWithPath: path))) != nil
+        SnapshotCapture.png(window, to: path)
     }
 
     private static func menuItems(_ action: Selector) -> Int {

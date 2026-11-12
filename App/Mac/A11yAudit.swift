@@ -16,7 +16,7 @@ enum A11yAudit {
     static func run(_ app: AppModel, dir: String, env: [String: String]) async {
         NSApp.appearance = NSAppearance(named: env["CORE_THEME"] == "light" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
-        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else { return log("no main window") }
+        guard let window = await SnapshotCapture.mainWindow() else { return log("no main window") }
         let shell = app.shell
         var report = ["screen | controls | unnamed"]
         var details: [String] = []
