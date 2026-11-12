@@ -452,8 +452,8 @@ struct InviteDeviceTests {
         let r = try await rig(after: .milliseconds(20))
         await r.add.create()
         r.add.copyLink()
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(r.board.text == nil && !r.add.copied)
+        #expect(await until { r.board.text == nil })
+        #expect(!r.add.copied)
     }
 
     @Test func theCopiedLinkIsClearedWhenTheAppQuits() async throws {
