@@ -18,7 +18,7 @@ struct RunnerFactsTests {
     @Test func fourStatesInPlainWords() {
         #expect(facts().chip == "Online" && facts().say == nil)
         #expect(facts(avg1: 20).chip == "Busy")
-        #expect(facts(avg1: 20).say?.contains("very busy (load 5.0 for each core)") == true)
+        #expect(facts(avg1: 20).say?.contains("very busy: load 5.0 per core") == true)
         #expect(facts(degraded: true).chip == "Not answering")
         #expect(facts(degraded: true).say == "mac-studio did not answer for a while. The data can be old.")
         #expect(facts(online: false).chip == "Offline")
@@ -137,5 +137,13 @@ struct RunnerNewFactsTests {
     @Test func updateChipOnlyWhenTheCoreSaysSo() {
         #expect(!facts { _ in }.updateAvailable)
         #expect(facts { $0.updateAvailable = true }.updateAvailable)
+    }
+
+    @Test("the AI sessions row names the AI tools and their short versions")
+    func aiToolsLine() {
+        #expect(RunnerTools.aiLine([:]) == nil)
+        #expect(RunnerTools.aiLine(["git": "2.47"]) == nil)
+        #expect(RunnerTools.aiLine(["claude": "2.1.318", "codex": "0.9.2"]) == "Claude Code 2.1, Codex 0.9")
+        #expect(RunnerTools.aiLine(["codex": ""]) == "Codex")
     }
 }

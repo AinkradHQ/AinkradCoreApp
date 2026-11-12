@@ -82,7 +82,7 @@ struct RunnerFacts: Equatable {
             return "The Core cannot reach \(n). Nothing new starts there. Work continues when it is back."
         case .busy:
             let load = runner.perCore.map { coreDecimal($0, 1) } ?? "high"
-            return "\(n) is very busy (load \(load) for each core). New work waits or goes to another runner."
+            return "\(n) is very busy: load \(load) per core. New work waits or goes to another runner."
         }
     }
 
