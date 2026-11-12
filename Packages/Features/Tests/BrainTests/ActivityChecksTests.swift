@@ -244,3 +244,10 @@ struct ActivityChecksTests {
         #expect(BrainWords.checksSummary(failed: 2, due: 1) == "2 checks failed.")
     }
 }
+
+struct BrainNotOnCoreTests {
+    @Test func a404OnLoadSaysTheCoreHasNoBrain() {
+        #expect(BrainWords.loadFailure(BrainHTTPError(status: 404, code: "unknown")) == BrainWords.notOnCore)
+        #expect(BrainWords.loadFailure(BrainHTTPError(status: 409, code: "x")).contains("cannot be done"))
+    }
+}
