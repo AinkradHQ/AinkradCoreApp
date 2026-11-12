@@ -17,7 +17,7 @@ public final class BrainDemo {
         "checks-offline",
         "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
         "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
-        "inbox-offline", "loading", "inbox-noroom-selected", "worst-overview", "worst-rooms", "worst-inbox",
+        "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -62,6 +62,7 @@ public final class BrainDemo {
         }
         switch scene {
         case "rooms": model.show(.rooms)
+        case "sources": model.show(.sources)
         case "room":
             model.show(.rooms)
             await model.inspect("workan-space")

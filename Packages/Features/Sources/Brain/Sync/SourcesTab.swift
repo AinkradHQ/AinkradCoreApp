@@ -20,7 +20,7 @@ struct SourcesTab: View {
         let unreadable = lines.filter { $0.source == nil }
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s4) {
-                Text("Source").padding(.leading, Space.s8 + Space.s5)
+                Text("Source").padding(.leading, Space.s8 * 2)  // the switch slot (48) + the row gap (16)
                 Spacer(minLength: Space.s3)
                 Text("Last run").frame(width: Space.s8 * 4, alignment: .trailing)
             }
@@ -82,10 +82,11 @@ struct SourcesTab: View {
         HStack(spacing: Space.s4) {
             if let s = l.source {
                 Toggle(l.title, isOn: Binding(get: { s.enabled }, set: { on in Task { await sync.toggle(s, on: on) } }))
-                    .toggleStyle(.switch).labelsHidden().tint(GlassInk.blue)
-                    .frame(width: Space.s8 + Space.s1, alignment: .leading)
+                    .toggleStyle(.switch).labelsHidden().tint(GlassInk.blue).controlSize(.small)
+                    // The switch keeps its own width: in a narrower slot it ran into the source's name.
+                    .fixedSize().frame(width: Space.s8 + Space.s4, alignment: .leading)
             } else {
-                Color.clear.frame(width: Space.s8 + Space.s1, height: 1)
+                Color.clear.frame(width: Space.s8 + Space.s4, height: 1)
             }
             Text(l.title).foregroundStyle(l.source == nil ? GlassInk.secondary : GlassInk.primary).lineLimit(1)
             Spacer(minLength: Space.s3)
