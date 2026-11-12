@@ -39,6 +39,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         }
         container.addSubview(term)
         container.addSubview(overlay)
+        overlay.caretFrame = { [weak term] in term?.caretFrame ?? .zero }
         container.overlay = overlay
         container.term = term
         container.surface = self
@@ -75,6 +76,8 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         overlay.font = p.font
         overlay.ink = t.foreground
         overlay.paper = t.background
+        overlay.caretColor = t.caret
+        overlay.caretShape = p.cursor
         container.needsLayout = true
     }
 
@@ -92,7 +95,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
 
     private func showPredictions() {
         let c = instant.cells
-        overlay.set(row: c.row, cells: c.cells)
+        overlay.set(row: c.row, cells: c.cells, real: instant.baseX, caret: instant.cursorX)
     }
 
     /// Typed bytes are predicted (display only), then sent unchanged.
@@ -112,6 +115,22 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         }
         onInput?(bytes)
     }
+
+    #if DEBUG
+    /// Debug only (the terminals walk): types `train` and `text` as a person would, with each echo coming `delay` after the
+    /// key, as on a slow link. `train` is echoed one key at a time so the line is proven; `text` is held, unechoed, for
+    /// `hold` so a screenshot shows the predictions, and then echoed.
+    func debugSlowEcho(train: String, text: String, delay: Duration, hold: Duration) async {
+        for ch in train {
+            typed(Data(String(ch).utf8))
+            try? await Task.sleep(for: delay)
+            feed(Data(String(ch).utf8))
+        }
+        for ch in text { typed(Data(String(ch).utf8)) }
+        try? await Task.sleep(for: hold)
+        feed(Data(text.utf8))
+    }
+    #endif
 
     // MARK: output
 

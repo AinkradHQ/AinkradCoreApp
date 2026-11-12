@@ -28,7 +28,7 @@ ssh air 'V=$(launchctl print gui/501 | grep -o "CORE_[A-Z_]*" | sort -u | tr "\n
 rsync -a --delete "$APP/" air:rig/walk-app/Ainkrad.app/
 ssh air "caffeinate -u -t 3; open -n --stdout $REMOTE/out.log --stderr $REMOTE/err.log \
   --env CORE_DEMO=1 --env CORE_SHOTS=1 --env CORE_ALLOW_CAPTURE=1 --env CORE_KEYSTORE=memory --env $VAR=$REMOTE \
-  --env CORE_THEME=$T --env CORE_ADMIN_SCENES=${SCENES:-} --env CORE_BRAIN_SCENES=${SCENES:-} --env CORE_ACC_SCENES=${SCENES:-} ~/rig/walk-app/Ainkrad.app
+  --env CORE_THEME=$T --env CORE_ADMIN_SCENES=${SCENES:-} --env CORE_BRAIN_SCENES=${SCENES:-} --env CORE_ACC_SCENES=${SCENES:-} --env CORE_TERM_SCENES=${SCENES:-} ~/rig/walk-app/Ainkrad.app
   for i in \$(seq 90); do pgrep -x Ainkrad >/dev/null || break; sleep 2; done; pkill -x Ainkrad 2>/dev/null; true"
 ssh air "cat /tmp/ainkrad-snap.log" || true
 rsync -a --include='*.png' --exclude='*' air:"$REMOTE/" "$OUT/"

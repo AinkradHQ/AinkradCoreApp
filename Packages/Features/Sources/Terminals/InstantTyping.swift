@@ -64,6 +64,9 @@ struct InstantTyping {
         return (base.y, s.cells.sorted { $0.key < $1.key }.map { ($0.key, $0.value) })
     }
 
+    /// Where the real cursor sits while predictions are pending.
+    var baseX: Int { base.x }
+
     /// The cursor column the display should now show.
     var cursorX: Int { Self.simulate(pending.map(\.op), from: base.x).x }
 
