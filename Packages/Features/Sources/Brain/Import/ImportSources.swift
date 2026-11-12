@@ -71,6 +71,25 @@ public struct OpenCodeSource: ImportSource {
 
     public func scan() async -> CollectReport { collector.scan() }
 
+    public var incremental: Bool { true }
+    static func mark(_ c: SourceCursor) -> Int64? { c.ocMessageMs ?? c.mtime.map { Int64($0 * 1000) } }
+    public func newCount(cursor: SourceCursor) async -> Int {
+        guard let m = Self.mark(cursor) else { return 0 }
+        return collector.newCount(after: m)
+    }
+    public func streamNew(cursor: SourceCursor, run: String, uploader: Uploader, uploaded: Uploader.Progress)
+        async throws -> CollectReport
+    {
+        guard let m = Self.mark(cursor) else { return CollectReport() }
+        return try await collector.run(
+            after: m, run: run, uploader: uploader, uploaded: uploaded, resume: .init(), save: { _ in },
+            onProgress: { _ in })
+    }
+    public func cursorAfter(_ cursor: SourceCursor, began: Date) -> SourceCursor {
+        let old = Self.mark(cursor) ?? Int64(began.timeIntervalSince1970 * 1000)
+        return SourceCursor(ocMessageMs: max(old, collector.newestMessage() ?? 0))
+    }
+
     public func stream(
         run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void

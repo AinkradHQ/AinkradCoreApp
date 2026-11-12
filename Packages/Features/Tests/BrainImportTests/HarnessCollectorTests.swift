@@ -208,4 +208,57 @@ func jsonl(_ lines: [String]) -> String { lines.joined(separator: "\n") }
             resume: SourceResume(done: ["a"], items: 1), save: { _ in }, onProgress: { _ in })
         #expect(rec.items.map(\.title) == ["B"] && report.items == 2)
     }
+
+    // MARK: OpenCode incremental
+
+    func newRun(_ path: String, after: Int64?) async throws -> (items: [ImportItem], report: CollectReport) {
+        let rec = Recorder()
+        let report = try await OpenCodeCollector(device: "mac-1", dbPath: path).run(
+            after: after, run: "r", uploader: Uploader(transport: rec, retries: 0, pause: { _ in }), uploaded: .init(),
+            resume: .init(), save: { _ in }, onProgress: { _ in })
+        return (rec.items, report)
+    }
+
+    static let twoSessions =
+        Self.schema + [
+            "INSERT INTO session VALUES ('a', '/s/a', 'A', 1788000000000)",
+            "INSERT INTO session VALUES ('b', '/s/b', 'B', 1788000100000)",
+            #"INSERT INTO message VALUES ('m1','a',1788000001000,'{"role":"user"}')"#,
+            #"INSERT INTO message VALUES ('m2','b',1788000101000,'{"role":"user"}')"#,
+            #"INSERT INTO part VALUES ('p1','m1','a',1,'{"type":"text","text":"one"}')"#,
+            #"INSERT INTO part VALUES ('p2','m2','b',1,'{"type":"text","text":"two"}')"#,
+        ]
+
+    @Test func opencodeIncrementalFirstThenNothingThenOnlyTheNewMessage() async throws {
+        let path = try makeDB(Self.twoSessions)
+        let c = OpenCodeCollector(device: "mac-1", dbPath: path)
+        // First run: no mark, everything; the newest message time becomes the cursor.
+        #expect(try await newRun(path, after: nil).items.count == 2)
+        let mark = try #require(c.newestMessage())
+        #expect(mark == 1_788_000_101_000)
+        // Second run: nothing newer.
+        #expect(c.newCount(after: mark) == 0)
+        #expect(try await newRun(path, after: mark).items.isEmpty)
+        // A new message in the old session 'a': only that message, and only that session.
+        var db: OpaquePointer?
+        #expect(sqlite3_open(path, &db) == SQLITE_OK)
+        for q in [
+            #"INSERT INTO message VALUES ('m3','a',1788000200000,'{"role":"assistant"}')"#,
+            #"INSERT INTO part VALUES ('p3','m3','a',1,'{"type":"text","text":"later"}')"#,
+        ] { #expect(sqlite3_exec(db, q, nil, nil, nil) == SQLITE_OK) }
+        sqlite3_close(db)
+        #expect(c.newCount(after: mark) == 1)
+        let (items, report) = try await newRun(path, after: mark)
+        #expect(items.count == 1 && items[0].title == "A" && report.found == 1)
+        #expect(items[0].text.contains("later") && !items[0].text.contains("one"))
+        #expect(!items[0].text.contains("CANARY"))
+    }
+
+    @Test func opencodeIncrementalSkipsAnUnknownSchema() async throws {
+        let path = try makeDB(["CREATE TABLE session (id TEXT, cwd TEXT)", "CREATE TABLE message (id TEXT)"])
+        let c = OpenCodeCollector(device: "mac-1", dbPath: path)
+        #expect(c.newCount(after: 0) == 0 && c.newestMessage() == nil)
+        let (items, report) = try await newRun(path, after: 0)
+        #expect(items.isEmpty && report.skipped["unknown-format"] == 1)
+    }
 }

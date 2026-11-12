@@ -101,6 +101,8 @@ public final class AgentsModel {
     let notifier: any ApprovalNotifier
     let defaults: UserDefaults
     @ObservationIgnored var feed: Task<Void, Never>?
+    /// The load `attach` starts; tests await it so it cannot overlap their own calls.
+    @ObservationIgnored var firstLoad: Task<Void, Never>?
     @ObservationIgnored var ticker: Task<Void, Never>?
     @ObservationIgnored var primed = false
     @ObservationIgnored var announced: Set<String> = []
@@ -222,7 +224,7 @@ public final class AgentsModel {
             }
         }
         Task { await refreshPermission() }
-        Task { await reloadAll() }
+        firstLoad = Task { await reloadAll() }
     }
 
     public func detach() {
