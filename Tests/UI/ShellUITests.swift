@@ -107,14 +107,14 @@ final class ShellUITests: XCTestCase {
         launcher.typeText("edit widgets")
         launcher.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5), "Edit Widgets turns into Done")
-        let remove = app.buttons["Remove Clock"]
+        let remove = app.buttons["Remove Digital clock"]
         XCTAssertTrue(remove.waitForExistence(timeout: 5), "edit mode shows a remove button on each widget")
         let large = app.buttons["Wide, 2 by 1"]
         XCTAssertTrue(large.firstMatch.exists, "edit mode shows size choices")
         remove.click()
         XCTAssertTrue(
-            app.staticTexts["Removed Clock"].waitForExistence(timeout: 5),
-            "toast says Removed Clock; tree: \(app.buttons.allElementsBoundByIndex.map(\.label))")
+            app.staticTexts["Removed Digital clock"].waitForExistence(timeout: 5),
+            "toast says Removed Digital clock; tree: \(app.buttons.allElementsBoundByIndex.map(\.label))")
         XCTAssertTrue(remove.waitForNonExistence(timeout: 5), "Remove takes the widget off Home")
         app.typeKey(.escape, modifierFlags: [])
         // At rest the bar is hidden (right-click the sky for Add / Edit Widgets): leaving edit mode takes Done away.

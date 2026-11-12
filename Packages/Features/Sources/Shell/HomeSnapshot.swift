@@ -102,7 +102,7 @@ public struct HomeSnapshot: Sendable {
 }
 
 public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
-    case today, needs, running, spend, machines, board, events, core, quick, clock
+    case today, needs, running, spend, machines, board, events, core, quick, clock, digital
     public var id: String { rawValue }
     /// Core has no board, so the board widget exists in the sample world (`CORE_DEMO=1`) only, never on a live Core.
     static var boardShown: Bool {
@@ -123,21 +123,23 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .events: "Recent events"
         case .core: "Core health"
         case .quick: "Quick actions"
-        case .clock: "Clock"
+        case .clock: "Analog clock"
+        case .digital: "Digital clock"
         }
     }
     public var about: String {
         switch self {
-        case .today: "What needs you, what is running, how the machines are."
+        case .today: "What needs you, what runs, which machines are up."
         case .needs: "Approvals waiting on a person."
         case .running: "AI sessions working now, and for how long."
-        case .spend: "Spend today and the month token meter."
-        case .machines: "Runner slots in use and host load, sampled on this Mac."
+        case .spend: "What the AI sessions cost this month."
+        case .machines: "Slots in use on every machine."
         case .board: "Issues by state across the board."
         case .events: "What just happened on the Core."
         case .core: "Home Core connection and the alarms it raised."
         case .quick: "New session, new terminal, add a device, open the launcher."
-        case .clock: "Time and date."
+        case .clock: "A round dial with hour, minute and second hands."
+        case .digital: "Time and date, with UTC beside your own time."
         }
     }
     public var symbol: String {
@@ -152,12 +154,14 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .core: "heart.text.square"
         case .quick: "bolt"
         case .clock: "clock"
+        case .digital: "textformat.123"
         }
     }
     /// The macOS sizes this widget has a layout for; the first is its default.
     public var sizes: [WidgetSize] {
         switch self {
         case .clock: [.s, .m, .l]
+        case .digital: [.m, .s, .t, .l]
         case .quick, .board: [.s, .m, .l, .x]
         default: [.m, .s, .l, .x]
         }
@@ -165,7 +169,7 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
     public var category: String {
         switch self {
         case .spend, .board: "Work"
-        case .quick, .clock: "Utilities"
+        case .quick, .clock, .digital: "Utilities"
         default: "Core"
         }
     }

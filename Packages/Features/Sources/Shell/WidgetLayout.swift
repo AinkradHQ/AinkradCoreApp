@@ -1,24 +1,38 @@
 import CoreGraphics
 import Foundation
 
-/// A widget's footprint on the Home grid, in the macOS widget sizes (N9), counted in 16 x 8 grid units:
-/// small 2x2, medium 4x2, large 4x4, extra large 8x4. There is no tall size on macOS.
+/// A widget's footprint on the Home grid, counted in 16 x 8 grid units: small 2x2, wide 4x2, tall 2x4, large 4x4, extra
+/// large 8x4. One Home cell is 2x2 units, so the names read as cells: small 1x1, wide 2x1, tall 1x2, large 2x2 (home-clocks).
+/// Only the digital clock has the tall size.
 public enum WidgetSize: String, CaseIterable, Codable, Sendable {
-    case s, m, l, x
-    public var cols: Int { self == .s ? 2 : self == .x ? 8 : 4 }
+    case s, m, t, l, x
+    public var cols: Int { self == .s || self == .t ? 2 : self == .x ? 8 : 4 }
     public var rows: Int { self == .s || self == .m ? 2 : 4 }
     public var title: String {
         switch self {
         case .s: "Small"
-        case .m: "Medium"
+        case .m: "Wide"
+        case .t: "Tall"
         case .l: "Large"
         case .x: "Extra Large"
         }
     }
+    /// The size choice in the gallery: one letter (S, W, T, L, X).
+    public var short: String {
+        switch self {
+        case .s: "S"
+        case .m: "W"
+        case .t: "T"
+        case .l: "L"
+        case .x: "X"
+        }
+    }
+    /// "Wide, 2 by 1": the name and its footprint in Home cells, for VoiceOver and the menus.
+    public var spoken: String { "\(title), \(cols / 2) by \(rows / 2)" }
     var area: Int { cols * rows }
 
-    /// A size saved by an earlier build (8 x 5 grid: s 1x1, m 2x1, t 1x2, l 2x2, x 2x3) on today's grid. The removed
-    /// tall size becomes small, and the old extra large (two cells wide) becomes large.
+    /// A size saved by an earlier build (8 x 5 grid: s 1x1, m 2x1, t 1x2, l 2x2, x 2x3) on today's grid. That tall size
+    /// becomes small (no v1 widget had today's tall), and the old extra large (two cells wide) becomes large.
     static func migrated(_ raw: String) -> WidgetSize? {
         switch raw {
         case "t": .s
@@ -51,11 +65,11 @@ public struct WidgetLayout: Equatable, Sendable {
     public var items: [WidgetItem]
     public init(items: [WidgetItem] = []) { self.items = items }
 
-    /// The first layout: the desk of the N9 mockup.
+    /// The first layout: the desk of the N9 mockup (its small clock is the digital one).
     public static func standard() -> WidgetLayout {
         let d: [(WidgetKind, WidgetSize, Int, Int)] = [
             (.running, .x, 0, 0), (.spend, .l, 8, 0), (.machines, .l, 12, 0), (.needs, .m, 0, 4), (.core, .m, 4, 4),
-            (.events, .l, 8, 4), (.clock, .s, 12, 4), (.quick, .s, 14, 4), (.today, .m, 4, 6),
+            (.events, .l, 8, 4), (.digital, .s, 12, 4), (.quick, .s, 14, 4), (.today, .m, 4, 6),
             (.board, .m, 0, 6),
         ].filter { $0.0 != .board || WidgetKind.boardShown }
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
@@ -117,7 +131,9 @@ public struct WidgetLayout: Equatable, Sendable {
 
     /// A free cell for a new widget: its size first, then smaller ones. nil when the desk is full.
     public func firstFree(_ kind: WidgetKind, _ size: WidgetSize) -> WidgetItem? {
-        let sizes = [size] + WidgetSize.allCases.filter { $0 != size && $0.area <= size.area }
+        // Only sizes this widget has a layout for: the tall size must never land on a widget without one.
+        let sizes =
+            [size] + WidgetSize.allCases.filter { $0 != size && $0.area <= size.area && kind.sizes.contains($0) }
         for z in sizes {
             for y in 0...(Self.rows - z.rows) {
                 for x in 0...(Self.cols - z.cols) {

@@ -244,12 +244,12 @@ private struct PaneTab: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: spec.symbol).coreFont(size: MacTextSize.body, weight: .medium)
-                .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary)
+                .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
                 .accessibilityHidden(true)
             if shell.renamingTab == spec.id {
                 TextField("Tab name", text: $draft)
                     .textFieldStyle(.plain).coreFont(size: MacTextSize.body, weight: .semibold)
-                    .foregroundStyle(WidgetInk.primary).frame(width: Space.s8 * 4)
+                    .foregroundStyle(GlassInk.primary).frame(width: Space.s8 * 4)
                     .focused($editing)
                     .onSubmit { shell.renameTab(spec.id, to: draft) }
                     .onExitCommand { shell.renamingTab = nil }
@@ -259,7 +259,7 @@ private struct PaneTab: View {
                     }
             } else if !compact {
                 Text(shell.tabName(spec)).coreFont(size: MacTextSize.body, weight: on ? .semibold : .regular)
-                    .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary).lineLimit(1)
+                    .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary).lineLimit(1)
                     .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
                     .transition(.opacity)
             }
@@ -279,7 +279,7 @@ private struct PaneTab: View {
                 .opacity(hovering ? 1 : 0).allowsHitTesting(hovering)
             }
         }
-        .foregroundStyle(WidgetInk.secondary)
+        .foregroundStyle(GlassInk.secondary)
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
         .background {
             if on {

@@ -44,18 +44,18 @@ struct QuickBody: View {
                 grid(columns: 2, labels: false)
             case .m:
                 grid(columns: 4, labels: true)
-            case .l:
+            case .l, .t:
                 VStack(spacing: Space.s2) {
                     ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
                         Button {
                             go(t)
                         } label: {
                             HStack(spacing: Space.s3) {
-                                Image(systemName: t.symbol).foregroundStyle(WidgetInk.blue).frame(width: 20)
+                                Image(systemName: t.symbol).foregroundStyle(GlassInk.blue).frame(width: 20)
                                 Text(t.title).coreFont(size: MacTextSize.body, weight: .medium)
                                 Spacer(minLength: 0)
                                 if let k = t.key {
-                                    Text(k).coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
+                                    Text(k).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                                 }
                             }
                             .padding(.horizontal, Space.s3).frame(
@@ -109,20 +109,35 @@ extension View {
     }
 }
 
-/// A quick-action tile on clear glass: a white well (no second glass inside the widget), the launcher one blue.
+/// A quick-action tile on clear glass: a plain well (no second glass inside the widget), the launcher one blue. Hover lifts
+/// the fill a step, a press shrinks it a little; Reduce Motion keeps the fill change and drops the shrink.
 struct QuickTileStyle: ButtonStyle {
     let prominent: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduce
     func makeBody(configuration: Configuration) -> some View {
+        QuickTile(configuration: configuration, prominent: prominent)
+    }
+}
+
+private struct QuickTile: View {
+    let configuration: ButtonStyleConfiguration
+    let prominent: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.coreForcedInteraction) private var forced
+    @State private var hovering = false
+
+    private var lit: Bool { hovering || forced == .hover || configuration.isPressed }
+
+    var body: some View {
         configuration.label
-            .foregroundStyle(WidgetInk.primary)
-            .background(
-                prominent
-                    ? WidgetInk.blue.opacity(configuration.isPressed ? 0.75 : 0.9)
-                    : configuration.isPressed ? WidgetInk.wellEdge : WidgetInk.well,
-                in: coreShape(Radius.control + 4)
-            )
-            .scaleEffect(configuration.isPressed && !reduce ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .foregroundStyle(GlassInk.primary)
+            .background(fill, in: coreShape(Radius.control))
+            .scaleEffect(configuration.isPressed && !reduce ? 0.97 : 1)
+            .onHover { hovering = $0 }
+            .animation(Motion.out(Motion.hover), value: lit)
+            .animation(Motion.press(Motion.press), value: configuration.isPressed)
+    }
+
+    private var fill: Color {
+        prominent ? GlassInk.blue.opacity(lit ? 1 : 0.85) : lit ? GlassInk.wellEdge : GlassInk.wellHover
     }
 }
