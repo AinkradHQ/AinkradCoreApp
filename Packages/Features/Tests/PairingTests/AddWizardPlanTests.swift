@@ -7,13 +7,30 @@ import Testing
 struct AddWizardPlanTests {
     @Test func eachKindHasItsOwnWay() {
         #expect(AddWizardPlan.steps(.phone) == [.what, .install])
-        #expect(AddWizardPlan.steps(.mac) == [.what, .install, .access, .connect, .done])
+        #expect(AddWizardPlan.steps(.mac) == [.what, .install, .connect, .access, .done])
         #expect(AddWizardPlan.steps(.linuxRunner) == [.what, .install, .connect, .settings, .done])
         #expect(AddWizardPlan.steps(.macRunner) == AddWizardPlan.steps(.linuxRunner))
-        #expect(AddWizardPlan.next(after: .install, .mac) == .access)
+        #expect(AddWizardPlan.next(after: .install, .mac) == .connect)
+        #expect(AddWizardPlan.next(after: .connect, .mac) == .access)
+        #expect(AddWizardPlan.next(after: .access, .mac) == .done)
         #expect(AddWizardPlan.next(after: .done, .mac) == nil)
         #expect(AddWizardPlan.previous(before: .connect, .linuxRunner) == .install)
         #expect(AddWizardPlan.previous(before: .what, .mac) == nil)
+    }
+
+    @Test func accessChangesOnlyWhatDiffers() {
+        #expect(!AddWizardPlan.needsChange(holds: ["approve", "read"], chosen: ["read", "approve"]))
+        #expect(AddWizardPlan.needsChange(holds: AccessPreset.work.scopes, chosen: AccessPreset.watch.scopes))
+        #expect(!AddWizardPlan.needsChange(holds: ["read"], chosen: []), "nothing chosen never strips a device")
+    }
+
+    @Test func theConnectLinesFollowTheInvite() {
+        let waiting = AddWizardWords.connectLines(invited: true, connected: nil, checked: false)
+        #expect(
+            waiting.map(\.text) == ["Invite created · 15 minutes", "Waiting for the new device…", "Connection checked"])
+        #expect(waiting.map(\.done) == [true, false, false])
+        let done = AddWizardWords.connectLines(invited: true, connected: "Azure Dev", checked: true)
+        #expect(done[1].text == "Azure Dev connected" && done.allSatisfy(\.done))
     }
 
     @Test func onlyADeviceChoosesAccess() {
@@ -101,6 +118,57 @@ struct AddWizardModelTests {
         #expect(w.coreURL == "https://core.example.com:8443")
         #expect(!w.canGoNext, "the flow waits for the device")
         _ = await w.requestClose()
+    }
+
+    @Test func accessIsNotReportedAsSetWhenTheDeviceIsNotListed() async throws {
+        let (m, _) = try await app()
+        let w = AddWizardModel(app: m, kind: .mac)
+        w.step = .access
+        await w.next()
+        #expect(w.step == .access, "the choice was never applied, so the wizard stays")
+        #expect(w.accessError != nil)
+    }
+
+    @Test func aRefusedAccessChangeIsShownOnTheStep() async throws {
+        let (m, service) = try await app()
+        service.deviceList = [FakeService.device("d_new", "Mac", scopes: ["read"])]
+        service.scopesError = CoreError.forbiddenScope
+        let w = AddWizardModel(app: m, kind: .mac)
+        w.step = .access
+        await w.next()
+        #expect(w.step == .access)
+        #expect(w.accessError != nil)
+        service.scopesError = nil
+        await w.next()
+        #expect(w.step == .done && w.accessError == nil)
+        #expect(Set(w.connected?.scopes ?? []) == Set(w.granted))
+    }
+
+    @Test func pickingAnotherKindTakesBackTheEarlierCode() async throws {
+        let (m, _) = try await app()
+        let w = AddWizardModel(app: m, kind: .macRunner)
+        w.step = .install
+        await w.next()
+        #expect(w.typed != nil)
+        w.back()
+        w.back()
+        #expect(w.step == .what)
+        w.choose(.mac)
+        await w.next()
+        #expect(w.step == .install && w.typed == nil)
+    }
+
+    @Test func addAnotherStartsClean() async throws {
+        let (m, service) = try await app()
+        service.deviceList = [FakeService.device("d_new", "mac-runner")]
+        let w = AddWizardModel(app: m, kind: .macRunner)
+        w.step = .install
+        await w.next()
+        await w.findConnected()
+        #expect(w.connected != nil && w.typed != nil)
+        w.step = .done
+        await w.startOver()
+        #expect(w.step == .what && w.kind == nil && w.connected == nil && w.typed == nil && w.name.isEmpty)
     }
 
     @Test func thePhoneFlowStopsAtComingSoon() async throws {

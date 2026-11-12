@@ -31,7 +31,8 @@ public enum ConnectionChipState: Equatable, Sendable {
 
     var tone: Tone {
         switch self {
-        case .online, .reconnecting: .run
+        // n14: online and reconnecting are blue; green is kept for work that runs.
+        case .online, .reconnecting: .done
         case .noNetwork: .queue
         case .coreNotAnswering: .warn
         }
@@ -98,7 +99,6 @@ struct ConnectionChip: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var hovering = false
 
     var body: some View {
         if let state = shell.chipState {
@@ -117,11 +117,8 @@ struct ConnectionChip: View {
                 .foregroundStyle(c.ink)
                 .padding(.horizontal, Space.s2)
                 .frame(minHeight: MacSize.controlMd)
-                .background(c.fill.opacity(hovering ? 1.4 : 1), in: coreShape(Radius.control))
-                .contentShape(coreShape(Radius.control))
             }
-            .buttonStyle(.plain)
-            .onHover { hovering = $0 }
+            .buttonStyle(StatusBarStyle(fill: c.fill))
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: state)
             .help("\(state.popTitle). Click for details.")
             .accessibilityLabel("\(shell.home.coreName), \(state.popTitle)")
@@ -169,18 +166,15 @@ struct ConnectionPanel: View {
                 }
             }
             if state != .online {
-                Button {
+                // n14: a small blue button on the left with its key, not a full-width bar.
+                Button("Reconnect now") {
                     shell.connectionPanelOpen = false
                     shell.retryConnection?()
-                } label: {
-                    HStack(spacing: Space.s2) {
-                        Text("Reconnect now")
-                        Text("⌘R").coreFont(size: 10, weight: .medium, design: .rounded)
-                    }
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(CoreButtonStyle(.prominent))
+                .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                .environment(\.coreKeycap, "⌘R")
                 .disabled(shell.retryConnection == nil)
+                .help("Try to reach \(shell.home.coreName) now (⌘R)")
             }
         }
         .padding(Space.s4)
