@@ -64,6 +64,12 @@ public protocol AgentsAPI: Sendable {
     func attempts(run: String) async throws -> [AgentSessionInfo]
     /// An account's label, for a route; nil when the device may not read it.
     func accountName(_ id: Int64) async throws -> String?
+    /// Interrupts the turn in flight (the CLI's Esc); the session stays open and goes back to waiting.
+    func stopTurn(_ id: String) async throws -> AgentSessionInfo
+    /// Ends the session for good (the CLI exits).
+    func end(_ id: String) async throws -> AgentSessionInfo
+    /// Names a session (`PATCH title`).
+    func rename(_ id: String, title: String) async throws -> AgentSessionInfo
 }
 
 extension AgentsAPI {
@@ -75,6 +81,8 @@ extension AgentsAPI {
     public func ledger(_ session: String) async throws -> SessionLedger? { nil }
     public func attempts(run: String) async throws -> [AgentSessionInfo] { [] }
     public func accountName(_ id: Int64) async throws -> String? { nil }
+    /// Ending a session is the Core's cancel until a dedicated route exists.
+    public func end(_ id: String) async throws -> AgentSessionInfo { try await cancel(id) }
 }
 
 /// Reading a transcript entry body (the runner's JSON) into words. Pure, so it is tested without a Core.
@@ -88,7 +96,10 @@ enum EntryParser {
         case "message", "user_message": return .user(str("text") ?? "")
         case "assistant_text": return .assistant(str("text") ?? "")
         case "tool_use":
-            return .toolUse(id: str("id") ?? "", name: str("name") ?? "tool", summary: summary(b["input"]))
+            let name = str("name") ?? "tool"
+            if let e = edit(id: str("id") ?? "", name: name, input: b["input"]) { return e }
+            if name.lowercased() == "todowrite", let t = todos(id: str("id") ?? "", input: b["input"]) { return t }
+            return .toolUse(id: str("id") ?? "", name: name, summary: summary(b["input"]))
         case "tool_result":
             return .toolResult(
                 id: str("id") ?? "", name: str("name"), ok: str("status") != "error", exitCode: int("exit_code"),
@@ -105,9 +116,47 @@ enum EntryParser {
             let o = b["outcome"] as? [String: Any]
             return .ended(kind: o?["kind"] as? String ?? "ended", reason: o?["reason"] as? String)
         // `approval_requested` is the harness asking; the Core's own `approval_request` entry that follows is the one shown.
-        case "session_started", "usage", "usage_so_far", "turn_ended", "exited", "approval_requested": return .hidden
+        // One answer's usage closes its turn: the divider carries what that turn cost. `turn_ended` and `waiting` are the Core's
+        // own bookkeeping (the state says it), so they are not drawn.
+        case "usage":
+            let u = (b["usage"] as? [String: Any]) ?? b
+            let cost = (u["cost_usd_micros"] as? NSNumber) ?? (b["cost_usd_micros"] as? NSNumber)
+            func n(_ k: String...) -> Int64? { k.lazy.compactMap { (u[$0] as? NSNumber)?.int64Value }.first }
+            let tokens = (n("input", "input_tokens") ?? 0) + (n("output", "output_tokens") ?? 0)
+            return .turnEnded(costMicros: cost?.int64Value, tokens: tokens > 0 ? tokens : nil)
+        case "session_started", "usage_so_far", "turn_ended", "waiting", "exited", "approval_requested": return .hidden
         default: return .note(type: type.isEmpty ? "unknown" : type, detail: str("reason") ?? str("text") ?? "")
         }
+    }
+
+    /// Edit, MultiEdit and Write as a diff: what was cut out and what went in.
+    static func edit(id: String, name: String, input: Any?) -> EntryKind? {
+        guard let o = input as? [String: Any], let path = (o["file_path"] ?? o["path"]) as? String else { return nil }
+        switch name.lowercased() {
+        case "edit":
+            return .toolEdit(
+                id: id, name: name, path: path, old: o["old_string"] as? String ?? "",
+                new: o["new_string"] as? String ?? "", ok: nil, durationMs: nil)
+        case "multiedit":
+            let es = (o["edits"] as? [[String: Any]]) ?? []
+            return .toolEdit(
+                id: id, name: name, path: path,
+                old: es.compactMap { $0["old_string"] as? String }.joined(separator: "\n"),
+                new: es.compactMap { $0["new_string"] as? String }.joined(separator: "\n"), ok: nil, durationMs: nil)
+        case "write":
+            return .toolEdit(
+                id: id, name: name, path: path, old: "", new: o["content"] as? String ?? "", ok: nil, durationMs: nil)
+        default: return nil
+        }
+    }
+
+    static func todos(id: String, input: Any?) -> EntryKind? {
+        guard let o = input as? [String: Any], let list = o["todos"] as? [[String: Any]] else { return nil }
+        let items = list.compactMap { t -> TodoItem? in
+            guard let text = (t["content"] ?? t["text"]) as? String else { return nil }
+            return TodoItem(text: text, status: TodoItem.Status(rawValue: t["status"] as? String ?? "") ?? .pending)
+        }
+        return .toolTodos(id: id, items: items)
     }
 
     /// A tool's input in one line: its command or path, else the JSON, cut.

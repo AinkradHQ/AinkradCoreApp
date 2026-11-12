@@ -110,7 +110,7 @@ public struct LiveAgentsAPI: AgentsAPI {
             let plain = new.chain == nil && new.agent == nil
             let body = Components.Schemas.NewAgentSession(
                 agent: new.agent, chain: new.chain, harness: plain ? new.harness : nil, model: plain ? new.model : nil,
-                policy: policy, prompt: new.prompt, runner: new.runner,
+                policy: policy, prompt: new.prompt.isEmpty ? nil : new.prompt, runner: new.runner,
                 secrets: new.secrets.isEmpty ? nil : new.secrets.map { .init(name: $0, _var: $0) })
             switch try await client.createAgentSession(body: .json(body)) {
             case .ok(let o): return Self.session(try o.body.json)
@@ -130,6 +130,30 @@ public struct LiveAgentsAPI: AgentsAPI {
             case .badRequest(let r): throw Self.fail(r)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    public func stopTurn(_ id: String) async throws -> AgentSessionInfo {
+        try await run {
+            switch try await client.interruptAgentSession(path: .init(id: id)) {
+            case .ok(let o): return Self.session(try o.body.json)
+            case .notFound(let r): throw Self.fail(r)
+            case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    public func rename(_ id: String, title: String) async throws -> AgentSessionInfo {
+        try await run {
+            switch try await client.titleAgentSession(path: .init(id: id), body: .json(.init(title: title))) {
+            case .ok(let o): return Self.session(try o.body.json)
+            case .badRequest(let r): throw Self.fail(r)
+            case .notFound(let r): throw Self.fail(r)
             case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
@@ -248,7 +272,8 @@ public struct LiveAgentsAPI: AgentsAPI {
                 AgentUsageInfo(
                     input: $0.input, output: $0.output, cacheRead: $0.cacheRead, cacheWrite: $0.cacheWrite,
                     costMicros: $0.costUsdMicros)
-            }, resumes: s.resumes.map(Int.init), index: s.index, route: route(s, outcome))
+            }, resumes: s.resumes.map(Int.init), index: s.index, route: route(s, outcome), title: s.title,
+            keepsOpen: s.live, idleSince: s.idleSince)
     }
 
     /// Everything the scheduler adds to a session; nil when the Core gave none of it (not an admin, or no chain).

@@ -65,7 +65,7 @@ struct AgentSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? Space.s3 : Space.s4) {
             GlassSection(
-                "Look", sub: "The Agents app and its sessions, as one.", symbol: "square.on.square",
+                "Look", sub: "The AI Sessions app and its sessions, as one.", symbol: "square.on.square",
                 hue: GlassInk.violet
             ) {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)

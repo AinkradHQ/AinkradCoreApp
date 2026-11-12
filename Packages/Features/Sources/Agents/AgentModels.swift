@@ -34,6 +34,16 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var lastSeq: Int64
     public var usage: AgentUsageInfo?
     public var resumes: Int?
+    /// The name the Core holds (`title`, set by the first message or a PATCH); nil until it says one.
+    public var title: String?
+    /// The folder or repo it works in (the Core's `folder` / `repo`), for grouping by project. Nil until the Core says.
+    public var project: String?
+    /// The branch it works on, when it is a repo.
+    public var branch: String?
+    /// False when the runner is old and runs one answer, then ends (the Core's `live`); nil when it did not say.
+    public var keepsOpen: Bool?
+    /// While waiting: since when.
+    public var idleSince: Date?
     /// Its row, for paging the list with `before`.
     public var index: Int64?
     /// Its chain, account, run and attempts (admins only; nil for any other device).
@@ -44,8 +54,14 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
         outcome: SessionOutcome? = nil, outcomeReason: String? = nil, createdAt: Date, updatedAt: Date,
         endedAt: Date? = nil, lastSeq: Int64 = 0, usage: AgentUsageInfo? = nil, resumes: Int? = nil,
         index: Int64? = nil,
-        route: SessionRoute? = nil
+        route: SessionRoute? = nil, title: String? = nil, project: String? = nil, branch: String? = nil,
+        keepsOpen: Bool? = nil, idleSince: Date? = nil
     ) {
+        self.keepsOpen = keepsOpen
+        self.idleSince = idleSince
+        self.title = title
+        self.project = project
+        self.branch = branch
         self.route = route
         self.id = id
         self.runner = runner
@@ -66,7 +82,7 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     /// Doing something now (or about to, or being resumed). A state this build does not know counts as not live.
     public var live: Bool {
         switch state {
-        case .starting, .running, .interrupted: true
+        case .starting, .running, .waiting, .interrupted: true
         default: false
         }
     }
@@ -76,6 +92,10 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
         if case .cancelled? = outcome { return outcomeReason?.lowercased().contains("budget") == true }
         return false
     }
+    /// Live and idle: the process is up and the composer is the only thing it needs.
+    /// Ended because nobody came back (`agents.idle_end_secs`): the next message resumes it.
+    public var idleEnded: Bool { state == .ended && outcome == .succeeded && outcomeReason == "idle_timeout" }
+    public var idle: Bool { if case .waiting = state { true } else { false } }
     public var over: Bool {
         switch state {
         case .ended, .lost: true
@@ -130,7 +150,11 @@ public struct NewAgentSession: Equatable, Sendable {
     public var runner: String
     public var harness: String
     public var model: String?
+    /// Empty opens a live session that waits for the first message, like typing `claude` in a terminal.
     public var prompt: String
+    /// A folder or repo and branch the session works in; nil is a fresh folder.
+    public var project: String?
+    public var branch: String?
     /// `ask`, `accept_edits` or `sandboxed`.
     public var mode: String
     public var secrets: [String]
@@ -140,8 +164,10 @@ public struct NewAgentSession: Equatable, Sendable {
     public var agent: String?
     public init(
         runner: String, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
-        secrets: [String] = [], chain: Int64? = nil, agent: String? = nil
+        secrets: [String] = [], chain: Int64? = nil, agent: String? = nil, project: String? = nil, branch: String? = nil
     ) {
+        self.project = project
+        self.branch = branch
         self.chain = chain
         self.agent = agent
         self.runner = runner
@@ -162,6 +188,12 @@ public enum EntryKind: Equatable, Sendable {
     case toolUse(id: String, name: String, summary: String)
     case toolResult(
         id: String, name: String?, ok: Bool, exitCode: Int?, output: String, durationMs: Int?)
+    /// A file edit (Edit, MultiEdit, Write), kept with what it replaced so the row can draw a diff. `ok` is nil until it answers.
+    case toolEdit(id: String, name: String, path: String, old: String, new: String, ok: Bool?, durationMs: Int?)
+    /// The CLI's todo list (TodoWrite), drawn as a checklist.
+    case toolTodos(id: String, items: [TodoItem])
+    /// A turn is over: the harness is waiting for you. Carries what the turn cost, when the Core says.
+    case turnEnded(costMicros: Int64?, tokens: Int64?)
     /// A tool call and its result as one row: the store folds a `toolResult` into the `toolUse` it answers.
     case toolDone(
         id: String, name: String, summary: String, ok: Bool, exitCode: Int?, output: String, durationMs: Int?)
@@ -173,6 +205,20 @@ public enum EntryKind: Equatable, Sendable {
     case note(type: String, detail: String)
     /// Bookkeeping that is not for reading (session id, usage, turn end).
     case hidden
+}
+
+public struct TodoItem: Equatable, Sendable {
+    public enum Status: String, Sendable {
+        case pending
+        case inProgress = "in_progress"
+        case completed
+    }
+    public var text: String
+    public var status: Status
+    public init(text: String, status: Status) {
+        self.text = text
+        self.status = status
+    }
 }
 
 public struct TranscriptEntry: Identifiable, Equatable, Sendable {
@@ -258,7 +304,8 @@ public enum AgentWords {
 
     /// The word for a session in a list or head: a pending approval wins over the state.
     public static func status(_ s: AgentSessionInfo, waiting: Bool) -> (label: String, tone: Tone, symbol: String) {
-        if waiting { return (String(localized: "Waiting on you", bundle: .module), .warn, "hand.raised") }
+        if waiting { return (String(localized: "Needs you", bundle: .module), .warn, "hand.raised") }
+        if s.idleEnded { return (String(localized: "Ended (idle)", bundle: .module), .queue, "moon.zzz") }
         if case .ended = s.state, s.stoppedByBudget {
             return (endedWords("budget"), .warn, "gauge.with.dots.needle.100percent")
         }
@@ -287,6 +334,7 @@ public enum AgentWords {
     /// A reason the Core or runner gave: a known code becomes a sentence, a snake_case code is spaced, free text stays.
     public static func reasonWords(_ reason: String) -> String {
         switch reason {
+        case "idle_timeout": return "Nobody came back, so it ended. Send a message to continue."
         case "host_lost": return "The runner's terminal process was lost"
         case "token_cap": return "It used all the tokens it was allowed"
         case "runner_lost": return "The runner went away"
@@ -326,6 +374,14 @@ public enum AgentWords {
     }
 
     /// The prompt-less name: the harness and the id's tail, `Claude · K9R003`.
+    /// A short word for the harness's tool in the AI session list ("Claude Code").
+    public static func toolName(_ h: String) -> String {
+        switch h.lowercased() {
+        case "claude", "claude-code", "claude_code": "Claude Code"
+        default: harnessName(h)
+        }
+    }
+
     public static func fallbackTitle(_ s: AgentSessionInfo) -> String {
         "\(harnessName(s.harness)) · \(s.id.count > 10 ? String(s.id.suffix(6)) : s.id)"
     }

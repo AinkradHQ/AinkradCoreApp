@@ -95,7 +95,7 @@ struct SessionSpendStrip: View {
                 .help(
                     ledger.isPlan
                         ? "The plan's token is lent to the runner for this session only."
-                        : "The key is used by the runner's gateway and never enters the agent's sandbox.")
+                        : "The key is used by the runner's gateway and never enters the session's sandbox.")
             }
             Spacer(minLength: Space.s2)
             if capped {

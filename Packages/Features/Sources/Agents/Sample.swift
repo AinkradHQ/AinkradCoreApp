@@ -131,9 +131,11 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         }
         let s = AgentSessionInfo(
             id: id, runner: new.runner, harness: new.chain == nil && new.agent == nil ? new.harness : "claude",
-            state: .starting, createdAt: Date(), updatedAt: Date(),
-            index: Int64(counter))
-        add(s, entries: [.started(harness: new.harness, resumed: false), .user(new.prompt)])
+            state: new.prompt.isEmpty ? .waiting : .starting, createdAt: Date(), updatedAt: Date(),
+            index: Int64(counter), project: new.project, branch: new.branch)
+        add(
+            s,
+            entries: [.started(harness: new.harness, resumed: false)] + (new.prompt.isEmpty ? [] : [.user(new.prompt)]))
         return s
     }
 
@@ -170,6 +172,24 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         }
         append(id, [.ended(kind: kind, reason: nil)])
         emit(.event(AgentEvent(kind: "agent.ended", session: id)))
+        return try await session(id)
+    }
+
+    public func stopTurn(_ id: String) async throws -> AgentSessionInfo {
+        try record("stopTurn")
+        update(id) { $0.state = .waiting }
+        append(id, [.turnEnded(costMicros: nil, tokens: nil)])
+        emit(.event(AgentEvent(kind: "agent.turn_ended", session: id)))
+        return try await session(id)
+    }
+
+    public func end(_ id: String) async throws -> AgentSessionInfo {
+        try await finish(id, "end", .succeeded, "succeeded")
+    }
+
+    public func rename(_ id: String, title: String) async throws -> AgentSessionInfo {
+        try record("rename")
+        update(id) { $0.title = title }
         return try await session(id)
     }
 
