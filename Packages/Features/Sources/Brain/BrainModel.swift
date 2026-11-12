@@ -172,7 +172,7 @@ public final class BrainModel {
             if let sync, sync.status == nil {
                 await sync.reload()
                 // Real Cores only: the sample has no Mac collectors to run.
-                if service.importRoutes != nil { sync.startTimer() }
+                if service.importRoutes != nil, !service.isSample { sync.startTimer() }
             }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }
             // A room that sealed or lost its lease under us must not stay on screen.

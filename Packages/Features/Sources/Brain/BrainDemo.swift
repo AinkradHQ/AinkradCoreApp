@@ -18,6 +18,7 @@ public final class BrainDemo {
         "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
         "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
         "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
+        "import", "import-review",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -56,6 +57,9 @@ public final class BrainDemo {
         case "worst-overview", "worst-rooms", "worst-inbox": s.worst = true
         default: break
         }
+        // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
+        s.imports = true
+        model.importSources = { SampleImportSource.all }
         if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))
             await model.reload()
@@ -115,6 +119,12 @@ public final class BrainDemo {
         case "worst-overview": model.show(.overview)
         case "worst-rooms": model.show(.rooms)
         case "worst-inbox": await inbox(.noRoom)
+        case "import":
+            model.show(.rooms)
+            model.openImport()
+        case "import-review":
+            model.show(.rooms)
+            await model.openReview(SampleImportTransport.run)
         default: model.show(.overview)
         }
     }
