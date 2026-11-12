@@ -47,6 +47,8 @@ final class FakeService: AdminService, @unchecked Sendable {
     var settingList: [SettingItem] = []
     var historyByKey: [String: [SettingChangeItem]] = [:]
     var secretList: [SecretItem] = []
+    var groupList: [SecretGroupItem] = []
+    private(set) var drafts: [SecretDraft] = []
     var runnerList: [RunnerChoice] = [RunnerChoice(id: "d_run", name: "mac-studio", online: true, drivers: ["pty"])]
     var auditRows: [AuditItem] = []
     var metricsText = ""
@@ -94,14 +96,41 @@ final class FakeService: AdminService, @unchecked Sendable {
         try note("secrets")
         return secretList
     }
-    func createSecret(name: String, value: String, delivery: String, runners: [String]) async throws -> SecretItem {
-        lock.withLock { secretValues.append(value) }
-        try note("create \(name) \(delivery) \(runners.joined(separator: ","))")
-        let made = secret(name, runners: runners)
+    func createSecret(_ d: SecretDraft) async throws -> SecretItem {
+        lock.withLock {
+            secretValues.append(d.value)
+            drafts.append(d)
+        }
+        try note("create \(d.name) \(d.delivery) \(d.runners.joined(separator: ","))")
+        var made = secret(d.name, runners: d.runners)
+        made.kind = d.kind
+        made.group = d.group
+        made.description = d.description
         secretList.append(made)
         return made
     }
-    func rotateSecret(_ name: String, value: String) async throws -> SecretItem {
+    func secretGroups() async throws -> [SecretGroupItem] { lock.withLock { groupList } }
+    func createSecretGroup(name: String, description: String, runners: [String]) async throws -> SecretGroupItem {
+        try note("group-create \(name)")
+        let g = SecretGroupItem(name: name, description: description, members: [], runners: runners)
+        lock.withLock { groupList.append(g) }
+        return g
+    }
+    func updateSecretGroup(_ name: String, description: String, runners: [String]) async throws -> SecretGroupItem {
+        try note("group-update \(name)")
+        let g = SecretGroupItem(name: name, description: description, members: [], runners: runners)
+        lock.withLock { groupList = groupList.map { $0.name == name ? g : $0 } }
+        return g
+    }
+    func deleteSecretGroup(_ name: String) async throws {
+        try note("group-delete \(name)")
+        lock.withLock { groupList.removeAll { $0.name == name } }
+    }
+    func leaseGroup(_ name: String, runner: String, ttl: Int64?) async throws -> [LeaseItem] {
+        try note("group-lease \(name) \(runner)")
+        return [LeaseItem(lease: "l_g1", secret: "a", runner: runner, expiresAt: Date().addingTimeInterval(120))]
+    }
+    func rotateSecret(_ name: String, value: String, fileName: String?) async throws -> SecretItem {
         lock.withLock { secretValues.append(value) }
         try note("rotate \(name)")
         guard let i = secretList.firstIndex(where: { $0.name == name }) else {

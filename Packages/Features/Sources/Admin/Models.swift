@@ -82,6 +82,41 @@ struct SecretItem: Identifiable, Equatable, Sendable {
     let keyID: String
     let createdAt: Date
     let updatedAt: Date
+    /// `text`, `multiline`, `file` or `env_bundle`; a Core before API minor 54 sends none, and that is `text`.
+    var kind = "text"
+    var description = ""
+    var fileName: String?
+    var fileMode: String?
+    /// The group it is in; its runners are used when the secret has none of its own.
+    var group: String?
+    /// The runners that really may use it: its own, else its group's.
+    var effectiveRunners: [String]?
+    var lastUsedAt: Date?
+    var useCount: Int64 = 0
+
+    var runnersUsing: [String] { effectiveRunners ?? runners }
+}
+
+/// A group of secrets (one level): a description and a runner list its members inherit.
+struct SecretGroupItem: Identifiable, Equatable, Sendable {
+    var id: String { name }
+    let name: String
+    var description: String
+    var members: [String]
+    var runners: [String]
+}
+
+/// What a new secret or a new value carries to the Core. The value is text; for a file it is the file's bytes in base64.
+struct SecretDraft: Sendable {
+    var name: String
+    var kind: String
+    var value: String
+    var delivery: String
+    var runners: [String]
+    var description: String
+    var group: String?
+    var fileName: String?
+    var fileMode: String?
 }
 
 /// A lease this Mac granted. The Core has no list of leases, so these are the ones made since the app opened.

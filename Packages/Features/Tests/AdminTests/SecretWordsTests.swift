@@ -13,9 +13,41 @@ struct SecretWordsTests {
             createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 1_000_000 - ago))
     }
 
-    @Test func onlyTextIsStoredToday() {
-        #expect(SecretWords.Kind.allCases.filter(\.available) == [.text])
-        #expect(SecretWords.Kind.file.blurb.contains("1 MB"))
+    @Test func everyKindHasItsCoreWordAndFilesAreLimitedToOneMegabyte() {
+        #expect(SecretWords.Kind.allCases.map(\.wire) == ["text", "multiline", "file", "env_bundle"])
+        #expect(SecretWords.Kind(wire: "env_bundle") == .env && SecretWords.Kind(wire: "old") == .text)
+        #expect(SecretWords.Kind.file.blurb.contains("1 MB") && SecretWords.fileLimit == 1_048_576)
+    }
+
+    @Test func rowsShowLastUsedAndUseCount() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        var s = item()
+        #expect(SecretWords.lastUsed(s, now: now) == "Never used")
+        s.lastUsedAt = now.addingTimeInterval(-7200)
+        s.useCount = 12
+        #expect(SecretWords.lastUsed(s, now: now) == "Used 2 h ago · 12 times")
+        s.kind = "file"
+        s.fileName = "aws.json"
+        #expect(SecretWords.sealed(s) == "aws.json · Sealed · 20 B")
+    }
+
+    @Test func groupsAreSectionsAndTheRestIsNoGroup() {
+        var a = item("a")
+        a.group = "aws"
+        let b = item("b")
+        let aws = SecretGroupItem(name: "aws", description: "", members: ["a"], runners: [])
+        let empty = SecretGroupItem(name: "zed", description: "", members: [], runners: [])
+        let all = SecretSections.sections([a, b], groups: [empty, aws])
+        #expect(all.map(\.title) == ["aws", "zed", "No group"])
+        #expect(
+            SecretSections.sections([a, b], groups: [empty, aws], narrowed: true).map(\.title) == ["aws", "No group"])
+        #expect(SecretSections.sections([b], groups: []).map(\.title) == ["All secrets"])
+    }
+
+    @Test func aGroupsRunnersCountWhenTheSecretHasNone() {
+        var s = item("a", runners: [])
+        s.effectiveRunners = ["r9"]
+        #expect(s.runnersUsing == ["r9"] && SecretWords.matches(s, query: "", runner: "r9"))
     }
 
     @Test func sizesReadLikeTheDesign() {
@@ -33,7 +65,7 @@ struct SecretWordsTests {
     @Test func thePreviewSaysWhoGetsItAndHow() {
         #expect(
             SecretWords.preview(delivery: "file", runners: ["Azure Dev"])
-                == "Agents on Azure Dev get it as a file only they can read.")
+                == "AI sessions on Azure Dev get it as a file only they can read.")
         #expect(SecretWords.preview(delivery: "env", runners: []).hasPrefix("No runner may use it yet"))
     }
 
@@ -63,8 +95,8 @@ struct SecretWordsTests {
     }
 
     @Test func withoutGroupsEverySecretIsInOneSection() {
-        #expect(SecretSections.sections([]).isEmpty)
-        let s = SecretSections.sections([item("a"), item("b")])
+        #expect(SecretSections.sections([], groups: []).isEmpty)
+        let s = SecretSections.sections([item("a"), item("b")], groups: [])
         #expect(s.count == 1 && s[0].items.count == 2)
     }
 }

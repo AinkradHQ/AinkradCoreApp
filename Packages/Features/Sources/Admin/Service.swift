@@ -11,9 +11,15 @@ protocol AdminService: Sendable {
     func resetSetting(_ key: String) async throws -> SettingItem
     func history(_ key: String) async throws -> [SettingChangeItem]
     func secrets() async throws -> [SecretItem]
-    func createSecret(name: String, value: String, delivery: String, runners: [String]) async throws -> SecretItem
-    func rotateSecret(_ name: String, value: String) async throws -> SecretItem
+    func createSecret(_ draft: SecretDraft) async throws -> SecretItem
+    func rotateSecret(_ name: String, value: String, fileName: String?) async throws -> SecretItem
     func deleteSecret(_ name: String) async throws
+    func secretGroups() async throws -> [SecretGroupItem]
+    func createSecretGroup(name: String, description: String, runners: [String]) async throws -> SecretGroupItem
+    func updateSecretGroup(_ name: String, description: String, runners: [String]) async throws -> SecretGroupItem
+    func deleteSecretGroup(_ name: String) async throws
+    /// Lends every secret of the group to a runner at once.
+    func leaseGroup(_ name: String, runner: String, ttl: Int64?) async throws -> [LeaseItem]
     func lease(_ name: String, runner: String, ttl: Int64?) async throws -> LeaseItem
     func runners() async throws -> [RunnerChoice]
     func audit(before: Int64?, limit: Int, filter: AuditFilter) async throws -> AuditPageItem
@@ -101,9 +107,11 @@ struct LiveAdminService: AdminService {
         }
     }
 
-    func createSecret(name: String, value: String, delivery: String, runners: [String]) async throws -> SecretItem {
+    func createSecret(_ d: SecretDraft) async throws -> SecretItem {
         try await run {
-            let body = Components.Schemas.NewSecret(delivery: delivery, name: name, runners: runners, value: value)
+            let body = Components.Schemas.NewSecret(
+                delivery: d.delivery, description: d.description.isEmpty ? nil : d.description, fileMode: d.fileMode,
+                fileName: d.fileName, group: d.group, kind: d.kind, name: d.name, runners: d.runners, value: d.value)
             switch try await client.createSecret(body: .json(body)) {
             case .ok(let o): return Self.secret(try o.body.json)
             case .badRequest(let r): throw Self.fail(400, try? r.body.json)
@@ -116,9 +124,11 @@ struct LiveAdminService: AdminService {
         }
     }
 
-    func rotateSecret(_ name: String, value: String) async throws -> SecretItem {
+    func rotateSecret(_ name: String, value: String, fileName: String?) async throws -> SecretItem {
         try await run {
-            switch try await client.rotateSecret(path: .init(id: name), body: .json(.init(value: value))) {
+            switch try await client.rotateSecret(
+                path: .init(id: name), body: .json(.init(fileName: fileName, value: value)))
+            {
             case .ok(let o): return Self.secret(try o.body.json)
             case .badRequest(let r): throw Self.fail(400, try? r.body.json)
             case .notFound(let r): throw Self.fail(404, try? r.body.json)
@@ -127,6 +137,42 @@ struct LiveAdminService: AdminService {
             case .undocumented(let status, let payload): throw await Self.fail(status, payload)
             default: throw Self.unknown
             }
+        }
+    }
+
+    func secretGroups() async throws -> [SecretGroupItem] {
+        try await run { try await client.listSecretGroups().ok.body.json.map(Self.group) }
+    }
+
+    func createSecretGroup(name: String, description: String, runners: [String]) async throws -> SecretGroupItem {
+        try await run {
+            Self.group(
+                try await client.createSecretGroup(
+                    body: .json(
+                        .init(description: description.isEmpty ? nil : description, name: name, runners: runners))
+                ).ok.body.json)
+        }
+    }
+
+    func updateSecretGroup(_ name: String, description: String, runners: [String]) async throws -> SecretGroupItem {
+        try await run {
+            Self.group(
+                try await client.updateSecretGroup(
+                    path: .init(id: name), body: .json(.init(description: description, runners: runners))
+                ).ok.body.json)
+        }
+    }
+
+    func deleteSecretGroup(_ name: String) async throws {
+        try await run { _ = try await client.deleteSecretGroup(path: .init(id: name)).ok }
+    }
+
+    func leaseGroup(_ name: String, runner: String, ttl: Int64?) async throws -> [LeaseItem] {
+        try await run {
+            try await client.leaseSecretGroup(path: .init(id: name), body: .json(.init(runner: runner, ttlSecs: ttl)))
+                .ok.body.json.leases.map {
+                    LeaseItem(lease: $0.lease, secret: $0.secret, runner: runner, expiresAt: $0.expiresAt)
+                }
         }
     }
 
@@ -238,7 +284,13 @@ struct LiveAdminService: AdminService {
     static func secret(_ s: Components.Schemas.SecretInfo) -> SecretItem {
         SecretItem(
             name: s.name, owner: s.owner, runners: s.runners, delivery: s.delivery, version: s.version, size: s.size,
-            keyID: s.keyId, createdAt: s.createdAt, updatedAt: s.updatedAt)
+            keyID: s.keyId, createdAt: s.createdAt, updatedAt: s.updatedAt, kind: s.kind ?? "text",
+            description: s.description ?? "", fileName: s.fileName, fileMode: s.fileMode, group: s.group,
+            effectiveRunners: s.effectiveRunners, lastUsedAt: s.lastUsedAt, useCount: s.useCount ?? 0)
+    }
+
+    static func group(_ g: Components.Schemas.SecretGroupInfo) -> SecretGroupItem {
+        SecretGroupItem(name: g.name, description: g.description, members: g.members, runners: g.runners)
     }
 
     static func actor(_ a: Components.Schemas.EventActor) -> ActorInfo {
