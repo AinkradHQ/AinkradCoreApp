@@ -55,14 +55,14 @@ public struct ResumeStore: Sendable {
 /// Collects and uploads a Claude Code folder one file at a time: read a file in bounded pieces, send its
 /// items in batches, forget them, go to the next. A finished file is remembered through `save`.
 public struct ImportStreamer: Sendable {
-    public let collector: ClaudeCodeCollector
+    public let collector: (any FileCollector)?
     public let uploader: Uploader
     public let gauge: BufferGauge?
     /// How often the done list is written, at most.
     public let saveEvery: TimeInterval
 
     public init(
-        collector: ClaudeCodeCollector, uploader: Uploader, gauge: BufferGauge? = nil, saveEvery: TimeInterval = 1
+        collector: (any FileCollector)?, uploader: Uploader, gauge: BufferGauge? = nil, saveEvery: TimeInterval = 1
     ) {
         self.collector = collector
         self.uploader = uploader
@@ -70,14 +70,26 @@ public struct ImportStreamer: Sendable {
         self.saveEvery = saveEvery
     }
 
+    /// One thing to read: a file under the root, or a record set a collector names itself (`key` is what resume remembers).
+    public struct Unit: Sendable {
+        public var key: String
+        public var size: UInt64
+        public var url: URL?
+        public init(key: String, size: UInt64, url: URL? = nil) {
+            self.key = key
+            self.size = size
+            self.url = url
+        }
+    }
+
     public func run(
         root: URL, runID: String, resume: SourceResume, uploaded: Uploader.Progress,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
     ) async throws -> CollectReport {
         var report = CollectReport()
-        var todo: [(url: URL, rel: String, size: UInt64)] = []
-        for url in collector.files.listFiles(under: root).sorted(by: { $0.path < $1.path })
-        where url.pathExtension == "jsonl" {
+        var todo: [Unit] = []
+        guard let collector else { return report }
+        for url in collector.candidates(under: root).sorted(by: { $0.path < $1.path }) {
             report.found += 1
             let rel = url.path.replacingOccurrences(of: root.path, with: "")
             // Decided by the path alone, before the file is opened.
@@ -85,13 +97,30 @@ public struct ImportStreamer: Sendable {
                 report.skipped[why, default: 0] += 1
                 continue
             }
-            todo.append((url, rel, collector.files.size(of: url)))
+            todo.append(Unit(key: rel, size: collector.files.size(of: url), url: url))
         }
+        return try await run(
+            units: todo, report: report, runID: runID, resume: resume, uploaded: uploaded, save: save,
+            onProgress: onProgress
+        ) { unit, sink in
+            guard let url = unit.url else { return "unreadable" }
+            return try await collector.stream(file: url, sink: sink)
+        }
+    }
+
+    /// The loop every collector shares, whatever it reads from: `units` are read in order through `read`.
+    public func run(
+        units todo: [Unit], report start: CollectReport, runID: String, resume: SourceResume,
+        uploaded: Uploader.Progress, save: @Sendable (SourceResume) -> Void,
+        onProgress: @Sendable (StreamProgress) async -> Void,
+        read: (Unit, (ImportItem) async throws -> Void) async throws -> String?
+    ) async throws -> CollectReport {
+        var report = start
         var state = resume
         var p = StreamProgress()
         p.filesTotal = todo.count
         p.bytesTotal = todo.reduce(0) { $0 + $1.size }
-        for f in todo where state.done.contains(f.rel) {
+        for f in todo where state.done.contains(f.key) {
             p.filesDone += 1
             p.bytesDone += f.size
         }
@@ -110,12 +139,12 @@ public struct ImportStreamer: Sendable {
         }
         var lastSave = Date()
         do {
-            for f in todo where !state.done.contains(f.rel) {
+            for f in todo where !state.done.contains(f.key) {
                 try Task.checkCancellation()
-                p.current = f.rel
+                p.current = f.key
                 await onProgress(p)
                 var count = 0
-                let why = try await collector.stream(file: f.url) { item in
+                let why = try await read(f) { item in
                     pending.append(item)
                     pendingBytes += item.text.utf8.count + 1024
                     gauge?.set("batch", pendingBytes)
@@ -132,7 +161,7 @@ public struct ImportStreamer: Sendable {
                     state.items += count
                     report.items += count
                 }
-                state.done.insert(f.rel)
+                state.done.insert(f.key)
                 p.filesDone += 1
                 p.bytesDone += f.size
                 await onProgress(p)

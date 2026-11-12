@@ -111,6 +111,19 @@ struct BrainImportFlowTests {
         #expect(ImportWords.shortName("/-p1/s1.jsonl") == "s1.jsonl")
     }
 
+    @Test func aToolWithUnreadableHistoryIsListedButCannotBeChosen() async {
+        let t = FakeBrainTransport()
+        _ = wizard(t)
+        let nr = NotReadableSource(id: "antigravity", title: "Antigravity sessions", reason: "Binary records.")
+        let model = ImportModel(
+            host: FakeHost(), routes: BrainRoutes(transport: t), sources: [FakeSource(), nr], poll: .milliseconds(1),
+            pause: { _ in })
+        await model.scan()
+        let c = model.choices.first { $0.id == "antigravity" }
+        #expect(c?.notReadable == "Binary records." && c?.on == false && c?.found == 0)
+        #expect(model.chosen.map(\.id) == ["claude_code"])
+    }
+
     @Test func collectUploadsThenReportsDoneThenReachesReview() async {
         let t = FakeBrainTransport()
         let (m, _) = wizard(t)

@@ -8,6 +8,24 @@ public protocol FileAccess: Sendable {
     /// Calls `each` with every line (no line end), reading `chunk` bytes at a time. A line longer than
     /// `maxLine` is dropped, never held. `each` returns false to stop reading this file.
     func readLines(_ url: URL, chunk: Int, maxLine: Int, _ each: (Data) async throws -> Bool) async throws
+    /// The modified time from file attributes; the file is not opened.
+    func modified(of url: URL) -> Date?
+    /// The names in one folder, not recursive; nothing is opened.
+    func children(of url: URL) -> [URL]
+}
+
+extension FileAccess {
+    public func modified(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+    public func children(of url: URL) -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+    }
+}
+
+public enum FileReadError: Error, Equatable {
+    /// A `.zst` file and no `zstd` tool on this Mac to unpack it.
+    case needsZstd
 }
 
 public struct DiskFiles: FileAccess {
@@ -25,9 +43,35 @@ public struct DiskFiles: FileAccess {
         ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.uint64Value ?? 0
     }
 
+    /// Codex keeps finished sessions as `.jsonl.zst`. macOS has no zstd decoder, so the `zstd` tool is used
+    /// when one is installed (Homebrew); without it those files are reported, not read.
+    public static var zstdPath: String? {
+        ["/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"].first {
+            FileManager.default.isExecutableFile(atPath: $0)
+        }
+    }
+
     public func readLines(_ url: URL, chunk: Int, maxLine: Int, _ each: (Data) async throws -> Bool) async throws {
+        if url.pathExtension == "zst" {
+            guard let tool = Self.zstdPath else { throw FileReadError.needsZstd }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: tool)
+            p.arguments = ["-dc", "--", url.path]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError = FileHandle.nullDevice
+            try p.run()
+            defer { if p.isRunning { p.terminate() } }
+            try await Self.lines(pipe.fileHandleForReading, chunk: chunk, maxLine: maxLine, each)
+            return
+        }
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
+        try await Self.lines(handle, chunk: chunk, maxLine: maxLine, each)
+    }
+
+    static func lines(_ handle: FileHandle, chunk: Int, maxLine: Int, _ each: (Data) async throws -> Bool) async throws
+    {
         var line = Data()
         var dropping = false
         while true {
@@ -77,7 +121,7 @@ public final class BufferGauge: @unchecked Sendable {
 /// A session becomes one item (or ordered parts when it is large): the user and assistant text, with
 /// tool output trimmed. It is read as a stream, so memory is bounded by a chunk, a line, and a part,
 /// never by the file. Records of an unknown shape are skipped, never guessed at.
-public struct ClaudeCodeCollector: Sendable {
+public struct ClaudeCodeCollector: FileCollector {
     public let device: String
     public let files: any FileAccess
     public let chunk: Int
@@ -99,41 +143,25 @@ public struct ClaudeCodeCollector: Sendable {
         self.gauge = gauge
     }
 
-    /// Reads one session file and hands each item to `sink` as soon as it is complete. Returns the
-    /// reason the file was skipped, or nil. An error from `sink` (a failed upload) is thrown.
+    var lines: LineCollector {
+        LineCollector(
+            device: device, files: files, chunk: chunk, maxLine: maxLine, gauge: gauge, kind: "claude_code",
+            defaultTitle: "Claude Code session", accepts: { $0.pathExtension == "jsonl" },
+            decode: { obj, _ in
+                var r = SessionStream.Read(cwd: obj["cwd"] as? String, timestamp: obj["timestamp"] as? String)
+                if let type = obj["type"] as? String, type == "user" || type == "assistant",
+                    let message = obj["message"] as? [String: Any]
+                {
+                    r.turn = (type, ClaudeCodeCollector.text(of: message["content"]))
+                }
+                return r
+            })
+    }
+
+    public func accepts(_ url: URL) -> Bool { lines.accepts(url) }
+
     public func stream(file url: URL, sink: (ImportItem) async throws -> Void) async throws -> String? {
-        var s = SessionStream(path: url.path, device: device, gauge: gauge)
-        var failure: Error?
-        var skip: String?
-        func emit(_ items: [ImportItem]) async -> Bool {
-            for i in items {
-                do { try await sink(i) } catch {
-                    failure = error
-                    return false
-                }
-            }
-            return true
-        }
-        do {
-            try await files.readLines(url, chunk: chunk, maxLine: maxLine) { line in
-                gauge?.set("reader", chunk + line.count)
-                switch s.add(line: line) {
-                case .skip(let why):
-                    skip = why
-                    return false
-                case .items(let items): return await emit(items)
-                }
-            }
-        } catch {
-            gauge?.set("reader", 0)
-            return "unreadable"
-        }
-        gauge?.set("reader", 0)
-        if let failure { throw failure }
-        if let skip { return skip }
-        if case .items(let items) = s.finish() { _ = await emit(items) }
-        if let failure { throw failure }
-        return s.emitted == 0 ? "empty" : nil
+        try await lines.stream(file: url, sink: sink)
     }
 
     static func text(of content: Any?) -> String {

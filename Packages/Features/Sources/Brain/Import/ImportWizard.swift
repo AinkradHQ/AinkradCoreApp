@@ -58,16 +58,13 @@ private struct SourcesStep: View {
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: Space.s3) {
                 ForEach($m.choices) { $c in
-                    CoreCheckbox(c.title, detail: detail(c), isOn: $c.on)
+                    CoreCheckbox(c.title, detail: detail(c), isOn: $c.on).disabled(c.notReadable != nil)
                 }
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
-            Text(
-                "Coming later: Codex, OpenCode, Antigravity, Cursor, Kimi, project docs and your vault. "
-                    + "Passwords, keys, certificates and contracts are never read, and refused projects are skipped."
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            Text("Passwords, keys, certificates and contracts are never read, and refused projects are skipped.")
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             CoreDialogFooter(
                 cancel: CoreAction("Cancel", key: .cancel, run: close),
                 primary: CoreAction("Start", key: .primary) { model.start() }, enabled: model.canStart)
@@ -76,6 +73,7 @@ private struct SourcesStep: View {
     }
 
     private func detail(_ c: ImportModel.Choice) -> String {
+        if let why = c.notReadable { return "Not readable yet. \(why)" }
         guard let found = c.found else { return "Looking…" }
         let skipped = ImportWords.skips(c.skipped)
         return "\(found) found" + (skipped.isEmpty ? "" : ", skipped by rule: \(skipped)")

@@ -17,6 +17,8 @@ public final class ImportModel {
         public var found: Int?
         public var skipped: [String: Int] = [:]
         public var on = true
+        /// Why the source cannot be collected yet; such a choice is off and can not be turned on.
+        public var notReadable: String?
     }
 
     let host: any AdminHost
@@ -61,13 +63,15 @@ public final class ImportModel {
         self.poll = poll
         self.pause = pause
         self.resume = resume
-        choices = sources.map { Choice(id: $0.id, title: $0.title) }
+        choices = sources.map {
+            Choice(id: $0.id, title: $0.title, on: $0.notReadable == nil, notReadable: $0.notReadable)
+        }
         review = ReviewModel(host: host, routes: routes)
     }
 
     // MARK: step 1
 
-    public var chosen: [Choice] { choices.filter(\.on) }
+    public var chosen: [Choice] { choices.filter { $0.on && $0.notReadable == nil } }
     public var canStart: Bool { step == .sources && !chosen.isEmpty && job == nil }
     /// Something is running or waiting for the person: the pane says "Import in progress".
     public var isActive: Bool { run != nil && step != .done }

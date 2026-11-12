@@ -1,11 +1,14 @@
 import BrainImport
 import Foundation
 
-/// One thing the wizard can collect from. The Claude Code one is the only one in M1.
+/// One thing the wizard can collect from.
 public protocol ImportSource: Sendable {
     /// The id the Core knows (`source_kind` of its items).
     var id: String { get }
     var title: String { get }
+    /// Why this source cannot be collected yet, in plain words; nil when it can. Such a source is listed in
+    /// step 1 as "not readable yet" and can not be chosen.
+    var notReadable: String? { get }
     /// What is there and what a rule already skips, from file names alone: no file is opened.
     func scan() async -> CollectReport
     /// Reads and uploads file by file, so memory never depends on how much there is. Files in `resume`
@@ -14,6 +17,10 @@ public protocol ImportSource: Sendable {
         run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
     ) async throws -> CollectReport
+}
+
+extension ImportSource {
+    public var notReadable: String? { nil }
 }
 
 /// Claude Code sessions, `<root>/<project>/<session>.jsonl`.
@@ -68,6 +75,10 @@ public enum ImportWords {
         case "restricted": return "restricted files"
         case "empty": return "empty"
         case "unreadable": return "unreadable"
+        case "unknown-format": return "a format this version does not know"
+        case "needs-zstd": return "compressed files (install zstd to read them)"
+        case "too-big": return "files too big to read"
+        case "zip": return "zip files (unpack them first)"
         default: return reason
         }
     }

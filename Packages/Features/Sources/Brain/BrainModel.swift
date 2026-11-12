@@ -19,9 +19,9 @@ public final class BrainModel {
     public internal(set) var setup: BrainSetup = .ready
     /// The import in this session, kept while its sheet is closed so a collect in progress is not lost.
     public internal(set) var importer: ImportModel?
-    /// The sources the wizard offers. Tests and the Debug gallery replace it; the default reads this Mac's Claude Code.
+    /// The sources the wizard offers. Tests and the Debug gallery replace it; the default reads this Mac's AI session histories, docs and chat exports.
     @ObservationIgnored public var importSources: @Sendable () -> [any ImportSource] = {
-        [ClaudeCodeSource.standard()]
+        ImportSources.standard()
     }
     /// Every known room. A sealed one carries a name and mode only (`RoomSummary.counts` is nil).
     public private(set) var rooms: [RoomSummary] = []
