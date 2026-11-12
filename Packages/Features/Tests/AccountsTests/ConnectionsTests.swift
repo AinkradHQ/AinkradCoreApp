@@ -61,7 +61,34 @@ struct ConnectionsTests {
         #expect(m.installing)
         await settle(m) { if case .connected = $0 { true } else { false } }
         #expect(m.flow?.isConnected == true)
-        #expect(opened.last?.absoluteString == "https://github.com/apps")
+        #expect(opened.last?.absoluteString == "https://github.com/apps/ainkradhq/installations/new")
+    }
+
+    @Test func theInstallationCatchShowsTheRepositoriesPicked() async {
+        let (m, _, _) = await make()
+        await m.startFlow("github")
+        m.openSignIn()
+        await settle(m) { if case .chooseResources = $0 { true } else { false } }
+        #expect(m.picked.isEmpty)
+        await m.installed("4242")
+        #expect(m.flow?.isConnected == true)
+        #expect(m.picked.count == 6)
+        #expect(!m.installing)
+    }
+
+    @Test func gitHubWaitsForACodeAndJiraForTheBrowser() async {
+        let (m, _, _) = await make()
+        await m.startFlow("github")
+        guard case .waiting? = m.flow?.step else {
+            Issue.record("github should wait for the code")
+            return
+        }
+        #expect(m.flow?.userCode != nil)
+        m.stopFlow()
+        await m.startFlow("jira")
+        #expect(m.flow?.userCode == nil)
+        #expect(m.kind("jira")?.signIn == .browser)
+        m.stopFlow()
     }
 
     @Test func aFailedSignInSaysWhatToDoNotACode() async {
@@ -312,9 +339,54 @@ struct ConnectionsRefusalWordsTests {
     @Test(arguments: [
         ("no_runner", 409, "No runner can check this key yet. Pick a runner that is online and has the gateway on."),
         ("credential_rejected", 400, "The provider said no to that token. Check it and try again."),
-        ("not_configured", 409, "This service isn't set up yet. Use App registration on this page to set it up."),
+        ("not_configured", 409, ConnSay.notConfigured),
     ])
     func plain(code: String, status: Int, words: String) {
         #expect(ConnSay.plain(CoreError.http(status: status, code: code, message: "raw")) == words)
+    }
+}
+
+struct ConnectionsSignInServiceWordsTests {
+    private func says(_ status: Int, _ code: String, _ message: String = "raw") -> String {
+        ConnSay.plain(CoreError.http(status: status, code: code, message: message))
+    }
+
+    @Test func serviceDownIsOneSentence() {
+        #expect(says(502, "signin_service") == "Ainkrad's sign-in service can't be reached. Try again in a minute.")
+    }
+
+    @Test func aForeignInstallSaysSo() {
+        #expect(says(403, "installation_not_yours") == "This GitHub install isn't yours.")
+    }
+
+    @Test func noGitHubSignInIsNotTheDefaultRefusal() {
+        #expect(says(409, "github_sign_in_needed") == "Sign in to GitHub first.")
+        #expect(says(409, "conflict", "sign in to GitHub first").contains("default"))  // text alone no longer matches
+        #expect(says(409, "conflict").contains("default"))  // an ordinary 409 keeps its words
+    }
+
+    @Test func installFailureSaysFirstOrAgain() {
+        let e = CoreError.http(status: 409, code: "github_sign_in_needed", message: "")
+        guard case .failed(let a, _) = ConnSay.installFailure(e, hasGitHub: true),
+            case .failed(let b, _) = ConnSay.installFailure(e, hasGitHub: false)
+        else {
+            Issue.record("not a failure")
+            return
+        }
+        #expect(a == "Sign in to GitHub again.")
+        #expect(b == "Sign in to GitHub first.")
+    }
+
+    @Test func aFlowThatFailedAtTheServiceOrTheInstallIsPlain() {
+        func title(_ code: String) -> String? {
+            let f = LiveConnectionsService.flow(
+                .init(errorCode: code, expiresInSecs: 0, id: "f", kind: "jira", sites: [], step: "failed"),
+                install: nil)
+            if case .failed(let t, _) = f.step { return t }
+            return nil
+        }
+        #expect(title("signin_service") == ConnSay.serviceDown)
+        #expect(title("installation_not_yours") == ConnSay.notYours)
+        #expect(title("bad_user_token") == ConnSay.signInAgain)
     }
 }
