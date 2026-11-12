@@ -23,6 +23,10 @@ public final class SyncModel {
     /// The last sync's answer, shown under Sync now.
     public private(set) var outcome: SyncResultWire?
     public private(set) var syncing = false
+    /// While syncing: which source is being read, as "n of total".
+    public private(set) var syncAt = 0
+    public private(set) var syncTotal = 0
+    public private(set) var syncSource: String?
     public internal(set) var notice: String?
     @ObservationIgnored private var timer: Task<Void, Never>?
 
@@ -83,9 +87,15 @@ public final class SyncModel {
         guard !syncing else { return nil }
         syncing = true
         notice = nil
-        defer { syncing = false }
+        outcome = nil
+        defer {
+            syncing = false
+            syncSource = nil
+        }
         do {
             try await collectLocal()
+            syncSource = SyncWords.coreSource
+            syncAt = max(syncTotal - 1, 0)
             let r = try await service.syncNow()
             outcome = r
             await reload()
@@ -99,10 +109,18 @@ public final class SyncModel {
 
     /// Every enabled, registered Mac collector once. The first failure stops the sync and is shown.
     func collectLocal() async throws {
+        syncTotal = 1
+        syncAt = 0
         guard let routes = service.importRoutes else { return }
         let rows = try await service.sources()
-        for src in sourceList() where src.incremental {
-            guard let row = rows.first(where: { $0.id == Self.sourceID(src.id) }), row.enabled else { continue }
+        let local = sourceList().filter { s in
+            s.incremental && rows.contains { $0.id == Self.sourceID(s.id) && $0.enabled }
+        }
+        syncTotal = local.count + 1
+        for (i, src) in local.enumerated() {
+            guard let row = rows.first(where: { $0.id == Self.sourceID(src.id) }) else { continue }
+            syncAt = i
+            syncSource = SyncWords.title(src.id, sourceList())
             let since = row.cursor.date
             let began = now()
             guard await src.newCount(since: since) > 0 else { continue }
@@ -142,6 +160,32 @@ public final class SyncModel {
             let row = SourceWire(id: id, device: deviceName, kind: s.id)
             _ = try? await service.putSource(row, enabled: true, cursor: SourceCursor(date: since))
         }
+    }
+
+    // MARK: what the page shows
+
+    /// Puts the sync result away.
+    public func dismissOutcome() { outcome = nil }
+
+    /// The newest run of any source, as the Core reported it.
+    public var lastSync: Date? {
+        (status?.sources ?? []).compactMap { SyncWords.date($0.lastRun) }.max()
+    }
+
+    /// The one line over the room list: a sync running, its result, or imports waiting for review.
+    public var banner: SyncBanner {
+        if syncing { return .syncing(source: syncSource, at: syncAt, total: syncTotal) }
+        if let r = outcome {
+            let review = r.unsorted + r.newRooms
+            if r.idle == "nothing_new" || (r.idle == nil && r.stored == 0 && review == 0) {
+                let n = status?.sources.count ?? sources.count
+                return .nothingNew(sources: n, nextMinutes: max((status?.everySecs ?? 3600) / 60, 1))
+            }
+            if r.idle != nil { return .message(r.summary()) }
+            return .synced(
+                new: r.stored, went: r.routed.reduce(0) { $0 + $1.sources }, rooms: r.routed.count, review: review)
+        }
+        return review.isEmpty ? .none : .waiting(review.count)
     }
 
     // MARK: timer

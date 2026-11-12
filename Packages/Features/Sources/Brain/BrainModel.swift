@@ -86,6 +86,16 @@ public final class BrainModel {
     public var canMakeRooms: Bool { isSample }
     /// The tab bar: only where the Brain has rooms to look at.
     public var tabsVisible: Bool { load != .unavailable && setup == .ready }
+    /// A real Core serves rooms and sources; Overview, Inbox, Activity and Checks are on the sample only for now.
+    public var visibleTabs: [BrainTab] { isSample ? BrainTab.allCases : [.rooms, .sources] }
+    /// The tab on screen: the chosen one, or the first this Core has.
+    public var currentTab: BrainTab { visibleTabs.contains(tab) ? tab : visibleTabs[0] }
+
+    /// The time under a room's count: when this Mac last synced, else what the room itself says.
+    public func lastSyncLabel(_ r: RoomSummary) -> String? {
+        if let d = sync?.lastSync { return SyncWords.ago(d) }
+        return r.counts?.lastSync
+    }
 
     // MARK: derived
 

@@ -13,8 +13,10 @@ struct BrainPane: View {
             AppHeader {
                 // No service attached: nothing to look at, so no tabs over the unavailable card.
                 if model.tabsVisible {
-                    ForEach(Array(BrainTab.allCases.enumerated()), id: \.offset) { i, t in
-                        AppFilterTile(title: t.title, count: model.tabCount(t), on: model.tab == t, key: "⌘\(i + 1)") {
+                    ForEach(Array(model.visibleTabs.enumerated()), id: \.offset) { i, t in
+                        AppFilterTile(
+                            title: t.title, count: model.tabCount(t), on: model.currentTab == t, key: "⌘\(i + 1)"
+                        ) {
                             go(t)
                         }
                         .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
@@ -22,66 +24,92 @@ struct BrainPane: View {
                     }
                 }
             } actions: {
-                if model.service?.importRoutes != nil, model.setup == .ready, model.load == .ready {
-                    AppActionTile(
-                        title: "How it works", symbol: "questionmark.circle", key: "", hue: GlassInk.slate
-                    ) {
-                        BrainHowItWorks.open(model.host.shell)
-                    }
-                    AppActionTile(
-                        title: "Import", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.blue,
-                        prominent: true
-                    ) {
-                        model.openImport()
-                    }
-                    .keyboardShortcut("i", modifiers: .command)
-                }
-                if model.tab == .rooms, model.load == .ready, model.canMakeRooms {
-                    AppActionTile(
-                        title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
-                    ) {
-                        BrainSheets.openNewRoom(model)
-                    }
-                    .keyboardShortcut("n", modifiers: [.command, .option])
-                    AppActionTile(title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
-                        Task { await model.quickRoom() }
-                    }
-                    .keyboardShortcut("n", modifiers: .command)
-                }
+                actions
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s4) {
-                    if model.load == .ready, !model.rooms.isEmpty, showsRoomBar { RoomBar(model: model) }
+            .background { importKey }
+            if model.load == .ready, model.setup == .ready, !model.rooms.isEmpty, let sync = model.sync,
+                model.currentTab == .rooms || model.currentTab == .sources
+            {
+                SyncBannerView(brain: model, sync: sync)
+                    .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
+            }
+            if model.currentTab == .rooms, model.load == .ready, model.setup == .ready, !model.rooms.isEmpty {
+                // The Rooms page fills the pane: its list and its room each scroll on their own.
+                VStack(alignment: .leading, spacing: Space.s3) {
                     if let n = model.notice { notice(n) }
-                    content
+                    BrainConditions(model: model)
+                    RoomsTab(model: model)
                 }
                 .coreFont(size: MacTextSize.body)
                 .foregroundStyle(GlassInk.primary)
-                .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .transition(.opacity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.s4) {
+                        if model.load == .ready, !model.rooms.isEmpty, showsRoomBar { RoomBar(model: model) }
+                        if let n = model.notice { notice(n) }
+                        content
+                    }
+                    .coreFont(size: MacTextSize.body)
+                    .foregroundStyle(GlassInk.primary)
+                    .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if model.isSample { footer }
             }
-            .focusable().focused($paneFocus).focusEffectDisabled()
-            .onAppear { paneFocus = true }
-            .retakeFocus(after: model.host.shell, pane: "brain") { paneFocus = true }
-            .onKeyPress(.escape) {
-                guard model.inspectingID != nil else { return .ignored }
-                withAnimation(.smooth(duration: 0.25)) { model.closeInspect() }
-                return .handled
-            }
-            footer
         }
+        .focusable().focused($paneFocus).focusEffectDisabled()
+        .onAppear { paneFocus = true }
+        .retakeFocus(after: model.host.shell, pane: "brain") { paneFocus = true }
         .paneLook(BrainPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("brain-pane")
     }
 
+    /// Rooms and Sources: when this Mac last synced and Sync now. Before the first rooms: Import.
+    @ViewBuilder private var actions: some View {
+        let ready = model.setup == .ready && model.load == .ready
+        if ready, !model.rooms.isEmpty, let sync = model.sync,
+            model.currentTab == .rooms || model.currentTab == .sources
+        {
+            SyncNowTile(sync: sync)
+        } else if model.service?.importRoutes != nil, model.load == .ready, model.setup != .ready || model.rooms.isEmpty
+        {
+            AppActionTile(title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.blue) {
+                model.openImport()
+            }
+        }
+        if model.currentTab == .rooms, model.load == .ready, model.canMakeRooms {
+            AppActionTile(
+                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+            ) {
+                BrainSheets.openNewRoom(model)
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option])
+            AppActionTile(title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                Task { await model.quickRoom() }
+            }
+            .keyboardShortcut("n", modifiers: .command)
+        }
+    }
+
+    /// ⌘I opens Import from every tab, also where the header shows Sync now instead of the Import tile.
+    private var importKey: some View {
+        Button("Import into the Brain") { model.openImport() }
+            .keyboardShortcut("i", modifiers: .command)
+            .disabled(model.service?.importRoutes == nil)
+            .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+    }
+
     /// Rooms, Inbox (but not the no-room list) and Activity look at one room. Overview and Checks are global.
     private var showsRoomBar: Bool {
-        switch model.tab {
-        case .rooms, .activity: true
+        switch model.currentTab {
+        case .activity: true
         case .inbox: model.inboxState.list != .noRoom
-        case .overview, .checks: false
+        case .overview, .checks, .rooms, .sources: false
         }
     }
 
@@ -124,9 +152,10 @@ struct BrainPane: View {
         case .ready:
             BrainConditions(model: model)
             Group {
-                switch model.tab {
-                case .overview: if model.isSample { OverviewTab(model: model) } else { CoreOverviewTab(model: model) }
+                switch model.currentTab {
+                case .overview: OverviewTab(model: model)
                 case .rooms: RoomsTab(model: model)
+                case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
                 case .inbox: if model.isSample { InboxTab(model: model) } else { BrainComingLater(title: "The Inbox") }
                 case .activity:
                     if model.isSample { ActivityTab(model: model) } else { BrainComingLater(title: "Activity") }
@@ -170,9 +199,6 @@ struct BrainPane: View {
                 AppStatChip("testtube.2", BrainWords.sampleLabel, GlassInk.slate)
             }
             Spacer(minLength: 0)
-            if model.tab == .rooms, model.inspectingID != nil {
-                Text("Esc back to all rooms").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            }
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3).frame(minHeight: MacSize.controlSm)
     }
@@ -184,8 +210,6 @@ struct RoomBar: View {
     var body: some View {
         let r = model.viewing
         HStack(spacing: Space.s3) {
-            Image(systemName: r?.lock == nil ? "lock.open" : "lock").foregroundStyle(GlassInk.secondary)
-                .accessibilityHidden(true)
             CoreSelect(
                 nil, selection: Binding(get: { model.viewingID ?? "" }, set: { model.view($0) }),
                 options: model.rooms.map {
@@ -195,13 +219,12 @@ struct RoomBar: View {
             )
             .frame(width: Space.s8 * 7)
             if let r {
-                BrainChip(
-                    r.lock == nil ? "Open" : r.lock == .expired ? "Key ended" : "Sealed",
-                    r.lock == nil ? GlassInk.green : GlassInk.slate)
-                RoomChips(room: r)
-                Text(r.lock == nil ? BrainWords.keyRenews(r.lease.left) : "Nothing from it is on screen.")
-                    .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
-                    .lineLimit(1).help(r.lock == nil ? BrainWords.leaseHelp : "")
+                if r.lock == nil {
+                    StateBadge("Open", tone: .done, symbol: "lock.open")
+                        .help("\(BrainWords.keyRenews(r.lease.left)). \(BrainWords.leaseHelp)")
+                } else {
+                    StateBadge(r.lock == .expired ? "Key ended" : "Sealed", tone: .queue, symbol: "lock")
+                }
             }
             Spacer(minLength: Space.s2)
             if let r {
