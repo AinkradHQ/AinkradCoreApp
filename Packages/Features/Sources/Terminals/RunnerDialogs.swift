@@ -19,23 +19,13 @@ struct RenameRunnerDialog: View {
     private var valid: Bool { !clean.isEmpty && clean.count <= 64 }
 
     var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 11) {
-            Text("Rename \(runner.name)").coreFont(size: MacTextSize.large + 2, weight: .bold)
-                .accessibilityAddTraits(.isHeader)
-            Text("A name of 1 to 64 characters. It shows in the Runners list and where you pick a machine.")
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            TextField("Name", text: $name).textFieldStyle(.roundedBorder).onSubmit(save)
-            if let error {
-                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.amberInk)
-                    .coreFont(size: MacTextSize.meta)
-            }
-            HStack(spacing: Space.s2) {
-                Button("Cancel") { model.shell.closeDialog() }
-                    .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-                Spacer(minLength: Space.s2)
-                Button("Rename", action: save)
-                    .buttonStyle(CoreButtonStyle(.prominent)).disabled(!valid || busy || clean == runner.name)
-            }
+        CoreDialogPanel("Rename \(runner.name)", width: Space.s8 * 12) {
+            CoreTextField(
+                "Name", placeholder: "1 to 64 characters", text: $name, error: error, autofocus: true, onSubmit: save)
+            CoreDialogFooter(
+                cancel: CoreAction("Cancel", key: .cancel) { model.shell.closeDialog() },
+                primary: CoreAction("Rename", key: .primary, run: save),
+                busy: busy, enabled: valid && clean != runner.name)
         }
     }
 
@@ -50,7 +40,8 @@ struct RenameRunnerDialog: View {
     }
 }
 
-/// Revoke a runner: what stops, that it must pair again, and Touch ID on the button.
+/// Revoke a runner (n18-n19 revoke): what stops, that it must pair again, the runner in a well, and Touch ID on the
+/// button. The red button has no Return key, so Return is never a trap.
 struct RevokeRunnerDialog: View {
     let model: TerminalsModel
     let runner: RunnerItem
@@ -58,42 +49,35 @@ struct RevokeRunnerDialog: View {
     let terminals: Int
     @State private var error: String?
     @State private var busy = false
+    @Environment(\.corePalette) private var palette
+
+    private var lead: AttributedString {
+        var stops = AttributedString(RunnerFacts.stops(agents: agents, terminals: terminals))
+        stops.inlinePresentationIntent = .stronglyEmphasized
+        stops.foregroundColor = palette.text
+        return AttributedString("Work running on \(runner.name) stops: ") + stops
+            + AttributedString(". The runner must pair again to come back.")
+    }
 
     var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 13) {
-            Text("Revoke \(runner.name)?").coreFont(size: MacTextSize.large + 2, weight: .bold)
-                .accessibilityAddTraits(.isHeader)
-            Text(
-                "Work running on \(runner.name) stops: \(RunnerFacts.stops(agents: agents, terminals: terminals)). The runner must pair again to come back. Revoking cannot be undone."
-            )
-            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+        CoreDialogPanel("Revoke \(runner.name)?", width: Space.s8 * 15) {
+            Text(lead).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Space.s3) {
-                Image(systemName: "server.rack").foregroundStyle(GlassInk.blue).accessibilityHidden(true)
+                IconTile(
+                    model.host.thisMacRunnerID == runner.id ? "laptopcomputer" : "server.rack", hue: GlassInk.slate,
+                    size: Space.s8 - Space.s1)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(runner.name).coreFont(size: MacTextSize.body, weight: .semibold)
-                    Text(TerminalsModel.spec(runner)).coreFont(size: MacTextSize.meta).foregroundStyle(
-                        GlassInk.secondary)
+                    Text(TerminalsModel.spec(runner)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.control + 2))
+            .padding(Space.s3).coreWell(radius: Radius.control)
             if let n = model.host.elevationNotice { ElevationBanner(notice: n) }
-            if let error {
-                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.amberInk)
-                    .coreFont(size: MacTextSize.meta)
-            }
-            HStack(spacing: Space.s2) {
-                Button("Cancel") { model.shell.closeDialog() }
-                    .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-                Spacer(minLength: Space.s2)
-                // Destructive confirms are secondary, never prominent, so Return is not a trap.
-                Button {
-                    revoke()
-                } label: {
-                    Label("Revoke with Touch ID", systemImage: "touchid")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary)).disabled(busy)
-            }
+            if let error { CoreFieldError(error) }
+            CoreDialogFooter(
+                cancel: CoreAction("Cancel", key: .cancel) { model.shell.closeDialog() },
+                primary: CoreAction("Revoke with Touch ID", run: revoke), danger: true, busy: busy)
         }
     }
 

@@ -10,6 +10,7 @@ struct FileDrop: View {
     let prompt: String
     @Binding var error: String?
     @State private var over = false
+    @State private var hovering = false
     @Environment(\.corePalette) private var palette
 
     var body: some View {
@@ -28,13 +29,12 @@ struct FileDrop: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3)
-            .background(over ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(over ? GlassInk.blue : GlassInk.wellEdge, lineWidth: 1)
-            }
+            .coreWell(active: over || hovering)
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering || over)
         .onDrop(of: [.fileURL], isTargeted: $over) { providers in
             guard let p = providers.first else { return false }
             _ = p.loadObject(ofClass: URL.self) { url, _ in
@@ -81,28 +81,13 @@ struct GroupDialog: View {
         let model = admin.secrets!
         CoreDialogPanel(existing.map { "Edit \($0.name)" } ?? "New group", width: Space.s8 * 16) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("A group keeps related secrets together. Its runners can use all of them, in one step.")
-                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 if existing == nil {
                     CoreTextField("Name", placeholder: "e.g. aws-production", text: $name, autofocus: true)
                 }
                 CoreTextField("What is it for?", placeholder: "e.g. Keys for the production account", text: $about)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Runners that may use it")
-                    HStack(spacing: Space.s2) {
-                        ForEach(model.runners) { r in
-                            let on = runners.contains(r.id)
-                            Button {
-                                if on { runners.remove(r.id) } else { runners.insert(r.id) }
-                            } label: {
-                                Label(r.name, systemImage: on ? "checkmark" : "server.rack")
-                                    .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
-                                    .background(
-                                        on ? GlassInk.blue.opacity(0.2) : GlassInk.wellHover, in: coreShape(7))
-                            }
-                            .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
-                        }
-                    }
+                    RunnerPicks(runners: model.runners, picked: $runners)
                 }
                 if let issue { IssueLine(code: nil, text: issue) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
@@ -164,5 +149,27 @@ struct DeleteGroupDialog: View {
             }
         }
         .accessibilityIdentifier("secret-group-delete")
+    }
+}
+
+/// Which runners may use a secret or a group: one checkbox per runner, offline ones say so.
+struct RunnerPicks: View {
+    let runners: [RunnerChoice]
+    @Binding var picked: Set<String>
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        if runners.isEmpty {
+            Text("No runners yet.").foregroundStyle(palette.text2)
+        }
+        VStack(alignment: .leading, spacing: Space.s2) {
+            ForEach(runners) { r in
+                CoreCheckbox(
+                    r.name, detail: r.online ? nil : "Offline right now",
+                    isOn: Binding(
+                        get: { picked.contains(r.id) },
+                        set: { on in if on { picked.insert(r.id) } else { picked.remove(r.id) } }))
+            }
+        }
     }
 }

@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// The Brain, in the shape of every other Core app: tab tiles and action tiles in one header, the open-room bar under it,
-/// the tab below, and a quiet footer. Overview and Checks are global; the room picker sits inside Rooms, Inbox and Activity,
+/// the tab below. Overview and Checks are global; the room picker sits inside Rooms, Inbox and Activity,
 /// the tabs that look at one room. The keyboard drives it: ⌘1 to ⌘5 tabs, ⌘N a new room, ⌥⌘N the advanced sheet, Esc back.
 struct BrainPane: View {
     let model: BrainModel
@@ -57,7 +57,6 @@ struct BrainPane: View {
                     .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if model.isSample { footer }
             }
         }
         .focusable().focused($paneFocus).focusEffectDisabled()
@@ -74,6 +73,11 @@ struct BrainPane: View {
 
     /// Inbox, Rooms and Sources: when this Mac last synced and Sync now. Before the first rooms: Import.
     @ViewBuilder private var actions: some View {
+        // In the header, never over the page: a footer chip sat on the last card of a long tab.
+        if model.isSample {
+            AppStatChip("testtube.2", "Sample data", GlassInk.slate).help(BrainWords.sampleLabel)
+                .accessibilityLabel(BrainWords.sampleLabel)
+        }
         let ready = model.setup == .ready && model.load == .ready
         if ready, !model.rooms.isEmpty, let sync = model.sync,
             model.currentTab == .rooms || model.currentTab == .sources || (model.currentTab == .inbox && servesInbox)
@@ -194,16 +198,6 @@ struct BrainPane: View {
                 .accessibilityIdentifier("brain-not-set-up")
             }
         }
-    }
-
-    @ViewBuilder private var footer: some View {
-        HStack(spacing: Space.s3) {
-            if model.isSample {
-                AppStatChip("testtube.2", BrainWords.sampleLabel, GlassInk.slate)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Space.s4).padding(.bottom, Space.s3).frame(minHeight: MacSize.controlSm)
     }
 }
 

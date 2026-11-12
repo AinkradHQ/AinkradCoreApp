@@ -17,9 +17,10 @@ public final class BrainDemo {
         "checks-offline",
         "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
         "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
-        "inbox-offline", "loading", "inbox-noroom-selected", "worst-overview", "worst-rooms", "worst-inbox",
         // The Brain M3 states of brain-m3.html, in the mockup's order.
         "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
+        "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
+        "import", "import-review",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -90,6 +91,9 @@ public final class BrainDemo {
             s.noLocalModel = scene == "m3-queued" || scene == "m3-room-queued"
             s.autoAccept = scene == "m3-local"
         }
+        // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
+        s.imports = true
+        model.importSources = { SampleImportSource.all }
         if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))
             await model.reload()
@@ -100,6 +104,7 @@ public final class BrainDemo {
         }
         switch scene {
         case "rooms": model.show(.rooms)
+        case "sources": model.show(.sources)
         case "room":
             model.show(.rooms)
             await model.inspect("workan-space")
@@ -152,6 +157,12 @@ public final class BrainDemo {
         case "worst-overview": model.show(.overview)
         case "worst-rooms": model.show(.rooms)
         case "worst-inbox": await inbox(.noRoom)
+        case "import":
+            model.show(.rooms)
+            model.openImport()
+        case "import-review":
+            model.show(.rooms)
+            await model.openReview(SampleImportTransport.run)
         default: model.show(.overview)
         }
     }

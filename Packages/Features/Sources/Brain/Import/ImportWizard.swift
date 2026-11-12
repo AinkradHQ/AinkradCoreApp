@@ -9,7 +9,9 @@ extension BrainModel {
     public func openReview(_ run: String) async {
         guard let routes = service?.importRoutes else { return }
         if importer == nil || importer?.step == .done {
-            importer = ImportModel(host: host, routes: routes, sources: importSources(), resume: .standard())
+            importer = ImportModel(
+                host: host, routes: routes, sources: importSources(),
+                resume: service?.isSample == true ? nil : .standard())
             importer?.service = service
         }
         guard let importer, await importer.reviewExisting(run) else {
@@ -32,7 +34,9 @@ extension BrainModel {
     public func openImport() {
         guard let routes = service?.importRoutes, setup == .ready || setup == .notSetUp else { return }
         if importer == nil || importer?.step == .done {
-            importer = ImportModel(host: host, routes: routes, sources: importSources(), resume: .standard())
+            importer = ImportModel(
+                host: host, routes: routes, sources: importSources(),
+                resume: service?.isSample == true ? nil : .standard())
             importer?.service = service
         }
         guard let importer else { return }

@@ -35,11 +35,44 @@ extension SampleBrainService {
         ]
     }
 
+    public func latest(room: String) async throws -> [LatestItem] {
+        [
+            LatestItem(
+                itemID: "l1", type: "decision", sourceKind: "claude_code",
+                title: "Sample: run the queue migration before the runner rewrite", startedAt: "2026-11-11T10:00:00Z"),
+            LatestItem(
+                itemID: "l2", type: "rule", sourceKind: "codex",
+                title: "Sample: change the webhook addresses last", startedAt: "2026-11-09T10:00:00Z"),
+            LatestItem(
+                itemID: "l3", type: "fact", sourceKind: "opencode",
+                title: "Sample: everything is kept encrypted with one brain key", startedAt: "2026-11-06T10:00:00Z"),
+            LatestItem(
+                itemID: "l4", type: "task", sourceKind: "claude_code",
+                title: "Sample: decide which providers may read the rooms", startedAt: "2026-11-05T10:00:00Z"),
+        ]
+    }
+
     public func rules() async throws -> [RuleWire] {
         [
             RuleWire(id: 1, pattern: "Old project", origin: "seed", locked: true, reason: "A refused project."),
-            RuleWire(id: 2, pattern: "**/.env", enabled: sampleRuleOn[2] ?? true, reason: "Secrets are never read."),
-        ]
+            RuleWire(id: 2, pattern: "**/.env", reason: "Secrets are never read."),
+            // Rules that name a room show on that room's page.
+            RuleWire(
+                id: 3, pattern: "~/Projects/Ainkrad/**", action: "route", reason: "File new items here automatically",
+                room: "ainkrad"),
+            RuleWire(id: 4, pattern: "**/scratch/**", reason: "Leave scratch folders out", room: "ainkrad"),
+            RuleWire(
+                id: 5, pattern: "*.pem, *.key", origin: "seed", locked: true, reason: "Keys are never read",
+                room: "ainkrad"),
+            RuleWire(
+                id: 6, pattern: "~/Projects/Workan/**", action: "route", reason: "File new items here automatically",
+                room: "workan-space"),
+            RuleWire(id: 7, pattern: "**/contracts/**", reason: "Contracts are never read", room: "workan-space"),
+        ].map {
+            var r = $0
+            if !r.locked { r.enabled = sampleRuleOn[r.id] ?? true }
+            return r
+        }
     }
 
     public func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire {

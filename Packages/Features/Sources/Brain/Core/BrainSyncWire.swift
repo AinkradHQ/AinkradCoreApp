@@ -222,6 +222,29 @@ public struct SnippetPiece: Sendable, Equatable {
 
 struct SearchWire: Codable { var hits: [SearchHit] }
 
+/// One of a room's newest items, for the room's "Latest" list. `type` is a `MemoryType` raw value.
+public struct LatestItem: Codable, Sendable, Equatable, Identifiable {
+    public var itemID: String
+    public var type: String
+    public var sourceKind: String
+    public var title: String
+    public var startedAt: String
+    public var id: String { itemID }
+    enum CodingKeys: String, CodingKey {
+        case type, title
+        case itemID = "item_id"
+        case sourceKind = "source_kind"
+        case startedAt = "started_at"
+    }
+    public init(itemID: String, type: String, sourceKind: String, title: String, startedAt: String = "") {
+        self.itemID = itemID
+        self.type = type
+        self.sourceKind = sourceKind
+        self.title = title
+        self.startedAt = startedAt
+    }
+}
+
 /// A rule as `GET /rules` lists it. Locked rules (the refused projects) cannot be switched.
 public struct RuleWire: Codable, Sendable, Equatable, Identifiable {
     public var id: Int

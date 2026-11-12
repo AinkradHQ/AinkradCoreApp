@@ -29,6 +29,8 @@ public actor SampleBrainService: BrainService {
         public var noLocalModel = false
         /// M3: workan-space accepts its facts and open threads without a review.
         public var autoAccept = false
+        /// The Import wizard opens, on an invented Core (`SampleImportTransport`).
+        public var imports = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
@@ -48,6 +50,7 @@ public actor SampleBrainService: BrainService {
     }
 
     public nonisolated let isSample = true
+    public nonisolated let importRoutes: BrainRoutes?
     var scenario: Scenario
     private var list: [RoomSummary]
     private var pausedRooms = ["automotive-ai", "optimus"]
@@ -68,6 +71,7 @@ public actor SampleBrainService: BrainService {
         self.scenario = scenario
         self.list = scenario.empty ? [] : scenario.m3 ? SampleM3.rooms : Self.world(worst: scenario.worst)
         self.m3 = SampleM3(scenario)
+        self.importRoutes = scenario.imports ? BrainRoutes(transport: SampleImportTransport()) : nil
         self.pace = pace
         self.checkList = Self.initialChecks(scenario)
         self.box = SampleInbox(empty: scenario.empty || scenario.emptyInbox)

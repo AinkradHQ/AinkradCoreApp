@@ -22,7 +22,7 @@ struct SourcesTab: View {
         let mac = lines.compactMap(\.source).filter { !$0.isConnection && !$0.isRunner && !$0.isCore }
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s4) {
-                Text("Source").padding(.leading, Space.s8 + Space.s5)
+                Text("Source").padding(.leading, Space.s8 * 2)  // the switch slot (48) + the row gap (16)
                 Spacer(minLength: Space.s3)
                 Text("Items").frame(width: Space.s8 * 3.5, alignment: .trailing)
                 Text("Last run").frame(width: Space.s8 * 4.5, alignment: .trailing)
@@ -107,12 +107,12 @@ struct SourcesTab: View {
     private func row(_ l: Line) -> some View {
         HStack(spacing: Space.s4) {
             if let s = l.source {
-                CoreSwitch(
-                    l.title, isOn: Binding(get: { s.enabled }, set: { on in Task { await sync.toggle(s, on: on) } })
-                )
-                .fixedSize(horizontal: false, vertical: true).frame(width: Space.s8 + Space.s1, alignment: .leading)
+                CoreSwitch(isOn: Binding(get: { s.enabled }, set: { on in Task { await sync.toggle(s, on: on) } }))
+                    .accessibilityLabel(l.title)
+                    // The switch keeps its own width: in a narrower slot it ran into the source's name.
+                    .fixedSize().frame(width: Space.s8 + Space.s4, alignment: .leading)
             } else {
-                Color.clear.frame(width: Space.s8 + Space.s1, height: 1)
+                Color.clear.frame(width: Space.s8 + Space.s4, height: 1)
             }
             Text(l.title).foregroundStyle(l.source == nil ? GlassInk.secondary : GlassInk.primary).lineLimit(1)
             Spacer(minLength: Space.s3)

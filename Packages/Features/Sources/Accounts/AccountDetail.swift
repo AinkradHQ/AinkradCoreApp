@@ -99,19 +99,10 @@ struct AccountDetailView: View {
 
     /// One refusal no longer turns an account off: Core tests the key again and only a second refusal does.
     private var confirming: some View {
-        HStack(spacing: Space.s3) {
-            Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(GlassInk.amberInk)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("The provider refused this key once").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("Core is checking it again. If it's refused again, the account turns off by itself.")
-                    .foregroundStyle(GlassInk.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(Space.s3)
-        .background(GlassInk.amber.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.4), lineWidth: 1) }
+        CoreNotice(
+            symbol: "key.slash", title: "The provider refused this key once",
+            text: "Core is checking it again. If it's refused again, the account turns off by itself.", tone: .warn
+        )
         .transition(.opacity)
     }
 
@@ -127,11 +118,9 @@ struct AccountDetailView: View {
             : verdict.line(a, limits: model.limits(of: a), budgets: model.budgets, now: model.now())
         return HStack(spacing: Space.s4) {
             Image(systemName: verdict.usable ? "checkmark.seal.fill" : verdict.symbol)
-                .font(.system(size: 24, weight: .semibold)).foregroundStyle(tone.ink)
-                .frame(width: 52, height: 52)
-                .background(GlassInk.well, in: coreShape(Radius.cardMac))
+                .coreFont(size: MacTextSize.large, weight: .semibold).foregroundStyle(tone.ink)
                 .contentTransition(.symbolEffect(.replace))
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Space.s1) {
                 Text(title).coreFont(size: MacTextSize.title, weight: .bold).foregroundStyle(tone.ink)
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -143,17 +132,14 @@ struct AccountDetailView: View {
                 }
             }
             if verdict.kind == .noPool {
-                AppActionTile(
-                    title: "Add to a pool", symbol: "square.grid.2x2", key: "P", hue: GlassInk.blue, prominent: true
-                ) {
-                    addToPool(a)
-                }
-                .disabled(model.readOnly)
+                Button("Add to a pool") { addToPool(a) }
+                    .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                    .keyboardShortcut("p", modifiers: [])
+                    .disabled(model.readOnly)
             }
         }
         .padding(Space.s4)
-        .background(tone.fill.opacity(0.12), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(tone.ink.opacity(0.4), lineWidth: 1) }
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-verdict")
     }
@@ -173,17 +159,14 @@ struct AccountDetailView: View {
         }
     }
 
-    /// Key saved → Turned on → In a pool: each step lit once it holds.
+    /// Key saved, Turned on, In a pool: a quiet line, each word ticked once it holds (no chips, no connector).
     private func path(on: Bool, inPool: Bool, hue: Color) -> some View {
-        HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             ForEach(Array([("Key saved", true), ("Turned on", on), ("In a pool", inPool)].enumerated()), id: \.offset) {
-                i, s in
-                if i > 0 { coreShape(1).fill(s.1 ? hue : GlassInk.track).frame(width: 14, height: 2) }
-                Label(s.0, systemImage: s.1 ? "checkmark" : "circle.dashed")
-                    .coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(s.1 ? .white : GlassInk.secondary)
-                    .padding(.horizontal, 8).frame(height: 24)
-                    .background(s.1 ? hue.opacity(0.6) : GlassInk.well, in: coreShape(6))
+                _, s in
+                Label(s.0, systemImage: s.1 ? "checkmark" : "minus")
+                    .coreFont(size: MacTextSize.meta, weight: s.1 ? .medium : .regular)
+                    .foregroundStyle(s.1 ? GlassInk.primary : GlassInk.secondary)
             }
         }
         .fixedSize()

@@ -181,7 +181,7 @@ public final class BrainModel {
             if let sync, sync.status == nil {
                 await sync.reload()
                 // Real Cores only: the sample has no Mac collectors to run.
-                if service.importRoutes != nil { sync.startTimer() }
+                if service.importRoutes != nil, !service.isSample { sync.startTimer() }
             }
             if service.servesCandidates { await candidates.load(quiet: true) }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }

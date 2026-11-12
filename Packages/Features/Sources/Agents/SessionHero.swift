@@ -1,9 +1,9 @@
 import CoreUI
 import SwiftUI
 
-/// The top of a session pane (N33, variant B): one line of about 56 pt with the harness tile, the title, the state and the
-/// actions, and under it a details strip that the Details button shows or hides (remembered on this Mac). The strip holds
-/// what used to fill the header: runner, account, order, tokens, cost, wakes, the key note and the spend chart.
+/// The top of a conversation (ui-fixes ai-session-conversation): one line with a flat blue tile, a 15 pt title, one state
+/// badge and the actions. Below 1300 pt, where there is no side panel, the Details button (test-fixes decision 1, variant B)
+/// shows or hides a strip of runner, account, order, tokens and cost under it, remembered on this Mac.
 struct SessionHero: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
@@ -11,32 +11,35 @@ struct SessionHero: View {
     var panel = false
     @AppStorage("agents.detailsStrip") private var showDetails = true
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let waiting = model.waiting(session.id)
         let st = AgentWords.status(session, waiting: waiting)
-        let hue = SessionTile.hue(session.harness)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
-                Image(systemName: AgentsModel.harnessSymbol(session.harness))
-                    .coreFont(size: 15, weight: .semibold).foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                        in: coreShape(8)
-                    )
+                // One flat blue tile for every AI session (no gradient, no per-tool hue).
+                Image(systemName: "bubble.left")
+                    .coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(palette.btnInk)
+                    .frame(width: MacSize.controlMd, height: MacSize.controlMd)
+                    .background(palette.btnPrimary, in: coreShape(Radius.control))
                     .accessibilityHidden(true)
-                Text(model.title(session)).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
+                Text(model.title(session)).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                     .truncationMode(.tail).help(model.title(session) + "\n" + session.id)
+                    .accessibilityAddTraits(.isHeader)
                 StateBadge(st.label, tone: st.tone, symbol: st.symbol).help(subtitle)
                 Spacer(minLength: Space.s3)
+                if empty {
+                    Button("Advanced…") { model.openNewSession(advanced: true) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Choose the tool, runner, folder or repo, model and account order")
+                }
                 if !panel { detailsButton }
                 actions
             }
-            .frame(minHeight: 40)
+            .frame(minHeight: MacSize.controlLg)
             if showDetails && !panel {
-                strip(hue: hue, tone: st.tone).transition(
-                    reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                strip(tone: st.tone).transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -Space.s2)))
             }
             if let stop = model.stopping[session.id], session.live {
                 Label(
@@ -46,34 +49,36 @@ struct SessionHero: View {
                     systemImage: "hourglass"
                 )
                 .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
-                .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                 .accessibilityIdentifier("session-stopping")
             }
         }
-        .foregroundStyle(GlassInk.primary)
-        .padding(.horizontal, Space.s4).padding(.vertical, Space.s2)
-        .padding([.horizontal, .top], Space.s1)
+        .foregroundStyle(palette.text)
+        .padding(.horizontal, Space.s4).padding(.top, Space.s3).padding(.bottom, Space.s2)
         .task(id: session.id) { await model.followLedger(session.id) }
         .task(id: session.id) { await model.followRoute(session.id) }
         .accessibilityElement(children: .contain)
     }
 
+    /// A session with nothing in it yet is the quick "New AI session" page: the header offers Advanced….
+    private var empty: Bool {
+        session.live && model.transcripts[session.id]?.entries.isEmpty == true
+            && model.transcripts[session.id]?.hasEarlier != true
+    }
+
+    /// Decision 1 (test-fixes, variant B): Details shows or hides the strip under the header; the choice is remembered.
     private var detailsButton: some View {
         Button {
-            if reduce { showDetails.toggle() } else { withAnimation(.smooth(duration: 0.3)) { showDetails.toggle() } }
+            withAnimation(reduce ? nil : Motion.out(Motion.ui)) { showDetails.toggle() }
         } label: {
-            Label("Details", systemImage: showDetails ? "info.circle.fill" : "info.circle")
-                .coreFont(size: MacTextSize.body, weight: .semibold)
-                .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
-                .background(showDetails ? GlassInk.blue.opacity(0.22) : GlassInk.well, in: coreShape(Radius.control))
-                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            Label("Details", systemImage: "info.square")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoreButtonStyle(showDetails ? .prominent : .secondary, size: .small))
         .help(showDetails ? "Hide the details under the header" : "Show the runner, account, tokens and cost")
+        .accessibilityValue(showDetails ? "Shown" : "Hidden")
         .accessibilityIdentifier("session-details")
     }
 
-    private func strip(hue: Color, tone: Tone) -> some View {
+    private func strip(tone: Tone) -> some View {
         let route = session.route
         var facts: [(String, String)] = [("Runner", model.runnerName(session.runner))]
         if let a = route?.account { facts.append(("Account", model.accountNames[a] ?? "an account")) }
@@ -90,26 +95,24 @@ struct SessionHero: View {
         if let w = session.resumes, w > 0 { facts.append(("Woke up", w == 1 ? "1 time" : "\(w) times")) }
         let burn = model.sessions.burn[session.id] ?? []
         return VStack(alignment: .leading, spacing: Space.s2) {
-            HStack(alignment: .top, spacing: Space.s5) {
+            HStack(alignment: .center, spacing: Space.s5) {
                 ForEach(Array(facts.enumerated()), id: \.offset) { _, f in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(f.0).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        Text(f.0).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         Text(f.1).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                             .truncationMode(.middle).monospacedDigit().help(f.1)
                     }
                 }
                 Spacer(minLength: Space.s3)
                 if burn.count >= 2 {
-                    CoreSpark(burn, tone: tone == .fail ? .fail : .run).frame(width: 140, height: 32)
+                    CoreSpark(burn, tone: tone == .fail ? .fail : .done).frame(width: Space.s8 * 4, height: Space.s8)
                         .help("Tokens used, as this Mac saw them change")
                 }
-                timer
             }
             if let l = model.ledgers[session.id] { SessionSpendStrip(session: session, ledger: l).transition(.opacity) }
         }
         .padding(Space.s3)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
     }
 
     /// What happened, in words: why it ended, or what it is doing.
@@ -138,61 +141,39 @@ struct SessionHero: View {
         }
     }
 
-    private var timer: some View {
-        Label {
-            if session.live {
-                Text(session.createdAt, style: .timer)
-            } else if let end = session.endedAt {
-                Text("ran \(AgentWords.clock(end.timeIntervalSince(session.createdAt))) · \(AgentWords.ago(end))")
-            }
-        } icon: {
-            Image(systemName: "clock")
-        }
-        .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.secondary).monospacedDigit()
-    }
-
-    /// A live session has one action: End session. A finished one has recovery only (Wake, Resume, Start again).
+    /// A live session has one action: End session, a quiet red outline. A finished one has recovery only: Wake (secondary)
+    /// and Start again (blue). A lost one has Resume in the notice above the transcript, so nothing here.
     @ViewBuilder private var actions: some View {
         HStack(spacing: Space.s2) {
             if session.live {
-                AppActionTile(title: "End session", symbol: "stop.fill", key: "", hue: GlassInk.red) {
-                    model.confirmEnd(session.id)
+                Button(action: { model.confirmEnd(session.id) }) {
+                    Label {
+                        Text("End session").foregroundStyle(palette.tone(.fail).ink)
+                    } icon: {
+                        Image(systemName: "stop").foregroundStyle(palette.tone(.fail).ink)
+                    }
                 }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 .disabled(model.stopping[session.id] != nil)
-                .help(
-                    "Ends the session: the CLI exits and the composer closes. The transcript stays. Esc stops only the current turn."
-                )
-            } else {
-                if case .succeeded? = session.outcome {
-                    AppActionTile(title: "Wake", symbol: "alarm", key: "W", hue: GlassInk.blue) {
-                        model.wake(session.id)
-                    }
-                    .help("Recovery: bring the process back on its runner, with the same conversation.")
-                }
+                .help("End the session: the CLI exits and the transcript stays. Esc stops only the current turn.")
+            } else if session.state != .lost {
                 if session.stoppedByBudget {
-                    AppActionTile(title: "Raise budget…", symbol: "arrow.up.circle", key: "", hue: GlassInk.blue) {
-                        model.raiseBudget(session)
-                    }
-                    .help("Open the budget that stopped this session, raise it, then resume")
-                    AppActionTile(title: "Open Accounts", symbol: "creditcard", key: "", hue: GlassInk.slate) {
-                        model.openAccounts()
-                    }
+                    Button("Raise budget…") { model.raiseBudget(session) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Open the budget that stopped this session, raise it, then resume")
+                    Button("Open Accounts") { model.openAccounts() }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
-                if session.state == .lost {
-                    AppActionTile(
-                        title: "Resume", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true
-                    ) {
-                        model.resume(session.id)
-                    }
-                    .help("Recovery: the runner lost it. Resume continues the conversation in the same folder.")
-                } else {
-                    AppActionTile(
-                        title: "Start again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue, prominent: true
-                    ) {
-                        model.startAgain(session.id)
-                    }
-                    .help("Start a new AI session with the same first message and runner. This one stays as it is.")
+                if case .succeeded? = session.outcome {
+                    Button(action: { model.wake(session.id) }) { Label("Wake", systemImage: "alarm") }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "W")
+                        .help("Bring the process back on its runner, with the same conversation (W)")
                 }
+                Button(action: { model.startAgain(session.id) }) {
+                    Label("Start again", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(CoreButtonStyle(.prominent, size: .small)).environment(\.coreKeycap, "R")
+                .help("Start a new AI session with the same first message and runner. This one stays as it is (R)")
             }
         }
     }

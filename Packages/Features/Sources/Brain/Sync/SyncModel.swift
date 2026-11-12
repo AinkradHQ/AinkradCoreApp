@@ -219,4 +219,9 @@ public final class SyncModel {
             return []
         }
     }
+
+    /// The room's newest items; none when the Core cannot say (the room still has its search).
+    public func latest(room: String) async -> [LatestItem] {
+        (try? await service.latest(room: room)) ?? []
+    }
 }

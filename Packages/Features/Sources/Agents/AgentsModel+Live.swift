@@ -159,9 +159,13 @@ extension AgentsModel {
         return order.compactMap { by[$0] }
     }
 
-    /// Cost of each turn, from the turn separators.
-    func turnCosts(_ id: String) -> [Int64] {
-        (transcripts[id]?.entries ?? []).compactMap { if case .turnEnded(let c, _) = $0.kind { c } else { nil } }
+    /// Cost of each turn with its number, from the turn separators. A turn without a cost keeps its number, so the
+    /// card's "Turn 2" is the transcript's "Turn 2 done".
+    func turnCosts(_ id: String) -> [(turn: Int, cost: Int64)] {
+        let costs = (transcripts[id]?.entries ?? []).compactMap { e -> Int64?? in
+            if case .turnEnded(let c, _) = e.kind { c } else { nil }
+        }
+        return costs.enumerated().compactMap { i, c in c.map { (i + 1, $0) } }
     }
 }
 

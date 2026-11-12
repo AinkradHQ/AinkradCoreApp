@@ -54,6 +54,8 @@ public protocol BrainService: Sendable {
     /// The Core's own sync (`POST /sync`); the Mac collectors are run by `SyncModel` first.
     func syncNow() async throws -> SyncResultWire
     func search(room: String, query: String) async throws -> [SearchHit]
+    /// A room's newest items, newest first. The Core has no route for it yet, so a real Core shows none.
+    func latest(room: String) async throws -> [LatestItem]
     func rules() async throws -> [RuleWire]
     /// The caller has already asked for Touch ID.
     func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire
@@ -95,6 +97,7 @@ extension BrainService {
     public func putSource(_ s: SourceWire, enabled: Bool?, cursor: SourceCursor?) async throws -> SourceWire { s }
     public func syncNow() async throws -> SyncResultWire { SyncResultWire() }
     public func search(room: String, query: String) async throws -> [SearchHit] { [] }
+    public func latest(room: String) async throws -> [LatestItem] { [] }
     public func rules() async throws -> [RuleWire] { [] }
     public func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire {
         throw BrainFailure("Rules come later.", code: "not_served")

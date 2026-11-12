@@ -134,6 +134,8 @@ public final class TerminalsDemo {
             Self.runner("linux-01", arch: "x86_64", load: 0, capacity: 2, avg1: 1.2, cores: 8),
             Self.runner("oracle-arm", arch: "aarch64", load: 1, capacity: 2, avg1: 0.4, cores: 4),
         ]
+        // A runner that reports its policy, so "What it offers" shows the AI-sessions-at-once stepper.
+        service.runnerList[0].policy = RunnerPolicy(terminals: true, agents: true, capacity: 2)
         service.terminalList = [
             Self.item("t_1a2b3c4d5e6f7a8b", runner: "mac-studio", attached: 1),
             Self.item("t_2b3c4d5e6f7a8b9c", runner: "linux-01", attached: 1, cols: 64, rows: 24, ageMinutes: 190),
