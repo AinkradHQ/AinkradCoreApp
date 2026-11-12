@@ -36,6 +36,15 @@ struct NewSessionSheet: View {
     /// The tools the sheet offers (approved mockup): Claude Code, Codex, OpenCode.
     static let tools = ["claude", "codex", "opencode"]
 
+    /// The sub-line under each tool. The app knows no installed versions, so it says whose CLI it is instead.
+    static func toolLine(_ tool: String) -> String {
+        switch tool {
+        case "claude": "Anthropic's CLI"
+        case "codex": "OpenAI's CLI"
+        default: "Open source CLI"
+        }
+    }
+
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 22) {
             HStack(alignment: .firstTextBaseline) {
@@ -50,10 +59,19 @@ struct NewSessionSheet: View {
                     field("Tool") {
                         HStack(spacing: Space.s2) {
                             ForEach(Self.tools, id: \.self) { t in
+                                // A well card per tool with a sub-line (mockup); the selected one carries RadioRow's ring.
                                 RadioRow(
-                                    AgentWords.toolName(t), symbol: AgentsModel.harnessSymbol(t),
-                                    selected: harness == t
+                                    AgentWords.toolName(t), subtitle: Self.toolLine(t),
+                                    symbol: AgentsModel.harnessSymbol(t), selected: harness == t
                                 ) { harness = t }
+                                .frame(maxWidth: .infinity)
+                                .background(GlassInk.well, in: coreShape(Radius.row))
+                                .overlay {
+                                    if harness != t {
+                                        coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
                             }
                         }
                     }

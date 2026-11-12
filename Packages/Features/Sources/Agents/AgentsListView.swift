@@ -141,7 +141,8 @@ struct AgentsListView: View {
     }
 
     private var keyHints: some View {
-        Text("\(coreArrowKeys()) move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive")
+        // A vertical list: up and down, which never flip on a right-to-left line.
+        Text("↑ ↓ move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive")
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s2)
     }

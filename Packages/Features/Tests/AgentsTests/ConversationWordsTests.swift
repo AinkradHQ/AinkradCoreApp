@@ -106,6 +106,21 @@ struct ConversationWordsTests {
         #expect(ConversationWords.recentPlaces(all, limit: 1).count == 1)
     }
 
+    @Test func contextNeverReadsMoreThanItsWindow() {
+        let under = ConversationWords.context(used: 50_000, window: 200_000)
+        #expect(
+            under.fill == 0.25 && under.text == "\(AgentWords.tokens(50_000)) of \(AgentWords.tokens(200_000)) tokens")
+        let over = ConversationWords.context(used: 500_000, window: 200_000)
+        #expect(over.fill == 1)
+        #expect(over.text == "\(AgentWords.tokens(500_000)) used, more than the \(AgentWords.tokens(200_000)) window")
+    }
+
+    @Test func theSampleContextFitsItsWindow() async throws {
+        for s in try await FakeAgentsAPI.prototypeWorld().sessions(before: nil, limit: 100) {
+            #expect((s.usage?.tokens ?? 0) <= ContextWindow.tokens(model: s.model), "\(s.id)")
+        }
+    }
+
     @Test func theSheetOffersTheApprovedTools() {
         #expect(NewSessionSheet.tools == ["claude", "codex", "opencode"])
     }

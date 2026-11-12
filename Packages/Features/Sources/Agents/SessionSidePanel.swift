@@ -32,7 +32,8 @@ struct SessionSidePanel: View {
                                 .coreFont(size: MacTextSize.meta).monospacedDigit()
                                 .padding(.vertical, Space.s1).contentShape(Rectangle())
                             }
-                            .buttonStyle(ToolRowStyle()).help("\(f.path)\nShow or hide its diff")
+                            .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
+                            .help("\(f.path)\nShow or hide its diff")
                             if openFile == f.path { DiffBlock(lines: diff(f.path)).transition(.opacity) }
                         }
                     }
@@ -45,20 +46,20 @@ struct SessionSidePanel: View {
                     "chart.bar", "Context",
                     action: model.canWrite(session) ? ("/compact", { model.drafts[session.id] = "/compact " }) : nil
                 ) {
-                    let used = session.usage?.tokens ?? 0
-                    let window = ContextWindow.tokens(model: session.model)
-                    CoreMeter(min(1, Double(used) / Double(window)), label: "Context used")
-                    Text("\(AgentWords.tokens(used)) of \(AgentWords.tokens(window)) tokens")
+                    let ctx = ConversationWords.context(
+                        used: session.usage?.tokens ?? 0, window: ContextWindow.tokens(model: session.model))
+                    CoreMeter(ctx.fill, label: "Context used")
+                    Text(ctx.text)
                         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
                 }
                 card("dollarsign", "Cost") {
                     let turns = model.turnCosts(session.id)
-                    let top = max(turns.max() ?? 1, 1)
-                    ForEach(Array(turns.enumerated()), id: \.offset) { i, c in
+                    let top = max(turns.map(\.cost).max() ?? 1, 1)
+                    ForEach(turns, id: \.turn) { n, c in
                         HStack(spacing: Space.s2) {
-                            Text("Turn \(i + 1)").foregroundStyle(palette.text2).frame(
+                            Text("Turn \(n)").foregroundStyle(palette.text2).frame(
                                 width: Space.s8 + Space.s4, alignment: .leading)
-                            CoreMeter(Double(c) / Double(top), label: "Turn \(i + 1) cost")
+                            CoreMeter(Double(c) / Double(top), label: "Turn \(n) cost")
                             Text(AgentWords.cost(c) ?? "").monospacedDigit()
                                 .frame(width: Space.s8 * 2, alignment: .trailing)
                                 .help(AgentWords.exactCost(c) ?? "")

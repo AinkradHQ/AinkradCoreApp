@@ -58,6 +58,16 @@ enum ConversationWords {
         seconds < 60 ? "\(seconds) s" : "\(seconds / 60) min" + (seconds % 60 == 0 ? "" : " \(seconds % 60) s")
     }
 
+    /// The Context card: how full the window is and its line. The usage figure counts every turn, so it can pass the
+    /// window; then the meter stays full and the line says so instead of "500k of 200k".
+    static func context(used: Int64, window: Int64) -> (fill: Double, text: String) {
+        let w = max(window, 1)
+        guard used > w else {
+            return (Double(max(used, 0)) / Double(w), "\(AgentWords.tokens(used)) of \(AgentWords.tokens(w)) tokens")
+        }
+        return (1, "\(AgentWords.tokens(used)) used, more than the \(AgentWords.tokens(w)) window")
+    }
+
     /// "Turn 1 done · 41 s · $0.04" (ui-fixes mockup); the time of day is added by the line, the tokens go in its tooltip.
     static func turn(_ turn: Turn?, cost: Int64?) -> [String] {
         [
@@ -134,29 +144,5 @@ enum ConversationWords {
             if out.count == limit { break }
         }
         return out
-    }
-}
-
-/// Thinking and running tools: a short blue bar whose segment slides along its track, never a spinner or bouncing dots.
-/// Under Reduce Motion the segment rests in the middle. Local part, proposed for CoreUI as an indeterminate `CoreMeter`.
-struct WorkingBar: View {
-    var width: CGFloat = Space.s8 + Space.s6
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        let seg = width * 0.4
-        TimelineView(.animation(paused: reduce)) { ctx in
-            // A 1.2 s sweep, eased at both ends so it reads as calm travel rather than a tick.
-            let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.2) / 1.2
-            let p = reduce ? 0.5 : (1 - cos(t * 2 * .pi)) / 2
-            coreShape(Space.s1 / 2).fill(palette.track)
-                .overlay(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg).offset(x: (width - seg) * p)
-                }
-        }
-        .frame(width: width, height: Space.s1)
-        .clipShape(coreShape(Space.s1 / 2))
-        .accessibilityHidden(true)
     }
 }
