@@ -49,6 +49,8 @@ public struct SyncResultWire: Codable, Sendable, Equatable {
         case "nothing_new": return "Nothing new."
         case "disabled": return "The Core's own AI sessions are switched off. Nothing was collected."
         case "running": return "A sync is already running."
+        case "no_connection": return "This runner doesn't share its history yet, or there is no connection to read."
+        case "no_repositories": return "Choose the repositories GitHub should read first."
         default: break
         }
         var s = "\(BrainWords.plural(found, "item", "items")) found, \(stored) kept, \(duplicate) already known"
@@ -93,6 +95,22 @@ public struct SyncStatusWire: Codable, Sendable, Equatable {
     }
 }
 
+/// A runner as a source sees it: online, the tools it offers, and whether it was started to share its history.
+public struct RunnerNowWire: Codable, Sendable, Equatable {
+    public var online: Bool
+    public var tools: [String]
+    public var historyOffered: Bool
+    enum CodingKeys: String, CodingKey {
+        case online, tools
+        case historyOffered = "history_offered"
+    }
+    public init(online: Bool, tools: [String] = [], historyOffered: Bool = false) {
+        self.online = online
+        self.tools = tools
+        self.historyOffered = historyOffered
+    }
+}
+
 /// One collector with its switch, roots and cursor (`GET /sources`).
 public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var id: String
@@ -102,14 +120,19 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var roots: [String]
     public var cursor: SourceCursor
     public var lastRun: String?
+    /// Items this source has delivered to the Brain.
+    public var items: Int?
+    /// For a `runner-<id>` source: the runner now.
+    public var runner: RunnerNowWire?
     enum CodingKeys: String, CodingKey {
-        case id, device, kind, enabled, roots, cursor
+        case id, device, kind, enabled, roots, cursor, items, runner
         case lastRun = "last_run"
     }
     public init(
         id: String, device: String, kind: String, enabled: Bool = true, roots: [String] = [],
-        cursor: SourceCursor = .init(), lastRun: String? = nil
+        cursor: SourceCursor = .init(), lastRun: String? = nil, items: Int? = nil
     ) {
+        self.items = items
         self.id = id
         self.device = device
         self.kind = kind
@@ -128,10 +151,16 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
         // The cursor is the collector's own JSON; anything this build cannot read counts as "from the start".
         cursor = (try? c.decodeIfPresent(SourceCursor.self, forKey: .cursor)) ?? .init()
         lastRun = try c.decodeIfPresent(String.self, forKey: .lastRun)
+        items = try c.decodeIfPresent(Int.self, forKey: .items)
+        runner = try c.decodeIfPresent(RunnerNowWire.self, forKey: .runner)
     }
 
     /// The Core's own AI-session collector.
     public var isCore: Bool { id == "core_transcript" }
+    /// Jira and GitHub, read by the Core through the accounts in Connections.
+    public var isConnection: Bool { id == "jira" || id == "github" }
+    /// A runner's AI tool history, `runner-<id>`.
+    public var isRunner: Bool { id.hasPrefix("runner-") }
 }
 
 struct SourcePutBody: Encodable {

@@ -23,6 +23,12 @@ public actor SampleBrainService: BrainService {
         public var inboxError = false
         /// Worst-case data for screenshots: very long and non-Latin room names, a thousand captures.
         public var worst = false
+        /// The Brain M3 world: the four rooms of the approved mockup with their candidates, policies and runners.
+        public var m3 = false
+        /// M3: no runner has a local model yet, so the local-only rooms queue their items.
+        public var noLocalModel = false
+        /// M3: workan-space accepts its facts and open threads without a review.
+        public var autoAccept = false
         /// The Import wizard opens, on an invented Core (`SampleImportTransport`).
         public var imports = false
         public init(
@@ -59,11 +65,13 @@ public actor SampleBrainService: BrainService {
     private var failNext = false
     var sampleSwitches: [String: Bool] = [:]
     var sampleRuleOn: [Int: Bool] = [:]
+    var m3: SampleM3
 
     public init(_ scenario: Scenario = Scenario(), pace: Duration = .milliseconds(250)) {
         self.scenario = scenario
+        self.list = scenario.empty ? [] : scenario.m3 ? SampleM3.rooms : Self.world(worst: scenario.worst)
+        self.m3 = SampleM3(scenario)
         self.importRoutes = scenario.imports ? BrainRoutes(transport: SampleImportTransport()) : nil
-        self.list = scenario.empty ? [] : Self.world(worst: scenario.worst)
         self.pace = pace
         self.checkList = Self.initialChecks(scenario)
         self.box = SampleInbox(empty: scenario.empty || scenario.emptyInbox)
@@ -119,7 +127,7 @@ public actor SampleBrainService: BrainService {
             rows.append(SyncRow(device: "MacBook (sample)", at: "1 min ago"))
             rows.append(SyncRow(device: "iPhone (sample)", at: "4 min ago"))
         }
-        if r.id == "workan-space" {
+        if r.id == "workan-space", rows.count > 1 {
             rows[1] = SyncRow(device: "MacBook (sample)", at: "3 h ago", state: .lag, lag: "3 h")
         }
         let cost: RoomCost? =
