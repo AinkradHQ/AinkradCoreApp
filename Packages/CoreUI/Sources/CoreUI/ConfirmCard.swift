@@ -230,20 +230,20 @@ public enum ModalLook {
     public static func of(_ title: String) -> (symbol: String, hue: Color) {
         let t = title.lowercased()
         func has(_ words: String...) -> Bool { words.contains { t.contains($0) } }
-        if t.hasPrefix("lend ") { return ("key.horizontal", GlassInk.orange) }  // not "end "
+        if t.hasPrefix("lend ") { return ("key.horizontal", GlassInk.blue) }  // not "end "
         if has("revoke", "remove", "delete", "forget", "kill", "end ", "end this", "stop") {
             return ("trash", GlassInk.red)
         }
         if has("rename") { return ("pencil", GlassInk.blue) }
-        if has("may do", "access", "scope") { return ("lock.shield", GlassInk.violet) }
-        if has("secret", "lease") { return ("key.horizontal", GlassInk.orange) }
-        if has("pool") { return ("square.stack.3d.up", GlassInk.violet) }
-        if has("account", "connect") { return ("person.crop.circle.badge.plus", GlassInk.green) }
+        if has("may do", "access", "scope") { return ("lock.shield", GlassInk.blue) }
+        if has("secret", "lease") { return ("key.horizontal", GlassInk.blue) }
+        if has("pool") { return ("square.stack.3d.up", GlassInk.blue) }
+        if has("account", "connect") { return ("person.crop.circle.badge.plus", GlassInk.blue) }
         if has("device", "pair") { return ("laptopcomputer.and.iphone", GlassInk.blue) }
         if has("terminal") { return ("terminal", GlassInk.slate) }
-        if has("session", "agent") { return ("sparkles", GlassInk.violet) }
+        if has("session", "agent") { return ("sparkles", GlassInk.blue) }
         if has("switch", "setting") { return ("slider.horizontal.3", GlassInk.blue) }
-        if has("add", "new", "create") { return ("plus.circle", GlassInk.green) }
+        if has("add", "new", "create") { return ("plus.circle", GlassInk.blue) }
         return ("sparkles", GlassInk.blue)
     }
 }

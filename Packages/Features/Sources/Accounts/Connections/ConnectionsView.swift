@@ -60,7 +60,7 @@ struct ConnectionsView: View {
                 HStack(spacing: Space.s2) {
                     AppStatChip("checkmark.seal.fill", "\(model.connected) connected", GlassInk.green)
                     if model.needLook > 0 {
-                        AppStatChip("exclamationmark.triangle.fill", "\(model.needLook) need a look", GlassInk.orange)
+                        AppStatChip("exclamationmark.triangle.fill", "\(model.needLook) need a look", GlassInk.amber)
                     }
                     Spacer(minLength: 0)
                     Text(

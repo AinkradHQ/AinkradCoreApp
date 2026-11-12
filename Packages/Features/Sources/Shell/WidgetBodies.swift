@@ -230,7 +230,7 @@ struct WMachineRow: View {
             HStack(spacing: Space.s3) {
                 Meter(
                     value: machine.slots > 0 ? Double(machine.used) / Double(machine.slots) : 0,
-                    tint: machine.used >= machine.slots && machine.slots > 0 ? WidgetInk.orange : nil)
+                    tint: machine.used >= machine.slots && machine.slots > 0 ? GlassInk.amber : nil)
                 if machine.load.count > 1 {
                     WLine(values: machine.load).frame(width: 80, height: 22)
                 }
@@ -294,7 +294,7 @@ struct MachinesBody: View {
     private func tint(_ m: HomeSnapshot.Machine) -> Color {
         switch HomeSnapshot.state(m) {
         case .online: WidgetInk.green
-        case .busy: WidgetInk.orange
+        case .busy: GlassInk.amber
         case .offline: WidgetInk.track
         }
     }

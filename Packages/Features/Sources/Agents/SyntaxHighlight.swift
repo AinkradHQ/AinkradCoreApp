@@ -66,9 +66,9 @@ enum SyntaxHighlight {
             for (text, t) in tokens(String(line)) {
                 var a = AttributedString(text)
                 switch t {
-                case .keyword: a.foregroundColor = GlassInk.violet
-                case .string: a.foregroundColor = GlassInk.green
-                case .number: a.foregroundColor = GlassInk.orangeInk
+                case .keyword: a.foregroundColor = GlassInk.blueInk
+                case .string: a.foregroundColor = GlassInk.primary
+                case .number: a.foregroundColor = GlassInk.slate
                 case .comment: a.foregroundColor = GlassInk.secondary
                 case .plain: break
                 }

@@ -50,7 +50,7 @@ struct AccessSheet: View {
                         "AI sessions will be able to change things on \(k?.name ?? "it") as you. Saving needs Touch ID.",
                         systemImage: "exclamationmark.triangle"
                     )
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.orangeInk)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
                     .transition(.opacity)
                 }
                 CoreSegmented(

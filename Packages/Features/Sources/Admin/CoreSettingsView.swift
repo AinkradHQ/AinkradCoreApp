@@ -125,7 +125,7 @@ private struct LimitRow: View {
                             SettingsChip(text: "Changed", symbol: "pencil", hue: hue)
                         }
                         if SettingWords.needsRestart(setting) {
-                            SettingsChip(text: "After a restart", symbol: "arrow.clockwise", hue: GlassInk.orange)
+                            SettingsChip(text: "After a restart", symbol: "arrow.clockwise", hue: GlassInk.amber)
                                 .help("Your Core reads this only when it starts.")
                         }
                     }
@@ -191,7 +191,7 @@ private struct LimitRow: View {
                 AppActionTile(
                     title: "Back to \(SettingWords.value(setting, setting.defaultValue))",
                     symbol: "arrow.uturn.backward",
-                    key: selected ? "⌫" : "", hue: GlassInk.orange
+                    key: selected ? "⌫" : "", hue: GlassInk.amber
                 ) { Task { await model.reset(setting) } }
             }
             AppActionTile(

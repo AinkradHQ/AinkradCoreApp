@@ -65,7 +65,7 @@ struct NeedsBody: View {
             shell.bellOpen = true
         } label: {
             HStack(spacing: Space.s3) {
-                Image(systemName: n.symbol).foregroundStyle(WidgetInk.orange).accessibilityHidden(true)
+                Image(systemName: n.symbol).foregroundStyle(GlassInk.amber).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(n.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                     if let s = n.sub { WCaption(s) }
@@ -184,7 +184,7 @@ struct CoreBody: View {
                 WHead("heart.text.square", "Core")
                 HStack(spacing: Space.s2) {
                     Image(systemName: s.symbol).font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(s.tone == .done ? WidgetInk.green : WidgetInk.orange)
+                        .foregroundStyle(s.tone == .done ? WidgetInk.green : GlassInk.amber)
                         .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
                     Text(s.word).coreFont(size: 28, weight: .bold).foregroundStyle(WidgetInk.primary)
                         .lineLimit(1).minimumScaleFactor(0.6)
@@ -232,11 +232,11 @@ struct CoreBody: View {
             tint: WidgetInk.green)
         WBarRow(
             label: "Alarms", value: alarms == 0 ? "None" : "\(alarms)", fill: min(Double(alarms) / 5, 1),
-            tint: WidgetInk.orange)
+            tint: GlassInk.amber)
         if let c = h.health?.certificate, let health = h.health {
             WBarRow(
                 label: "Certificate", value: c + (health.certDaysLeft ?? 0 > 0 ? " left" : ""),
-                fill: health.certificateShare, tint: health.certificateLow ? WidgetInk.orange : WidgetInk.green)
+                fill: health.certificateShare, tint: health.certificateLow ? GlassInk.amber : WidgetInk.green)
         } else {
             WGap(label: "Certificate")
         }
@@ -267,7 +267,7 @@ struct TodayBody: View {
         let h = shell.home
         let waiting = shell.waitingOnYou
         let rows: [(String, String, Double, Double, Color)] = [
-            ("Waiting for you", "\(waiting)", Double(waiting), min(Double(waiting), 5) / 5, WidgetInk.orange),
+            ("Waiting for you", "\(waiting)", Double(waiting), min(Double(waiting), 5) / 5, GlassInk.amber),
             (
                 "AI sessions running", "\(h.runningAgents) of \(h.totalSlots)", Double(h.runningAgents),
                 Double(h.runningAgents) / Double(max(h.totalSlots, 1)), WidgetInk.blue
@@ -331,7 +331,7 @@ struct BoardBody: View {
         let total = Double(max(board.todo + board.doing + board.review + board.blocked + board.done, 1))
         let cols: [(String, Int, Color)] = [
             ("To do", board.todo, WidgetInk.secondary), ("In progress", board.doing, WidgetInk.blue),
-            ("In review", board.review, WidgetInk.blue), ("Blocked", board.blocked, WidgetInk.orange),
+            ("In review", board.review, WidgetInk.blue), ("Blocked", board.blocked, GlassInk.amber),
             ("Done", board.done, WidgetInk.green),
         ]
         VStack(alignment: .leading, spacing: Space.s2) {

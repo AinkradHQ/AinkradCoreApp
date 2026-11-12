@@ -141,7 +141,7 @@ struct Thinking: View {
                 Text("thinking…").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .padding(.trailing, Space.s1)
                 ForEach(0..<3, id: \.self) { i in
-                    coreShape(2).fill(GlassInk.violet).frame(width: 7, height: 7)
+                    coreShape(2).fill(GlassInk.blue).frame(width: 7, height: 7)
                         .opacity(reduce || i == t ? 1 : 0.35).offset(y: reduce || i != t ? 0 : -3)
                         .animation(.spring(duration: 0.3), value: t)
                 }

@@ -67,14 +67,14 @@ enum AuditWords {
 
     static let areas: [Area] = [
         Area(id: "device.", title: "Devices", symbol: "laptopcomputer.and.iphone", hue: GlassInk.blue),
-        Area(id: "pairing.", title: "Pairing", symbol: "qrcode", hue: GlassInk.violet),
+        Area(id: "pairing.", title: "Pairing", symbol: "qrcode", hue: GlassInk.blue),
         Area(id: "auth.", title: "Sign-in", symbol: "lock.shield.fill", hue: GlassInk.red),
         Area(id: "setting.", title: "Settings", symbol: "slider.horizontal.3", hue: GlassInk.blue),
-        Area(id: "secret.", title: "Secrets", symbol: "key.fill", hue: GlassInk.orange),
-        Area(id: "account.", title: "Accounts", symbol: "person.crop.circle.fill", hue: GlassInk.green),
+        Area(id: "secret.", title: "Secrets", symbol: "key.fill", hue: GlassInk.blue),
+        Area(id: "account.", title: "Accounts", symbol: "person.crop.circle.fill", hue: GlassInk.blue),
         Area(id: "connection.", title: "Connections", symbol: "link", hue: GlassInk.blue),
-        Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.green),
-        Area(id: "agent.", title: "AI sessions", symbol: "sparkles", hue: GlassInk.violet),
+        Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.blue),
+        Area(id: "agent.", title: "AI sessions", symbol: "sparkles", hue: GlassInk.blue),
     ]
 
     static func area(_ action: String) -> Area {

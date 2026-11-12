@@ -124,7 +124,7 @@ struct TerminalsListView: View {
             stat("play.fill", "\(running) running", GlassInk.green)
             if ended > 0 { stat("stop.fill", "\(ended) ended", GlassInk.slate) }
             ForEach(model.runners.filter { model.onRunner($0.id) > 0 }) { r in
-                stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", RunnerHue.of(r.name))
+                stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", GlassInk.blue)
             }
             Spacer(minLength: 0)
             Text("↩ open · D detach · E end · S running command · R rename").coreFont(size: MacTextSize.meta)
@@ -153,15 +153,5 @@ enum TileAction {
             model.openTerminal(id, attach: false)
             model.shell.renamingTab = "terminal-\(id)"
         }
-    }
-}
-
-/// A runner's own colour, so tiles from different machines tell apart at a glance.
-enum RunnerHue {
-    static func of(_ name: String) -> Color {
-        let hues = [
-            GlassInk.blue, GlassInk.violet, GlassInk.green, GlassInk.orange, Color(red: 0.3, green: 0.82, blue: 0.9),
-        ]
-        return hues[abs(name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }) % hues.count]
     }
 }

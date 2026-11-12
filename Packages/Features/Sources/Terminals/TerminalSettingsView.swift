@@ -13,7 +13,7 @@ struct TerminalSettingsView: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             TerminalPreview(prefs: prefs).coreRise(true, 0)
             GlassSection(
-                "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.violet, index: 1
+                "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.blue, index: 1
             ) {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
                     ForEach(TermTheme.all) { t in
@@ -39,7 +39,7 @@ struct TerminalSettingsView: View {
                 }
             }
             GlassSection(
-                "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.green,
+                "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.blue,
                 index: 3
             ) {
                 GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
@@ -66,7 +66,7 @@ struct TerminalSettingsView: View {
             }
             GlassSection(
                 "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
-                hue: GlassInk.green, index: 5
+                hue: GlassInk.blue, index: 5
             ) {
                 SettingRow("Runner", symbol: "server.rack") {
                     CoreSegmented(

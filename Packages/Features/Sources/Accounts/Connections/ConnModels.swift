@@ -150,7 +150,7 @@ enum ConnLook {
         switch kind {
         case "github": GlassInk.slate
         case "jira": GlassInk.blue
-        case "linear", "slack": GlassInk.violet
+        case "linear", "slack": GlassInk.blue
         default: GlassInk.blue
         }
     }

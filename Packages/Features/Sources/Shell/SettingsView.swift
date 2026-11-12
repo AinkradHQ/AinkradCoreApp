@@ -13,11 +13,11 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
     /// Each group has its colour on the nav tiles, so the list reads at a glance.
     var hue: Color {
         switch self {
-        case .mac: Color(red: 0.55, green: 0.6, blue: 0.7)
-        case .apps: Color(red: 0.3, green: 0.82, blue: 0.9)
+        case .mac: GlassInk.slate
+        case .apps: WidgetInk.blue
         case .core: WidgetInk.blue
-        case .security: WidgetInk.orange
-        case .notifications: Color(red: 1, green: 0.38, blue: 0.4)
+        case .security: GlassInk.amber
+        case .notifications: WidgetInk.blue
         }
     }
 }

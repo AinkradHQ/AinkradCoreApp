@@ -22,7 +22,7 @@ struct OpsSection: View {
                 if !warnings.isEmpty {
                     GlassSection(
                         "Warnings", sub: "Your Core warns you before these become a problem.",
-                        symbol: "exclamationmark.triangle.fill", hue: GlassInk.orange, index: 1
+                        symbol: "exclamationmark.triangle.fill", hue: GlassInk.amber, index: 1
                     ) {
                         HStack(alignment: .top, spacing: Space.s3) {
                             ForEach(warnings) { d in WarningCard(admin: admin, detail: d) }
@@ -63,10 +63,10 @@ struct OpsSection: View {
 enum OpsWords {
     static let figure: [String: (symbol: String, hue: Color)] = [
         "ainkrad_uptime_seconds": ("clock.fill", GlassInk.blue),
-        "ainkrad_devices_active": ("laptopcomputer.and.iphone", GlassInk.violet),
-        "ainkrad_runners": ("server.rack", GlassInk.green),
-        "ainkrad_terminals": ("terminal.fill", GlassInk.green),
-        "ainkrad_agent_sessions": ("sparkles", GlassInk.violet),
+        "ainkrad_devices_active": ("laptopcomputer.and.iphone", GlassInk.blue),
+        "ainkrad_runners": ("server.rack", GlassInk.blue),
+        "ainkrad_terminals": ("terminal.fill", GlassInk.blue),
+        "ainkrad_agent_sessions": ("sparkles", GlassInk.blue),
         "ainkrad_db_size_bytes": ("cylinder.fill", GlassInk.slate),
     ]
 
@@ -116,7 +116,7 @@ private struct Verdict: View {
     var body: some View {
         let raised = model.alarms.filter(\.raised)
         let ok = raised.isEmpty
-        let hue = ok ? GlassInk.green : GlassInk.orange
+        let hue = ok ? GlassInk.green : GlassInk.amber
         let names = raised.map { OpsWords.warning[$0.name]?.title ?? $0.name }
         HStack(spacing: Space.s4) {
             Image(systemName: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
@@ -164,7 +164,7 @@ private struct WarningCard: View {
     var body: some View {
         let a = detail.alarm
         let w = OpsWords.warning[a.name]
-        let hue = a.raised ? GlassInk.orange : GlassInk.green
+        let hue = a.raised ? GlassInk.amber : GlassInk.green
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
                 IconTile(w?.symbol ?? "bell.fill", hue: hue, size: 36, bounce: a.raised)
@@ -196,12 +196,12 @@ private struct WarningCard: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(a.raised ? GlassInk.orange.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+        .background(a.raised ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay {
             coreShape(Radius.cardMac).strokeBorder(
-                a.raised ? GlassInk.orange.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
+                a.raised ? GlassInk.amber.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
         }
-        .shadow(color: GlassInk.orange.opacity(a.raised ? 0.25 : 0), radius: 12)
+        .shadow(color: GlassInk.amber.opacity(a.raised ? 0.25 : 0), radius: 12)
         .accessibilityElement(children: .combine)
     }
 }

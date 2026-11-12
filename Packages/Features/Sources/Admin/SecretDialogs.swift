@@ -173,7 +173,7 @@ struct SecretFormDialog: View {
     private func wizardBody(_ model: SecretsModel) -> some View {
         CoreDialogPanel("New secret", width: Space.s8 * 20) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                StepTrack(["Type", "Value", "Details"], at: form.step, hue: GlassInk.orange)
+                StepTrack(["Type", "Value", "Details"], at: form.step, hue: GlassInk.blue)
                 switch form.step {
                 case 0: typeStep
                 case 1: valueStep
@@ -203,7 +203,7 @@ struct SecretFormDialog: View {
                         fileError = nil
                     } label: {
                         VStack(alignment: .leading, spacing: Space.s1) {
-                            IconTile(k.symbol, hue: GlassInk.orange, size: 36)
+                            IconTile(k.symbol, hue: GlassInk.blue, size: 36)
                             Text(k.title).fontWeight(.semibold)
                             Text(k.blurb).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                         }
@@ -211,7 +211,7 @@ struct SecretFormDialog: View {
                         .background(GlassInk.well, in: coreShape(Radius.cardMac))
                         .overlay {
                             coreShape(Radius.cardMac).strokeBorder(
-                                form.kind == k ? GlassInk.orange : GlassInk.wellEdge,
+                                form.kind == k ? GlassInk.blue : GlassInk.wellEdge,
                                 lineWidth: form.kind == k ? 1.5 : 1)
                         }
                         .contentShape(coreShape(Radius.cardMac))
@@ -273,7 +273,7 @@ struct SecretFormDialog: View {
                         } label: {
                             Label(r.name, systemImage: on ? "checkmark" : "server.rack")
                                 .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
-                                .background(on ? GlassInk.orange.opacity(0.2) : GlassInk.wellHover, in: coreShape(7))
+                                .background(on ? GlassInk.blue.opacity(0.2) : GlassInk.wellHover, in: coreShape(7))
                         }
                         .buttonStyle(.plain).help(r.online ? "\(r.name) is online" : "\(r.name) is offline right now")
                         .accessibilityAddTraits(on ? .isSelected : [])
@@ -290,14 +290,14 @@ struct SecretFormDialog: View {
                         } label: {
                             HStack(spacing: Space.s2) {
                                 Image(systemName: on ? "checkmark.square.fill" : "square")
-                                    .foregroundStyle(on ? GlassInk.orange : palette.text2)
+                                    .foregroundStyle(on ? GlassInk.blue : palette.text2)
                                 Text(SecretWords.delivery(d).line)
                                 Spacer(minLength: 0)
                             }
                             .padding(Space.s2)
                             .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
                             .overlay {
-                                coreShape(Radius.control).strokeBorder(on ? GlassInk.orange : .clear, lineWidth: 1.5)
+                                coreShape(Radius.control).strokeBorder(on ? GlassInk.blue : .clear, lineWidth: 1.5)
                             }
                             .contentShape(coreShape(Radius.control))
                         }
@@ -414,7 +414,7 @@ struct DeleteDialog: View {
                 Text("This cannot be undone.").foregroundStyle(palette.text2)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s3) {
-                        IconTile("key.fill", hue: GlassInk.orange, size: 32)
+                        IconTile("key.fill", hue: GlassInk.blue, size: 32)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(secret.name).fontWeight(.semibold)
                             Text("\(SecretWords.versions(secret)) · \(SecretWords.lastUsed(secret))")

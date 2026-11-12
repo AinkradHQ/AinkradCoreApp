@@ -48,7 +48,7 @@ struct TermCard: View {
         if t.contains("still running") || t.contains("detached") { return ("play.circle", GlassInk.green) }
         if t.contains("exited") || t.contains("ended") || t.contains("gone") { return ("stop.circle", GlassInk.slate) }
         if t.contains("lost") || t.contains("offline") || t.contains("can't") || t.contains("not") {
-            return ("wifi.exclamationmark", GlassInk.orange)
+            return ("wifi.exclamationmark", GlassInk.amber)
         }
         return ("terminal", GlassInk.blue)
     }

@@ -119,7 +119,7 @@ private struct RunnerTile: View {
     var body: some View {
         let st = RunnerStatus(runner)
         let on = form.runner == runner.id
-        let hue: Color = st == .off ? GlassInk.red : st == .ok ? GlassInk.green : GlassInk.orange
+        let hue: Color = st == .off ? GlassInk.red : st == .ok ? GlassInk.green : GlassInk.amber
         let warn: String? =
             st == .off
             ? "Not connected"
@@ -176,7 +176,7 @@ private struct RunnerTile: View {
 private struct BlinkingCursor: View {
     @State private var on = true
     var body: some View {
-        Rectangle().fill(GlassInk.green).frame(width: 9, height: 18)
+        Rectangle().fill(GlassInk.blue).frame(width: 9, height: 18)
             .opacity(on ? 1 : 0.15)
             .coreLoop(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
             .onAppear { on = false }

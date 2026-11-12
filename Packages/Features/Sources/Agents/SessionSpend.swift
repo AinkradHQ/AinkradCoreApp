@@ -83,7 +83,7 @@ struct SessionSpendStrip: View {
     var body: some View {
         let share = ledger.share
         let capped = session.outcome == .tokenCap || session.stoppedByBudget
-        let hue = capped || (share ?? 0) >= 1 ? GlassInk.red : (share ?? 0) >= 0.8 ? GlassInk.orange : GlassInk.green
+        let hue = capped || (share ?? 0) >= 1 ? GlassInk.red : (share ?? 0) >= 0.8 ? GlassInk.amber : GlassInk.green
         HStack(spacing: Space.s3) {
             if let a = ledger.account {
                 Label(

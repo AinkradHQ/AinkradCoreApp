@@ -9,7 +9,7 @@ struct SpendHeader: View {
     let symbol: String
 
     var body: some View {
-        AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.green) {
+        AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.blue) {
             CoreSegmented(
                 "Spend",
                 segments: [AccountsPage.spending, .budgets, .costs, .ledger, .prices].map {
@@ -83,7 +83,7 @@ struct BudgetsPage: View {
         let warn = model.budgets.filter { $0.standing == .warning || $0.standing == .over }
         let none = model.budgets.isEmpty
         let hue =
-            !stopped.isEmpty ? GlassInk.red : !warn.isEmpty ? GlassInk.orange : none ? GlassInk.slate : GlassInk.green
+            !stopped.isEmpty ? GlassInk.red : !warn.isEmpty ? GlassInk.amber : none ? GlassInk.slate : GlassInk.green
         let title =
             if let s = stopped.first {
                 stopped.count == 1 ? "\(model.budgetName(s)) is stopped" : "\(stopped.count) budgets are stopped"
@@ -225,7 +225,7 @@ private struct BudgetCard: View {
     }
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {
-        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.orange : GlassInk.blue
+        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.amber : GlassInk.blue
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)

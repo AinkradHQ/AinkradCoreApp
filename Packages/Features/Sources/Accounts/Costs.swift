@@ -90,7 +90,7 @@ enum CostWords {
         case "list_price": ("List price", GlassInk.secondary)
         case "provider_reported": ("Reported by the provider", GlassInk.secondary)
         case "billing_corrected": ("Corrected from the bill", GlassInk.blue)
-        case "unpriced": ("No price", GlassInk.orange)
+        case "unpriced": ("No price", GlassInk.amber)
         default: (b, GlassInk.secondary)
         }
     }

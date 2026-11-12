@@ -103,7 +103,7 @@ private struct DeviceHeader: View {
     @State private var shown = false
 
     private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.violet : GlassInk.blue
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.blue : GlassInk.blue
     }
 
     var body: some View {
@@ -144,7 +144,7 @@ private struct OnlyAdminWarning: View {
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s2)
-            AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.orange) {
+            AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.blue) {
                 app.openAddDevice(admin: true)
             }
         }
@@ -225,7 +225,7 @@ private struct DeviceCard: View {
     @State private var shown = false
 
     private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.violet : GlassInk.blue
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.blue : GlassInk.blue
     }
 
     var body: some View {
@@ -298,7 +298,7 @@ struct ScopeIcons: View {
                     .opacity(on ? 1 : 0.5)
                     .help(on ? "\(s.capitalized): \(ScopeText.text(s))" : "No \(s)")
             }
-            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.violet, size: 24) }
+            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.blue, size: 24) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scopes.joined(separator: ", "))
@@ -451,14 +451,14 @@ struct DeviceDetail: View {
             }
             GlassSection(
                 "Keys", sub: "Made on the device. The Core only holds the public halves.", symbol: "key.horizontal",
-                hue: GlassInk.green, index: 2
+                hue: GlassInk.blue, index: 2
             ) {
                 HStack(spacing: Space.s3) {
                     KeyFact(
                         symbol: device.keyStorage == "software" ? "exclamationmark.triangle" : "cpu",
                         title: DeviceWords.storage(device.keyStorage),
                         detail: device.keyStorage == "software" ? "Kept in a file" : "Locked in the device's chip",
-                        hue: device.keyStorage == "software" ? GlassInk.orange : GlassInk.green)
+                        hue: device.keyStorage == "software" ? GlassInk.amber : GlassInk.green)
                     KeyFact(
                         symbol: device.stepup == true ? "touchid" : "touchid",
                         title: device.stepup.map { $0 ? "Can use Touch ID" : "No Touch ID key" } ?? "Didn't say",
@@ -471,7 +471,7 @@ struct DeviceDetail: View {
                 // N18: a runner does the work the Core sends; it does not ask for anything, so scopes do not describe it.
                 GlassSection(
                     "Access", sub: "A runner does work; it does not ask for it.", symbol: "server.rack",
-                    hue: GlassInk.violet, index: 3
+                    hue: GlassInk.blue, index: 3
                 ) {
                     SectionAction("Open runner page", symbol: "arrow.right") {
                         app.shell.launcher.entry("runners")?.run()
@@ -486,7 +486,7 @@ struct DeviceDetail: View {
             } else {
                 GlassSection(
                     "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
-                    symbol: "lock.shield", hue: GlassInk.violet, index: 3
+                    symbol: "lock.shield", hue: GlassInk.blue, index: 3
                 ) {
                     if !device.revoked {
                         SectionAction("Edit access", symbol: "slider.horizontal.3") {

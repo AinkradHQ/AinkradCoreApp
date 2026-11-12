@@ -54,7 +54,7 @@ struct OverviewView: View {
         let state: Color? = p.chip.map {
             $0.tone == .fail
                 ? GlassInk.red
-                : $0.tone == .warn ? GlassInk.orange : $0.tone == .queue ? GlassInk.slate : GlassInk.green
+                : $0.tone == .warn ? GlassInk.amber : $0.tone == .queue ? GlassInk.slate : GlassInk.green
         }
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack {

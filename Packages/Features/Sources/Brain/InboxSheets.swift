@@ -294,7 +294,7 @@ private struct AssignSheet: View {
             + (r.kind.chipLabel.map { " This is an \($0.lowercased()) room: the stricter room rule applies." } ?? "")
             + " Undo later removes it from the room and flags it for review."
         return InboxNote(
-            wide ? "touchid" : "info.circle", wide ? GlassInk.orange : GlassInk.slate,
+            wide ? "touchid" : "info.circle", wide ? GlassInk.amber : GlassInk.slate,
             Text("What happens. ").bold() + Text(line)
                 + Text(wide ? " This room can reach cloud AI sessions, so " : "")
                 + Text(wide ? "Touch ID asks" : "").bold()

@@ -208,7 +208,7 @@ private struct RoomView: View {
                     Text(" left").foregroundStyle(GlassInk.secondary)
                 }
                 BrainBar(
-                    fraction: d.room.lease.fraction, hue: d.room.lease.state == .ok ? GlassInk.blue : GlassInk.orange)
+                    fraction: d.room.lease.fraction, hue: d.room.lease.state == .ok ? GlassInk.blue : GlassInk.amber)
                 Text("Backup: \(d.backup ?? "none. This room never leaves this Mac.")").foregroundStyle(
                     GlassInk.secondary)
             }

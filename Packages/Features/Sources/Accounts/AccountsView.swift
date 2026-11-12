@@ -145,7 +145,7 @@ struct AccountsView: View {
         HStack(spacing: Space.s2) {
             AppStatChip("checkmark.seal.fill", "\(model.readyCount) ready", GlassInk.green)
             if !model.needLook.isEmpty {
-                AppStatChip("exclamationmark.triangle.fill", "\(model.needLook.count) need a look", GlassInk.orange)
+                AppStatChip("exclamationmark.triangle.fill", "\(model.needLook.count) need a look", GlassInk.amber)
             }
             Spacer(minLength: 0)
             Text(AccountsKeys.hint(model)).coreFont(size: MacTextSize.meta)

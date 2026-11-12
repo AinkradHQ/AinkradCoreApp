@@ -16,6 +16,7 @@ public struct CoreUIGallery: View {
         CoreSelectOption("codex", "Codex", symbol: "chevron.left.forwardslash.chevron.right"),
         CoreSelectOption("opencode", "OpenCode", symbol: "terminal"),
     ]
+    @State private var choice = "b"
     @State private var checks: Set<String> = ["read", "terminal"]
 
     private let officialOnly: Bool
@@ -69,6 +70,7 @@ public struct CoreUIGallery: View {
         segmented
         banners
         overlays
+        sharedParts
         stateCards
     }
 
@@ -224,6 +226,38 @@ public struct CoreUIGallery: View {
                 ConnectionBanner(.loading)
                 ConnectionBanner(.error("The request timed out. Check the server and try again."), retry: {})
             }
+        }
+    }
+
+    private var sharedParts: some View {
+        section("Count badge, stepper, back button and radio row") {
+            HStack(spacing: Space.s3) {
+                CountBadge(3)
+                CountBadge(2, tone: .needsYou)
+                CountBadge(12, tone: .quiet)
+                CountBadge(120)
+                CountBadge(0, tone: .quiet, showsZero: true)
+            }
+            CoreStepper(["Provider", "Key", "Name", "Where it goes"], at: 2, showsCount: true).frame(maxWidth: 480)
+            HStack(spacing: Space.s3) {
+                BackButton("Runners") {}
+                BackButton("Runners") {}.environment(\.coreForcedInteraction, .hover)
+                BackButton("Runners") {}.environment(\.coreForcedInteraction, .pressed)
+            }
+            VStack(spacing: Space.s1) {
+                RadioRow("Anthropic", subtitle: "API key or Claude plan", symbol: "sparkle", selected: choice == "a") {
+                    choice = "a"
+                }
+                RadioRow("OpenAI", subtitle: "Hover", symbol: "hexagon", selected: false) { choice = "b" }
+                    .environment(\.coreForcedInteraction, .hover)
+                RadioRow("OpenCode", subtitle: "Uses your other keys", symbol: "terminal", selected: choice == "b") {
+                    choice = "b"
+                } trailing: {
+                    StateBadge("Ready", tone: .run, symbol: "checkmark")
+                }
+                RadioRow("Google", subtitle: "Disabled", symbol: "globe", selected: false) {}.disabled(true)
+            }
+            .frame(maxWidth: 480)
         }
     }
 

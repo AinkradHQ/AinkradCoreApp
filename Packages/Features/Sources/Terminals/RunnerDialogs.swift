@@ -26,7 +26,7 @@ struct RenameRunnerDialog: View {
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             TextField("Name", text: $name).textFieldStyle(.roundedBorder).onSubmit(save)
             if let error {
-                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.orangeInk)
+                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.amberInk)
                     .coreFont(size: MacTextSize.meta)
             }
             HStack(spacing: Space.s2) {
@@ -79,7 +79,7 @@ struct RevokeRunnerDialog: View {
             .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.control + 2))
             if let n = model.host.elevationNotice { ElevationBanner(notice: n) }
             if let error {
-                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.orangeInk)
+                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.amberInk)
                     .coreFont(size: MacTextSize.meta)
             }
             HStack(spacing: Space.s2) {

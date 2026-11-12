@@ -101,7 +101,7 @@ private struct LedgerRow: View {
                 .frame(width: 150, alignment: .trailing)
             Text(c.costMicros.map { (c.approximate ? "≈ " : "") + CostWords.usd($0) } ?? "—")
                 .coreFont(size: MacTextSize.headline, weight: .bold, design: .rounded).monospacedDigit()
-                .foregroundStyle(c.costMicros == nil ? GlassInk.orangeInk : GlassInk.primary)
+                .foregroundStyle(c.costMicros == nil ? GlassInk.amberInk : GlassInk.primary)
                 .frame(width: 86, alignment: .trailing)
         }
         .padding(.horizontal, Space.s3).frame(minHeight: 44)
