@@ -91,6 +91,8 @@ private struct GalleryCard: View {
                         "Size", segments: kind.sizes.map { CoreSegment($0, $0.short) },
                         selection: Binding(get: { size }, set: pick)
                     )
+                    // Its own width: beside Remove, four sizes were squeezed until their letters vanished.
+                    .fixedSize()
                     .help(kind.sizes.map(\.title).joined(separator: ", "))
                 }
                 Spacer(minLength: 0)
