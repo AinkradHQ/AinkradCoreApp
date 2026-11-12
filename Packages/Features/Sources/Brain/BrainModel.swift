@@ -45,11 +45,14 @@ public final class BrainModel {
     /// Activity and Checks keep their own state; both read this model for rooms, Paused and the service.
     @ObservationIgnored public private(set) var activity: ActivityModel!
     @ObservationIgnored public private(set) var checks: ChecksModel!
+    /// The M3 Inbox, room policy and runner history.
+    @ObservationIgnored public private(set) var candidates: BrainCandidates!
 
     public init(host: any AdminHost) {
         self.host = host
         activity = ActivityModel(brain: self)
         checks = ChecksModel(brain: self)
+        candidates = BrainCandidates(brain: self)
     }
 
     // MARK: connection
@@ -69,6 +72,7 @@ public final class BrainModel {
         for id in Self.actionIDs { host.shell.launcher.unregister(id) }
         activity.reset()
         checks.reset()
+        candidates.clear()
         clearRoomView()
         rooms = []
         overview = nil
@@ -86,8 +90,11 @@ public final class BrainModel {
     public var canMakeRooms: Bool { isSample }
     /// The tab bar: only where the Brain has rooms to look at.
     public var tabsVisible: Bool { load != .unavailable && setup == .ready }
-    /// A real Core serves rooms and sources; Overview, Inbox, Activity and Checks are on the sample only for now.
-    public var visibleTabs: [BrainTab] { isSample ? BrainTab.allCases : [.rooms, .sources] }
+    /// A real Core serves the Inbox, rooms and sources; Overview, Activity and Checks are on the sample only for now.
+    public var visibleTabs: [BrainTab] {
+        if isSample { return BrainTab.allCases }
+        return service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
+    }
     /// The tab on screen: the chosen one, or the first this Core has.
     public var currentTab: BrainTab { visibleTabs.contains(tab) ? tab : visibleTabs[0] }
 
@@ -124,7 +131,9 @@ public final class BrainModel {
 
     public func tabCount(_ tab: BrainTab) -> Int {
         switch tab {
-        case .inbox: visibleNeeds.filter { $0.tab == .inbox }.reduce(0) { $0 + $1.n }
+        case .inbox:
+            !candidates.items.isEmpty
+                ? candidates.items.count : visibleNeeds.filter { $0.tab == .inbox }.reduce(0) { $0 + $1.n }
         case .checks: visibleNeeds.filter { $0.tab == .checks }.reduce(0) { $0 + $1.n }
         default: -1
         }
@@ -174,6 +183,7 @@ public final class BrainModel {
                 // Real Cores only: the sample has no Mac collectors to run.
                 if service.importRoutes != nil { sync.startTimer() }
             }
+            if service.servesCandidates { await candidates.load(quiet: true) }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }
             // A room that sealed or lost its lease under us must not stay on screen.
             if let id = inspectingID, room(id)?.lock != nil { clearRoomView() }
@@ -411,6 +421,11 @@ public final class BrainModel {
         // A locked Mac clears the room view from memory (security rule 7).
         lockWatch = DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main
-        ) { [weak self] _ in Task { @MainActor in self?.clearRoomView() } }
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.clearRoomView()
+                self?.candidates.clear()
+            }
+        }
     }
 }

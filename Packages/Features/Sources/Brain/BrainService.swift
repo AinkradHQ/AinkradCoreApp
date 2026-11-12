@@ -57,6 +57,21 @@ public protocol BrainService: Sendable {
     func rules() async throws -> [RuleWire]
     /// The caller has already asked for Touch ID.
     func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire
+
+    // MARK: candidates, policy, runner history (M3)
+
+    /// True when this service has the M3 Inbox, policy and history routes; the Inbox tab shows then.
+    var servesCandidates: Bool { get }
+    /// Every candidate waiting in the open rooms, and what waits for a local model.
+    func candidates() async throws -> CandidateInbox
+    /// Accepts, edits (then accepts) or rejects one candidate. Returns the candidate as filed, nil for a rejection.
+    func decide(_ id: String, room: String, _ decision: CandidateDecision) async throws
+    func policy(room: String) async throws -> RoomPolicy
+    /// The caller has already asked for Touch ID.
+    func setPolicy(room: String, _ change: PolicyChange) async throws -> RoomPolicy
+    func runners() async throws -> [RunnerHistory]
+    /// Turns a runner's history collection on or off. The caller has already asked for Touch ID when turning it on.
+    func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -83,6 +98,19 @@ extension BrainService {
     public func rules() async throws -> [RuleWire] { [] }
     public func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire {
         throw BrainFailure("Rules come later.", code: "not_served")
+    }
+    public var servesCandidates: Bool { false }
+    public func candidates() async throws -> CandidateInbox { CandidateInbox() }
+    public func decide(_ id: String, room: String, _ decision: CandidateDecision) async throws {
+        throw BrainFailure("The Inbox comes later.", code: "not_served")
+    }
+    public func policy(room: String) async throws -> RoomPolicy { RoomPolicy() }
+    public func setPolicy(room: String, _ change: PolicyChange) async throws -> RoomPolicy {
+        throw BrainFailure("Room policy comes later.", code: "not_served")
+    }
+    public func runners() async throws -> [RunnerHistory] { [] }
+    public func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory {
+        throw BrainFailure("Runner history comes later.", code: "not_served")
     }
 }
 

@@ -102,14 +102,17 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var roots: [String]
     public var cursor: SourceCursor
     public var lastRun: String?
+    /// Items this source has stored. TODO(brain-m3-core): confirm the Core sends it on `/sources`; blank until then.
+    public var items: Int?
     enum CodingKeys: String, CodingKey {
-        case id, device, kind, enabled, roots, cursor
+        case id, device, kind, enabled, roots, cursor, items
         case lastRun = "last_run"
     }
     public init(
         id: String, device: String, kind: String, enabled: Bool = true, roots: [String] = [],
-        cursor: SourceCursor = .init(), lastRun: String? = nil
+        cursor: SourceCursor = .init(), lastRun: String? = nil, items: Int? = nil
     ) {
+        self.items = items
         self.id = id
         self.device = device
         self.kind = kind
@@ -128,10 +131,13 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
         // The cursor is the collector's own JSON; anything this build cannot read counts as "from the start".
         cursor = (try? c.decodeIfPresent(SourceCursor.self, forKey: .cursor)) ?? .init()
         lastRun = try c.decodeIfPresent(String.self, forKey: .lastRun)
+        items = try c.decodeIfPresent(Int.self, forKey: .items)
     }
 
     /// The Core's own AI-session collector.
     public var isCore: Bool { id == "core_transcript" }
+    /// Jira and GitHub, read by the Core through the accounts in Connections.
+    public var isConnection: Bool { id == "jira" || id == "github" }
 }
 
 struct SourcePutBody: Encodable {

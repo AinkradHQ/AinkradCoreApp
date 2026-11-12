@@ -48,7 +48,14 @@ extension SampleBrainService {
     }
 
     private func sampleSources() -> [SourceWire] {
-        [
+        if scenario.m3 {
+            return SampleM3.sources.map { src in
+                var s = src
+                s.enabled = sampleSwitches[s.id] ?? s.enabled
+                return s
+            }
+        }
+        return [
             SourceWire(id: "core_transcript", device: "core", kind: "core_transcript"),
             SourceWire(id: "mac_claude_code", device: "Sample Mac", kind: "claude_code"),
         ].map {
