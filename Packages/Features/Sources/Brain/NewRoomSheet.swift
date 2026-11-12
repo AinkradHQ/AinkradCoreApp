@@ -22,7 +22,6 @@ struct NewRoomSheet: View {
     let close: () -> Void
     @State private var name = ""
     @State private var kind: RoomKind = .product
-    @State private var mode: StorageMode = .localOnly
     @State private var busy = false
 
     private static let kinds: [(RoomKind, String, String)] = [
@@ -46,21 +45,11 @@ struct NewRoomSheet: View {
                         ChoiceTile(title: k.1, sub: k.2, on: kind == k.0) { kind = k.0 }
                     }
                 }
-                CoreFieldLabel("Where it lives")
-                HStack(spacing: Space.s2) {
-                    ForEach(StorageMode.allCases, id: \.self) { m in
-                        ChoiceTile(title: m.label, sub: m.plain, on: mode == m) { mode = m }
-                    }
-                }
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text("What you get").coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(preview).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
-                if mode.widens {
-                    Text("Touch ID is asked first, because this room will leave this Mac.")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                }
                 if let n = model.host.elevationNotice {
                     CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.warn ? .warn : .queue)
                 }
@@ -77,14 +66,14 @@ struct NewRoomSheet: View {
     private var preview: String {
         let who = kind.chipLabel.map { "\($0) room. " } ?? ""
         return
-            "\(who)Your room will be sealed apart from every other room. \(mode.story) Only models on this Mac read it until you approve a cloud model."
+            "\(who)Your room will be sealed apart from every other room. \(StorageMode.synced.story) Only local models read it until you approve a cloud model."
     }
 
     private func go() {
         guard !typed.isEmpty, !taken else { return }
         busy = true
         Task {
-            let ok = await model.createRoom(NewRoomDraft(name: typed, kind: kind, mode: mode))
+            let ok = await model.createRoom(NewRoomDraft(name: typed, kind: kind))
             busy = false
             if ok { close() }
         }

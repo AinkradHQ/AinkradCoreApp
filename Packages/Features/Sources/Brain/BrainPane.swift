@@ -12,7 +12,7 @@ struct BrainPane: View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
                 // No service attached: nothing to look at, so no tabs over the unavailable card.
-                if model.load != .unavailable {
+                if model.tabsVisible {
                     ForEach(Array(BrainTab.allCases.enumerated()), id: \.offset) { i, t in
                         AppFilterTile(title: t.title, count: model.tabCount(t), on: model.tab == t, key: "⌘\(i + 1)") {
                             go(t)
@@ -22,7 +22,21 @@ struct BrainPane: View {
                     }
                 }
             } actions: {
-                if model.tab == .rooms, model.load == .ready {
+                if model.service?.importRoutes != nil, model.setup == .ready, model.load == .ready {
+                    AppActionTile(
+                        title: "How it works", symbol: "questionmark.circle", key: "", hue: GlassInk.slate
+                    ) {
+                        BrainHowItWorks.open(model.host.shell)
+                    }
+                    AppActionTile(
+                        title: "Import", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.blue,
+                        prominent: true
+                    ) {
+                        model.openImport()
+                    }
+                    .keyboardShortcut("i", modifiers: .command)
+                }
+                if model.tab == .rooms, model.load == .ready, model.canMakeRooms {
                     AppActionTile(
                         title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
                     ) {
@@ -88,14 +102,19 @@ struct BrainPane: View {
     @ViewBuilder private var content: some View {
         switch model.load {
         case .unavailable:
-            BrainStateCard(symbol: "brain", title: BrainWords.unavailableTitle, text: BrainWords.unavailableText)
-                .accessibilityIdentifier("brain-unavailable")
+            BrainStateCard(
+                symbol: "brain", title: BrainWords.unavailableTitle, text: BrainWords.unavailableText,
+                secondary: CoreAction("How the Brain works") { BrainHowItWorks.open(model.host.shell) }
+            )
+            .accessibilityIdentifier("brain-unavailable")
         case .loading:
             BrainSkeleton(shape: .page).accessibilityIdentifier("brain-loading")
         case .failed(let why):
             BrainStateCard(
                 symbol: "exclamationmark.triangle", title: "The Brain did not load", text: why,
                 primary: CoreAction("Try again") { model.retry() })
+        case .ready where model.setup != .ready:
+            setupCard
         case .ready where model.rooms.isEmpty:
             BrainStateCard(
                 symbol: "tray", title: "No rooms yet",
@@ -106,14 +125,42 @@ struct BrainPane: View {
             BrainConditions(model: model)
             Group {
                 switch model.tab {
-                case .overview: OverviewTab(model: model)
+                case .overview: if model.isSample { OverviewTab(model: model) } else { CoreOverviewTab(model: model) }
                 case .rooms: RoomsTab(model: model)
-                case .inbox: InboxTab(model: model)
-                case .activity: ActivityTab(model: model)
-                case .checks: ChecksTab(model: model)
+                case .inbox: if model.isSample { InboxTab(model: model) } else { BrainComingLater(title: "The Inbox") }
+                case .activity:
+                    if model.isSample { ActivityTab(model: model) } else { BrainComingLater(title: "Activity") }
+                case .checks: if model.isSample { ChecksTab(model: model) } else { BrainComingLater(title: "Checks") }
                 }
             }
             .transition(.opacity)
+        }
+    }
+
+    /// The Core has the Brain, but it is locked or has no rooms yet; or an import is under way.
+    @ViewBuilder private var setupCard: some View {
+        let how = CoreAction("How the Brain works") { BrainHowItWorks.open(model.host.shell) }
+        switch model.setup {
+        case .locked(let why):
+            BrainStateCard(symbol: "lock", title: "The Brain is locked", text: why, secondary: how)
+                .accessibilityIdentifier("brain-locked")
+        default:
+            if model.importer?.isActive == true {
+                BrainStateCard(
+                    symbol: "square.and.arrow.down", title: "Import in progress",
+                    text: "Your sessions are being collected and sorted into rooms. Nothing is kept until you import.",
+                    secondary: how, primary: CoreAction("Continue") { model.openImport() }
+                )
+                .accessibilityIdentifier("brain-importing")
+            } else {
+                BrainStateCard(
+                    symbol: "tray", title: "Nothing in the Brain yet",
+                    text:
+                        "Import your agent sessions to make the first rooms. You review every room before anything is kept.",
+                    secondary: how, primary: CoreAction("Import") { model.openImport() }
+                )
+                .accessibilityIdentifier("brain-not-set-up")
+            }
         }
     }
 

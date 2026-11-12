@@ -185,7 +185,7 @@ private struct EgressView: View {
                     symbol: "exclamationmark.triangle", title: "This list could not load", text: why,
                     primary: CoreAction("Try again") { Task { await a.loadEgress() } })
             } else if a.egress.isEmpty, let room {
-                if room.mode == .localOnly {
+                if room.provider == .local {
                     BrainStateCard(
                         symbol: "lock", title: BrainWords.leftNothing(room.name), text: BrainWords.leftNothingText)
                 } else {

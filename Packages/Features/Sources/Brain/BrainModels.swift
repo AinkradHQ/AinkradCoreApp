@@ -4,38 +4,20 @@ import Foundation
 // BM-89 health fields; when Core serves the Brain, the generated client maps onto these in one file (`BrainService`).
 // Nothing here ever holds a record title, snippet or query: counts, names and codes only (BM-00 I-8).
 
-/// Where a room's memories live. Plain words first; the id is hover help.
+/// Where a room's memories live. Every room is kept on your Core (Phase 0 Q-2), so there is one answer and it is shown as a
+/// fact, not offered as a choice.
 public enum StorageMode: String, Sendable, CaseIterable, Hashable {
-    case localOnly = "local-only"
-    case localBackup = "local-backup"
     case synced
 
-    public var label: String {
-        switch self {
-        case .localOnly: "This Mac only"
-        case .localBackup: "Backed up"
-        case .synced: "Synced"
-        }
-    }
-    /// One sentence for the New room sheet and the room view.
-    public var plain: String {
-        switch self {
-        case .localOnly: "Never leaves this Mac. No backup."
-        case .localBackup: "Server keeps a copy it cannot read."
-        case .synced: "Your Macs share it."
-        }
-    }
+    public var label: String { "Synced" }
+    /// One sentence for the room view.
+    public var plain: String { "Kept on your Core, encrypted." }
     /// What the room view says about who can read what.
     public var story: String {
-        switch self {
-        case .localOnly: "Not visible to cloud agents, not backed up. It stays on this Mac."
-        case .localBackup: "A backup copy is kept on the server. The server cannot read it."
-        case .synced:
-            "The remote Core holds the canonical copy. An approved cloud model may read what a search returns."
-        }
+        "The Core holds the canonical copy, encrypted. An approved cloud model may read what a search returns."
     }
-    /// Leaving this Mac widens who could reach the room, so it asks for Touch ID.
-    var widens: Bool { self != .localOnly }
+    /// Nothing about a room leaves the Core's keeping, so there is no wider step to confirm.
+    var widens: Bool { false }
 }
 
 public enum ProviderClass: String, Sendable, CaseIterable, Hashable {
@@ -317,15 +299,13 @@ public struct BrainOverview: Sendable, Hashable {
     }
 }
 
-/// What a new room is made with. The quick path is `NewRoomDraft.quick`: this Mac only, local models.
+/// What a new room is made with. The quick path is `NewRoomDraft.quick`: a product room with local models.
 public struct NewRoomDraft: Sendable, Hashable {
     public var name: String
     public var kind: RoomKind
-    public var mode: StorageMode
-    public init(name: String, kind: RoomKind = .product, mode: StorageMode = .localOnly) {
+    public init(name: String, kind: RoomKind = .product) {
         self.name = name
         self.kind = kind
-        self.mode = mode
     }
     public static func quick(name: String) -> NewRoomDraft { NewRoomDraft(name: name) }
     /// Employer and client rooms start with local models until a cloud provider is approved.

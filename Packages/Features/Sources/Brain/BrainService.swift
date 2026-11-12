@@ -38,6 +38,28 @@ public protocol BrainService: Sendable {
     func captures() async throws -> [Capture]
     /// Applies one Inbox change (the caller has already asked for Touch ID where it is needed).
     func perform(_ action: InboxAction) async throws
+    /// What this Core has of the Brain (`GET /status`).
+    func setup() async throws -> BrainSetup
+    /// The import routes, or nil when the service cannot import (the sample).
+    var importRoutes: BrainRoutes? { get }
+}
+
+/// Whether the Brain exists on this Core and whether it has anything yet.
+public enum BrainSetup: Sendable, Equatable {
+    /// The Core has no Brain module.
+    case absent
+    /// The module is there but its key is not usable (the text says why, in plain words).
+    case locked(String)
+    /// The module is there and has no rooms yet.
+    case notSetUp
+    case ready
+}
+
+extension BrainService {
+    /// Stand-in services are always set up. The Core service asks `GET /status`.
+    public func setup() async throws -> BrainSetup { .ready }
+    /// The import routes of a real Core; nil for a stand-in.
+    public var importRoutes: BrainRoutes? { nil }
 }
 
 /// A failure the screens can word.

@@ -36,18 +36,18 @@ struct BrainModelTests {
         let model = BrainModel(host: host)
         model.install()
         let ids = { host.shell.launcher.entries.map(\.id).filter { $0.hasPrefix("brain") } }
-        #expect(ids() == ["brain"])
+        #expect(Set(ids()) == ["brain", "brain-how"])
         model.use(SampleBrainService())
-        #expect(Set(ids()) == ["brain", "brain-open-room", "brain-new-room", "brain-new-room-advanced"])
+        #expect(Set(ids()) == ["brain", "brain-how", "brain-open-room", "brain-new-room", "brain-new-room-advanced"])
         model.detach()
-        #expect(ids() == ["brain"])
+        #expect(Set(ids()) == ["brain", "brain-how"])
     }
 
     @Test func noServiceMeansUnavailable() {
         let model = BrainModel(host: FakeHost())
         #expect(model.load == .unavailable)
         #expect(model.rooms.isEmpty && model.bellTexts.isEmpty)
-        #expect(BrainWords.unavailableTitle == "Core does not serve the Brain yet")
+        #expect(BrainWords.unavailableTitle == "Brain is coming")
     }
 
     @Test func switchingRoomsClearsTheOldRoomsViewFirst() async {
@@ -139,18 +139,15 @@ struct BrainModelTests {
         #expect(m.host.shell.bell.items.contains { $0.title.contains("Ainkrad") } == false)
     }
 
-    @Test func quickRoomRunsAtOnceWithDefaultsAndWideningAsksTouchID() async {
+    @Test func quickRoomRunsAtOnceWithDefaults() async {
         let (m, host) = await make()
         await m.quickRoom()
         let made = m.room("new-room")
-        #expect(made?.mode == .localOnly && made?.provider == .local)
+        #expect(made?.mode == .synced && made?.provider == .local)
         #expect(host.reasons.isEmpty)
         #expect(m.quickName == "New room 2")
-        #expect(await m.createRoom(NewRoomDraft(name: "Synced one", kind: .client, mode: .synced)))
-        #expect(host.reasons.count == 1)
-        host.declines = true
-        #expect(await m.createRoom(NewRoomDraft(name: "Backup one", mode: .localBackup)) == false)
-        #expect(m.room("backup-one") == nil)
+        #expect(await m.createRoom(NewRoomDraft(name: "Synced one", kind: .client)))
+        #expect(host.reasons.isEmpty, "every room is synced: nothing wider to confirm")
     }
 
     @Test func failureIsWordedAndRetryable() async {

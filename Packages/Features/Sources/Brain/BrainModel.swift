@@ -15,6 +15,14 @@ public final class BrainModel {
     let host: any AdminHost
     public private(set) var service: (any BrainService)?
     public internal(set) var load: BrainLoad = .unavailable
+    /// What the Core has of the Brain. Stand-in services are always `.ready`.
+    public internal(set) var setup: BrainSetup = .ready
+    /// The import in this session, kept while its sheet is closed so a collect in progress is not lost.
+    public internal(set) var importer: ImportModel?
+    /// The sources the wizard offers. Tests and the Debug gallery replace it; the default reads this Mac's Claude Code.
+    @ObservationIgnored public var importSources: @Sendable () -> [any ImportSource] = {
+        [ClaudeCodeSource.standard()]
+    }
     /// Every known room. A sealed one carries a name and mode only (`RoomSummary.counts` is nil).
     public private(set) var rooms: [RoomSummary] = []
     public private(set) var overview: BrainOverview?
@@ -61,11 +69,17 @@ public final class BrainModel {
         rooms = []
         overview = nil
         viewingID = nil
+        importer = nil
+        setup = .absent
         load = .unavailable
         refreshBell()
     }
 
     public var isSample: Bool { service?.isSample ?? false }
+    /// A real Core makes rooms by an import, not by a button.
+    public var canMakeRooms: Bool { isSample }
+    /// The tab bar: only where the Brain has rooms to look at.
+    public var tabsVisible: Bool { load != .unavailable && setup == .ready }
 
     // MARK: derived
 
@@ -114,6 +128,24 @@ public final class BrainModel {
     func reload() async {
         guard let service else { return }
         do {
+            let st = try await service.setup()
+            guard self.service != nil else { return }
+            setup = st
+            switch st {
+            case .absent:
+                rooms = []
+                overview = nil
+                load = .unavailable
+                refreshBell()
+                return
+            case .locked, .notSetUp:
+                rooms = []
+                overview = nil
+                load = .ready
+                refreshBell()
+                return
+            case .ready: break
+            }
             async let r = service.rooms()
             async let o = service.overview()
             let (rs, ov) = try await (r, o)
@@ -226,20 +258,15 @@ public final class BrainModel {
         }
     }
 
-    /// Makes a room. The quick path (this Mac only, local models) runs at once; leaving this Mac asks for Touch ID.
+    /// Makes a room (sample only: a real Core makes rooms by an import).
     @discardableResult
     public func createRoom(_ draft: NewRoomDraft) async -> Bool {
         guard let service else { return false }
         busy = "create"
         defer { busy = nil }
         do {
-            let make: () async throws -> RoomSummary = { try await service.createRoom(draft) }
-            let made =
-                draft.mode.widens
-                ? try await host.elevated(
-                    "Create a room that is \(draft.mode.label.lowercased()).", done: "created", keepsEdit: true, make)
-                : try await make()
-            host.shell.showToast("Room \(made.name) created, \(made.mode.label.lowercased())")
+            let made = try await service.createRoom(draft)
+            host.shell.showToast("Room \(made.name) created")
             await reload()
             return true
         } catch is AdminDeclined {
@@ -300,7 +327,7 @@ public final class BrainModel {
         }
     }
 
-    private static let actionIDs = ["brain-open-room", "brain-new-room", "brain-new-room-advanced"]
+    private static let actionIDs = ["brain-open-room", "brain-new-room", "brain-new-room-advanced", "brain-import"]
     @ObservationIgnored private var installed = false
 
     private func entry(
@@ -316,20 +343,28 @@ public final class BrainModel {
     /// The room actions need a service to act on: registered when one attaches, withdrawn when it goes.
     private func registerActions() {
         guard installed else { return }
+        if service?.importRoutes != nil {
+            entry(
+                "brain-import", "Import into the Brain…", "Collect your agent sessions into rooms",
+                "square.and.arrow.down",
+                ["import", "sessions", "rooms", "claude"], action: true
+            ) { $0.openImport() }
+        }
         entry(
             "brain-open-room", "Open room…", "Pick a room to look at", "lock.open", ["room", "mount", "unseal"],
             action: true
         ) { $0.show(.rooms) }
+        guard isSample else { return }
         entry(
-            "brain-new-room", "New room", "Makes a room at once · this Mac only", "plus", ["create", "room"],
+            "brain-new-room", "New room", "Makes a room at once", "plus", ["create", "room"],
             action: true
         ) { m in
             m.show(.rooms)
             Task { await m.quickRoom() }
         }
         entry(
-            "brain-new-room-advanced", "New room (advanced)…", "Name it and choose where it lives",
-            "slider.horizontal.3", ["create", "room", "backup", "sync"], action: true
+            "brain-new-room-advanced", "New room (advanced)…", "Name it and choose its kind",
+            "slider.horizontal.3", ["create", "room"], action: true
         ) { m in
             m.show(.rooms)
             BrainSheets.openNewRoom(m)
@@ -342,6 +377,9 @@ public final class BrainModel {
         installed = true
         entry("brain", "Brain", "Rooms, memory and health", "brain", ["memory", "rooms", "sealed", "health"]) {
             $0.show(.overview)
+        }
+        entry("brain-how", "How the Brain works", "What it keeps and where", "questionmark.circle", ["help", "brain"]) {
+            BrainHowItWorks.open($0.host.shell)
         }
         if service != nil { registerActions() }
         shell.settings.section(
