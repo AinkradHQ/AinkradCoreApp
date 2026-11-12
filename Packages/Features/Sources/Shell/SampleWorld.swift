@@ -111,7 +111,7 @@ public enum SampleWorld {
     public static func samplePane(_ id: String, _ shell: ShellModel) -> PaneSpec {
         var spec = samplePaneBody(id, shell)
         // The tab carries the app's name, as the real panes do.
-        spec.tab = ["agents": "Agents", "terminals": "Terminals", "runners": "Runners", "core": "Accounts"][id]
+        spec.tab = ["agents": "AI Sessions", "terminals": "Terminals", "runners": "Runners", "core": "Accounts"][id]
         return spec
     }
 
@@ -119,7 +119,7 @@ public enum SampleWorld {
         switch id {
         case "agents":
             PaneSpec(
-                id: id, title: "Agents", sub: "Home Core", symbol: "sparkles",
+                id: id, title: "AI Sessions", sub: "Home Core", symbol: "sparkles",
                 chip: PaneChip("Waiting on you", tone: .warn, symbol: "hourglass")
             ) {
                 SampleList(

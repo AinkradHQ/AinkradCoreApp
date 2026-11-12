@@ -269,7 +269,7 @@ struct TodayBody: View {
         let rows: [(String, String, Double, Double, Color)] = [
             ("Waiting for you", "\(waiting)", Double(waiting), min(Double(waiting), 5) / 5, WidgetInk.orange),
             (
-                "Agents running", "\(h.runningAgents) of \(h.totalSlots)", Double(h.runningAgents),
+                "AI sessions running", "\(h.runningAgents) of \(h.totalSlots)", Double(h.runningAgents),
                 Double(h.runningAgents) / Double(max(h.totalSlots, 1)), WidgetInk.blue
             ),
             (
@@ -281,7 +281,7 @@ struct TodayBody: View {
             switch size {
             case .s:
                 WHead("calendar", "Today")
-                WFigure(value: Double(h.runningAgents), caption: "agents running")
+                WFigure(value: Double(h.runningAgents), caption: "AI sessions running")
                 Spacer(minLength: 0)
                 Meter(value: rows[1].3)
             case .m:

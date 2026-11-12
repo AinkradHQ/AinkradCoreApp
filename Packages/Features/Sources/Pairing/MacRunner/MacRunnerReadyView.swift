@@ -20,7 +20,7 @@ struct MacRunnerReadyView: View {
             Text("Ready: 2 machines").coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(
                 .isHeader)
             Text("This Core (built-in) and This Mac").foregroundStyle(palette.text2)
-            machine("server.rack", "This Core (built-in)", "Terminals and agents, always on.", enabled: true)
+            machine("server.rack", "This Core (built-in)", "Terminals and AI sessions, always on.", enabled: true)
             machine(
                 "laptopcomputer", "This Mac",
                 on

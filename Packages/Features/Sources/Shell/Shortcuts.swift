@@ -9,7 +9,7 @@ enum ShortcutCatalog {
             "File",
             [
                 ("Launcher…", "⌘K"), ("Actions…", "⇧⌘A"), ("Overview", "⇧⌘O"), ("Next / Previous Tab", "⌃Tab / ⌃⇧Tab"),
-                ("Rename Tab…", "⇧⌘R"), ("New Agent Session", "⌘N"), ("New Terminal", "⌘T"),
+                ("Rename Tab…", "⇧⌘R"), ("New AI Session", "⌘N"), ("New Terminal", "⌘T"),
                 ("Close Pane", "⌘W"),
                 ("Reopen Closed Pane", "⇧⌘T"), ("Close All Panes", "⌥⌘W"),
             ]
@@ -155,7 +155,7 @@ public struct ShellCommands: Commands {
             Button("Actions…") { shell.toggleActions() }.keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(paneCount == 0)
             Divider()
-            Button("New Agent Session") { shell.newItem() }.keyboardShortcut("n")
+            Button("New AI Session") { shell.newItem() }.keyboardShortcut("n")
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
             Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
                 .keyboardShortcut("t", modifiers: [.command, .option])

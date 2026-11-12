@@ -150,9 +150,9 @@ enum ScopeText {
     static func text(_ s: String) -> String {
         switch s {
         case "read": "See sessions, runners, events and settings"
-        case "approve": "Decide agent tool approvals"
+        case "approve": "Decide AI session tool approvals"
         case "terminal": "Open and use terminals"
-        case "agent": "Start and steer agent sessions"
+        case "agent": "Start and steer AI sessions"
         case "admin": "Devices, secrets and settings"
         case "runner": "Only redeems secret leases"
         default: "A scope this app does not know"

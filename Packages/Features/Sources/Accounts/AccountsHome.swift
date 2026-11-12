@@ -165,7 +165,7 @@ private struct AccountRow: View {
     }
 }
 
-/// "Agents try these accounts in this order": the default chain as a drag list. Accounts of one provider that share a
+/// "AI sessions try these accounts in this order": the default chain as a drag list. Accounts of one provider that share a
 /// place are shown together on it (that is the pool).
 private struct OrderList: View {
     let model: AccountsModel
@@ -175,7 +175,8 @@ private struct OrderList: View {
         let seats = model.orderSeats
         VStack(alignment: .leading, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Agents try these accounts in this order").coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text("AI sessions try these accounts in this order").coreFont(
+                    size: MacTextSize.headline, weight: .semibold)
                 Text("Drag to change it. If one is over its limit or fails, the next one takes over.")
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }

@@ -10,8 +10,10 @@ struct MacRunnerSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text("This Mac can run terminals and agents for your Core, as a second machine beside the Core itself.")
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            Text(
+                "This Mac can run terminals and AI sessions for your Core, as a second machine beside the Core itself."
+            )
+            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             MacRunnerSwitches(model: model)
             if model.isAvailable { MacRunnerStatus(model: model, accounts: accounts) }
         }
@@ -85,7 +87,7 @@ struct MacRunnerStatus: View {
             }
             if model.useThisMac {
                 Text(
-                    "When this Mac sleeps or goes offline, its terminals and agents pause. The Core keeps the session and shows it as interrupted."
+                    "When this Mac sleeps or goes offline, its terminals and AI sessions pause. The Core keeps the session and shows it as interrupted."
                 )
                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
                     horizontal: false, vertical: true)

@@ -138,8 +138,15 @@ struct LiveSessionsTests {
                 == .toolTodos(
                     id: "t2",
                     items: [TodoItem(text: "one", status: .completed), TodoItem(text: "two", status: .inProgress)]))
-        let turn = EntryParser.kind(["type": "usage", "cost_usd_micros": 40_000])
-        #expect(turn == .turnEnded(costMicros: 40_000, tokens: nil))
+        // The runner's real usage entry: this turn's tokens, and the session's cost so far in dollars.
+        let turn = EntryParser.kind([
+            "type": "usage", "input": 4, "output": 207, "cache_read": 32422, "cache_write": 6411,
+            "cost_usd": 0.00171032,
+        ])
+        #expect(turn == .turnEnded(costMicros: 1710, tokens: 211))
+        #expect(
+            EntryParser.kind(["type": "usage", "input": 0, "output": 0, "cost_usd": NSNull()])
+                == .turnEnded(costMicros: nil, tokens: nil))
     }
 
     @Test func idleEndedSessionsReadAsEndedAndTakeAMessage() {
@@ -172,6 +179,18 @@ struct LiveSessionsTests {
                 == .toolEdit(id: "e", name: "Edit", path: "/p", old: "a", new: "b", ok: true, durationMs: 100))
     }
 
+    @MainActor @Test func cumulativeCostBecomesEachTurnsOwn() {
+        let store = TranscriptStore(sessionID: "s")
+        let t = Date()
+        func usage(_ seq: Int64, _ micros: Int64?) -> TranscriptEntry {
+            TranscriptEntry(seq: seq, at: t, kind: .turnEnded(costMicros: micros, tokens: 10))
+        }
+        store.append([usage(1, 1_000), usage(2, 4_500), usage(3, nil), usage(4, 4_500)])
+        let costs = store.entries.map { e -> Int64? in if case .turnEnded(let c, _) = e.kind { c } else { nil } }
+        // The first turn held has nothing to subtract from, so it shows no cost; the rest are the differences.
+        #expect(costs == [nil, 3_500, nil, 0])
+    }
+
     @Test func markdownTablesQuotesAndHighlighting() {
         let md = "| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n\n> quoted\n\ntext"
         #expect(
@@ -187,5 +206,37 @@ struct LiveSessionsTests {
         #expect(SlashCommands.matches("/co").map(\.name) == ["/compact", "/context", "/cost"])
         #expect(SlashCommands.matches("/compact now").isEmpty && SlashCommands.matches("hi").isEmpty)
         #expect(SlashCommands.matches("/").count == SlashCommands.all.count)
+    }
+}
+
+@Suite struct ContextWindowTests {
+    @Test func windowComesFromTheModelId() {
+        #expect(ContextWindow.tokens(model: "claude-opus-4-7[1m]") == 1_000_000)
+        #expect(ContextWindow.tokens(model: "claude-sonnet-4-5") == 200_000)
+        #expect(ContextWindow.tokens(model: "gpt-5-codex") == 400_000)
+        #expect(ContextWindow.tokens(model: nil) == 200_000)
+    }
+}
+
+@Suite struct WorkspaceWireTests {
+    @Test func theSheetsRepoBecomesTheCoresWorkspace() throws {
+        let none = NewAgentSession(runner: "d_1", harness: "claude", prompt: "")
+        #expect(try LiveAgentsAPI.workspace(none) == nil)
+        let repo = NewAgentSession(
+            runner: "d_1", harness: "claude", prompt: "", project: "https://github.com/AinkradHQ/AinkradCore.git",
+            branch: "feat/x", base: "development")
+        let w = try #require(try LiveAgentsAPI.workspace(repo)?.value)
+        #expect(w["repo"] as? String == "https://github.com/AinkradHQ/AinkradCore.git")
+        #expect(w["base"] as? String == "development" && w["branch"] as? String == "feat/x")
+        // No branch named: the session works on the base; no base: main.
+        let bare = NewAgentSession(runner: "d_1", harness: "claude", prompt: "", project: "/srv/repo")
+        let b = try #require(try LiveAgentsAPI.workspace(bare)?.value)
+        #expect(b["base"] as? String == "main" && b["branch"] as? String == "main")
+    }
+
+    @Test func projectsAreNamedByTheirRepo() {
+        #expect(LiveAgentsAPI.projectName("https://github.com/AinkradHQ/AinkradCore.git") == "AinkradCore")
+        #expect(LiveAgentsAPI.projectName("git@github.com:AinkradHQ/AinkradCoreApp.git") == "AinkradCoreApp")
+        #expect(LiveAgentsAPI.projectName("/Users/me/code/workan-space/") == "workan-space")
     }
 }

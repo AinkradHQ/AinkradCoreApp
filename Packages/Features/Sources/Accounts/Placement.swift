@@ -71,10 +71,10 @@ enum Placement {
         return out
     }
 
-    /// `Agents will try: 1. tech → 2. creative`; nothing to try when the order is empty.
+    /// `AI sessions will try: 1. tech → 2. creative`; nothing to try when the order is empty.
     static func preview(_ seats: [OrderSeat]) -> String {
-        guard !seats.isEmpty else { return "Agents will try: nothing yet" }
-        return "Agents will try: "
+        guard !seats.isEmpty else { return "AI sessions will try: nothing yet" }
+        return "AI sessions will try: "
             + seats.enumerated().map { "\($0.offset + 1). \($0.element.title)" }.joined(separator: " → ")
     }
 

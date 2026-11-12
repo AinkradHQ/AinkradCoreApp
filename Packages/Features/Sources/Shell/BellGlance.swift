@@ -73,7 +73,7 @@ private enum BellGroup: String, CaseIterable {
     case agents, alerts, citadel, approvals, activity
     var title: String {
         switch self {
-        case .agents: "Agents"
+        case .agents: "AI sessions"
         case .alerts: "Alerts"
         case .citadel: "Citadel"
         case .approvals: "Approvals"
@@ -162,7 +162,7 @@ struct BellGlance: View {
             ? Text("Nothing waiting on you")
             : Text("\(w) waiting on you").fontWeight(.semibold).foregroundStyle(palette.text))
             + Text(alerts > 0 ? " · \(alerts) \(alerts == 1 ? "alert" : "alerts")" : "")
-            + Text(" · \(running) \(running == 1 ? "agent" : "agents") running")
+            + Text(" · \(running) \(running == 1 ? "AI session" : "AI sessions") running")
     }
 
     @ViewBuilder private var groups: some View {
@@ -217,7 +217,7 @@ struct BellGlance: View {
                 .coreFont(size: MacTextSize.body, weight: .semibold)
             Text(
                 tab == .approvals
-                    ? "When an agent asks to do something, it waits here for you."
+                    ? "When an AI session asks to do something, it waits here for you."
                     : "Approvals and alerts from your Core show up here."
             )
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(.center)

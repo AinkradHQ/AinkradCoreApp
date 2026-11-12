@@ -104,7 +104,7 @@ struct SetupWizardView: View {
     private var choose: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             title("Set up Ainkrad")
-            note("Ainkrad runs your agents and terminals on a Core. This Mac shows you everything it does.")
+            note("Ainkrad runs your AI sessions and terminals on a Core. This Mac shows you everything it does.")
             HStack(alignment: .top, spacing: Space.s3) {
                 ChoiceCard(
                     symbol: "plus", title: "Set up a new Core",

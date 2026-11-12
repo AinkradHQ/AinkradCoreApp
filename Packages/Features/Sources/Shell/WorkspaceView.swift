@@ -98,8 +98,11 @@ struct WorkspaceView: View {
                 if !shell.panes.isEmpty {
                     // Every pane's tab, tiled or focused: title, state and all its actions. Dragging a tab over another
                     // pane tiles it there.
-                    PaneTabs(shell: shell, onDrag: { dragTo($0, $1, $2, layout) }, onDragEnd: { dropIt($0) })
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    PaneTabs(
+                        shell: shell, compact: geo.size.width < ShellMetrics.railBelow,
+                        onDrag: { dragTo($0, $1, $2, layout) }, onDragEnd: { dropIt($0) }
+                    )
+                    .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
             .coordinateSpace(name: "wsroot")
@@ -182,21 +185,27 @@ struct WorkspaceView: View {
 /// pane elsewhere. One indicator glides to the active tab.
 private struct PaneTabs: View {
     @Bindable var shell: ShellModel
+    /// A narrow window: every tab shrinks to its icon (and state dot), the rail of the AI Sessions narrow mockup. The same for
+    /// every app, since the tabs are the Shell's own.
+    let compact: Bool
     let onDrag: (String, CGPoint, CGSize) -> Void
     let onDragEnd: (String) -> Void
     @Namespace private var indicator
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         HStack(spacing: Space.s1) {
             ForEach(shell.panes) { p in
                 PaneTab(
-                    shell: shell, spec: p, on: (shell.focusedPane ?? shell.activePane) == p.id, indicator: indicator,
+                    shell: shell, spec: p, compact: compact, on: (shell.focusedPane ?? shell.activePane) == p.id,
+                    indicator: indicator,
                     onDrag: { onDrag(p.id, $0, $1) }, onDragEnd: { onDragEnd(p.id) })
             }
         }
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac)
         .coreAnimation(Motion.out(Motion.ui), value: shell.focusedPane ?? shell.activePane)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: compact)
         .coreSideKeys {
             shell.cyclePane($0)
             return .handled
@@ -212,6 +221,7 @@ private struct PaneTabs: View {
 private struct PaneTab: View {
     @Bindable var shell: ShellModel
     let spec: PaneSpec
+    let compact: Bool
     let on: Bool
     let indicator: Namespace.ID
     let onDrag: (CGPoint, CGSize) -> Void
@@ -247,23 +257,27 @@ private struct PaneTab: View {
                         draft = shell.tabName(spec)
                         editing = true
                     }
-            } else {
+            } else if !compact {
                 Text(shell.tabName(spec)).coreFont(size: MacTextSize.body, weight: on ? .semibold : .regular)
                     .foregroundStyle(on ? WidgetInk.primary : WidgetInk.secondary).lineLimit(1)
                     .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
+                    .transition(.opacity)
             }
             if let c = stateColor {
                 coreShape(1.5).fill(c).frame(width: 6, height: 6).help(spec.chip?.label ?? "")
             }
-            // Always laid out in a fixed 24 pt slot and shown by opacity, so hover never moves the tab.
-            Button {
-                shell.dismissPane(spec.id)
-            } label: {
-                Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
+            // Always laid out in a fixed 24 pt slot and shown by opacity, so hover never moves the tab. The rail has no room for
+            // it: the tab's menu closes the pane.
+            if !compact {
+                Button {
+                    shell.dismissPane(spec.id)
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).accessibilityLabel("Close \(spec.title)")
+                .opacity(hovering ? 1 : 0).allowsHitTesting(hovering)
             }
-            .buttonStyle(.plain).accessibilityLabel("Close \(spec.title)")
-            .opacity(hovering ? 1 : 0).allowsHitTesting(hovering)
         }
         .foregroundStyle(WidgetInk.secondary)
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
@@ -284,7 +298,9 @@ private struct PaneTab: View {
                 .onEnded { _ in onDragEnd() }
         )
         .contextMenu { menu }
-        .help("\(spec.title) · right-click for actions, ⌃Tab next tab, ⇧⌘R rename")
+        .help(
+            "\(compact ? shell.tabName(spec) + " · " : "")\(spec.title) · right-click for actions, ⌃Tab next tab, ⇧⌘R rename"
+        )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(spec.chip.map { "\(shell.tabName(spec)), \($0.label)" } ?? shell.tabName(spec))
         .accessibilityAddTraits(on ? [.isSelected, .isButton] : .isButton)

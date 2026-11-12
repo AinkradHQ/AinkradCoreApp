@@ -118,12 +118,14 @@ enum EntryParser {
         // `approval_requested` is the harness asking; the Core's own `approval_request` entry that follows is the one shown.
         // One answer's usage closes its turn: the divider carries what that turn cost. `turn_ended` and `waiting` are the Core's
         // own bookkeeping (the state says it), so they are not drawn.
+        // The runner's `usage` entry is the harness event as it is: `input`, `output`, `cache_read`, `cache_write` are THIS turn's
+        // tokens; `cost_usd` (US dollars, a float, null when the harness does not price) is the SESSION's cost so far, not the turn's.
+        // So the cost here is cumulative; the transcript store turns it into a per-turn cost (`TranscriptStore.perTurn`).
         case "usage":
-            let u = (b["usage"] as? [String: Any]) ?? b
-            let cost = (u["cost_usd_micros"] as? NSNumber) ?? (b["cost_usd_micros"] as? NSNumber)
-            func n(_ k: String...) -> Int64? { k.lazy.compactMap { (u[$0] as? NSNumber)?.int64Value }.first }
-            let tokens = (n("input", "input_tokens") ?? 0) + (n("output", "output_tokens") ?? 0)
-            return .turnEnded(costMicros: cost?.int64Value, tokens: tokens > 0 ? tokens : nil)
+            func n(_ k: String) -> Int64 { (b[k] as? NSNumber)?.int64Value ?? 0 }
+            let tokens = n("input") + n("output")
+            let cost = (b["cost_usd"] as? NSNumber).map { Int64(($0.doubleValue * 1_000_000).rounded()) }
+            return .turnEnded(costMicros: cost, tokens: tokens > 0 ? tokens : nil)
         case "session_started", "usage_so_far", "turn_ended", "waiting", "exited", "approval_requested": return .hidden
         default: return .note(type: type.isEmpty ? "unknown" : type, detail: str("reason") ?? str("text") ?? "")
         }

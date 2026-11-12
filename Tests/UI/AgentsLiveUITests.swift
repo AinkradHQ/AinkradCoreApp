@@ -1,6 +1,6 @@
 import XCTest
 
-/// The agents screens against a real local Core and a runner with a stand-in `claude` (no provider, no credentials).
+/// The AI sessions screens against a real local Core and a runner with a stand-in `claude` (no provider, no credentials).
 /// Only with `CORE_IT=1`: `scripts/app-it.sh agents` starts the Core and the runner, plays the approver for the app's pairing,
 /// and starts the first session from outside a little after the app is paired (this runner cannot write signal files).
 /// The stand-in prints an assistant message, one tool call and its result, asks for one approval (a push), and ends the turn.
@@ -54,10 +54,10 @@ final class AgentsLiveUITests: XCTestCase {
         try LivePairing.pair(app, env: env)
 
         // The list, live: nothing yet.
-        run("agents")
-        XCTAssertTrue(containing("Agents, Home Core").waitForExistence(timeout: 10), "the list pane opens")
+        run("ai sessions")
+        XCTAssertTrue(containing("AI Sessions, Home Core").waitForExistence(timeout: 10), "the list pane opens")
         // The script starts the first session a while after pairing; the list is empty until then.
-        _ = app.staticTexts["No agent sessions yet"].waitForExistence(timeout: 8)
+        _ = app.staticTexts["No AI sessions yet"].waitForExistence(timeout: 8)
         shot("list-empty")
 
         // A session started from outside arrives over the event stream and waits on the approval.
@@ -78,38 +78,35 @@ final class AgentsLiveUITests: XCTestCase {
             containing("on runner-1, Succeeded").waitForExistence(timeout: 60), "the stand-in was told yes and finished"
         )
 
-        // A session started from the app: the sheet, the runner picked for you, ⌘Return starts it (step-up already done).
-        run("new agent")
-        let prompt = app.textViews["Prompt"]
-        XCTAssertTrue(prompt.waitForExistence(timeout: 15), "the sheet has its prompt")
-        shot("new-session")
-        XCTAssertTrue(app.buttons["Start session"].exists)
-        app.typeText("add the v25 migration")  // the sheet focuses its prompt
+        // A session started from the app opens at once and empty, like typing `claude` in a terminal: no sheet, no prompt field.
+        // The first message goes through the composer (Touch ID is a software key here).
+        run("new ai session")
+        let composer1 = app.textFields["agent-composer"]
+        XCTAssertTrue(composer1.waitForExistence(timeout: 30), "a new session opens its pane with the composer")
+        shot("new-session-empty")
+        composer1.click()
+        composer1.typeText("add the v25 migration")
         shot("new-session-typed")
-        app.typeKey(.return, modifierFlags: .command)
-        shot("after-start")
-        XCTAssertTrue(
-            app.textFields["agent-composer"].waitForExistence(timeout: 30), "starting opens the session pane")
+        composer1.typeKey(.return, modifierFlags: [])
+        shot("after-first-message")
         XCTAssertTrue(containing("wants to use Bash").waitForExistence(timeout: 30), "its approval shows in the pane")
         shot("session-waiting")
         app.typeKey(.delete, modifierFlags: .command)  // ⌘⌫ denies
         XCTAssertTrue(containing("Denied").waitForExistence(timeout: 30), "the denial is in the transcript")
-        XCTAssertTrue(containing("Ended: succeeded").waitForExistence(timeout: 60), "the stand-in stopped when told no")
-        shot("session-denied-ended")
+        shot("session-denied")
 
-        // Another: the composer, then Cancel with its confirmation.
-        run("new agent")
-        let prompt2 = app.textViews["Prompt"]
-        XCTAssertTrue(prompt2.waitForExistence(timeout: 15))
-        app.typeText("second one")
-        app.typeKey(.return, modifierFlags: .command)
-        XCTAssertTrue(containing("wants to use Bash").waitForExistence(timeout: 30))
+        // Another: an empty session, a message, then Cancel with its confirmation.
+        run("new ai session")
+        XCTAssertTrue(app.textFields["agent-composer"].waitForExistence(timeout: 30))
         let fields = app.textFields.matching(identifier: "agent-composer")
         let composer = fields.element(boundBy: max(fields.count - 1, 0))  // the newest pane is the last
         composer.click()
+        composer.typeText("second one")
+        composer.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(containing("wants to use Bash").waitForExistence(timeout: 30))
         composer.typeText("please be quick")
         composer.typeKey(.return, modifierFlags: [])
-        let cleared = NSPredicate(format: "value == '' OR value == nil OR value == 'Reply to claude…'")
+        let cleared = NSPredicate(format: "value == '' OR value == nil OR value BEGINSWITH 'Message '")
         XCTAssertEqual(
             XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: cleared, object: composer)], timeout: 30),
             .completed, "a sent message leaves the composer")

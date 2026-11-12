@@ -14,6 +14,7 @@ struct NewSessionSheet: View {
     @State private var folder = ""
     @State private var repo = ""
     @State private var branch = ""
+    @State private var base = ""
     @State private var chainID: Int64?
     @State private var notice: InlineNotice?
     @State private var busy = false
@@ -72,11 +73,15 @@ struct NewSessionSheet: View {
                         case .fresh: EmptyView()
                         case .folder:
                             CoreTextField("Folder", placeholder: "/path/on/the/runner", text: $folder, mono: true)
+                            CoreTextField("Start from", placeholder: "main", text: $base, mono: true)
+                            Text("The folder must be a git repo. The session works in its own copy of it.")
+                                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         case .repo:
                             HStack(spacing: Space.s3) {
                                 CoreTextField("Repository", placeholder: "AinkradCore", text: $repo, mono: true)
                                 CoreTextField("Branch", placeholder: "feat/my-branch", text: $branch, mono: true)
                             }
+                            CoreTextField("Start from", placeholder: "main", text: $base, mono: true)
                             Text("Works in its own copy of the repo on the runner, so your branch stays as it is.")
                                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         }
@@ -184,7 +189,8 @@ struct NewSessionSheet: View {
             }
         let new = NewAgentSession(
             runner: runner.id, harness: harness, model: llm.isEmpty ? nil : llm, prompt: "", mode: mode,
-            chain: chain?.id, project: project, branch: place == .repo && !branch.isEmpty ? branch : nil)
+            chain: chain?.id, project: project, branch: place == .repo && !branch.isEmpty ? branch : nil,
+            base: base.trimmingCharacters(in: .whitespaces))
         Task {
             let n = await model.create(new)
             busy = false

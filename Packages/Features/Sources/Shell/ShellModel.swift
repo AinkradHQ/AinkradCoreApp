@@ -27,7 +27,7 @@ public struct PaneSpec: Identifiable {
     /// Panes with their own sidebar (Citadel, Core, admin) ask for more room than a list or terminal.
     public var minWidth: CGFloat
     public let content: AnyView
-    /// What ⌘N does while this pane is the active one; nil leaves ⌘N to start an agent session.
+    /// What ⌘N does while this pane is the active one; nil leaves ⌘N to start an AI session.
     public var onNew: (@MainActor () -> Void)?
 
     public init<V: View>(
@@ -411,7 +411,7 @@ public final class ShellModel {
         panes.sort { (order.firstIndex(of: $0.id) ?? 0) < (order.firstIndex(of: $1.id) ?? 0) }
     }
 
-    /// ⌘N: the active pane's own "new" (connect, new budget...), else a new agent session.
+    /// ⌘N: the active pane's own "new" (connect, new budget...), else a new AI session.
     public func newItem() {
         let id = activePane ?? panes.first?.id
         if surface == .workspace, let new = panes.first(where: { $0.id == id })?.onNew {

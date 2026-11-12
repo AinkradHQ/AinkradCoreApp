@@ -345,7 +345,7 @@ public final class BrainModel {
         guard installed else { return }
         if service?.importRoutes != nil {
             entry(
-                "brain-import", "Import into the Brain…", "Collect your agent sessions into rooms",
+                "brain-import", "Import into the Brain…", "Collect your AI sessions into rooms",
                 "square.and.arrow.down",
                 ["import", "sessions", "rooms", "claude"], action: true
             ) { $0.openImport() }

@@ -156,7 +156,7 @@ struct BrainPane: View {
                 BrainStateCard(
                     symbol: "tray", title: "Nothing in the Brain yet",
                     text:
-                        "Import your agent sessions to make the first rooms. You review every room before anything is kept.",
+                        "Import your AI sessions to make the first rooms. You review every room before anything is kept.",
                     secondary: how, primary: CoreAction("Import") { model.openImport() }
                 )
                 .accessibilityIdentifier("brain-not-set-up")
