@@ -243,7 +243,13 @@ struct ConnCard: View {
                 ConnDialogs.openAccess(model, item)
             },
             CoreDropdownItem("Replace token", symbol: "key") { ConnDialogs.openReplace(model, item) },
-        ]
+        ] + history
+    }
+
+    /// History moves into the menu (n35: a card shows Test and Disconnect only).
+    private var history: [CoreDropdownItem] {
+        model.host.shell.settings.hidden.contains("audit")
+            ? [] : [CoreDropdownItem("History", symbol: "clock.arrow.circlepath") { model.openHistory(item) }]
     }
 
     var body: some View {
@@ -265,47 +271,29 @@ struct ConnCard: View {
                 Spacer(minLength: Space.s2)
                 StateBadge(label, tone: tone, symbol: symbol).layoutPriority(2)
             }
-            Text(
-                need
-                    ? "\(item.reason ?? "This sign-in stopped working.") AI sessions can't use it until you sign in again."
-                    : model.access(item)
-            )
-            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            if let t = model.tested[item.id] {
-                Label(t, systemImage: "checkmark.seal").coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(GlassInk.secondary)
-            }
-            HStack {
-                Text(when).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                Spacer()
-                Text(item.users <= 1 ? "Only you" : "You and \(item.users - 1) AI sessions")
-                    .coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(GlassInk.secondary)
-            }
-            HStack(spacing: Space.s1) {
+            // One line (n35); the rest of what the card used to say is in its tooltip.
+            Text(model.tested[item.id] ?? (need ? item.reason ?? "This sign-in stopped working." : model.access(item)))
+                .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                .help("\(when) · \(item.users <= 1 ? "Only you" : "You and \(item.users - 1) AI sessions")")
+            HStack(spacing: Space.s2) {
                 if need {
                     AccLink(title: "Sign in again", symbol: "arrow.clockwise") {
                         ConnDialogs.openConnect(model, kind: item.kind, again: item.id)
                     }
                 }
-                AccLink(title: model.testing == item.id ? "Testing…" : "Test", symbol: "play") {
+                AccLink(title: model.testing == item.id ? "Testing…" : "Test") {
                     Task { await model.test(item) }
                 }
-                if !model.host.shell.settings.hidden.contains("audit") {
-                    AccLink(title: "History", symbol: "clock.arrow.circlepath") { model.openHistory(item) }
-                        .help("Opens Settings, Audit, showing only what happened to this connection")
-                }
+                AccLink(title: "Disconnect", danger: true) { ConnDialogs.openDisconnect(model, item) }
                 Spacer(minLength: 0)
-                AccLink(title: "Disconnect", symbol: "trash", danger: true) { ConnDialogs.openDisconnect(model, item) }
                 CoreDropdown(items: menuItems, isPresented: $menuOpen) {
                     Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
                         .foregroundStyle(GlassInk.primary)
-                        .frame(width: 30, height: 26)
-                        .background(GlassInk.well, in: coreShape(7))
-                        .overlay { coreShape(7).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-                        .contentShape(coreShape(7))
+                        .frame(width: MacSize.controlMd, height: MacSize.controlSm)
+                        .background(GlassInk.well, in: coreShape(Radius.chip))
+                        .contentShape(coreShape(Radius.chip))
                 }
-                .help("More: rename, default, who can use it, replace the token")
+                .help("More: rename, default, who can use it, replace the token, history")
                 .accessibilityLabel("More actions for \(item.name)")
             }
         }
