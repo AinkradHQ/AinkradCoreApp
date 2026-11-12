@@ -72,7 +72,7 @@ public struct ConfirmCard: View {
         .padding(Space.s6)
         .frame(width: Space.s8 * 14)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
-        .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
+        .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         .scaleEffect(shown || reduce ? 1 : 0.97)
         .opacity(shown ? 1 : 0)
         .animation(Motion.modal(shown, reduce), value: shown)
@@ -136,17 +136,17 @@ public struct ChoiceTile: View {
                 if let keys {
                     Text(keys).coreFont(size: MacTextSize.meta, weight: .medium, design: .rounded)
                         .padding(.horizontal, 6).frame(minHeight: 20)
-                        .background(.white.opacity(0.14), in: coreShape(5))
+                        .background(on ? .white.opacity(0.14) : GlassInk.lift(0.14), in: coreShape(5))
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(on ? .white : GlassInk.primary)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 on ? hue.opacity(choice.destructive ? 0.85 : 0.6) : GlassInk.well, in: coreShape(Radius.control + 2)
             )
             .animation(Motion.out(Motion.hover), value: on)
             .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? .white.opacity(0.4) : GlassInk.wellEdge, lineWidth: 1)
+                coreShape(Radius.control + 2).strokeBorder(on ? GlassInk.rim(0.4) : GlassInk.wellEdge, lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control + 2))
         }

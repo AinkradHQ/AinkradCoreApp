@@ -124,10 +124,10 @@ struct BrainScreensTests {
         #expect(ReviewWords.line(ProposalCard(id: "unsorted", name: "Unsorted")).hasPrefix("No room yet"))
     }
 
-    @Test func aRealCoreShowsRoomsAndSourcesOnly() {
+    @Test func aRealCoreShowsInboxRoomsAndSources() {
         let m = BrainModel(host: FakeHost())
         m.use(CoreBrainService(transport: FakeBrainTransport()))
-        #expect(m.visibleTabs == [.rooms, .sources] && m.currentTab == .rooms)
+        #expect(m.visibleTabs == [.inbox, .rooms, .sources] && m.currentTab == .inbox)
         m.tab = .sources
         #expect(m.currentTab == .sources)
     }

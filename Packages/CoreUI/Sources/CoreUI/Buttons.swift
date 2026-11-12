@@ -70,7 +70,9 @@ private struct CoreButtonBody: View {
     private var hover: Bool { hovering || forced == .hover }
 
     var body: some View {
-        let ink: Color = kind == .quietDanger ? GlassInk.redInk : .white
+        // White on the blue and red fills; the glass ink on the wells (dark by day).
+        let solid = kind == .prominent || kind == .danger
+        let ink: Color = kind == .quietDanger ? GlassInk.redInk : solid ? .white : GlassInk.primary
         HStack(spacing: Space.s2) {
             ZStack {
                 configuration.label.opacity(busy ? 0 : 1)
@@ -81,7 +83,7 @@ private struct CoreButtonBody: View {
                 // fixedSize: a keycap never gives way to its label ("Deny ⌘⌫" drew as "⌘…" on a small button).
                 Text(keycap).coreFont(size: 10, weight: .medium, design: .rounded).fixedSize()
                     .padding(.horizontal, 5).frame(minHeight: 16)
-                    .background(.white.opacity(0.16), in: coreShape(5))
+                    .background(solid ? .white.opacity(0.16) : GlassInk.lift(0.16), in: coreShape(5))
                     .accessibilityHidden(true)
             }
         }
@@ -135,7 +137,8 @@ private struct ButtonSurface: ViewModifier {
             .background {
                 switch kind {
                 case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.95 : 0.8))
-                case .secondary: shape.fill(hover ? hue.opacity(0.28) : GlassInk.well)
+                case .secondary:
+                    shape.fill(hover ? GlassInk.adaptive(hue.opacity(0.28), day: .white.opacity(0.85)) : GlassInk.well)
                 case .plain: shape.fill(hover ? GlassInk.wellHover : .clear)
                 case .quietDanger: shape.fill(GlassInk.red.opacity(hover ? 0.22 : 0.1))
                 }
@@ -145,7 +148,7 @@ private struct ButtonSurface: ViewModifier {
                     shape.strokeBorder(GlassInk.red.opacity(hover ? 0.85 : 0.55), lineWidth: 1)
                 } else if kind != .plain {
                     shape.strokeBorder(
-                        .white.opacity(0.3 + (hover ? 0.15 : 0)), lineWidth: 1)
+                        GlassInk.rim(0.3 + (hover ? 0.15 : 0)), lineWidth: 1)
                 }
             }
             .overlay { shape.fill(.black.opacity(darken ? 0.18 : 0)).allowsHitTesting(false) }
@@ -223,9 +226,9 @@ extension View {
         keyboardShortcut(KeyEquivalent(key), modifiers: modifiers)
             .overlay(alignment: .bottomTrailing) {
                 Text(label).coreFont(size: 10, weight: .semibold, design: .rounded)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(GlassInk.adaptive(.white.opacity(0.85), day: GlassInk.dayInk.opacity(0.7)))
                     .padding(.horizontal, 5).frame(minHeight: 16)
-                    .background(.black.opacity(0.35), in: coreShape(4))
+                    .background(GlassInk.adaptive(.black.opacity(0.35), day: .white.opacity(0.85)), in: coreShape(4))
                     .padding(6)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)

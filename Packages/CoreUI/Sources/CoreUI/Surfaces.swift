@@ -50,31 +50,33 @@ private struct GlassModifier: ViewModifier {
     let tinted: Bool
     let frosted: Bool
     @Environment(\.coreSolidOnly) private var solid
+    /// Night glass is always dark; day glass is light.
+    private var scheme: ColorScheme { palette.isDay ? .light : .dark }
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         if solid {
             // Reduce Transparency: a solid panel fill instead of Liquid Glass (glass is not documented to honour the setting).
-            content.environment(\.colorScheme, .dark).background(palette.panelStrong, in: shape)
+            content.environment(\.colorScheme, scheme).background(palette.panelStrong, in: shape)
         } else if #available(macOS 26, iOS 26, *) {
             if tinted {
-                // The one glass for cards, tiles and dialogs (the launcher's): a dark layer on Apple's glass, clear by
-                // day and frosted at night. The older deep-blue tint is gone (Ahmed, 2026-11-05: latest style everywhere).
-                let glass = palette.isDay ? Glass.clear : Glass.regular
-                content.environment(\.colorScheme, .dark)
-                    .background(Color.black.opacity(palette.isDay ? 0.4 : 0.32), in: shape)
+                // The one glass for cards, tiles and dialogs (the launcher's): a dark layer on Apple's frosted glass at
+                // night; by day a white layer on light glass (Ahmed, 2026-11-12: day is light Liquid Glass).
+                let glass = Glass.regular
+                content.environment(\.colorScheme, scheme)
+                    .background(palette.isDay ? Color.white.opacity(0.42) : Color.black.opacity(0.32), in: shape)
                     .glassEffect(interactive ? glass.interactive() : glass, in: shape)
             } else {
                 let base = frosted ? Glass.regular : Glass.clear
                 // Untinted is the widgets' glass: clear, so the sky shows through sharp; darkened a touch at night.
                 let glass =
                     palette.isDay
-                    ? base.tint(Color(red: 0.08, green: 0.22, blue: 0.5).opacity(0.35))
+                    ? base.tint(.white.opacity(0.3))
                     : base.tint(.black.opacity(0.32))
-                content.environment(\.colorScheme, .dark)
+                content.environment(\.colorScheme, scheme)
                     .glassEffect(interactive ? glass.interactive() : glass, in: shape)
             }
         } else {
-            content.background(shape.fill(.regularMaterial).environment(\.colorScheme, .dark))
+            content.background(shape.fill(.regularMaterial).environment(\.colorScheme, scheme))
                 .background(palette.glassTint, in: shape)
         }
     }

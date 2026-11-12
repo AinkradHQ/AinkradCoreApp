@@ -22,6 +22,9 @@ struct RoomsTab: View {
         }
         .animation(Motion.out(Motion.ui), value: model.viewingID)
         .task {
+            for r in model.rooms where model.candidates.policy(r.id) == nil { await model.candidates.loadPolicy(r.id) }
+        }
+        .task {
             if let id = model.viewingID, model.inspectingID != id, model.viewing?.lock == nil {
                 await model.inspect(id)
             }
@@ -65,16 +68,15 @@ private struct RoomRow: View {
             selected: room.id == model.viewingID, action: pick
         ) {
             VStack(alignment: .trailing, spacing: 0) {
-                Text(room.counts.map { $0.records.formatted() } ?? "Sealed")
-                    .coreFont(size: MacTextSize.body, weight: .medium).monospacedDigit()
-                HStack(spacing: 0) {
-                    if let n = newCount, n > 0 {
-                        Text("+\(n) new · ").foregroundStyle(GlassInk.blueInk)
-                    }
-                    Text(model.lastSyncLabel(room) ?? "")
+                if waiting {
+                    Text("Needs a local model").foregroundStyle(GlassInk.amberInk)
+                } else {
+                    Text(policyLabel).foregroundStyle(GlassInk.secondary)
                 }
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                Text(room.counts.map { $0.records.formatted() } ?? "Sealed")
+                    .foregroundStyle(GlassInk.secondary).monospacedDigit()
             }
+            .coreFont(size: MacTextSize.meta)
         }
         .help(room.help)
         .contextMenu {
@@ -87,15 +89,21 @@ private struct RoomRow: View {
         .accessibilityIdentifier("brain-room-\(room.id)")
     }
 
-    private var subtitle: String {
-        if room.lock != nil { return "Sealed · \(room.kind.label)" }
-        let types = BrainWords.breakdown(room.counts?.byType ?? [])
-        return types.isEmpty ? "\(room.kind.label) · \(room.mode.label)" : types
+    private var policy: RoomPolicy? { model.candidates.policy(room.id) }
+    private var waiting: Bool { policy?.needsLocalModel ?? false }
+    private var policyLabel: String {
+        (policy.map { $0.model == .localOnly } ?? (room.provider == .local)) ? "Local only" : "Cloud"
     }
 
-    /// What the last sync added here.
-    private var newCount: Int? {
-        model.sync?.outcome?.routed.first { $0.room == room.id }?.sources
+    private var subtitle: String {
+        if room.lock != nil { return "Sealed · \(room.kind.label)" }
+        // Sources named with capitals ("Claude Code 842") are listed as they are; record types are counted and pluralised.
+        let shares = room.counts?.byType ?? []
+        let types =
+            shares.contains { $0.type.first?.isUppercase == true }
+            ? shares.filter { $0.count > 0 }.map { "\($0.type) \($0.count.formatted())" }.joined(separator: " · ")
+            : BrainWords.breakdown(shares)
+        return types.isEmpty ? "\(room.kind.label) · \(room.mode.label)" : types
     }
 
     private func pick() {
@@ -123,6 +131,8 @@ private struct RoomPane: View {
                         }
                         .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(model.busy != nil)
                     }
+                } else if model.candidates.paneMode == .settings {
+                    RoomSettings(model: model, room: room)
                 } else {
                     notices
                     if let sync = model.sync {
@@ -143,11 +153,18 @@ private struct RoomPane: View {
                 Text(line).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
             Spacer(minLength: Space.s3)
-            VStack(alignment: .trailing, spacing: 2) {
-                if let when = model.lastSyncLabel(room) { Text("Synced \(when.lowercased())") }
-                Text("\(room.mode.label) · \(room.provider.label)").help(room.provider.help)
+            if room.lock == nil, model.service?.servesCandidates == true {
+                CoreSegmented(
+                    "Room view",
+                    segments: [CoreSegment(RoomPaneMode.items, "Items"), CoreSegment(.settings, "Settings")],
+                    selection: Bindable(model.candidates).paneMode)
+            } else {
+                VStack(alignment: .trailing, spacing: 2) {
+                    if let when = model.lastSyncLabel(room) { Text("Synced \(when.lowercased())") }
+                    Text("\(room.mode.label) · \(room.provider.label)").help(room.provider.help)
+                }
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .help(room.help)
         .contextMenu {
@@ -157,7 +174,7 @@ private struct RoomPane: View {
 
     private var line: String {
         var parts = [room.kind.label]
-        if let c = room.counts { parts.append(BrainWords.plural(c.records, "item", "items")) }
+        if let c = room.counts { parts.append("\(c.records.formatted()) \(c.records == 1 ? "item" : "items")") }
         return parts.joined(separator: " · ")
     }
 

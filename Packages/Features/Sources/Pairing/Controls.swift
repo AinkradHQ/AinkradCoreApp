@@ -18,7 +18,7 @@ struct DialogCard<Content: View>: View {
         .foregroundStyle(palette.text)
         .corePanel(radius: Radius.panel, padding: Space.s6)
         .frame(width: width)
-        .shadow(color: .black.opacity(0.3), radius: 34, y: 14)
+        .shadow(color: GlassInk.shade(0.3), radius: 34, y: 14)
         .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)

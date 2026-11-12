@@ -6,6 +6,7 @@ import SwiftUI
 struct SourcesTab: View {
     let brain: BrainModel
     let sync: SyncModel
+    @State private var expanded = false
 
     private struct Line: Identifiable {
         let id: String
@@ -18,30 +19,33 @@ struct SourcesTab: View {
         let known = brain.importSources()
         let lines = self.lines(known)
         let unreadable = lines.filter { $0.source == nil }
+        let mac = lines.compactMap(\.source).filter { !$0.isConnection && !$0.isRunner && !$0.isCore }
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s4) {
                 Text("Source").padding(.leading, Space.s8 * 2)  // the switch slot (48) + the row gap (16)
                 Spacer(minLength: Space.s3)
-                Text("Last run").frame(width: Space.s8 * 4, alignment: .trailing)
+                Text("Items").frame(width: Space.s8 * 3.5, alignment: .trailing)
+                Text("Last run").frame(width: Space.s8 * 4.5, alignment: .trailing)
             }
             .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             .padding(.horizontal, Space.s3)
-            ForEach([SyncWords.sessionsGroup, SyncWords.notesGroup], id: \.self) { g in
-                let rows = lines.filter { $0.group == g }.enumerated()
-                    .sorted { (Self.rank($0.element), $0.offset) < (Self.rank($1.element), $1.offset) }.map(\.element)
-                if !rows.isEmpty {
-                    Text(g).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
-                        .padding(.horizontal, Space.s3).padding(.top, Space.s2)
-                        .accessibilityAddTraits(.isHeader)
-                    VStack(spacing: 2) { ForEach(rows) { row($0) } }
+            SourceLine(
+                name: "On this Mac", sub: "Claude Code, Codex, OpenCode, project docs, notes vault and more",
+                items: mac.contains { $0.items != nil } ? mac.compactMap(\.items).reduce(0, +).formatted() : "",
+                tap: { withAnimation(Motion.out(Motion.ui)) { expanded.toggle() } }
+            ) {
+                IconTile("terminal", hue: GlassInk.slate, size: Space.s8 - Space.s1)
+            } last: {
+                HStack(spacing: Space.s1) {
+                    Text("\(mac.filter(\.enabled).count) of \(mac.count) on")
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right").coreFont(size: MacTextSize.meta)
                 }
+                .coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
             }
-            if !unreadable.isEmpty {
-                Text(Self.unreadableNote(unreadable.map(\.title)))
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .padding(.horizontal, Space.s3).padding(.top, Space.s2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .accessibilityIdentifier("sources-mac")
+            if expanded { macGroups(lines, unreadable) }
+            ConnectionSources(sync: sync)
+            RunnerSources(model: brain)
             let global = sync.rules.filter { $0.room == nil }
             if !global.isEmpty {
                 HStack {
@@ -55,9 +59,31 @@ struct SourcesTab: View {
                 VStack(spacing: 2) { ForEach(global) { RuleRow(sync: sync, rule: $0) } }
             }
         }
+        .task { await brain.candidates.loadRunners() }
         .frame(maxWidth: Space.s8 * 28, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("brain-sources")
+    }
+
+    /// The Mac collectors, in their two groups, once "On this Mac" is open.
+    @ViewBuilder private func macGroups(_ lines: [Line], _ unreadable: [Line]) -> some View {
+        ForEach([SyncWords.sessionsGroup, SyncWords.notesGroup], id: \.self) { g in
+            let rows = lines.filter { $0.group == g && $0.source?.isConnection != true && $0.source?.isRunner != true }
+                .enumerated()
+                .sorted { (Self.rank($0.element), $0.offset) < (Self.rank($1.element), $1.offset) }.map(\.element)
+            if !rows.isEmpty {
+                Text(g).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
+                    .padding(.horizontal, Space.s3).padding(.top, Space.s2)
+                    .accessibilityAddTraits(.isHeader)
+                VStack(spacing: 2) { ForEach(rows) { row($0) } }
+            }
+        }
+        if !unreadable.isEmpty {
+            Text(Self.unreadableNote(unreadable.map(\.title)))
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .padding(.horizontal, Space.s3).padding(.top, Space.s2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// The Core's collectors in the wizard's order, then the tools this app cannot read yet.

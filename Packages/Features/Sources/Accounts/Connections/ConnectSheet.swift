@@ -119,6 +119,7 @@ struct ConnectSheet: View {
             CoreDialogPanel("Connected") {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     Text("Your AI sessions can use it now.").foregroundStyle(GlassInk.secondary)
+                    if !model.picked.isEmpty { PickedList(kind: k.resource, names: model.picked) }
                     if let c = model.item(id) {
                         AccPanel {
                             HStack(spacing: Space.s3) {
@@ -150,19 +151,21 @@ struct ConnectSheet: View {
         let gh = k.signIn == .deviceCode
         let steps =
             gh
-            ? ["Waiting for you on github.com", "Approved", "Choose which repositories Core can reach", "Connected"]
-            : ["Waiting for you in your browser", "Approved", "Pick your site", "Connected"]
+            ? ["Sign in to GitHub", "Choose repositories", "Connected"]
+            : ["Sign in with Atlassian", "Pick your site", "Connected"]
         let at: Int =
             switch f?.step {
-            case .chooseResources, .pickSite: 2
+            case .chooseResources, .pickSite: 1
             default: 0
             }
         return CoreDialogPanel("Sign in with \(k.name)") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 switch f?.step {
                 case .chooseResources(let login, _):
-                    Text("Signed in as \(login). Now pick which repositories Core may reach. GitHub shows the list.")
-                        .foregroundStyle(GlassInk.secondary)
+                    Text(
+                        "Signed in as \(login). Step 2: choose the repositories Core may reach. GitHub shows the list."
+                    )
+                    .foregroundStyle(GlassInk.secondary)
                 case .pickSite:
                     Text("You have access to more than one site. Pick one; connect the other later if you need it.")
                         .foregroundStyle(GlassInk.secondary)
@@ -170,7 +173,7 @@ struct ConnectSheet: View {
                     Text(
                         gh
                             ? "Enter this code on github.com. It works for 15 minutes."
-                            : "Your browser opens \(k.name). Sign in and press Accept, then come back here."
+                            : "Your browser opens Atlassian. Sign in and press Accept, then come back here."
                     ).foregroundStyle(GlassInk.secondary)
                 }
                 if gh, case .waiting? = f?.step, let code = f?.userCode {
@@ -216,7 +219,7 @@ struct ConnectSheet: View {
                 Button("Skip for now") { Task { await model.choose(site: nil) } }
                     .buttonStyle(CoreButtonStyle(.secondary))
                 Spacer(minLength: Space.s3)
-                Button(model.installing ? "Waiting for GitHub…" : "Choose on github.com") { model.openInstall() }
+                Button(model.installing ? "Waiting for GitHub…" : "Choose repositories") { model.openInstall() }
                     .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.installing)
                     .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
             case .pickSite(let sites):
@@ -229,9 +232,11 @@ struct ConnectSheet: View {
                     Button("(advanced)…") { advanced = true }.buttonStyle(CoreButtonStyle(.secondary))
                 }
                 Spacer(minLength: Space.s3)
-                Button(k.signIn == .deviceCode ? "Open github.com" : "Open \(k.name)") { model.openSignIn() }
-                    .buttonStyle(CoreButtonStyle(.prominent)).disabled(f == nil)
-                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
+                Button(k.signIn == .deviceCode ? "Sign in with GitHub" : "Sign in with Atlassian") {
+                    model.openSignIn()
+                }
+                .buttonStyle(CoreButtonStyle(.prominent)).disabled(f == nil)
+                .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
             }
         }
     }
@@ -360,5 +365,24 @@ struct TurnOnConnections: View {
     private func button(_ title: String) -> some View {
         Button(title) { Task { await model.turnOnConnections(then: retry) } }
             .buttonStyle(CoreButtonStyle(.prominent)).accessibilityIdentifier("connections-turn-on")
+    }
+}
+
+/// GitHub: the repositories the person picked, a few by name.
+struct PickedList: View {
+    let kind: String
+    let names: [String]
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Text("You chose \(names.count) \(names.count == 1 ? String(kind.dropLast()) : kind)").coreFont(
+                size: MacTextSize.meta, weight: .semibold)
+            ForEach(names.prefix(5), id: \.self) { Text($0).coreFont(size: MacTextSize.meta, design: .monospaced) }
+            if names.count > 5 {
+                Text("and \(names.count - 5) more").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .accessibilityElement(children: .combine)
     }
 }

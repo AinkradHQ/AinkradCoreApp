@@ -102,7 +102,7 @@ public struct CoreDropdown<Label: View>: View {
         .frame(minWidth: max(Space.s8 * 6, triggerFrame.width), alignment: .leading)
         .fixedSize()
         .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, part: .dropdowns)
-        .shadow(color: .black.opacity(0.3), radius: 24, y: 8)
+        .shadow(color: GlassInk.shade(0.3), radius: 24, y: 8)
         .background(
             GeometryReader { g in
                 Color.clear.onChange(of: g.frame(in: .global), initial: true) { _, f in panelFrame = f }

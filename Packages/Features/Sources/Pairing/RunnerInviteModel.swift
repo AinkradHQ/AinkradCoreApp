@@ -51,7 +51,7 @@ final class RunnerInviteModel {
     }
 
     /// The command the person runs on the server.
-    var command: String? { invite.map { AddWizardPlan.runnerInviteCommand(token: $0.token) } }
+    var command: String? { invite.map { _ in AddWizardPlan.runnerInviteCommand() } }
     var live: Bool { phase == .waiting }
     var done: Bool { if case .connected = phase { true } else { false } }
 
@@ -151,9 +151,10 @@ final class RunnerInviteModel {
 
     // MARK: the copied command
 
+    /// Copies the invite code (the secret), not the command.
     func copy() {
-        guard let command else { return }
-        copiedCount = pasteboard.write(secret: command)
+        guard let code = invite?.token, !code.isEmpty else { return }
+        copiedCount = pasteboard.write(secret: code)
         copied = true
         clearTask?.cancel()
         clearTask = Task { [weak self] in

@@ -17,6 +17,8 @@ public final class BrainDemo {
         "checks-offline",
         "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
         "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
+        // The Brain M3 states of brain-m3.html, in the mockup's order.
+        "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
         "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
         "import", "import-review",
     ]
@@ -26,6 +28,33 @@ public final class BrainDemo {
         if let room { model.view(room) }
         model.inboxState.list = list
         await model.loadInbox()
+    }
+
+    private func showM3(_ scene: String) async {
+        let c = model.candidates!
+        c.paneMode = .items
+        switch scene {
+        case "m3-inbox", "m3-edit", "m3-queued":
+            model.show(.inbox)
+            await c.load()
+            for r in model.rooms { await c.loadPolicy(r.id) }
+            if scene == "m3-edit", let first = c.items.first { c.startEdit(first.id) }
+        case "m3-rules", "m3-local", "m3-room-queued":
+            let id = scene == "m3-rules" ? "core" : scene == "m3-local" ? "workan-space" : "personal"
+            model.show(.rooms)
+            model.view(id)
+            await model.inspect(id)
+            for r in model.rooms { await c.loadPolicy(r.id) }
+            c.paneMode = .settings
+        default:
+            model.show(.sources)
+            await model.sync?.reload()
+            await c.loadRunners()
+            if scene == "m3-runner-on" {
+                await c.toggleRunner("vps-1")
+                BrainSheets.runnerHistory(model)
+            }
+        }
     }
 
     public func showInteractive(_ scene: String) async { await show(scene) }
@@ -57,12 +86,21 @@ public final class BrainDemo {
         case "worst-overview", "worst-rooms", "worst-inbox": s.worst = true
         default: break
         }
+        if scene.hasPrefix("m3-") {
+            s.m3 = true
+            s.noLocalModel = scene == "m3-queued" || scene == "m3-room-queued"
+            s.autoAccept = scene == "m3-local"
+        }
         // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
         s.imports = true
         model.importSources = { SampleImportSource.all }
         if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))
             await model.reload()
+        }
+        if scene.hasPrefix("m3-") {
+            await showM3(scene)
+            return
         }
         switch scene {
         case "rooms": model.show(.rooms)

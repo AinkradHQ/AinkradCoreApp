@@ -186,7 +186,9 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
                 } else {
                     f.step =
                         f.kind == "github"
-                        ? .chooseResources(login: "@sample-dev", install: URL(string: "https://github.com/apps")!)
+                        ? .chooseResources(
+                            login: "@sample-dev",
+                            install: URL(string: "https://github.com/apps/ainkradhq/installations/new")!)
                         : .pickSite(["sample.atlassian.net", "other.atlassian.net"])
                 }
             } else if n >= 5, case .chooseResources = f.step {

@@ -14,7 +14,7 @@ struct AppRegistrationSheet: View {
     private var key: String { "app-\(kind.id)" }
 
     var body: some View {
-        CoreDialogPanel("\(kind.name) app registration", width: Space.s8 * 17) {
+        CoreDialogPanel("Your own \(kind.name) app (advanced)", width: Space.s8 * 17) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 switch state {
                 case .loading: AccSkeleton()

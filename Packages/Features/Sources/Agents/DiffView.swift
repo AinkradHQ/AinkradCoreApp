@@ -66,7 +66,7 @@ struct DiffBlock: View {
         }
         .textSelection(.enabled)
         .padding(.vertical, Space.s1)
-        .background(.black.opacity(0.22), in: coreShape(Radius.control))
+        .background(GlassInk.sunk(0.22), in: coreShape(Radius.control))
         .clipShape(coreShape(Radius.control))
     }
 

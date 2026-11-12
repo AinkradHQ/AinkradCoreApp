@@ -274,7 +274,7 @@ private struct DeviceCard: View {
         .buttonStyle(.plain)
         .focusable(false)
         .coreScaleEffect(hovering ? 1.02 : 1)
-        .shadow(color: .black.opacity(hovering ? 0.25 : 0), radius: 16, y: 8)
+        .shadow(color: GlassInk.shade(hovering ? 0.25 : 0), radius: 16, y: 8)
         .onHover { hovering = $0 }
         .animation(.smooth(duration: 0.3), value: hovering)
         .animation(.smooth(duration: 0.3), value: selected)

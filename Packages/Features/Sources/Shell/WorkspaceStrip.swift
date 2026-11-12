@@ -64,7 +64,7 @@ struct StripBar: View {
         GeometryReader { g in
             let w = max(48, g.size.width * visible / max(total, 1))
             let x = (g.size.width - w) * offset / max(total - visible, 1)
-            coreShape(2).fill(.white.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
+            coreShape(2).fill(GlassInk.primary.opacity(0.45)).frame(width: w, height: 4).offset(x: x)
         }
         .frame(height: 4)
         .padding(.horizontal, Space.s4).padding(.bottom, 2)
@@ -114,8 +114,8 @@ struct StackBehind: View {
     var body: some View {
         ZStack(alignment: .top) {
             ForEach(0..<min(count, 2), id: \.self) { i in
-                coreShape(Radius.pane).fill(.white.opacity(0.06 - Double(i) * 0.02))
-                    .overlay { coreShape(Radius.pane).strokeBorder(.white.opacity(0.14), lineWidth: 1) }
+                coreShape(Radius.pane).fill(GlassInk.lift(0.06 - Double(i) * 0.02))
+                    .overlay { coreShape(Radius.pane).strokeBorder(GlassInk.rim(0.14), lineWidth: 1) }
                     .padding(.horizontal, CGFloat(i + 1) * 10)
                     .offset(y: -CGFloat(i + 1) * 5)
             }

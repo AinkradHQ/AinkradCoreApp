@@ -24,6 +24,8 @@ public final class ConnectionsModel {
     var flow: ConnFlow?
     /// The connection being signed in to again (its "Sign in again" button), instead of a new one.
     var again: Int64?
+    /// GitHub: the repositories the person picked, read once the connection exists.
+    var picked: [String] = []
     /// GitHub's repository page is open; waiting for GitHub to say which were chosen.
     var installing = false
     /// The card the keyboard is on.
@@ -165,6 +167,7 @@ public final class ConnectionsModel {
     func startFlow(_ kind: String) async {
         guard let service else { return }
         stopFlow()
+        picked = []
         turnOn = nil
         if let why = host.pausedReason {
             host.shell.showToast(why)
@@ -266,7 +269,7 @@ public final class ConnectionsModel {
         poll()
     }
 
-    private func installed(_ number: String) async {
+    func installed(_ number: String) async {
         guard let f = flow, let service, let n = Int64(number) else { return }
         do {
             let why = "Let Core reach the repositories you chose."
@@ -274,6 +277,7 @@ public final class ConnectionsModel {
                 try await service.install(kind: f.kind, installation: n)
             }
             await reload()
+            picked = (try? await service.resources(c.id)) ?? []
             if flow?.id == f.id { flow?.step = .connected(c.id) }
             catcher?.stop()
             catcher = nil
@@ -281,8 +285,9 @@ public final class ConnectionsModel {
         } catch is AdminDeclined {
             installing = false
         } catch {
-            flow?.step = .failed(title: "Couldn't use the repositories you chose.", fix: ConnSay.plain(error))
+            flow?.step = ConnSay.installFailure(error, hasGitHub: items.contains { $0.kind == f.kind })
             flow?.gated = ConnSay.isGate(error)
+            installing = false
         }
     }
 

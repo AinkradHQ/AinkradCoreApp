@@ -246,7 +246,7 @@ private struct BannerPreview: View {
             Text("now").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
         .padding(Space.s3).frame(maxWidth: Space.s8 * 12, alignment: .leading)
-        .background(.black.opacity(0.25), in: coreShape(Radius.cardMac))
+        .background(GlassInk.sunk(0.25), in: coreShape(Radius.cardMac))
         .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .help("What an approval banner looks like")
         .accessibilityElement(children: .combine).accessibilityLabel("Preview: claude is waiting on you")
