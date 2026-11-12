@@ -37,12 +37,12 @@ public enum BrainWords {
     }
 
     public static func failure(_ error: Error) -> String {
-        (error as? BrainFailure)?.sentence ?? "Something went wrong. Nothing was changed."
+        if let e = error as? BrainHTTPError { return CoreBrainService.failure(e).sentence }
+        return (error as? BrainFailure)?.sentence ?? "Something went wrong. Nothing was changed."
     }
 
-    public static let unavailableTitle = "Core does not serve the Brain yet"
-    public static let unavailableText =
-        "Rooms and memory appear here once Core serves them. Nothing on this screen is live."
+    public static let unavailableTitle = "Brain is coming"
+    public static let unavailableText = "It will keep what your agents learn, in rooms, on your Core."
     public static let sampleLabel = "Sample data. Core does not serve the Brain yet."
 
     // MARK: plain words. The technical term stays in the hover help.
