@@ -27,6 +27,8 @@ struct SetupWizardView: View {
                     case .install: install
                     case .connect, .connecting: connect
                     case .name: nameStep
+                    case .ready:
+                        if let m = model.macRunner { MacRunnerReadyView(macRunner: m, finish: model.finishSetup) }
                     case .failed(let f): failed(f)
                     }
                 }
@@ -47,13 +49,14 @@ struct SetupWizardView: View {
 
     /// The screen a stage belongs to (connecting stays on the paste screen).
     private enum Stage: Hashable {
-        case choose, install, connect, name, failed
+        case choose, install, connect, name, ready, failed
         init(_ s: SetupWizardModel.Stage) {
             switch s {
             case .choose: self = .choose
             case .install: self = .install
             case .connect, .connecting: self = .connect
             case .name: self = .name
+            case .ready: self = .ready
             case .failed: self = .failed
             }
         }
@@ -65,6 +68,7 @@ struct SetupWizardView: View {
         case .install: (2, "Install Core")
         case .connect, .connecting: (3, "Connect")
         case .name: (0, "Connected")
+        case .ready: (0, "Ready")
         case .failed: (0, "Connect to a Core")
         }
     }

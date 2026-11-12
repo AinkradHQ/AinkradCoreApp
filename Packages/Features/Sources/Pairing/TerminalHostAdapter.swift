@@ -12,6 +12,7 @@ final class TerminalHostAdapter: TerminalHost, RunnerHost {
 
     var shell: ShellModel { app.shell }
     var isElevated: Bool { app.isElevated }
+    var thisMacRunnerID: String? { app.macRunner.runnerID }
 
     var elevationNotice: ElevationNotice? {
         app.stepUpNotice.map { ElevationNotice(title: $0.title, detail: $0.detail, symbol: $0.symbol, tone: $0.tone) }
