@@ -155,9 +155,10 @@ enum AddWizardPlan {
         return c + " --pair \(core) --code \(code)"
     }
 
-    /// The one command for a Linux server with a runner invite: installs the runner and connects it. Contains the secret token.
-    static func runnerInviteCommand(token: String) -> String {
-        "sudo sh -c \"$(curl -fsSL https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh)\" sh --runner --invite \(token)"
+    /// The one command for a Linux server with a runner invite: installs the runner and connects it. It holds no secret:
+    /// `--invite -` makes get.sh ask for the code on the terminal (no echo), so it stays out of argv and shell history.
+    static func runnerInviteCommand() -> String {
+        "sudo sh -c \"$(curl -fsSL https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh)\" sh --runner --invite -"
     }
 
     /// For a Mac runner: pair, then serve the Core with what was chosen.

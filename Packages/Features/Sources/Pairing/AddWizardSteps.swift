@@ -136,8 +136,20 @@ extension AddWizardView {
         let m = model.runnerInvite
         VStack(alignment: .leading, spacing: Space.s3) {
             if let m, let text = m.command, m.live {
-                command(text, copied: m.copied) { m.copy() }
-                    .accessibilityHint("The command has a one-time secret; the copy is cleared after a minute.")
+                command(text)
+                HStack(spacing: Space.s2) {
+                    Text("When it asks for the code, paste it. Nothing shows as you paste.")
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        m.copy()
+                    } label: {
+                        Label(
+                            m.copied ? "Copied" : "Copy code", systemImage: m.copied ? "checkmark" : "key")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .accessibilityHint("The code is a one-time secret; the copy is cleared after a minute.")
+                }
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     Label {
                         Text("Valid for \(RunnerInviteModel.clock(m.secondsLeft(now: ctx.date))) · works once")
@@ -151,7 +163,7 @@ extension AddWizardView {
                 well {
                     Text("What happens").coreFont(size: MacTextSize.meta, weight: .semibold)
                     Text(
-                        "1. Installs the runner and the tools AI sessions need.\n2. Connects to this Core with the invite.\n3. Starts by itself when the server starts."
+                        "1. Installs the runner and the tools AI sessions need.\n2. Asks for the invite code, then connects to this Core.\n3. Starts by itself when the server starts."
                     )
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)

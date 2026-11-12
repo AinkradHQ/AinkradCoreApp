@@ -279,3 +279,23 @@ struct MacRunnerPlistTests {
         #expect(MacRunnerModel.accountsLine(nil) == "Can use your accounts: not reported yet")
     }
 }
+
+struct MacRunnerPairProcessTests {
+    @Test func theTokenGoesInOnStdinNeverInArguments() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "pair-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let script = dir.appending(path: "fake-runner")
+        try "#!/bin/sh\nprintf '%s\\n' \"$@\" > '\(dir.path)/args'\ncat > '\(dir.path)/stdin'\n"
+            .write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        var control = LiveMacRunnerControl()
+        control.runnerOverride = script
+        try await control.pair(core: URL(string: "https://core.example")!, token: "core.example/FP.SECRET")
+        let args = try String(contentsOf: dir.appending(path: "args"), encoding: .utf8)
+        let stdin = try String(contentsOf: dir.appending(path: "stdin"), encoding: .utf8)
+        #expect(!args.contains("SECRET"))
+        #expect(args.split(separator: "\n").suffix(2) == ["--invite", "-"])
+        #expect(stdin == "core.example/FP.SECRET\n")
+    }
+}
