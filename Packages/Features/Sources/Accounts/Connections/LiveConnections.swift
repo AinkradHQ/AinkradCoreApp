@@ -353,7 +353,7 @@ struct LiveConnectionsService: ConnectionsService {
             .failed(title: ConnSay.serviceDown, fix: "Nothing was connected.")
         case "installation_not_yours":
             .failed(title: ConnSay.notYours, fix: "Choose repositories with the GitHub account you signed in with.")
-        case "no_github_sign_in", "bad_user_token":
+        case "github_sign_in_needed", "bad_user_token":
             .failed(title: ConnSay.signInAgain, fix: "Press Try again.")
         case "real_secret_refused", "secrets_disabled":
             .failed(title: "Connections are turned off on this Core.", fix: ConnSay.turnedOff)
@@ -384,12 +384,10 @@ enum ConnSay {
     static let signInFirst = "Sign in to GitHub first."
     static let signInAgain = "Sign in to GitHub again."
 
-    /// The Core says "sign in to GitHub first" as a plain 409 (also when the token ran out).
+    /// The Core says "sign in to GitHub first" with its own code (also when the token ran out).
     static func needsGitHubSignIn(_ error: any Error) -> Bool {
-        guard case .http(409, let code, let message)? = CoreError.unwrapping(error) ?? error as? CoreError else {
-            return false
-        }
-        return code == "no_github_sign_in" || message.lowercased().contains("sign in to github")
+        guard case .http(_, let code, _)? = CoreError.unwrapping(error) ?? error as? CoreError else { return false }
+        return code == "github_sign_in_needed"
     }
 
     /// Choosing repositories failed: the step the sheet shows. A person who just signed in has an expired token, so it is "again".

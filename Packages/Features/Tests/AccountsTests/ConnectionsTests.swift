@@ -360,13 +360,13 @@ struct ConnectionsSignInServiceWordsTests {
     }
 
     @Test func noGitHubSignInIsNotTheDefaultRefusal() {
-        let m = "sign in to GitHub first (Sign in with GitHub), then add the App"
-        #expect(says(409, "conflict", m) == "Sign in to GitHub first.")
+        #expect(says(409, "github_sign_in_needed") == "Sign in to GitHub first.")
+        #expect(says(409, "conflict", "sign in to GitHub first").contains("default"))  // text alone no longer matches
         #expect(says(409, "conflict").contains("default"))  // an ordinary 409 keeps its words
     }
 
     @Test func installFailureSaysFirstOrAgain() {
-        let e = CoreError.http(status: 409, code: "conflict", message: "sign in to GitHub first")
+        let e = CoreError.http(status: 409, code: "github_sign_in_needed", message: "")
         guard case .failed(let a, _) = ConnSay.installFailure(e, hasGitHub: true),
             case .failed(let b, _) = ConnSay.installFailure(e, hasGitHub: false)
         else {
