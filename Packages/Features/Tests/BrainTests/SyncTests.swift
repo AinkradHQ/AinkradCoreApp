@@ -1,5 +1,6 @@
 import BrainImport
 import Foundation
+import SQLite3
 import Testing
 
 @testable import Admin
@@ -181,5 +182,30 @@ struct SyncTests {
         #expect(host.shell.toast?.message.contains("2 unsorted") == true)
         for _ in 0..<200 where b.sync?.review.isEmpty != false { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(b.sync?.review == ["run-1"])
+    }
+
+    @Test func openCodeCursorIsAMessageTimeAndMovesOnlyAfterTheRun() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("oc-\(UUID().uuidString).db").path
+        var db: OpaquePointer?
+        #expect(sqlite3_open(path, &db) == SQLITE_OK)
+        for q in [
+            "CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, title TEXT, time_created INTEGER)",
+            "CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, data TEXT)",
+            "CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, time_created INTEGER, data TEXT)",
+            "INSERT INTO session VALUES ('a', '/s/a', 'A', 1000)",
+            #"INSERT INTO message VALUES ('m1','a',5000,'{"role":"user"}')"#,
+            #"INSERT INTO part VALUES ('p1','m1','a',1,'{"type":"text","text":"one"}')"#,
+        ] { #expect(sqlite3_exec(db, q, nil, nil, nil) == SQLITE_OK) }
+        sqlite3_close(db)
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let src = OpenCodeSource(device: "Mac", dbPath: path)
+        // A date cursor (from the first import) stands in as ms; 1 s is before the message at 5 s.
+        #expect(await src.newCount(cursor: SourceCursor(mtime: 1)) == 1)
+        #expect(await src.newCount(cursor: SourceCursor()) == 0)
+        let next = src.cursorAfter(SourceCursor(mtime: 1), began: Date())
+        #expect(next.ocMessageMs == 5000)
+        #expect(await src.newCount(cursor: next) == 0)
+        let json = try JSONEncoder().encode(next)
+        #expect(String(decoding: json, as: UTF8.self).contains("\"oc_msg\":5000"))
     }
 }
