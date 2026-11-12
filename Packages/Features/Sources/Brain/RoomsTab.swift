@@ -178,12 +178,14 @@ private struct RoomPane: View {
     }
 }
 
-/// One room's search. Matches are marked; nothing from another room is ever asked for.
+/// One room's search, and its newest items while nothing is asked. Matches are marked; nothing from another room is ever
+/// asked for.
 private struct RoomSearch: View {
     let sync: SyncModel
     let room: RoomSummary
     @State private var query = ""
     @State private var hits: [SearchHit] = []
+    @State private var latest: [LatestItem] = []
     @State private var asked = ""
     @FocusState private var focused: Bool
     @Environment(\.corePalette) private var palette
@@ -191,7 +193,21 @@ private struct RoomSearch: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             field
-            if !asked.isEmpty {
+            if asked.isEmpty, !latest.isEmpty {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    HStack {
+                        Text("Latest").coreFont(size: MacTextSize.headline, weight: .semibold)
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer(minLength: Space.s3)
+                        Text("Newest first").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    }
+                    .padding(.horizontal, 2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(latest) { LatestRow(item: $0, room: room.name) }
+                    }
+                }
+                .transition(.opacity)
+            } else if !asked.isEmpty {
                 if hits.isEmpty {
                     Text("Nothing in \(room.name) matches “\(asked)”.").foregroundStyle(GlassInk.secondary)
                         .padding(.horizontal, Space.s3)
@@ -202,6 +218,7 @@ private struct RoomSearch: View {
                 }
             }
         }
+        .task { latest = await sync.latest(room: room.id) }
         .task(id: query) {
             let q = query.trimmingCharacters(in: .whitespaces)
             guard !q.isEmpty else {
@@ -244,6 +261,33 @@ private struct RoomSearch: View {
             Button("Search this room") { focused = true }.keyboardShortcut("f", modifiers: .command)
                 .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
         }
+    }
+}
+
+/// One of the room's newest items: its type, its title with source and room under it, and its day at the right.
+private struct LatestRow: View {
+    let item: LatestItem
+    let room: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
+            Text(MemoryType(rawValue: item.type)?.label ?? item.type)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .frame(width: Space.s8 * 2.5, alignment: .leading).lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(2)
+                Text("\(SyncWords.title(item.sourceKind, ImportSources.standard())) · \(room)")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let d = SyncWords.date(item.startedAt) {
+                Text(d.formatted(.dateTime.day().month(.abbreviated)))
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).fixedSize()
+            }
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .modifier(BrainRowHover())
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -332,11 +376,10 @@ struct RuleRow: View {
                 Image(systemName: "lock").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .help("This rule is always on.").accessibilityHidden(true)
             }
-            Toggle(
-                rule.reason.isEmpty ? rule.pattern : rule.reason,
+            CoreSwitch(
                 isOn: Binding(get: { rule.enabled }, set: { on in Task { await sync.toggleRule(rule, on: on) } })
             )
-            .toggleStyle(.switch).labelsHidden().tint(GlassInk.blue)
+            .accessibilityLabel(rule.reason.isEmpty ? rule.pattern : rule.reason)
             .disabled(rule.locked)
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)

@@ -81,8 +81,8 @@ struct SourcesTab: View {
     private func row(_ l: Line) -> some View {
         HStack(spacing: Space.s4) {
             if let s = l.source {
-                Toggle(l.title, isOn: Binding(get: { s.enabled }, set: { on in Task { await sync.toggle(s, on: on) } }))
-                    .toggleStyle(.switch).labelsHidden().tint(GlassInk.blue).controlSize(.small)
+                CoreSwitch(isOn: Binding(get: { s.enabled }, set: { on in Task { await sync.toggle(s, on: on) } }))
+                    .accessibilityLabel(l.title)
                     // The switch keeps its own width: in a narrower slot it ran into the source's name.
                     .fixedSize().frame(width: Space.s8 + Space.s4, alignment: .leading)
             } else {
