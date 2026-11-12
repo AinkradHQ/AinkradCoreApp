@@ -45,7 +45,7 @@ struct SessionHero: View {
                         : "Cancelling: it finishes the tool call in flight, then ends. K kills at once.",
                     systemImage: "hourglass"
                 )
-                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.orangeInk)
+                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
                 .symbolEffect(.pulse, options: .repeating, isActive: !reduce)
                 .accessibilityIdentifier("session-stopping")
             }
@@ -164,7 +164,7 @@ struct SessionHero: View {
                 )
             } else {
                 if case .succeeded? = session.outcome {
-                    AppActionTile(title: "Wake", symbol: "alarm", key: "W", hue: GlassInk.violet) {
+                    AppActionTile(title: "Wake", symbol: "alarm", key: "W", hue: GlassInk.blue) {
                         model.wake(session.id)
                     }
                     .help("Recovery: bring the process back on its runner, with the same conversation.")

@@ -2,6 +2,9 @@ import SwiftUI
 
 /// The one visual language for content on Liquid Glass (Ahmed, 2026-11-05: glassy, visual, animated, readable, consistent):
 /// white ink, soft white wells for cards, gradient icon tiles in a hue per subject, vivid status colours.
+/// The glass palette: neutrals, the one blue accent family, and the status hues. Nothing here is decoration.
+/// Blue carries identity, selection and every tile. `amber` is the single "needs you" state (attention, approval,
+/// warning). `green` and `red` mean ok and error, only ever on a status, never as a theme or a tint for a subject.
 public enum GlassInk {
     public static let primary = Color.white
     public static let secondary = Color.white.opacity(0.72)
@@ -10,22 +13,24 @@ public enum GlassInk {
     public static let wellHover = Color.white.opacity(0.13)
     /// Neutral edge: white 0.30, the least that reads 3:1 over the day glass (measured 2026-11-09).
     public static let wellEdge = Color.white.opacity(0.3)
+    public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
     public static let blue = Color(red: 0.25, green: 0.6, blue: 1)
+    /// Needs you: the one warm hue. Attention, approval waiting, a warning. Never decoration.
+    public static let amber = Color(red: 1, green: 0.62, blue: 0.1)
+    /// Status only: ok. Muted use, on a state badge, meter or dot.
     public static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
-    public static let orange = Color(red: 1, green: 0.62, blue: 0.1)
+    /// Status only: error or a destructive action.
     public static let red = Color(red: 1, green: 0.38, blue: 0.4)
-    // The same hues as TEXT: lighter, so red, orange and the blue link read 4.5:1 or better on the day glass (measured
+    // The same hues as TEXT: lighter, so red, amber and the blue link read 4.5:1 or better on the day glass (measured
     // 2026-11-09: 3.05 to 4.34 before). Fills, tiles and bars keep the hues above.
     public static let blueInk = Color(red: 0.52, green: 0.76, blue: 1)
-    public static let orangeInk = Color(red: 1, green: 0.70, blue: 0.30)
+    public static let amberInk = Color(red: 1, green: 0.70, blue: 0.30)
     public static let redInk = Color(red: 1, green: 0.64, blue: 0.62)
-    public static let violet = Color(red: 0.62, green: 0.45, blue: 1)
-    public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
 
-    /// The text colour for a fill hue: red, orange and blue have lighter inks that pass contrast; slate reads as secondary
+    /// The text colour for a fill hue: red, amber and blue have lighter inks that pass contrast; slate reads as secondary
     /// text; any other hue keeps its colour.
     public static func ink(_ hue: Color) -> Color {
-        hue == red ? redInk : hue == orange ? orangeInk : hue == blue ? blueInk : hue == slate ? secondary : hue
+        hue == red ? redInk : hue == amber ? amberInk : hue == blue ? blueInk : hue == slate ? secondary : hue
     }
 }
 

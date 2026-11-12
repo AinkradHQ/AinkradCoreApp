@@ -43,8 +43,8 @@ extension AccountsPrefs {
 enum ProviderLook {
     static func hue(_ provider: String) -> Color {
         switch provider {
-        case "anthropic", "claude-sub": GlassInk.orange
-        case "openai": GlassInk.green
+        case "anthropic", "claude-sub": GlassInk.blue
+        case "openai": GlassInk.blue
         case "google", "gemini": GlassInk.blue
         default: GlassInk.blue
         }

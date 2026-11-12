@@ -8,7 +8,7 @@ import SwiftUI
 public enum AppSurfaceStyle: String, CaseIterable, Sendable { case clear, frosted, tinted, solid }
 
 /// The app's background inside the pane's glass rim, rounded. `tint` colours the tinted style (a terminal theme's
-/// background, the agents violet).
+/// background).
 public struct AppSurfaceFill: View {
     let style: AppSurfaceStyle
     let opacity: Double

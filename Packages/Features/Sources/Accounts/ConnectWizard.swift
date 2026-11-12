@@ -260,7 +260,7 @@ struct ConnectWizard: View {
             if let shape {
                 Label(shape.text, systemImage: shape.ok ? "checkmark.circle" : "exclamationmark.triangle")
                     .coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(shape.ok ? GlassInk.green : GlassInk.orangeInk)
+                    .foregroundStyle(shape.ok ? GlassInk.green : GlassInk.amberInk)
             }
             if let n = w.flow.gateNote { AccIssue(text: n) }
             footer(

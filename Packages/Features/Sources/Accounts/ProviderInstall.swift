@@ -41,7 +41,7 @@ struct ProviderInstall: View {
                         .foregroundStyle(GlassInk.secondary)
                 }
                 if let why = note ?? progress?.reason {
-                    Text(why).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.orangeInk)
+                    Text(why).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
                         .multilineTextAlignment(.trailing).frame(maxWidth: 220, alignment: .trailing)
                 }
             }

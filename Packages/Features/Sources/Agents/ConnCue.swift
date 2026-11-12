@@ -31,7 +31,7 @@ struct ConnCue: View {
         let refused = ok == false
         HStack(spacing: Space.s2) {
             Image(systemName: refused ? "exclamationmark.triangle" : ok == nil ? "link" : "checkmark.circle")
-                .foregroundStyle(refused ? GlassInk.orangeInk : GlassInk.secondary)
+                .foregroundStyle(refused ? GlassInk.amberInk : GlassInk.secondary)
             Text(
                 refused
                     ? "Couldn't \(Self.line(tool, summary).lowercased())\(why.isEmpty ? "" : ": \(why)")"
@@ -45,10 +45,10 @@ struct ConnCue: View {
             }
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
-        .background(refused ? GlassInk.orange.opacity(0.12) : GlassInk.well, in: coreShape(Radius.control))
+        .background(refused ? GlassInk.amber.opacity(0.12) : GlassInk.well, in: coreShape(Radius.control))
         .overlay {
             coreShape(Radius.control).strokeBorder(
-                refused ? GlassInk.orange.opacity(0.35) : GlassInk.wellEdge, lineWidth: 1)
+                refused ? GlassInk.amber.opacity(0.35) : GlassInk.wellEdge, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
     }

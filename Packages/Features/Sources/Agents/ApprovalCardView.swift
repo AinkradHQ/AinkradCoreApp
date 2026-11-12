@@ -36,12 +36,12 @@ struct ApprovalCardView: View {
         let busy = model.deciding.contains(request.id)
         let left = request.remaining(now: now)
         let ratio = left.map { $0 / Double(max(request.timeoutSecs ?? 1, 1)) } ?? 1
-        let hue = (left ?? 999) <= 20 ? GlassInk.red : (left ?? 999) <= 60 ? GlassInk.orange : GlassInk.blue
+        let hue = (left ?? 999) <= 20 ? GlassInk.red : (left ?? 999) <= 60 ? GlassInk.amber : GlassInk.blue
         let session = model.sessions.session(request.session)
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                IconTile(ask.symbol, hue: GlassInk.orange, size: 44, bounce: request.id)
-                    .shadow(color: GlassInk.orange.opacity(0.45), radius: 12)
+                IconTile(ask.symbol, hue: GlassInk.amber, size: 44, bounce: request.id)
+                    .shadow(color: GlassInk.amber.opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.title, weight: .bold)
                     Text(
@@ -100,10 +100,10 @@ struct ApprovalCardView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
-        .background(GlassInk.orange.opacity(0.08), in: coreShape(Radius.cardMac))
+        .background(GlassInk.amber.opacity(0.08), in: coreShape(Radius.cardMac))
         .overlay {
             coreShape(Radius.cardMac).strokeBorder(
-                GlassInk.orange.opacity(keys ? 0.6 : 0.35), lineWidth: keys ? 1.5 : 1)
+                GlassInk.amber.opacity(keys ? 0.6 : 0.35), lineWidth: keys ? 1.5 : 1)
         }
         .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s2))))
     }

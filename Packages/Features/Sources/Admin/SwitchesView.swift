@@ -22,7 +22,7 @@ struct SwitchesSection: View {
                 if let a = model.item("secrets.provider_accounts") {
                     FlagCard(
                         model: model, setting: a, index: 1, title: "Real provider keys", symbol: "key.fill",
-                        hue: GlassInk.orange,
+                        hue: GlassInk.blue,
                         sub: "Let accounts hold a real API key from Anthropic, OpenAI or Google.",
                         offLine: "Only test keys are accepted for accounts.",
                         onLine: "Accounts can hold real provider keys. Your AI sessions can use them.",
@@ -34,7 +34,7 @@ struct SwitchesSection: View {
                 if let c = model.item("secrets.connections") {
                     FlagCard(
                         model: model, setting: c, index: 2, title: "Real connection tokens", symbol: "link",
-                        hue: GlassInk.orange,
+                        hue: GlassInk.blue,
                         sub: "Let a connection to GitHub, Jira or Linear hold its own real token.",
                         offLine: "Connections accept test tokens only.",
                         onLine:
@@ -47,7 +47,7 @@ struct SwitchesSection: View {
                 if let p = model.item("auth.passkey_admin") {
                     FlagCard(
                         model: model, setting: p, index: 3, title: "Admin from a browser", symbol: "globe",
-                        hue: GlassInk.violet,
+                        hue: GlassInk.blue,
                         sub: "Let a device that signs in with a passkey in a web browser become an admin.",
                         offLine: "Browser devices can read and approve, but not change your Core. Safer.",
                         onLine:
@@ -63,7 +63,7 @@ struct SwitchesSection: View {
                     GlassSection(
                         "Terminals on your runners",
                         sub: "Whether each runner can open terminals.",
-                        symbol: "terminal.fill", hue: GlassInk.green, index: 4
+                        symbol: "terminal.fill", hue: GlassInk.blue, index: 4
                     ) {
                         ForEach(model.runners) { r in
                             let pty = r.drivers.contains("pty")
@@ -113,7 +113,7 @@ private struct SecretsModeCard: View {
 
     var body: some View {
         let mode = Int(setting.value)
-        let hue = mode == 0 ? GlassInk.orange : GlassInk.blue
+        let hue = mode == 0 ? GlassInk.slate : GlassInk.blue
         GlassSection(
             "Keys and secrets", sub: "Whether your Core may keep keys and secrets at all.", symbol: "lock.shield.fill",
             hue: GlassInk.blue
@@ -180,7 +180,7 @@ private struct FlagCard: View {
         GlassSection(title, sub: sub, symbol: symbol, hue: hue, index: index) {
             HStack(spacing: Space.s2) {
                 Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
-                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.orangeInk)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
                 if model.busy == setting.key { ProgressView().controlSize(.small) }
                 GlassToggleTile(
                     isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
@@ -194,7 +194,7 @@ private struct FlagCard: View {
             }
         } content: {
             StatePanel(
-                symbol: isOn ? onSymbol : offSymbol, hue: isOn ? GlassInk.orange : GlassInk.green,
+                symbol: isOn ? onSymbol : offSymbol, hue: isOn ? GlassInk.amber : GlassInk.green,
                 title: isOn ? "On · less safe" : "Off · safer", line: isOn ? onLine : offLine, trigger: isOn
             ) { EmptyView() }
             if let needs {

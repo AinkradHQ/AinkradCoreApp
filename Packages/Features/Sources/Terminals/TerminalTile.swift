@@ -19,13 +19,13 @@ struct TerminalTile: View {
             ?? PaneView.make(item: item, runner: model.runner(item.runner), link: .none, note: nil).chip
         let selected = model.selected == item.id
         let runner = model.name(of: item.runner)
-        let accent = RunnerHue.of(runner)
+        let accent = GlassInk.blue
         let state: Color =
             model.rang.contains(item.id)
-            ? GlassInk.orange
+            ? GlassInk.amber
             : item.isEnded
                 ? GlassInk.slate
-                : chip.tone == .fail ? GlassInk.red : chip.tone == .warn ? GlassInk.orange : GlassInk.green
+                : chip.tone == .fail ? GlassInk.red : chip.tone == .warn ? GlassInk.amber : GlassInk.green
         VStack(alignment: .leading, spacing: Space.s2) {
             TileScreen(
                 runner: runner, accent: accent, state: state, label: chip.label, ended: item.isEnded, blink: shown
@@ -40,7 +40,7 @@ struct TerminalTile: View {
                         Text(model.shell.tabNames["terminal-\(item.id)"] ?? runner)
                             .coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                         if model.rang.contains(item.id) {
-                            Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(GlassInk.orangeInk)
+                            Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(GlassInk.amberInk)
                         }
                     }
                     Text(
@@ -102,7 +102,7 @@ struct TerminalTile: View {
             mini("arrow.up.forward.app", "↩", GlassInk.blue) { TileAction.run(.open, item.id, model) }
             if !item.isEnded {
                 mini("eject", "D", GlassInk.slate) { TileAction.run(.detach, item.id, model) }
-                mini("bolt", "S", GlassInk.orange) { TileAction.run(.signal, item.id, model) }
+                mini("bolt", "S", GlassInk.blue) { TileAction.run(.signal, item.id, model) }
                 mini("stop.fill", "E", GlassInk.red) { TileAction.run(.end, item.id, model) }
             }
         }

@@ -235,7 +235,7 @@ private struct PaneTab: View {
         switch chip.tone {
         case .run, .done: return GlassInk.green
         case .fail: return GlassInk.red
-        default: return GlassInk.orange
+        default: return GlassInk.amber
         }
     }
 

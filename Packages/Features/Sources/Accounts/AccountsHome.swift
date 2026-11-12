@@ -54,7 +54,7 @@ private struct AccountsBanner: View {
                 $0.kind == "account" && $0.subject == String(first.id) && $0.standing != .fine
             }
             HStack(spacing: Space.s3) {
-                Image(systemName: "bell.fill").foregroundStyle(GlassInk.orange).accessibilityHidden(true)
+                Image(systemName: "bell.fill").foregroundStyle(GlassInk.amber).accessibilityHidden(true)
                 (Text(AccountsBannerWords.headline(need: need.count)).fontWeight(.semibold) + Text(" ")
                     + Text(
                         "\(first.label): \(v.line(first, limits: model.limits(of: first), budgets: model.budgets, now: model.now()))"
@@ -72,8 +72,8 @@ private struct AccountsBanner: View {
                 }
             }
             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-            .background(GlassInk.orange.opacity(0.14), in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.35), lineWidth: 1) }
+            .background(GlassInk.amber.opacity(0.14), in: coreShape(Radius.cardMac))
+            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.35), lineWidth: 1) }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("accounts-banner")
         }

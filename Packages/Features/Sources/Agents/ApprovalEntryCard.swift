@@ -29,7 +29,7 @@ struct ApprovalEntryCard: View {
         return HStack {
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(spacing: Space.s2) {
-                    Image(systemName: ask.symbol).foregroundStyle(waiting ? GlassInk.orange : GlassInk.secondary)
+                    Image(systemName: ask.symbol).foregroundStyle(waiting ? GlassInk.amber : GlassInk.secondary)
                         .accessibilityHidden(true)
                     Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
                     Spacer(minLength: Space.s2)
@@ -63,10 +63,10 @@ struct ApprovalEntryCard: View {
             }
             .padding(Space.s3)
             .frame(maxWidth: 560, alignment: .leading)
-            .background(waiting ? GlassInk.orange.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+            .background(waiting ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
             .overlay {
                 coreShape(Radius.cardMac).strokeBorder(
-                    waiting ? GlassInk.orange.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
+                    waiting ? GlassInk.amber.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
             }
             Spacer(minLength: Space.s8)
         }
@@ -83,9 +83,9 @@ struct ApprovalEntryCard: View {
                 .background((ok ? GlassInk.green : GlassInk.red).opacity(0.15), in: coreShape(5))
         } else {
             Label("Waiting for you", systemImage: "hand.raised")
-                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.orangeInk)
+                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
                 .padding(.horizontal, Space.s2).frame(height: 20)
-                .background(GlassInk.orange.opacity(0.15), in: coreShape(5))
+                .background(GlassInk.amber.opacity(0.15), in: coreShape(5))
         }
     }
 

@@ -298,11 +298,11 @@ private struct LauncherItem: View {
     private var hue: Color {
         if row.entry.tile == .slate { return .white.opacity(0.35) }
         if row.entry.tile == .danger { return Color(red: 1, green: 0.38, blue: 0.4) }
-        if row.entry.tile == .view { return Color(red: 0.62, green: 0.45, blue: 1) }
+        if row.entry.tile == .view { return WidgetInk.blue }
         switch row.group {
         case .recent, .topHit: return WidgetInk.blue
-        case .actions: return WidgetInk.green
-        case .goTo: return WidgetInk.orange
+        case .actions: return GlassInk.blue
+        case .goTo: return GlassInk.blue
         }
     }
 
@@ -340,7 +340,7 @@ private struct PaneActionsHeader: View {
                     HStack(spacing: Space.s1) {
                         StatusDot(
                             color: chip.tone == .fail
-                                ? GlassInk.red : chip.tone == .warn ? GlassInk.orange : GlassInk.green,
+                                ? GlassInk.red : chip.tone == .warn ? GlassInk.amber : GlassInk.green,
                             live: chip.tone == .run || chip.tone == .done)
                         Text(chip.label).coreFont(size: MacTextSize.meta, weight: .medium)
                     }

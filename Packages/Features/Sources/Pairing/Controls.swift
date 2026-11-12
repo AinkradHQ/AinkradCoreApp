@@ -140,10 +140,10 @@ enum ScopeText {
     static func hue(_ s: String) -> Color {
         switch s {
         case "read": GlassInk.blue
-        case "approve": GlassInk.green
+        case "approve": GlassInk.blue
         case "terminal": GlassInk.slate
-        case "agent": GlassInk.violet
-        case "admin": GlassInk.orange
+        case "agent": GlassInk.blue
+        case "admin": GlassInk.blue
         default: GlassInk.slate
         }
     }

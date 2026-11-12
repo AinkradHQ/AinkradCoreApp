@@ -64,7 +64,7 @@ struct SecretsSection: View {
                 SecretDialogs.openGroup(admin, nil)
             }
             .help("Keep related secrets together and give them to runners in one step")
-            AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.orange, prominent: true) {
+            AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 SecretDialogs.openNew(admin)
             }
             .keyboardShortcut("n", modifiers: .command)
@@ -81,7 +81,7 @@ struct SecretsSection: View {
             } label: {
                 HStack(spacing: Space.s2) {
                     Image(systemName: open ? "chevron.down" : "chevron.right").frame(width: 14)
-                    Image(systemName: section.symbol).foregroundStyle(GlassInk.orange)
+                    Image(systemName: section.symbol).foregroundStyle(GlassInk.blue)
                     Text(section.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text("\(section.items.count)").foregroundStyle(GlassInk.secondary)
                     if let g = section.group {
@@ -172,7 +172,7 @@ private struct ModePanel: View {
     let mode: Int
 
     var body: some View {
-        let hue = mode == 0 ? GlassInk.orange : GlassInk.blue
+        let hue = mode == 0 ? GlassInk.slate : GlassInk.blue
         HStack(spacing: Space.s3) {
             IconTile(mode == 0 ? "lock.fill" : "testtube.2", hue: hue, size: 44, bounce: mode)
                 .shadow(color: hue.opacity(0.45), radius: 12)
@@ -210,8 +210,8 @@ enum Delivery {
         let hue: Color =
             switch d {
             case "env": GlassInk.blue
-            case "file": GlassInk.green
-            case "askpass": GlassInk.violet
+            case "file": GlassInk.blue
+            case "askpass": GlassInk.blue
             default: GlassInk.slate
             }
         return (w.title, w.line, w.symbol, hue)
@@ -233,7 +233,7 @@ private struct SecretRow: View {
         let names = secret.runnersUsing.map(model.runnerName)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
-                IconTile(kind.symbol, hue: GlassInk.orange, size: 32)
+                IconTile(kind.symbol, hue: GlassInk.blue, size: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(secret.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         .lineLimit(1).truncationMode(.middle)
@@ -259,7 +259,7 @@ private struct SecretRow: View {
                         SecretDialogs.openReplace(admin, secret)
                     }
                     .help("New value (E)").accessibilityLabel("Replace the value of \(secret.name)")
-                    AppActionTile(title: "", symbol: "server.rack", key: "", hue: GlassInk.orange) {
+                    AppActionTile(title: "", symbol: "server.rack", key: "", hue: GlassInk.blue) {
                         SecretDialogs.openLease(admin, secret)
                     }
                     .help("Let a runner use it (L)").accessibilityLabel("Let a runner use \(secret.name)")
@@ -275,12 +275,12 @@ private struct SecretRow: View {
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .background(
-            selected ? GlassInk.orange.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+            selected ? GlassInk.blue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
             in: coreShape(Radius.cardMac)
         )
         .overlay {
             coreShape(Radius.cardMac).strokeBorder(
-                selected ? GlassInk.orange.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
+                selected ? GlassInk.blue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
         }
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(perform: pick)

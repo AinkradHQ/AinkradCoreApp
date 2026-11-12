@@ -50,7 +50,7 @@ struct LockoutsSection: View {
 
     private func verdict(_ model: LockoutsModel) -> some View {
         let n = model.items.count
-        let hue = n == 0 ? GlassInk.green : GlassInk.orange
+        let hue = n == 0 ? GlassInk.green : GlassInk.amber
         return HStack(spacing: Space.s4) {
             IconTile(n == 0 ? "lock.open.fill" : "lock.fill", hue: hue, size: 56, bounce: n)
                 .shadow(color: hue.opacity(0.5), radius: 14)
@@ -108,7 +108,7 @@ private struct LockCard: View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let left = max(0, Int(lock.lockedUntil.timeIntervalSince(ctx.date).rounded(.up)))
             let soon = left > 0 && left <= 60
-            let hue = left == 0 ? GlassInk.green : soon ? GlassInk.red : GlassInk.orange
+            let hue = left == 0 ? GlassInk.green : soon ? GlassInk.red : GlassInk.amber
             let who = Self.who(lock.key)
             VStack(alignment: .leading, spacing: Space.s3) {
                 HStack(spacing: Space.s3) {
@@ -122,7 +122,7 @@ private struct LockCard: View {
                         .coreFont(size: MacTextSize.large + 4, weight: .bold, design: .rounded).monospacedDigit()
                         .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
                     AppActionTile(
-                        title: "Clear", symbol: "lock.open", key: selected ? "⌫" : "", hue: GlassInk.orange,
+                        title: "Clear", symbol: "lock.open", key: selected ? "⌫" : "", hue: GlassInk.amber,
                         prominent: selected
                     ) { Task { await model.clear(lock) } }
                     .disabled(left == 0)

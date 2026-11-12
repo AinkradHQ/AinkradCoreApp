@@ -187,7 +187,7 @@ private struct RunnerCard: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 HStack(spacing: Space.s3) {
                     IconTile(
-                        "server.rack", hue: facts.status == .off ? GlassInk.slate : RunnerHue.of(runner.name), size: 40)
+                        "server.rack", hue: facts.status == .off ? GlassInk.slate : GlassInk.blue, size: 40)
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: Space.s2) {
                             Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)

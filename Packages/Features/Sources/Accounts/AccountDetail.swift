@@ -101,7 +101,7 @@ struct AccountDetailView: View {
     private var confirming: some View {
         HStack(spacing: Space.s3) {
             Image(systemName: "key.slash").font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(GlassInk.orangeInk)
+                .foregroundStyle(GlassInk.amberInk)
             VStack(alignment: .leading, spacing: 2) {
                 Text("The provider refused this key once").coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text("Core is checking it again. If it's refused again, the account turns off by itself.")
@@ -110,8 +110,8 @@ struct AccountDetailView: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3)
-        .background(GlassInk.orange.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.4), lineWidth: 1) }
+        .background(GlassInk.amber.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.4), lineWidth: 1) }
         .transition(.opacity)
     }
 
@@ -228,7 +228,7 @@ struct AccountDetailView: View {
             if pools.isEmpty {
                 Text("In no pool").coreFont(size: MacTextSize.title, weight: .semibold)
                 Text("AI sessions can't reach it yet.").coreFont(size: MacTextSize.meta).foregroundStyle(
-                    GlassInk.orangeInk)
+                    GlassInk.amberInk)
             }
             ForEach(pools) { p in
                 Button {

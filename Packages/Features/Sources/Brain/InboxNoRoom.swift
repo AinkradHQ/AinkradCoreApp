@@ -131,7 +131,7 @@ private struct CaptureRow: View {
                 ChipFlow(spacing: Space.s2) {
                     Text("Waiting \(BrainWords.glue(u.age))").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
-                    if u.stale { BrainChip("Stale", GlassInk.orange, help: "Older than 14 days") }
+                    if u.stale { BrainChip("Stale", GlassInk.amber, help: "Older than 14 days") }
                     if u.inBell { BrainChip("In the bell", GlassInk.blue, help: "Older than 30 days") }
                     BrainChip(
                         u.guess.map { "Guess: \($0)" } ?? "No guess", GlassInk.slate,

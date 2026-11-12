@@ -46,7 +46,7 @@ struct RunnerPage: View {
     private var header: some View {
         HStack(alignment: .center, spacing: Space.s3) {
             RunnerBackTile { model.runnerDetail = nil }
-            IconTile("server.rack", hue: off ? GlassInk.slate : RunnerHue.of(runner.name), size: 56)
+            IconTile("server.rack", hue: off ? GlassInk.slate : GlassInk.blue, size: 56)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: Space.s2) {
                     Text(runner.name).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
@@ -233,7 +233,7 @@ struct RunnerPage: View {
             if let n = model.policyNote[runner.id] {
                 Label(n.text, systemImage: n.refused ? "exclamationmark.triangle" : "arrow.triangle.2.circlepath")
                     .coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(n.refused ? GlassInk.orangeInk : palette.text2)
+                    .foregroundStyle(n.refused ? GlassInk.amberInk : palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("runner-policy-note")
             }
@@ -294,7 +294,7 @@ struct RunnerPage: View {
                         .foregroundStyle(palette.text2)
                 } else if let inst, inst.state == .failed {
                     Text(inst.reason ?? "The install did not finish.").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.orangeInk).fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GlassInk.amberInk).fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text(version.map { $0.isEmpty ? "Installed" : "Installed, version \($0)" } ?? t.help)
                         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)

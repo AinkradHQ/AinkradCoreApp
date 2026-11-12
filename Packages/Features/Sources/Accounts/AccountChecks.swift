@@ -41,7 +41,7 @@ enum TestWords {
         switch r {
         case "ok": ("Works", "The provider took the key.", GlassInk.green, "checkmark.seal.fill")
         case "rate_limited":
-            ("Works, but busy", "The key is fine; the provider asked to slow down.", GlassInk.orange, "tortoise.fill")
+            ("Works, but busy", "The key is fine; the provider asked to slow down.", GlassInk.amber, "tortoise.fill")
         case "quota":
             (
                 "Out of credit", "The key is fine but its plan has run out.", GlassInk.red,
@@ -49,9 +49,9 @@ enum TestWords {
             )
         case "auth_failed": ("Key refused", "The provider said no to this key.", GlassInk.red, "key.slash")
         case "server_error":
-            ("Provider error", "The provider failed. Try again later.", GlassInk.orange, "exclamationmark.icloud")
+            ("Provider error", "The provider failed. Try again later.", GlassInk.amber, "exclamationmark.icloud")
         case "unreachable":
-            ("Couldn't reach it", "The runner could not reach the provider.", GlassInk.orange, "wifi.slash")
+            ("Couldn't reach it", "The runner could not reach the provider.", GlassInk.amber, "wifi.slash")
         case "refused_address":
             ("Address refused", "Core won't send a key to that address.", GlassInk.red, "hand.raised.fill")
         case "tls_failed": ("Not secure", "The provider's secure connection failed.", GlassInk.red, "lock.slash")
@@ -60,7 +60,7 @@ enum TestWords {
                 "Can't tell", "This provider has no way to test a key, so nothing was sent.", GlassInk.slate,
                 "questionmark.circle"
             )
-        case "failed": ("Runner didn't answer", "The test didn't run to the end.", GlassInk.orange, "server.rack")
+        case "failed": ("Runner didn't answer", "The test didn't run to the end.", GlassInk.amber, "server.rack")
         default: (r, "Core reported this result.", GlassInk.slate, "questionmark.circle")
         }
     }
@@ -120,7 +120,7 @@ extension SignInTile {
             let w = PlanCheckWords.of(last.check.result)
             HStack(alignment: .top, spacing: Space.s2) {
                 Image(systemName: w.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(GlassInk.ink(w.ok ? GlassInk.green : GlassInk.orange))
+                    .foregroundStyle(GlassInk.ink(w.ok ? GlassInk.green : GlassInk.amber))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(w.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Text(w.line + (last.check.latencyMs.map { " (\($0) ms)" } ?? ""))

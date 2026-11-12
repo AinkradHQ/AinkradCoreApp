@@ -66,7 +66,7 @@ struct AgentSettingsView: View {
         VStack(alignment: .leading, spacing: compact ? Space.s3 : Space.s4) {
             GlassSection(
                 "Look", sub: "The AI Sessions app and its sessions, as one.", symbol: "square.on.square",
-                hue: GlassInk.violet
+                hue: GlassInk.blue
             ) {
                 AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
             } content: {
@@ -78,7 +78,7 @@ struct AgentSettingsView: View {
                 }
             }
             GlassSection(
-                "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.green,
+                "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.blue,
                 index: 1
             ) {
                 SettingRow("Harness", symbol: "cpu") {
@@ -123,7 +123,7 @@ private struct ModelField: View {
     var body: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: text.isEmpty ? "sparkles" : "brain.head.profile")
-                .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.violet)
+                .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.blue)
                 .contentTransition(.symbolEffect(.replace)).coreBounce(text.count)
             TextField("The harness default", text: $text).textFieldStyle(.plain).focused($focused)
                 .autocorrectionDisabled()

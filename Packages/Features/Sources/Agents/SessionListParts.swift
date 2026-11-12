@@ -56,7 +56,7 @@ struct SessionSidebar: View {
                 Spacer(minLength: Space.s2)
                 Text("\(n)").coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
                     .padding(.horizontal, 6).frame(minWidth: 22, minHeight: 18)
-                    .background(hot && n > 0 ? GlassInk.orange : GlassInk.well, in: coreShape(5))
+                    .background(hot && n > 0 ? GlassInk.amber : GlassInk.well, in: coreShape(5))
                     .foregroundStyle(hot && n > 0 ? .black.opacity(0.8) : GlassInk.secondary)
             }
             .coreFont(size: MacTextSize.body)
@@ -166,7 +166,7 @@ struct StateMark: View {
     var body: some View {
         let hue: Color =
             waiting
-            ? GlassInk.orange
+            ? GlassInk.amber
             : session.idle
                 ? GlassInk.green : session.live ? GlassInk.blue : session.state == .lost ? GlassInk.red : GlassInk.slate
         HStack(spacing: 6) {
@@ -193,7 +193,7 @@ struct SectionHeader: View {
                 )
                 .frame(width: 12)
                 Text(group.section.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                    .foregroundStyle(group.section == .needsYou ? GlassInk.orangeInk : GlassInk.primary)
+                    .foregroundStyle(group.section == .needsYou ? GlassInk.amberInk : GlassInk.primary)
                 Text("\(group.rows.count)").coreFont(size: MacTextSize.meta).padding(.horizontal, 6)
                     .background(GlassInk.well, in: coreShape(4)).foregroundStyle(GlassInk.secondary)
                 Spacer()

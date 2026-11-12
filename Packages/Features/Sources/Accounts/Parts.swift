@@ -129,7 +129,7 @@ struct AccStateCard<Actions: View>: View {
     @ViewBuilder let actions: Actions
     @State private var shown = false
     var body: some View {
-        let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.orange : GlassInk.blue
+        let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.amber : GlassInk.blue
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown).shadow(color: hue.opacity(0.5), radius: 18)
                 .coreScaleEffect(shown ? 1 : 0.6)
@@ -210,7 +210,7 @@ struct GateBanner: View {
     var body: some View {
         let g = model.gate
         if g.kind != .real {
-            let hue = g.kind == .off ? GlassInk.orange : g.kind == .throwaway ? GlassInk.blue : GlassInk.slate
+            let hue = g.kind == .off ? GlassInk.slate : g.kind == .throwaway ? GlassInk.blue : GlassInk.slate
             HStack(alignment: .center, spacing: Space.s4) {
                 IconTile(
                     g.kind == .off ? "lock.fill" : g.kind == .throwaway ? "testtube.2" : "questionmark", hue: hue,

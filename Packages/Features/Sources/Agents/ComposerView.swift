@@ -187,7 +187,7 @@ struct ComposerView: View {
 
     @ViewBuilder private var stateChip: some View {
         if model.waiting(session.id) {
-            Text("Waiting for your answer").foregroundStyle(GlassInk.orangeInk)
+            Text("Waiting for your answer").foregroundStyle(GlassInk.amberInk)
         } else if model.canStopTurn(session) {
             HStack(spacing: 4) {
                 Text("Working ·")

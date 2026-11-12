@@ -35,7 +35,7 @@ struct CostsPage: View {
             .fixedSize()
         }
         HStack(spacing: Space.s3) {
-            figure("Spent", CostWords.usd(total.costMicros), "dollarsign.circle.fill", GlassInk.green)
+            figure("Spent", CostWords.usd(total.costMicros), "dollarsign.circle.fill", GlassInk.blue)
             figure("Tokens", CostWords.tokens(total.tokens), "text.word.spacing", GlassInk.blue)
             figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.blue)
         }
@@ -71,7 +71,7 @@ struct CostsPage: View {
     private var unpriced: some View {
         HStack(spacing: Space.s3) {
             Image(systemName: "tag.slash.fill").font(.system(size: 18, weight: .semibold)).foregroundStyle(
-                GlassInk.orange)
+                GlassInk.amber)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(CostWords.tokens(model.unpricedTokens)) tokens had no price")
                     .coreFont(size: MacTextSize.headline, weight: .semibold)
@@ -79,13 +79,13 @@ struct CostsPage: View {
                     .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s3)
-            AppActionTile(title: "Open prices", symbol: "tag", key: "", hue: GlassInk.orange) {
+            AppActionTile(title: "Open prices", symbol: "tag", key: "", hue: GlassInk.amber) {
                 withAnimation(.smooth(duration: 0.3)) { model.page = .prices }
             }
         }
         .padding(Space.s3)
-        .background(GlassInk.orange.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.4), lineWidth: 1) }
+        .background(GlassInk.amber.opacity(0.1), in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.4), lineWidth: 1) }
     }
 
     private func accounts(_ total: UsageWindowItem) -> some View {
@@ -182,7 +182,7 @@ struct SpendBarRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                     Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(
-                        warn ? GlassInk.orangeInk : GlassInk.secondary
+                        warn ? GlassInk.amberInk : GlassInk.secondary
                     )
                     .lineLimit(1)
                 }

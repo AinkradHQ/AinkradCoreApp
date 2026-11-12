@@ -12,7 +12,6 @@ enum WidgetInk {
     static let wellEdge = Color.white.opacity(0.3)
     static let blue = Color(red: 0.25, green: 0.6, blue: 1)
     static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
-    static let orange = Color(red: 1, green: 0.62, blue: 0.1)
 }
 
 /// Pieces the widgets share (`widgets.css`: header, section label, status square, meters, slot squares, load line).

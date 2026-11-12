@@ -70,7 +70,7 @@ struct AgentRowButton<Label: View>: View {
             .overlay {
                 // Waiting on you: an orange edge that stands out in a long list; selected: a white one.
                 if waiting {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.orange.opacity(0.6), lineWidth: 1.5)
+                    coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.6), lineWidth: 1.5)
                 } else if selected || focus.wrappedValue == id {
                     coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.3), lineWidth: 1)
                 } else {
@@ -78,7 +78,7 @@ struct AgentRowButton<Label: View>: View {
                 }
             }
             .shadow(
-                color: (waiting ? GlassInk.orange : GlassInk.violet).opacity(hovering || waiting ? 0.3 : 0), radius: 14
+                color: (waiting ? GlassInk.amber : GlassInk.blue).opacity(hovering || waiting ? 0.3 : 0), radius: 14
             )
             .coreScaleEffect(hovering ? 1.015 : 1)
             .animation(Motion.out(Motion.hover), value: hovering)

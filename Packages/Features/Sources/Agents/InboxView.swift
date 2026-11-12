@@ -47,7 +47,7 @@ struct InboxView: View {
     private var elevatedUntil: Date? { model.shell.elevatedUntil.flatMap { $0 > Date() ? $0 : nil } }
 
     private func verdict(_ n: Int) -> some View {
-        let hue = n == 0 ? GlassInk.green : GlassInk.orange
+        let hue = n == 0 ? GlassInk.green : GlassInk.amber
         return HStack(spacing: Space.s4) {
             IconTile(n == 0 ? "checkmark.seal.fill" : "hand.raised.fill", hue: hue, size: 52, bounce: n)
                 .shadow(color: hue.opacity(0.5), radius: 14)
@@ -192,7 +192,7 @@ struct NotificationsSection: View {
 
     private var permission: some View {
         let p = model.notifierPermission
-        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.blue : GlassInk.orange
+        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.blue : GlassInk.amber
         return HStack(spacing: Space.s4) {
             IconTile(p == .allowed ? "bell.fill" : "bell.slash.fill", hue: hue, size: 56, bounce: p == .allowed)
                 .shadow(color: hue.opacity(0.5), radius: 14)

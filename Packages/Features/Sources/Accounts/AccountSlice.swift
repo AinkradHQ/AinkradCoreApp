@@ -24,7 +24,7 @@ struct AccountSlice: View {
                 Text("This Mac can only look. Usage and costs need a Mac you allowed to manage the Core.")
                     .foregroundStyle(GlassInk.secondary)
             case .failed(_, let message):
-                Text("Could not load usage. \(message)").foregroundStyle(GlassInk.orangeInk)
+                Text("Could not load usage. \(message)").foregroundStyle(GlassInk.amberInk)
             case .ready:
                 if let use {
                     HStack(alignment: .top, spacing: Space.s3) {

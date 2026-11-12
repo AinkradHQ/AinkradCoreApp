@@ -15,7 +15,7 @@ struct FileDrop: View {
     var body: some View {
         Button(action: choose) {
             HStack(spacing: Space.s3) {
-                IconTile(form.fileName == nil ? "arrow.down.doc" : "doc.fill", hue: GlassInk.orange, size: 32)
+                IconTile(form.fileName == nil ? "arrow.down.doc" : "doc.fill", hue: GlassInk.blue, size: 32)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(form.fileName ?? prompt).fontWeight(.semibold).lineLimit(1)
                     Text(
@@ -30,7 +30,7 @@ struct FileDrop: View {
             .padding(Space.s3)
             .background(over ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
             .overlay {
-                coreShape(Radius.cardMac).strokeBorder(over ? GlassInk.orange : GlassInk.wellEdge, lineWidth: 1)
+                coreShape(Radius.cardMac).strokeBorder(over ? GlassInk.blue : GlassInk.wellEdge, lineWidth: 1)
             }
             .contentShape(coreShape(Radius.cardMac))
         }
@@ -98,7 +98,7 @@ struct GroupDialog: View {
                                 Label(r.name, systemImage: on ? "checkmark" : "server.rack")
                                     .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
                                     .background(
-                                        on ? GlassInk.orange.opacity(0.2) : GlassInk.wellHover, in: coreShape(7))
+                                        on ? GlassInk.blue.opacity(0.2) : GlassInk.wellHover, in: coreShape(7))
                             }
                             .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
                         }

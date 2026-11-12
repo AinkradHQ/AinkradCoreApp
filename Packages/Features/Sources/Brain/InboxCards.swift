@@ -55,7 +55,7 @@ struct ConflictCard: View {
     var body: some View {
         let busy = model.busy != nil
         InboxCardFrame {
-            CardHeader(chip: "Conflict", hue: GlassInk.orange, title: c.title, age: c.age)
+            CardHeader(chip: "Conflict", hue: GlassInk.amber, title: c.title, age: c.age)
             if model.inboxState.later.contains(c.id) {
                 InboxNote("bell", GlassInk.slate, "Asked again later. It stays here and in the bell.")
             }
@@ -93,7 +93,7 @@ struct ConflictCard: View {
             Text(s.when).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             if let higher = model.overridden(c, choice) {
                 Text("Keeping this one replaces a higher source (\(higher.label)). Touch ID asks.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.orangeInk)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)

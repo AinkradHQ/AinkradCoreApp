@@ -87,8 +87,8 @@ struct AboutBlock: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
                 fact("shippingbox.fill", GlassInk.blue, "Core version", a.server, help: a.build.map { "Build \($0)" })
-                fact("number", GlassInk.violet, "API", "Minor \(a.apiMinor)", help: "API \(AboutWords.api(a))")
-                fact("laptopcomputer", GlassInk.green, "This device", a.device, help: nil)
+                fact("number", GlassInk.blue, "API", "Minor \(a.apiMinor)", help: "API \(AboutWords.api(a))")
+                fact("laptopcomputer", GlassInk.blue, "This device", a.device, help: nil)
             }
             .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: Space.s2) {
