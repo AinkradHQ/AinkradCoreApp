@@ -43,6 +43,12 @@ public final class AccountsModel {
     /// The account whose key is being tested now, and what the last test of each answered when it could not run.
     var testing: Int64?
     var testNote: [Int64: String] = [:]
+    /// Claude plan sign-in check (N36): the account being checked and the last answer of each, with the time.
+    var checking: Int64?
+    var planChecks: [Int64: (check: PlanCheck, at: Date)] = [:]
+    var checkNote: [Int64: String] = [:]
+    /// Tool installs the Connect wizard started or saw, by "runner|tool" (N22).
+    var installs: [String: ToolProgress] = [:]
     /// Budgets (Spend), read when the Spend pages open.
     var budgets: [BudgetItem] = []
     var spendLoad: AccountsLoad = .loading

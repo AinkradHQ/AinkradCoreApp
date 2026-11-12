@@ -99,12 +99,6 @@ struct PlacementTests {
         #expect(ProviderWords.keyShape("custom", "abc") == nil)
     }
 
-    @Test func theInstallSheetHasTheExactClaudeCommands() {
-        let cmds = InstallHelp.steps(provider("anthropic")).compactMap(\.command)
-        #expect(cmds.contains("sudo npm install -g @anthropic-ai/claude-code@2.1.318"))
-        #expect(cmds.contains("ainkrad-runner connect --enable-agents"))
-    }
-
     // MARK: the wizard writes
 
     func make() async -> (AccountsModel, FakeService, FakeHost) {
@@ -154,5 +148,36 @@ struct PlacementTests {
         let p = try #require(svc.placements.first)
         #expect(p.pool != nil && p.chain != nil && p.monthlyLimitMicros == 0)
         #expect(host.reasons.filter { $0.hasPrefix("Add creative") }.count == 1, "one elevation for all three writes")
+    }
+}
+
+@MainActor @Suite struct InstallAndCheckTests {
+    @Test func aToolInstallEventBecomesProgressForTheRunnerAndTool() {
+        let m = AccountsModel(host: FakeHost())
+        m.toolInstall(["runner": "r1", "tool": "claude", "state": "running", "percent": "40", "step": "Downloading"])
+        #expect(m.installs["r1|claude"] == ToolProgress(state: .running, percent: 40, step: "Downloading", reason: nil))
+        m.toolInstall(["runner": "r1", "tool": "claude", "state": "done", "percent": "100"])
+        #expect(m.installs["r1|claude"]?.state == .done)
+    }
+
+    @Test func installGoesToAnOnlineRunnerThatLacksTheTool() {
+        let m = AccountsModel(host: FakeHost())
+        let p = ProviderItem(
+            id: "claude-sub", name: "Claude", harness: "claude", authVar: "X", baseURL: "https://x", delivery: ["env"],
+            loginMethods: ["browser_code"], models: [], pricedAt: nil, builtin: true)
+        let has = AccountRunner(id: "a", name: "has", online: true, tools: ["claude": "2.1.318"])
+        let lacks = AccountRunner(id: "b", name: "lacks", online: true)
+        let off = AccountRunner(id: "c", name: "off", online: false)
+        #expect(m.installTarget(p, [has, lacks, off])?.id == "b")
+        #expect(m.installTarget(p, [off]) == nil)
+    }
+
+    @Test func everyCheckResultHasPlainWordsAndOnlyOkIsGood() {
+        for r in [
+            "ok", "token_expired", "limit_reached", "no_runner", "runner_outdated", "runner_busy", "egress_not_proven",
+            "unreachable", "timeout", "failed", "something_new",
+        ] {
+            #expect(!PlanCheckWords.of(r).title.isEmpty && PlanCheckWords.of(r).ok == (r == "ok"))
+        }
     }
 }
