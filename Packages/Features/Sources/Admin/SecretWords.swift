@@ -18,10 +18,10 @@ enum SecretWords {
         }
         var blurb: String {
             switch self {
-            case .text: "A password, a token or a key on one line."
-            case .multiline: "Text on many lines, like a PEM key."
-            case .file: "Any file up to 1 MB, like a .p8 key or a JSON file."
-            case .env: "Many names and values in one secret."
+            case .text: "A password, token or key"
+            case .multiline: "A PEM or SSH key"
+            case .file: "Up to 1 MB, like a .p8"
+            case .env: "Many names and values"
             }
         }
         var symbol: String {
@@ -92,6 +92,30 @@ enum SecretWords {
                 : secs < 86_400 ? "\(Int(secs / 3600)) h ago" : "\(Int(secs / 86_400)) d ago"
         return "Used \(ago) · \(s.useCount) time\(s.useCount == 1 ? "" : "s")"
     }
+
+    /// The Last used column: `Never`, `Just now`, `12 min ago`, `2 hours ago`, `Yesterday`, `3 days ago`.
+    static func lastUsedShort(_ s: SecretItem, now: Date = Date()) -> String {
+        guard let at = s.lastUsedAt else { return "Never" }
+        let secs = max(0, now.timeIntervalSince(at))
+        if secs < 60 { return "Just now" }
+        if secs < 3600 { return "\(Int(secs / 60)) min ago" }
+        if secs < 86_400 {
+            let h = Int(secs / 3600)
+            return h == 1 ? "1 hour ago" : "\(h) hours ago"
+        }
+        let d = Int(secs / 86_400)
+        return d == 1 ? "Yesterday" : "\(d) days ago"
+    }
+
+    /// A loan in the Used by column: `Lent to Azure Dev · 41 min left`, `… · 40 s left`, or `Back from Azure Dev`.
+    static func lent(to runner: String, secondsLeft: Int) -> String {
+        if secondsLeft <= 0 { return "Back from \(runner)" }
+        let left = secondsLeft < 60 ? "\(secondsLeft) s" : "\((secondsLeft + 59) / 60) min"
+        return "Lent to \(runner) · \(left) left"
+    }
+
+    /// The line beside the page title: `6 · values never come back`.
+    static func header(count: Int) -> String { "\(count) · values never come back" }
 
     /// How a row's value is described: `Sealed · 1.2 KB`, or the file name for a file.
     static func sealed(_ s: SecretItem) -> String {
