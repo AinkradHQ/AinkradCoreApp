@@ -10,10 +10,7 @@ struct MacRunnerSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            Text(
-                "This Mac can run terminals and AI sessions for your Core, as a second machine beside the Core itself."
-            )
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            Text("Run terminals and AI sessions for your Core on this Mac.").foregroundStyle(palette.text2)
             MacRunnerSwitches(model: model)
             if model.isAvailable { MacRunnerStatus(model: model, accounts: accounts) }
         }
@@ -25,32 +22,27 @@ struct MacRunnerSection: View {
 struct MacRunnerSwitches: View {
     let model: MacRunnerModel
     var showTerminals = true
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Toggle(
-                "Use this Mac as a runner",
-                isOn: Binding(get: { model.useThisMac }, set: { v in Task { await model.setUseThisMac(v) } })
+        VStack(alignment: .leading, spacing: Space.s2) {
+            GlassToggleTile(
+                "Use this Mac as a runner", sub: "Works for your Core while you are logged in and the Mac is awake",
+                symbol: "laptopcomputer",
+                isOn: Binding(get: { model.useThisMac }, set: { v in Task { await model.setUseThisMac(v) } }),
+                fill: true
             )
             .disabled(!model.isAvailable || model.isBusy)
             .accessibilityIdentifier("mac-runner-switch")
             if showTerminals {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Toggle(
-                        "Terminals on this Mac",
-                        isOn: Binding(get: { model.terminals }, set: { v in Task { await model.setTerminals(v) } })
-                    )
-                    .disabled(!model.isAvailable || !model.useThisMac || model.isBusy)
-                    .accessibilityIdentifier("mac-runner-terminals-switch")
-                    Text(MacRunnerModel.terminalsWarning).coreFont(size: MacTextSize.meta).foregroundStyle(
-                        palette.text2
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+                GlassToggleTile(
+                    "Terminals on this Mac", sub: MacRunnerModel.terminalsWarning, symbol: "terminal",
+                    isOn: Binding(get: { model.terminals }, set: { v in Task { await model.setTerminals(v) } }),
+                    fill: true
+                )
+                .disabled(!model.isAvailable || !model.useThisMac || model.isBusy)
+                .accessibilityIdentifier("mac-runner-terminals-switch")
             }
         }
-        .toggleStyle(.switch)
     }
 }
 
@@ -65,9 +57,8 @@ struct MacRunnerStatus: View {
             switch model.state {
             case .running:
                 CoreNotice(
-                    symbol: "checkmark.circle", title: "This Mac is a runner",
-                    text: "It works for your Core while you are logged in and the Mac is awake.", tone: .done
-                ) {}
+                    symbol: "checkmark", title: "This Mac is a runner",
+                    text: "Its terminals and AI sessions pause while the Mac sleeps.", tone: .done)
             case .working(let what):
                 HStack(spacing: Space.s2) {
                     CoreBusyBar()
@@ -76,21 +67,18 @@ struct MacRunnerStatus: View {
             case .needsApproval:
                 CoreNotice(
                     symbol: "exclamationmark.triangle", title: "Allow Ainkrad in Login Items",
-                    text: "macOS asks you to allow the runner once, in System Settings, Login Items.", tone: .warn
+                    text: "macOS asks once, in System Settings.", tone: .warn
                 ) {
-                    Button("Open Login Items") { model.openLoginItems() }.coreGlassButton()
+                    Button("Open Login Items") { model.openLoginItems() }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
             case .failed(let why):
-                CoreNotice(symbol: "xmark.octagon", title: "This Mac is not a runner", text: why, tone: .fail) {}
+                CoreNotice(
+                    symbol: "exclamationmark.triangle", title: "This Mac is not a runner", text: why, tone: .fail)
             case .off, .unavailable:
                 EmptyView()
             }
             if model.useThisMac {
-                Text(
-                    "When this Mac sleeps or goes offline, its terminals and AI sessions pause. The Core keeps the session and shows it as interrupted."
-                )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
-                    horizontal: false, vertical: true)
                 Text(MacRunnerModel.accountsLine(accounts)).coreFont(size: MacTextSize.meta).foregroundStyle(
                     palette.text2
                 )

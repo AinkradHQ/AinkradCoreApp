@@ -20,6 +20,16 @@ enum RunnerTools {
         ("docker", "Docker", "Runs containers."),
     ]
 
+    /// The AI tools a runner has, for the AI sessions row: `Claude Code 2.1, Codex 0.9`; nil when it has none.
+    static func aiLine(_ tools: [String: String]) -> String? {
+        let names = all.filter { ["claude", "codex"].contains($0.id) }.compactMap { t -> String? in
+            guard let v = tools[t.id] else { return nil }
+            let short = v.split(separator: ".").prefix(2).joined(separator: ".")
+            return short.isEmpty ? t.name : "\(t.name) \(short)"
+        }
+        return names.isEmpty ? nil : names.joined(separator: ", ")
+    }
+
     /// The refusal in plain words; the Core's own reason is already a sentence.
     static func why(_ error: Error, runner: String) -> String {
         switch CoreError.unwrapping(error) {

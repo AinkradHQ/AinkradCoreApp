@@ -101,6 +101,7 @@ struct SecretFormDialog: View {
     @Bindable var form: SecretForm
     let close: () -> Void
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var fileError: String?
 
     var body: some View {
@@ -117,14 +118,10 @@ struct SecretFormDialog: View {
     private func replaceBody(_ model: SecretsModel, _ old: SecretItem) -> some View {
         CoreDialogPanel("New value for \(old.name)", width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("Replace what is sealed. Name and settings stay.").foregroundStyle(palette.text2)
                 valueInput(label: "New value", placeholder: "Paste the new value") { go(model) }
-                Label(
-                    "The old value is removed. Running sessions keep the old value until they end.",
-                    systemImage: "exclamationmark.triangle"
-                )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.warn).ink)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Running AI sessions keep the old value until they end.")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let i = form.issue { IssueLine(code: nil, text: i.message) }
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
                 DialogButtons(confirm: "Seal new value", busy: form.busy, cancel: close) { go(model) }
@@ -145,15 +142,11 @@ struct SecretFormDialog: View {
                 label, placeholder: placeholder, text: Binding(get: { form.value }, set: { form.setValue($0) }),
                 autofocus: true, onSubmit: submit)
         case .multiline, .env:
-            VStack(alignment: .leading, spacing: Space.s1) {
-                CoreFieldLabel(label)
-                TextEditor(text: Binding(get: { form.value }, set: { form.setValue($0) }))
-                    .font(.system(size: MacTextSize.meta + 1, design: .monospaced)).scrollContentBackground(.hidden)
-                    .frame(height: 120).padding(Space.s2)
-                    .background(GlassInk.well, in: coreShape(Radius.control))
-                    .accessibilityLabel(label)
-                    .accessibilityIdentifier("secret-multiline")
-            }
+            CoreTextArea(
+                label, placeholder: placeholder, text: Binding(get: { form.value }, set: { form.setValue($0) }),
+                minHeight: Space.s8 * 4, autofocus: true
+            )
+            .accessibilityIdentifier("secret-multiline")
             FileDrop(form: form, prompt: "Or drop a text file here, or choose", error: $fileError)
         case .file:
             FileDrop(form: form, prompt: "Drop a file here, or choose", error: $fileError)
@@ -164,16 +157,16 @@ struct SecretFormDialog: View {
                 (form.fileName.map { "\($0) · " } ?? "") + "Ready to seal · \(SecretWords.size(n))",
                 systemImage: "lock.fill"
             )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.done).ink)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
     }
 
     // MARK: new secret, three steps
 
     private func wizardBody(_ model: SecretsModel) -> some View {
-        CoreDialogPanel("New secret", width: Space.s8 * 20) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                StepTrack(["Type", "Value", "Details"], at: form.step, hue: GlassInk.blue)
+        CoreDialogPanel("New secret", width: Space.s8 * 17) {
+            VStack(alignment: .leading, spacing: Space.s4) {
+                CoreStepper(["Type", "Value", "Details"], at: form.step)
                 switch form.step {
                 case 0: typeStep
                 case 1: valueStep
@@ -185,48 +178,37 @@ struct SecretFormDialog: View {
                 }
                 footer(model)
             }
-            .animation(.smooth(duration: 0.25), value: form.step)
+            .animation(reduce ? nil : Motion.out(Motion.ui), value: form.step)
         }
         .accessibilityIdentifier("secret-form")
     }
 
+    /// The four kinds as choice rows, two by two, each with its one-line blurb.
     private var typeStep: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text("What kind of value is it?").foregroundStyle(palette.text2)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2) {
-                ForEach(SecretWords.Kind.allCases, id: \.self) { k in
-                    Button {
-                        form.kind = k
-                        form.delivery = k.delivery
-                        form.wipe()
-                        form.fileName = nil
-                        fileError = nil
-                    } label: {
-                        VStack(alignment: .leading, spacing: Space.s1) {
-                            IconTile(k.symbol, hue: GlassInk.blue, size: 36)
-                            Text(k.title).fontWeight(.semibold)
-                            Text(k.blurb).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(Space.s3).frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
-                        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-                        .overlay {
-                            coreShape(Radius.cardMac).strokeBorder(
-                                form.kind == k ? GlassInk.blue : GlassInk.wellEdge,
-                                lineWidth: form.kind == k ? 1.5 : 1)
-                        }
-                        .contentShape(coreShape(Radius.cardMac))
+        let kinds = SecretWords.Kind.allCases
+        return Grid(horizontalSpacing: Space.s2, verticalSpacing: Space.s2) {
+            ForEach([0, 2], id: \.self) { i in
+                GridRow {
+                    ForEach(kinds[i..<i + 2], id: \.self) { k in
+                        RadioRow(k.title, subtitle: k.blurb, symbol: k.symbol, selected: form.kind == k) { pick(k) }
+                            .help(k.blurb)
                     }
-                    .buttonStyle(.plain).help(k.blurb)
-                    .accessibilityAddTraits(form.kind == k ? .isSelected : [])
                 }
             }
         }
     }
 
+    private func pick(_ k: SecretWords.Kind) {
+        form.kind = k
+        form.delivery = k.delivery
+        form.wipe()
+        form.fileName = nil
+        fileError = nil
+    }
+
     private var valueStep: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Add the value. Ainkrad seals it. You will never see it again, only its name and size.")
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            Text("Ainkrad seals it. Only its name and size come back.").foregroundStyle(palette.text2)
             valueInput(label: "Value", placeholder: "Paste a test value") { next() }
         }
     }
@@ -261,47 +243,15 @@ struct SecretFormDialog: View {
                     )
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
-                if model.runners.isEmpty {
-                    Text("No runners yet. A secret no runner may use can't be given to an AI session.").foregroundStyle(
-                        palette.text2)
-                }
-                HStack(spacing: Space.s2) {
-                    ForEach(model.runners) { r in
-                        let on = form.runners.contains(r.id)
-                        Button {
-                            if on { form.runners.remove(r.id) } else { form.runners.insert(r.id) }
-                        } label: {
-                            Label(r.name, systemImage: on ? "checkmark" : "server.rack")
-                                .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
-                                .background(on ? GlassInk.blue.opacity(0.2) : GlassInk.wellHover, in: coreShape(7))
-                        }
-                        .buttonStyle(.plain).help(r.online ? "\(r.name) is online" : "\(r.name) is offline right now")
-                        .accessibilityAddTraits(on ? .isSelected : [])
-                    }
-                }
+                RunnerPicks(runners: model.runners, picked: $form.runners)
             }
             if !form.kind.isFile {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("How an AI session gets it")
-                    ForEach(Delivery.all, id: \.self) { d in
-                        let on = form.delivery == d
-                        Button {
-                            form.delivery = d
-                        } label: {
-                            HStack(spacing: Space.s2) {
-                                Image(systemName: on ? "checkmark.square.fill" : "square")
-                                    .foregroundStyle(on ? GlassInk.blue : palette.text2)
-                                Text(SecretWords.delivery(d).line)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(Space.s2)
-                            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-                            .overlay {
-                                coreShape(Radius.control).strokeBorder(on ? GlassInk.blue : .clear, lineWidth: 1.5)
-                            }
-                            .contentShape(coreShape(Radius.control))
+                    VStack(spacing: 2) {
+                        ForEach(Delivery.all, id: \.self) { d in
+                            RadioRow(SecretWords.delivery(d).line, selected: form.delivery == d) { form.delivery = d }
                         }
-                        .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
                     }
                 }
             }
@@ -314,8 +264,6 @@ struct SecretFormDialog: View {
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("secret-preview")
-            Label("Once stored, nobody can show or copy it again. Asks for Touch ID.", systemImage: "lock.fill")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
     }
 
@@ -359,7 +307,9 @@ struct LeaseDialog: View {
     var body: some View {
         let model = admin.secrets!
         CoreDialogPanel(
-            form.isGroup ? "Let a runner use all of \(form.name)" : "Let a runner use \(form.name)",
+            form.isGroup
+                ? "Let a runner use all of \(SecretWords.unbroken(form.name))"
+                : "Let a runner use \(SecretWords.unbroken(form.name))",
             width: Space.s8 * 15
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -375,13 +325,12 @@ struct LeaseDialog: View {
                     }
                 }
                 CoreTextField(
-                    "For how long", placeholder: "\(model.leaseLimit)", text: $form.ttl, suffix: "seconds",
-                    autofocus: true
+                    "For how long", placeholder: "\(model.leaseLimit)", text: $form.ttl, suffix: "seconds"
                 ) { go(model) }
                 Text(
                     "Up to \(SettingWords.duration(model.leaseLimit)). It comes back by itself when the time runs out."
                 )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 GlassToggleTile(
                     "An AI session on that runner can read it",
                     sub: "Allow it only on a runner whose AI sessions you trust.",
@@ -424,7 +373,7 @@ struct DeleteDialog: View {
                     Text(SecretWords.usage(secret, runnerNames: secret.runnersUsing.map(model.runnerName)))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))
+                .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
                 AdminNoticeBanner(notice: admin.host.elevationNotice)
                 DialogButtons(confirm: "Delete with Touch ID", danger: true, busy: busy, cancel: close) {
                     busy = true
