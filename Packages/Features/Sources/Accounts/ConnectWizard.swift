@@ -4,7 +4,8 @@ import Observation
 import SwiftUI
 
 /// Connect an account as a wizard (N22, variant B): Provider (rows with a live state) → Key or sign-in → Name and limit →
-/// optionally "Where does it go?". The quick path adds the account with the defaults; the advanced path asks where.
+/// optionally "Where does it go?". Both paths share one footer: Add account adds it with the defaults, Choose where it goes…
+/// asks where (accounts-connect.html).
 @MainActor @Observable
 final class ConnectWizardState {
     enum Step: Int {
@@ -119,12 +120,20 @@ struct ConnectWizard: View {
     }
 
     private var plan: Bool { w.isPlan(model) }
+    /// The dialog's title names the step (accounts-connect.html): the panel carries it, not a second heading inside.
+    private var title: String {
+        guard w.flow.stage == .form else { return "Connect an account" }
+        return ConnectWizardWords.title(
+            w.step, provider: model.provider(w.provider).map(ProviderWords.title) ?? "provider", plan: plan)
+    }
     private var stages: [String] { plan ? ["Provider", "Sign in"] : ["Provider", "Key", "Name", "Where it goes"] }
 
     var body: some View {
-        CoreDialogPanel("Connect an account", width: Space.s8 * 16) {
+        CoreDialogPanel(title, width: Space.s8 * 19) {
             VStack(alignment: .leading, spacing: Space.s4) {
-                StepTrack(stages, at: min(w.step.rawValue, stages.count - 1), hue: GlassInk.blue)
+                if w.flow.stage == .form {
+                    CoreStepper(stages, at: min(w.step.rawValue, stages.count - 1))
+                }
                 Group {
                     if w.flow.stage != .form {
                         outcome
@@ -139,7 +148,7 @@ struct ConnectWizard: View {
                 }
                 .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .trailing)))
             }
-            .animation(.smooth(duration: 0.3), value: w.step)
+            .animation(reduce ? .easeOut(duration: Motion.hover) : .smooth(duration: 0.3), value: w.step)
         }
         .accessibilityIdentifier("account-connect")
         .task {
@@ -158,83 +167,59 @@ struct ConnectWizard: View {
     // MARK: 1 provider
 
     private var providerStep: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Choose a provider. Ainkrad checks if it can work on this Core.").foregroundStyle(GlassInk.secondary)
-            VStack(spacing: Space.s2) {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            VStack(spacing: 2) {
                 ForEach(ProviderLook.ordered(model.providers)) { p in providerRow(p) }
             }
-            Text(
-                "AI sessions run their tools on a runner. A provider is ready when a runner that is online can serve it."
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            footer(
-                back: nil, next: "Next", enabled: model.provider(w.provider).map { w.readiness($0).isReady } ?? false
-            ) {
-                go(.key)
+            HStack(spacing: Space.s2) {
+                Button("Cancel", action: close).buttonStyle(.corePlain).coreShortcut(.cancel)
+                Spacer(minLength: 0)
+                Button("Next") { go(.key) }.buttonStyle(.coreProminent).coreShortcut(.primary)
+                    .disabled(!(model.provider(w.provider).map { w.readiness($0).isReady } ?? false))
             }
         }
     }
 
     private func providerRow(_ p: ProviderItem) -> some View {
-        let on = p.id == w.provider
         let r = w.readiness(p)
-        return Button {
+        let offered = ConnectWizardWords.offered(r, installable: AccountsModel.installable.contains(p.harness))
+        return ProviderChoiceRow(
+            provider: p.id, title: ProviderWords.title(p), line: ProviderWords.how(p),
+            selected: p.id == w.provider, dim: !offered
+        ) {
             w.provider = p.id
             w.labelTouched = false
             w.suggestName(model)
-        } label: {
-            HStack(spacing: Space.s3) {
-                AccTile(provider: p.id)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(ProviderWords.title(p)).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    Text(ProviderWords.how(p)).foregroundStyle(GlassInk.secondary)
-                }
-                Spacer(minLength: Space.s3)
-                status(p, r)
-            }
-            .padding(Space.s3)
-            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    on ? GlassInk.blue.opacity(0.8) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
-            }
-            .contentShape(coreShape(Radius.cardMac))
+        } trailing: {
+            status(p, r, offered: offered)
         }
-        .buttonStyle(.plain).focusEffectDisabled()
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("provider-\(p.id)")
     }
 
-    @ViewBuilder private func status(_ p: ProviderItem, _ r: ProviderReadiness) -> some View {
+    @ViewBuilder private func status(_ p: ProviderItem, _ r: ProviderReadiness, offered: Bool) -> some View {
         switch r {
         case .ready(let runner, _):
-            VStack(alignment: .trailing, spacing: 2) {
-                StateBadge("Ready", tone: .run, symbol: "checkmark.circle")
-                Text("Works on \(runner)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            }
-        case .notInstalled:
+            StateBadge("Ready", tone: .run, symbol: "checkmark").help("Works on \(runner)")
+        case .notInstalled where offered:
             ProviderInstall(model: model, w: w, provider: p)
+        case .notInstalled:
+            StateBadge("No runner offers it", tone: .queue, symbol: "minus")
         case .needsRunner:
-            VStack(alignment: .trailing, spacing: Space.s1) {
-                StateBadge("Needs a runner", tone: .warn, symbol: "server.rack")
-                AccLink(title: "Add runner", symbol: "plus") {
-                    close()
-                    model.openRunners()
-                }
+            Button("Add a runner") {
+                close()
+                model.openRunners()
             }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            .help("No runner is online. Open Runners to add one.")
         }
     }
 
     // MARK: 2 key or sign in
 
     private var keyStep: some View {
-        let p = model.provider(w.provider)
         let site = ProviderSites.page(w.provider)
         let shape = ProviderWords.keyShape(w.provider, w.flow.key)
         return VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Add your \(p.map(ProviderWords.title) ?? "provider") key").coreFont(
-                size: MacTextSize.headline, weight: .semibold)
             if let site {
                 HStack(spacing: Space.s3) {
                     AccTile(symbol: "link", provider: nil)
@@ -311,28 +296,26 @@ struct ConnectWizard: View {
     private var nameStep: some View {
         let slug = w.flow.slugged
         return VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Name it and set a limit").coreFont(size: MacTextSize.headline, weight: .semibold)
-            VStack(alignment: .leading, spacing: Space.s1) {
-                CoreTextField(
-                    "Name", placeholder: "claude-work",
-                    text: Binding(
-                        get: { w.flow.label },
-                        set: {
-                            w.flow.label = $0
-                            w.labelTouched = true
-                        }),
-                    error: w.flow.labelOK || w.flow.label.isEmpty ? nil : "Start the name with a letter.")
-                if w.flow.labelOK, slug != w.flow.label {
-                    Text("Shown as “\(slug)” everywhere. Ainkrad makes the short name for you.")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            HStack(alignment: .top, spacing: Space.s3) {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    CoreTextField(
+                        "Name", placeholder: "claude-work",
+                        text: Binding(
+                            get: { w.flow.label },
+                            set: {
+                                w.flow.label = $0
+                                w.labelTouched = true
+                            }),
+                        error: w.flow.labelOK || w.flow.label.isEmpty ? nil : "Start the name with a letter.")
+                    if w.flow.labelOK { hint("Shown as “\(slug)” everywhere") }
                 }
-            }
-            VStack(alignment: .leading, spacing: Space.s1) {
-                CoreTextField(
-                    "Monthly limit", placeholder: "20", text: $w.limitText,
-                    error: w.limit == nil ? "Type a dollar amount, or 0 for no limit." : nil, suffix: "USD")
-                Text("AI sessions stop using it when it reaches this. You can change it later. 0 means no limit.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    CoreTextField(
+                        "Monthly limit", placeholder: "20", text: $w.limitText,
+                        error: w.limit == nil ? "Type a dollar amount." : nil, suffix: "USD")
+                    if w.limit != nil { hint("0 means no limit") }
+                }
+                .frame(width: Space.s8 * 5 + Space.s5)
             }
             if case .ready(let runner, _) = model.provider(w.provider).map({ w.readiness($0) }) ?? .needsRunner {
                 Label("The key is checked on \(runner) when you add it.", systemImage: "checkmark.shield")
@@ -341,20 +324,15 @@ struct ConnectWizard: View {
             HStack(spacing: Space.s2) {
                 Button("Back") { go(.key) }.buttonStyle(.coreSecondary)
                 Spacer(minLength: 0)
-                if w.advanced {
-                    Button("Add with the defaults") { add() }.buttonStyle(.coreSecondary).disabled(!canAdd)
-                } else {
-                    Button("Choose where it goes…") { go(.place) }.buttonStyle(.coreSecondary).disabled(!canAdd)
-                }
-                if w.advanced {
-                    Button("Choose where it goes…") { go(.place) }.buttonStyle(.coreProminent)
-                        .coreShortcut(.primary).disabled(!canAdd)
-                } else {
-                    Button("Add account") { add() }.buttonStyle(.coreProminent).coreShortcut(.primary)
-                        .disabled(!canAdd)
-                }
+                Button("Choose where it goes…") { go(.place) }.buttonStyle(.corePlain).disabled(!canAdd)
+                Button("Add account") { add() }.buttonStyle(.coreProminent).coreShortcut(.primary)
+                    .disabled(!canAdd)
             }
         }
+    }
+
+    private func hint(_ text: String) -> some View {
+        Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
     }
 
     private var canAdd: Bool {
@@ -367,11 +345,8 @@ struct ConnectWizard: View {
         let seats = w.seats(model)
         let issue = w.issue(model)
         return VStack(alignment: .leading, spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Where does it go?").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("AI sessions try accounts in an order. Most people keep the defaults.")
-                    .foregroundStyle(GlassInk.secondary)
-            }
+            Text("AI sessions try accounts in an order. Most people keep the defaults.")
+                .foregroundStyle(GlassInk.secondary)
             HStack(alignment: .top, spacing: Space.s4) {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     heading("Pool", "accounts of one provider that share the work")
@@ -432,30 +407,13 @@ struct ConnectWizard: View {
     }
 
     private func radio(_ title: String, _ on: Bool, _ pick: @escaping () -> Void) -> some View {
-        Button(action: pick) {
-            HStack(spacing: Space.s2) {
-                Image(systemName: on ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(on ? GlassInk.blueInk : GlassInk.secondary)
-                Text(title).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(Space.s2)
-            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-            .overlay {
-                coreShape(Radius.control).strokeBorder(on ? GlassInk.blue.opacity(0.8) : .clear, lineWidth: 1.5)
-            }
-            .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain).focusEffectDisabled()
-        .accessibilityAddTraits(on ? .isSelected : [])
+        RadioRow(title, selected: on, action: pick)
     }
 
     private func seatRow(_ i: Int, _ seat: OrderSeat, count: Int) -> some View {
         HStack(spacing: Space.s2) {
             Image(systemName: "line.3.horizontal").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-            Text("\(i + 1)").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(seat.isNew ? GlassInk.blue : GlassInk.track, in: coreShape(6))
+            CountBadge(i + 1, tone: seat.isNew ? .accent : .quiet)
             Text(seat.title).fontWeight(seat.isNew ? .semibold : .regular).lineLimit(1)
             if seat.isNew {
                 Text(Placement.positionWords(i, in: w.seats(model))).coreFont(size: MacTextSize.meta)
@@ -466,19 +424,21 @@ struct ConnectWizard: View {
                 Button {
                     w.position = max(i - 1, 0)
                 } label: {
-                    Image(systemName: "chevron.up")
+                    Label("Earlier", systemImage: "chevron.up")
                 }
-                .buttonStyle(.plain).disabled(i == 0).help("Move earlier").accessibilityLabel("Move earlier")
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(i == 0).help(
+                    "Move it one place earlier")
                 Button {
                     w.position = min(i + 1, count - 1)
                 } label: {
-                    Image(systemName: "chevron.down")
+                    Label("Later", systemImage: "chevron.down")
                 }
-                .buttonStyle(.plain).disabled(i == count - 1).help("Move later").accessibilityLabel("Move later")
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(i == count - 1)
+                .help("Move it one place later")
             }
         }
         .padding(Space.s2)
-        .background(seat.isNew ? GlassInk.blue.opacity(0.14) : GlassInk.well, in: coreShape(Radius.control))
+        .background(seat.isNew ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
         .modifier(NewSeatDrag(isNew: seat.isNew, index: i) { w.position = $0 })
     }
 

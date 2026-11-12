@@ -9,44 +9,38 @@ struct ProviderInstall: View {
     let provider: ProviderItem
     @State private var note: String?
     @State private var turningOn = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var target: AccountRunner? { model.installTarget(provider, w.runners) }
     private var progress: ToolProgress? { target.flatMap { model.installs["\($0.id)|\(provider.harness)"] } }
-    private var canInstall: Bool { AccountsModel.installable.contains(provider.harness) }
-    private var many: Bool { w.runners.filter(\.online).count > 1 }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: Space.s1) {
-            if let progress, progress.state == .running {
-                StateBadge("Installing… \(progress.percent)%", tone: .run, symbol: "arrow.down.circle")
+            if let progress, progress.state == .running, let target {
                 CoreMeter(Double(progress.percent) / 100, label: "Installing \(ProviderWords.title(provider))")
-                    .frame(width: 150)
-                Text(progress.step.isEmpty ? "Working…" : progress.step).coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    .frame(width: ConnectWizardWords.barWidth)
+                meta(ConnectWizardWords.installing(on: target.name, percent: progress.percent))
             } else if turningOn || progress?.state == .done {
-                StateBadge("Almost ready", tone: .run, symbol: "checkmark.circle")
-                Text(turningOn ? "Turning on AI sessions…" : "Installed. Checking the runner…")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            } else {
-                StateBadge("Not installed", tone: .queue, symbol: "arrow.down.circle")
-                if canInstall, let target {
-                    AccLink(title: many ? "Install on \(target.name)" : "Install", symbol: "arrow.down.to.line") {
-                        note = nil
-                        Task { await model.install(provider, on: target) }
-                    }
-                    .disabled(model.readOnly)
-                    .accessibilityIdentifier("install-\(provider.id)")
-                } else if !canInstall {
-                    Text("Install \(provider.harness) on a runner.").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
+                CoreMeter(1, label: "Installed").frame(width: ConnectWizardWords.barWidth)
+                meta(turningOn ? "Turning on AI sessions…" : "Installed. Checking the runner…")
+            } else if let target {
+                Button("Install on \(target.name)") {
+                    note = nil
+                    Task { await model.install(provider, on: target) }
                 }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .disabled(model.readOnly)
+                .help("Install \(provider.harness) on \(target.name)")
+                .accessibilityIdentifier("install-\(provider.id)")
                 if let why = note ?? progress?.reason {
-                    Text(why).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
-                        .multilineTextAlignment(.trailing).frame(maxWidth: 220, alignment: .trailing)
+                    Text(why).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk).lineLimit(1)
+                        .frame(maxWidth: ConnectWizardWords.barWidth + Space.s8 * 2, alignment: .trailing).help(why)
                 }
+            } else {
+                StateBadge("No runner offers it", tone: .queue, symbol: "minus")
             }
         }
-        .animation(.smooth(duration: 0.25), value: progress)
+        .animation(reduce ? nil : .smooth(duration: 0.25), value: progress)
         .onChange(of: progress?.state) { _, state in
             guard state == .done, let r = target else { return }
             Task {
@@ -55,5 +49,11 @@ struct ProviderInstall: View {
                 turningOn = false
             }
         }
+    }
+}
+
+extension ProviderInstall {
+    fileprivate func meta(_ text: String) -> some View {
+        Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
     }
 }
