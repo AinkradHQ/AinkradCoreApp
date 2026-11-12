@@ -82,25 +82,3 @@ struct BrainComingLater: View {
         .accessibilityIdentifier("brain-coming-later")
     }
 }
-
-/// The Overview of a real Core: what is stored, in numbers. The health charts are for the sample until Core serves them.
-struct CoreOverviewTab: View {
-    let model: BrainModel
-    var body: some View {
-        let sources = model.rooms.reduce(0) { $0 + ($1.counts?.records ?? 0) }
-        VStack(alignment: .leading, spacing: Space.s3) {
-            BrainCard(
-                "Your Brain",
-                sub: "\(BrainWords.plural(model.rooms.count, "room", "rooms")) on your Core, "
-                    + "\(BrainWords.plural(sources, "source", "sources")) stored."
-            ) {
-                HStack(spacing: Space.s2) {
-                    Button("Import more") { model.openImport() }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                    Button("How it works") { BrainHowItWorks.open(model.host.shell) }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                }
-            }
-        }
-        .accessibilityIdentifier("brain-overview-core")
-    }
-}

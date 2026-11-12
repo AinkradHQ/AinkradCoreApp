@@ -216,7 +216,7 @@ private struct AssignSheet: View {
                     .padding(Space.s3).opacity(0.5).help(
                         "The inbox is only entered by capture, so a link into it is not allowed.")
                 }
-                if let p = model.movePause { InboxNote("shield", GlassInk.red, Text("Paused. ").bold() + Text(p)) }
+                if let p = model.movePause { InboxNote("shield", GlassInk.red, "Paused", p) }
                 if let r = room { effect(r) }
                 SheetButtons(
                     model: model, action: "Assign", enabled: room != nil && model.movePause == nil, busy: busy
@@ -287,18 +287,11 @@ private struct AssignSheet: View {
     private func effect(_ r: RoomSummary) -> some View {
         let wide = model.widens(r)
         let line =
-            (mode == .copy
-                ? "The original stays in the inbox, still unsearchable." : "The raw capture leaves the inbox.")
-            + " In \(r.name) it waits for your approval and follows that room's rules."
-            + (r.provider == .local ? " Only local models read it, no cloud AI session." : "")
-            + (r.kind.chipLabel.map { " This is an \($0.lowercased()) room: the stricter room rule applies." } ?? "")
-            + " Undo later removes it from the room and flags it for review."
+            (mode == .copy ? "The original stays here, unsearchable." : "The capture leaves this list.")
+            + " In \(r.name) it waits for your approval. Undo takes it back out."
         return InboxNote(
             wide ? "touchid" : "info.circle", wide ? GlassInk.amber : GlassInk.slate,
-            Text("What happens. ").bold() + Text(line)
-                + Text(wide ? " This room can reach cloud AI sessions, so " : "")
-                + Text(wide ? "Touch ID asks" : "").bold()
-                + Text(wide ? " before it goes in." : ""))
+            wide ? "Touch ID asks first: this room can reach cloud AI sessions" : "What happens", line)
     }
 }
 

@@ -86,6 +86,16 @@ public final class BrainModel {
     public var canMakeRooms: Bool { isSample }
     /// The tab bar: only where the Brain has rooms to look at.
     public var tabsVisible: Bool { load != .unavailable && setup == .ready }
+    /// A real Core serves rooms and sources; Overview, Inbox, Activity and Checks are on the sample only for now.
+    public var visibleTabs: [BrainTab] { isSample ? BrainTab.allCases : [.rooms, .sources] }
+    /// The tab on screen: the chosen one, or the first this Core has.
+    public var currentTab: BrainTab { visibleTabs.contains(tab) ? tab : visibleTabs[0] }
+
+    /// The time under a room's count: when this Mac last synced, else what the room itself says.
+    public func lastSyncLabel(_ r: RoomSummary) -> String? {
+        if let d = sync?.lastSync { return SyncWords.ago(d) }
+        return r.counts?.lastSync
+    }
 
     // MARK: derived
 
@@ -120,12 +130,12 @@ public final class BrainModel {
         }
     }
 
-    /// The pane head chip: Paused (red), Needs you with its count (blue), or Healthy (green).
+    /// The pane head chip: Paused (red), Needs you with its count (amber), or Healthy (green).
     var chip: PaneChip {
         switch health {
-        case .paused: PaneChip("Paused, \(needsTotal)", tone: .fail, symbol: "pause.circle")
-        case .needsYou: PaneChip("Needs you, \(needsTotal)", tone: .run, symbol: "hand.raised")
-        case .healthy: PaneChip("Healthy", tone: .done, symbol: "checkmark.circle")
+        case .paused: PaneChip("Paused, \(needsTotal)", tone: .fail, symbol: "pause")
+        case .needsYou: PaneChip("Needs you, \(needsTotal)", tone: .warn, symbol: "hand.raised")
+        case .healthy: PaneChip("Healthy", tone: .run, symbol: "checkmark")
         }
     }
 
@@ -162,7 +172,7 @@ public final class BrainModel {
             if let sync, sync.status == nil {
                 await sync.reload()
                 // Real Cores only: the sample has no Mac collectors to run.
-                if service.importRoutes != nil { sync.startTimer() }
+                if service.importRoutes != nil, !service.isSample { sync.startTimer() }
             }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }
             // A room that sealed or lost its lease under us must not stay on screen.

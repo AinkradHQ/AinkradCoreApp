@@ -104,10 +104,13 @@ public struct NotReadableSource: ImportSource {
     public let id: String
     public let title: String
     public let notReadable: String?
+    /// Nothing of this tool is on this Mac, so its format could not even be checked.
+    public let absent: Bool
 
-    public init(id: String, title: String, reason: String) {
+    public init(id: String, title: String, reason: String, absent: Bool = false) {
         self.id = id
         self.title = title
+        self.absent = absent
         self.notReadable = reason
     }
 
@@ -146,7 +149,7 @@ public enum ImportSources {
                 reason: "Its conversations are stored as binary records with no published format."),
             NotReadableSource(
                 id: "kimi", title: "Kimi sessions",
-                reason: "No Kimi history was found on this Mac, so its format could not be checked."),
+                reason: "No Kimi history was found on this Mac, so its format could not be checked.", absent: true),
             FolderSource(id: "doc", title: "Project docs", root: projects, collector: markdown(.projectDocs)),
             FolderSource(
                 id: "vault", title: "Notes vault (Ainkrad)", root: home.appending(path: "Ainkrad"),
@@ -155,7 +158,7 @@ public enum ImportSources {
                 id: "agents_md", title: "AGENTS.md and CLAUDE.md files", root: projects,
                 collector: markdown(.agentFiles)),
             FolderSource(
-                id: "chat", title: "Chat exports (Documents/Chat exports)", root: chatExportsFolder,
+                id: "chat", title: "Chat exports", root: chatExportsFolder,
                 collector: ChatExportCollector(device: device)),
         ]
     }

@@ -206,6 +206,29 @@ struct BrainImportFlowTests {
         #expect(m.review.cards.first { $0.id == "alpha" }?.state == "refused" && m.review.openID == nil)
     }
 
+    @Test func acceptAgainUndoesItAndABlockedAcceptSaysWhy() async {
+        let t = FakeBrainTransport()
+        let (m, _) = wizard(t)
+        let held = NSLock()
+        nonisolated(unsafe) var state = "proposed"
+        t.routes["PATCH /modules/brain/v1/imports/r1/proposals/alpha"] = { b in
+            let o = (try? JSONSerialization.jsonObject(with: b ?? Data()) as? [String: Any]) ?? [:]
+            return held.withLock {
+                state = o["state"] as? String ?? state
+                return card("alpha", state: state)
+            }
+        }
+        m.start()
+        await untilStep(m, .review)
+        await m.review.choose("alpha", "accept")
+        #expect(m.review.accepted.map(\.id) == ["alpha"])
+        await m.review.choose("alpha", "accept")
+        #expect(m.review.accepted.isEmpty, "Accept again takes it back out")
+        #expect(m.review.cards.first { $0.id == "alpha" }?.state == "proposed")
+        await m.review.choose("acme", "accept")
+        #expect(m.review.notice == "Two employers are in this room. Split it first.")
+    }
+
     @Test func commitAsksTouchIDAndHeldRoomsAreShownHeld() async {
         let t = FakeBrainTransport()
         let host = FakeHost()

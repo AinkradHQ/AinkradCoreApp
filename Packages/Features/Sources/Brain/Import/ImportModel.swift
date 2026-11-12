@@ -19,6 +19,20 @@ public final class ImportModel {
         public var on = true
         /// Why the source cannot be collected yet; such a choice is off and can not be turned on.
         public var notReadable: String?
+        /// The tool has no history on this Mac at all (rather than one this app cannot read).
+        public var absent = false
+    }
+
+    /// One source's line on the collect step: done, being read, or waiting.
+    public struct SourceRow: Identifiable, Equatable {
+        public enum State: Equatable { case waiting, reading, done }
+        public let id: String
+        public let title: String
+        public let state: State
+        /// Items read so far over the items the scan found.
+        public let done: Int
+        public let total: Int
+        public var fraction: Double { total == 0 ? (state == .done ? 1 : 0) : min(1, Double(done) / Double(total)) }
     }
 
     let host: any AdminHost
@@ -48,7 +62,9 @@ public final class ImportModel {
     @ObservationIgnored private var job: Task<Void, Never>?
     @ObservationIgnored private var poller: Task<Void, Never>?
     @ObservationIgnored private let uploaded = Uploader.Progress()
-    @ObservationIgnored private var collectedSources: Set<String> = []
+    /// The sources finished in this run, and the one being read now.
+    public private(set) var collectedSources: Set<String> = []
+    public private(set) var current: String?
     @ObservationIgnored private var started: Date?
     @ObservationIgnored private var baseline: UInt64?
     @ObservationIgnored private let resume: ResumeStore?
@@ -66,7 +82,9 @@ public final class ImportModel {
         self.pause = pause
         self.resume = resume
         choices = sources.map {
-            Choice(id: $0.id, title: $0.title, on: $0.notReadable == nil, notReadable: $0.notReadable)
+            Choice(
+                id: $0.id, title: $0.title, on: $0.notReadable == nil, notReadable: $0.notReadable,
+                absent: ($0 as? NotReadableSource)?.absent ?? false)
         }
         review = ReviewModel(host: host, routes: routes)
     }
@@ -119,6 +137,8 @@ public final class ImportModel {
             for c in chosen {
                 let sid = c.id
                 guard let source = sources[sid], !collectedSources.contains(sid) else { continue }
+                current = sid
+                progress = StreamProgress()
                 let report = try await source.stream(
                     run: id, uploader: uploader, uploaded: uploaded, resume: resumeState.sources[sid] ?? .init(),
                     save: { [weak self] s in self?.remember(sid, s) },
@@ -130,6 +150,7 @@ public final class ImportModel {
                 {}  // already reported by an earlier attempt
                 collectedSources.insert(sid)
             }
+            current = nil
             stopPoller()
             phase = .discovering
             try await waitForReview(run: id)
@@ -220,6 +241,29 @@ public final class ImportModel {
         case .uploading: progress.bytesTotal == 0 ? 0 : min(1, Double(progress.bytesDone) / Double(progress.bytesTotal))
         case .discovering: 1
         }
+    }
+
+    /// The collect step's lines, one per chosen source.
+    public var sourceRows: [SourceRow] {
+        chosen.map { Self.row($0, done: collectedSources.contains($0.id), reading: $0.id == current ? progress : nil) }
+    }
+
+    /// One line, always in items (what the scan found). Reading progress comes in files, so it is turned into the same
+    /// share of the items: mixing the two made a bar stall short and then jump, and the total add files to items.
+    static func row(_ c: Choice, done: Bool, reading: StreamProgress?) -> SourceRow {
+        let total = c.found ?? 0
+        if done { return SourceRow(id: c.id, title: c.title, state: .done, done: total, total: total) }
+        guard let p = reading else {
+            return SourceRow(id: c.id, title: c.title, state: .waiting, done: 0, total: total)
+        }
+        let share = p.filesTotal == 0 ? 0 : min(1, Double(p.filesDone) / Double(p.filesTotal))
+        return SourceRow(
+            id: c.id, title: c.title, state: .reading, done: Int((Double(total) * share).rounded(.down)), total: total)
+    }
+
+    /// Items read over items found, across every chosen source.
+    public var itemsDone: (done: Int, total: Int) {
+        sourceRows.reduce((0, 0)) { ($0.0 + $1.done, $0.1 + $1.total) }
     }
 
     /// The one live status line.
