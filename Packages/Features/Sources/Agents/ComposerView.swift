@@ -22,6 +22,59 @@ enum SlashCommands {
     }
 }
 
+/// What Return does in the field: ⇧Return a new line; with the command list open and a different command highlighted, fill it in;
+/// otherwise send.
+enum ComposerReturn: Equatable {
+    case newline, send
+    case fill(String)
+
+    static func action(shift: Bool, text: String, commands: [(name: String, help: String)], pick: Int) -> Self {
+        if shift { return .newline }
+        if !commands.isEmpty {
+            let name = commands[min(pick, commands.count - 1)].name
+            if name != text { return .fill(name) }
+        }
+        return .send
+    }
+}
+
+/// A TextEditor is an NSTextView, which takes Return itself (`insertNewline`) before SwiftUI's `onKeyPress` hears it, so Return
+/// never sent. While the field is focused, one local key monitor sees Return first; `handle(shift)` says whether it took it.
+private struct ReturnMonitor: ViewModifier {
+    let active: Bool
+    let handle: (Bool) -> Bool
+    @State private var monitor: Any?
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: active, initial: true) { _, on in on ? install() : remove() }
+            .onDisappear { remove() }
+    }
+
+    private func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            guard e.keyCode == 36 || e.keyCode == 76,
+                e.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+                // IME composition owns Return until it is done.
+                (e.window?.firstResponder as? NSTextView)?.hasMarkedText() != true
+            else { return e }
+            return MainActor.assumeIsolated { handle(e.modifierFlags.contains(.shift)) } ? nil : e
+        }
+    }
+
+    private func remove() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil
+    }
+}
+
+extension View {
+    fileprivate func onReturn(active: Bool, _ handle: @escaping (Bool) -> Bool) -> some View {
+        modifier(ReturnMonitor(active: active, handle: handle))
+    }
+}
+
 /// The message field under a conversation. Always open while the session is live: Return sends (⇧Return a new line), the
 /// message queues while a turn runs, ↑ on an empty field edits the last message, Esc stops the turn, "/" opens the commands.
 struct ComposerView: View {
@@ -68,14 +121,15 @@ struct ComposerView: View {
                     TextEditor(text: draft)
                         .accessibilityIdentifier("agent-composer")
                         .scrollContentBackground(.hidden).focused(focused).focusEffectDisabled().disabled(!enabled)
-                        .onKeyPress(.return, phases: .down) { press in
-                            if press.modifiers.contains(.shift) { return .ignored }
-                            if !commands.isEmpty, commands[min(pick, commands.count - 1)].name != text {
-                                draft.wrappedValue = commands[min(pick, commands.count - 1)].name + " "
-                                return .handled
+                        .onReturn(active: focused.wrappedValue && enabled) { shift in
+                            switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
+                            case .newline: return false
+                            case .fill(let name):
+                                draft.wrappedValue = name + " "
+                            case .send:
+                                Task { await model.send(session.id) }
                             }
-                            Task { await model.send(session.id) }
-                            return .handled
+                            return true
                         }
                         .onKeyPress(.upArrow, phases: .down) { _ in
                             if !commands.isEmpty {

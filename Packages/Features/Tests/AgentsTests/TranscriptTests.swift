@@ -46,10 +46,35 @@ struct EntryParserTests {
         #expect(EntryParser.kind([:]) == .note(type: "unknown", detail: ""))
     }
 
+    @Test func aMessageIsDrawnOnceAndAnAllowedRateLimitNotAtAll() {
+        #expect(EntryParser.kind(["type": "user_message", "id": 2, "text": "hi"]) == .hidden)
+        #expect(EntryParser.kind(["type": "rate_limit", "status": "allowed", "windows": []]) == .hidden)
+        #expect(EntryParser.kind(["type": "rate_limit", "status": "allowed_warning"]) == .hidden)
+        guard case .note(let type, let detail) = EntryParser.kind(["type": "rate_limit", "status": "rejected"]) else {
+            Issue.record("a rejected rate limit is a notice")
+            return
+        }
+        #expect(type == "rate_limit" && !detail.isEmpty)
+    }
+
     @Test func aToolInputWithoutACommandIsItsJSONCut() {
         let long = String(repeating: "a", count: 900)
         #expect(EntryParser.summary(["blob": long]).count <= 401)
         #expect(EntryParser.summary(["file_path": "/a/b.rs", "x": 1]) == "/a/b.rs")
+    }
+}
+
+struct ComposerReturnTests {
+    private let cmds = SlashCommands.matches("/co")
+
+    @Test func returnSendsAndShiftReturnIsANewLine() {
+        #expect(ComposerReturn.action(shift: false, text: "hi", commands: [], pick: 0) == .send)
+        #expect(ComposerReturn.action(shift: true, text: "hi", commands: [], pick: 0) == .newline)
+    }
+
+    @Test func returnPicksTheHighlightedCommandThenSendsIt() {
+        #expect(ComposerReturn.action(shift: false, text: "/co", commands: cmds, pick: 1) == .fill(cmds[1].name))
+        #expect(ComposerReturn.action(shift: false, text: "/compact", commands: [cmds[0]], pick: 0) == .send)
     }
 }
 

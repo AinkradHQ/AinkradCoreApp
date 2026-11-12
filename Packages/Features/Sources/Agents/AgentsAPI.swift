@@ -93,7 +93,15 @@ enum EntryParser {
         func int(_ k: String) -> Int? { (b[k] as? NSNumber)?.intValue }
         switch type {
         case "started": return .started(harness: str("harness"), resumed: b["resumed"] as? Bool ?? false)
-        case "message", "user_message": return .user(str("text") ?? "")
+        case "message": return .user(str("text") ?? "")
+        // The runner's `user_message` says it took a message the Core already recorded as `message` (same text, `id` = that
+        // entry's seq - 1), so drawing both showed one message twice.
+        case "user_message": return .hidden
+        // The harness's `rate_limit` is its usage report after every turn (`allowed`, `allowed_warning`): only a refusal is news.
+        case "rate_limit":
+            let status = str("status") ?? "allowed"
+            return status.hasPrefix("allowed")
+                ? .hidden : .note(type: type, detail: "this account has hit its usage limit for now")
         case "assistant_text": return .assistant(str("text") ?? "")
         case "tool_use":
             let name = str("name") ?? "tool"
