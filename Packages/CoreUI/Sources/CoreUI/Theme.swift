@@ -142,7 +142,7 @@ extension View {
     /// The disabled look every control shares.
     public func coreDimWhenDisabled(_ enabled: Bool) -> some View { modifier(DimWhenDisabled(enabled: enabled)) }
 
-    /// Keyboard focus without a ring (Ahmed, 2026-11-05; D6): the hover fill, a brighter 1 pt edge and a 1 pt lift.
+    /// Keyboard focus without a ring (Ahmed, 2026-11-05; D6): the lifted fill and a 1 pt lift.
     /// Reduce Motion: no lift. One implementation, so every control that calls it answers focus the same way.
     public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
         modifier(CoreFocusLook(show: show, radius: radius))
@@ -163,9 +163,7 @@ private struct CoreFocusLook: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                coreShape(radius).fill(.white.opacity(show ? 0.08 : 0))
-                    .overlay { coreShape(radius).strokeBorder(.white.opacity(show ? 0.55 : 0), lineWidth: 1) }
-                    .allowsHitTesting(false)
+                coreShape(radius).fill(.white.opacity(show ? 0.14 : 0)).allowsHitTesting(false)
             }
             .offset(y: show && !reduce ? -1 : 0)
             .animation(Motion.out(Motion.hover), value: show)
