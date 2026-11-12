@@ -1,8 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// New AI session (advanced): tool, runner, model, where it works (fresh folder, an existing folder, or a repo and branch) and the
-/// order of accounts. No first message is needed: the session opens live and waits, like the CLI. The Core refuses a runner that
+/// New AI session (advanced, ai-sessions-2026-11-12 new-advanced): tool, runner, model, where it works (fresh folder, an
+/// existing folder, or a repo and branch) and the order of accounts. No first message is needed: the session opens live and waits, like the CLI. The Core refuses a runner that
 /// cannot run it, and the refusal shows here in place.
 struct NewSessionSheet: View {
     @Bindable var model: AgentsModel
@@ -33,33 +33,44 @@ struct NewSessionSheet: View {
     }
     private var ready: Bool { runner != nil && placeOK && !busy }
 
+    /// The tools the sheet offers (approved mockup): Claude Code, Codex, OpenCode.
+    static let tools = ["claude", "codex", "opencode"]
+
     var body: some View {
-        CoreDialogPanel("New AI session (advanced)", width: Space.s8 * 17) {
+        CoreDialogPanel("", width: Space.s8 * 22) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("New AI session (advanced)").coreFont(size: MacTextSize.large, weight: .semibold)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Space.s3)
+                Text("No first message needed").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    Text("No first message needed. The session opens and waits for you, on a runner of the Home Core.")
-                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                     if let notice { NoticeBanner(notice: notice) }
                     field("Tool") {
                         HStack(spacing: Space.s2) {
-                            ForEach(["claude", "codex", "opencode", "agy"], id: \.self) { t in toolTile(t) }
+                            ForEach(Self.tools, id: \.self) { t in
+                                RadioRow(
+                                    AgentWords.toolName(t), subtitle: toolLine, symbol: AgentsModel.harnessSymbol(t),
+                                    selected: harness == t
+                                ) { harness = t }
+                            }
                         }
                     }
                     HStack(alignment: .top, spacing: Space.s3) {
-                        field("Runner") {
+                        VStack(alignment: .leading, spacing: Space.s1) {
                             CoreSelect(
                                 "Runner", selection: Binding(get: { runnerID ?? "" }, set: { runnerID = $0 }),
                                 options: model.runners.map {
                                     CoreSelectOption($0.id, $0.name, note: $0.online ? nil : "offline")
                                 })
-                            Text(runnerLine).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            hint(runnerLine)
                         }
                         VStack(alignment: .leading, spacing: Space.s1) {
                             CoreTextField(
                                 "Model", placeholder: "Default for \(AgentWords.toolName(harness))", text: $llm,
                                 mono: true)
-                            Text("You can change it later with /model.").coreFont(size: MacTextSize.meta)
-                                .foregroundStyle(palette.text2)
+                            hint("You can change it later with /model")
                         }
                     }
                     field("Where it works") {
@@ -68,67 +79,96 @@ struct NewSessionSheet: View {
                             segments: [
                                 CoreSegment(Place.fresh, "Fresh folder"), CoreSegment(Place.folder, "Existing folder"),
                                 CoreSegment(Place.repo, "Repo and branch"),
-                            ], selection: $place)
+                            ], selection: $place
+                        )
+                        .fixedSize()
                         switch place {
                         case .fresh: EmptyView()
                         case .folder:
-                            CoreTextField("Folder", placeholder: "/path/on/the/runner", text: $folder, mono: true)
-                            CoreTextField("Start from", placeholder: "main", text: $base, mono: true)
-                            Text("The folder must be a git repo. The session works in its own copy of it.")
-                                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            HStack(alignment: .top, spacing: Space.s3) {
+                                CoreTextField("Folder", placeholder: "/path/on/the/runner", text: $folder, mono: true)
+                                CoreTextField("Start from", placeholder: "main", text: $base, mono: true)
+                            }
+                            hint("The folder must be a git repo. The session works in its own copy of it.")
                         case .repo:
-                            HStack(spacing: Space.s3) {
+                            HStack(alignment: .top, spacing: Space.s3) {
                                 CoreTextField("Repository", placeholder: "AinkradCore", text: $repo, mono: true)
                                 CoreTextField("Branch", placeholder: "feat/my-branch", text: $branch, mono: true)
                             }
-                            CoreTextField("Start from", placeholder: "main", text: $base, mono: true)
-                            Text("Works in its own copy of the repo on the runner, so your branch stays as it is.")
-                                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            hint("Works in its own copy of the repo on the runner, so your branch stays as it is.")
                         }
                     }
-                    if !model.chains.isEmpty {
-                        field("Accounts, tried in this order") {
-                            CoreSelect(
-                                "Order", selection: Binding(get: { chain?.id ?? 0 }, set: { chainID = $0 }),
-                                options: model.chains.map {
-                                    CoreSelectOption($0.id, $0.name, note: $0.isDefault ? "default" : nil)
-                                })
-                            if let chain {
-                                Text(
-                                    chain.steps.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(
-                                        separator: "   ")
-                                )
-                                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                                .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
+                    if !model.chains.isEmpty { order }
                     field("What it may do") {
                         CoreSegmented(
                             "What it may do", segments: SessionMode.all.map { CoreSegment($0, SessionMode.words($0)) },
-                            selection: $mode)
-                        Text(SessionMode.help(mode)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            selection: $mode
+                        )
+                        .fixedSize()
+                        hint(SessionMode.help(mode))
                     }
                 }
                 .padding(.bottom, Space.s1)
             }
             .frame(maxHeight: Space.s8 * 20)
-            Text("Starting needs Touch ID.").foregroundStyle(palette.text2)
-            CoreDialogFooter(
-                cancel: CoreAction("Cancel", key: .cancel) { model.shell.closeDialog() },
-                primary: CoreAction(busy ? "Starting…" : notice == nil ? "Start AI session" : "Try again", key: nil) {
-                    if ready { start() }
-                }, busy: busy
-            )
-            .opacity(ready || busy ? 1 : 0.7)
-            .help("Start the AI session (⌘Return)")
-            .background {
-                Button("") { if ready { start() } }.keyboardShortcut(.return, modifiers: .command).opacity(0)
-                    .accessibilityHidden(true)
+            .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Cancel") { model.shell.closeDialog() }
+                    .buttonStyle(CoreButtonStyle(.plain)).keyboardShortcut(.cancelAction)
+                Spacer(minLength: Space.s3)
+                Button(busy ? "Starting…" : notice == nil ? "Start AI session" : "Try again") { if ready { start() } }
+                    .buttonStyle(CoreButtonStyle(.prominent, busy: busy))
+                    .coreShortcut(.command)
+                    .disabled(!ready && !busy)
+                    .help("Start the AI session (⌘Return)")
             }
         }
-        .onAppear { pickRunner() }
+        .onAppear {
+            pickRunner()
+            if !Self.tools.contains(harness) { harness = Self.tools[0] }
+            if let p = model.newSessionPlace {
+                place = .repo
+                repo = p.project
+                branch = p.branch ?? ""
+            }
+        }
         .onChange(of: model.runners) { _, _ in pickRunner() }
+    }
+
+    /// The account order the session draws from, step by step. The order itself is edited in Settings, Account orders.
+    private var order: some View {
+        field("Accounts, tried in this order") {
+            if model.chains.count > 1 {
+                CoreSelect(
+                    nil, selection: Binding(get: { chain?.id ?? 0 }, set: { chainID = $0 }),
+                    options: model.chains.map { CoreSelectOption($0.id, $0.name, note: $0.isDefault ? "default" : nil) }
+                )
+            }
+            if let chain {
+                VStack(spacing: 2) {
+                    ForEach(Array(chain.steps.enumerated()), id: \.offset) { i, step in
+                        HStack(spacing: Space.s3) {
+                            Text("\(i + 1)").foregroundStyle(palette.text2).monospacedDigit().frame(width: Space.s4)
+                            Text(step).lineLimit(1).truncationMode(.middle)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
+                        .coreWell(radius: Radius.control)
+                    }
+                }
+                hint("Change the order in Settings, Account orders. Keys stay on the runner.")
+            }
+        }
+    }
+
+    private var toolLine: String {
+        let n = model.runners.filter { $0.online && $0.runsAgents }.count
+        return n == 0 ? "No runner offers it" : n == 1 ? "On 1 runner" : "On \(n) runners"
+    }
+
+    private func hint(_ text: String) -> some View {
+        Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var runnerLine: String {
@@ -136,28 +176,6 @@ struct NewSessionSheet: View {
         return r.online
             ? "Online, \(r.load) AI session\(r.load == 1 ? "" : "s") running"
             : "Offline. Pick another, or bring it back online."
-    }
-
-    private func toolTile(_ t: String) -> some View {
-        let on = harness == t
-        let n = model.runners.filter { $0.online && $0.runsAgents }.count
-        return Button {
-            harness = t
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(AgentWords.toolName(t)).coreFont(size: MacTextSize.body, weight: .semibold)
-                Text(n == 0 ? "No runner offers it" : "On \(n) runner\(n == 1 ? "" : "s")")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            }
-            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background(on ? GlassInk.blue.opacity(0.22) : GlassInk.well, in: coreShape(Radius.control))
-            .overlay {
-                coreShape(Radius.control).strokeBorder(on ? GlassInk.blue : GlassInk.wellEdge, lineWidth: on ? 2 : 1)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     private func field<C: View>(_ label: String, @ViewBuilder _ content: () -> C) -> some View {

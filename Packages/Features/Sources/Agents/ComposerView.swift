@@ -40,27 +40,30 @@ struct ComposerView: View {
     private var enabled: Bool { model.canWrite(session) }
     private var commands: [(name: String, help: String)] { enabled ? SlashCommands.matches(text) : [] }
 
-    private var placeholder: String {
-        switch session.state {
-        case .running: "Type to queue a message for after this turn"
-        case .waiting: "Message \(AgentWords.toolName(session.harness))…"
-        case .starting: "Starting. You can type now; it is sent when the session is up."
-        case .interrupted: "Resuming. You can type now."
-        case .ended where session.idleEnded: "Ended (idle). Send a message to continue."
-        case .ended: "This AI session ended. Start again to continue."
-        default: "This AI session was lost. Send a message to bring it back."
+    private var placeholder: String { ConversationWords.placeholder(session) }
+
+    var body: some View {
+        if !enabled && session.state == .ended {
+            // An ended session takes no message: one quiet line where the composer was (Start again is in the header).
+            Label(placeholder, systemImage: "lock")
+                .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                .coreWell()
+                .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
+        } else {
+            composer
         }
     }
 
-    var body: some View {
+    private var composer: some View {
         let on = focused.wrappedValue
-        VStack(alignment: .leading, spacing: Space.s1) {
+        return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
             VStack(alignment: .leading, spacing: Space.s2) {
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
-                        Text(placeholder).foregroundStyle(GlassInk.secondary).padding(.horizontal, 5).allowsHitTesting(
-                            false)
+                        Text(placeholder).foregroundStyle(palette.text2).padding(.horizontal, Space.s1 + 1)
+                            .allowsHitTesting(false)
                     }
                     TextEditor(text: draft)
                         .accessibilityIdentifier("agent-composer")
@@ -100,59 +103,42 @@ struct ComposerView: View {
                         }
                 }
                 .coreFont(size: MacTextSize.body)
-                .frame(minHeight: 44, maxHeight: 160).fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5).fixedSize(
+                    horizontal: false, vertical: true)
                 HStack(spacing: Space.s2) {
-                    Button {
-                        attach()
-                    } label: {
-                        Image(systemName: "paperclip").frame(width: 28, height: 28)
-                            .background(GlassInk.well, in: coreShape(Radius.control))
-                    }
-                    .buttonStyle(.plain).disabled(!enabled).help("Attach a file: adds its path to the message")
-                    .accessibilityLabel("Attach a file")
-                    chip(AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model"))
+                    CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
+                        .disabled(!enabled).help("Attach a file: adds its path to the message")
+                    CoreChip(AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model"))
                     stateChip
                     Spacer(minLength: Space.s2)
                     if bytes > AgentsModel.messageLimit / 2 {
                         Text("\(coreDecimal(Double(bytes) / 1024, 1)) / 16 KiB")
-                            .coreFont(size: MacTextSize.meta, design: .monospaced)
-                            .foregroundStyle(over ? palette.tone(.fail).ink : GlassInk.secondary)
+                            .coreFont(size: MacTextSize.meta).monospacedDigit()
+                            .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
                     }
                     if model.canStopTurn(session) {
-                        Button {
-                            model.stopTurn(session.id)
-                        } label: {
-                            Label("Stop turn", systemImage: "stop.fill").coreFont(
-                                size: MacTextSize.body, weight: .semibold
-                            )
-                            .padding(.horizontal, Space.s3).frame(height: 28)
-                            .background(GlassInk.well, in: coreShape(Radius.control))
-                            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-                        }
-                        .buttonStyle(.plain).help("Stop the current turn (Esc). The session stays open.")
+                        Button("Stop turn") { model.stopTurn(session.id) }
+                            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "esc")
+                            .help("Stop the current turn (Esc). The session stays open.")
                     }
                     if enabled {
-                        AppActionTile(
-                            title: session.idle ? "Send" : "Queue", symbol: "arrow.up", key: "↩", hue: GlassInk.blue,
-                            prominent: true
-                        ) { Task { await model.send(session.id) } }
-                        .disabled(!model.canSend(session.id)).opacity(model.canSend(session.id) ? 1 : 0.5)
-                        .help("Send the message (Return)")
+                        Button(action: { Task { await model.send(session.id) } }) {
+                            Label(session.idle || !session.live ? "Send" : "Queue", systemImage: "arrow.up")
+                        }
+                        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).environment(\.coreKeycap, "↩")
+                        .disabled(!model.canSend(session.id))
+                        .help(
+                            session.idle || !session.live
+                                ? "Send the message (Return)" : "Send it after this turn (Return)")
                     }
                 }
-                .coreFont(size: MacTextSize.meta)
             }
             .padding(Space.s3)
-            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
-            }
-            .opacity(enabled || session.over ? 1 : 0.6)
-            .animation(Motion.out(Motion.ui), value: on)
+            .coreFieldSurface(focused: on, radius: Radius.cardMac)
+            .coreDimWhenDisabled(enabled || session.over)
             hints
         }
-        .padding(.horizontal, Space.s3).padding(.bottom, Space.s1)
+        .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
         .onChange(of: text) { _, _ in pick = 0 }
     }
 
@@ -164,44 +150,41 @@ struct ComposerView: View {
                 } label: {
                     HStack(spacing: Space.s3) {
                         Text(c.name).coreFont(size: MacTextSize.body, weight: .semibold, design: .monospaced)
-                        Text(c.help).foregroundStyle(GlassInk.secondary)
+                        Text(c.help).foregroundStyle(palette.text2)
                         Spacer(minLength: 0)
                     }
-                    .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3).frame(height: 30)
-                    .background(i == min(pick, list.count - 1) ? GlassInk.blue.opacity(0.25) : .clear)
+                    .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3)
+                    .frame(minHeight: MacSize.controlLg)
+                    .background(
+                        i == min(pick, list.count - 1) ? palette.uDimHover : .clear, in: coreShape(Radius.control)
+                    )
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ToolRowStyle())
             }
         }
-        .background(GlassInk.well, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .padding(Space.s1)
+        .coreGlass(radius: Radius.row, interactive: false)
         .accessibilityLabel("Commands")
     }
 
-    private func chip(_ t: String) -> some View {
-        Text(t).padding(.horizontal, Space.s2).frame(height: 24).lineLimit(1)
-            .background(GlassInk.well, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-    }
-
+    /// What the session is doing, beside the tool: blue while it works, amber while an approval waits. Nothing when idle.
     @ViewBuilder private var stateChip: some View {
         if model.waiting(session.id) {
-            Text("Waiting for your answer").foregroundStyle(GlassInk.amberInk)
+            StateBadge("Waiting for your answer", tone: .warn, symbol: "hand.raised")
         } else if model.canStopTurn(session) {
-            HStack(spacing: 4) {
-                Text("Working ·")
-                Text(session.updatedAt, style: .timer).monospacedDigit()
+            TimelineView(.periodic(from: session.updatedAt, by: 1)) { ctx in
+                StateBadge(
+                    "Thinking · " + coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(session.updatedAt))))", "s"),
+                    tone: .done, symbol: "ellipsis")
             }
-            .foregroundStyle(GlassInk.blueInk)
-        } else if session.idle {
-            Text("Waiting for you").foregroundStyle(GlassInk.green)
         }
     }
 
+    /// The keys, as quiet words under the composer.
     private var hints: some View {
         Text("⇧↩ new line · ↑ edit last message · esc stop turn · / commands")
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center)
     }
 
