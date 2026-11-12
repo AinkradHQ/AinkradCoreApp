@@ -109,7 +109,7 @@ public actor SampleBrainService: BrainService {
             candidate: c?.waiting ?? 0, active: Int(Double(n) * 0.93), superseded: Int(Double(n) * 0.04),
             archived: Int(Double(n) * 0.03), tombstoned: n > 100 ? 2 : 0)
         var rows = [SyncRow(device: "Mac Studio (sample)", at: "now")]
-        if r.mode != .localOnly {
+        if r.provider != .local {
             rows.append(SyncRow(device: "MacBook (sample)", at: "1 min ago"))
             rows.append(SyncRow(device: "iPhone (sample)", at: "4 min ago"))
         }
@@ -122,7 +122,7 @@ public actor SampleBrainService: BrainService {
                 month: r.id == "workan-space" ? 31.8 : 14.2, cap: 30,
                 series: [1, 1.2, 0.8, 1.4, 1, 0.9, 1.3, 1.1, 0.7, 1.2, 1, 1.4, 0.9, 1.1]) : nil
         return RoomDetail(
-            room: r, status: status, sync: rows, backup: r.mode == .localOnly ? nil : "3 h ago", cost: cost)
+            room: r, status: status, sync: rows, backup: r.provider == .local ? nil : "3 h ago", cost: cost)
     }
 
     public func openRoom(_ id: String) async throws {
@@ -143,7 +143,7 @@ public actor SampleBrainService: BrainService {
     public func createRoom(_ draft: NewRoomDraft) async throws -> RoomSummary {
         let slug = draft.name.lowercased().replacingOccurrences(of: " ", with: "-")
         let r = RoomSummary(
-            id: slug, name: draft.name, kind: draft.kind, mode: draft.mode, provider: draft.provider, mounted: true,
+            id: slug, name: draft.name, kind: draft.kind, mode: .synced, provider: draft.provider, mounted: true,
             lease: Lease(left: "24 h", fraction: 1), counts: RoomCounts(records: 0))
         list.append(r)
         return r
@@ -231,19 +231,19 @@ public actor SampleBrainService: BrainService {
             room(
                 "global-safe", worst ? "غرفة المشاريع العربية الطويلة جداً" : "Global safe", .shared, .synced, .local,
                 records: 14),
-            room("personal", "Personal", .personal, .localOnly, .local, records: 240, sync: "now"),
+            room("personal", "Personal", .personal, .synced, .local, records: 240, sync: "now"),
             room(
                 "workan-space", "Workan space", .product, .synced, .approvedCloud, records: 820, conflicts: 1,
                 models: 2, lease: Lease(left: "5 h", fraction: 0.21, state: .expiring)),
             room("voutra", "Voutra", .product, .synced, .local, records: 410),
             room(
-                "automotive-ai", "AutomotiveAi", .employer, .localBackup, .local, records: 1130, waiting: 1,
+                "automotive-ai", "AutomotiveAi", .employer, .synced, .local, records: 1130, waiting: 1,
                 sync: "now"),
-            room("optimus", "Optimus", .employer, .localOnly, .local, records: 640, sync: "now"),
+            room("optimus", "Optimus", .employer, .synced, .local, records: 640, sync: "now"),
             RoomSummary(
-                id: "althaqeel", name: "Althaqeel", kind: .employer, mode: .localOnly, provider: .local,
+                id: "althaqeel", name: "Althaqeel", kind: .employer, mode: .synced, provider: .local,
                 mounted: false, lease: Lease(left: "expired", fraction: 0, state: .expired)),
-            room("ulynk", "Ulynk", .client, .localBackup, .local, records: 188, sync: "now"),
+            room("ulynk", "Ulynk", .client, .synced, .local, records: 188, sync: "now"),
         ]
     }
 

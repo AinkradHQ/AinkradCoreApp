@@ -27,7 +27,7 @@ struct RoomChips: View {
     let room: RoomSummary
     var body: some View {
         ChipFlow(spacing: Space.s2) {
-            BrainChip(room.mode.label, room.mode == .localOnly ? GlassInk.blue : GlassInk.slate, help: room.mode.story)
+            BrainChip(room.mode.label, GlassInk.slate, help: room.mode.story)
             BrainChip(
                 room.provider.label, room.provider == .approvedCloud ? GlassInk.blue : GlassInk.slate,
                 help: room.provider.help)

@@ -54,6 +54,17 @@ public actor CoreConnection {
             transport: transport, middlewares: [SigningMiddleware(sessions: sessions)])
     }
 
+    /// One signed request to a route the generated client does not cover (a module's, under `/modules/...`): the same
+    /// signing, session and retry rules as every generated call, no new crypto. `target` is the path and raw query exactly
+    /// as sent. Any non-2xx answer is thrown as `CoreError`. A body is JSON and at most 1 MiB (§4).
+    public func signedRequest(method: String, target: String, body: Data = Data()) async throws -> Data {
+        guard target.hasPrefix("/"), !target.hasPrefix("/handshake"), !target.hasPrefix("/pair") else {
+            throw CoreError.invalidInput("\(target) is not a signed route")
+        }
+        guard body.count <= SigningMiddleware.maxBody else { throw CoreError.bodyTooLarge }
+        return try await sessions.perform(method: method, target: target, body: body).body
+    }
+
     /// Proves the Core, opens a session and keeps it fresh in the background.
     @discardableResult
     public func connect() async throws -> CoreSession {

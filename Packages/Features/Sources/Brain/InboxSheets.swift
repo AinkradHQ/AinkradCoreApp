@@ -290,7 +290,7 @@ private struct AssignSheet: View {
             (mode == .copy
                 ? "The original stays in the inbox, still unsearchable." : "The raw capture leaves the inbox.")
             + " In \(r.name) it waits for your approval and follows that room's rules."
-            + (r.mode == .localOnly ? " It stays on this Mac, not visible to cloud agents." : "")
+            + (r.provider == .local ? " Only local models read it, no cloud agent." : "")
             + (r.kind.chipLabel.map { " This is an \($0.lowercased()) room: the stricter room rule applies." } ?? "")
             + " Undo later removes it from the room and flags it for review."
         return InboxNote(

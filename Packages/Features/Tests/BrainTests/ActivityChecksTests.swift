@@ -93,7 +93,7 @@ struct ActivityChecksTests {
         m.activity.egressRoom = "personal"
         await m.activity.loadEgress()
         #expect(m.activity.egress.isEmpty)
-        #expect(m.activity.egressRoomSummary?.mode == .localOnly)
+        #expect(m.activity.egressRoomSummary?.provider == .local)
         #expect(BrainWords.leftNothing("Personal") == "Nothing from Personal has left this Mac")
         m.activity.egressRoom = "ainkrad"
         await m.activity.loadEgress()

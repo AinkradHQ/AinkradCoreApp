@@ -48,7 +48,7 @@ public final class AppModel {
     public private(set) var admin: AdminModel!
     /// Provider accounts, pools and chains (E5-08); its screens say "not connected" until a Core is open.
     public private(set) var accounts: AccountsModel!
-    /// The Brain (memory rooms and health). Core does not serve it yet: Release says so; Debug demo shows sample data.
+    /// The Brain (memory rooms and import). A real Core serves it through the signed module routes; Debug demo shows sample data.
     public private(set) var brain: BrainModel!
     private var rateLimitEnd: Task<Void, Never>?
     private var restartedEnd: Task<Void, Never>?
@@ -196,6 +196,8 @@ public final class AppModel {
             terminals = model
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
+            // A Core without the Brain module answers 404 and the pane says "Brain is coming".
+            brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
         }
         if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop

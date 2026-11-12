@@ -64,7 +64,7 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Brain",
-            dependencies: ["Shell", "Admin", .product(name: "CoreUI", package: "CoreUI")],
+            dependencies: ["Shell", "Admin", "BrainImport", .product(name: "CoreUI", package: "CoreUI")],
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         // The Mac-side collectors of the Brain import (E3): pure Foundation, no UI, no Core client.
@@ -94,7 +94,7 @@ let package = Package(
             ]),
         .testTarget(
             name: "AgentsTests", dependencies: ["Agents", "Shell", .product(name: "CoreKit", package: "CoreKit")]),
-        .testTarget(name: "BrainTests", dependencies: ["Brain", "Shell", "Admin"]),
+        .testTarget(name: "BrainTests", dependencies: ["Brain", "BrainImport", "Shell", "Admin"]),
         .testTarget(name: "BrainImportTests", dependencies: ["BrainImport"]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
