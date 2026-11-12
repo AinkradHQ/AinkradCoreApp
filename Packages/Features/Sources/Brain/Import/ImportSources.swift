@@ -1,0 +1,127 @@
+import BrainImport
+import Foundation
+
+/// A folder read file by file through one `FileCollector`: Codex, Cursor, the Markdown kinds, chat exports.
+public struct FolderSource: ImportSource {
+    public let id: String
+    public let title: String
+    let root: URL
+    let collector: any FileCollector
+
+    public init(id: String, title: String, root: URL, collector: any FileCollector) {
+        self.id = id
+        self.title = title
+        self.root = root
+        self.collector = collector
+    }
+
+    public func scan() async -> CollectReport {
+        var report = CollectReport()
+        let zstd = DiskFiles.zstdPath != nil
+        for url in collector.candidates(under: root) {
+            report.found += 1
+            if let why = PreFilter.skipReason(path: url.path.replacingOccurrences(of: root.path, with: "")) {
+                report.skipped[why, default: 0] += 1
+            } else if url.pathExtension == "zst", !zstd {
+                report.skipped["needs-zstd", default: 0] += 1
+            }
+        }
+        return report
+    }
+
+    public func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport {
+        try await ImportStreamer(collector: collector, uploader: uploader).run(
+            root: root, runID: run, resume: resume, uploaded: uploaded, save: save, onProgress: onProgress)
+    }
+}
+
+/// OpenCode's database: one unit per session, so a restart skips the sessions already sent.
+public struct OpenCodeSource: ImportSource {
+    public let id = "opencode"
+    public let title = "OpenCode sessions"
+    let collector: OpenCodeCollector
+
+    public init(device: String, dbPath: String) { collector = OpenCodeCollector(device: device, dbPath: dbPath) }
+
+    public static func standard() -> OpenCodeSource {
+        OpenCodeSource(
+            device: Host.current().localizedName ?? "Mac",
+            dbPath: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".local/share/opencode/opencode.db")
+                .path)
+    }
+
+    public func scan() async -> CollectReport { collector.scan() }
+
+    public func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport {
+        try await collector.run(
+            run: run, uploader: uploader, uploaded: uploaded, resume: resume, save: save, onProgress: onProgress)
+    }
+}
+
+/// A tool whose history this app cannot read yet. Listed in step 1 with the reason; never collected.
+public struct NotReadableSource: ImportSource {
+    public let id: String
+    public let title: String
+    public let notReadable: String?
+
+    public init(id: String, title: String, reason: String) {
+        self.id = id
+        self.title = title
+        self.notReadable = reason
+    }
+
+    public func scan() async -> CollectReport { CollectReport() }
+
+    public func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport {
+        CollectReport()
+    }
+}
+
+/// Every source the wizard offers on this Mac.
+public enum ImportSources {
+    public static var chatExportsFolder: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Documents/Chat exports")
+    }
+
+    public static func standard() -> [any ImportSource] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let device = Host.current().localizedName ?? "Mac"
+        let projects = home.appending(path: "Home/Projects")
+        func markdown(_ l: MarkdownCollector.Layout) -> MarkdownCollector { .init(layout: l, device: device) }
+        return [
+            ClaudeCodeSource.standard(),
+            FolderSource(
+                id: "codex", title: "Codex sessions", root: home.appending(path: ".codex/sessions"),
+                collector: HarnessCollectors.codex(device: device)),
+            OpenCodeSource.standard(),
+            FolderSource(
+                id: "cursor", title: "Cursor sessions", root: home.appending(path: ".cursor/projects"),
+                collector: HarnessCollectors.cursor(device: device)),
+            NotReadableSource(
+                id: "antigravity", title: "Antigravity sessions",
+                reason: "Its conversations are stored as binary records with no published format."),
+            NotReadableSource(
+                id: "kimi", title: "Kimi sessions",
+                reason: "No Kimi history was found on this Mac, so its format could not be checked."),
+            FolderSource(id: "doc", title: "Project docs", root: projects, collector: markdown(.projectDocs)),
+            FolderSource(
+                id: "vault", title: "Notes vault (Ainkrad)", root: home.appending(path: "Ainkrad"),
+                collector: markdown(.vault)),
+            FolderSource(
+                id: "agents_md", title: "AGENTS.md and CLAUDE.md files", root: projects,
+                collector: markdown(.agentFiles)),
+            FolderSource(
+                id: "chat", title: "Chat exports (Documents/Chat exports)", root: chatExportsFolder,
+                collector: ChatExportCollector(device: device)),
+        ]
+    }
+}
