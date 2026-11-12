@@ -126,7 +126,7 @@ private struct EditSheet: View {
                 if c.flag != nil {
                     InboxNote(
                         "exclamationmark.triangle", GlassInk.red,
-                        "This reads like an instruction. It stays quoted text and agents never run it.")
+                        "This reads like an instruction. It stays quoted text and AI sessions never run it.")
                 }
                 SheetButtons(model: model, action: "Save and approve", enabled: !empty, busy: busy) {
                     busy = true
@@ -290,13 +290,14 @@ private struct AssignSheet: View {
             (mode == .copy
                 ? "The original stays in the inbox, still unsearchable." : "The raw capture leaves the inbox.")
             + " In \(r.name) it waits for your approval and follows that room's rules."
-            + (r.provider == .local ? " Only local models read it, no cloud agent." : "")
+            + (r.provider == .local ? " Only local models read it, no cloud AI session." : "")
             + (r.kind.chipLabel.map { " This is an \($0.lowercased()) room: the stricter room rule applies." } ?? "")
             + " Undo later removes it from the room and flags it for review."
         return InboxNote(
             wide ? "touchid" : "info.circle", wide ? GlassInk.orange : GlassInk.slate,
             Text("What happens. ").bold() + Text(line)
-                + Text(wide ? " This room can reach cloud agents, so " : "") + Text(wide ? "Touch ID asks" : "").bold()
+                + Text(wide ? " This room can reach cloud AI sessions, so " : "")
+                + Text(wide ? "Touch ID asks" : "").bold()
                 + Text(wide ? " before it goes in." : ""))
     }
 }
@@ -322,7 +323,8 @@ private struct SplitSheet: View {
                 }
                 InboxNote(
                     "info.circle", GlassInk.slate,
-                    "Both parts wait for your approval in their rooms. Touch ID asks if a room can reach cloud agents.")
+                    "Both parts wait for your approval in their rooms. "
+                        + "Touch ID asks if a room can reach cloud AI sessions.")
                 SheetButtons(
                     model: model, action: "Split", enabled: !one.isEmpty && !two.isEmpty && model.movePause == nil,
                     busy: busy

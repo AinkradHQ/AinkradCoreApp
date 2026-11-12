@@ -48,7 +48,7 @@ public struct CoreUIGallery: View {
         .coreTheme()
         .coreToast($toast)
         .coreConfirm(
-            "Close this session?", isPresented: $confirm, message: "The agent stops and its work is kept.",
+            "Close this session?", isPresented: $confirm, message: "The AI session stops and its work is kept.",
             confirmTitle: "Close"
         ) {
             toast = ToastItem("Session closed", undo: {})
@@ -174,8 +174,8 @@ public struct CoreUIGallery: View {
                 CoreTextField("Large", placeholder: "K7QD", text: $fieldText, mono: true, big: true)
             }
             HStack(alignment: .top, spacing: Space.s4) {
-                CoreTextArea("Prompt", placeholder: "What should the agent do?", text: $fieldText)
-                CoreTextArea("Focus", placeholder: "What should the agent do?", text: $fieldText)
+                CoreTextArea("Prompt", placeholder: "What should the AI session do?", text: $fieldText)
+                CoreTextArea("Focus", placeholder: "What should the AI session do?", text: $fieldText)
                     .environment(\.coreForcedInteraction, .focused)
             }
             HStack(alignment: .top, spacing: Space.s4) {
@@ -261,7 +261,7 @@ public struct CoreUIGallery: View {
                 Button("Destructive confirm") { destructive = true }.buttonStyle(CoreButtonStyle(.secondary))
             }
             CoreConfirmDialog(
-                "Close this session?", message: "The agent stops and its work is kept.", confirmTitle: "Close",
+                "Close this session?", message: "The AI session stops and its work is kept.", confirmTitle: "Close",
                 onConfirm: {}, onCancel: {}
             )
             .clipShape(coreShape(Radius.panel))

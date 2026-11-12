@@ -4,76 +4,6 @@
     "" : {
 
     },
-    "percent" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "percent"
-          }
-        }
-      }
-    },
-    "Reconnecting to Core" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Reconnecting to Core"
-          }
-        }
-      }
-    },
-    "Core is offline" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Core is offline"
-          }
-        }
-      }
-    },
-    "Core asked the app to slow down" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Core asked the app to slow down"
-          }
-        }
-      }
-    },
-    "The session is renewing" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The session is renewing"
-          }
-        }
-      }
-    },
-    "Core restarted" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Core restarted"
-          }
-        }
-      }
-    },
-    "Back online" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Back online"
-          }
-        }
-      }
-    },
     " · %lld %@" : {
       "localizations" : {
         "en" : {
@@ -104,16 +34,6 @@
         }
       }
     },
-    "%@ · %lld min" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$lld min"
-          }
-        }
-      }
-    },
     "%@ · %lld×%lld" : {
       "localizations" : {
         "en" : {
@@ -124,8 +44,25 @@
         }
       }
     },
-    "%@ · right-click for actions, ⌃Tab next tab, ⇧⌘R rename" : {
-
+    "%@%@ · right-click for actions, ⌃Tab next tab, ⇧⌘R rename" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@ · right-click for actions, ⌃Tab next tab, ⇧⌘R rename"
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
     },
     "%@, %lld by %lld" : {
       "localizations" : {
@@ -136,6 +73,9 @@
           }
         }
       }
+    },
+    "%@. Click for details." : {
+
     },
     "%@: %@" : {
       "localizations" : {
@@ -160,9 +100,6 @@
         }
       }
     },
-    "%lld min" : {
-
-    },
     "%lld of %lld" : {
       "localizations" : {
         "en" : {
@@ -173,8 +110,15 @@
         }
       }
     },
-    "%lld percent" : {
-
+    "%lld of %lld AI sessions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld AI sessions"
+          }
+        }
+      }
     },
     "%lld running" : {
 
@@ -236,17 +180,27 @@
     "Add a widget" : {
 
     },
-    "Add your name" : {
-
-    },
     "Admin unlock" : {
 
     },
     "Admin unlock ends early if the Core restarts or this device is revoked." : {
 
     },
+    "Amount" : {
+
+    },
     "Approvals and alerts from your Core show up here." : {
 
+    },
+    "Back online" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Back online"
+          }
+        }
+      }
     },
     "Back to %@" : {
 
@@ -269,7 +223,43 @@
     "Confirm Sheet" : {
 
     },
+    "Connection to %@" : {
+
+    },
     "Copy Name" : {
+
+    },
+    "Core asked the app to slow down" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Core asked the app to slow down"
+          }
+        }
+      }
+    },
+    "Core is offline" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Core is offline"
+          }
+        }
+      }
+    },
+    "Core restarted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Core restarted"
+          }
+        }
+      }
+    },
+    "Day" : {
 
     },
     "Demo" : {
@@ -320,6 +310,9 @@
     "Launcher…" : {
 
     },
+    "Load" : {
+
+    },
     "Locks in " : {
 
     },
@@ -344,7 +337,7 @@
     "Move up" : {
 
     },
-    "New Agent Session" : {
+    "New AI Session" : {
 
     },
     "New Terminal" : {
@@ -360,6 +353,9 @@
 
     },
     "No apps in this workspace" : {
+
+    },
+    "Not reported yet" : {
 
     },
     "Nothing matches “%@”" : {
@@ -404,7 +400,23 @@
     "Previous Tab" : {
 
     },
+    "Reconnect now" : {
+
+    },
     "Reconnect to Core" : {
+
+    },
+    "Reconnecting to Core" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reconnecting to Core"
+          }
+        }
+      }
+    },
+    "Redo" : {
 
     },
     "Reduce Motion is on" : {
@@ -443,9 +455,6 @@
     "Sample data" : {
 
     },
-    "Save" : {
-
-    },
     "Saved" : {
 
     },
@@ -470,10 +479,23 @@
     "Tab name" : {
 
     },
+    "The session is renewing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The session is renewing"
+          }
+        }
+      }
+    },
     "Tile All Panes" : {
 
     },
     "Tile Panes" : {
+
+    },
+    "Time" : {
 
     },
     "Toast with Undo" : {
@@ -485,13 +507,16 @@
     "Turn on Reduce Motion in your Mac's settings to keep every change and drop the travel." : {
 
     },
+    "Undo" : {
+
+    },
     "Unlock with Touch ID" : {
 
     },
     "Unlocked for " : {
 
     },
-    "When an agent asks to do something, it waits here for you." : {
+    "When an AI session asks to do something, it waits here for you." : {
 
     },
     "Workspace" : {
@@ -509,7 +534,7 @@
     "expanded" : {
 
     },
-    "of this month's tokens" : {
+    "of %lld" : {
 
     },
     "to open the launcher." : {
@@ -519,6 +544,9 @@
 
     },
     "⌃Tab" : {
+
+    },
+    "⌘R" : {
 
     }
   },

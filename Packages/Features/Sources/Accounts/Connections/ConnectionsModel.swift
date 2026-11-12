@@ -397,14 +397,14 @@ public final class ConnectionsModel {
     }
 
     func setAccess(_ c: ConnItem, allowed: Set<String>, only: [String]?) async -> Bool {
-        await write("access-\(c.id)", reason: "Change what agents may do with \(c.name).", done: "Saved") {
+        await write("access-\(c.id)", reason: "Change what AI sessions may do with \(c.name).", done: "Saved") {
             try await $0.setAccess(c.id, allowed: allowed, only: only)
         }
     }
 
     func disconnect(_ c: ConnItem) async -> Bool {
         await write(
-            "delete-\(c.id)", reason: "Disconnect \(c.name). Agents lose access to it.",
+            "delete-\(c.id)", reason: "Disconnect \(c.name). AI sessions lose access to it.",
             done: "\(c.name) is disconnected"
         ) {
             try await $0.delete(c.id)

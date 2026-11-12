@@ -277,7 +277,7 @@ private struct AdvancedRow: View {
                         AccLink(title: "Orders (\(model.chains.count))", symbol: "link") {
                             withAnimation(.smooth(duration: 0.3)) { model.page = .chains }
                         }
-                        AccLink(title: "Agents and orders", symbol: "person.2") { model.openChainBinding() }
+                        AccLink(title: "AI sessions and orders", symbol: "person.2") { model.openChainBinding() }
                     }
                     AccLink(title: "Pools (\(model.pools.count))", symbol: "square.grid.2x2") {
                         withAnimation(.smooth(duration: 0.3)) { model.page = .pools }
@@ -291,7 +291,7 @@ private struct AdvancedRow: View {
                 ForEach(model.providers.filter { !$0.builtin }) { p in
                     HStack(spacing: Space.s2) {
                         AccTile(provider: p.id)
-                        Text("\(p.name) · your own provider, not usable by agents yet")
+                        Text("\(p.name) · your own provider, not usable by AI sessions yet")
                             .foregroundStyle(GlassInk.secondary)
                         Spacer(minLength: 0)
                         AccLink(title: "Edit", symbol: "slider.horizontal.3") {
@@ -319,7 +319,7 @@ private struct EmptyAccounts: View {
         AccStateCard(
             symbol: "key.fill", title: "No accounts yet",
             text:
-                "Add your first account to let agents work. It gets a monthly limit of $20 and a place in the order for you."
+                "Add your first account to let AI sessions work. It gets a monthly limit of $20 and a place in the order for you."
         ) {
             AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 AccountDialogs.openConnect(model, provider: nil)

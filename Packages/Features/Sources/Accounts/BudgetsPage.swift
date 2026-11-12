@@ -39,7 +39,7 @@ struct BudgetsPage: View {
             SpendHeader(
                 model: model, title: "Budgets",
                 detail:
-                    "Caps on what an account, pool, agent or project may spend. A hard stop also ends work already running.",
+                    "Caps on what an account, pool, AI session or project may spend. A hard stop also ends work already running.",
                 symbol: "dollarsign.circle.fill")
             switch model.spendLoad {
             case .loading: AccSkeleton()
@@ -70,7 +70,7 @@ struct BudgetsPage: View {
                 let theirs = model.budgets.filter { !["account", "pool"].contains($0.kind) }
                 if !mine.isEmpty { section("Accounts and pools", "creditcard.fill", GlassInk.blue, mine, 0) }
                 if !theirs.isEmpty {
-                    section("Agents, companies and projects", "person.3.fill", GlassInk.blue, theirs, 1)
+                    section("AI sessions, companies and projects", "person.3.fill", GlassInk.blue, theirs, 1)
                 }
             }
         }
@@ -101,7 +101,7 @@ struct BudgetsPage: View {
             : !warn.isEmpty
                 ? "Past the point where Core warns you. Work goes on until the cap."
                 : none
-                    ? "Without one, agents can spend without a limit."
+                    ? "Without one, AI sessions can spend without a limit."
                     : "\(model.budgets.count) budget\(model.budgets.count == 1 ? "" : "s"), all under their warning point."
         return HStack(spacing: Space.s4) {
             IconTile(

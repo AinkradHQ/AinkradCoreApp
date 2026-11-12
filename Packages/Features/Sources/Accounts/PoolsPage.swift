@@ -11,14 +11,14 @@ struct PoolsPage: View {
             AccHeader(
                 title: "Pools",
                 detail:
-                    "A pool is a team of accounts from one provider. Agents share it, and Core picks who works next.",
+                    "A pool is a team of accounts from one provider. AI sessions share it, and Core picks who works next.",
                 symbol: "square.grid.2x2.fill", hue: GlassInk.blue
             ) { EmptyView() }
             if model.pools.isEmpty {
                 AccStateCard(
                     symbol: "square.grid.2x2", title: "No pools yet",
                     text:
-                        "Agents only use accounts that are in a pool. Make one for a provider with New pool (⌘N), then add its accounts."
+                        "AI sessions only use accounts that are in a pool. Make one for a provider with New pool (⌘N), then add its accounts."
                 )
             } else {
                 tabs

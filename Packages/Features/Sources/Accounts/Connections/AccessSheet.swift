@@ -20,8 +20,8 @@ struct AccessSheet: View {
         let writes = k?.capabilities.contains { $0.writes && allowed.contains($0.id) } ?? false
         CoreDialogPanel(item.name, width: Space.s8 * 17) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("What your agents may do with \(item.identity).").foregroundStyle(GlassInk.secondary)
-                CoreFieldLabel("What agents may do")
+                Text("What your AI sessions may do with \(item.identity).").foregroundStyle(GlassInk.secondary)
+                CoreFieldLabel("What AI sessions may do")
                 ForEach(k?.capabilities ?? []) { c in
                     HStack(spacing: Space.s3) {
                         VStack(alignment: .leading, spacing: 0) {
@@ -47,7 +47,7 @@ struct AccessSheet: View {
                 }
                 if writes {
                     Label(
-                        "Agents will be able to change things on \(k?.name ?? "it") as you. Saving needs Touch ID.",
+                        "AI sessions will be able to change things on \(k?.name ?? "it") as you. Saving needs Touch ID.",
                         systemImage: "exclamationmark.triangle"
                     )
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.orangeInk)

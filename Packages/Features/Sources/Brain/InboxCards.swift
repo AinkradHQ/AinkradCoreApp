@@ -35,7 +35,7 @@ struct CandidateCard: View {
                     .help("Choose who it applies to, who said so and when it ends.")
                 Button(action: approve) { KeyLabel("Approve", key: "⌘↩") }
                     .buttonStyle(CoreButtonStyle(.prominent)).help(
-                        "Approve with the room defaults. Agents can use it at once.")
+                        "Approve with the room defaults. AI sessions can use it at once.")
             }
             .disabled(busy)
         }
