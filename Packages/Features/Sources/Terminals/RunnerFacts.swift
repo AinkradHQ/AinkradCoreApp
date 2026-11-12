@@ -38,7 +38,7 @@ struct RunnerFacts: Equatable {
     var agentBar: (text: String, value: Double, full: Bool)? {
         guard let s = runner.slots, let cap = s.agentsCapacity else { return nil }
         let n = s.agentsUsed
-        return ("\(n) of \(cap) agents", cap > 0 ? min(1, Double(n) / Double(cap)) : 0, cap > 0 && n >= cap)
+        return ("\(n) of \(cap) AI sessions", cap > 0 ? min(1, Double(n) / Double(cap)) : 0, cap > 0 && n >= cap)
     }
 
     /// The terminals bar; `fallbackUsed` is the count this Mac listed when the Core sent no `slots`.
@@ -64,8 +64,8 @@ struct RunnerFacts: Equatable {
         guard let a = runner.accounts else { return nil }
         let checks: [(Bool, String?, String)] = [
             (a.gateway, a.gatewayReason, "it cannot reach the account gateway"),
-            (a.subscriptionEnv, a.subscriptionEnvReason, "it cannot pass a plan sign-in to agents"),
-            (a.egressFilter, a.egressFilterReason, "it cannot limit where agents connect"),
+            (a.subscriptionEnv, a.subscriptionEnvReason, "it cannot pass a plan sign-in to AI sessions"),
+            (a.egressFilter, a.egressFilterReason, "it cannot limit where AI sessions connect"),
         ]
         guard let bad = checks.first(where: { !$0.0 }) else { return "Yes" }
         return "No (\(bad.1 ?? bad.2))"
@@ -99,9 +99,9 @@ struct RunnerFacts: Equatable {
         runners.filter(\.builtIn) + runners.filter { !$0.builtIn }
     }
 
-    /// What revoking stops, in the confirm card: "2 agents and 3 terminals".
+    /// What revoking stops, in the confirm card: "2 AI sessions and 3 terminals".
     static func stops(agents: Int, terminals: Int) -> String {
-        let a = agents == 1 ? "1 agent" : "\(agents) agents"
+        let a = agents == 1 ? "1 AI session" : "\(agents) AI sessions"
         let t = terminals == 1 ? "1 terminal" : "\(terminals) terminals"
         switch (agents, terminals) {
         case (0, 0): return "nothing is running"
@@ -115,7 +115,7 @@ struct RunnerFacts: Equatable {
     static func access(_ scopes: [String]) -> String? {
         var does: [String] = []
         if scopes.contains("terminal") || scopes.contains("admin") { does.append("open terminals") }
-        if scopes.contains("agent") || scopes.contains("admin") { does.append("start agents") }
+        if scopes.contains("agent") || scopes.contains("admin") { does.append("start AI sessions") }
         if scopes.contains("approve") { does.append("approve requests") }
         if does.isEmpty { return scopes.contains("read") ? "Can watch work here" : nil }
         let list = does.count > 1 ? does.dropLast().joined(separator: ", ") + " and " + does.last! : does[0]

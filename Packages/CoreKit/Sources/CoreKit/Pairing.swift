@@ -231,6 +231,8 @@ public actor DevicePairing {
         case .code(let c): body["code"] = c
         case .qr(let q): body["secret"] = Wire.b64(q.secret)
         }
+        // N11: the device is named after the Mac, not after the invite ("owner" is a role).
+        if let name = Self.deviceName { body["device_name"] = name }
         let res = try await http.send(
             RawRequest(
                 method: "POST", target: "/pair/claim", headers: ["content-type": "application/json"],
@@ -251,6 +253,23 @@ public actor DevicePairing {
         let mine = Wire.sas(coreSPKI: spki, deviceSPKI: routine.spki, pairingID: pairing)
         guard c.sas == mine else { throw CoreError.sasMismatch }
         return PairingClaim(deviceID: device, pairingID: pairing, sas: mine, coreFingerprint: pinned)
+    }
+
+    /// The Mac's own name ("Ahmed's MacBook Pro") as the Core takes it (1 to 64 characters, no control characters); nil when
+    /// the system has none, and then the Core keeps the invite's name.
+    static var deviceName: String? {
+        #if os(macOS)
+        clean(Host.current().localizedName)
+        #else
+        nil
+        #endif
+    }
+
+    static func clean(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let t = String(raw.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) })
+            .trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : String(t.prefix(64))
     }
 
     static var platform: String {

@@ -37,15 +37,15 @@ struct RunnerFactsTests {
         #expect(RunnerFacts.access(["terminal", "read"]) == "Can open terminals here")
         #expect(
             RunnerFacts.access(["terminal", "agent", "approve"])
-                == "Can open terminals, start agents and approve requests here")
-        #expect(RunnerFacts.access(["admin"]) == "Can open terminals and start agents here")
+                == "Can open terminals, start AI sessions and approve requests here")
+        #expect(RunnerFacts.access(["admin"]) == "Can open terminals and start AI sessions here")
         #expect(RunnerFacts.access(["read"]) == "Can watch work here")
         #expect(RunnerFacts.access(["runner"]) == nil)
     }
 
     @Test func revokeSaysWhatStops() {
-        #expect(RunnerFacts.stops(agents: 2, terminals: 3) == "2 agents and 3 terminals")
-        #expect(RunnerFacts.stops(agents: 1, terminals: 0) == "1 agent")
+        #expect(RunnerFacts.stops(agents: 2, terminals: 3) == "2 AI sessions and 3 terminals")
+        #expect(RunnerFacts.stops(agents: 1, terminals: 0) == "1 AI session")
         #expect(RunnerFacts.stops(agents: 0, terminals: 1) == "1 terminal")
         #expect(RunnerFacts.stops(agents: 0, terminals: 0) == "nothing is running")
     }
@@ -110,7 +110,7 @@ struct RunnerNewFactsTests {
         let f = facts {
             $0.slots = RunnerSlotFacts(agentsUsed: 2, agentsCapacity: 2, terminalsUsed: 3, terminalsCapacity: 16)
         }
-        #expect(f.agentBar?.text == "2 of 2 agents" && f.agentBar?.full == true)
+        #expect(f.agentBar?.text == "2 of 2 AI sessions" && f.agentBar?.full == true)
         #expect(f.terminalBar(fallbackUsed: 9)?.text == "3 of 16 terminals")
         let off = facts {
             $0.slots = RunnerSlotFacts(agentsUsed: 0, agentsCapacity: nil, terminalsUsed: 0, terminalsCapacity: nil)

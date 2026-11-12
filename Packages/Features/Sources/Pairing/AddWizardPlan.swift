@@ -16,10 +16,10 @@ enum AddKind: CaseIterable, Equatable, Sendable {
 
     var blurb: String {
         switch self {
-        case .phone: "Approve agents and watch work from your phone."
+        case .phone: "Approve AI sessions and watch work from your phone."
         case .mac: "Use Ainkrad Core on a second Mac."
-        case .linuxRunner: "More power for agents and terminals."
-        case .macRunner: "Run agents and terminals on that Mac."
+        case .linuxRunner: "More power for AI sessions and terminals."
+        case .macRunner: "Run AI sessions and terminals on that Mac."
         }
     }
 
@@ -78,7 +78,7 @@ enum AccessPreset: CaseIterable, Equatable, Sendable {
     var blurb: String {
         switch self {
         case .watch: "Read and approve. Good for a phone."
-        case .work: "Read, approve, terminals and agents. Good for a second Mac."
+        case .work: "Read, approve, terminals and AI sessions. Good for a second Mac."
         case .full: "Everything, including settings and other devices."
         case .custom: "The switches you chose under Advanced."
         }

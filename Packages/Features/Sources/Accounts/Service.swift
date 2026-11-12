@@ -45,6 +45,12 @@ protocol AccountsService: Sendable {
     func cancelLogin(_ id: String) async throws
     /// Runners a sign-in may be pinned to (the advanced choice).
     func runners() async throws -> [AccountRunner]
+    /// `POST /runners/{id}/tools` (`admin`, step-up): installs a host tool; progress arrives as `runner.tool_install` events.
+    func installTool(runner: String, tool: String) async throws
+    /// `PUT /runners/{id}/policy`: turns AI sessions on, keeping the other switches (`admin`, step-up).
+    func enableAgents(runner: String, policy: AccountRunner.Policy?) async throws
+    /// `POST /accounts/{id}/check` (`admin`): does a Claude plan sign-in work? The result word and the latency.
+    func check(account: Int64) async throws -> PlanCheck
     /// One free request with the key through a runner: the status class and the latency, never a body.
     func test(account: Int64) async throws -> TestedItem
     /// What one session may spend on the account; nil clears that limit.
@@ -94,6 +100,29 @@ struct AccountRunner: Identifiable, Equatable, Sendable {
     /// driver names (`agent`, `pty`…). Empty until it first connects.
     var commands: Set<String> = []
     var drivers: Set<String> = []
+    /// Tools found on the host, name to version (`claude`, `git`, `node`…).
+    var tools: [String: String] = [:]
+    var policy: Policy?
+
+    struct Policy: Equatable, Sendable {
+        var terminals: Bool
+        var agents: Bool
+        var capacity: Int
+    }
+}
+
+/// What `POST /accounts/{id}/check` answered for a Claude plan: one of `ok`, `token_expired`, `limit_reached`, `no_runner`,
+/// `runner_outdated`, `runner_busy`, `egress_not_proven`, `unreachable`, `timeout`, `failed`.
+struct PlanCheck: Equatable, Sendable {
+    let result: String
+    let latencyMs: Int64?
+    let runner: String?
+}
+
+extension AccountsService {
+    func installTool(runner: String, tool: String) async throws {}
+    func enableAgents(runner: String, policy: AccountRunner.Policy?) async throws {}
+    func check(account: Int64) async throws -> PlanCheck { PlanCheck(result: "ok", latencyMs: 12, runner: nil) }
 }
 
 struct TestedItem: Equatable, Sendable {
@@ -252,8 +281,33 @@ struct LiveAccountsService: AccountsService {
                 let ds = $0.drivers ?? []
                 return AccountRunner(
                     id: $0.id, name: $0.name, online: $0.online ?? false,
-                    commands: Set(ds.flatMap { $0.commands ?? [] }), drivers: Set(ds.compactMap(\.name)))
+                    commands: Set(ds.flatMap { $0.commands ?? [] }), drivers: Set(ds.compactMap(\.name)),
+                    tools: $0.tools?.additionalProperties ?? [:],
+                    policy: $0.policy.map {
+                        AccountRunner.Policy(
+                            terminals: $0.terminals, agents: $0.agents, capacity: Int($0.agentCapacity))
+                    })
             }
+        }
+    }
+    func installTool(runner: String, tool: String) async throws {
+        try await run {
+            _ = try await client.installRunnerTool(path: .init(id: runner), body: .json(.init(tool: tool))).accepted
+        }
+    }
+    func enableAgents(runner: String, policy: AccountRunner.Policy?) async throws {
+        try await run {
+            let p = policy ?? .init(terminals: true, agents: false, capacity: 2)
+            _ = try await client.setRunnerPolicy(
+                path: .init(id: runner),
+                body: .json(.init(agentCapacity: Int32(max(1, p.capacity)), agents: true, terminals: p.terminals))
+            ).ok
+        }
+    }
+    func check(account: Int64) async throws -> PlanCheck {
+        try await run {
+            let c = try await client.checkAccount(path: .init(id: String(account))).ok.body.json
+            return PlanCheck(result: c.result, latencyMs: c.latencyMs, runner: c.runner)
         }
     }
     func test(account: Int64) async throws -> TestedItem {

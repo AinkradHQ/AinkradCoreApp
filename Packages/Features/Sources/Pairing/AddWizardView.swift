@@ -71,8 +71,8 @@ struct AddWizardView: View {
                 : model.usesInvite
                     ? "Nothing to type. The QR is the proof, and it works once."
                     : "Type nothing on the new device but the command. Then compare the check code here."
-        case .settings: "How the runner works. These are set on the machine for now."
-        case .done: "Agents and terminals can use it now."
+        case .settings: "What this runner offers. Change it here, any time."
+        case .done: "AI sessions and terminals can use it now."
         }
     }
 
@@ -243,7 +243,7 @@ struct AddWizardView: View {
             card {
                 Text("2. Choose what it offers").fontWeight(.semibold)
                 Toggle("Terminals (open a shell on this runner)", isOn: $model.terminals)
-                Toggle("Agents (let agents work here)", isOn: $model.agents)
+                Toggle("AI sessions (let AI sessions work here)", isOn: $model.agents)
                 Text("Core shows the command in the next step, with these choices in it.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
@@ -560,16 +560,74 @@ struct AddWizardView: View {
     // MARK: 5 settings, 6 done
 
     private var settings: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            settingRow("Terminals", model.terminals ? "On" : "Off", "Open a shell on this runner.")
-            settingRow("Agents", model.agents ? "On" : "Off", "Let agents work here.")
-            settingRow("How many agents at the same time", "Set on the machine", "More agents use more memory.")
-            settingRow("Where its work goes", "A folder for each session", "Core makes it.")
-            Text(
-                "Changing these from the app needs a Core command that is not built yet. Until then, change how the runner starts on the machine."
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
-                horizontal: false, vertical: true)
+        let live = model.runnerSettings
+        return VStack(alignment: .leading, spacing: Space.s2) {
+            if let r = live, r.editable {
+                GlassToggleTile(
+                    "Terminals", sub: "Open a shell on this runner.", symbol: "terminal",
+                    isOn: Binding(
+                        get: { r.terminals },
+                        set: { v in model.changeRunner(r.id, terminals: v) }),
+                    fill: true
+                )
+                .disabled(r.busy)
+                GlassToggleTile(
+                    "AI sessions", sub: "Let AI sessions work here.", symbol: "sparkles",
+                    isOn: Binding(
+                        get: { r.agents },
+                        set: { v in model.changeRunner(r.id, agents: v) }),
+                    fill: true
+                )
+                .disabled(r.busy)
+                if r.agents {
+                    card {
+                        HStack(spacing: Space.s3) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text("AI sessions at the same time").fontWeight(.semibold)
+                                Text("More sessions use more memory.").foregroundStyle(palette.text2)
+                            }
+                            Spacer(minLength: 0)
+                            Button {
+                                model.changeRunner(r.id, capacity: r.capacity - 1)
+                            } label: {
+                                Image(systemName: "minus")
+                            }
+                            .buttonStyle(.coreSecondary).disabled(r.capacity <= 1 || r.busy)
+                            .accessibilityLabel("Fewer AI sessions")
+                            Text("\(r.capacity)").fontWeight(.semibold).monospacedDigit().frame(minWidth: 20)
+                            Button {
+                                model.changeRunner(r.id, capacity: r.capacity + 1)
+                            } label: {
+                                Image(systemName: "plus")
+                            }
+                            .buttonStyle(.coreSecondary).disabled(r.capacity >= 8 || r.busy)
+                            .accessibilityLabel("More AI sessions")
+                        }
+                    }
+                }
+                if let note = r.note {
+                    Label(
+                        note, systemImage: r.noteIsRefusal ? "exclamationmark.triangle" : "arrow.triangle.2.circlepath"
+                    )
+                    .foregroundStyle(r.noteIsRefusal ? palette.tone(.warn).ink : palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(
+                    "Each change asks for Touch ID and the runner restarts for a moment. You can change these later on the runner's page."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                settingRow("Terminals", model.terminals ? "On" : "Off", "Open a shell on this runner.")
+                settingRow("AI sessions", model.agents ? "On" : "Off", "Let AI sessions work here.")
+                Text(
+                    live == nil
+                        ? "The runner is not in the list yet. Change these later on its page."
+                        : "This runner is too old to change these from the app. Update it first, or change how it starts on the machine."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).fixedSize(
+                    horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -615,7 +673,7 @@ struct AddWizardView: View {
     private func summary(_ d: DeviceInfo?) -> String {
         let scopes = d?.scopes ?? model.granted
         if model.kind?.isRunner == true {
-            return "Runner · Terminals \(model.terminals ? "on" : "off") · Agents \(model.agents ? "on" : "off")"
+            return "Runner · Terminals \(model.terminals ? "on" : "off") · AI sessions \(model.agents ? "on" : "off")"
         }
         return "\(model.kind?.title ?? "Device") · \(AccessPreset.matching(Set(scopes)).title)"
     }

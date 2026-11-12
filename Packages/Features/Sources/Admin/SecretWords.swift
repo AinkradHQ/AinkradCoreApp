@@ -1,11 +1,11 @@
 import Foundation
 
-/// What the Secrets page says (N24), as plain functions the tests pin. The Core stores only text secrets for now: it has no
-/// type, group, description or last-used time, so those show as "Coming with the next Core" and nothing is invented.
+/// What the Secrets page says (N24), as plain functions the tests pin.
 enum SecretWords {
-    static let comingNext = "Coming with the next Core"
+    /// A file secret is at most 1 MiB (decision G1).
+    static let fileLimit = 1_048_576
 
-    /// What a secret can be. Only `text` works today; the others are shown so people know they are planned.
+    /// What a secret can be (`kind` on the Core).
     enum Kind: CaseIterable, Equatable {
         case text, multiline, file, env
         var title: String {
@@ -32,7 +32,20 @@ enum SecretWords {
             case .env: "curlybraces"
             }
         }
-        var available: Bool { self == .text }
+        /// The word the Core takes and sends back.
+        var wire: String {
+            switch self {
+            case .text: "text"
+            case .multiline: "multiline"
+            case .file: "file"
+            case .env: "env_bundle"
+            }
+        }
+        init(wire: String) { self = Self.allCases.first { $0.wire == wire } ?? .text }
+        var isFile: Bool { self == .file }
+        /// Typed or pasted on several lines, or read from a text file.
+        var isMultiline: Bool { self == .multiline || self == .env }
+        var delivery: String { self == .file ? "file" : "env" }
     }
 
     /// `20 B`, `1.2 KB`.
@@ -42,7 +55,7 @@ enum SecretWords {
         return kb < 10 ? String(format: "%.1f KB", kb) : String(format: "%.0f KB", kb)
     }
 
-    /// How an agent gets it, in the words a person would use.
+    /// How an AI session gets it, in the words a person would use.
     static func delivery(_ d: String) -> (title: String, line: String, symbol: String) {
         switch d {
         case "env": ("As a setting", "As a setting (environment variable)", "terminal.fill")
@@ -54,18 +67,40 @@ enum SecretWords {
 
     /// The preview under the details step: what agents on those runners will get.
     static func preview(delivery d: String, runners: [String]) -> String {
-        let who = runners.isEmpty ? "No runner may use it yet" : "Agents on \(runners.joined(separator: ", "))"
+        let who = runners.isEmpty ? "No runner may use it yet" : "AI sessions on \(runners.joined(separator: ", "))"
         let how =
             switch d {
             case "file": "get it as a file only they can read"
             case "askpass": "get it as the answer to git and ssh password prompts"
             default: "get it as an environment variable"
             }
-        return runners.isEmpty ? "\(who). Choose a runner to let agents have it." : "\(who) \(how)."
+        return runners.isEmpty ? "\(who). Choose a runner to let AI sessions have it." : "\(who) \(how)."
     }
 
     /// `Oracle, Azure Dev`, or why there is none.
     static func usedBy(_ names: [String]) -> String { names.isEmpty ? "No runner yet" : names.joined(separator: ", ") }
+
+    /// `Used 2 h ago · 12 times`, or `Never used`.
+    static func lastUsed(_ s: SecretItem, now: Date = Date()) -> String {
+        guard let at = s.lastUsedAt else { return "Never used" }
+        let secs = max(0, now.timeIntervalSince(at))
+        let ago =
+            secs < 60
+            ? "just now"
+            : secs < 3600
+                ? "\(Int(secs / 60)) min ago"
+                : secs < 86_400 ? "\(Int(secs / 3600)) h ago" : "\(Int(secs / 86_400)) d ago"
+        return "Used \(ago) · \(s.useCount) time\(s.useCount == 1 ? "" : "s")"
+    }
+
+    /// How a row's value is described: `Sealed · 1.2 KB`, or the file name for a file.
+    static func sealed(_ s: SecretItem) -> String {
+        let size = "Sealed · \(size(s.size))"
+        return Kind(wire: s.kind).isFile ? (s.fileName.map { "\($0) · \(size)" } ?? size) : size
+    }
+
+    /// The row's second line: the description, else how an agent gets it.
+    static func line(_ s: SecretItem) -> String { s.description.isEmpty ? delivery(s.delivery).line : s.description }
 
     /// The Core has no last-used time yet, so the row says when the value last changed.
     static func changed(_ s: SecretItem, now: Date = Date()) -> String {
@@ -85,7 +120,7 @@ enum SecretWords {
     /// The search box and the runner filter.
     static func matches(_ s: SecretItem, query: String, runner: String?) -> Bool {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        return (q.isEmpty || s.name.lowercased().contains(q)) && (runner.map { s.runners.contains($0) } ?? true)
+        return (q.isEmpty || s.name.lowercased().contains(q)) && (runner.map { s.runnersUsing.contains($0) } ?? true)
     }
 
     /// The delete dialog's line about where it is used.
@@ -94,21 +129,40 @@ enum SecretWords {
             runnerNames.isEmpty
             ? "No runner may use it."
             : "Used on \(runnerNames.count) runner\(runnerNames.count == 1 ? "" : "s") (\(runnerNames.joined(separator: ", ")))."
-        return "\(used) \(versions(s)). Agents that need it will stop getting it."
+        return "\(used) \(versions(s)). AI sessions that need it will stop getting it."
     }
 }
 
-/// A group of secrets on the page. The Core has none yet, so every secret is in one section; when groups arrive this is the
-/// one place that splits them.
+/// A section of the page: a group (with its description and runners) or "No group" at the end.
 struct SecretSectionItem: Identifiable, Equatable {
     let id: String
     let title: String
     let symbol: String
     let items: [SecretItem]
+    /// nil for "No group".
+    var group: SecretGroupItem?
 }
 
 enum SecretSections {
-    static func sections(_ items: [SecretItem]) -> [SecretSectionItem] {
-        items.isEmpty ? [] : [SecretSectionItem(id: "all", title: "All secrets", symbol: "lock.fill", items: items)]
+    /// Each group, even an empty one, in name order, then the secrets with no group. A secret whose group is unknown here goes
+    /// to "No group". While a search narrows the list, empty groups are left out.
+    static func sections(_ items: [SecretItem], groups: [SecretGroupItem], narrowed: Bool = false)
+        -> [SecretSectionItem]
+    {
+        var out: [SecretSectionItem] = []
+        let known = Set(groups.map(\.name))
+        for g in groups.sorted(by: { $0.name < $1.name }) {
+            let mine = items.filter { $0.group == g.name }
+            if narrowed && mine.isEmpty { continue }
+            out.append(
+                SecretSectionItem(id: "g-\(g.name)", title: g.name, symbol: "folder.fill", items: mine, group: g))
+        }
+        let loose = items.filter { $0.group == nil || !known.contains($0.group!) }
+        if !loose.isEmpty || (out.isEmpty && !items.isEmpty) {
+            out.append(
+                SecretSectionItem(
+                    id: "none", title: groups.isEmpty ? "All secrets" : "No group", symbol: "lock.fill", items: loose))
+        }
+        return out
     }
 }

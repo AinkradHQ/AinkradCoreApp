@@ -1,6 +1,8 @@
+import AppKit
 import CoreUI
 import Shell
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The dialogs of the Secrets section, shown over the shell like the Devices dialogs.
 @MainActor
@@ -30,6 +32,34 @@ enum SecretDialogs {
         shell.present(
             ShellDialog(id: "secret-lease", onClose: { [weak admin] in admin?.host.clearElevationNotice() }) {
                 LeaseDialog(admin: admin, form: form) { shell.closeDialog() }
+            })
+    }
+
+    static func openGroup(_ admin: AdminModel, _ g: SecretGroupItem?) {
+        admin.host.clearElevationNotice()
+        let shell = admin.host.shell
+        shell.present(
+            ShellDialog(id: "secret-group", onClose: { [weak admin] in admin?.host.clearElevationNotice() }) {
+                GroupDialog(admin: admin, existing: g) { shell.closeDialog() }
+            })
+    }
+
+    static func openGroupLease(_ admin: AdminModel, _ g: SecretGroupItem) {
+        admin.host.clearElevationNotice()
+        let shell = admin.host.shell
+        let form = LeaseForm(group: g)
+        shell.present(
+            ShellDialog(id: "secret-lease", onClose: { [weak admin] in admin?.host.clearElevationNotice() }) {
+                LeaseDialog(admin: admin, form: form) { shell.closeDialog() }
+            })
+    }
+
+    static func openDeleteGroup(_ admin: AdminModel, _ g: SecretGroupItem) {
+        admin.host.clearElevationNotice()
+        let shell = admin.host.shell
+        shell.present(
+            ShellDialog(id: "secret-group-delete", onClose: { [weak admin] in admin?.host.clearElevationNotice() }) {
+                DeleteGroupDialog(admin: admin, group: g) { shell.closeDialog() }
             })
     }
 
@@ -71,6 +101,7 @@ struct SecretFormDialog: View {
     @Bindable var form: SecretForm
     let close: () -> Void
     @Environment(\.corePalette) private var palette
+    @State private var fileError: String?
 
     var body: some View {
         let model = admin.secrets!
@@ -87,10 +118,7 @@ struct SecretFormDialog: View {
         CoreDialogPanel("New value for \(old.name)", width: Space.s8 * 15) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("Replace what is sealed. Name and settings stay.").foregroundStyle(palette.text2)
-                CoreSecureField(
-                    "New value", placeholder: "Paste the new value",
-                    text: Binding(get: { form.value }, set: { form.setValue($0) }), autofocus: true
-                ) { go(model) }
+                valueInput(label: "New value", placeholder: "Paste the new value") { go(model) }
                 Label(
                     "The old value is removed. Running sessions keep the old value until they end.",
                     systemImage: "exclamationmark.triangle"
@@ -103,6 +131,41 @@ struct SecretFormDialog: View {
             }
         }
         .accessibilityIdentifier("secret-form")
+    }
+
+    // MARK: the value, for every kind
+
+    /// A secure line for text, a text box for many lines, and a file chooser or drop zone for a file. A file or text file can
+    /// also be picked for the multi-line kinds.
+    @ViewBuilder private func valueInput(label: String, placeholder: String, submit: @escaping () -> Void) -> some View
+    {
+        switch form.kind {
+        case .text:
+            CoreSecureField(
+                label, placeholder: placeholder, text: Binding(get: { form.value }, set: { form.setValue($0) }),
+                autofocus: true, onSubmit: submit)
+        case .multiline, .env:
+            VStack(alignment: .leading, spacing: Space.s1) {
+                CoreFieldLabel(label)
+                TextEditor(text: Binding(get: { form.value }, set: { form.setValue($0) }))
+                    .font(.system(size: MacTextSize.meta + 1, design: .monospaced)).scrollContentBackground(.hidden)
+                    .frame(height: 120).padding(Space.s2)
+                    .background(GlassInk.well, in: coreShape(Radius.control))
+                    .accessibilityLabel(label)
+                    .accessibilityIdentifier("secret-multiline")
+            }
+            FileDrop(form: form, prompt: "Or drop a text file here, or choose", error: $fileError)
+        case .file:
+            FileDrop(form: form, prompt: "Drop a file here, or choose", error: $fileError)
+        }
+        if let e = fileError { IssueLine(code: nil, text: e) }
+        if let n = form.shownSize {
+            Label(
+                (form.fileName.map { "\($0) · " } ?? "") + "Ready to seal · \(SecretWords.size(n))",
+                systemImage: "lock.fill"
+            )
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.done).ink)
+        }
     }
 
     // MARK: new secret, three steps
@@ -134,15 +197,15 @@ struct SecretFormDialog: View {
                 ForEach(SecretWords.Kind.allCases, id: \.self) { k in
                     Button {
                         form.kind = k
+                        form.delivery = k.delivery
+                        form.wipe()
+                        form.fileName = nil
+                        fileError = nil
                     } label: {
                         VStack(alignment: .leading, spacing: Space.s1) {
-                            IconTile(k.symbol, hue: k.available ? GlassInk.orange : GlassInk.slate, size: 36)
+                            IconTile(k.symbol, hue: GlassInk.orange, size: 36)
                             Text(k.title).fontWeight(.semibold)
                             Text(k.blurb).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                            if !k.available {
-                                Text(SecretWords.comingNext).coreFont(size: MacTextSize.meta).foregroundStyle(
-                                    palette.tone(.warn).ink)
-                            }
                         }
                         .padding(Space.s3).frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
                         .background(GlassInk.well, in: coreShape(Radius.cardMac))
@@ -153,8 +216,7 @@ struct SecretFormDialog: View {
                         }
                         .contentShape(coreShape(Radius.cardMac))
                     }
-                    .buttonStyle(.plain).disabled(!k.available).opacity(k.available ? 1 : 0.55)
-                    .help(k.available ? k.blurb : "\(k.title): \(SecretWords.comingNext)")
+                    .buttonStyle(.plain).help(k.blurb)
                     .accessibilityAddTraits(form.kind == k ? .isSelected : [])
                 }
             }
@@ -165,24 +227,7 @@ struct SecretFormDialog: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             Text("Add the value. Ainkrad seals it. You will never see it again, only its name and size.")
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            CoreSecureField(
-                "Value", placeholder: "Paste a test value",
-                text: Binding(get: { form.value }, set: { form.setValue($0) }), autofocus: true
-            ) { next() }
-            HStack(spacing: Space.s3) {
-                IconTile("arrow.down.doc", hue: GlassInk.slate, size: 32)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Drop a file here, or choose").fontWeight(.semibold)
-                    Text(SecretWords.comingNext).foregroundStyle(palette.text2)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac)).opacity(0.55)
-            .help("Files: \(SecretWords.comingNext)")
-            if form.value.isEmpty == false {
-                Label("Ready to seal · \(SecretWords.size(Int64(form.value.utf8.count)))", systemImage: "lock.fill")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.done).ink)
-            }
+            valueInput(label: "Value", placeholder: "Paste a test value") { next() }
         }
     }
 
@@ -191,23 +236,33 @@ struct SecretFormDialog: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 CoreTextField(
                     "Name", placeholder: "e.g. github-token-test", text: $form.name, mono: false, autofocus: true)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    CoreFieldLabel("Group")
-                    Text("No group · \(SecretWords.comingNext)").foregroundStyle(palette.text2).opacity(0.7)
-                        .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(GlassInk.well, in: coreShape(Radius.control))
+                CoreSelect(
+                    "Group",
+                    selection: Binding(get: { form.group ?? "" }, set: { form.group = $0.isEmpty ? nil : $0 }),
+                    options: [CoreSelectOption("", "No group")]
+                        + model.groups.map { CoreSelectOption($0.name, $0.name, symbol: "folder") })
+            }
+            CoreTextField(
+                "What is it for?", placeholder: "e.g. Pushes to the website repository", text: $form.description)
+            if form.kind.isFile {
+                HStack(alignment: .top, spacing: Space.s3) {
+                    CoreTextField(
+                        "File name on the runner", placeholder: "aws.json",
+                        text: Binding(get: { form.fileName ?? "" }, set: { form.fileName = $0 }))
+                    CoreTextField("File mode", placeholder: "0600", text: $form.fileMode, mono: true)
+                        .frame(width: Space.s8 * 3)
                 }
             }
             VStack(alignment: .leading, spacing: Space.s1) {
-                CoreFieldLabel("What is it for?")
-                Text("A description: \(SecretWords.comingNext)").foregroundStyle(palette.text2).opacity(0.7)
-                    .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GlassInk.well, in: coreShape(Radius.control))
-            }
-            VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("Runners that may use it")
+                if let g = model.groups.first(where: { $0.name == form.group }), form.runners.isEmpty {
+                    Text(
+                        "Left empty, it uses the runners of \(g.name): \(SecretWords.usedBy(g.runners.map(model.runnerName)))."
+                    )
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                }
                 if model.runners.isEmpty {
-                    Text("No runners yet. A secret no runner may use can't be given to an agent.").foregroundStyle(
+                    Text("No runners yet. A secret no runner may use can't be given to an AI session.").foregroundStyle(
                         palette.text2)
                 }
                 HStack(spacing: Space.s2) {
@@ -225,32 +280,35 @@ struct SecretFormDialog: View {
                     }
                 }
             }
-            VStack(alignment: .leading, spacing: Space.s1) {
-                CoreFieldLabel("How the agent gets it")
-                ForEach(Delivery.all, id: \.self) { d in
-                    let on = form.delivery == d
-                    Button {
-                        form.delivery = d
-                    } label: {
-                        HStack(spacing: Space.s2) {
-                            Image(systemName: on ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(on ? GlassInk.orange : palette.text2)
-                            Text(SecretWords.delivery(d).line)
-                            Spacer(minLength: 0)
+            if !form.kind.isFile {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    CoreFieldLabel("How an AI session gets it")
+                    ForEach(Delivery.all, id: \.self) { d in
+                        let on = form.delivery == d
+                        Button {
+                            form.delivery = d
+                        } label: {
+                            HStack(spacing: Space.s2) {
+                                Image(systemName: on ? "checkmark.square.fill" : "square")
+                                    .foregroundStyle(on ? GlassInk.orange : palette.text2)
+                                Text(SecretWords.delivery(d).line)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(Space.s2)
+                            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+                            .overlay {
+                                coreShape(Radius.control).strokeBorder(on ? GlassInk.orange : .clear, lineWidth: 1.5)
+                            }
+                            .contentShape(coreShape(Radius.control))
                         }
-                        .padding(Space.s2)
-                        .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-                        .overlay {
-                            coreShape(Radius.control).strokeBorder(on ? GlassInk.orange : .clear, lineWidth: 1.5)
-                        }
-                        .contentShape(coreShape(Radius.control))
+                        .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
                     }
-                    .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
             Label(
                 SecretWords.preview(
-                    delivery: form.delivery, runners: form.runners.sorted().map(model.runnerName)),
+                    delivery: form.kind.isFile ? "file" : form.delivery,
+                    runners: form.runners.sorted().map(model.runnerName)),
                 systemImage: "info.circle"
             )
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
@@ -271,7 +329,7 @@ struct SecretFormDialog: View {
             Spacer(minLength: 0)
             if form.step < 2 {
                 Button("Next", action: next).buttonStyle(.coreProminent).coreShortcut(.primary)
-                    .disabled((form.step == 0 && !form.kind.available) || (form.step == 1 && form.value.isEmpty))
+                    .disabled(form.step == 1 && form.value.isEmpty)
             } else {
                 Button("Seal secret") { go(model) }.buttonStyle(CoreButtonStyle(.prominent, busy: form.busy))
                     .coreShortcut(.primary).disabled(form.busy)
@@ -300,16 +358,19 @@ struct LeaseDialog: View {
 
     var body: some View {
         let model = admin.secrets!
-        CoreDialogPanel("Let a runner use \(form.secret.name)", width: Space.s8 * 15) {
+        CoreDialogPanel(
+            form.isGroup ? "Let a runner use all of \(form.name)" : "Let a runner use \(form.name)",
+            width: Space.s8 * 15
+        ) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Which runner")
-                    if form.secret.runners.isEmpty {
-                        Text("No runner may borrow this secret yet.").foregroundStyle(
+                    if form.runnerIDs.isEmpty {
+                        Text("No runner may borrow this yet.").foregroundStyle(
                             palette.text2)
                     } else {
                         CoreSegmented(
-                            "Runner", segments: form.secret.runners.map { CoreSegment($0, model.runnerName($0)) },
+                            "Runner", segments: form.runnerIDs.map { CoreSegment($0, model.runnerName($0)) },
                             selection: $form.runner, fill: true)
                     }
                 }
@@ -322,7 +383,8 @@ struct LeaseDialog: View {
                 )
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 GlassToggleTile(
-                    "An agent on that runner can read it", sub: "Allow it only on a runner whose agents you trust.",
+                    "An AI session on that runner can read it",
+                    sub: "Allow it only on a runner whose AI sessions you trust.",
                     symbol: "exclamationmark.triangle", onSymbol: "checkmark.shield.fill", isOn: $form.understood,
                     fill: true)
                 if let i = form.issue { IssueLine(code: nil, text: i.message) }
@@ -355,11 +417,11 @@ struct DeleteDialog: View {
                         IconTile("key.fill", hue: GlassInk.orange, size: 32)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(secret.name).fontWeight(.semibold)
-                            Text("\(SecretWords.versions(secret)) · \(SecretWords.changed(secret))")
+                            Text("\(SecretWords.versions(secret)) · \(SecretWords.lastUsed(secret))")
                                 .foregroundStyle(palette.text2)
                         }
                     }
-                    Text(SecretWords.usage(secret, runnerNames: secret.runners.map(model.runnerName)))
+                    Text(SecretWords.usage(secret, runnerNames: secret.runnersUsing.map(model.runnerName)))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))

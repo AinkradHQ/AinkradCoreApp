@@ -88,6 +88,11 @@ struct SignInTile: View {
                     .foregroundStyle(GlassInk.ink(GlassInk.green))
                 Text("Signed in").coreFont(size: MacTextSize.title, weight: .semibold)
                 Spacer(minLength: 0)
+                AccLink(
+                    title: model.checking == account.id ? "Checking…" : "Check sign-in", symbol: "checkmark.shield"
+                ) { Task { await model.checkPlan(account) } }
+                .disabled(model.readOnly || model.checking != nil)
+                .accessibilityIdentifier("check-signin")
                 AccLink(title: "Sign in again", symbol: "arrow.clockwise") {
                     AccountDialogs.openConnect(model, provider: account.provider, replacing: account)
                 }
@@ -96,10 +101,34 @@ struct SignInTile: View {
             Text("\(account.label) · since \(account.createdAt.formatted(date: .abbreviated, time: .shortened))")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             Text(
-                "A plan has no key to test. Its token is lent to a runner for each session and uses the plan's quota, not money."
+                "A plan has no key to test. Check sign-in sends one short message through a runner. It uses a little of the plan's quota, not money."
             )
             .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
+            checkLine
+        }
+    }
+}
+
+extension SignInTile {
+    @ViewBuilder fileprivate var checkLine: some View {
+        if model.checking == account.id {
+            CoreBusyBar()
+        } else if let note = model.checkNote[account.id] {
+            AccIssue(text: note)
+        } else if let last = model.planChecks[account.id] {
+            let w = PlanCheckWords.of(last.check.result)
+            HStack(alignment: .top, spacing: Space.s2) {
+                Image(systemName: w.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(GlassInk.ink(w.ok ? GlassInk.green : GlassInk.orange))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(w.title).coreFont(size: MacTextSize.body, weight: .semibold)
+                    Text(w.line + (last.check.latencyMs.map { " (\($0) ms)" } ?? ""))
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
         }
     }
 }

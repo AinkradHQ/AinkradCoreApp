@@ -25,10 +25,25 @@ public final class AdminDemo {
         }
         func history(_ key: String) async throws -> [SettingChangeItem] { DemoData.history[key] ?? [] }
         func secrets() async throws -> [SecretItem] { DemoData.secrets }
-        func createSecret(name: String, value: String, delivery: String, runners: [String]) async throws -> SecretItem {
+        func createSecret(_ draft: SecretDraft) async throws -> SecretItem { DemoData.secrets[0] }
+        func rotateSecret(_ name: String, value: String, fileName: String?) async throws -> SecretItem {
             DemoData.secrets[0]
         }
-        func rotateSecret(_ name: String, value: String) async throws -> SecretItem { DemoData.secrets[0] }
+        func secretGroups() async throws -> [SecretGroupItem] { DemoData.groups }
+        func createSecretGroup(name: String, description: String, runners: [String]) async throws -> SecretGroupItem {
+            SecretGroupItem(name: name, description: description, members: [], runners: runners)
+        }
+        func updateSecretGroup(_ name: String, description: String, runners: [String]) async throws -> SecretGroupItem {
+            SecretGroupItem(name: name, description: description, members: [], runners: runners)
+        }
+        func deleteSecretGroup(_ name: String) async throws {}
+        func leaseGroup(_ name: String, runner: String, ttl: Int64?) async throws -> [LeaseItem] {
+            [
+                LeaseItem(
+                    lease: "l_8Kd2Qx", secret: "aws-access-key", runner: runner,
+                    expiresAt: Date().addingTimeInterval(120))
+            ]
+        }
         func deleteSecret(_ name: String) async throws {}
         func lease(_ name: String, runner: String, ttl: Int64?) async throws -> LeaseItem {
             LeaseItem(lease: "l_8Kd2Qx", secret: name, runner: runner, expiresAt: Date().addingTimeInterval(120))
@@ -254,17 +269,28 @@ nonisolated enum DemoData {
     ]
 
     nonisolated static var secrets: [SecretItem] {
-        func make(_ n: String, _ size: Int64, _ ver: Int64, _ del: String, _ r: [String]) -> SecretItem {
-            SecretItem(
+        func make(_ n: String, _ size: Int64, _ ver: Int64, _ del: String, _ r: [String], kind: String = "text")
+            -> SecretItem
+        {
+            var s = SecretItem(
                 name: n, owner: "d_mac7Qa2", runners: r, delivery: del, version: ver, size: size, keyID: "k_2026_10",
                 createdAt: Date().addingTimeInterval(-5 * 86_400), updatedAt: Date().addingTimeInterval(-3_600 * 5))
+            s.kind = kind
+            s.lastUsedAt = Date().addingTimeInterval(-7_200)
+            s.useCount = 12
+            return s
         }
         return [
             make("github-token-test", 40, 3, "env", ["d_run2Gt4", "d_run9Lq1"]),
-            make("npm-auth-throwaway", 52, 1, "file", ["d_run9Lq1"]),
+            make("npm-auth-throwaway", 52, 1, "file", ["d_run9Lq1"], kind: "file"),
             make("git-askpass-test", 36, 2, "askpass", ["d_run2Gt4"]),
         ]
     }
+
+    nonisolated static let groups = [
+        SecretGroupItem(
+            name: "aws-production", description: "Keys for the production account", members: [], runners: ["d_run9Lq1"])
+    ]
 
     nonisolated static var audit: [AuditItem] { audit(60) }
 

@@ -19,7 +19,7 @@ struct SecretsSection: View {
             intro:
                 "Values go in and never come back: nobody can show or copy them, not even you. Runners use them for a short time.",
             state: model.state,
-            empty: ("No secrets yet", "Add a test value, then let a runner use it.", "key"),
+            empty: ("No secrets yet", "Add a secret, then let a runner use it.", "key"),
             emptyAction: ("New secret…", { SecretDialogs.openNew(admin) }),
             retry: { Task { await model.reload() } }
         ) {
@@ -31,7 +31,9 @@ struct SecretsSection: View {
                 if shown.isEmpty {
                     Text("No secret matches.").foregroundStyle(GlassInk.secondary)
                 }
-                ForEach(SecretSections.sections(shown)) { section in
+                ForEach(
+                    SecretSections.sections(shown, groups: model.groups, narrowed: !query.isEmpty || runner != nil)
+                ) { section in
                     sectionView(section, model)
                 }
             }
@@ -58,8 +60,10 @@ struct SecretsSection: View {
             }
             .fixedSize()
             Spacer(minLength: 0)
-            AppActionTile(title: "New group", symbol: "folder.badge.plus", key: "", hue: GlassInk.slate) {}
-                .disabled(true).help("Groups: \(SecretWords.comingNext)")
+            AppActionTile(title: "New group", symbol: "folder.badge.plus", key: "", hue: GlassInk.slate) {
+                SecretDialogs.openGroup(admin, nil)
+            }
+            .help("Keep related secrets together and give them to runners in one step")
             AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.orange, prominent: true) {
                 SecretDialogs.openNew(admin)
             }
@@ -80,8 +84,12 @@ struct SecretsSection: View {
                     Image(systemName: section.symbol).foregroundStyle(GlassInk.orange)
                     Text(section.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text("\(section.items.count)").foregroundStyle(GlassInk.secondary)
-                    Text("Groups: \(SecretWords.comingNext)").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
+                    if let g = section.group {
+                        Text(
+                            g.description.isEmpty ? SecretWords.usedBy(g.runners.map(model.runnerName)) : g.description
+                        )
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    }
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
@@ -89,6 +97,7 @@ struct SecretsSection: View {
             .buttonStyle(.plain).focusable(false)
             .accessibilityLabel("\(section.title), \(section.items.count) secrets")
             .accessibilityValue(open ? "Expanded" : "Collapsed")
+            if let g = section.group { groupBar(g, model) }
             if open {
                 ForEach(section.items) { s in
                     SecretRow(admin: admin, model: model, secret: s, selected: cursor == s.name) {
@@ -99,6 +108,28 @@ struct SecretsSection: View {
                 }
             }
         }
+    }
+
+    /// A group's runners and its actions: edit, let a runner use all of it, delete.
+    private func groupBar(_ g: SecretGroupItem, _ model: SecretsModel) -> some View {
+        HStack(spacing: Space.s2) {
+            Label(
+                g.runners.isEmpty
+                    ? "No runner yet" : "Runners: " + g.runners.map(model.runnerName).joined(separator: ", "),
+                systemImage: "server.rack"
+            )
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            Spacer(minLength: 0)
+            AccGroupLink(title: "Edit", symbol: "pencil") { SecretDialogs.openGroup(admin, g) }
+            AccGroupLink(title: "Let a runner use all", symbol: "server.rack") {
+                SecretDialogs.openGroupLease(admin, g)
+            }
+            .disabled(g.members.isEmpty || g.runners.isEmpty)
+            AccGroupLink(title: "Delete", symbol: "trash", danger: true) { SecretDialogs.openDeleteGroup(admin, g) }
+        }
+        .padding(.leading, Space.s6)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("group-\(g.name)")
     }
 
     private func keys(_ press: KeyPress, _ model: SecretsModel) -> KeyPress.Result {
@@ -198,15 +229,15 @@ private struct SecretRow: View {
     @State private var hovering = false
 
     var body: some View {
-        let kind = SecretWords.Kind.text
-        let names = secret.runners.map(model.runnerName)
+        let kind = SecretWords.Kind(wire: secret.kind)
+        let names = secret.runnersUsing.map(model.runnerName)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
                 IconTile(kind.symbol, hue: GlassInk.orange, size: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(secret.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         .lineLimit(1).truncationMode(.middle)
-                    Text(SecretWords.delivery(secret.delivery).line).coreFont(size: MacTextSize.meta)
+                    Text(SecretWords.line(secret)).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -216,13 +247,13 @@ private struct SecretRow: View {
                 }
                 .frame(width: Space.s8 * 5, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(SecretWords.changed(secret)).coreFont(size: MacTextSize.meta).foregroundStyle(
+                    Text(SecretWords.lastUsed(secret)).coreFont(size: MacTextSize.meta).foregroundStyle(
                         GlassInk.secondary)
-                    Text("Sealed · \(SecretWords.size(secret.size))").coreFont(size: MacTextSize.meta, weight: .medium)
+                    Text(SecretWords.sealed(secret)).lineLimit(1).coreFont(size: MacTextSize.meta, weight: .medium)
                         .padding(.horizontal, Space.s2).padding(.vertical, 1)
                         .background(GlassInk.wellHover, in: coreShape(5))
                 }
-                .frame(width: Space.s8 * 4, alignment: .trailing)
+                .frame(width: Space.s8 * 5, alignment: .trailing)
                 HStack(spacing: Space.s1) {
                     AppActionTile(title: "", symbol: "arrow.triangle.2.circlepath", key: "", hue: GlassInk.slate) {
                         SecretDialogs.openReplace(admin, secret)
@@ -311,4 +342,21 @@ private struct LeaseLine: View {
 
 extension SecretsModel {
     func runnerName(_ id: String) -> String { runners.first { $0.id == id }?.name ?? id }
+}
+
+/// A small text action in a group's bar.
+private struct AccGroupLink: View {
+    let title: String
+    let symbol: String
+    var danger = false
+    let action: () -> Void
+    @Environment(\.isEnabled) private var enabled
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .medium)
+        }
+        .buttonStyle(.plain).focusable(false)
+        .foregroundStyle(danger ? GlassInk.redInk : GlassInk.blue).opacity(enabled ? 1 : 0.4)
+    }
 }

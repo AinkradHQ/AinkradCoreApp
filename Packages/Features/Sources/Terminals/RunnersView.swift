@@ -41,7 +41,8 @@ struct RunnersView: View {
             if model.runners.isEmpty {
                 if model.load == .ready { empty } else { CoreBusyBar() }
             } else {
-                Text("Machines that do the work for your Core: terminals and agents.").foregroundStyle(palette.text2)
+                Text("Machines that do the work for your Core: terminals and AI sessions.").foregroundStyle(
+                    palette.text2)
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s3, alignment: .top)],
                     spacing: Space.s3
@@ -84,7 +85,7 @@ struct RunnersView: View {
         VStack(spacing: Space.s3) {
             IconTile("server.rack", hue: GlassInk.slate, size: 52)
             Text("No runners yet").coreFont(size: MacTextSize.large, weight: .bold)
-            Text("A runner is a machine that runs terminals and agents for your Core. Add the first one.")
+            Text("A runner is a machine that runs terminals and AI sessions for your Core. Add the first one.")
                 .foregroundStyle(palette.text2).multilineTextAlignment(.center)
                 .frame(maxWidth: Space.s8 * 8)
         }
@@ -207,7 +208,7 @@ private struct RunnerCard: View {
                 }
                 HStack(spacing: Space.s2) {
                     OfferChip(symbol: "terminal", title: "Terminals", on: facts.terminalsOn)
-                    OfferChip(symbol: "sparkles", title: "Agents", on: facts.agentsOn)
+                    OfferChip(symbol: "sparkles", title: "AI sessions", on: facts.agentsOn)
                 }
                 RunnerBars(facts: facts, terminalsHere: terminals)
                 HStack(alignment: .bottom) {

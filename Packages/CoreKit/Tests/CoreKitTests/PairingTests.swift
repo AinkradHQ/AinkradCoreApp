@@ -55,6 +55,17 @@ struct StepUpTestStore: KeyStore {
 }
 
 @Suite struct PairingTests {
+    @Test func theClaimCarriesTheMacsNameAndTheNameIsCleaned() async throws {
+        #expect(DevicePairing.clean("  Ahmed's MacBook Pro\n") == "Ahmed's MacBook Pro")
+        #expect(DevicePairing.clean(String(repeating: "x", count: 100))?.count == 64)
+        #expect(DevicePairing.clean("   ") == nil && DevicePairing.clean(nil) == nil)
+        let core = FakeCore(clock: TestClock())
+        _ = try await pairing(core, storeWithSoftwareStepUp()).claim(try .parse("4dttj-f9nwo"), endpoint: loopback)
+        let sent = try #require(core.log.first { $0.target == "/pair/claim" })
+        let body = try #require(try JSONSerialization.jsonObject(with: sent.body) as? [String: String])
+        #expect(body["device_name"] == DevicePairing.deviceName)
+    }
+
     @Test func claimsWithATypedCodeAndComputesTheSASItself() async throws {
         let core = FakeCore(clock: TestClock())
         let store = storeWithSoftwareStepUp()

@@ -118,6 +118,50 @@ struct SecretsTests {
         #expect(admin.secrets.checkLease(none) != nil)
     }
 
+    @Test("a file secret goes as base64 with its name and mode, a group member carries its group")
+    func fileInGroup() async throws {
+        let (admin, service, _) = await world()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("aws-\(UUID().uuidString).json")
+        try Data("{\"k\":1}".utf8).write(to: url)
+        let f = SecretForm()
+        f.kind = .file
+        f.name = "aws-json"
+        f.group = "aws"
+        f.runners = ["d_run"]
+        #expect(f.setFile(url) == nil && f.fileName == url.lastPathComponent)
+        #expect(await admin.secrets.store(f))
+        let d = try #require(service.drafts.first)
+        #expect(d.kind == "file" && d.delivery == "file" && d.fileMode == "0600" && d.group == "aws")
+        #expect(d.value == Data("{\"k\":1}".utf8).base64EncodedString())
+    }
+
+    @Test("a file over 1 MB is refused before anything is sent, and a bad mode is caught")
+    func bigFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("big-\(UUID().uuidString)")
+        try Data(count: SecretWords.fileLimit + 1).write(to: url)
+        let f = SecretForm()
+        f.kind = .file
+        #expect(f.setFile(url)?.contains("at most 1 MB") == true && f.value.isEmpty)
+        #expect(SecretForm.validMode("0600") && SecretForm.validMode("644") && !SecretForm.validMode("0999"))
+    }
+
+    @Test("groups are made, edited, leased as a whole and deleted through Touch ID")
+    func groups() async {
+        let (admin, service, host) = await world()
+        #expect(
+            await admin.secrets.saveGroup(name: "aws", description: "keys", runners: ["d_run"], existing: false) == nil)
+        #expect(admin.secrets.groups.map(\.name) == ["aws"])
+        #expect(await admin.secrets.saveGroup(name: "Bad Name", description: "", runners: [], existing: false) != nil)
+        let g = admin.secrets.groups[0]
+        let f = LeaseForm(group: g)
+        f.understood = true
+        #expect(await admin.secrets.lease(f))
+        #expect(service.log.contains("group-lease aws d_run"))
+        #expect(await admin.secrets.deleteGroup(g) == nil)
+        #expect(service.log.contains("group-delete aws") && admin.secrets.groups.isEmpty)
+        #expect(host.reasons.contains { $0.contains("aws") })
+    }
+
     @Test("delete goes through Touch ID and removes the row; leases of it go too")
     func delete() async {
         let (admin, service, host) = await world()

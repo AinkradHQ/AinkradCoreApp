@@ -146,6 +146,11 @@ struct ConnectWizard: View {
             await w.flow.load(model)
             w.runners = w.flow.runners
             w.suggestName(model)
+            // The provider step follows the runners by itself: an install finishing, a runner restarting.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                if let r = try? await model.service?.runners() { w.runners = r }
+            }
         }
         .onDisappear { w.flow.wipe() }
     }
@@ -158,8 +163,10 @@ struct ConnectWizard: View {
             VStack(spacing: Space.s2) {
                 ForEach(ProviderLook.ordered(model.providers)) { p in providerRow(p) }
             }
-            Text("Agents run their tools on a runner. A provider is ready when a runner that is online can serve it.")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(
+                "AI sessions run their tools on a runner. A provider is ready when a runner that is online can serve it."
+            )
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             footer(
                 back: nil, next: "Next", enabled: model.provider(w.provider).map { w.readiness($0).isReady } ?? false
             ) {
@@ -207,10 +214,7 @@ struct ConnectWizard: View {
                 Text("Works on \(runner)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
         case .notInstalled:
-            VStack(alignment: .trailing, spacing: Space.s1) {
-                StateBadge("Not installed", tone: .queue, symbol: "arrow.down.circle")
-                AccLink(title: "How to install", symbol: "terminal") { InstallHelpSheet.open(model, p) }
-            }
+            ProviderInstall(model: model, w: w, provider: p)
         case .needsRunner:
             VStack(alignment: .trailing, spacing: Space.s1) {
                 StateBadge("Needs a runner", tone: .warn, symbol: "server.rack")
@@ -327,7 +331,7 @@ struct ConnectWizard: View {
                 CoreTextField(
                     "Monthly limit", placeholder: "20", text: $w.limitText,
                     error: w.limit == nil ? "Type a dollar amount, or 0 for no limit." : nil, suffix: "USD")
-                Text("Agents stop using it when it reaches this. You can change it later. 0 means no limit.")
+                Text("AI sessions stop using it when it reaches this. You can change it later. 0 means no limit.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             if case .ready(let runner, _) = model.provider(w.provider).map({ w.readiness($0) }) ?? .needsRunner {
@@ -365,7 +369,7 @@ struct ConnectWizard: View {
         return VStack(alignment: .leading, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Where does it go?").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("Agents try accounts in an order. Most people keep the defaults.")
+                Text("AI sessions try accounts in an order. Most people keep the defaults.")
                     .foregroundStyle(GlassInk.secondary)
             }
             HStack(alignment: .top, spacing: Space.s4) {
@@ -384,7 +388,7 @@ struct ConnectWizard: View {
                         )
                         .onChange(of: w.newPoolName) { _, v in w.poolPick = .new(v) }
                     }
-                    heading("Order", "the list agents try, one place after another").padding(.top, Space.s2)
+                    heading("Order", "the list AI sessions try, one place after another").padding(.top, Space.s2)
                     radio("Default order", w.chainPick == .standard) { w.chainPick = .standard }
                     ForEach(model.chains.filter { !$0.isDefault }) { c in
                         radio("Order “\(c.name)”", w.chainPick == .existing(c.id)) { w.chainPick = .existing(c.id) }
@@ -495,7 +499,8 @@ struct ConnectWizard: View {
             let place = a.flatMap { Placement.usedWords(seat: model.seatIndex(of: $0)) }?.lowercased()
             VStack(spacing: Space.s3) {
                 IconTile("checkmark.seal.fill", hue: GlassInk.green, size: 64, bounce: true)
-                Text("\(a?.label ?? w.flow.slugged) works for agents").coreFont(size: MacTextSize.large, weight: .bold)
+                Text("\(a?.label ?? w.flow.slugged) works for AI sessions").coreFont(
+                    size: MacTextSize.large, weight: .bold)
                 Text(
                     "\(place.map { "It is \($0.replacingOccurrences(of: "used ", with: "")) in the order" } ?? "It is added"), with a \(w.limit.map(Placement.limitWords) ?? "default") monthly limit. It answered in \(ms) ms."
                 )
@@ -583,48 +588,5 @@ private struct NewSeatDrag: ViewModifier {
                 return true
             }
         }
-    }
-}
-
-/// How to install: the exact commands for the provider's tool on a runner, until Core can install it in one click.
-struct InstallHelpSheet: View {
-    let provider: ProviderItem
-    let close: () -> Void
-
-    @MainActor static func open(_ m: AccountsModel, _ p: ProviderItem) {
-        AccountDialogs.present(m, "provider-install-help") { close in InstallHelpSheet(provider: p, close: close) }
-    }
-
-    var body: some View {
-        CoreDialogPanel("Install \(ProviderWords.title(provider)) on a runner", width: Space.s8 * 16) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                Text("One-click install is not in Core yet. Run these on the runner's machine, in order.")
-                    .foregroundStyle(GlassInk.secondary)
-                ForEach(Array(InstallHelp.steps(provider).enumerated()), id: \.element.id) { i, s in
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        Text("\(i + 1). \(s.title)").fontWeight(.semibold)
-                        Text(s.detail).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                        if let c = s.command {
-                            HStack(alignment: .top, spacing: Space.s2) {
-                                Text(c).coreFont(size: MacTextSize.meta, design: .monospaced).textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                AccLink(title: "Copy", symbol: "doc.on.doc") {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(c, forType: .string)
-                                }
-                            }
-                            .padding(Space.s2).background(GlassInk.wellHover, in: coreShape(Radius.control))
-                        }
-                    }
-                }
-                Text("This window updates by itself: when a runner can serve the provider, it says Ready.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                HStack {
-                    Spacer(minLength: 0)
-                    Button("Done", action: close).buttonStyle(.coreProminent).coreShortcut(.primary)
-                }
-            }
-        }
-        .accessibilityIdentifier("provider-install-help")
     }
 }

@@ -75,16 +75,6 @@ struct TerminalSettingsView: View {
                             + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
                         selection: $prefs.defaultRunner, fill: true)
                 }
-                SettingRow("Shell", symbol: "apple.terminal") {
-                    CoreSegmented(
-                        "Shell",
-                        segments: [
-                            CoreSegment("", "Login shell", symbol: "person.crop.square"),
-                            CoreSegment("zsh", "zsh", symbol: "z.square"),
-                            CoreSegment("bash", "bash", symbol: "b.square"),
-                            CoreSegment("sh", "sh", symbol: "s.square"),
-                        ], selection: $prefs.defaultShell, fill: true)
-                }
                 HStack(spacing: Space.s2) {
                     GlassToggleTile(
                         "Open full pane", sub: "A new terminal fills its pane.",

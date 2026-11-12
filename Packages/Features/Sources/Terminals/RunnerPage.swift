@@ -28,6 +28,7 @@ struct RunnerPage: View {
                 VStack(spacing: Space.s3) {
                     now
                     offers
+                    tools
                 }
                 VStack(spacing: Space.s3) {
                     machine
@@ -43,19 +44,19 @@ struct RunnerPage: View {
     // MARK: header
 
     private var header: some View {
-        HStack(spacing: Space.s3) {
-            Button {
-                model.runnerDetail = nil
-            } label: {
-                Label("Runners", systemImage: "chevron.backward")
+        HStack(alignment: .center, spacing: Space.s3) {
+            RunnerBackTile { model.runnerDetail = nil }
+            IconTile("server.rack", hue: off ? GlassInk.slate : RunnerHue.of(runner.name), size: 56)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: Space.s2) {
+                    Text(runner.name).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
+                    if runner.builtIn { BuiltInBadge() }
+                    if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
+                    RunnerChip(facts: facts)
+                }
+                Text(facts.system ?? "Runner").foregroundStyle(palette.text2).lineLimit(1)
             }
-            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).keyboardShortcut(.escape, modifiers: [])
-            IconTile("server.rack", hue: off ? GlassInk.slate : RunnerHue.of(runner.name), size: 32)
-            Text(runner.name).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
-                .accessibilityAddTraits(.isHeader)
-            if runner.builtIn { BuiltInBadge() }
-            if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
-            RunnerChip(facts: facts)
             Spacer(minLength: Space.s3)
             Button {
                 Task { await model.runNoop(runner.id) }
@@ -173,19 +174,22 @@ struct RunnerPage: View {
 
     private var offers: some View {
         card("What it offers") {
-            offer(
-                "terminal", "Terminals",
-                facts.terminalsOn
-                    ? "Open a shell on this runner."
-                    : "Terminals are off here. Turn them on on the machine that runs this runner.",
-                on: facts.terminalsOn)
-            offer(
-                "sparkles", "Agents",
-                facts.agentsOn
-                    ? (facts.tools.isEmpty
-                        ? "Let agents work here."
-                        : "Let agents work here. Tools found: \(facts.tools.joined(separator: ", ")).")
-                    : "Agents are off here. Turn them on on the machine that runs this runner.", on: facts.agentsOn)
+            if let policy = runner.policy {
+                controls(policy)
+            } else {
+                offer(
+                    "terminal", "Terminals",
+                    facts.terminalsOn
+                        ? "Open a shell on this runner."
+                        : "Terminals are off here. Update the runner to turn them on from this app.",
+                    on: facts.terminalsOn)
+                offer(
+                    "sparkles", "AI sessions",
+                    facts.agentsOn
+                        ? "Let AI sessions work here."
+                        : "AI sessions are off here. Update the runner to turn them on from this app.",
+                    on: facts.agentsOn)
+            }
             offer(
                 "chevron.left.forwardslash.chevron.right", "Run commands", "One-off commands without a session.",
                 on: facts.commandsOn)
@@ -207,10 +211,115 @@ struct RunnerPage: View {
         }
     }
 
+    // MARK: switches, capacity and tools (N17 step 5, N19)
+
+    private var busyPolicy: Bool { model.policyBusy.contains(runner.id) }
+
+    private func controls(_ p: RunnerPolicy) -> some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            GlassToggleTile(
+                "Terminals", sub: "Open a shell on this runner.", symbol: "terminal",
+                isOn: Binding(get: { p.terminals }, set: { v in Task { await model.setPolicy(runner, terminals: v) } }),
+                fill: true
+            )
+            .disabled(busyPolicy || off)
+            GlassToggleTile(
+                "AI sessions", sub: "Let AI sessions work here. Needs an AI tool below.", symbol: "sparkles",
+                isOn: Binding(get: { p.agents }, set: { v in Task { await model.setPolicy(runner, agents: v) } }),
+                fill: true
+            )
+            .disabled(busyPolicy || off)
+            if p.agents { capacity(p) }
+            if let n = model.policyNote[runner.id] {
+                Label(n.text, systemImage: n.refused ? "exclamationmark.triangle" : "arrow.triangle.2.circlepath")
+                    .coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(n.refused ? GlassInk.orangeInk : palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("runner-policy-note")
+            }
+        }
+        .animation(Motion.calm(.smooth(duration: 0.25), reduce), value: p)
+    }
+
+    private func capacity(_ p: RunnerPolicy) -> some View {
+        HStack(spacing: Space.s3) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("AI sessions at the same time").coreFont(size: MacTextSize.body, weight: .medium)
+                Text("From 1 to 8. The runner restarts when this changes.").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: Space.s2)
+            Button {
+                Task { await model.setPolicy(runner, capacity: p.capacity - 1) }
+            } label: {
+                Image(systemName: "minus")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(p.capacity <= 1 || busyPolicy || off)
+            .accessibilityLabel("Fewer AI sessions")
+            Text("\(p.capacity)").coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
+                .frame(minWidth: 20).contentTransition(.numericText())
+            Button {
+                Task { await model.setPolicy(runner, capacity: p.capacity + 1) }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(p.capacity >= 8 || busyPolicy || off)
+            .accessibilityLabel("More AI sessions")
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .background(GlassInk.well, in: coreShape(Radius.control))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("runner-capacity")
+    }
+
+    /// Tools found on the host, each with an Install button when missing and live progress while installing.
+    private var tools: some View {
+        card("Tools") {
+            ForEach(RunnerTools.all, id: \.id) { t in toolRow(t) }
+        }
+    }
+
+    private func toolRow(_ t: (id: String, name: String, help: String)) -> some View {
+        let version = runner.tools[t.id]
+        let inst = model.installs[runner.id]?[t.id]
+        return HStack(spacing: Space.s3) {
+            Image(systemName: version != nil ? "checkmark.circle" : "arrow.down.circle")
+                .foregroundStyle(version != nil ? GlassInk.green : palette.text2).frame(width: 20)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(t.name).coreFont(size: MacTextSize.body, weight: .medium)
+                if let inst, inst.state == .running {
+                    CoreMeter(Double(inst.percent) / 100, label: "Installing \(t.name)")
+                    Text(inst.step.isEmpty ? "Installing…" : inst.step).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(palette.text2)
+                } else if let inst, inst.state == .failed {
+                    Text(inst.reason ?? "The install did not finish.").coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.orangeInk).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(version.map { $0.isEmpty ? "Installed" : "Installed, version \($0)" } ?? t.help)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                }
+            }
+            Spacer(minLength: Space.s2)
+            if inst?.state == .running {
+                Text("\(inst?.percent ?? 0)%").monospacedDigit().foregroundStyle(palette.text2)
+            } else if version == nil || inst?.state == .failed {
+                Button(inst?.state == .failed ? "Try again" : "Install") {
+                    Task { await model.installTool(runner, t.id) }
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(off)
+            } else {
+                StateBadge("Ready", tone: .run, symbol: "checkmark")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("runner-tool-\(t.id)")
+    }
+
     private var accountsHelp: String {
         switch facts.accountsAnswer {
-        case nil: "The Core does not say yet whether agents here can use your accounts."
-        case "Yes": "Agents here use your accounts without the key leaving this runner."
+        case nil: "The Core does not say yet whether AI sessions here can use your accounts."
+        case "Yes": "AI sessions here use your accounts without the key leaving this runner."
         case let no?: no
         }
     }
@@ -301,7 +410,7 @@ struct RunnerPage: View {
                     Task { await model.runNoop(runner.id) }
                 }
                 action("Open a terminal here", "terminal", disabled: !canTerminal) { model.openNew(runner: runner.id) }
-                action("Start an agent here", "sparkles", disabled: off || !facts.agentsOn) {
+                action("Start an AI session here", "sparkles", disabled: off || !facts.agentsOn) {
                     model.host.runnerHost?.startAgent(on: runner.id)
                 }
                 action("Rename", "pencil", disabled: false) { model.confirmRename(runner) }
@@ -314,7 +423,7 @@ struct RunnerPage: View {
     }
 
     private var unavailable: String? {
-        if off { return "Test, terminals and agents are not available while \(runner.name) is offline." }
+        if off { return "Test, terminals and AI sessions are not available while \(runner.name) is offline." }
         if busy { return "New terminals are refused while the host is over its load limit." }
         return nil
     }
@@ -329,5 +438,28 @@ struct RunnerPage: View {
         }
         .buttonStyle(CoreButtonStyle(.secondary)).foregroundStyle(danger ? GlassInk.redInk : GlassInk.primary)
         .disabled(disabled)
+    }
+}
+
+/// The way back to the runners, as a tile beside the page's icon: the same tile as the account page's. Esc does the same.
+private struct RunnerBackTile: View {
+    let action: () -> Void
+    @State private var hovering = false
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.backward").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                .offset(x: hovering ? -2 : 0)
+                .frame(width: 36, height: 56)
+                .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(10))
+                .overlay { coreShape(10).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .contentShape(coreShape(10))
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .keyboardShortcut(.escape, modifiers: [])
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.25), value: hovering)
+        .help("All runners (esc)")
+        .accessibilityLabel("All runners")
     }
 }
