@@ -25,6 +25,8 @@ final class AddWizardModel {
     private(set) var testLine: String?
     private(set) var testing = false
     private(set) var held: [String] = []
+    /// True while the Access step's choice is being sent to the Core.
+    private(set) var applying = false
     private weak var app: AppModel?
 
     init(app: AppModel, kind: AddKind? = nil) {
@@ -70,8 +72,8 @@ final class AddWizardModel {
     var canGoNext: Bool {
         switch step {
         case .what: kind != nil
-        case .install: kind != .phone
-        case .access: !granted.isEmpty && !name.trimmingCharacters(in: .whitespaces).isEmpty
+        case .install: kind != .phone && !name.trimmingCharacters(in: .whitespaces).isEmpty
+        case .access: !granted.isEmpty && !applying
         case .connect: connectedYet
         case .settings, .done: true
         }
@@ -97,7 +99,10 @@ final class AddWizardModel {
 
     func next() async {
         guard let kind, canGoNext, let n = AddWizardPlan.next(after: step, kind) else { return }
+        if step == .access, !(await applyAccess()) { return }
         step = n
+        // A Linux server's install step already shows the one command, so its invite is made on the way in.
+        if n == .install, usesRunnerInvite { await startConnect() }
         if n == .connect { await startConnect() }
         if n == .settings || n == .done { await findConnected() }
     }
@@ -139,6 +144,19 @@ final class AddWizardModel {
             if !kind.isRunner { m.scopes = Set(granted) }
             await m.create()
         }
+    }
+
+    /// The Access step, after the device connected with its kind's standard access: when the choice differs from what the
+    /// device holds, it is changed (behind Touch ID, with Undo in the toast). False keeps the wizard on the step.
+    func applyAccess() async -> Bool {
+        if connected == nil { await findConnected() }
+        guard let d = connected, AddWizardPlan.needsChange(holds: d.scopes, chosen: granted), let devices = app?.devices
+        else { return true }
+        applying = true
+        defer { applying = false }
+        guard await devices.setScopes(d, granted) else { return false }
+        connected?.scopes = granted
+        return true
     }
 
     private func runnerDeps(_ app: AppModel) -> RunnerInviteDeps {

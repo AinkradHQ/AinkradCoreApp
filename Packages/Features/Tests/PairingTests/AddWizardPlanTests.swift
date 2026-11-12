@@ -7,13 +7,30 @@ import Testing
 struct AddWizardPlanTests {
     @Test func eachKindHasItsOwnWay() {
         #expect(AddWizardPlan.steps(.phone) == [.what, .install])
-        #expect(AddWizardPlan.steps(.mac) == [.what, .install, .access, .connect, .done])
+        #expect(AddWizardPlan.steps(.mac) == [.what, .install, .connect, .access, .done])
         #expect(AddWizardPlan.steps(.linuxRunner) == [.what, .install, .connect, .settings, .done])
         #expect(AddWizardPlan.steps(.macRunner) == AddWizardPlan.steps(.linuxRunner))
-        #expect(AddWizardPlan.next(after: .install, .mac) == .access)
+        #expect(AddWizardPlan.next(after: .install, .mac) == .connect)
+        #expect(AddWizardPlan.next(after: .connect, .mac) == .access)
+        #expect(AddWizardPlan.next(after: .access, .mac) == .done)
         #expect(AddWizardPlan.next(after: .done, .mac) == nil)
         #expect(AddWizardPlan.previous(before: .connect, .linuxRunner) == .install)
         #expect(AddWizardPlan.previous(before: .what, .mac) == nil)
+    }
+
+    @Test func accessChangesOnlyWhatDiffers() {
+        #expect(!AddWizardPlan.needsChange(holds: ["approve", "read"], chosen: ["read", "approve"]))
+        #expect(AddWizardPlan.needsChange(holds: AccessPreset.work.scopes, chosen: AccessPreset.watch.scopes))
+        #expect(!AddWizardPlan.needsChange(holds: ["read"], chosen: []), "nothing chosen never strips a device")
+    }
+
+    @Test func theConnectLinesFollowTheInvite() {
+        let waiting = AddWizardWords.connectLines(invited: true, connected: nil, checked: false)
+        #expect(
+            waiting.map(\.text) == ["Invite created · 15 minutes", "Waiting for the new device…", "Connection checked"])
+        #expect(waiting.map(\.done) == [true, false, false])
+        let done = AddWizardWords.connectLines(invited: true, connected: "Azure Dev", checked: true)
+        #expect(done[1].text == "Azure Dev connected" && done.allSatisfy(\.done))
     }
 
     @Test func onlyADeviceChoosesAccess() {
