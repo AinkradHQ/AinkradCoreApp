@@ -245,3 +245,37 @@ struct MacRunnerSetupTests {
         #expect(!r.useThisMac && r.state == .off)
     }
 }
+
+/// The LaunchAgent plists bundled in the app: a Mac runner gets account sessions only with both agents on and the egress filter.
+@MainActor
+struct MacRunnerPlistTests {
+    private func plist(_ name: String) throws -> [String: Any] {
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { url.deleteLastPathComponent() }
+        url.append(path: "App/Mac/LaunchAgents/\(name).plist")
+        let obj = try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil)
+        return try #require(obj as? [String: Any])
+    }
+
+    @Test func bothAgentsOfferAccountSessionsWithTheEgressFilter() throws {
+        let plain = try plist("com.ainkrad.core.runner")
+        let terms = try plist("com.ainkrad.core.runner.terminals")
+        let a = try #require(plain["ProgramArguments"] as? [String])
+        let b = try #require(terms["ProgramArguments"] as? [String])
+        #expect(a.contains("--enable-agents") && !a.contains("--enable-pty"))
+        #expect(b.contains("--enable-agents") && b.contains("--enable-pty"))
+        let ea = try #require(plain["EnvironmentVariables"] as? [String: String])
+        let eb = try #require(terms["EnvironmentVariables"] as? [String: String])
+        #expect(ea["AINKRAD_AGENT_NETWORK"] == "filtered")
+        #expect(ea["AINKRAD_AGENT_EGRESS_HOSTS"]?.split(separator: ",").contains("api.anthropic.com") == true)
+        #expect(ea == eb)
+    }
+
+    @Test func theAccountsLineSaysWhatTheRunnerReports() {
+        #expect(MacRunnerModel.accountsLine("Yes") == "Can use your accounts: Yes")
+        #expect(
+            MacRunnerModel.accountsLine("No (it cannot limit where AI sessions connect)").hasPrefix(
+                "Can use your accounts: No ("))
+        #expect(MacRunnerModel.accountsLine(nil) == "Can use your accounts: not reported yet")
+    }
+}

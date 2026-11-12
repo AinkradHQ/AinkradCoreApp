@@ -30,8 +30,10 @@ final class MacRunnerModel {
     static let terminalsKey = "core.macRunner.terminals"
     /// D2, shown beside the terminals switch.
     static let terminalsWarning = "Devices allowed to open terminals can reach this Mac's files."
-    /// D3, until the Core can give a macOS runner its accounts.
-    static let agentsNote = "AI sessions on this Mac start when the Core supports accounts on macOS."
+    /// D3: what the runner itself reports (`accountsAnswer` is "Yes" or "No (reason)"); nil until the Core says.
+    static func accountsLine(_ answer: String?) -> String {
+        "Can use your accounts: \(answer ?? "not reported yet")"
+    }
 
     private(set) var state: State
     private(set) var deviceID: String?
