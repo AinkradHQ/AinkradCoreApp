@@ -177,7 +177,7 @@ private struct DeleteChainDialog: View {
         CoreDialogPanel("Delete \(chain.name)?", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
-                    "The chain goes\(n == 0 ? "" : ", and so do its \(n) AI session binding\(n == 1 ? "" : "s")"). Running sessions keep going. The pools and accounts stay.\(chain.isDefault ? " It is the default, so sessions with no chain run plain until you pick another default." : "")"
+                    "The chain goes\(n == 0 ? "" : ", and so do its \(n) binding\(n == 1 ? "" : "s")"). Running sessions keep going. The pools and accounts stay.\(chain.isDefault ? " It is the default, so sessions with no chain run plain until you pick another default." : "")"
                 )
                 .fixedSize(horizontal: false, vertical: true)
                 if let error { AccIssue(text: "\(error) Try again, or cancel and leave the chain as it is.") }

@@ -135,7 +135,7 @@ struct AgentChainsSection: View {
             Text("Bind another AI session").coreFont(size: MacTextSize.headline, weight: .semibold)
             HStack(alignment: .bottom, spacing: Space.s2) {
                 CoreTextField(
-                    "AI session id", placeholder: "AI session id, such as atlas", text: $newAgent,
+                    "Citadel agent id", placeholder: "Citadel agent id, such as atlas", text: $newAgent,
                     error: id.isEmpty || valid ? nil : AgentsModel.agentIDRule, mono: true
                 ) { add(id, chain) }
                 .disabled(model.bindingsReadOnly)
@@ -144,7 +144,7 @@ struct AgentChainsSection: View {
                     options: model.chains.map { CoreSelectOption($0.id, $0.name, note: $0.isDefault ? "default" : nil) }
                 )
                 .frame(width: Space.s8 * 8)
-                Button("Bind AI session") { add(id, chain) }
+                Button("Bind Citadel agent") { add(id, chain) }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.bindingBusy == id))
                     .disabled(!valid || chain == nil || model.bindingBusy != nil || model.bindingsReadOnly)
                     .frame(minHeight: MacSize.controlLg)
