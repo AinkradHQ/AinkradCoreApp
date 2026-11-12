@@ -2,46 +2,37 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// Settings, Security, Secrets (N24): what your Core keeps, as sections with one row per secret. Values go in and never come
-/// back. Arrows move the cursor row; ↩ lets a runner use it, E gives it a new value, ⌫ deletes it, ⌘N adds one.
+/// Settings, Security, Secrets (N24, ui-fixes secrets.html): a line with the count and the two actions, the test-values
+/// notice, search and the runner filter, then one section per group with one flat row per secret. Values go in and never
+/// come back. Arrows move the cursor row; ↩ lets a runner use it, E gives it a new value, ⌫ deletes it, ⌘N adds one.
 struct SecretsSection: View {
     let admin: AdminModel
     @State private var cursor: String?
     @State private var query = ""
-    @State private var runner: String?
+    @State private var runner = ""
     @State private var closed: Set<String> = []
     @FocusState private var focus: Bool
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         let model = admin.secrets!
-        AdminScreen(
-            admin: admin, what: "Secrets",
-            intro:
-                "Values go in and never come back: nobody can show or copy them, not even you. Runners use them for a short time.",
-            state: model.state,
-            empty: ("No secrets yet", "Add a secret, then let a runner use it.", "key"),
-            emptyAction: ("New secret…", { SecretDialogs.openNew(admin) }),
-            retry: { Task { await model.reload() } }
-        ) {
-            VStack(alignment: .leading, spacing: Space.s4) {
-                ModePanel(admin: admin, mode: model.mode)
-                AdminNoticeBanner(notice: admin.host.elevationNotice)
-                toolbar(model)
-                let shown = model.items.filter { SecretWords.matches($0, query: query, runner: runner) }
-                if shown.isEmpty {
-                    Text("No secret matches.").foregroundStyle(GlassInk.secondary)
-                }
-                ForEach(
-                    SecretSections.sections(shown, groups: model.groups, narrowed: !query.isEmpty || runner != nil)
-                ) { section in
-                    sectionView(section, model)
-                }
-            }
-            .foregroundStyle(GlassInk.primary)
-            .focusable().focused($focus).focusEffectDisabled()
-            .onKeyPress(phases: .down) { keys($0, model) }
-            .onChange(of: model.items.map(\.name), initial: true) { _, names in
-                if !names.contains(cursor ?? "") { cursor = names.first }
+        VStack(alignment: .leading, spacing: Space.s4) {
+            header(model)
+            if admin.isConnected && model.isOff {
+                CoreStateCard(
+                    symbol: "lock", title: "Secrets are off", line: "Turn on test values to add one.",
+                    primary: CoreAction("Open Feature switches") { admin.host.shell.settings.selected = "switches" }
+                )
+                .frame(maxWidth: .infinity).padding(.top, Space.s8)
+                .accessibilityIdentifier("secrets-mode")
+            } else {
+                AdminScreen(
+                    admin: admin, what: "Secrets", intro: "", state: model.state,
+                    empty: ("No secrets yet", "Add a secret, then let a runner use it.", "key"),
+                    emptyAction: ("New secret…", { SecretDialogs.openNew(admin) }),
+                    retry: { Task { await model.reload() } }
+                ) { list(model) }
             }
         }
         .task {
@@ -51,53 +42,114 @@ struct SecretsSection: View {
         .accessibilityIdentifier("secrets")
     }
 
-    private func toolbar(_ model: SecretsModel) -> some View {
+    // MARK: header
+
+    private func header(_ model: SecretsModel) -> some View {
         HStack(spacing: Space.s2) {
-            CoreTextField("", placeholder: "Search secrets", text: $query).frame(maxWidth: Space.s8 * 8)
-            Menu(runner.map(model.runnerName) ?? "All runners") {
-                Button("All runners") { runner = nil }
-                ForEach(model.runners) { r in Button(r.name) { runner = r.id } }
-            }
-            .fixedSize()
-            Spacer(minLength: 0)
-            AppActionTile(title: "New group", symbol: "folder.badge.plus", key: "", hue: GlassInk.slate) {
+            Text(SecretWords.header(count: model.items.count)).coreFont(size: MacTextSize.meta)
+                .foregroundStyle(palette.text2)
+            Spacer(minLength: Space.s3)
+            Button {
                 SecretDialogs.openGroup(admin, nil)
+            } label: {
+                Label("New group", systemImage: "folder")
             }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             .help("Keep related secrets together and give them to runners in one step")
-            AppActionTile(title: "New secret", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            .disabled(model.isOff)
+            Button {
                 SecretDialogs.openNew(admin)
+            } label: {
+                Label("New secret", systemImage: "plus")
             }
-            .keyboardShortcut("n", modifiers: .command)
+            .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+            .keyboardShortcut("n", modifiers: .command).environment(\.coreKeycap, "⌘N")
+            .help("Add a secret (⌘N)")
+            .disabled(model.isOff)
+        }
+    }
+
+    // MARK: the list
+
+    private func list(_ model: SecretsModel) -> some View {
+        let shown = model.items.filter { SecretWords.matches($0, query: query, runner: runner.isEmpty ? nil : runner) }
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            if model.mode == 1 {
+                CoreNotice(
+                    symbol: "testtube.2", title: "Test values only",
+                    text: "Anything that looks like a real key is refused."
+                ) {
+                    Button("Change…") { admin.host.shell.settings.selected = "switches" }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Keys and secrets in Feature switches")
+                }
+                .accessibilityIdentifier("secrets-mode")
+            }
+            AdminNoticeBanner(notice: admin.host.elevationNotice)
+            HStack(spacing: Space.s2) {
+                CoreTextField("", placeholder: "Search secrets", text: $query).frame(maxWidth: Space.s8 * 9)
+                CoreSelect(
+                    nil, selection: $runner,
+                    options: [CoreSelectOption("", "All runners")]
+                        + model.runners.map { CoreSelectOption($0.id, $0.name, symbol: "server.rack") }
+                )
+                .frame(width: Space.s8 * 5)
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                SecretColumns()
+                if shown.isEmpty {
+                    Text("No secret matches.").foregroundStyle(palette.text2).padding(Space.s3)
+                }
+                ForEach(
+                    SecretSections.sections(shown, groups: model.groups, narrowed: !query.isEmpty || !runner.isEmpty)
+                ) { section in
+                    sectionView(section, model)
+                }
+            }
+            SecretKeyHints().padding(.top, Space.s2)
+        }
+        .focusable().focused($focus).focusEffectDisabled()
+        .onKeyPress(phases: .down) { keys($0, model) }
+        .onChange(of: model.items.map(\.name), initial: true) { _, names in
+            if !names.contains(cursor ?? "") { cursor = names.first }
         }
     }
 
     private func sectionView(_ section: SecretSectionItem, _ model: SecretsModel) -> some View {
         let open = !closed.contains(section.id)
-        return VStack(alignment: .leading, spacing: Space.s2) {
-            Button {
-                withAnimation(.smooth(duration: 0.25)) {
-                    if open { closed.insert(section.id) } else { closed.remove(section.id) }
-                }
-            } label: {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: open ? "chevron.down" : "chevron.right").frame(width: 14)
-                    Image(systemName: section.symbol).foregroundStyle(GlassInk.blue)
-                    Text(section.title).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    Text("\(section.items.count)").foregroundStyle(GlassInk.secondary)
-                    if let g = section.group {
-                        Text(
-                            g.description.isEmpty ? SecretWords.usedBy(g.runners.map(model.runnerName)) : g.description
-                        )
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: Space.s2) {
+                Button {
+                    withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+                        if open { closed.insert(section.id) } else { closed.remove(section.id) }
                     }
-                    Spacer(minLength: 0)
+                } label: {
+                    HStack(spacing: Space.s2) {
+                        Image(systemName: "chevron.down").coreFont(size: MacTextSize.meta, weight: .semibold)
+                            .rotationEffect(.degrees(open ? 0 : -90)).foregroundStyle(palette.text2)
+                            .frame(width: Space.s4)
+                        Image(systemName: section.group == nil ? "lock" : "folder").foregroundStyle(palette.primary)
+                        Text(section.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                        CountBadge(section.items.count, tone: .quiet, showsZero: true, label: "secrets")
+                        if let g = section.group, !g.runners.isEmpty {
+                            Text("Runners: " + g.runners.map(model.runnerName).joined(separator: ", "))
+                                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+                        }
+                    }
+                    .frame(minHeight: MacSize.controlMd)
+                    .padding(.horizontal, Space.s1)
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
+                .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.99, hoverFill: true)).focusable(false)
+                .padding(.horizontal, -Space.s1)  // grid: ok the fill bleeds 4 pt; the chevron stays on the rows' edge
+                .accessibilityLabel("\(section.title), \(section.items.count) secrets")
+                .accessibilityValue(open ? "Expanded" : "Collapsed")
+                .help(section.group?.description ?? "")
+                Spacer(minLength: Space.s2)
+                if let g = section.group { GroupMenu(admin: admin, group: g) }
             }
-            .buttonStyle(.plain).focusable(false)
-            .accessibilityLabel("\(section.title), \(section.items.count) secrets")
-            .accessibilityValue(open ? "Expanded" : "Collapsed")
-            if let g = section.group { groupBar(g, model) }
+            .padding(.horizontal, Space.s3).frame(minHeight: Space.s8 + Space.s3)
             if open {
                 ForEach(section.items) { s in
                     SecretRow(admin: admin, model: model, secret: s, selected: cursor == s.name) {
@@ -108,32 +160,12 @@ struct SecretsSection: View {
                 }
             }
         }
-    }
-
-    /// A group's runners and its actions: edit, let a runner use all of it, delete.
-    private func groupBar(_ g: SecretGroupItem, _ model: SecretsModel) -> some View {
-        HStack(spacing: Space.s2) {
-            Label(
-                g.runners.isEmpty
-                    ? "No runner yet" : "Runners: " + g.runners.map(model.runnerName).joined(separator: ", "),
-                systemImage: "server.rack"
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            Spacer(minLength: 0)
-            AccGroupLink(title: "Edit", symbol: "pencil") { SecretDialogs.openGroup(admin, g) }
-            AccGroupLink(title: "Let a runner use all", symbol: "server.rack") {
-                SecretDialogs.openGroupLease(admin, g)
-            }
-            .disabled(g.members.isEmpty || g.runners.isEmpty)
-            AccGroupLink(title: "Delete", symbol: "trash", danger: true) { SecretDialogs.openDeleteGroup(admin, g) }
-        }
-        .padding(.leading, Space.s6)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("group-\(g.name)")
+        .accessibilityIdentifier(section.group.map { "group-\($0.name)" } ?? "group-none")
     }
 
     private func keys(_ press: KeyPress, _ model: SecretsModel) -> KeyPress.Result {
-        let list = model.items.filter { SecretWords.matches($0, query: query, runner: runner) }
+        let list = model.items.filter { SecretWords.matches($0, query: query, runner: runner.isEmpty ? nil : runner) }
         let at = list.firstIndex { $0.name == cursor } ?? 0
         guard list.indices.contains(at) else { return .ignored }
         let step: Int? =
@@ -144,7 +176,7 @@ struct SecretsSection: View {
             }
         if let step {
             let i = at + step
-            if list.indices.contains(i) { withAnimation(.smooth(duration: 0.25)) { cursor = list[i].name } }
+            if list.indices.contains(i) { cursor = list[i].name }
             return .handled
         }
         let s = list[at]
@@ -166,60 +198,67 @@ struct SecretsSection: View {
     }
 }
 
-/// Whether the Core keeps secrets at all, in words, with a tile to Feature switches.
-private struct ModePanel: View {
+/// The widths of the list's columns (mockup: name, 190 used by, 150 last used, 96 sealed size), on the 4 pt grid.
+enum SecretColumn {
+    static let tile: CGFloat = Space.s8 - Space.s1
+    static let used: CGFloat = Space.s8 * 6
+    static let last: CGFloat = Space.s8 * 5 - Space.s2
+    static let size: CGFloat = Space.s8 * 3
+}
+
+/// The quiet column names above the rows.
+private struct SecretColumns: View {
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            Text("Name").padding(.leading, SecretColumn.tile + Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+            Text("Used by").frame(width: SecretColumn.used, alignment: .leading)
+            Text("Last used").frame(width: SecretColumn.last, alignment: .leading)
+            Text("Sealed size").frame(width: SecretColumn.size, alignment: .trailing)
+        }
+        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+        .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A group's actions behind one "…" on its header: edit, let a runner use all of it, delete.
+private struct GroupMenu: View {
     let admin: AdminModel
-    let mode: Int
+    let group: SecretGroupItem
+    @State private var open = false
+    @State private var hovering = false
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
-        let hue = mode == 0 ? GlassInk.slate : GlassInk.blue
-        HStack(spacing: Space.s3) {
-            IconTile(mode == 0 ? "lock.fill" : "testtube.2", hue: hue, size: 44, bounce: mode)
-                .shadow(color: hue.opacity(0.45), radius: 12)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(mode == 0 ? "Secrets are off" : mode == 1 ? "Test values only" : "Real values")
-                    .coreFont(size: MacTextSize.headline, weight: .bold).foregroundStyle(GlassInk.ink(hue))
-                Text(
-                    mode == 0
-                        ? "Nothing can be added or lent until you turn on Test keys."
-                        : mode == 1
-                            ? "Anything that looks like a real key is refused, to keep you safe while testing."
-                            : "Your Core keeps real secrets."
-                )
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s3)
-            AppActionTile(title: "Change", symbol: "switch.2", key: "", hue: GlassInk.slate) {
-                admin.host.shell.settings.selected = "switches"
-            }
-            .help("Keys and secrets in Feature switches (secrets.mode = \(mode))")
+        CoreDropdown(
+            items: [
+                CoreDropdownItem("Edit group…", symbol: "pencil") { SecretDialogs.openGroup(admin, group) },
+                CoreDropdownItem(
+                    "Let a runner use all…", symbol: "server.rack",
+                    enabled: !group.members.isEmpty && !group.runners.isEmpty
+                ) { SecretDialogs.openGroupLease(admin, group) },
+                CoreDropdownItem("Delete group…", symbol: "trash", destructive: true) {
+                    SecretDialogs.openDeleteGroup(admin, group)
+                },
+            ], isPresented: $open
+        ) {
+            Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
+                .foregroundStyle(palette.text2)
+                .frame(width: MacSize.controlMd, height: MacSize.controlSm)
+                .coreWell(radius: Radius.chip, active: hovering || open)
+                .contentShape(coreShape(Radius.chip))
+                .onHover { hovering = $0 }
+                .animation(Motion.out(Motion.hover), value: hovering)
         }
-        .padding(Space.s3)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("secrets-mode")
+        .help("Actions for \(group.name)")
+        .accessibilityLabel("Actions for \(group.name)")
     }
 }
 
-/// How a runner receives a secret, in words.
-enum Delivery {
-    static let all = ["env", "file", "askpass"]
-    static func look(_ d: String) -> (title: String, line: String, symbol: String, hue: Color) {
-        let w = SecretWords.delivery(d)
-        let hue: Color =
-            switch d {
-            case "env": GlassInk.blue
-            case "file": GlassInk.blue
-            case "askpass": GlassInk.blue
-            default: GlassInk.slate
-            }
-        return (w.title, w.line, w.symbol, hue)
-    }
-}
-
-/// One secret as a row: its type icon, name and how an agent gets it, who uses it, when it changed, and its sealed size.
-/// Actions fade in on hover or with the cursor, and are in the context menu too.
+/// One secret as a flat row: its type tile, name and line, who uses it (or the loan and its time left), when it was last
+/// used and its sealed size. The selected row is lit and shows its three actions in place of the last two columns; the
+/// context menu has them too.
 private struct SecretRow: View {
     let admin: AdminModel
     let model: SecretsModel
@@ -227,66 +266,61 @@ private struct SecretRow: View {
     let selected: Bool
     let pick: () -> Void
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let kind = SecretWords.Kind(wire: secret.kind)
         let names = secret.runnersUsing.map(model.runnerName)
-        VStack(alignment: .leading, spacing: Space.s2) {
+        let shape = coreShape(Radius.row)
+        VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s3) {
-                IconTile(kind.symbol, hue: GlassInk.blue, size: 32)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(secret.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                IconTile(kind.symbol, hue: names.isEmpty ? GlassInk.slate : GlassInk.blue, size: SecretColumn.tile)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(secret.name).coreFont(size: MacTextSize.body, weight: .medium)
                         .lineLimit(1).truncationMode(.middle)
                     Text(SecretWords.line(secret)).coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                        .foregroundStyle(palette.text2).lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Used by").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    Text(SecretWords.usedBy(names)).lineLimit(1)
-                }
-                .frame(width: Space.s8 * 5, alignment: .leading)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(SecretWords.lastUsed(secret)).coreFont(size: MacTextSize.meta).foregroundStyle(
-                        GlassInk.secondary)
-                    Text(SecretWords.sealed(secret)).lineLimit(1).coreFont(size: MacTextSize.meta, weight: .medium)
-                        .padding(.horizontal, Space.s2).padding(.vertical, 1)
-                        .background(GlassInk.wellHover, in: coreShape(5))
-                }
-                .frame(width: Space.s8 * 5, alignment: .trailing)
-                HStack(spacing: Space.s1) {
-                    AppActionTile(title: "", symbol: "arrow.triangle.2.circlepath", key: "", hue: GlassInk.slate) {
-                        SecretDialogs.openReplace(admin, secret)
+                Group {
+                    if let lease = model.leases.first(where: { $0.secret == secret.name }) {
+                        LeaseCell(lease: lease, runner: model.runnerName(lease.runner))
+                    } else {
+                        Text(SecretWords.usedBy(names)).lineLimit(1).help(SecretWords.usedBy(names))
                     }
-                    .help("New value (E)").accessibilityLabel("Replace the value of \(secret.name)")
-                    AppActionTile(title: "", symbol: "server.rack", key: "", hue: GlassInk.blue) {
-                        SecretDialogs.openLease(admin, secret)
-                    }
-                    .help("Let a runner use it (L)").accessibilityLabel("Let a runner use \(secret.name)")
-                    AppActionTile(title: "", symbol: "trash", key: "", hue: GlassInk.red) {
-                        SecretDialogs.openDelete(admin, secret)
-                    }
-                    .help("Delete \(secret.name) (⌫)").accessibilityLabel("Delete \(secret.name)")
                 }
-                .opacity(selected || hovering ? 1 : 0)
+                .frame(width: SecretColumn.used, alignment: .leading)
+                HStack(spacing: Space.s3) {
+                    Text(SecretWords.lastUsedShort(secret)).frame(width: SecretColumn.last, alignment: .leading)
+                        .help(SecretWords.lastUsed(secret))
+                    Text(SecretWords.size(secret.size)).coreFont(size: MacTextSize.meta).monospacedDigit()
+                        .foregroundStyle(palette.text2).frame(width: SecretColumn.size, alignment: .trailing)
+                }
+                .opacity(selected ? 0 : 1)
             }
-            if let lease = model.leases.first(where: { $0.secret == secret.name }) { LeaseLine(lease: lease) }
-            if let e = model.rowError[secret.name] { IssueLine(code: nil, text: e) }
+            // The worded actions float over the row's trailing end (secrets.html `.acts`), so they never widen the row
+            // and push Used by out of its column.
+            .overlay(alignment: .trailing) {
+                if selected {
+                    actions.padding(Space.s1)
+                        .background(palette.panelStrong, in: coreShape(Radius.chip + Space.s1))
+                        .overlay { coreShape(Radius.chip + Space.s1).strokeBorder(palette.edge, lineWidth: 1) }
+                        .transition(.opacity)
+                }
+            }
+            if let e = model.rowError[secret.name] {
+                IssueLine(code: nil, text: e).padding(.leading, SecretColumn.tile + Space.s3)
+            }
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-        .background(
-            selected ? GlassInk.blue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
-            in: coreShape(Radius.cardMac)
-        )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                selected ? GlassInk.blue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-        }
-        .contentShape(coreShape(Radius.cardMac))
+        .frame(minHeight: Space.s8 + Space.s4)
+        .background(selected ? palette.uDimHover : hovering ? palette.rowHover : .clear, in: shape)
+        .overlay { if selected { shape.strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
+        .contentShape(shape)
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.2), value: hovering)
-        .animation(.smooth(duration: 0.3), value: selected)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.hover), value: selected)
         .help("Key \(secret.keyID) · stored by \(secret.owner)")
         .contextMenu {
             Button("Let a runner use it…") { SecretDialogs.openLease(admin, secret) }
@@ -301,41 +335,67 @@ private struct SecretRow: View {
         .accessibilityIdentifier("secret-\(secret.name)")
         .coreActivates(pick)
     }
+
+    /// The selected row's actions, worded, each with its key.
+    private var actions: some View {
+        HStack(spacing: Space.s1) {
+            Button {
+                SecretDialogs.openLease(admin, secret)
+            } label: {
+                Label("Let a runner use it", systemImage: "server.rack")
+            }
+            .environment(\.coreKeycap, "↩").help("Let a runner use \(secret.name) for a short time (↩)")
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            Button("New value") { SecretDialogs.openReplace(admin, secret) }
+                .environment(\.coreKeycap, "E").help("Replace the value of \(secret.name) (E)")
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            Button("Delete") { SecretDialogs.openDelete(admin, secret) }
+                .environment(\.coreKeycap, "⌫").help("Delete \(secret.name) (⌫)")
+                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
+        }
+        .fixedSize()
+    }
 }
 
-/// A loan from this Mac: to which runner, and the time left as a shrinking bar and a countdown.
-private struct LeaseLine: View {
+/// A loan from this Mac in the Used by column: to which runner and the time left, in words and as a meter.
+private struct LeaseCell: View {
     let lease: LeaseItem
+    let runner: String
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let total = max(lease.expiresAt.timeIntervalSince(lease.grantedAt), 1)
             let left = max(lease.expiresAt.timeIntervalSince(ctx.date), 0)
-            let hue = left > 0 ? GlassInk.green : GlassInk.slate
+            let words = SecretWords.lent(to: runner, secondsLeft: Int(left.rounded(.up)))
             VStack(alignment: .leading, spacing: Space.s1) {
-                HStack {
-                    Label("Allowed on \(lease.runner)", systemImage: "arrow.up.forward.circle.fill")
-                        .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
-                    Spacer()
-                    Text(left > 0 ? Countdown.text(Int(left.rounded(.up))) : "Returned")
-                        .coreFont(size: MacTextSize.body, weight: .bold, design: .rounded).monospacedDigit()
-                        .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
-                }
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3).fill(hue).frame(width: g.size.width * left / total)
-                            .shadow(color: hue.opacity(0.6), radius: 5)
-                    }
-                }
-                .frame(height: 5)
-                .animation(.linear(duration: 1), value: left)
+                Text(words).lineLimit(1).monospacedDigit().contentTransition(.numericText(countsDown: true))
+                CoreMeter(left / total, low: left > 0 && left < 60, label: words)
             }
-            .padding(Space.s2)
-            .background(hue.opacity(0.1), in: coreShape(Radius.control))
             .help(lease.lease)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(
-                "Allowed on \(lease.runner), \(left > 0 ? "\(Int(left.rounded(.up))) seconds left" : "returned")")
+        }
+    }
+}
+
+/// The keys of the list, at its foot.
+private struct SecretKeyHints: View {
+    @Environment(\.corePalette) private var palette
+    var body: some View {
+        HStack(spacing: Space.s4) {
+            hint(["↑", "↓"], "move")
+            hint(["↩"], "let a runner use it")
+            hint(["E"], "new value")
+            hint(["⌫"], "delete")
+            hint(["⌘N"], "new secret")
+        }
+        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+        .padding(.horizontal, Space.s3)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func hint(_ keys: [String], _ what: String) -> some View {
+        HStack(spacing: Space.s1) {
+            ForEach(keys, id: \.self) { CoreKeycap($0) }
+            Text(what)
         }
     }
 }
@@ -344,19 +404,7 @@ extension SecretsModel {
     func runnerName(_ id: String) -> String { runners.first { $0.id == id }?.name ?? id }
 }
 
-/// A small text action in a group's bar.
-private struct AccGroupLink: View {
-    let title: String
-    let symbol: String
-    var danger = false
-    let action: () -> Void
-    @Environment(\.isEnabled) private var enabled
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .medium)
-        }
-        .buttonStyle(.plain).focusable(false)
-        .foregroundStyle(danger ? GlassInk.redInk : GlassInk.blue).opacity(enabled ? 1 : 0.4)
-    }
+/// How a runner receives a secret.
+enum Delivery {
+    static let all = ["env", "file", "askpass"]
 }

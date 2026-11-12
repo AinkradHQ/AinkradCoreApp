@@ -73,7 +73,9 @@ final class FakeService: CoreService, @unchecked Sendable {
         d.name = name
         return d
     }
+    var scopesError: (any Error)?
     func setScopes(_ id: String, _ scopes: [String]) async throws -> DeviceInfo {
+        if let scopesError { throw scopesError }
         var d = deviceList.first { $0.id == id }!
         d.scopes = scopes
         return d

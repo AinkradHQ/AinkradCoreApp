@@ -313,7 +313,7 @@ public struct NewRoomDraft: Sendable, Hashable {
 }
 
 public enum BrainTab: String, Sendable, CaseIterable, Hashable {
-    case overview, rooms, inbox, activity, checks
+    case overview, rooms, sources, inbox, activity, checks
     var title: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
 }
 

@@ -41,7 +41,7 @@ struct AgentsListView: View {
                 keyHints
             }
         }
-        .foregroundStyle(GlassInk.primary)
+        .foregroundStyle(palette.text)
         .paneLook(AgentPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
@@ -55,27 +55,19 @@ struct AgentsListView: View {
 
     private func header(_ index: SessionIndex) -> some View {
         let active = index.counts[.active] ?? 0
-        let waiting = model.waitingOnYou
         return HStack(spacing: Space.s3) {
-            Text("AI Sessions").coreFont(size: MacTextSize.large, weight: .bold)
-            Text("\(model.sessions.items.count)").coreFont(size: MacTextSize.meta, weight: .semibold)
-                .padding(.horizontal, 7).frame(height: 20).background(GlassInk.well, in: coreShape(5))
-                .foregroundStyle(GlassInk.secondary)
+            Text("AI Sessions").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
+            CountBadge(model.sessions.items.count, tone: .quiet, label: "AI sessions")
             Text(
                 [
                     "\(active) active", AgentWords.cost(model.sessions.totalCostMicros).map { "\($0) in total" },
                 ].compactMap { $0 }.joined(separator: " · ")
             )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
-            AppActionTile(
-                title: waiting > 0 ? "Approvals \(waiting)" : "Approvals", symbol: "lock.shield", key: "",
-                hue: waiting > 0 ? GlassInk.blue : GlassInk.slate, pulse: waiting > 0
-            ) { model.openInbox() }
-            .accessibilityLabel(waiting > 0 ? "Approvals, \(waiting) waiting" : "Approvals")
-            AppActionTile(title: "New AI session", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
-                model.openNewSession()
-            }
+            Button(action: { model.openNewSession() }) { Label("New AI session", systemImage: "plus") }
+                .buttonStyle(.coreProminent).environment(\.coreKeycap, "⌘N")
+                .help("Open a new AI session with the defaults (⌘N)")
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
     }
@@ -83,7 +75,7 @@ struct AgentsListView: View {
     private func filterBar(_ index: SessionIndex, compact: Bool) -> some View {
         HStack(spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary)
+                Image(systemName: "magnifyingglass").foregroundStyle(palette.text2).accessibilityHidden(true)
                 TextField("Search title, first message, folder or project", text: $model.filters.search)
                     .textFieldStyle(.plain).focused($searchFocus)
                     .onKeyPress(.escape) {
@@ -98,37 +90,25 @@ struct AgentsListView: View {
                         return .handled
                     }
                     .accessibilityLabel("Search AI sessions")
-                Text("⌘F").coreFont(size: 10, weight: .medium).padding(.horizontal, 5)
-                    .background(GlassInk.lift(0.14), in: coreShape(4)).foregroundStyle(GlassInk.secondary)
+                Text("⌘F").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).accessibilityHidden(true)
             }
-            .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3).frame(height: 34)
-            .background(GlassInk.well, in: coreShape(Radius.control))
-            .overlay {
-                coreShape(Radius.control).strokeBorder(searchFocus ? GlassInk.blue : GlassInk.wellEdge, lineWidth: 1)
-            }
+            .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
+            .coreFieldSurface(focused: searchFocus)
             if compact { scopeMenu }
             filter(
-                "Tool", model.filters.tool.map(AgentWords.toolName), all: "Any tool",
-                items: ["claude", "codex", "opencode", "agy"].map { t in
-                    (AgentWords.toolName(t), model.filters.tool == t, { model.filters.tool = t })
-                }, clear: { model.filters.tool = nil })
+                $model.filters.tool, all: "Any tool",
+                NewSessionSheet.tools.map { CoreSelectOption(Optional($0), AgentWords.toolName($0)) })
             if !compact {
                 filter(
-                    "Runner", model.filters.runner.map { model.runnerName($0) }, all: "Any runner",
-                    items: index.runners.map { r in
-                        (model.runnerName(r.id), model.filters.runner == r.id, { model.filters.runner = r.id })
-                    }, clear: { model.filters.runner = nil })
+                    $model.filters.runner, all: "Any runner",
+                    index.runners.map { CoreSelectOption(Optional($0.id), model.runnerName($0.id)) })
                 filter(
-                    "Project", model.filters.project, all: "Any project",
-                    items: index.projects.map { p in
-                        (p.name, model.filters.project == p.name, { model.filters.project = p.name })
-                    }, clear: { model.filters.project = nil })
+                    $model.filters.project, all: "Any project",
+                    index.projects.map { CoreSelectOption(Optional($0.name), $0.name) })
             }
             filter(
-                "State", model.filters.state.map(Self.facetWords), all: "Any state",
-                items: SessionFilters.Facet.allCases.map { f in
-                    (Self.facetWords(f), model.filters.state == f, { model.filters.state = f })
-                }, clear: { model.filters.state = nil })
+                $model.filters.state, all: "Any state",
+                SessionFilters.Facet.allCases.map { CoreSelectOption(Optional($0), Self.facetWords($0)) })
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
     }
@@ -142,54 +122,28 @@ struct AgentsListView: View {
         }
     }
 
-    private func filter(
-        _ name: String, _ value: String?, all: String, items: [(String, Bool, @MainActor @Sendable () -> Void)],
-        clear: @escaping @MainActor @Sendable () -> Void
-    ) -> some View {
-        CoreDropdown(
-            items: [CoreDropdownItem(all, checked: value == nil, run: clear)]
-                + items.map { i in CoreDropdownItem(i.0, checked: i.1, run: i.2) }
-        ) {
-            HStack(spacing: 5) {
-                Text("\(name):").foregroundStyle(GlassInk.secondary)
-                Text(value ?? all).fontWeight(.semibold).lineLimit(1)
-                Image(systemName: "chevron.down").coreFont(size: 9, weight: .semibold).foregroundStyle(
-                    GlassInk.secondary)
-            }
-            .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3).frame(height: 34)
-            .background(GlassInk.well, in: coreShape(Radius.control))
-            .overlay {
-                coreShape(Radius.control).strokeBorder(
-                    value == nil ? GlassInk.wellEdge : GlassInk.blue.opacity(0.7), lineWidth: 1)
-            }
-        }
-        .accessibilityLabel("\(name) filter, \(value ?? all)")
+    /// One filter: a quiet chevron select (CoreSelect) whose first choice clears it.
+    private func filter<V: Hashable>(_ value: Binding<V?>, all: String, _ options: [CoreSelectOption<V?>]) -> some View
+    {
+        CoreSelect(nil, selection: value, options: [CoreSelectOption(nil, all)] + options)
+            .frame(width: Space.s8 * 5)
     }
 
-    /// Narrow panes drop the sidebar: its entries become one menu.
+    /// Narrow panes drop the sidebar: its entries become one select.
     private var scopeMenu: some View {
         let all: [(String, SessionScope)] = [
             ("Active", .active), ("Needs you", .needsYou), ("Running", .running), ("Waiting for you", .waiting),
             ("Pinned", .pinned), ("Today", .today), ("Yesterday", .yesterday), ("This week", .thisWeek),
             ("Earlier", .earlier), ("Archive", .archive),
         ]
-        return CoreDropdown(
-            items: all.map { a in CoreDropdownItem(a.0, checked: model.scope == a.1) { model.scope = a.1 } }
-        ) {
-            HStack(spacing: 5) {
-                Text(all.first { $0.1 == model.scope }?.0 ?? "Group").fontWeight(.semibold)
-                Image(systemName: "chevron.down").coreFont(size: 9, weight: .semibold).foregroundStyle(
-                    GlassInk.secondary)
-            }
-            .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3).frame(height: 34)
-            .background(GlassInk.well, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        }
+        return CoreSelect(nil, selection: $model.scope, options: all.map { CoreSelectOption($0.1, $0.0) })
+            .frame(width: Space.s8 * 5)
     }
 
     private var keyHints: some View {
-        Text("\(coreArrowKeys()) move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive")
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail)
+        // A vertical list: up and down, which never flip on a right-to-left line.
+        Text("↑ ↓ move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive")
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s2)
     }
 
@@ -235,14 +189,15 @@ struct AgentsListView: View {
 
     private func columnHeads(compact: Bool) -> some View {
         HStack(spacing: Space.s3) {
-            Text("Title and project").frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 22 + Space.s3)
+            Text("Title and project").frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, MacSize.controlSm + Space.s3)
             if !compact { Text("Runner").frame(width: SessionColumns.runner, alignment: .leading) }
             Text("State").frame(width: SessionColumns.state, alignment: .leading)
             if !compact { Text("Last activity").frame(width: SessionColumns.activity, alignment: .leading) }
             Text("Cost").frame(width: SessionColumns.cost, alignment: .trailing)
         }
-        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3)
-        .frame(height: 24)
+        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).padding(.horizontal, Space.s3)
+        .frame(height: Space.s6)
     }
 
     /// Keyboard: the list holds focus, ↑↓ move the cursor, ↩ opens, P pins, E ends, A archives.

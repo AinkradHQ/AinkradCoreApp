@@ -5,6 +5,7 @@ import SwiftUI
 struct SessionSidebar: View {
     @Bindable var model: AgentsModel
     let index: SessionIndex
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         ScrollView {
@@ -41,33 +42,42 @@ struct SessionSidebar: View {
     }
 
     private func heading(_ t: String) -> some View {
-        Text(t).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
+        Text(t).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
             .padding(.horizontal, Space.s3).padding(.top, Space.s3).padding(.bottom, Space.s1)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func item(_ title: String, _ scope: SessionScope, hot: Bool = false, count: Int? = nil) -> some View {
         let n = count ?? index.counts[scope] ?? 0
-        let on = model.scope == scope
-        return Button {
-            model.scope = scope
-        } label: {
+        return SidebarItem(title: title, count: n, hot: hot, on: model.scope == scope) { model.scope = scope }
+    }
+}
+
+/// One sidebar entry: the name and its count; hover lightens it, the chosen one is a lifted well with an edge.
+private struct SidebarItem: View {
+    let title: String
+    let count: Int
+    let hot: Bool
+    let on: Bool
+    let pick: () -> Void
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        Button(action: pick) {
             HStack(spacing: Space.s2) {
                 Text(title).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: Space.s2)
-                Text("\(n)").coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
-                    .padding(.horizontal, 6).frame(minWidth: 22, minHeight: 18)
-                    .background(hot && n > 0 ? GlassInk.amber : GlassInk.well, in: coreShape(5))
-                    .foregroundStyle(hot && n > 0 ? .black.opacity(0.8) : GlassInk.secondary)
+                CountBadge(count, tone: hot && count > 0 ? .needsYou : .quiet, showsZero: true)
             }
             .coreFont(size: MacTextSize.body)
-            .padding(.horizontal, Space.s3).frame(height: 30)
-            .background(on ? GlassInk.wellHover : .clear, in: coreShape(Radius.control))
-            .overlay { if on { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) } }
+            .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
-        .accessibilityLabel("\(title), \(n)")
+        .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
+        .clipShape(coreShape(Radius.control))
+        .background { if on { Color.clear.coreWell(radius: Radius.control, active: true) } }
+        .foregroundStyle(on ? palette.text : palette.text2)
+        .accessibilityLabel("\(title), \(count)")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
@@ -94,19 +104,24 @@ struct SessionRow: View {
     let onPin: () -> Void
     let onEnd: () -> Void
     @State private var hover = false
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let st = AgentWords.status(session, waiting: waiting)
         let hue = SessionTile.hue(session.harness)
         HStack(spacing: Space.s3) {
-            Image(systemName: AgentsModel.harnessSymbol(session.harness)).coreFont(size: 11, weight: .semibold)
-                .foregroundStyle(.white).frame(width: 22, height: 22)
-                .background(hue, in: coreShape(6)).accessibilityHidden(true)
+            Image(systemName: AgentsModel.harnessSymbol(session.harness))
+                .coreFont(size: MacTextSize.meta, weight: .semibold)
+                .foregroundStyle(palette.btnInk).frame(width: MacSize.controlSm, height: MacSize.controlSm)
+                .background(hue, in: coreShape(Radius.chip)).accessibilityHidden(true)
             HStack(spacing: Space.s2) {
-                if pinned { Image(systemName: "pin.fill").coreFont(size: 10).foregroundStyle(GlassInk.secondary) }
+                if pinned {
+                    Image(systemName: "pin.fill").coreFont(size: MacTextSize.floor).foregroundStyle(palette.text2)
+                }
                 Text(title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1).truncationMode(.tail)
+                    .help(title)
                 if let p = session.project {
-                    Text(p).foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+                    Text(p).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,23 +133,28 @@ struct SessionRow: View {
                 .transition(.opacity)
             }
             if !compact {
-                Text(runner).foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail)
+                Text(runner).lineLimit(1).truncationMode(.tail)
                     .frame(width: SessionColumns.runner, alignment: .leading)
             }
-            StateMark(label: st.label, session: session, waiting: waiting).frame(
+            StateBadge(st.label, tone: st.tone, symbol: st.symbol).frame(
                 width: SessionColumns.state, alignment: .leading)
             if !compact {
-                Text(AgentWords.ago(session.updatedAt, now: now)).foregroundStyle(GlassInk.secondary)
+                Text(AgentWords.ago(session.updatedAt, now: now))
                     .frame(width: SessionColumns.activity, alignment: .leading)
             }
-            Text(AgentWords.cost(session.usage?.costMicros) ?? "").monospacedDigit().foregroundStyle(GlassInk.secondary)
+            Text(AgentWords.cost(session.usage?.costMicros) ?? "").monospacedDigit()
                 .frame(width: SessionColumns.cost, alignment: .trailing)
                 .help(AgentWords.exactCost(session.usage?.costMicros) ?? "")
         }
         .coreFont(size: MacTextSize.body)
-        .padding(.horizontal, Space.s3).frame(height: 36)
-        .background(selected ? GlassInk.wellHover : hover ? GlassInk.well : .clear, in: coreShape(Radius.control))
-        .overlay { if selected { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) } }
+        .padding(.horizontal, Space.s3).frame(height: Space.s8 + Space.s1)
+        .background {
+            if selected {
+                Color.clear.coreWell(radius: Radius.control, active: true)
+            } else if hover {
+                coreShape(Radius.control).fill(palette.uDim)
+            }
+        }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
         .animation(Motion.out(Motion.hover), value: hover)
@@ -143,39 +163,8 @@ struct SessionRow: View {
     }
 
     private func mini(_ t: String, _ key: String, _ run: @escaping () -> Void) -> some View {
-        Button(action: run) {
-            HStack(spacing: 4) {
-                Text(t)
-                Text(key).coreFont(size: 9, weight: .medium).padding(.horizontal, 4)
-                    .background(GlassInk.lift(0.16), in: coreShape(3))
-            }
-            .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s2).frame(height: 22)
-            .background(GlassInk.well, in: coreShape(5))
-            .overlay { coreShape(5).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// The state as a small rounded square and a word: orange Needs you, blue Running, green Waiting for you, quiet when ended.
-struct StateMark: View {
-    let label: String
-    let session: AgentSessionInfo
-    let waiting: Bool
-
-    var body: some View {
-        let hue: Color =
-            waiting
-            ? GlassInk.amber
-            : session.idle
-                ? GlassInk.green : session.live ? GlassInk.blue : session.state == .lost ? GlassInk.red : GlassInk.slate
-        HStack(spacing: 6) {
-            coreShape(2).fill(hue).frame(width: 7, height: 7)
-            Text(label).lineLimit(1)
-        }
-        .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.ink(hue))
-        .padding(.horizontal, Space.s2).frame(height: 22)
-        .background(hue.opacity(0.18), in: coreShape(5))
+        Button(t, action: run).buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, key)
+            .help("\(t) (\(key))")
     }
 }
 
@@ -184,26 +173,27 @@ struct SectionHeader: View {
     let group: SessionGroup
     let collapsed: Bool
     let toggle: () -> Void
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: Space.s2) {
-                Image(systemName: "chevron.down").coreFont(size: 9, weight: .semibold).rotationEffect(
-                    .degrees(collapsed ? -90 : 0)
-                )
-                .frame(width: 12)
+                Image(systemName: "chevron.down").coreFont(size: MacTextSize.floor, weight: .semibold)
+                    .rotationEffect(.degrees(collapsed ? -90 : 0))
+                    .frame(width: Space.s3)
                 Text(group.section.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                    .foregroundStyle(group.section == .needsYou ? GlassInk.amberInk : GlassInk.primary)
-                Text("\(group.rows.count)").coreFont(size: MacTextSize.meta).padding(.horizontal, 6)
-                    .background(GlassInk.well, in: coreShape(4)).foregroundStyle(GlassInk.secondary)
+                    .foregroundStyle(group.section == .needsYou ? GlassInk.amberInk : palette.text)
+                CountBadge(group.rows.count, tone: .quiet)
                 Spacer()
                 if let c = AgentWords.cost(group.costMicros), group.costMicros > 0 {
-                    Text("\(c) in total").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    Text("\(c) in total").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
             }
-            .padding(.horizontal, Space.s3).frame(height: 32).contentShape(Rectangle())
+            .foregroundStyle(palette.text2)
+            .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg).contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
+        .clipShape(coreShape(Radius.control))
         .accessibilityLabel("\(group.section.title), \(group.rows.count)")
         .accessibilityValue(collapsed ? "collapsed" : "expanded")
     }

@@ -7,6 +7,7 @@ struct ApprovalEntryCard: View {
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -26,66 +27,58 @@ struct ApprovalEntryCard: View {
         var waiting = false
         if case .waiting = state { waiting = true }
         let busy = model.deciding.contains(request.id)
-        return HStack {
-            VStack(alignment: .leading, spacing: Space.s2) {
+        return VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                Image(systemName: ask.symbol).foregroundStyle(waiting ? GlassInk.amberInk : palette.text2)
+                    .accessibilityHidden(true)
+                Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
+                Spacer(minLength: Space.s2)
+                chip(state)
+            }
+            if !request.input.isEmpty {
+                Text(PathWords.short(request.input)).coreFont(size: MacTextSize.meta, design: .monospaced)
+                    .lineLimit(1)
+                    .truncationMode(.tail).textSelection(.enabled)
+                    .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
+                    .help(request.input).agentCopyMenu(request.input)
+            }
+            if waiting {
+                if let n = model.approvalNotices[request.id] { NoticeBanner(notice: n) }
                 HStack(spacing: Space.s2) {
-                    Image(systemName: ask.symbol).foregroundStyle(waiting ? GlassInk.amber : GlassInk.secondary)
-                        .accessibilityHidden(true)
-                    Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
-                    Spacer(minLength: Space.s2)
-                    chip(state)
-                }
-                if !request.input.isEmpty {
-                    Text(PathWords.short(request.input)).coreFont(size: 12, design: .monospaced).lineLimit(1)
-                        .truncationMode(.tail).textSelection(.enabled)
-                        .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 + 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
-                        .help(request.input).agentCopyMenu(request.input)
-                }
-                if waiting {
-                    if let n = model.approvalNotices[request.id] { NoticeBanner(notice: n) }
-                    HStack(spacing: Space.s2) {
-                        button(approve: true, busy: busy)
-                        button(approve: false, busy: busy)
-                        if busy {
-                            Text("Waiting for your Core…").coreFont(size: MacTextSize.meta)
-                                .foregroundStyle(GlassInk.secondary)
-                        }
-                        Spacer(minLength: 0)
-                        if case .waiting(let left?) = state {
-                            Text("Asks again in \(AgentWords.clock(left))").coreFont(size: MacTextSize.meta)
-                                .foregroundStyle(GlassInk.secondary).monospacedDigit()
-                                .contentTransition(.numericText(countsDown: true))
-                        }
+                    button(approve: true, busy: busy)
+                    button(approve: false, busy: busy)
+                    if busy {
+                        Text("Waiting for your Core…").coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(palette.text2)
+                    }
+                    Spacer(minLength: 0)
+                    if case .waiting(let left?) = state {
+                        Text("Asks again in \(AgentWords.clock(left))").coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(palette.text2).monospacedDigit()
+                            .contentTransition(.numericText(countsDown: true))
                     }
                 }
             }
-            .padding(Space.s3)
-            .frame(maxWidth: 560, alignment: .leading)
-            .background(waiting ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    waiting ? GlassInk.amber.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
-            }
-            Spacer(minLength: Space.s8)
         }
-        .animation(reduce ? nil : .smooth(duration: 0.3), value: state)
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // The one amber state: an approval that needs you. Decided, it is a plain well like the tool rows.
+        .background(waiting ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                waiting ? GlassInk.amber.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
+        }
+        .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 
     @ViewBuilder private func chip(_ state: ApprovalCardState) -> some View {
         if let text = state.result {
             let ok = { if case .allowed = state { return true } else { return false } }()
-            Label(text, systemImage: ok ? "checkmark" : "xmark")
-                .coreFont(size: MacTextSize.meta, weight: .semibold)
-                .foregroundStyle(GlassInk.ink(ok ? GlassInk.green : GlassInk.red))
-                .padding(.horizontal, Space.s2).frame(height: 20)
-                .background((ok ? GlassInk.green : GlassInk.red).opacity(0.15), in: coreShape(5))
+            StateBadge(text, tone: ok ? .run : .fail, symbol: ok ? "checkmark" : "xmark")
         } else {
-            Label("Waiting for you", systemImage: "hand.raised")
-                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
-                .padding(.horizontal, Space.s2).frame(height: 20)
-                .background(GlassInk.amber.opacity(0.15), in: coreShape(5))
+            StateBadge("Needs you", tone: .warn, symbol: "hand.raised")
         }
     }
 
@@ -93,11 +86,15 @@ struct ApprovalEntryCard: View {
         let first = model.cards(for: request.session).first?.id == request.id
         let live =
             first && model.shell.activePane == AgentsModel.paneID(request.session) && !model.shell.coverOpen
-        let tile = AppActionTile(
-            title: approve ? (elevated ? "Allow" : "Allow with Touch ID") : "Deny",
-            symbol: approve ? (elevated ? "checkmark" : "touchid") : "xmark", key: approve ? "⌘↩" : "⌘⌫",
-            hue: approve ? GlassInk.blue : GlassInk.slate, prominent: approve
-        ) { Task { await model.decide(request, approved: approve) } }
+        let tile = Button(action: { Task { await model.decide(request, approved: approve) } }) {
+            if approve {
+                Label(elevated ? "Allow" : "Allow with Touch ID", systemImage: elevated ? "checkmark" : "touchid")
+            } else {
+                Text("Deny")
+            }
+        }
+        .buttonStyle(CoreButtonStyle(approve ? .prominent : .secondary, size: .small))
+        .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
         .disabled(busy)
         .help(
             approve

@@ -185,7 +185,9 @@ struct AdminScreen<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s5) {
-            Text(intro).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            if !intro.isEmpty {
+                Text(intro).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            }
             if !admin.isConnected {
                 StateCard(
                     symbol: "wifi.slash", title: "Not connected",

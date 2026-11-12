@@ -209,3 +209,30 @@ struct PlainWordsTests {
         #expect(m.visibleNeeds.allSatisfy { n in n.room.map { m.room($0)?.mounted ?? false } ?? true })
     }
 }
+
+@MainActor
+struct SampleImportTests {
+    @Test func theSampleImportReachesReviewAndCommitsWithoutReadingThisMac() async throws {
+        var s = SampleBrainService.Scenario()
+        s.imports = true
+        let routes = try #require(SampleBrainService(s).importRoutes)
+        #expect(SampleBrainService().importRoutes == nil)
+        let m = ImportModel(
+            host: FakeHost(), routes: routes, sources: SampleImportSource.all, poll: .milliseconds(1), pause: { _ in })
+        await m.scan()
+        #expect(m.chosen.map(\.id) == ["claude_code", "codex", "opencode"])
+        m.start()
+        for _ in 0..<500 where m.step != .review { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(m.step == .review && m.review.visible.last?.isUnsorted == true)
+        await m.review.accept("ainkrad")
+        await m.commit()
+        #expect(m.step == .done && m.result?.rooms.map(\.room) == ["ainkrad"])
+    }
+
+    @Test func sampleRulesNameRoomsAndLatestIsNewestFirst() async throws {
+        let svc = SampleBrainService()
+        #expect(try await svc.rules().contains { $0.room == "ainkrad" })
+        let days = try await svc.latest(room: "ainkrad").map(\.startedAt)
+        #expect(!days.isEmpty && days == days.sorted(by: >))
+    }
+}

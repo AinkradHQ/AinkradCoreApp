@@ -46,7 +46,7 @@ enum AddKind: CaseIterable, Equatable, Sendable {
 }
 
 enum AddStep: Int, Equatable, Sendable {
-    case what, install, access, connect, settings, done
+    case what, install, connect, access, settings, done
 
     var title: String {
         switch self {
@@ -116,12 +116,13 @@ enum AddWizardPlan {
     static let macReleases = URL(string: "https://github.com/AinkradHQ/AinkradCoreApp/releases/latest")!
     static let runnerReleases = URL(string: "https://github.com/AinkradHQ/AinkradCore/releases/latest")!
 
-    /// The screens a kind goes through. A device is told what it may do before its QR exists, because the Core fixes the
-    /// scopes when it makes the invite; a runner has no choice of scopes (it holds only `runner`) and has its settings.
+    /// The screens a kind goes through, in n17's order: What, Install, Connect, then Access (a device) or Settings (a
+    /// runner), then Done. A device connects with the standard access for its kind and is narrowed or widened on the
+    /// Access step; a runner has no choice of scopes (it holds only `runner`) and has its settings.
     static func steps(_ kind: AddKind) -> [AddStep] {
         switch kind {
         case .phone: [.what, .install]
-        case .mac: [.what, .install, .access, .connect, .done]
+        case .mac: [.what, .install, .connect, .access, .done]
         case .linuxRunner, .macRunner: [.what, .install, .connect, .settings, .done]
         }
     }
@@ -135,6 +136,9 @@ enum AddWizardPlan {
         let all = steps(kind)
         return all.firstIndex(of: step).flatMap { $0 > 0 ? all[$0 - 1] : nil }
     }
+
+    /// Whether the Access step has to change what a connected device holds.
+    static func needsChange(holds: [String], chosen: [String]) -> Bool { !chosen.isEmpty && Set(holds) != Set(chosen) }
 
     /// What a Mac that holds `mine` can hand on of `wanted`, and what it cannot (the Core refuses a wider pairing).
     static func narrowed(_ wanted: [String], mine: [String]) -> (granted: [String], dropped: [String]) {

@@ -1,21 +1,33 @@
 import CoreUI
 import SwiftUI
 
-/// A small rounded status chip: sentence case, a solid tint, never a pill or a glow.
+/// A small tag on the CoreUI state tones (no hand-mixed tint): blue informs, green and red are real status, amber is
+/// "needs you", slate is quiet. Same height, radius and type as `StateBadge`, without the symbol a tag does not need.
 struct BrainChip: View {
     let text: String
     let hue: Color
     var help: String?
+    @Environment(\.corePalette) private var palette
     init(_ text: String, _ hue: Color, help: String? = nil) {
         self.text = text
         self.hue = hue
         self.help = help
     }
+    private var tone: Tone {
+        hue == GlassInk.green
+            ? .run
+            : hue == GlassInk.red
+                ? .fail
+                : hue == GlassInk.amber
+                    ? .warn
+                    : hue == GlassInk.blue ? .done : .queue
+    }
     var body: some View {
+        let c = palette.tone(tone)
         Text(text).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1)
-            .foregroundStyle(GlassInk.primary)
-            .padding(.horizontal, Space.s2).frame(height: MacSize.chip)
-            .background(hue.opacity(0.28), in: coreShape(Radius.chip))
+            .foregroundStyle(c.ink)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .background(c.fill, in: coreShape(Radius.chip))
             // A tag keeps its whole word: its neighbours shrink first (same rule as StateBadge and CoreChip).
             .fixedSize().layoutPriority(2)
             .help(help ?? text)
@@ -65,24 +77,14 @@ struct BrainCard<Content: View>: View {
     }
 }
 
-/// A bar that fills to a fraction. Instant under Reduce Motion; the value is always printed beside it.
+/// A bar that fills to a fraction: the CoreUI meter, amber when the hue says it is running out.
 struct BrainBar: View {
     let fraction: Double
     var hue: Color = GlassInk.blue
     var height: CGFloat = 6
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var shown = false
     var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                coreShape(height / 2).fill(GlassInk.well)
-                coreShape(height / 2).fill(hue)
-                    .frame(width: g.size.width * min(max(fraction, 0), 1) * (shown || reduce ? 1 : 0))
-            }
-        }
-        .frame(height: height)
-        .onAppear { withAnimation(Motion.calm(Motion.out(Motion.reveal), reduce)) { shown = true } }
-        .accessibilityHidden(true)
+        CoreMeter(fraction, low: hue == GlassInk.amber || hue == GlassInk.red, height: height, label: "")
+            .accessibilityHidden(true)
     }
 }
 
@@ -159,5 +161,18 @@ struct BrainConditions: View {
                 }
             }
         }
+    }
+}
+
+/// The quiet well a Brain list row shows under the pointer (source, rule and search-hit rows, as in the mockups).
+/// A colour change only, so it needs no Reduce Motion path.
+struct BrainRowHover: ViewModifier {
+    var enabled = true
+    @State private var hovering = false
+    func body(content: Content) -> some View {
+        content
+            .background(hovering && enabled ? GlassInk.well : .clear, in: coreShape(Radius.control))
+            .onHover { hovering = $0 }
+            .animation(Motion.out(Motion.hover), value: hovering)
     }
 }

@@ -10,11 +10,10 @@ struct NoRoomList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             InboxNote(
-                "lock", GlassInk.slate,
-                Text("This list is not a room. ").bold()
-                    + Text(
-                        "These captures had no trusted room. They are never searched and never shown to AI sessions. A capture older than 14 days shows as stale, and at 30 days it also rings the bell. Nothing is deleted or assigned for you."
-                    ))
+                "lock", GlassInk.slate, "This list is not a room",
+                "Nothing here is searched or shown to AI sessions, and nothing is assigned for you."
+            )
+            .help("A capture older than 14 days shows as stale; at 30 days it also rings the bell.")
             if st.captures.isEmpty {
                 BrainStateCard(
                     symbol: "tray", title: "Nothing without a room",

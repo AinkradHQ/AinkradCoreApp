@@ -94,7 +94,7 @@ struct ActivityRowView: View {
         Button(action: pick) {
             HStack(alignment: .top, spacing: Space.s3) {
                 Text(time).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .frame(width: Space.s8 * 2.6, alignment: .leading).padding(.top, 1)
+                    .frame(width: Space.s8 * 2.5, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).fontWeight(.semibold)
                     Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
@@ -118,7 +118,7 @@ struct ActivityRowView: View {
             )
             .overlay {
                 coreShape(Radius.cardMac).strokeBorder(
-                    selected ? GlassInk.rim(0.28) : GlassInk.wellEdge, lineWidth: 1)
+                    selected ? GlassInk.blue : GlassInk.wellEdge, lineWidth: 1)
             }
             .contentShape(coreShape(Radius.cardMac))
         }
@@ -198,7 +198,7 @@ struct PausedBanner: View {
                         .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.busy != nil).help("Needs Touch ID")
                     }
                 } else {
-                    Button("Open Checks") { withAnimation(.smooth(duration: 0.3)) { model.tab = .checks } }
+                    Button("Open Checks") { withAnimation(Motion.out(Motion.ui)) { model.tab = .checks } }
                         .buttonStyle(CoreButtonStyle(.secondary))
                 }
             }
