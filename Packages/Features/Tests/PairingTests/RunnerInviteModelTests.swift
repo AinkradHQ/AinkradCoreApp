@@ -48,14 +48,15 @@ import Testing
             pasteboard: board)
     }
 
-    @Test func theCommandHasTheTokenInside() async {
+    @Test func theCommandHasNoToken() async {
         let m = make(Box())
         await m.create(name: "oracle")
         #expect(m.phase == .waiting)
         #expect(
             m.command
-                == "sudo sh -c \"$(curl -fsSL https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh)\" sh --runner --invite core.example/FP.SECRET"
+                == "sudo sh -c \"$(curl -fsSL https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh)\" sh --runner --invite -"
         )
+        #expect(m.command?.contains("SECRET") == false)
     }
 
     @Test func fifteenMinutesCountDownThenTheInviteIsOver() async {
@@ -67,7 +68,6 @@ import Testing
         #expect(m.phase == .waiting)
         m.tick(now: t0.addingTimeInterval(900))
         #expect(m.phase == .expired && m.secondsLeft(now: t0.addingTimeInterval(901)) == 0)
-        #expect(m.command?.hasSuffix("--invite ") == true)  // the token is gone once the invite is over
     }
 
     @Test func waitingBecomesConnectedWhenTheRunnerShowsUp() async {

@@ -44,7 +44,9 @@ struct LiveMacRunnerControl: MacRunnerControl {
     static let withTerminals = "com.ainkrad.core.runner.terminals.plist"
 
     private var helpers: URL { Bundle.main.bundleURL.appending(path: "Contents/Helpers", directoryHint: .isDirectory) }
-    private var runner: URL { helpers.appending(path: "ainkrad-runner") }
+    /// Tests point this at a stand-in executable.
+    var runnerOverride: URL?
+    private var runner: URL { runnerOverride ?? helpers.appending(path: "ainkrad-runner") }
     /// The runner's default state (`$HOME/.ainkrad-runner/core`, device key and enrolment, both 0600, the folder 0700): the agent
     /// plists name no `--state`, because a plist cannot know the home folder.
     private var state: URL {
@@ -101,11 +103,14 @@ struct LiveMacRunnerControl: MacRunnerControl {
         try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, any Error>) in
             let p = Process()
             p.executableURL = runner
-            p.arguments = ["pair", core.absoluteString, "--invite", token]
+            p.arguments = ["pair", core.absoluteString, "--invite", "-"]
             // No inherited environment: nothing of the app's goes to the runner.
             p.environment = ["HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin"]
             let err = Pipe()
             p.standardError = err
+            // The token goes in on stdin, never in argv (visible in ps).
+            let input = Pipe()
+            p.standardInput = input
             p.standardOutput = FileHandle.nullDevice
             p.terminationHandler = { p in
                 let text = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
@@ -120,7 +125,11 @@ struct LiveMacRunnerControl: MacRunnerControl {
             do { try p.run() } catch {
                 done.resume(
                     throwing: MacRunnerFailure(message: "The runner would not start: \(error.localizedDescription)"))
+                return
             }
+            // A failed write ends the runner on EOF; its termination handler reports that.
+            try? input.fileHandleForWriting.write(contentsOf: Data((token + "\n").utf8))
+            try? input.fileHandleForWriting.close()
         }
     }
 
