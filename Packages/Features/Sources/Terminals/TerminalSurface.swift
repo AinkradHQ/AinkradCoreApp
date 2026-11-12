@@ -96,6 +96,10 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
     private func showPredictions() {
         let c = instant.cells
         overlay.set(row: c.row, cells: c.cells, real: instant.baseX, caret: instant.cursorX)
+        // Our predicted caret stands in for the emulator's own while predictions show; it comes back with the real output.
+        for v in term.subviews where String(describing: type(of: v)) == "CaretView" {
+            v.alphaValue = c.cells.isEmpty ? 1 : 0
+        }
     }
 
     /// Typed bytes are predicted (display only), then sent unchanged.
@@ -139,6 +143,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
         if repaint {
             term.feed(text: "\u{1b}c")
             instant.reset()
+            showPredictions()
         }
         term.feed(byteArray: [UInt8](data)[...])
         if instant.hasPending {

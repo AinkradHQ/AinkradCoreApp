@@ -57,7 +57,7 @@ struct InstantTyping {
     var showing: Bool { mode == .automatic && slow && trusted && !pending.isEmpty }
     var hasPending: Bool { !pending.isEmpty }
 
-    /// Cells to draw (column, character; a space erases) on `row`; empty when nothing is shown.
+    /// Cells to draw (column, character; NUL erases) on `row`; empty when nothing is shown.
     var cells: (row: Int, cells: [(x: Int, ch: Character)]) {
         guard showing else { return (base.y, []) }
         let s = Self.simulate(pending.map(\.op), from: base.x)
@@ -168,7 +168,7 @@ struct InstantTyping {
                 cx += 1
             case .back:
                 cx -= 1
-                cells[cx] = " "
+                cells[cx] = "\u{0}"
                 low = min(low, cx)
             }
         }

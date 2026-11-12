@@ -69,7 +69,7 @@ import Testing
     @Test func backspaceErasesWhatWeTypedAndIsConfirmedByTheEcho() {
         var e = slowAndTrusted()
         e.typed(key("\u{7f}"), screen("$ abc", x: 5), now: t0.addingTimeInterval(1))
-        #expect(e.showing && e.cells.cells.map { "\($0.x)" } == ["4"] && e.cells.cells[0].ch == " ")
+        #expect(e.showing && e.cells.cells.map { "\($0.x)" } == ["4"] && e.cells.cells[0].ch == "\u{0}")
         e.output(screen("$ ab", x: 4), now: t0.addingTimeInterval(1.2))
         #expect(!e.hasPending && e.trusted)
     }

@@ -50,12 +50,9 @@ final class PredictionOverlay: NSView {
                 height: size.height)
         }
         guard !cells.isEmpty else { return }
-        // The emulator's cursor has not moved yet: cover it, then draw the cursor where the text now ends.
-        paper.setFill()
-        rect(real).fill()
         for (x, ch) in cells {
             let r = rect(x)
-            if ch == " " {
+            if ch == "\u{0}" {
                 paper.setFill()
                 r.fill()
             } else {
