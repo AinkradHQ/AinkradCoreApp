@@ -5,6 +5,8 @@ import SwiftUI
 /// Building blocks of the macOS-style widgets (N9): a header with a blue symbol, a darker well for a chart or list, and
 /// Swift Charts for columns and load lines. Bars and charts animate to new values; Reduce Motion cross-fades instead.
 struct WHead<Trailing: View>: View {
+    @Environment(\.widgetEditing) private var editing
+    @Environment(\.accessibilityReduceMotion) private var reduce
     let symbol: String
     let title: String
     let trailing: Trailing
@@ -21,7 +23,14 @@ struct WHead<Trailing: View>: View {
             trailing
         }
         .coreFont(size: MacTextSize.headline, weight: .semibold).foregroundStyle(GlassInk.secondary)
+        // While editing, the edit bar owns the top of the widget: the title fades out in place (no layout shift).
+        .opacity(editing ? 0 : 1)
+        .animation(reduce ? nil : Motion.out(Motion.hover), value: editing)
     }
+}
+
+extension EnvironmentValues {
+    @Entry var widgetEditing = false
 }
 
 extension WHead where Trailing == EmptyView {

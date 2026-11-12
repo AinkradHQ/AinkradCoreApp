@@ -20,6 +20,7 @@ struct DeskWidget: View {
         let size = DeskGrid.frameSize(item.size)
         ZStack(alignment: .topLeading) {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
+                .environment(\.widgetEditing, editing)
                 .padding(Space.s4)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 // The edit chrome floats over the content; nothing moves, so nothing is cut off at the bottom.
