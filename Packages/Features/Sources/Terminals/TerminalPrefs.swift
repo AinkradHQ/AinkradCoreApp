@@ -41,6 +41,8 @@ final class TerminalPrefs {
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
     var openFullPane: Bool { didSet { save() } }
     var confirmEnd: Bool { didSet { save() } }
+    /// Local echo on a slow link (Settings, Terminal): Automatic turns itself on when the round trip is slow.
+    var instantTyping: InstantTypingMode { didSet { save() } }
 
     enum CursorShape: String, CaseIterable { case block, underline, bar }
 
@@ -68,6 +70,8 @@ final class TerminalPrefs {
         defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
         confirmEnd = defaults.object(forKey: "terminal.confirmEnd") as? Bool ?? true
+        instantTyping =
+            InstantTypingMode(rawValue: defaults.string(forKey: "terminal.instantTyping") ?? "") ?? .automatic
     }
 
     static let systemMono = "SF Mono"
@@ -140,6 +144,7 @@ final class TerminalPrefs {
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
         defaults.set(openFullPane, forKey: "terminal.openFull")
         defaults.set(confirmEnd, forKey: "terminal.confirmEnd")
+        defaults.set(instantTyping.rawValue, forKey: "terminal.instantTyping")
         NotificationCenter.default.post(name: Self.changed, object: nil)
     }
 }

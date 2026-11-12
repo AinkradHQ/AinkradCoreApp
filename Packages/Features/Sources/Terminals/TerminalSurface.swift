@@ -11,6 +11,10 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
     /// What the pane lays out.
     let container = SurfaceContainer()
     private let term: TerminalView
+    /// Instant typing: the engine decides, the overlay (above the terminal, never part of it) draws.
+    private var instant = InstantTyping()
+    private let overlay = PredictionOverlay()
+    private var instantCheck: DispatchWorkItem?
     /// Typed or pasted bytes.
     var onInput: ((Data) -> Void)?
     /// The window now fits this many columns and rows (only while the surface fills its pane).
@@ -34,6 +38,9 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
             MainActor.assumeIsolated { self?.applyPrefs() }
         }
         container.addSubview(term)
+        container.addSubview(overlay)
+        overlay.caretFrame = { [weak term] in term?.caretFrame ?? .zero }
+        container.overlay = overlay
         container.term = term
         container.surface = self
         container.wantsLayer = true
@@ -61,15 +68,88 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
             })
         term.getTerminal().setCursorStyle(
             p.cursorStyle(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))
+        instant.mode = p.instantTyping
+        if instant.mode == .off {
+            instant.reset()
+            showPredictions()
+        }
+        overlay.font = p.font
+        overlay.ink = t.foreground
+        overlay.paper = t.background
+        overlay.caretColor = t.caret
+        overlay.caretShape = p.cursor
         container.needsLayout = true
     }
+
+    // MARK: instant typing
+
+    private func predictionScreen() -> PredictionScreen {
+        let t = term.getTerminal()
+        let (x, y) = t.getCursorLocation()
+        return PredictionScreen(
+            x: x, y: y, cols: t.cols, alternate: t.isCurrentBufferAlternate,
+            atBottom: !term.canScroll || term.scrollPosition >= 0.999,
+            nextBlank: InstantTyping.same(t.getCharacter(col: x, row: y) ?? " ", " "),
+            cell: { t.getCharacter(col: $0, row: y) ?? " " })
+    }
+
+    private func showPredictions() {
+        let c = instant.cells
+        overlay.set(row: c.row, cells: c.cells, real: instant.baseX, caret: instant.cursorX)
+        // Our predicted caret stands in for the emulator's own while predictions show; it comes back with the real output.
+        for v in term.subviews where String(describing: type(of: v)) == "CaretView" {
+            v.alphaValue = c.cells.isEmpty ? 1 : 0
+        }
+    }
+
+    /// Typed bytes are predicted (display only), then sent unchanged.
+    private func typed(_ bytes: Data) {
+        instant.typed(bytes, predictionScreen())
+        showPredictions()
+        if instant.hasPending {
+            // Nothing echoed (no echo, or a dropped link): the prediction goes, however quiet the output is.
+            instantCheck?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.instant.output(self.predictionScreen(), now: Date())
+                self.showPredictions()
+            }
+            instantCheck = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + InstantTyping.timeout + 0.05, execute: work)
+        }
+        onInput?(bytes)
+    }
+
+    #if DEBUG
+    /// Debug only (the terminals walk): types `train` and `text` as a person would, with each echo coming `delay` after the
+    /// key, as on a slow link. `train` is echoed one key at a time so the line is proven; `text` is held, unechoed, for
+    /// `hold` so a screenshot shows the predictions, and then echoed.
+    func debugSlowEcho(train: String, text: String, delay: Duration, hold: Duration) async {
+        for ch in train {
+            typed(Data(String(ch).utf8))
+            try? await Task.sleep(for: delay)
+            feed(Data(String(ch).utf8))
+        }
+        for ch in text { typed(Data(String(ch).utf8)) }
+        try? await Task.sleep(for: hold)
+        feed(Data(text.utf8))
+    }
+    #endif
 
     // MARK: output
 
     /// Draws `data`; `repaint` clears the screen first (a snapshot).
     func feed(_ data: Data, repaint: Bool = false) {
-        if repaint { term.feed(text: "\u{1b}c") }
+        if repaint {
+            term.feed(text: "\u{1b}c")
+            instant.reset()
+            showPredictions()
+        }
         term.feed(byteArray: [UInt8](data)[...])
+        if instant.hasPending {
+            instant.output(predictionScreen())
+            showPredictions()
+        }
     }
 
     /// The last of what is on screen and in the scrollback, as text: for VoiceOver and the live test.
@@ -100,7 +180,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
     nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     nonisolated func send(source: TerminalView, data: ArraySlice<UInt8>) {
         let bytes = Data(data)
-        MainActor.assumeIsolated { onInput?(bytes) }
+        MainActor.assumeIsolated { typed(bytes) }
     }
     nonisolated func scrolled(source: TerminalView, position: Double) {
         MainActor.assumeIsolated { container.showThumb() }
@@ -128,6 +208,7 @@ final class SurfaceContainer: NSView {
     }
     var mode: Mode = .fill
     weak var term: TerminalView?
+    weak var overlay: PredictionOverlay?
     weak var surface: TerminalSurface?
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
@@ -154,6 +235,7 @@ final class SurfaceContainer: NSView {
                 x: 0, y: 0, width: min(want.width, bounds.width + strip), height: min(want.height, bounds.height))
         }
         term.layer?.backgroundColor = NSColor.clear.cgColor
+        overlay?.frame = term.frame
         placeThumb()
     }
 
