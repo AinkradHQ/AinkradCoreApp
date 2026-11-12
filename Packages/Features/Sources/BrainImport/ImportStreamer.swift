@@ -83,13 +83,18 @@ public struct ImportStreamer: Sendable {
     }
 
     public func run(
-        root: URL, runID: String, resume: SourceResume, uploaded: Uploader.Progress,
+        root: URL, runID: String, resume: SourceResume, uploaded: Uploader.Progress, since: Date? = nil,
         save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
     ) async throws -> CollectReport {
         var report = CollectReport()
         var todo: [Unit] = []
         guard let collector else { return report }
         for url in collector.candidates(under: root).sorted(by: { $0.path < $1.path }) {
+            // An incremental read takes only what changed after the source's cursor.
+            if let since {
+                guard let m = collector.files.modified(of: url), m > since else { continue }
+                report.newest = max(report.newest ?? m, m)
+            }
             report.found += 1
             let rel = url.path.replacingOccurrences(of: root.path, with: "")
             // Decided by the path alone, before the file is opened.

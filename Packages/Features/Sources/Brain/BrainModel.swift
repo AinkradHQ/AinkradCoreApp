@@ -23,6 +23,8 @@ public final class BrainModel {
     @ObservationIgnored public var importSources: @Sendable () -> [any ImportSource] = {
         ImportSources.standard()
     }
+    /// Sync now, sources and rules on the Rooms page; nil until a service attaches.
+    public private(set) var sync: SyncModel?
     /// Every known room. A sealed one carries a name and mode only (`RoomSummary.counts` is nil).
     public private(set) var rooms: [RoomSummary] = []
     public private(set) var overview: BrainOverview?
@@ -55,6 +57,8 @@ public final class BrainModel {
     /// Attach a service. Release attaches none until Core serves the Brain; Debug demo and tests attach the sample.
     public func use(_ service: any BrainService) {
         self.service = service
+        let sources = importSources
+        sync = SyncModel(host: host, service: service, sources: { sources() })
         registerActions()
         load = .loading
         Task { await reload() }
@@ -70,6 +74,8 @@ public final class BrainModel {
         overview = nil
         viewingID = nil
         importer = nil
+        sync?.stopTimer()
+        sync = nil
         setup = .absent
         load = .unavailable
         refreshBell()
@@ -153,6 +159,11 @@ public final class BrainModel {
             rooms = rs
             overview = ov
             load = .ready
+            if let sync, sync.status == nil {
+                await sync.reload()
+                // Real Cores only: the sample has no Mac collectors to run.
+                if service.importRoutes != nil { sync.startTimer() }
+            }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }
             // A room that sealed or lost its lease under us must not stay on screen.
             if let id = inspectingID, room(id)?.lock != nil { clearRoomView() }

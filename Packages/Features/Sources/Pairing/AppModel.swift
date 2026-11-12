@@ -338,7 +338,13 @@ public final class AppModel {
             if case .revokedHere = f.kind { try? keyStore.wipe() }
             shell.coreLink = .none
             phase = .blocked(f)
-        case .notice(let kind, let fields): accountNotice(kind, fields)
+        case .notice(let kind, let fields):
+            if kind == "brain.inbox" {
+                brain.inboxNotice(
+                    unsorted: Int(fields["unsorted"] ?? "") ?? 0, newRooms: Int(fields["new_rooms"] ?? "") ?? 0)
+            } else {
+                accountNotice(kind, fields)
+            }
         case .toolInstall(let fields):
             terminals?.toolInstall(fields)
             accounts.toolInstall(fields)

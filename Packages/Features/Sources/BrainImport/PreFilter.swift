@@ -44,5 +44,7 @@ public struct CollectReport: Sendable, Equatable {
     public var found = 0
     public var items = 0
     public var skipped: [String: Int] = [:]
+    /// Newest modified time among the files an incremental read took; nil when it read none.
+    public var newest: Date?
     public init() {}
 }

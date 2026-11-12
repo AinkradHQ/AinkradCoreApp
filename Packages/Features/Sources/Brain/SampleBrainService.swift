@@ -54,6 +54,8 @@ public actor SampleBrainService: BrainService {
     let pace: Duration
     private var box: SampleInbox
     private var failNext = false
+    var sampleSwitches: [String: Bool] = [:]
+    var sampleRuleOn: [Int: Bool] = [:]
 
     public init(_ scenario: Scenario = Scenario(), pace: Duration = .milliseconds(250)) {
         self.scenario = scenario

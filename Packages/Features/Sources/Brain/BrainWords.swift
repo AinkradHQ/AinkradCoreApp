@@ -3,7 +3,7 @@ import Foundation
 /// Every sentence the Brain says outside a view, so the wording is one thing and a test can read it. None of it can carry
 /// content: names, counts and plain verbs only (BM-00 I-8).
 public enum BrainWords {
-    static func plural(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
+    public static func plural(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
 
     /// The one Paused sentence every surface uses (Overview, bell). `names` are mounted rooms only.
     public static func pausedLine(names: [String]) -> String {

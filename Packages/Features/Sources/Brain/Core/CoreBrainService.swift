@@ -1,3 +1,4 @@
+import BrainImport
 import Foundation
 
 /// The real Brain service: rooms and the open step on a Core that has the `brain` module (M1). Overview is thin and
@@ -116,6 +117,22 @@ public final class CoreBrainService: BrainService, @unchecked Sendable {
         throw BrainFailure("The Inbox comes later.", code: "not_served")
     }
 
+    // MARK: sync, sources, search, rules
+
+    public func syncStatus() async throws -> SyncStatusWire { try await wrap { try await routes.syncStatus() } }
+    public func sources() async throws -> [SourceWire] { try await wrap { try await routes.sources() } }
+    public func putSource(_ s: SourceWire, enabled: Bool?, cursor: SourceCursor?) async throws -> SourceWire {
+        try await wrap { try await routes.putSource(s, enabled: enabled, cursor: cursor) }
+    }
+    public func syncNow() async throws -> SyncResultWire { try await wrap { try await routes.sync() } }
+    public func search(room: String, query: String) async throws -> [SearchHit] {
+        try await wrap { try await routes.search(room: room, query: query) }
+    }
+    public func rules() async throws -> [RuleWire] { try await wrap { try await routes.rules() } }
+    public func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire {
+        try await wrap { try await routes.setRule(id, enabled: enabled) }
+    }
+
     // MARK: errors
 
     /// A Core refusal in words; anything else (offline, Touch ID cancelled, auth) passes through for the host.
@@ -130,6 +147,7 @@ public final class CoreBrainService: BrainService, @unchecked Sendable {
             case "unsorted_not_a_room": "Unsorted is not a room. Move its items to one."
             case "batch_too_large": "That was too much to send at once."
             case "room_unavailable": "The room could not be opened."
+            case "room_closed": "Open this room first, then search it."
             default:
                 e.status == 409
                     ? "That cannot be done right now. \(e.message)".trimmingCharacters(in: .whitespaces)
