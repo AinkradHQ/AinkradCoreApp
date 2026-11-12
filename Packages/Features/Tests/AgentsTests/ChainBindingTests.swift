@@ -19,6 +19,7 @@ struct ChainBindingTests {
         let m = AgentsModel(shell: ShellModel(), notifier: FakeNotifier(), defaults: defaults, host: host)
         m.isAdmin = true
         m.attach(api)
+        await m.firstLoad?.value  // attach's own load finishes first, so it cannot take a scripted failure
         await m.reloadAll()
         return (m, api, host)
     }
@@ -67,13 +68,11 @@ struct ChainBindingTests {
         let sheet = m.shell.sheet
         #expect(sheet?.title == "Unbind atlas?" && sheet?.message.contains("Careful") == true)
         sheet?.actions.first { $0.destructive }?.run()
-        try? await Task.sleep(for: .milliseconds(100))
-        #expect(m.bindings.isEmpty && api.calls.contains("unbind atlas"))
+        #expect(await until { api.calls.contains("unbind atlas") && m.bindings.isEmpty })
     }
 
     @Test func aRefusalForScopeMakesThePageReadOnly() async {
         let (m, api, _) = await make()
-        try? await Task.sleep(for: .milliseconds(150))  // attach's own first load must not take the scripted failure
         api.failNext = CoreError.forbiddenScope
         #expect(!(await m.bind("atlas", to: m.chains[1])))
         #expect(m.bindingsReadOnly)

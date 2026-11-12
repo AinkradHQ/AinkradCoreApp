@@ -49,7 +49,10 @@ struct AuditTests {
         let before = service.auditQueries.count
         a.open(kind: "connection.", target: "connection:3")
         await a.reload()
-        try? await Task.sleep(for: .milliseconds(600))
+        #expect(
+            await until {
+                service.auditQueries.count > before && a.items.allSatisfy { $0.action.hasPrefix("connection.") }
+            })
         #expect(a.filter.kind == "connection." && a.filter.target == "connection:3")
         #expect(a.items.allSatisfy { $0.action.hasPrefix("connection.") })
         #expect(service.auditQueries.count == before + 1, "the link searches once")
@@ -63,7 +66,11 @@ struct AuditTests {
         let a = admin.audit!
         a.filter.kind = "device."
         a.filter.actor = .system
-        try? await Task.sleep(for: .milliseconds(600))
+        #expect(
+            await until {
+                let filtered = a.items.allSatisfy { $0.action.hasPrefix("device.") }
+                return service.auditQueries.last?.filter.actor == .system && filtered
+            })
         let last = service.auditQueries.last
         #expect(last?.before == nil)
         #expect(last?.filter.kind == "device.")
@@ -71,7 +78,7 @@ struct AuditTests {
         #expect(a.items.allSatisfy { $0.action.hasPrefix("device.") })
         #expect(service.auditQueries.filter { $0.filter.kind == "device." }.count == 1, "two edits, one search")
         a.clearFilters()
-        try? await Task.sleep(for: .milliseconds(600))
+        #expect(await until { a.filter.isEmpty && a.items.count == 30 })
         #expect(a.filter.isEmpty && a.items.count == 30)
     }
 
@@ -79,7 +86,7 @@ struct AuditTests {
     func empty() async {
         let (admin, _) = await world(1)
         admin.audit.filter.kind = "zzz"
-        try? await Task.sleep(for: .milliseconds(600))
+        #expect(await until { admin.audit.items.isEmpty && admin.audit.state == .ready })
         #expect(admin.audit.items.isEmpty)
         #expect(admin.audit.state == .ready)
         let s = FakeService()
