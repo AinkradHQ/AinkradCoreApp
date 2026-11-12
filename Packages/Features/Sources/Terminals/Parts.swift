@@ -40,6 +40,7 @@ struct TermCard: View {
     let text: String
     var note: String?
     var actions: [(title: String, primary: Bool, run: @MainActor () -> Void)]
+    @Environment(\.corePalette) private var palette
 
     /// The card's picture and colour, from what it says.
     private var look: (symbol: String, hue: Color) {
@@ -64,7 +65,11 @@ struct TermCard: View {
                     ) { a.run() },
                     a.primary
                 )
-            })
+            }
+        )
+        // By day the card is the light glass dialog: a white backing so it does not turn grey on the dark terminal scrim.
+        .background(
+            palette.isDay ? Color.white.opacity(0.94) : .clear, in: coreShape(Radius.panel + Space.s1))
     }
 }
 
