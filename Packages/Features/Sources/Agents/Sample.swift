@@ -366,7 +366,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                     id: "tf", name: "Bash", ok: false, exitCode: 101,
                     output:
                         "test policy::push::deny_unknown_branch ... FAILED\ntest result: FAILED. 18 passed; 3 failed",
-                    durationMs: 12_400), .ended(kind: "failed", reason: "The agent exited with an error."),
+                    durationMs: 12_400), .ended(kind: "failed", reason: "The AI session exited with an error."),
             ])
         api.add(
             session(10, "claude", "d_mac", .ended, .cancelled, age: 300 * 60, tin: 40_100, tout: 9_000, cost: 210_000),

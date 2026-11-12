@@ -29,17 +29,17 @@ struct AgentChainsSection: View {
         if model.api == nil {
             CoreStateCard(
                 symbol: "wifi.slash", title: "Not connected to a Core",
-                line: "Agents and their chains come from your Core. Connect this Mac to one first.")
+                line: "AI sessions and their chains come from your Core. Connect this Mac to one first.")
         } else if !model.isAdmin {
             CoreStateCard(
                 symbol: "lock", title: "This Mac can only look",
-                line: "Choosing a chain for an agent needs a Mac you allowed to manage the Core.")
+                line: "Choosing a chain for an AI session needs a Mac you allowed to manage the Core.")
         } else {
             switch model.bindingsPhase {
             case .loading: skeleton
             case .failed(let why):
                 CoreStateCard(
-                    symbol: "exclamationmark.triangle", title: "Couldn't load the agents",
+                    symbol: "exclamationmark.triangle", title: "Couldn't load the AI sessions",
                     line: "\(why) Nothing was changed.",
                     primary: CoreAction("Try again") { model.retryBindings() })
             case .ready: ready
@@ -52,7 +52,7 @@ struct AgentChainsSection: View {
             ForEach(0..<3, id: \.self) { _ in CoreSkeleton(coreShape(Radius.cardMac)).frame(height: 52) }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Loading the agents")
+        .accessibilityLabel("Loading the AI sessions")
     }
 
     @ViewBuilder private var ready: some View {
@@ -132,10 +132,10 @@ struct AgentChainsSection: View {
         let valid = AgentsModel.validAgent(id)
         let chain = model.chains.first { $0.id == newChain } ?? model.defaultChain
         return VStack(alignment: .leading, spacing: Space.s2) {
-            Text("Bind another agent").coreFont(size: MacTextSize.headline, weight: .semibold)
+            Text("Bind another AI session").coreFont(size: MacTextSize.headline, weight: .semibold)
             HStack(alignment: .bottom, spacing: Space.s2) {
                 CoreTextField(
-                    "Agent id", placeholder: "Agent id, such as atlas", text: $newAgent,
+                    "AI session id", placeholder: "AI session id, such as atlas", text: $newAgent,
                     error: id.isEmpty || valid ? nil : AgentsModel.agentIDRule, mono: true
                 ) { add(id, chain) }
                 .disabled(model.bindingsReadOnly)
@@ -144,7 +144,7 @@ struct AgentChainsSection: View {
                     options: model.chains.map { CoreSelectOption($0.id, $0.name, note: $0.isDefault ? "default" : nil) }
                 )
                 .frame(width: Space.s8 * 8)
-                Button("Bind agent") { add(id, chain) }
+                Button("Bind AI session") { add(id, chain) }
                     .buttonStyle(CoreButtonStyle(.prominent, busy: model.bindingBusy == id))
                     .disabled(!valid || chain == nil || model.bindingBusy != nil || model.bindingsReadOnly)
                     .frame(minHeight: MacSize.controlLg)

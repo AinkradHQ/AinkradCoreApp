@@ -194,7 +194,7 @@ struct GateState: Equatable, Sendable {
             "Your Core is set to keep no provider keys, so an account can't be added yet. Turn it on in Settings."
         case .throwaway:
             "Your Core takes practice keys but refuses real ones, to keep you safe while testing. Allow real keys in Settings when you're ready."
-        case .real: "Your Core can keep real provider keys for your agents."
+        case .real: "Your Core can keep real provider keys for your AI sessions."
         case .other: "Your Core has a setting this app doesn't know yet."
         }
     }
@@ -324,9 +324,9 @@ enum AccountsWords {
         switch a.phase {
         case .cooling: s = "Resting. Other accounts of this provider cover until it is back."
         case .limited: s = "The provider limited it."
-        case .unhealthy: s = "Core marked it unhealthy, so agents do not use it."
-        case .disabled: s = "Agents will not use it until you turn it back on."
-        case .active: s = "Agents can use it now."
+        case .unhealthy: s = "Core marked it unhealthy, so AI sessions do not use it."
+        case .disabled: s = "AI sessions will not use it until you turn it back on."
+        case .active: s = "AI sessions can use it now."
         case .other(let raw): s = "Core reports it as \(raw)."
         }
         if let r = a.stateReason, !r.isEmpty { s += r.hasSuffix(".") ? " \(r)" : " \(r)." }

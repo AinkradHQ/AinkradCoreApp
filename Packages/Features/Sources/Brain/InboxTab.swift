@@ -52,7 +52,7 @@ struct InboxTab: View {
                 Text("No room yet").coreFont(size: MacTextSize.headline, weight: .semibold)
                 BrainChip("Not a room", GlassInk.slate, help: "The unclassified inbox is a sealed pseudo-room.")
                 BrainChip("Never searched", GlassInk.slate)
-                BrainChip("Agents never see it", GlassInk.slate)
+                BrainChip("AI sessions never see it", GlassInk.slate)
                 Spacer(minLength: Space.s2)
                 Text("This Mac and iPhone only").coreFont(size: MacTextSize.meta).foregroundStyle(
                     GlassInk.secondary)
@@ -95,7 +95,7 @@ struct InboxTab: View {
                 BrainStateCard(
                     symbol: "lock", title: "This room is sealed",
                     text: lock.sentence
-                        + " Its memories, conflicts and blocked notes stay hidden. No agent, cloud runner or search can read it.",
+                        + " Its memories, conflicts and blocked notes stay hidden. No AI session, cloud runner or search can read it.",
                     primary: CoreAction("Open this room with Touch ID") { Task { await model.open(r.id) } }
                 )
                 .accessibilityIdentifier("inbox-sealed")
@@ -113,7 +113,7 @@ struct InboxTab: View {
             } else {
                 empty(
                     "Nothing waits for you",
-                    "Agents propose memories here. When one does, you approve, edit or reject it, and nothing is used until you do."
+                    "AI sessions propose memories here. When one does, you approve, edit or reject it, and nothing is used until you do."
                 )
             }
         case .conflicts:

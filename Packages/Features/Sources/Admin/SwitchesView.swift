@@ -25,7 +25,7 @@ struct SwitchesSection: View {
                         hue: GlassInk.orange,
                         sub: "Let accounts hold a real API key from Anthropic, OpenAI or Google.",
                         offLine: "Only test keys are accepted for accounts.",
-                        onLine: "Accounts can hold real provider keys. Your agents can use them.",
+                        onLine: "Accounts can hold real provider keys. Your AI sessions can use them.",
                         needs: model.secretsMode < 1 ? "Set Keys and secrets to Test keys first." : nil,
                         reason: {
                             $0 ? "Let accounts hold real provider keys." : "Stop accounts holding real provider keys."

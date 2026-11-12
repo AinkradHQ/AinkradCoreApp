@@ -113,7 +113,7 @@ struct ConnListPage: View {
         VStack(alignment: .leading, spacing: Space.s5) {
             AccHeader(
                 title: "Connections",
-                detail: "Services Core signs in to for you, so your agents can read issues and code.",
+                detail: "Services Core signs in to for you, so your AI sessions can read issues and code.",
                 symbol: "link"
             ) {
                 if !model.items.isEmpty {
@@ -163,7 +163,7 @@ struct ConnListPage: View {
         AccStateCard(
             symbol: "link", title: "Nothing connected yet",
             text:
-                "Sign in to GitHub or Jira once, here. Core keeps the sign-in safe and lets your agents read issues and code. They can't change anything until you allow it."
+                "Sign in to GitHub or Jira once, here. Core keeps the sign-in safe and lets your AI sessions read issues and code. They can't change anything until you allow it."
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if !missing.isEmpty {
@@ -267,7 +267,7 @@ struct ConnCard: View {
             }
             Text(
                 need
-                    ? "\(item.reason ?? "This sign-in stopped working.") Agents can't use it until you sign in again."
+                    ? "\(item.reason ?? "This sign-in stopped working.") AI sessions can't use it until you sign in again."
                     : model.access(item)
             )
             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
@@ -278,7 +278,8 @@ struct ConnCard: View {
             HStack {
                 Text(when).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Spacer()
-                Text(item.users <= 1 ? "Only you" : "You and \(item.users - 1) agents").coreFont(size: MacTextSize.meta)
+                Text(item.users <= 1 ? "Only you" : "You and \(item.users - 1) AI sessions")
+                    .coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
             }
             HStack(spacing: Space.s1) {

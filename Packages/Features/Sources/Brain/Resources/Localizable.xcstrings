@@ -4,7 +4,7 @@
     "" : {
 
     },
-    " This room can reach cloud agents, so " : {
+    " This room can reach cloud AI sessions, so " : {
 
     },
     " a conflict. Each room keeps its own rule, and only disagreements inside this room show here." : {
@@ -88,13 +88,38 @@
     "%lld days ago" : {
 
     },
+    "%lld items" : {
+
+    },
+    "%lld items %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld items %2$@"
+          }
+        }
+      }
+    },
     "%lld ms" : {
+
+    },
+    "%lld refused. The same material is refused next time." : {
 
     },
     "%lld selected" : {
 
     },
+    "%lld sources stored" : {
+
+    },
+    "Accept" : {
+
+    },
     "All rooms" : {
+
+    },
+    "An admin sees every room. Every room is kept on your Core, encrypted. Review dates archive; nothing is deleted." : {
 
     },
     "Approve this memory with settings you choose. The plain Approve uses the room defaults." : {
@@ -103,7 +128,7 @@
     "Approve with options…" : {
 
     },
-    "Approve with the room defaults. Agents can use it at once." : {
+    "Approve with the room defaults. AI sessions can use it at once." : {
 
     },
     "Ask me later" : {
@@ -133,7 +158,13 @@
     "Change the title or text, then approve." : {
 
     },
+    "Choose items below first." : {
+
+    },
     "Choose the room this capture belongs to." : {
+
+    },
+    "Choose what to collect. Nothing is kept in the Brain until you press Import accepted rooms." : {
 
     },
     "Choose what to run. The plain Run now uses the defaults: every mounted room, 1,000 test questions." : {
@@ -146,6 +177,9 @@
 
     },
     "Clear filters" : {
+
+    },
+    "Clear mark" : {
 
     },
     "Clear pause with Touch ID" : {
@@ -182,6 +216,12 @@
 
     },
     "Housekeeping" : {
+
+    },
+    "How it works" : {
+
+    },
+    "Import more" : {
 
     },
     "Keep both" : {
@@ -222,6 +262,9 @@
     "Last run" : {
 
     },
+    "Leave this out, and refuse the same material next time." : {
+
+    },
     "Link" : {
 
     },
@@ -250,6 +293,9 @@
     "Memory waiting: %@. Command Return approves, Command Delete rejects." : {
 
     },
+    "Merge" : {
+
+    },
     "More actions for the selected captures" : {
 
     },
@@ -260,6 +306,9 @@
 
     },
     "Name and mode only" : {
+
+    },
+    "Needed" : {
 
     },
     "Needs Touch ID" : {
@@ -275,6 +324,12 @@
 
     },
     "Not available. A link would keep a door open into the inbox." : {
+
+    },
+    "Nothing was found to put in a room." : {
+
+    },
+    "Open" : {
 
     },
     "Open Checks" : {
@@ -301,10 +356,19 @@
     "Redact and keep" : {
 
     },
+    "Refuse" : {
+
+    },
+    "Refused" : {
+
+    },
     "Reject this memory. The proposer is told it was not used." : {
 
     },
     "Remove the secret and keep the rest. The cleaned note waits in Waiting." : {
+
+    },
+    "Rename" : {
 
     },
     "Rule: %@" : {
@@ -334,6 +398,9 @@
     "Same as Settings, Appearance." : {
 
     },
+    "Save settings" : {
+
+    },
     "Seal room" : {
 
     },
@@ -346,8 +413,24 @@
     "Select all %lld" : {
 
     },
+    "Show more" : {
+
+    },
     "Shows only this room" : {
 
+    },
+    "Split…" : {
+
+    },
+    "Step %lld of 5 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of 5 · %2$@"
+          }
+        }
+      }
     },
     "Target %@" : {
 
@@ -361,13 +444,16 @@
     "Text from this source is untrusted. It is shown as written and never run." : {
 
     },
+    "The Inbox, where distilled memories wait for you, comes later." : {
+
+    },
     "The darkest part is the most common kind. Hover a row for the full breakdown." : {
 
     },
     "The inbox is only entered by capture, so a link into it is not allowed." : {
 
     },
-    "These captures had no trusted room. They are never searched and never shown to agents. A capture older than 14 days shows as stale, and at 30 days it also rings the bell. Nothing is deleted or assigned for you." : {
+    "These captures had no trusted room. They are never searched and never shown to AI sessions. A capture older than 14 days shows as stale, and at 30 days it also rings the bell. Nothing is deleted or assigned for you." : {
 
     },
     "This Mac and iPhone only" : {
@@ -379,19 +465,22 @@
     "This page keeps results only, never memory text. Hover for the codes." : {
 
     },
+    "This room's settings" : {
+
+    },
     "Today" : {
 
     },
     "Touch ID asks" : {
 
     },
-    "Touch ID is asked first, because this room will leave this Mac." : {
-
-    },
     "Try again" : {
 
     },
     "Two rooms that disagree are " : {
+
+    },
+    "Undo accept" : {
 
     },
     "View this room" : {
@@ -410,6 +499,12 @@
 
     },
     "Wipe the note from this Mac. Touch ID asks." : {
+
+    },
+    "Writing the accepted rooms. Touch ID confirms it first." : {
+
+    },
+    "You can close this and keep working. The Brain pane shows the import is in progress." : {
 
     },
     "chk.%@, run-%@-%lld" : {

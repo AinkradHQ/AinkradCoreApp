@@ -4,18 +4,34 @@
     "" : {
 
     },
-    "%@\n%@ on %@ · %@" : {
+    "%@ / 16 KiB" : {
+
+    },
+    "%@ filter, %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@\n%2$@ on %3$@ · %4$@"
+            "value" : "%1$@ filter, %2$@"
           }
         }
       }
     },
-    "%@ / 16 KiB" : {
+    "%@ in total" : {
 
+    },
+    "%@ move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive" : {
+
+    },
+    "%@ of %@ tokens used" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ tokens used"
+          }
+        }
+      }
     },
     "%@ on %@" : {
       "localizations" : {
@@ -27,6 +43,9 @@
         }
       }
     },
+    "%@ s" : {
+
+    },
     "%@ wants to %@" : {
       "localizations" : {
         "en" : {
@@ -37,20 +56,33 @@
         }
       }
     },
+    "%@ · Claude plan · signed-in token lent to this run" : {
+
+    },
     "%@ · key held by the runner" : {
 
     },
-    "%@, %@" : {
+    "%@, %@ on %@, %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@, %2$@"
+            "value" : "%1$@, %2$@ on %3$@, %4$@"
           }
         }
       }
     },
-    "%@. Click to choose another chain." : {
+    "%@, %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld"
+          }
+        }
+      }
+    },
+    "%@:" : {
 
     },
     "%@: %@" : {
@@ -62,6 +94,9 @@
           }
         }
       }
+    },
+    "%lld" : {
+
     },
     "%lld approvals are waiting on you" : {
 
@@ -75,16 +110,41 @@
     "%lld min ago" : {
 
     },
+    "%lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "%lld percent" : {
+
+    },
+    "+%lld" : {
+
+    },
     "1 approval is waiting on you" : {
 
     },
-    "Agent sessions" : {
+    "A plan costs no money per call. It uses the plan's quota." : {
 
     },
-    "Agents and chains" : {
+    "AI Sessions" : {
+
+    },
+    "AI session groups" : {
+
+    },
+    "AI sessions" : {
 
     },
     "Ainkrad can show a macOS banner for each new approval. macOS will ask you to allow it once." : {
+
+    },
+    "Allow %@" : {
 
     },
     "Allow in Connections" : {
@@ -93,19 +153,22 @@
     "Answered since this Mac opened" : {
 
     },
-    "Any secret you pass can be read by the agent in that session. Each is leased to the runner at every start." : {
-
-    },
     "Approvals" : {
-
-    },
-    "Approvals only. Alerts and Brain inbox items are counted separately." : {
 
     },
     "Approvals, %lld waiting" : {
 
     },
     "Approve %@" : {
+
+    },
+    "Asks again in %@" : {
+
+    },
+    "Attach a file" : {
+
+    },
+    "Attach a file: adds its path to the message" : {
 
     },
     "Attempts of this run" : {
@@ -117,19 +180,10 @@
     "Banners aren't set up yet" : {
 
     },
-    "Bind agent" : {
+    "Bind AI session" : {
 
     },
-    "Bind another agent" : {
-
-    },
-    "Cancel" : {
-
-    },
-    "Cancel asks %@ to stop after its current tool call. Safe; try this first." : {
-
-    },
-    "Cancel, stop after its current tool call" : {
+    "Bind another AI session" : {
 
     },
     "Cancelling: it finishes the tool call in flight, then ends. K kills at once." : {
@@ -138,22 +192,50 @@
     "Chain for %@" : {
 
     },
-    "Chain, %@" : {
+    "Chains are made in Accounts." : {
 
     },
-    "Chains are made in Accounts." : {
+    "Click a file to see its diff" : {
+
+    },
+    "Commands" : {
+
+    },
+    "Copied" : {
 
     },
     "Copy" : {
 
     },
+    "Cost" : {
+
+    },
     "Deny %@" : {
+
+    },
+    "Details" : {
 
     },
     "Earlier entries load as you scroll up" : {
 
     },
+    "Edited" : {
+
+    },
+    "Edited %@, %lld added, %lld removed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Edited %1$@, %2$lld added, %3$lld removed"
+          }
+        }
+      }
+    },
     "Ended" : {
+
+    },
+    "Ended (idle)" : {
 
     },
     "Ended: budget reached" : {
@@ -177,25 +259,28 @@
     "Ended: token limit reached" : {
 
     },
+    "Ends the session: the CLI exits and the composer closes. The transcript stays. Esc stops only the current turn." : {
+
+    },
     "From Core's ledger" : {
 
     },
-    "Get told when an agent needs you" : {
+    "From Core's ledger · %@" : {
 
     },
-    "It runs on a runner of the Home Core. You can close this Mac and it keeps going." : {
+    "Get told when an AI session needs you" : {
+
+    },
+    "Hide the details under the header" : {
 
     },
     "It wants to use Bash on mac-studio." : {
 
     },
-    "Kill stops it at once on the runner and can leave files half-written. Use it only if Cancel did not work." : {
-
-    },
-    "Kill, stop at once" : {
-
-    },
     "Killing: stopping it on the runner now." : {
+
+    },
+    "Last activity" : {
 
     },
     "Let %@ %@ (⌘Return). Asks for Touch ID when this Mac is locked." : {
@@ -208,22 +293,22 @@
         }
       }
     },
-    "Loading sessions" : {
+    "Loading AI sessions" : {
 
     },
-    "Loading the agents" : {
+    "Loading the AI sessions" : {
 
     },
     "Loading the transcript…" : {
 
     },
-    "More options" : {
+    "Needs you" : {
 
     },
-    "New agent session" : {
+    "No first message needed. The session opens and waits for you, on a runner of the Home Core." : {
 
     },
-    "No runner is paired yet. Add one from Settings, Devices." : {
+    "No runner offers it" : {
 
     },
     "Nobody answered in time: %@" : {
@@ -232,16 +317,16 @@
     "Not now" : {
 
     },
-    "Nothing here yet. The first entries arrive when the agent starts." : {
+    "Nothing changed yet." : {
+
+    },
+    "Nothing here yet. Type a message below to begin." : {
 
     },
     "Nothing is waiting on you" : {
 
     },
-    "Now on %@" : {
-
-    },
-    "Older sessions load as you scroll" : {
+    "Older AI sessions load as you scroll" : {
 
     },
     "On %@ · asked %@" : {
@@ -254,8 +339,15 @@
         }
       }
     },
-    "Open" : {
-
+    "On %lld runner%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "On %1$lld runner%2$@"
+          }
+        }
+      }
     },
     "Open Accounts" : {
 
@@ -269,34 +361,41 @@
     "Open this attempt" : {
 
     },
+    "Plan" : {
+
+    },
+    "Plan, %lld of %lld done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Plan, %1$lld of %2$lld done"
+          }
+        }
+      }
+    },
     "Preview: claude is waiting on you" : {
 
     },
-    "Prompt" : {
+    "Recovery: bring the process back on its runner, with the same conversation." : {
 
     },
-    "Remove %@" : {
-
-    },
-    "Reply to the agent" : {
+    "Recovery: the runner lost it. Resume continues the conversation in the same folder." : {
 
     },
     "Resume" : {
 
     },
-    "Resume starts this session again from where it stopped. The transcript is kept." : {
-
-    },
-    "Runner %@" : {
+    "Runner" : {
 
     },
     "Same as Settings, Appearance." : {
 
     },
-    "Sandboxed needs the admin scope; the Core refuses it otherwise." : {
+    "Search AI sessions" : {
 
     },
-    "Say what it should do. It keeps running if you close this Mac." : {
+    "Search title, first message, folder or project" : {
 
     },
     "Send the message (Return)" : {
@@ -312,55 +411,70 @@
         }
       }
     },
-    "Settings, Agents and chains: bind an agent to a chain" : {
-
-    },
-    "Show all %lld lines" : {
+    "Show %lld more lines" : {
 
     },
     "Show less" : {
 
     },
+    "Show the runner, account, tokens and cost" : {
+
+    },
     "Some calls had no price: their tokens count, their cost doesn't." : {
 
     },
-    "Start" : {
+    "Start a new AI session with the same first message and runner. This one stays as it is." : {
 
     },
     "Start of the session" : {
 
     },
-    "Start the session (⌘Return)" : {
+    "Start the AI session (⌘Return)" : {
 
     },
     "Starting needs Touch ID." : {
 
     },
-    "Starting…" : {
+    "State" : {
+
+    },
+    "Stop the current turn (Esc). The session stays open." : {
+
+    },
+    "Stop turn" : {
 
     },
     "Tell %@ no (⌘Delete). It carries on without it." : {
 
     },
-    "The agent is working" : {
+    "The AI session is working" : {
 
     },
-    "The agent stopped waiting for this. Ask it again from the composer if you still want it." : {
+    "The AI session stopped waiting for this. Ask it again from the composer if you still want it." : {
 
     },
-    "The chain bound to this agent serves the session, else the default chain." : {
+    "The folder must be a git repo. The session works in its own copy of it." : {
 
     },
     "The harness default" : {
 
     },
-    "The key is used by the runner's gateway and never enters the agent's sandbox." : {
+    "The key is used by the runner's gateway and never enters the session's sandbox." : {
+
+    },
+    "The plan's token is lent to the runner for this session only." : {
 
     },
     "The provider's last answer to this session: %@" : {
 
     },
-    "This session is not in the list anymore." : {
+    "This AI session is not in the list anymore." : {
+
+    },
+    "This session" : {
+
+    },
+    "Title and project" : {
 
     },
     "Tokens used, as this Mac saw them change" : {
@@ -376,7 +490,7 @@
         }
       }
     },
-    "Tries, in order: %@. It sets the harness and model." : {
+    "Turn %lld" : {
 
     },
     "Turn on" : {
@@ -391,22 +505,40 @@
     "Use the harness default" : {
 
     },
+    "Waiting for you" : {
+
+    },
     "Waiting for your Core…" : {
 
     },
-    "Waiting on you" : {
-
-    },
-    "Wake queues another turn for this finished agent. It keeps the same session. Resume restarts one that stopped." : {
+    "Waiting for your answer" : {
 
     },
     "What an approval banner looks like" : {
+
+    },
+    "Working ·" : {
+
+    },
+    "Works in its own copy of the repo on the runner, so your branch stays as it is." : {
+
+    },
+    "Wrote" : {
+
+    },
+    "You can change it later with /model." : {
 
     },
     "You: %@" : {
 
     },
     "claude is waiting on you" : {
+
+    },
+    "collapsed" : {
+
+    },
+    "expanded" : {
 
     },
     "just now" : {
@@ -419,6 +551,9 @@
 
     },
     "macOS shows Ainkrad's banners." : {
+
+    },
+    "new" : {
 
     },
     "now" : {
@@ -440,10 +575,29 @@
     "running" : {
 
     },
+    "thinking…" : {
+
+    },
     "to answer" : {
 
     },
-    "↩ open · %@ move · A approvals · C cancel · K kill · R resume" : {
+    "— %@ · %@ —" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "— %1$@ · %2$@ —"
+          }
+        }
+      }
+    },
+    "⇧↩ new line · ↑ edit last message · esc stop turn · / commands" : {
+
+    },
+    "−%lld" : {
+
+    },
+    "⌘F" : {
 
     }
   },

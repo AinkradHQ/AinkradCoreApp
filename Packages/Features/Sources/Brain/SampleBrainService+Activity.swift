@@ -190,7 +190,7 @@ extension SampleBrainService {
                 "secret_found", "Secret scanner", fix: "Remove the secret from the note and save again.")),
         ev(
             2037, "1 h ago", "Cloud runner (sample)", "Runner", "Asked for context", "optimus", .blocked, .blocked,
-            code: "context.request", reason: "This room is local only. Cloud agents cannot read it.",
+            code: "context.request", reason: "This room is local only. Cloud AI sessions cannot read it.",
             rule: BlockRule(
                 "local_only", "Room is local only", fix: "Change the room to synced, or use a local model.")),
         ev(

@@ -240,7 +240,8 @@ public struct ActivityFilter: Sendable, Equatable {
 extension BrainWords {
     public static func blockedBy(_ rule: String) -> String { "Blocked by: \(rule)" }
     public static func leftNothing(_ room: String) -> String { "Nothing from \(room) has left this Mac" }
-    public static let leftNothingText = "This room is local only. It is not visible to cloud agents and not backed up."
+    public static let leftNothingText =
+        "This room is local only. It is not visible to cloud AI sessions and not backed up."
     public static let activityIdsOnly = "Ids and codes only. No memory text or search words are kept here."
 
     /// One row of the feed, as a sentence: who, on what, where, and how it ended. Words only; the codes are elsewhere.

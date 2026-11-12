@@ -120,10 +120,10 @@ struct AccountDetailView: View {
         -> some View
     {
         let tone = palette.tone(verdict.tone)
-        let title = verdict.usable ? "Your agents can use it" : verdict.label
+        let title = verdict.usable ? "Your AI sessions can use it" : verdict.label
         let line =
             verdict.usable
-            ? "It's in \(pools.map(\.name).joined(separator: ", ")). Agents bound to \(pools.count == 1 ? "that pool" : "those pools") draw on it."
+            ? "It's in \(pools.map(\.name).joined(separator: ", ")). AI sessions bound to \(pools.count == 1 ? "that pool" : "those pools") draw on it."
             : verdict.line(a, limits: model.limits(of: a), budgets: model.budgets, now: model.now())
         return HStack(spacing: Space.s4) {
             Image(systemName: verdict.usable ? "checkmark.seal.fill" : verdict.symbol)
@@ -227,7 +227,7 @@ struct AccountDetailView: View {
         tile("Pools", "square.grid.2x2.fill") {
             if pools.isEmpty {
                 Text("In no pool").coreFont(size: MacTextSize.title, weight: .semibold)
-                Text("Agents can't reach it yet.").coreFont(size: MacTextSize.meta).foregroundStyle(
+                Text("AI sessions can't reach it yet.").coreFont(size: MacTextSize.meta).foregroundStyle(
                     GlassInk.orangeInk)
             }
             ForEach(pools) { p in

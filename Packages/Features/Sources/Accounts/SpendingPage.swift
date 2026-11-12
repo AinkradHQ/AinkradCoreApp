@@ -134,7 +134,7 @@ struct SpendingPage: View {
                 Text(model.costsLoad == .loading ? "Reading the calls…" : "Core did not share the calls with this Mac.")
                     .foregroundStyle(GlassInk.secondary)
             } else if rows.isEmpty {
-                Text("Each model call an agent makes lands here.").foregroundStyle(GlassInk.secondary)
+                Text("Each model call an AI session makes lands here.").foregroundStyle(GlassInk.secondary)
             }
             ForEach(Array(rows)) { c in
                 HStack(spacing: Space.s3) {

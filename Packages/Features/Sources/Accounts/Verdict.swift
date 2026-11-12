@@ -87,8 +87,8 @@ struct AccountVerdict: Equatable, Sendable {
                 "It reached \(UsageLimitWords.amount($0.cap, unit: $0.unit)) \(UsageLimitWords.window($0.windowSecs).lowercased()). New work waits until the window moves on."
             } ?? "A usage limit is reached."
         case .limitNear: "It is close to a usage limit."
-        case .noPool: "Agents only use accounts that are in a pool. Add it to one and it's ready."
-        case .ready: "Agents can use it now."
+        case .noPool: "AI sessions only use accounts that are in a pool. Add it to one and it's ready."
+        case .ready: "AI sessions can use it now."
         default: AccountsWords.why(a, now: now)
         }
     }

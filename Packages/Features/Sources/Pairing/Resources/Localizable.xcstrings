@@ -4,7 +4,7 @@
     "" : {
 
     },
-    "ainkrad-core-server bootstrap <db>" : {
+    " · works once" : {
 
     },
     "%@ come from your Core. This Mac is not connected to one right now." : {
@@ -59,6 +59,19 @@
         }
       }
     },
+    "%lld" : {
+
+    },
+    "%lld  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld  %2$@"
+          }
+        }
+      }
+    },
     "%lld can reach this Core. Revoking signs a device out at once." : {
 
     },
@@ -94,13 +107,28 @@
     "1. Enter the address, then the code it printed." : {
 
     },
+    "1. Get the runner" : {
+
+    },
+    "1. Open a terminal on any Linux machine you control." : {
+
+    },
     "10 of 10, ready" : {
+
+    },
+    "2. Choose what it offers" : {
 
     },
     "2. Compare the check code on this Mac with the one the host prints, and type y there." : {
 
     },
+    "2. Paste this command and press Return." : {
+
+    },
     "3. Add a second admin device (your iPhone) afterwards, so losing one never locks you out." : {
+
+    },
+    "3. It asks two questions, then prints a link at the end. Come back here and paste the link." : {
 
     },
     "A pairing lasts 5 minutes from when the approver made the code. This Mac isn't told the exact time." : {
@@ -112,6 +140,15 @@
     "A runner holds exactly runner: it only redeems secret leases." : {
 
     },
+    "A typed code, if the command cannot run there. Core then asks you to compare a check code." : {
+
+    },
+    "AI sessions (let AI sessions work here)" : {
+
+    },
+    "AI sessions at the same time" : {
+
+    },
     "Access it loses" : {
 
     },
@@ -119,6 +156,24 @@
 
     },
     "Active now" : {
+
+    },
+    "Add another" : {
+
+    },
+    "Advanced" : {
+
+    },
+    "Advanced · separate switches" : {
+
+    },
+    "Ainkrad Core for Mac (.dmg)" : {
+
+    },
+    "Ainkrad asks for Touch ID once to add this Mac. %@" : {
+
+    },
+    "Ainkrad runs your AI sessions and terminals on a Core. This Mac shows you everything it does." : {
 
     },
     "All %lld groups match." : {
@@ -139,6 +194,9 @@
     "Cancel pairing" : {
 
     },
+    "Cancel this code" : {
+
+    },
     "Case doesn't matter. I and L count as 1, O as 0." : {
 
     },
@@ -154,13 +212,43 @@
     "Checking the Core" : {
 
     },
+    "Checking this Core, then claiming your invite" : {
+
+    },
     "Close" : {
+
+    },
+    "Close anyway" : {
+
+    },
+    "Coming soon" : {
 
     },
     "Confirm with Touch ID" : {
 
     },
+    "Connect" : {
+
+    },
+    "Connected" : {
+
+    },
+    "Connection: runner. It can only receive work from this Core. What it offers, what runs on it and who may use it are on its runner page." : {
+
+    },
     "Continue" : {
+
+    },
+    "Copied" : {
+
+    },
+    "Copies the install command" : {
+
+    },
+    "Copies the link and its one-time secret; cleared after a minute." : {
+
+    },
+    "Copy" : {
 
     },
     "Copy QR text" : {
@@ -169,10 +257,16 @@
     "Copy code" : {
 
     },
+    "Copy link" : {
+
+    },
     "Copy the pairing link from the device that added this Mac. It already holds the address and the code." : {
 
     },
     "Core fingerprint" : {
+
+    },
+    "Core shows the command in the next step, with these choices in it." : {
 
     },
     "Create a new pairing" : {
@@ -188,6 +282,12 @@
 
     },
     "Done" : {
+
+    },
+    "Download it from GitHub Releases onto the machine and unpack it." : {
+
+    },
+    "Each change asks for Touch ID and the runner restarts for a moment. You can change these later on the runner's page." : {
 
     },
     "Each ends by itself when its time runs out. Clear one to end it now." : {
@@ -208,6 +308,9 @@
     "Expires in " : {
 
     },
+    "Fewer AI sessions" : {
+
+    },
     "Fingerprint" : {
 
     },
@@ -217,7 +320,19 @@
     "Found a Core on this Mac" : {
 
     },
+    "From GitHub Releases · signed and notarized" : {
+
+    },
+    "Home greets you with it. It stays on this Mac. You can change it later in Settings, Mac." : {
+
+    },
     "I have a code" : {
+
+    },
+    "I have the link" : {
+
+    },
+    "It checks the release signature before it runs anything, and needs root to set Core up as a service." : {
 
     },
     "It doesn't match" : {
@@ -247,6 +362,30 @@
     "Loading…" : {
 
     },
+    "Make a new QR" : {
+
+    },
+    "Make a new code" : {
+
+    },
+    "Make a new invite" : {
+
+    },
+    "Making the code…" : {
+
+    },
+    "Making the invite…" : {
+
+    },
+    "More AI sessions" : {
+
+    },
+    "More sessions use more memory." : {
+
+    },
+    "New code" : {
+
+    },
     "No %@" : {
 
     },
@@ -265,13 +404,37 @@
     "Nothing of that kind." : {
 
     },
+    "On the new Mac, open Ainkrad Core and scan this QR, or paste the link. It works once and stays valid until a device uses it or you withdraw it." : {
+
+    },
+    "On the new device choose Connect to a Core, then enter this code:" : {
+
+    },
     "On the new device, choose Connect to a Core and enter this code, or scan the QR." : {
+
+    },
+    "On the next screen Core shows one command with a one-time token in it. Run it on the server with sudo. It installs the runner and connects it to this Core." : {
+
+    },
+    "One command does it all" : {
+
+    },
+    "One use. It stays valid until a device scans it. Revoke the device later from Devices." : {
+
+    },
+    "Online" : {
 
     },
     "Only one admin device" : {
 
     },
     "Open Ainkrad" : {
+
+    },
+    "Open Login Items" : {
+
+    },
+    "Open releases" : {
 
     },
     "Opens this device's page" : {
@@ -283,7 +446,22 @@
     "Pairing code %@" : {
 
     },
+    "Paste the link the installer printed. It starts with ainkrad://connect." : {
+
+    },
+    "Pick something else" : {
+
+    },
+    "QR code for the download page" : {
+
+    },
     "QR code for this pairing" : {
+
+    },
+    "Ready: 2 machines" : {
+
+    },
+    "Recommended: you have only one admin device. A second one with Full control is a good backup." : {
 
     },
     "Reject" : {
@@ -295,7 +473,35 @@
     "Revoking this Mac signs it out at once and returns it to Connect to a Core. It must be paired again." : {
 
     },
+    "Run these on the Mac, one after the other:" : {
+
+    },
+    "Run this one command in the unpacked runner folder:" : {
+
+    },
+    "Run this one command on the server:" : {
+
+    },
     "Save" : {
+
+    },
+    "Scan this on the new device. It connects directly; there is nothing to approve afterwards." : {
+
+    },
+    "Show QR" : {
+
+    },
+    "Step %lld of %lld: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of %2$lld: %3$@"
+          }
+        }
+      }
+    },
+    "Stopped. Connect again to carry on." : {
 
     },
     "Stopped. There is no way to continue from here." : {
@@ -310,6 +516,15 @@
           }
         }
       }
+    },
+    "Terminals (open a shell on this runner)" : {
+
+    },
+    "Terminals on this Mac" : {
+
+    },
+    "Test it" : {
+
     },
     "That doesn't match" : {
 
@@ -329,22 +544,55 @@
     "The approver approved. Say it matches to finish." : {
 
     },
+    "The code ran out." : {
+
+    },
+    "The command has a one-time secret; the copy is cleared after a minute." : {
+
+    },
     "The device stays pending. Read the new device's screen again and retype it, or reject it." : {
+
+    },
+    "The invite ran out." : {
+
+    },
+    "The invite was withdrawn." : {
 
     },
     "The keys stay on this Mac. The Core only ever sees their public halves, and records the storage as a claim." : {
 
     },
+    "The link has a one-time secret; the copy is cleared after a minute." : {
+
+    },
+    "The new device connected. Compare the check code with the one on its screen." : {
+
+    },
     "The pairing expired. Make a new code." : {
+
+    },
+    "The pairing was rejected." : {
 
     },
     "The pairing was rejected. Its keys were never enrolled." : {
 
     },
+    "The runner is not in the list yet. Change these later on its page." : {
+
+    },
     "The very first device can only be created on the machine that runs the Core, never over the network. Until this can be done from here, run this once on that machine, with the path of your Core's database." : {
 
     },
+    "This Core (built-in) and This Mac" : {
+
+    },
+    "This Mac can run terminals and AI sessions for your Core, as a second machine beside the Core itself." : {
+
+    },
     "This Mac creates a one-time code. Whoever enters it still needs your approval." : {
+
+    },
+    "This Mac does not hold %@, so it cannot hand it on." : {
 
     },
     "This Mac is paired" : {
@@ -363,6 +611,9 @@
 
     },
     "This device can't open the admin pages: settings, secrets, audit, ops and lockouts are hidden." : {
+
+    },
+    "This runner is too old to change these from the app. Update it first, or change how it starts on the machine." : {
 
     },
     "Too many failed tries lock an address or a device for a while. Each new lock lasts twice as long, up to an hour." : {
@@ -392,7 +643,19 @@
     "Unlocked" : {
 
     },
+    "Use a typed code instead" : {
+
+    },
     "Use it" : {
+
+    },
+    "Use this Mac as a runner" : {
+
+    },
+    "Valid for " : {
+
+    },
+    "Valid for %@ · works once" : {
 
     },
     "Waiting for Touch ID" : {
@@ -404,7 +667,16 @@
     "Waiting for the new device to claim it" : {
 
     },
+    "Waiting for the new device…" : {
+
+    },
+    "Waiting for the runner…" : {
+
+    },
     "Waiting…" : {
+
+    },
+    "What it may do. You can only give what this Mac holds." : {
 
     },
     "What should we call you? Home greets you with it. It stays on this Mac." : {
@@ -413,7 +685,19 @@
     "What this device may do" : {
 
     },
+    "When it is ready, a QR here opens its App Store or TestFlight page. You can add a Mac or a runner now." : {
+
+    },
+    "When this Mac sleeps or goes offline, its terminals and AI sessions pause. The Core keeps the session and shows it as interrupted." : {
+
+    },
     "Where a key is kept is what each device said when it paired. Your Core can't check it." : {
+
+    },
+    "Withdraw" : {
+
+    },
+    "Withdraw the invite" : {
 
     },
     "You can take scopes away here. To give more, pair the device again." : {
@@ -422,7 +706,10 @@
     "You will be signed out of this Mac and sent back to Connect." : {
 
     },
-    "Your Core is the server that runs your agents and terminals. This Mac connects to it to show you everything." : {
+    "Your Core is the server that runs your AI sessions and terminals. This Mac connects to it to show you everything." : {
+
+    },
+    "brew install --cask ainkrad-core" : {
 
     },
     "• %@" : {

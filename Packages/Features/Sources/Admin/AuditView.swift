@@ -95,7 +95,7 @@ enum AuditWords {
         "limit_set": "set a provider limit on", "limit_cleared": "cleared a provider limit on",
         "login_started": "started a sign-in for", "login_failed": "had a failed sign-in for",
         "login_cancelled": "stopped a sign-in for", "updated": "changed", "disabled": "turned off",
-        "enabled": "turned on", "used": "used", "use": "used", "granted": "let an agent use",
+        "enabled": "turned on", "used": "used", "use": "used", "granted": "let an AI session use",
         "rotated": "gave a new token to", "default_set": "made the default",
         "default_cleared": "cleared the default of",
     ]
@@ -177,7 +177,7 @@ enum AuditWords {
     private static func thing(_ kind: String) -> String {
         [
             "device": "a device", "pairing": "a pairing", "session": "a session", "terminal": "a terminal",
-            "agent": "an agent", "account": "an account", "connection": "a connection",
+            "agent": "an AI session", "account": "an account", "connection": "a connection",
         ][kind] ?? "a \(kind)"
     }
 

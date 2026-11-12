@@ -284,7 +284,9 @@ public final class AccountsModel {
         let key = "account-\(a.id)"
         await write(
             key,
-            reason: on ? "Turn on \(a.label). Agents can use it again." : "Turn off \(a.label). New sessions skip it.",
+            reason: on
+                ? "Turn on \(a.label). AI sessions can use it again."
+                : "Turn off \(a.label). New sessions skip it.",
             done: on ? "\(a.label) is on" : "\(a.label) is off. Running sessions keep going until they end.",
             undo: { [weak self] in await self?.setEnabled(a, !on) }
         ) { _ = try await $0.setState(account: a.id, state: on ? "active" : "disabled") }
@@ -430,7 +432,7 @@ public final class AccountsModel {
     func delete(_ c: ChainItem) async -> Bool {
         let ok = await write(
             "delete-chain-\(c.id)",
-            reason: "Delete the chain \(c.name). Agents bound to it fall back to the default chain.",
+            reason: "Delete the chain \(c.name). AI sessions bound to it fall back to the default chain.",
             done: "\(c.name) deleted"
         ) { try await $0.deleteChain(c.id) }
         if ok { chainSelection = nil }
@@ -572,7 +574,7 @@ public final class AccountsModel {
                 })
         }
         entry(
-            "core", "Accounts", "Your accounts and the order agents use them", "creditcard",
+            "core", "Accounts", "Your accounts and the order AI sessions use them", "creditcard",
             ["provider", "claude", "codex", "gemini", "budget"]
         ) {
             $0.show(.accounts)
@@ -611,7 +613,7 @@ public final class AccountsModel {
             $0.show(.chains)
         }
         entry(
-            "accounts-pools", "Account pools", "Which accounts serve which agents", "square.grid.2x2",
+            "accounts-pools", "Account pools", "Which accounts serve which AI sessions", "square.grid.2x2",
             ["pool", "default", "fallback"]
         ) {
             $0.show(.pools)

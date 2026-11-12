@@ -43,7 +43,7 @@ struct CostsPage: View {
         if model.usage.isEmpty {
             AccStateCard(
                 symbol: "chart.bar", title: "Nothing spent yet",
-                text: "Once agents use an account, its tokens and spend show here.")
+                text: "Once AI sessions use an account, its tokens and spend show here.")
         } else {
             accounts(total)
             companies

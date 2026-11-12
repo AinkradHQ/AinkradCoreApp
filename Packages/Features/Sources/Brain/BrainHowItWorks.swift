@@ -13,8 +13,8 @@ public enum BrainHowItWorks {
     public static let sections: [Section] = [
         Section(
             title: "What it keeps",
-            text: "Decisions, facts, preferences, landmines and open threads that your agents learn, each with the "
-                + "sources it came from. It keeps what is worth remembering, not every word."),
+            text: "Decisions, facts, preferences, landmines and open threads that your AI sessions learn, "
+                + "each with the sources it came from. It keeps what is worth remembering, not every word."),
         Section(
             title: "Rooms",
             text: "Memory lives in rooms, and a room is sealed apart from every other. Employers and clients "

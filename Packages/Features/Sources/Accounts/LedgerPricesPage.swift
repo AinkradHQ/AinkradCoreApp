@@ -30,7 +30,7 @@ struct LedgerPage: View {
         let rows = model.costs.filter { only == nil || $0.accountID == only }
         if model.costs.isEmpty {
             AccStateCard(
-                symbol: "list.bullet", title: "No calls yet", text: "Each model call an agent makes lands here.")
+                symbol: "list.bullet", title: "No calls yet", text: "Each model call an AI session makes lands here.")
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Space.s2) {

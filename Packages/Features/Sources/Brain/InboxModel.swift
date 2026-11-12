@@ -141,7 +141,7 @@ extension BrainModel {
         return await inboxRun(
             .approve(id: id, room: c.room, edit: edit, options: options), ask: nil, item: id, kind: "Approved",
             text: edit == nil ? "Approved: \(c.title)" : "Approved with your edit: \(edit?.title ?? c.title)",
-            toast: offline ? "Approved. It waits to sync." : "Approved. Agents can use it now.")
+            toast: offline ? "Approved. It waits to sync." : "Approved. AI sessions can use it now.")
     }
 
     @discardableResult
@@ -222,7 +222,7 @@ extension BrainModel {
         let word = mode == .copy ? "Copied" : "Assigned"
         let ask =
             widens(target)
-            ? "Put \(BrainWords.plural(n, "capture", "captures")) into \(target.name), which cloud agents can reach."
+            ? "Put \(BrainWords.plural(n, "capture", "captures")) into \(target.name), which cloud AI sessions can reach."
             : nil
         let r = await inboxRun(
             .assign(ids: ids, room: roomID, mode: mode), ask: ask, item: ids[0], kind: word,
@@ -242,7 +242,7 @@ extension BrainModel {
             notice = "Paused. \(p)"
             return .failed
         }
-        let ask = targets.contains(where: widens) ? "Split a capture into rooms that cloud agents can reach." : nil
+        let ask = targets.contains(where: widens) ? "Split a capture into rooms that cloud AI sessions can reach." : nil
         return await inboxRun(
             .split(id: id, rooms: roomIDs), ask: ask, item: id, kind: "Split",
             text: "Split in two and assigned, both parts waiting for approval", toast: "Split and assigned")

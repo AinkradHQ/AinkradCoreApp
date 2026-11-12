@@ -92,7 +92,7 @@ private struct ChainDetail: View {
                     Text(chain.name).coreFont(size: MacTextSize.large, weight: .bold)
                     Label(
                         chain.isDefault
-                            ? "Default: for agents with no chain of their own" : "Serves agents bound to it",
+                            ? "Default: for AI sessions with no chain of their own" : "Serves AI sessions bound to it",
                         systemImage: chain.isDefault ? "checkmark.circle" : "link"
                     )
                     .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
@@ -127,8 +127,11 @@ private struct ChainDetail: View {
             }
             AccPanel(spacing: Space.s2) {
                 HStack(spacing: Space.s3) {
-                    Label("Bind agents where you start work: Agents > Agents and chains", systemImage: "person.2")
-                        .coreFont(size: MacTextSize.body).fixedSize(horizontal: false, vertical: true)
+                    Label(
+                        "Bind AI sessions where you start work: AI Sessions > Account orders",
+                        systemImage: "person.2"
+                    )
+                    .coreFont(size: MacTextSize.body).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Space.s2)
                     AppActionTile(title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue) {
                         model.openChainBinding()
