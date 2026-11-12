@@ -68,6 +68,8 @@ public final class AgentsModel {
     public var selected: String?
     /// The runner the New session sheet starts on (set by the runner page); nil: the best ready one.
     public var newSessionRunner: String?
+    /// The project the New session sheet opens on (the empty session's "Or start in a project"); nil: a fresh folder.
+    var newSessionPlace: ConversationWords.Place?
     /// Each session's name: the first line of its prompt (Core sends no title yet, KAN-455). Filled on create, from a loaded
     /// transcript, or by `loadTitle` when a tile shows.
     public internal(set) var titles: [String: String] = [:]

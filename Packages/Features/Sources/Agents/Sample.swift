@@ -297,12 +297,20 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         func head(_ h: String, _ p: String) -> [EntryKind] { [.started(harness: h, resumed: false), .user(p)] }
 
         // Waiting on you (three, with 292 s, 130 s and 241 s left).
-        let a1 = session(1, "claude", "d_mac", .running, age: 38 * 60, tin: 312_400, tout: 101_300, cost: 3_420_000)
+        let a1 = session(1, "claude", "d_mac", .running, age: 38 * 60, tin: 118_400, tout: 23_300, cost: 3_420_000)
         api.add(
             a1,
             entries: head(
                 "claude", "Bootstrap Citadel on the new Core and open the PR against development.\nUse the e2-14 plan.")
-                + work(12) + [
+                // Two finished turns, so the "Turn N done · time · cost" line shows. Costs are the session's running
+                // total, as the Core sends them; the store turns them into each turn's own.
+                + work(6) + [
+                    .turnEnded(costMicros: 1_180_000, tokens: 52_400),
+                    .user("Good. Now the store and the routes, then open the PR."),
+                ] + work(6) + [
+                    .turnEnded(costMicros: 2_640_000, tokens: 61_900),
+                    .user("Tests pass on my side too. Go ahead and open it."),
+                ] + [
                     .toolUse(id: "g0", name: "github.get_issue", summary: "#142"),
                     .toolResult(
                         id: "g0", name: "github.get_issue", ok: true, exitCode: nil, output: "", durationMs: 300),
@@ -314,7 +322,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                     ask("req_push", "Bash", "git push -u origin feat/e2-14-citadel-bootstrap"),
                 ], endsAt: ago(8))
         api.ledgerList[a1.id] = SessionLedger(
-            costMicros: 3_910_000, tokens: 413_700, unpriced: false, account: "claude-api-metered",
+            costMicros: 3_910_000, tokens: 141_700, unpriced: false, account: "claude-api-metered",
             maxUSDMicros: 5_000_000, maxTokens: 2_000_000)
         let a2 = session(2, "claude", "d_ora", .running, age: 27 * 60, tin: 121_800, tout: 30_200, cost: 870_000)
         api.add(
@@ -342,18 +350,21 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                 .interrupted(reason: "the runner restarted"),
             ])
         api.add(
-            session(6, "codex", "d_lin", .ended, .succeeded, age: 55 * 60, tin: 402_100, tout: 97_800, cost: 1_210_000),
-            entries: head("codex", "Wire notifications through the push policy") + work(8) + [
+            session(6, "codex", "d_lin", .ended, .succeeded, age: 55 * 60, tin: 128_100, tout: 31_700, cost: 1_210_000),
+            entries: head("codex", "Wire notifications through the push policy") + work(4) + [
+                .turnEnded(costMicros: 540_000, tokens: 71_300), .user("Looks right. Open the PR."),
+            ] + work(4) + [
                 .assistant("Notifications are wired through the push policy and the PR is open."),
+                .turnEnded(costMicros: 1_210_000, tokens: 88_500),
                 .ended(kind: "succeeded", reason: nil),
             ])
         api.add(
-            session(7, "claude", "d_ora", .ended, .stalled, age: 72 * 60, tin: 233_900, tout: 41_200, cost: 1_640_000),
+            session(7, "claude", "d_ora", .ended, .stalled, age: 72 * 60, tin: 98_600, tout: 21_200, cost: 1_640_000),
             entries: head("claude", "Find out why the nightly build stalls after the cache step") + work(5) + [
                 .ended(kind: "stalled", reason: "no progress for a long while")
             ])
         api.add(
-            session(8, "codex", "d_lin", .ended, .tokenCap, age: 123 * 60, tin: 480_000, tout: 20_000, cost: 2_300_000),
+            session(8, "codex", "d_lin", .ended, .tokenCap, age: 123 * 60, tin: 152_000, tout: 18_000, cost: 2_300_000),
             entries: head(
                 "codex",
                 "Migrate the audit log to the new schema, keeping every row, and write the rollback so it can be run twice without losing anything"
