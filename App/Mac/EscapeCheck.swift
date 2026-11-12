@@ -11,7 +11,7 @@ import SwiftUI
 enum EscapeCheck {
     static func run(_ app: AppModel, dir: String) async {
         try? await Task.sleep(for: .seconds(4))
-        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else { return log("no main window") }
+        guard let window = await SnapshotCapture.mainWindow() else { return log("no main window") }
         let shell = app.shell
         func settle(_ s: Double = 0.5) async { try? await Task.sleep(for: .seconds(s)) }
         func state(_ label: String) {
@@ -111,13 +111,7 @@ enum EscapeCheck {
     }
 
     private static func capture(_ window: NSWindow, to path: String) -> Bool {
-        guard
-            let image = CGWindowListCreateImage(
-                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
-                [.boundsIgnoreFraming, .nominalResolution]),
-            let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
-        else { return false }
-        return (try? png.write(to: URL(fileURLWithPath: path))) != nil
+        SnapshotCapture.png(window, to: path)
     }
 
     private static func log(_ s: String) { FileHandle.standardError.write(Data("ESC \(s)\n".utf8)) }
