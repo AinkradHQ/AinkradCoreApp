@@ -1,6 +1,10 @@
 import SwiftUI
 
-public enum CoreButtonKind: Sendable { case prominent, secondary, plain, danger }
+public enum CoreButtonKind: Sendable {
+    case prominent, secondary, plain, danger
+    /// Red ink and a red outline on a quiet fill: Delete, Revoke, Disconnect where a solid red tile would shout.
+    case quietDanger
+}
 public enum CoreButtonSize: Sendable {
     case small, medium, large
     var height: CGFloat {
@@ -46,6 +50,7 @@ extension ButtonStyle where Self == CoreButtonStyle {
     public static var coreSecondary: CoreButtonStyle { CoreButtonStyle(.secondary) }
     public static var corePlain: CoreButtonStyle { CoreButtonStyle(.plain) }
     public static var coreDanger: CoreButtonStyle { CoreButtonStyle(.danger) }
+    public static var coreQuietDanger: CoreButtonStyle { CoreButtonStyle(.quietDanger) }
 }
 
 private struct CoreButtonBody: View {
@@ -65,7 +70,7 @@ private struct CoreButtonBody: View {
     private var hover: Bool { hovering || forced == .hover }
 
     var body: some View {
-        let ink: Color = .white
+        let ink: Color = kind == .quietDanger ? GlassInk.redInk : .white
         HStack(spacing: Space.s2) {
             ZStack {
                 configuration.label.opacity(busy ? 0 : 1)
@@ -101,7 +106,7 @@ private struct CoreButtonBody: View {
         switch kind {
         case .prominent: pressed ? palette.btnPrimaryPress : hover ? palette.btnPrimaryHover : palette.btnPrimary
         case .secondary: hover || pressed ? palette.uDim : .clear
-        case .plain: hover || pressed ? palette.uDim : .clear
+        case .plain, .quietDanger: hover || pressed ? palette.uDim : .clear
         // ui.css `.btn.danger`: solid #D92D20, #E4402F on hover, white label in both themes.
         case .danger:
             hover || pressed
@@ -131,10 +136,13 @@ private struct ButtonSurface: ViewModifier {
                 case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.95 : 0.8))
                 case .secondary: shape.fill(hover ? hue.opacity(0.28) : GlassInk.well)
                 case .plain: shape.fill(hover ? GlassInk.wellHover : .clear)
+                case .quietDanger: shape.fill(GlassInk.red.opacity(hover ? 0.22 : 0.1))
                 }
             }
             .overlay {
-                if kind != .plain {
+                if kind == .quietDanger {
+                    shape.strokeBorder(GlassInk.red.opacity(hover ? 0.85 : 0.55), lineWidth: 1)
+                } else if kind != .plain {
                     shape.strokeBorder(
                         .white.opacity(0.3 + (hover ? 0.15 : 0)), lineWidth: 1)
                 }
