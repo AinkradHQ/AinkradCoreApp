@@ -35,7 +35,8 @@ if [ -z "$src" ]; then
   [ "$got" = "$SHA256_ARM64" ] || { rm -f "$cache/$name.zip"; echo "error: bundle-runner: checksum of $name.zip is $got, expected $SHA256_ARM64" >&2; exit 1; }
   rm -rf "$cache/unpacked"
   ditto -x -k "$cache/$name.zip" "$cache/unpacked"
-  src=$cache/unpacked/$name/bin
+  # The Core release zip holds the two binaries at its root; a mac-package.sh zip has them in <name>/bin.
+  src=$cache/unpacked; [ -d "$src/$name/bin" ] && src=$src/$name/bin
 fi
 for b in ainkrad-runner ainkrad-ptyhost; do
   [ -x "$src/$b" ] || skip "no $b in $src"
