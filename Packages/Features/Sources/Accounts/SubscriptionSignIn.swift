@@ -176,7 +176,7 @@ struct SubscriptionSignIn: View {
                 .coreBounce(account)
             Text("Your Claude plan is connected").coreFont(size: MacTextSize.large, weight: .bold)
             Text(
-                "It's saved in your Core as \(model.signIn?.label ?? "your plan"). Put it in a pool of its own so agents can use it."
+                "It's saved in your Core as \(model.signIn?.label ?? "your plan"). Put it in a pool of its own so AI sessions can use it."
             )
             .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)

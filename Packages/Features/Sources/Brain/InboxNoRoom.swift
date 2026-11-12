@@ -13,7 +13,7 @@ struct NoRoomList: View {
                 "lock", GlassInk.slate,
                 Text("This list is not a room. ").bold()
                     + Text(
-                        "These captures had no trusted room. They are never searched and never shown to agents. A capture older than 14 days shows as stale, and at 30 days it also rings the bell. Nothing is deleted or assigned for you."
+                        "These captures had no trusted room. They are never searched and never shown to AI sessions. A capture older than 14 days shows as stale, and at 30 days it also rings the bell. Nothing is deleted or assigned for you."
                     ))
             if st.captures.isEmpty {
                 BrainStateCard(

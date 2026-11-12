@@ -14,8 +14,34 @@
         }
       }
     },
+    "%@ is offline right now" : {
+
+    },
+    "%@ is online" : {
+
+    },
     "%@ needs a look" : {
 
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@. Choose another to replace it." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@. Choose another to replace it."
+          }
+        }
+      }
     },
     "%@, %@" : {
       "localizations" : {
@@ -23,6 +49,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %lld secrets" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld secrets"
           }
         }
       }
@@ -47,11 +83,43 @@
         }
       }
     },
-    "%lld bytes · hidden" : {
+    "%lld" : {
 
+    },
+    "%lld secret%@ in it: %@. The Core may refuse until they are moved or deleted." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld secret%2$@ in it: %3$@. The Core may refuse until they are moved or deleted."
+          }
+        }
+      }
     },
     "%lld shown" : {
 
+    },
+    "A group keeps related secrets together. Its runners can use all of them, in one step." : {
+
+    },
+    "Add the value. Ainkrad seals it. You will never see it again, only its name and size." : {
+
+    },
+    "All runners" : {
+
+    },
+    "Allowed on %@" : {
+
+    },
+    "Allowed on %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Allowed on %1$@, %2$@"
+          }
+        }
+      }
     },
     "Anything that looks like a real key is refused, to keep you safe while testing." : {
 
@@ -63,6 +131,9 @@
 
     },
     "Audit rows" : {
+
+    },
+    "Back" : {
 
     },
     "Back to default" : {
@@ -77,6 +148,9 @@
     "Change…" : {
 
     },
+    "Collapsed" : {
+
+    },
     "Copy name" : {
 
     },
@@ -89,21 +163,20 @@
     "Delete %@" : {
 
     },
+    "Delete %@ (⌫)" : {
+
+    },
+    "Delete with Touch ID" : {
+
+    },
     "Delete…" : {
 
     },
     "Drivers: %@" : {
 
     },
-    "Entry %lld · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Entry %1$lld · %2$@"
-          }
-        }
-      }
+    "Expanded" : {
+
     },
     "Find a name: a device, secret or setting" : {
 
@@ -111,13 +184,13 @@
     "Fine" : {
 
     },
-    "First value" : {
-
-    },
     "Hide history" : {
 
     },
     "History of %@" : {
+
+    },
+    "Keep related secrets together and give them to runners in one step" : {
 
     },
     "Key %@ · stored by %@" : {
@@ -133,26 +206,26 @@
     "Keys and secrets in Feature switches (secrets.mode = %lld)" : {
 
     },
-    "Lease %@" : {
-
-    },
-    "Lend…" : {
-
-    },
-    "Lent to %@" : {
-
-    },
-    "Lent to %@, %@" : {
+    "Left empty, it uses the runners of %@: %@." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Lent to %1$@, %2$@"
+            "value" : "Left empty, it uses the runners of %1$@: %2$@."
           }
         }
       }
     },
     "Less safe when on" : {
+
+    },
+    "Let a runner use %@" : {
+
+    },
+    "Let a runner use it (L)" : {
+
+    },
+    "Let a runner use it…" : {
 
     },
     "Loading" : {
@@ -161,16 +234,28 @@
     "Loading…" : {
 
     },
+    "Make group" : {
+
+    },
     "Needs a look" : {
+
+    },
+    "New value (E)" : {
 
     },
     "New value…" : {
 
     },
-    "No runner may borrow this secret yet." : {
+    "Next" : {
 
     },
-    "No runners yet. A secret no runner may borrow can't be lent." : {
+    "No runner may borrow this yet." : {
+
+    },
+    "No runners yet. A secret no runner may use can't be given to an AI session." : {
+
+    },
+    "No secret matches." : {
 
     },
     "Nothing can be added or lent until you turn on Test keys." : {
@@ -197,6 +282,9 @@
     "Replace the value of %@" : {
 
     },
+    "Replace what is sealed. Name and settings stay." : {
+
+    },
     "Row details" : {
 
     },
@@ -210,7 +298,10 @@
         }
       }
     },
-    "Runners can no longer borrow it. This can't be undone." : {
+    "Save" : {
+
+    },
+    "Seal secret" : {
 
     },
     "Secrets are off" : {
@@ -225,7 +316,10 @@
     "Show the next %lld older rows" : {
 
     },
-    "Terminals are off: this runner was started without terminal support." : {
+    "Technical details" : {
+
+    },
+    "Terminals are off. Turn them on on the machine that runs this runner." : {
 
     },
     "Terminals work on this runner." : {
@@ -237,23 +331,31 @@
     "That's the start of the log" : {
 
     },
+    "The group is empty. This cannot be undone." : {
+
+    },
+    "The ids, entry number and action code behind this row." : {
+
+    },
+    "The old value is removed. Running sessions keep the old value until they end." : {
+
+    },
+    "This cannot be undone." : {
+
+    },
     "Try again" : {
 
     },
     "Up to %@. It comes back by itself when the time runs out." : {
 
     },
-    "Value %lld, replaced %lld×" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Value %1$lld, replaced %2$lld×"
-          }
-        }
-      }
+    "Up to 1 MB. Ainkrad never shows what is inside." : {
+
     },
-    "Value, %lld bytes, hidden" : {
+    "Used by" : {
+
+    },
+    "What kind of value is it?" : {
 
     },
     "When things happened" : {

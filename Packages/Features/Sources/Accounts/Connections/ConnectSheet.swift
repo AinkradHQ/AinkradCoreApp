@@ -44,7 +44,7 @@ enum ConnDialogs {
             CoreDialogPanel("Disconnect \(c.name)?") {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     CoreNotice(
-                        symbol: "exclamationmark.triangle", title: "Agents lose access to \(c.identity).",
+                        symbol: "exclamationmark.triangle", title: "AI sessions lose access to \(c.identity).",
                         text:
                             "Running sessions keep going but can't reach \(m.kind(c.kind)?.name ?? c.kind). You can connect it again later.",
                         tone: .warn)
@@ -118,7 +118,7 @@ struct ConnectSheet: View {
         case .connected(let id):
             CoreDialogPanel("Connected") {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    Text("Your agents can use it now.").foregroundStyle(GlassInk.secondary)
+                    Text("Your AI sessions can use it now.").foregroundStyle(GlassInk.secondary)
                     if let c = model.item(id) {
                         AccPanel {
                             HStack(spacing: Space.s3) {

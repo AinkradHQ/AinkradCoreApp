@@ -4,6 +4,12 @@
     "" : {
 
     },
+    " " : {
+
+    },
+    "  " : {
+
+    },
     "$" : {
 
     },
@@ -17,11 +23,28 @@
         }
       }
     },
+    "%@ / %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@ %3$@"
+          }
+        }
+      }
+    },
     "%@ / M" : {
 
     },
-    "%@ arrived and is in your Core." : {
-
+    "%@ It answered in %lld ms." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ It answered in %2$lld ms."
+          }
+        }
+      }
     },
     "%@ held by running work" : {
 
@@ -36,7 +59,20 @@
         }
       }
     },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
     "%@ still uses this pool, so it can't be deleted yet. Take it out of the chain first." : {
+
+    },
+    "%@ tokens" : {
 
     },
     "%@ tokens had no price" : {
@@ -62,6 +98,9 @@
         }
       }
     },
+    "%@ works for AI sessions" : {
+
+    },
     "%@ · %@" : {
       "localizations" : {
         "en" : {
@@ -71,6 +110,19 @@
           }
         }
       }
+    },
+    "%@ · since %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · since %2$@"
+          }
+        }
+      }
+    },
+    "%@ · your own provider, not usable by AI sessions yet" : {
+
     },
     "%@, %@" : {
       "localizations" : {
@@ -102,22 +154,22 @@
         }
       }
     },
-    "%@: %lld" : {
+    "%@, with a %@ monthly limit. It answered in %lld ms." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@: %2$lld"
+            "value" : "%1$@, with a %2$@ monthly limit. It answered in %3$lld ms."
           }
         }
       }
     },
-    "%@: %lld of %lld" : {
+    "%@: %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@: %2$lld of %3$lld"
+            "value" : "%1$@: %2$@"
           }
         }
       }
@@ -131,16 +183,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lld account%2$@"
-          }
-        }
-      }
-    },
-    "%lld account%@%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld account%2$@%3$@"
           }
         }
       }
@@ -175,16 +217,6 @@
         }
       }
     },
-    "%lld ready, %lld need a look, %lld turned off or other" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld ready, %2$lld need a look, %3$lld turned off or other"
-          }
-        }
-      }
-    },
     "%lld. %@" : {
       "localizations" : {
         "en" : {
@@ -201,7 +233,13 @@
     "0.00" : {
 
     },
+    "A Claude plan gets its own pool and goes to the end of the order. Drag it in Accounts to move it." : {
+
+    },
     "A lower limit starts with the next session, resume or top-up. Sessions running now keep the limit they started with." : {
+
+    },
+    "A plan has no key to test. Check sign-in sends one short message through a runner. It uses a little of the plan's quota, not money." : {
 
     },
     "A pool holds accounts of one provider. It starts empty." : {
@@ -213,7 +251,28 @@
     "A session tries the first pool that has an account to give. Running sessions keep the chain they started with." : {
 
     },
+    "AI sessions can't reach it yet." : {
+
+    },
+    "AI sessions run their tools on a runner. A provider is ready when a runner that is online can serve it." : {
+
+    },
+    "AI sessions stop using it when it reaches this. You can change it later. 0 means no limit." : {
+
+    },
+    "AI sessions try accounts in an order. Most people keep the defaults." : {
+
+    },
+    "AI sessions try these accounts in this order" : {
+
+    },
+    "AI sessions will be able to change things on %@ as you. Saving needs Touch ID." : {
+
+    },
     "API key" : {
+
+    },
+    "Accounts of the same provider share the work. New accounts go to the end of the list." : {
 
     },
     "Accounts use this provider, so how it speaks and its key prefix stay as they are." : {
@@ -222,22 +281,25 @@
     "Accounts, in the order they're tried" : {
 
     },
-    "Add a provider" : {
+    "Activity" : {
 
     },
-    "Add an API key" : {
+    "Add account" : {
 
     },
     "Add an account to get this pool working." : {
 
     },
+    "Add with the defaults" : {
+
+    },
+    "Add your %@ key" : {
+
+    },
     "Adds room for %@ only, and clears its alert. The next period starts from the cap again." : {
 
     },
-    "Agents can't reach it yet." : {
-
-    },
-    "Agents will be able to change things on %@ as you. Saving needs Touch ID." : {
+    "Advanced" : {
 
     },
     "All accounts" : {
@@ -246,7 +308,10 @@
     "All accounts (esc)" : {
 
     },
-    "Bind agents where you start work: Agents > Agents and chains" : {
+    "Back" : {
+
+    },
+    "Bind AI sessions where you start work: AI Sessions > Account orders" : {
 
     },
     "Cache" : {
@@ -264,7 +329,16 @@
     "Changing the app can make existing %@ sign-ins ask to be signed in again." : {
 
     },
+    "Check the key on" : {
+
+    },
+    "Choose a provider. Ainkrad checks if it can work on this Core." : {
+
+    },
     "Choose on github.com" : {
+
+    },
+    "Choose where it goes…" : {
 
     },
     "Claude's sign-in runs on %@." : {
@@ -279,7 +353,13 @@
     "Code %@" : {
 
     },
-    "Copies the command. It has no key in it." : {
+    "Collapsed" : {
+
+    },
+    "Connected" : {
+
+    },
+    "Core did not share the calls with this Mac." : {
 
     },
     "Core is checking it again. If it's refused again, the account turns off by itself." : {
@@ -297,16 +377,28 @@
     "Could not load usage. %@" : {
 
     },
+    "Couldn't connect" : {
+
+    },
     "Couldn't connect Claude" : {
 
     },
     "Default pool for its provider" : {
 
     },
-    "Default: for agents with no chain of their own" : {
+    "Default: for AI sessions with no chain of their own" : {
 
     },
     "Delete %@" : {
+
+    },
+    "Done" : {
+
+    },
+    "Drag to change it. If one is over its limit or fails, the next one takes over." : {
+
+    },
+    "Each model call an AI session makes lands here." : {
 
     },
     "Enter this code on github.com. It works for 15 minutes." : {
@@ -315,10 +407,16 @@
     "Every %@ account is already in this pool." : {
 
     },
+    "Expanded" : {
+
+    },
     "GitHub asks for this code after you sign in." : {
 
     },
     "Give %@ this return address, exactly:" : {
+
+    },
+    "Go to API keys, choose Create key, and copy it. Ainkrad never sees your password." : {
 
     },
     "Hard stop" : {
@@ -330,13 +428,22 @@
     "In no pool" : {
 
     },
+    "Included in your Claude plan" : {
+
+    },
+    "Install %@ on a runner." : {
+
+    },
+    "Installed. Checking the runner…" : {
+
+    },
     "It goes last in the fallback order." : {
 
     },
     "It runs without a cap after this. Spend already recorded stays in the ledger." : {
 
     },
-    "It's saved in your Core as %@. Put it in a pool of its own so agents can use it." : {
+    "It's saved in your Core as %@. Put it in a pool of its own so AI sessions can use it." : {
 
     },
     "Its accounts can't join pools or chains yet. Models need a price to count as spend." : {
@@ -364,10 +471,10 @@
     "Keys go to it only through Core's gateway, matched by their prefix. Without a test path, a key test answers Can't tell." : {
 
     },
-    "Limits" : {
+    "Last 30 days, from the newest 100 calls" : {
 
     },
-    "List prices read %@" : {
+    "Limits" : {
 
     },
     "Loading" : {
@@ -376,31 +483,49 @@
     "Loading…" : {
 
     },
+    "Lowercase letters, digits, dot, dash, underscore." : {
+
+    },
     "Model" : {
 
     },
     "More actions for %@" : {
 
     },
-    "More you can connect" : {
+    "More than one order, pool details, your own providers · admins only" : {
 
     },
     "More: rename, default, who can use it, replace the token" : {
 
     },
+    "Move earlier" : {
+
+    },
+    "Move later" : {
+
+    },
+    "Name it and set a limit" : {
+
+    },
+    "New account" : {
+
+    },
     "No dollar cap" : {
+
+    },
+    "No limits yet. Without one, an account can spend without a stop." : {
+
+    },
+    "No monthly limit" : {
+
+    },
+    "No runner is online to check the key." : {
 
     },
     "No usage limit. Add one to cap the tokens or messages this account may use in a window." : {
 
     },
-    "None" : {
-
-    },
     "Not used yet, so there is nothing to count." : {
-
-    },
-    "Nothing here. All your accounts are fine." : {
 
     },
     "Only if signing in doesn't work for you. Core keeps the token sealed and never shows it again." : {
@@ -412,16 +537,13 @@
     "Open %@" : {
 
     },
-    "Open %@'s own page to get a key" : {
+    "Open account" : {
 
     },
     "Open github.com" : {
 
     },
     "Open runners" : {
-
-    },
-    "OpenRouter or another API. Not usable by agents yet: its accounts can't join pools or chains." : {
 
     },
     "Opens Settings, Audit, showing only what happened to this connection" : {
@@ -454,10 +576,25 @@
     "Pools, in the order they're tried" : {
 
     },
+    "Prices are filled in by the Core release (%lld models). Nothing to enter." : {
+
+    },
+    "Prices come with the Core release. Nothing to enter." : {
+
+    },
     "Raised this period" : {
 
     },
+    "Reading the calls…" : {
+
+    },
+    "Reads as %@" : {
+
+    },
     "Remove %@" : {
+
+    },
+    "Remove account" : {
 
     },
     "Revoke the key at the provider too. Core cannot do that for you." : {
@@ -469,7 +606,7 @@
     "Sends one free request with the key through a runner. Nothing is spent." : {
 
     },
-    "Serves agents bound to it" : {
+    "Serves AI sessions bound to it" : {
 
     },
     "Session %@ · %@%@" : {
@@ -488,10 +625,13 @@
     "Showing the newest 100 calls. Costs and usage has the totals." : {
 
     },
+    "Shown as “%@” everywhere. Ainkrad makes the short name for you." : {
+
+    },
     "Sign in with your Claude Pro or Max plan. You sign in on claude.ai; Ainkrad never sees your password." : {
 
     },
-    "Sign in with your Claude plan" : {
+    "Signed in" : {
 
     },
     "Signed in as %@. Now pick which repositories Core may reach. GitHub shows the list." : {
@@ -501,6 +641,12 @@
 
     },
     "Spend and usage" : {
+
+    },
+    "Spend by day over the last 30 days" : {
+
+    },
+    "Spent this month" : {
 
     },
     "Subscription" : {
@@ -530,6 +676,12 @@
           }
         }
       }
+    },
+    "The key is checked on %@ when you add it." : {
+
+    },
+    "The order starts when you add an account." : {
+
     },
     "The pool goes. The accounts stay." : {
 
@@ -561,6 +713,27 @@
     "Try again" : {
 
     },
+    "Try another key" : {
+
+    },
+    "Turn on" : {
+
+    },
+    "Turn on keys for accounts" : {
+
+    },
+    "Turning on AI sessions…" : {
+
+    },
+    "Turning on…" : {
+
+    },
+    "Use earlier" : {
+
+    },
+    "Use later" : {
+
+    },
     "Use this site" : {
 
     },
@@ -580,40 +753,52 @@
     "Waiting for GitHub…" : {
 
     },
-    "Waiting for the key to arrive" : {
-
-    },
     "Warns only" : {
 
     },
-    "What your agents may do with %@." : {
+    "What your AI sessions may do with %@." : {
 
     },
     "When a session reaches either, Core stops it." : {
 
     },
-    "You and %lld agents" : {
+    "Where does it go?" : {
+
+    },
+    "Will be saved as %@. Lowercase letters, digits, dot, dash, underscore." : {
+
+    },
+    "Works on %@" : {
+
+    },
+    "You and %lld AI sessions" : {
 
     },
     "You have access to more than one site. Pick one; connect the other later if you need it." : {
 
     },
+    "Your AI sessions can use it now." : {
+
+    },
     "Your Claude plan is connected" : {
 
     },
-    "Your agents can use it now." : {
+    "Your Core is set to keep no provider keys. This turns that on." : {
 
     },
     "Your browser opens %@. Sign in and press Accept, then come back here." : {
 
     },
-    "Your provider · no accounts yet" : {
-
-    },
     "id %@" : {
 
     },
+    "of %@ in limits" : {
+
+    },
     "result %@" : {
+
+    },
+    "this month" : {
 
     },
     "↑↓ move · ⌘N connect" : {

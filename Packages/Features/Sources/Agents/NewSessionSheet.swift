@@ -216,7 +216,7 @@ enum SessionSource: String, CaseIterable, Sendable {
         switch self {
         case .harness: "Harness"
         case .chain: "Chain"
-        case .agent: "Agent"
+        case .agent: "AI session"
         }
     }
     static let idRule = "Use 1 to 64 letters, digits, dots, dashes, colons or underscores."

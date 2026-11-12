@@ -300,7 +300,7 @@ struct AccountsLinkSection: View {
                 }
             }
             GlassSection(
-                "The Core app", sub: "Accounts, pools and chains, shared by agents, Citadel and every device.",
+                "The Core app", sub: "Accounts, pools and chains, shared by AI sessions, Citadel and every device.",
                 symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
             ) {
                 AppActionTile(

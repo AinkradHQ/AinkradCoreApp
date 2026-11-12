@@ -111,7 +111,7 @@ private struct FeedView: View {
             if a.events.isEmpty {
                 BrainStateCard(
                     symbol: "tray", title: "Nothing has happened yet",
-                    text: "Activity appears here as agents and your devices use your rooms.")
+                    text: "Activity appears here as AI sessions and your devices use your rooms.")
             } else if a.visible.isEmpty {
                 BrainStateCard(
                     symbol: "line.3.horizontal.decrease", title: "No activity matches",

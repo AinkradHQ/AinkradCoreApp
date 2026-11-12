@@ -42,7 +42,7 @@ public enum BrainWords {
     }
 
     public static let unavailableTitle = "Brain is coming"
-    public static let unavailableText = "It will keep what your agents learn, in rooms, on your Core."
+    public static let unavailableText = "It will keep what your AI sessions learn, in rooms, on your Core."
     public static let sampleLabel = "Sample data. Core does not serve the Brain yet."
 
     // MARK: plain words. The technical term stays in the hover help.
@@ -79,7 +79,7 @@ public enum BrainWords {
         ),
         (
             "flagged", "Sources that look like instructions",
-            "Flagged as instruction-like: text that tries to give orders to an agent. It is shown as written, never run."
+            "Flagged as instruction-like: text that tries to give orders to an AI session. It is shown as written, never run."
         ),
     ]
 

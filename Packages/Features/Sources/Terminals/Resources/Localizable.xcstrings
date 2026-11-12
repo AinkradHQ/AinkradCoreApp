@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
     " ~ " : {
 
     },
@@ -13,12 +10,25 @@
     "$ ls" : {
 
     },
-    "%@ $ %@" : {
+    "%@ $ ainkrad shell" : {
+
+    },
+    "%@ %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@ $ %2$@"
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ answered in %lld ms. No work was started." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ answered in %2$lld ms. No work was started."
           }
         }
       }
@@ -39,44 +49,53 @@
         }
       }
     },
-    "%@, %@, %lld of %lld slots in use" : {
+    "%@, %@, %lld of %lld work slots in use" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@, %2$@, %3$lld of %4$lld slots in use"
+            "value" : "%1$@, %2$@, %3$lld of %4$lld work slots in use"
           }
         }
       }
     },
-    "%lld at once" : {
-
-    },
-    "%lld attached" : {
+    "%lld" : {
 
     },
     "%lld pt" : {
 
     },
-    "%lld terminals" : {
-
-    },
-    "1 terminal" : {
+    "%lld%%" : {
 
     },
     "30 × 100" : {
 
     },
+    "A name of 1 to 64 characters. It shows in the Runners list and where you pick a machine." : {
+
+    },
+    "A runner is a machine that runs terminals and AI sessions for your Core. Add the first one." : {
+
+    },
+    "AI sessions at the same time" : {
+
+    },
     "All runners" : {
+
+    },
+    "All runners (esc)" : {
+
+    },
+    "Can use your accounts" : {
 
     },
     "Cancel" : {
 
     },
-    "Detach" : {
+    "Connection: runner. It can only receive work from this Core." : {
 
     },
-    "Disconnected, so the test would fail." : {
+    "Detach" : {
 
     },
     "End Terminal…" : {
@@ -85,37 +104,64 @@
     "Family" : {
 
     },
-    "Load sampled on this Mac while it watched." : {
+    "Fewer AI sessions" : {
 
     },
-    "Needs Touch ID. Covers this action only." : {
+    "From 1 to 8. The runner restarts when this changes." : {
 
     },
-    "Needs the read and agent scopes." : {
+    "Host load per core, while this Mac watched" : {
+
+    },
+    "Install" : {
+
+    },
+    "Last heartbeat" : {
+
+    },
+    "Load" : {
+
+    },
+    "Load, while this Mac watched" : {
+
+    },
+    "Machines that do the work for your Core: terminals and AI sessions." : {
+
+    },
+    "More AI sessions" : {
+
+    },
+    "Name" : {
+
+    },
+    "Never" : {
 
     },
     "New terminal" : {
 
     },
-    "No drivers reported yet" : {
-
-    },
-    "No runners" : {
+    "No device is listed for this Core yet." : {
 
     },
     "No runners are paired with this Core." : {
 
     },
+    "No runners match this filter." : {
+
+    },
+    "No runners yet" : {
+
+    },
     "No terminals here" : {
 
     },
-    "None reported yet." : {
+    "Not reported yet" : {
 
     },
-    "Not available while disconnected." : {
+    "Nothing is running here." : {
 
     },
-    "Nothing running." : {
+    "Nothing is running here. Work that was running continues when %@ is back." : {
 
     },
     "Open" : {
@@ -130,68 +176,49 @@
     "Open terminal" : {
 
     },
-    "Opens %@ on %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Opens %1$@ on %2$@"
-          }
-        }
-      }
-    },
-    "Or any command, for example htop" : {
+    "Opens the Ainkrad shell on %@" : {
 
     },
     "Output this Mac saw in the last hour" : {
 
     },
-    "Pair a runner to open terminals." : {
+    "Pair a new machine as a runner" : {
 
     },
-    "Pick where it runs and what it starts." : {
+    "Pick where it runs." : {
 
     },
     "Preview of the terminal" : {
 
     },
-    "Program to start" : {
+    "Rename" : {
 
     },
-    "Refused while the host is over its load limit." : {
+    "Rename %@" : {
 
     },
     "Rename…" : {
 
     },
-    "Run no-op test" : {
+    "Revoke %@?" : {
 
     },
-    "Runners report work slots and load per core; memory and disk are not reported." : {
+    "Revoke with Touch ID" : {
+
+    },
+    "Runner version" : {
+
+    },
+    "Runners" : {
+
+    },
+    "Running command…" : {
 
     },
     "Runs as the runner's user in a sandbox: sudo, su and ping don't work. The terminal scope counts as admin-level today." : {
 
     },
     "Same as Settings, Appearance. Each terminal keeps its theme's colour." : {
-
-    },
-    "Send SIG%@" : {
-
-    },
-    "Send Signal…" : {
-
-    },
-    "Sends an empty round trip to the runner. No work is started." : {
-
-    },
-    "Signal to send" : {
-
-    },
-    "Start with %@" : {
-
-    },
-    "Terminal" : {
 
     },
     "Terminal on %@, %@, %lld by %lld, %lld attached" : {
@@ -207,22 +234,19 @@
     "Terminals" : {
 
     },
-    "Terminals are off here. Turn them on on the machine that runs this runner." : {
-
-    },
-    "Terminals are off on this runner." : {
-
-    },
     "Terminals this device opened. The Core keeps no output, so a tile shows the shell, not its screen." : {
 
     },
-    "The marker is the limit: above %lld per core the runner refuses new work (default)." : {
+    "Test it" : {
 
     },
-    "The runner answered in %lld ms. No work was started." : {
+    "This Core (built-in)" : {
 
     },
-    "This runner has not reported host load." : {
+    "This Mac" : {
+
+    },
+    "Time" : {
 
     },
     "Try again" : {
@@ -231,16 +255,23 @@
     "Waiting for the runner…" : {
 
     },
+    "Work running on %@ stops: %@. The runner must pair again to come back. Revoking cannot be undone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Work running on %1$@ stops: %2$@. The runner must pair again to come back. Revoking cannot be undone."
+          }
+        }
+      }
+    },
     "[exited]" : {
 
     },
-    "not attached" : {
+    "and %lld more terminals" : {
 
     },
     "test result: ok. 412 passed; 0 failed" : {
-
-    },
-    "v%@" : {
 
     },
     "warning: 2 unused imports" : {
@@ -252,7 +283,7 @@
     "~/AinkradCore $ cargo test -p citadel" : {
 
     },
-    "↩ open · D detach · E end · S signal · R rename" : {
+    "↩ open · D detach · E end · S running command · R rename" : {
 
     }
   },

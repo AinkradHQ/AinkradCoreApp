@@ -65,7 +65,7 @@ enum BudgetWords {
         switch k {
         case "account": "Account"
         case "pool": "Pool"
-        case "agent": "Agent"
+        case "agent": "AI session"
         case "company": "Company"
         case "department": "Department"
         case "project": "Project"
