@@ -16,7 +16,7 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
         case .mac: GlassInk.slate
         case .apps: GlassInk.blue
         case .core: GlassInk.blue
-        case .security: GlassInk.amber
+        case .security: GlassInk.blue
         case .notifications: GlassInk.blue
         }
     }
