@@ -75,6 +75,13 @@ public struct WidgetLayout: Equatable, Sendable {
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
     }
 
+    /// The one copy of `kind` on the desk, for the gallery to resize or remove. nil when there is none, and when there
+    /// are several: the gallery cannot tell which one is meant, so it offers Add instead (each copy keeps its own controls).
+    public func onlyCopy(of kind: WidgetKind) -> WidgetItem? {
+        let copies = items.filter { $0.kind == kind }
+        return copies.count == 1 ? copies[0] : nil
+    }
+
     // MARK: grid maths
 
     static func hit(_ a: WidgetItem, _ b: WidgetItem) -> Bool {

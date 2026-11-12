@@ -20,7 +20,7 @@ struct WHead<Trailing: View>: View {
             Spacer(minLength: Space.s2)
             trailing
         }
-        .coreFont(size: MacTextSize.meta + 1, weight: .semibold).foregroundStyle(GlassInk.secondary)
+        .coreFont(size: MacTextSize.headline, weight: .semibold).foregroundStyle(GlassInk.secondary)
     }
 }
 
@@ -72,7 +72,7 @@ struct WEmpty: View {
     let text: String
     var body: some View {
         VStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: 24, weight: .regular)).foregroundStyle(GlassInk.secondary)
+            Image(systemName: symbol).coreFont(size: 24).foregroundStyle(GlassInk.secondary)
             Text(text).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).multilineTextAlignment(
                 .center)
         }
@@ -132,14 +132,14 @@ struct WColumns: View {
             .chartXScale(domain: -0.5...(Double(max(values.count, 1)) - 0.5))
             .chartYScale(domain: 0...max(values.max() ?? 1, 0.0001))
             .chartXAxis(.hidden).chartYAxis(.hidden)
-            .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: values)
+            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: values)
             if !labels.isEmpty {
                 HStack {
                     ForEach(Array(labels.enumerated()), id: \.offset) { _, l in
                         Text(l).frame(maxWidth: .infinity)
                     }
                 }
-                .coreFont(size: 10).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
         }
         .accessibilityHidden(true)
@@ -159,7 +159,7 @@ struct WLine: View {
                 .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
         .chartYScale(domain: 0...1).chartXAxis(.hidden).chartYAxis(.hidden)
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: values)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: values)
         .accessibilityHidden(true)
     }
 }

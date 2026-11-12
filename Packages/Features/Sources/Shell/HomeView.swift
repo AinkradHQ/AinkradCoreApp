@@ -71,7 +71,12 @@ struct HomeView: View {
                 WidgetGallery(shell: shell, begin: beginFromGallery, move: moveDrag, end: endDrag)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(holdingNew ? 0 : 1)
-                    .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.98)))
+                    // coreModalEntrance runs the entrance; the transition only fades it out.
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
+            }
+            if holdingNew {
+                // Escape drops the held widget back into the gallery instead of onto Home.
+                Button("Cancel Drag") { endDrag(cancel: true) }.keyboardShortcut(.cancelAction).hidden()
             }
         }
         .coordinateSpace(name: Self.stageSpace)

@@ -57,7 +57,7 @@ struct NeedsBody: View {
                 }
             }
         }
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: need.map(\.id))
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: need.map(\.id))
     }
 
     private func row(_ n: BellItem) -> some View {
@@ -114,7 +114,7 @@ struct EventsBody: View {
                     WHead("clock", "Latest")
                     if let e = ev.first {
                         Spacer(minLength: 0)
-                        Image(systemName: e.symbol).font(.system(size: 22)).foregroundStyle(GlassInk.blue)
+                        Image(systemName: e.symbol).coreFont(size: 22).foregroundStyle(GlassInk.blue)
                             .accessibilityHidden(true)
                         Text(e.text).coreFont(size: MacTextSize.body, weight: .semibold)
                             .foregroundStyle(GlassInk.primary).lineLimit(2)
@@ -156,13 +156,14 @@ struct EventsBody: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: ev.map(\.id))
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: ev.map(\.id))
     }
 }
 
 struct CoreBody: View {
     @Bindable var shell: ShellModel
     let size: WidgetSize
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var state: (word: String, tone: Tone, symbol: String) {
         switch shell.coreLink {
@@ -183,7 +184,7 @@ struct CoreBody: View {
             case .s:
                 WHead("heart.text.square", "Core")
                 HStack(spacing: Space.s2) {
-                    Image(systemName: s.symbol).font(.system(size: 26, weight: .semibold))
+                    Image(systemName: s.symbol).coreFont(size: 26, weight: .semibold)
                         .foregroundStyle(s.tone == .done ? GlassInk.green : GlassInk.amber)
                         .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
                     Text(s.word).coreFont(size: 28, weight: .bold).foregroundStyle(GlassInk.primary)
@@ -223,7 +224,7 @@ struct CoreBody: View {
                 }
             }
         }
-        .animation(.smooth(duration: 0.3), value: shell.coreLink)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.coreLink)
     }
 
     @ViewBuilder private func bars(alarms: Int, ratio: Double, h: HomeSnapshot) -> some View {

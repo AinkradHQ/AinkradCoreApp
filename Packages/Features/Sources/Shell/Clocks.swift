@@ -16,34 +16,38 @@ struct AnalogDial: View {
 
     var body: some View {
         let hand = prefs.secondHand.shown(reduceMotion: reduce, live: live)
-        GeometryReader { g in
-            let r = min(g.size.width, g.size.height) / 2
-            ZStack {
-                Canvas { c, size in face(c, size) }
-                TimelineView(homeTicks(1, live: live)) { ctx in
-                    let a = ClockFace.angles(ctx.date, hand: hand)
-                    ZStack {
-                        HandLine(tail: 0.08, length: 0.42, width: 0.06 * r, ink: GlassInk.blue).rotationEffect(
-                            .degrees(a.hour))
-                        HandLine(tail: 0.08, length: 0.70, width: 0.04 * r, ink: GlassInk.blue).rotationEffect(
-                            .degrees(a.minute))
-                        if hand == .ticking {
-                            secondHand(r).rotationEffect(.degrees(a.second))
+        // The minute tick re-syncs the smooth second hand (it drifts after sleep or a clock change) and keeps what
+        // VoiceOver reads current.
+        TimelineView(homeTicks(60, live: live)) { minute in
+            GeometryReader { g in
+                let r = min(g.size.width, g.size.height) / 2
+                ZStack {
+                    Canvas { c, size in face(c, size) }
+                    TimelineView(homeTicks(1, live: live)) { ctx in
+                        let a = ClockFace.angles(ctx.date, hand: hand)
+                        ZStack {
+                            HandLine(tail: 0.08, length: 0.42, width: 0.06 * r, ink: GlassInk.blue).rotationEffect(
+                                .degrees(a.hour))
+                            HandLine(tail: 0.08, length: 0.70, width: 0.04 * r, ink: GlassInk.blue).rotationEffect(
+                                .degrees(a.minute))
+                            if hand == .ticking {
+                                secondHand(r).rotationEffect(.degrees(a.second))
+                            }
                         }
                     }
+                    if hand == .smooth {
+                        SweepHand { secondHand(r) }.id(minute.date)
+                    }
+                    coreShape(0.03 * r).fill(GlassInk.blue).frame(width: 0.1 * r, height: 0.1 * r)
                 }
-                if hand == .smooth {
-                    SweepHand { secondHand(r) }
-                }
-                coreShape(0.03 * r).fill(GlassInk.blue).frame(width: 0.1 * r, height: 0.1 * r)
+                .frame(width: 2 * r, height: 2 * r)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(width: 2 * r, height: 2 * r)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .accessibilityElement()
+            .accessibilityLabel("Analog clock")
+            .accessibilityValue(Text(minute.date, format: .dateTime.hour().minute()))
         }
-        .aspectRatio(1, contentMode: .fit)
-        .accessibilityElement()
-        .accessibilityLabel("Analog clock")
-        .accessibilityValue(Text(Date.now, format: .dateTime.hour().minute()))
     }
 
     private func secondHand(_ r: CGFloat) -> some View {
@@ -100,7 +104,8 @@ private struct HandLine: View {
     }
 }
 
-/// The smooth second hand: starts at the current second and turns once a minute, linear, for as long as it is shown.
+/// The smooth second hand: starts at the current second and turns once a minute, linear. The dial gives it a new identity
+/// every minute, so it starts again from the real second.
 private struct SweepHand<Content: View>: View {
     @ViewBuilder let content: Content
     @State private var start = 0.0
@@ -155,7 +160,7 @@ struct AnalogClockBody: View {
     }
 
     private func day<V: View>(@ViewBuilder _ content: @escaping (Date) -> V) -> some View {
-        TimelineView(homeTicks(1, live: live)) { ctx in content(ctx.date) }
+        TimelineView(homeTicks(60, live: live)) { ctx in content(ctx.date) }
             .accessibilityElement(children: .combine)
     }
 }
@@ -248,7 +253,9 @@ struct DigitalClockBody: View {
     }
 
     private func digits(_ s: String, _ size: CGFloat, ink: Color = GlassInk.primary) -> some View {
-        Text(s).coreFont(size: size, weight: .semibold).monospacedDigit()
+        // Sized to the widget, as the dial's numbers are: the Text size setting would push 62 pt digits out of the
+        // fixed Tall frame (two lines at 200 % alone are taller than it). The day and date lines still follow it.
+        Text(s).font(.system(size: size, weight: .semibold)).monospacedDigit()
             .kerning(-0.03 * size)
             .foregroundStyle(ink)
             .lineLimit(1).minimumScaleFactor(0.6)

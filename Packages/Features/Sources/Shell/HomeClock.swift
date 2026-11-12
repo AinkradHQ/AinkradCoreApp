@@ -5,14 +5,19 @@ extension EnvironmentValues {
     @Entry var homeLive = true
 }
 
-/// Ticks every `seconds` while `live`; once, now, while it is not.
+/// Ticks every `seconds` while `live`, on the clock's own boundaries (a 60 s schedule ticks as the minute turns); once,
+/// now, while it is not.
 struct HomeSchedule: TimelineSchedule {
     let seconds: TimeInterval
     let live: Bool
     func entries(from start: Date, mode: TimelineScheduleMode) -> AnySequence<Date> {
-        live
-            ? AnySequence(PeriodicTimelineSchedule(from: start, by: seconds).entries(from: start, mode: mode))
-            : AnySequence([start])
+        let ticks = PeriodicTimelineSchedule(from: Self.boundary(start, seconds), by: seconds)
+        return live ? AnySequence(ticks.entries(from: start, mode: mode)) : AnySequence([start])
+    }
+
+    /// The last whole `seconds` boundary at or before `date`.
+    static func boundary(_ date: Date, _ seconds: TimeInterval) -> Date {
+        Date(timeIntervalSinceReferenceDate: (date.timeIntervalSinceReferenceDate / seconds).rounded(.down) * seconds)
     }
 }
 

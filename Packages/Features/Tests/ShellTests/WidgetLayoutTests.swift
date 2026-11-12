@@ -240,4 +240,13 @@ struct WidgetDataTests {
         #expect(HomeSnapshot.state(M(id: "a", os: "x", online: true, slots: 2, used: 2)) == .busy)
         #expect(HomeSnapshot.state(M(id: "a", os: "x", online: true, slots: 2, used: 1)) == .online)
     }
+
+    @Test func galleryActsOnlyOnASingleCopy() {
+        var l = WidgetLayout(items: [])
+        #expect(l.onlyCopy(of: .digital) == nil)
+        let first = l.add(.digital, .s)
+        #expect(first != nil && l.onlyCopy(of: .digital)?.id == first?.id)
+        #expect(l.add(.digital, .s) != nil)
+        #expect(l.onlyCopy(of: .digital) == nil)
+    }
 }

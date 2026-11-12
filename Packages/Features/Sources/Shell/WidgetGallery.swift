@@ -64,7 +64,9 @@ private struct GalleryCard: View {
     @State private var hovering = false
     @State private var dragging = false
 
-    private var placed: WidgetItem? { shell.widgets.items.first { $0.kind == kind } }
+    /// The copy the size choice and Remove act on: only when exactly one is on Home.
+    private var placed: WidgetItem? { shell.widgets.onlyCopy(of: kind) }
+    private var onHome: Bool { shell.widgets.items.contains { $0.kind == kind } }
     private var size: WidgetSize { placed?.size ?? chosen ?? kind.sizes[0] }
 
     var body: some View {
@@ -74,7 +76,7 @@ private struct GalleryCard: View {
                 HStack(spacing: Space.s2) {
                     Text(kind.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                     Spacer(minLength: Space.s2)
-                    if placed != nil {
+                    if onHome {
                         Label("On Home", systemImage: "checkmark").labelStyle(OnHomeLabel())
                             .transition(.opacity)
                     }
@@ -112,6 +114,7 @@ private struct GalleryCard: View {
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .animation(Motion.out(Motion.hover), value: placed?.id)
+        .animation(Motion.out(Motion.hover), value: onHome)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(kind.title)
     }

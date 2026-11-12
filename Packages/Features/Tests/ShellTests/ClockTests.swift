@@ -68,4 +68,13 @@ struct ClockTests {
         #expect(Set(WidgetGallery.order) == Set(WidgetKind.allCases))
         #expect(WidgetKind.clock.title == "Analog clock" && WidgetKind.digital.title == "Digital clock")
     }
+
+    @Test func minuteTicksLandOnTheMinute() {
+        let d = Date(timeIntervalSinceReferenceDate: 3 * 3600 + 7 * 60 + 41.5)
+        #expect(HomeSchedule.boundary(d, 60).timeIntervalSinceReferenceDate == 3 * 3600 + 7 * 60)
+        #expect(HomeSchedule.boundary(d, 1).timeIntervalSinceReferenceDate == 3 * 3600 + 7 * 60 + 41)
+        let next = HomeSchedule(seconds: 60, live: true).entries(from: d, mode: .normal).prefix(2).map { $0 }
+        let minute: TimeInterval = 3 * 3600 + 7 * 60
+        #expect(next.map(\.timeIntervalSinceReferenceDate) == [minute, minute + 60])
+    }
 }

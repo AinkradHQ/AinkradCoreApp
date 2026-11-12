@@ -137,7 +137,7 @@ public enum WidgetKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .board: "Issues by state across the board."
         case .events: "What just happened on the Core."
         case .core: "Home Core connection and the alarms it raised."
-        case .quick: "New session, new terminal, add a device, open the launcher."
+        case .quick: "Start an AI session, a terminal or a Brain search."
         case .clock: "A round dial with hour, minute and second hands."
         case .digital: "Time and date, with UTC beside your own time."
         }

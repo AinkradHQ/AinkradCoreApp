@@ -118,7 +118,7 @@ struct RunningBody: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             ForEach(runs) { r in WRunRow(run: r, showTool: tool).newRow(reduce) }
         }
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: runs.map(\.id))
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: runs.map(\.id))
     }
 }
 
