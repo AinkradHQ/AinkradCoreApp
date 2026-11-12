@@ -29,7 +29,7 @@ struct InboxRecordWire: Decodable {
     var body: String
     var tags: [String]
     var sources: [SourceRefWire]
-    var distilledAt: String
+    var distilledAt: String?
     var distilledBy: DistilledByWire?
     var tool: String?
     enum CodingKeys: String, CodingKey {
@@ -60,9 +60,9 @@ struct PolicyAccountWire: Decodable {
 struct PolicyWire: Decodable {
     var model: String
     var autoAccept: [String]
-    var minSources: Int
-    var accounts: [PolicyAccountWire]
-    var localModels: [String]
+    var minSources: Int?
+    var accounts: [PolicyAccountWire]?
+    var localModels: [String]?
     enum CodingKeys: String, CodingKey {
         case model, accounts
         case autoAccept = "auto_accept"

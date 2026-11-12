@@ -41,7 +41,7 @@ extension CoreBrainService {
                     place: ([src.room ?? room.name] + (at.isEmpty ? [] : [at])).joined(separator: " · "),
                     quote: src.quote)
             },
-            tags: w.tags, sortKey: w.distilledAt)
+            tags: w.tags, sortKey: w.distilledAt ?? "")
     }
 
     /// The harness name the Core sends (`claude`, `codex`) as the screens say it.
@@ -89,10 +89,10 @@ extension CoreBrainService {
         p.autoAccept = !w.autoAccept.isEmpty
         p.kinds = Set(w.autoAccept.compactMap(CandidateKind.init(autoType:)))
         p.otherAuto = w.autoAccept.filter { CandidateKind(autoType: $0) == nil }
-        p.minSources = w.minSources
-        p.provider = w.accounts.first.map { $0.provider.capitalized } ?? "Anthropic"
-        p.accounts = w.accounts.map(\.name)
-        p.localModels = w.localModels
+        p.minSources = w.minSources ?? 1
+        p.provider = w.accounts?.first.map { $0.provider.capitalized } ?? "Anthropic"
+        p.accounts = (w.accounts ?? []).map(\.name)
+        p.localModels = w.localModels ?? []
         p.queued = queued
         return p
     }
