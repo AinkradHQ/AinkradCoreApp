@@ -27,6 +27,11 @@ final class ConnectWizardState {
     var runners: [AccountRunner] = []
     var labelTouched = false
 
+    #if DEBUG
+    /// Snapshot walk only: the step the next wizard opens on.
+    static var debugStep: Step?
+    #endif
+
     init(provider: String, advanced: Bool) {
         self.provider = provider
         self.advanced = advanced
@@ -116,7 +121,17 @@ struct ConnectWizard: View {
         let first =
             provider ?? ProviderLook.ordered(model.providers).first { ProviderSites.page($0.id) != nil }?.id
             ?? model.providers.first?.id ?? ""
-        _w = State(initialValue: ConnectWizardState(provider: first, advanced: advanced))
+        let state = ConnectWizardState(provider: first, advanced: advanced)
+        #if DEBUG
+        // Snapshot walk only: open on a later step with a key typed, so every step gets a picture.
+        if let step = ConnectWizardState.debugStep {
+            ConnectWizardState.debugStep = nil
+            state.step = step
+            state.flow.key = "sk-ant-demo-0000"
+            state.suggestName(model)
+        }
+        #endif
+        _w = State(initialValue: state)
     }
 
     private var plan: Bool { w.isPlan(model) }

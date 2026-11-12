@@ -429,7 +429,8 @@ public final class AccountsDemo {
 
     public static let scenes = [
         "overview", "overview-gate-off", "overview-gate-throwaway", "overview-empty", "accounts", "accounts-need",
-        "account-ready", "account-at-limit", "connect-arrived", "key-add", "key-filled", "key-gate", "key-working",
+        "account-ready", "account-at-limit", "connect-arrived", "connect-key", "connect-name", "connect-place",
+        "key-add", "key-filled", "key-gate", "key-working",
         "key-done", "key-failed", "key-test-failed", "key-rotate", "accounts-not-admin",
         "account-cooling", "account-unhealthy", "account-disabled", "account-confirming", "account-testing",
         "provider-new", "provider-edit", "price-new", "budget-new", "budget-edit", "budget-raise", "budgets-empty",
@@ -500,7 +501,8 @@ public final class AccountsDemo {
         let page: AccountsPage =
             switch scene {
             case "accounts", "accounts-need", "accounts-not-admin", "account-ready", "account-cooling",
-                "account-unhealthy", "account-at-limit", "connect-arrived",
+                "account-unhealthy", "account-at-limit", "connect-arrived", "connect-key", "connect-name",
+                "connect-place",
                 "account-disabled", "account-confirming", "account-testing", "limits", "connect", "delete-account",
                 "cap", "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit",
                 "usage-limit-clear", "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
@@ -535,6 +537,10 @@ public final class AccountsDemo {
         if scene == "accounts-need" { model.filter = .need }
         switch scene {
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
+        case "connect-key", "connect-name", "connect-place":
+            ConnectWizardState.debugStep =
+                scene == "connect-key" ? .key : scene == "connect-name" ? .name : .place
+            AccountDialogs.openConnect(model, provider: "anthropic", advanced: scene == "connect-place")
         case "connect-arrived":
             AccountDialogs.openConnect(model, provider: "anthropic")
             try? await Task.sleep(for: .milliseconds(300))

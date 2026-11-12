@@ -71,6 +71,8 @@ struct ProviderChoiceRow<Trailing: View>: View {
             trailing.frame(minWidth: Space.s8 * 6, alignment: .trailing).padding(.trailing, Space.s3)
         }
         .frame(minHeight: Space.s8 + Space.s4)
+        // The label fills the row's height; without this the rows share out the whole dialog's height.
+        .fixedSize(horizontal: false, vertical: true)
         .background(
             selected || (pressed && !dim) ? palette.uDimHover : hovering && !dim ? palette.uDim : .clear, in: shape
         )

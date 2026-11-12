@@ -31,7 +31,8 @@ public enum ConnectionChipState: Equatable, Sendable {
 
     var tone: Tone {
         switch self {
-        case .online, .reconnecting: .run
+        // n14: online and reconnecting are blue; green is kept for work that runs.
+        case .online, .reconnecting: .done
         case .noNetwork: .queue
         case .coreNotAnswering: .warn
         }
