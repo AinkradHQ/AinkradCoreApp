@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import CoreUI
@@ -125,5 +126,24 @@ struct LabelAuditTests {
     @Test func clocksAndDecimalsUseTheReadersFormat() {
         #expect(coreClock(272) == "4:32" && coreClock(8) == "0:08" && coreClock(3725) == "1:02:05")
         #expect(coreDecimal(1.5, 2).hasPrefix("1") && coreDecimal(1.5, 2).hasSuffix("50"))
+    }
+}
+
+struct SharedPartsTests {
+    @Test func stepperClampsToItsRange() {
+        #expect(CoreNumberStepper.moved(1, by: -1, in: 1...8) == 1)
+        #expect(CoreNumberStepper.moved(8, by: 1, in: 1...8) == 8)
+        #expect(CoreNumberStepper.moved(7, by: 5, in: 1...8) == 8)
+        #expect(CoreNumberStepper.moved(3, by: -5, in: 1...8) == 1)
+        #expect(CoreNumberStepper.moved(4, by: 1, in: 1...8) == 5)
+    }
+
+    @MainActor @Test func switchFlipsItsBinding() {
+        var on = false
+        let sw = CoreSwitch("Allow", isOn: Binding(get: { on }, set: { on = $0 }))
+        sw.flip()
+        #expect(on)
+        sw.flip()
+        #expect(!on)
     }
 }

@@ -46,6 +46,9 @@ public struct CoreUIGallery: View {
             .task { if scrollToOfficial { proxy.scrollTo("official", anchor: .top) } }
         }
         .background(LinearGradient(colors: [palette.surface, palette.bg], startPoint: .top, endPoint: .bottom))
+        #if os(macOS)
+        .background(UnifiedTitleBar())
+        #endif
         .coreTheme()
         .coreToast($toast)
         .coreConfirm(
@@ -71,6 +74,7 @@ public struct CoreUIGallery: View {
         banners
         overlays
         sharedParts
+        sharedParts2
         stateCards
     }
 
@@ -84,9 +88,9 @@ public struct CoreUIGallery: View {
     private var buttons: some View {
         section("Buttons") {
             let states: [(String, CoreInteraction?)] = [
-                ("Rest", nil), ("Hover", .hover), ("Pressed", .pressed), ("Focus", .focused),
+                ("Rest", nil), ("Hover", .hover), ("Pressed", .pressed),
             ]
-            ForEach([CoreButtonKind.prominent, .secondary, .plain, .danger], id: \.self) { kind in
+            ForEach([CoreButtonKind.prominent, .secondary, .plain, .danger, .quietDanger], id: \.self) { kind in
                 HStack(spacing: Space.s3) {
                     ForEach(states, id: \.0) { state in
                         Button(state.0) {}.buttonStyle(CoreButtonStyle(kind)).environment(
@@ -128,10 +132,6 @@ public struct CoreUIGallery: View {
                 CoreRow("Selected", subtitle: "The current row", symbol: "terminal", selected: true, action: {}) {
                     StateBadge(IssueState.inReview)
                 }
-                CoreRow("Focus", subtitle: "Keyboard focus ring", symbol: "terminal", action: {}) {
-                    StateBadge(AccountState.cooling)
-                }
-                .environment(\.coreForcedInteraction, .focused)
                 CoreRow("Disabled", subtitle: "Not available", symbol: "terminal", action: {}) {
                     StateBadge(TerminalState.exited)
                 }
@@ -166,8 +166,6 @@ public struct CoreUIGallery: View {
                 CoreTextField("Rest", placeholder: "Device name", text: $fieldText)
                 CoreTextField("Hover", placeholder: "Device name", text: $fieldText)
                     .environment(\.coreForcedInteraction, .hover)
-                CoreTextField("Focus", placeholder: "Device name", text: $fieldText)
-                    .environment(\.coreForcedInteraction, .focused)
                 CoreTextField("Error", placeholder: "Device name", text: $fieldText, error: "Use 1 to 64 characters.")
                 CoreTextField("Disabled", placeholder: "Device name", text: $fieldText).disabled(true)
             }
@@ -177,8 +175,8 @@ public struct CoreUIGallery: View {
             }
             HStack(alignment: .top, spacing: Space.s4) {
                 CoreTextArea("Prompt", placeholder: "What should the AI session do?", text: $fieldText)
-                CoreTextArea("Focus", placeholder: "What should the AI session do?", text: $fieldText)
-                    .environment(\.coreForcedInteraction, .focused)
+                CoreTextArea(
+                    "Monospaced", placeholder: "-----BEGIN PRIVATE KEY-----", text: $fieldText, design: .monospaced)
             }
             HStack(alignment: .top, spacing: Space.s4) {
                 CoreSelect("Select", selection: $selectPick, options: Self.selectOptions)
@@ -212,7 +210,6 @@ public struct CoreUIGallery: View {
                 CoreSegment("done", "Done"),
             ]
             CoreSegmented("Filter", segments: all, selection: $segment)
-            CoreSegmented("Focused", segments: all, selection: $segment).environment(\.coreForcedInteraction, .focused)
             CoreSegmented("Disabled", segments: all, selection: $segment).disabled(true)
             Text("Tab to focus, then arrow keys.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         }
@@ -225,6 +222,47 @@ public struct CoreUIGallery: View {
                 ConnectionBanner(.reconnecting)
                 ConnectionBanner(.loading)
                 ConnectionBanner(.error("The request timed out. Check the server and try again."), retry: {})
+            }
+        }
+    }
+
+    @State private var count = 3
+    @State private var switchOn = true
+    @State private var switchOff = false
+
+    private var sharedParts2: some View {
+        section("Number stepper, switch, working bar and quiet press") {
+            HStack(spacing: Space.s4) {
+                CoreNumberStepper(value: $count, in: 1...8, noun: "AI sessions")
+                CoreNumberStepper(value: .constant(1), in: 1...8, noun: "AI sessions")
+                CoreNumberStepper(value: .constant(8), in: 1...8, noun: "AI sessions")
+                CoreNumberStepper(value: .constant(4), in: 1...8, noun: "AI sessions").disabled(true)
+                Text("Focus it, then arrow keys.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            }
+            HStack(spacing: Space.s4) {
+                CoreSwitch("On", isOn: $switchOn)
+                CoreSwitch("Off", isOn: $switchOff)
+                CoreSwitch("Hover", isOn: $switchOff).environment(\.coreForcedInteraction, .hover)
+                CoreSwitch("Pressed", isOn: $switchOn).environment(\.coreForcedInteraction, .pressed)
+                CoreSwitch("Disabled", isOn: .constant(true)).disabled(true)
+                CoreSwitch("Disabled", isOn: .constant(false)).disabled(true)
+            }
+            HStack(spacing: Space.s4) {
+                CoreWorkingBar()
+                CoreWorkingBar(width: Space.s8 * 3)
+                Text("Slides; rests in the middle under Reduce Motion.")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            }
+            HStack(spacing: Space.s3) {
+                ForEach([("Rest", nil), ("Hover", CoreInteraction.hover), ("Pressed", .pressed)], id: \.0) { s in
+                    Button {
+                    } label: {
+                        Text("Runner card").coreFont(size: MacTextSize.body, weight: .medium)
+                            .padding(Space.s4).frame(width: Space.s8 * 4, alignment: .leading)
+                            .coreWell(radius: Radius.cardMac)
+                    }
+                    .buttonStyle(CoreQuietPressStyle(hoverFill: true)).environment(\.coreForcedInteraction, s.1)
+                }
             }
         }
     }
@@ -302,4 +340,23 @@ public struct CoreUIGallery: View {
         }
     }
 }
+
+#if os(macOS)
+import AppKit
+
+/// Makes the window's title bar the same surface as the gallery body: transparent, content running underneath it.
+private struct UnifiedTitleBar: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Probe() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+    private final class Probe: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.styleMask.insert(.fullSizeContentView)
+        }
+    }
+}
+#endif
 #endif
