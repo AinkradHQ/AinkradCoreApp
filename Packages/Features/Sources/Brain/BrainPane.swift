@@ -33,12 +33,12 @@ struct BrainPane: View {
                 SyncBannerView(brain: model, sync: sync)
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
             }
-            if model.currentTab == .rooms, model.load == .ready, model.setup == .ready, !model.rooms.isEmpty {
-                // The Rooms page fills the pane: its list and its room each scroll on their own.
+            if fillsPane, model.load == .ready, model.setup == .ready, !model.rooms.isEmpty {
+                // Rooms and the Inbox fill the pane: their list and their detail each scroll on their own.
                 VStack(alignment: .leading, spacing: Space.s3) {
                     if let n = model.notice { notice(n) }
                     BrainConditions(model: model)
-                    RoomsTab(model: model)
+                    if model.currentTab == .rooms { RoomsTab(model: model) } else { CandidateInboxTab(model: model) }
                 }
                 .coreFont(size: MacTextSize.body)
                 .foregroundStyle(GlassInk.primary)
@@ -69,11 +69,14 @@ struct BrainPane: View {
         .accessibilityIdentifier("brain-pane")
     }
 
-    /// Rooms and Sources: when this Mac last synced and Sync now. Before the first rooms: Import.
+    private var servesInbox: Bool { model.service?.servesCandidates == true }
+    private var fillsPane: Bool { model.currentTab == .rooms || (model.currentTab == .inbox && servesInbox) }
+
+    /// Inbox, Rooms and Sources: when this Mac last synced and Sync now. Before the first rooms: Import.
     @ViewBuilder private var actions: some View {
         let ready = model.setup == .ready && model.load == .ready
         if ready, !model.rooms.isEmpty, let sync = model.sync,
-            model.currentTab == .rooms || model.currentTab == .sources
+            model.currentTab == .rooms || model.currentTab == .sources || (model.currentTab == .inbox && servesInbox)
         {
             SyncNowTile(sync: sync)
         } else if model.service?.importRoutes != nil, model.load == .ready, model.setup != .ready || model.rooms.isEmpty
@@ -156,7 +159,7 @@ struct BrainPane: View {
                 case .overview: OverviewTab(model: model)
                 case .rooms: RoomsTab(model: model)
                 case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
-                case .inbox: if model.isSample { InboxTab(model: model) } else { BrainComingLater(title: "The Inbox") }
+                case .inbox: CandidateInboxTab(model: model)
                 case .activity:
                     if model.isSample { ActivityTab(model: model) } else { BrainComingLater(title: "Activity") }
                 case .checks: if model.isSample { ChecksTab(model: model) } else { BrainComingLater(title: "Checks") }
