@@ -25,14 +25,22 @@ struct TerminalPaneView: View {
                     TerminalScreen(surface: session.surface).opacity(v.dim ? 0.5 : 1)
                         // Settings, Terminal, Transparency: frost what shows through a see-through terminal.
                         .background {
-                            if TerminalPrefs.shared.lookBlur { Rectangle().fill(.ultraThinMaterial) }
+                            if TerminalPrefs.shared.lookBlur {
+                                // Dark frost in both themes: the terminal stays dark by day.
+                                Rectangle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark)
+                            }
                         }
                         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: v.dim)
                 } else {
+                    // The terminal stays dark by day: the night surface, at least 0.85 so the light glass under it
+                    // does not wash it grey.
                     AppSurfaceFill(
                         style: TerminalPrefs.app(TerminalPrefs.shared.lookScreen),
-                        opacity: TerminalPrefs.shared.lookOpacity, blur: TerminalPrefs.shared.lookBlur
+                        opacity: palette.isDay
+                            ? max(0.85, TerminalPrefs.shared.lookOpacity) : TerminalPrefs.shared.lookOpacity,
+                        blur: TerminalPrefs.shared.lookBlur
                     )
+                    .environment(\.corePalette, .night)
                     .accessibilityHidden(true)
                 }
                 if let c = v.card {

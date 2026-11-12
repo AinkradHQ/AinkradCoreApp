@@ -64,7 +64,7 @@ struct AgentRowButton<Label: View>: View {
             .focusEffectDisabled()
             .background(
                 selected || focus.wrappedValue == id
-                    ? .white.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                    ? GlassInk.lift(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )
             .overlay {
@@ -72,7 +72,7 @@ struct AgentRowButton<Label: View>: View {
                 if waiting {
                     coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.6), lineWidth: 1.5)
                 } else if selected || focus.wrappedValue == id {
-                    coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                    coreShape(Radius.cardMac).strokeBorder(GlassInk.rim(0.3), lineWidth: 1)
                 } else {
                     coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1)
                 }

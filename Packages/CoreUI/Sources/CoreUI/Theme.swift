@@ -12,7 +12,7 @@ public struct Palette: Sendable {
     public var increased = false
 
     public static let night = Palette(isDay: false, theme: Themes.night)
-    public static let day = Palette(isDay: true, theme: Themes.dayMac)
+    public static let day = Palette(isDay: true, theme: Themes.dayLight)
 
     private func pick(_ key: String, fallback: Color) -> Color { theme.roles[key] ?? fallback }
 
@@ -25,18 +25,23 @@ public struct Palette: Sendable {
         return copy
     }
     public var primary: Color { theme["primary"] }
-    public var disabled: Color { isDay ? .white.opacity(0.62) : theme["disabled"] }
+    public var disabled: Color { theme["disabled"] }
     public var btnPrimary: Color { theme["btnPrimary"] }
     public var btnPrimaryHover: Color { theme["btnPrimaryHover"] }
     public var btnPrimaryPress: Color { theme["btnPrimaryPress"] }
     public var btnInk: Color { theme["btnInk"] }
     /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
-    public var navActive: Color { .white.opacity(0.18) }
-    public var navActiveEdge: Color { .white.opacity(0.3) }
-    public var navActiveInk: Color { .white }
-    public var rowHover: Color { .white.opacity(0.1) }
-    /// Neutral edges are white 0.30 or more (3:1 over the day glass, measured 2026-11-09); Increase Contrast goes to 0.55.
-    public var edge: Color { increased ? .white.opacity(0.55) : isDay ? .white.opacity(0.3) : theme["edge"] }
+    /// Day: the mockups' lit white row with dark ink.
+    public var navActive: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.18) }
+    public var navActiveEdge: Color { isDay ? .white.opacity(0.9) : .white.opacity(0.3) }
+    public var navActiveInk: Color { isDay ? theme["text"] : .white }
+    public var rowHover: Color { isDay ? .white.opacity(0.5) : .white.opacity(0.1) }
+    /// Neutral edges: white 0.30 or more at night; Increase Contrast goes to 0.55 (day: a dark hairline instead).
+    public var edge: Color {
+        isDay
+            ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7))
+            : increased ? .white.opacity(0.55) : theme["edge"]
+    }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
     public var warning: Color { theme["warning"] }
@@ -50,13 +55,16 @@ public struct Palette: Sendable {
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
     /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
     /// soft white well with a light edge, not a dark slab, in both themes.
-    public var glassCard: Color { .white.opacity(0.08) }
-    public var glassCardEdge: Color { .white.opacity(increased ? 0.55 : 0.3) }
+    public var glassCard: Color { isDay ? .white.opacity(0.55) : .white.opacity(0.08) }
+    public var glassCardEdge: Color {
+        isDay
+            ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7)) : .white.opacity(increased ? 0.55 : 0.3)
+    }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
-    public var uDim: Color { .white.opacity(0.1) }
-    public var uDimHover: Color { .white.opacity(0.16) }
+    public var uDim: Color { isDay ? .white.opacity(0.6) : .white.opacity(0.1) }
+    public var uDimHover: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.16) }
 
     public func tone(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {
@@ -198,4 +206,62 @@ public func coreMove(_ reduce: Bool, _ distance: CGFloat) -> CGFloat { reduce ? 
 /// A rounded rectangle at a token radius. The only shape the system draws.
 public func coreShape(_ radius: CGFloat) -> RoundedRectangle {
     RoundedRectangle(cornerRadius: radius, style: .continuous)
+}
+
+extension Themes {
+    /// Day for the Mac: light Liquid Glass with dark ink (Ahmed, 2026-11-12, the approved day mockups: `tf.css`
+    /// [data-theme=day] and `ds.css` light). Hand-written over the generated deep-blue `dayMac`, which it replaces.
+    /// Status inks are darker than the mockups' fills so they read 4.5:1 on the pale glass.
+    public static let dayLight = ThemeColors(
+        dayMac.roles.merging(
+            [
+                "text": GlassInk.dayInk,
+                "text2": GlassInk.dayInk.opacity(0.68),
+                "disabled": GlassInk.dayInk.opacity(0.4),
+                "primary": Color(red: 0.102, green: 0.361, blue: 0.776),
+                "primarySoft": Color(red: 0.122, green: 0.42, blue: 0.878),
+                "accent": Color(red: 0.122, green: 0.42, blue: 0.878),
+                "icon": Color(red: 0.122, green: 0.42, blue: 0.878),
+                "success": Color(red: 0.09, green: 0.5, blue: 0.23),
+                "warning": Color(red: 0.64, green: 0.345, blue: 0),
+                "error": Color(red: 0.784, green: 0.149, blue: 0.11),
+                "bg": Color(red: 0.98, green: 0.984, blue: 1),
+                "surface": .white,
+                "border": GlassInk.dayInk.opacity(0.1),
+                "edge": .white.opacity(0.7),
+                "edgeSoft": .white.opacity(0.55),
+                "hair": GlassInk.dayInk.opacity(0.07),
+                "track": GlassInk.dayInk.opacity(0.1),
+                "mClear": .white.opacity(0.04),
+                "mGlass": .white.opacity(0.46),
+                "mElev": .white.opacity(0.58),
+                "mRead": .white.opacity(0.86),
+                "mRow": .white.opacity(0.55),
+                "mRowHover": .white.opacity(0.75),
+                "panelGlass": .white.opacity(0.46),
+                "panelGlassStrong": Color(red: 0.97, green: 0.98, blue: 1, opacity: 0.94),
+                "btnPrimary": Color(red: 0.122, green: 0.42, blue: 0.878),
+                "btnPrimaryHover": Color(red: 0.102, green: 0.388, blue: 0.831),
+                "btnPrimaryPress": Color(red: 0.102, green: 0.361, blue: 0.776),
+                "btnInk": .white,
+                "chipRun": Color(red: 0.082, green: 0.502, blue: 0.239),
+                "chipRunBg": Color(red: 0.188, green: 0.82, blue: 0.345, opacity: 0.16),
+                "chipDone": Color(red: 0.102, green: 0.361, blue: 0.776),
+                "chipDoneBg": Color(red: 0.039, green: 0.518, blue: 1, opacity: 0.12),
+                "chipFail": Color(red: 0.784, green: 0.149, blue: 0.11),
+                "chipFailBg": Color(red: 1, green: 0.231, blue: 0.188, opacity: 0.12),
+                "chipQueue": Color(red: 0.278, green: 0.333, blue: 0.412),
+                "chipQueueBg": Color(red: 0.392, green: 0.455, blue: 0.545, opacity: 0.14),
+                "chipWarn": Color(red: 0.64, green: 0.345, blue: 0),
+                "chipWarnBg": Color(red: 1, green: 0.624, blue: 0.039, opacity: 0.18),
+                "ink3": GlassInk.dayInk.opacity(0.45),
+                "errInk": Color(red: 0.784, green: 0.149, blue: 0.11),
+                "uDim": .white.opacity(0.6),
+                "uDimHover": .white.opacity(0.8),
+                "navActive": .white.opacity(0.8),
+                "navActiveEdge": .white.opacity(0.9),
+                "navActiveInk": GlassInk.dayInk,
+                "skyVeil": Color(red: 0.91, green: 0.945, blue: 0.984, opacity: 0.45),
+                "focusRing": GlassInk.dayInk.opacity(0.35),
+            ], uniquingKeysWith: { _, new in new }))
 }

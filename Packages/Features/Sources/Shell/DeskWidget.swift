@@ -33,15 +33,16 @@ struct DeskWidget: View {
         .clipShape(coreShape(radius))
         // By day the clear glass lets the bright sky through, so white ink measured 2.2 to 3.5:1. The panes' day look is a dark
         // layer under the glass; the widgets get the same one (night is unchanged). Contrast measured 2026-11-09.
-        .background(Color.black.opacity(palette.isDay ? 0.6 : 0), in: coreShape(radius))
+        .background(palette.isDay ? Color.white.opacity(0.45) : Color.black.opacity(0), in: coreShape(radius))
         // Apple's Liquid Glass draws its own edge and light; no extra stroke or ring on top.
         .coreGlass(radius: radius, interactive: false, tinted: false)
         .overlay {
-            coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? 0.04 : 0)).allowsHitTesting(false)
+            coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? (palette.isDay ? 0.15 : 0.04) : 0))
+                .allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
+        .shadow(color: GlassInk.shade(0.12), radius: 14, y: 4)
         // The lifted shadow is a second layer that fades in; its radius never animates.
-        .shadow(color: .black.opacity(lifting ? 0.3 : 0), radius: 30, y: 14)
+        .shadow(color: GlassInk.shade(lifting ? 0.3 : 0), radius: 30, y: 14)
         .scaleEffect(lifting && !reduce ? 1.025 : 1)
         .animation(.easeOut(duration: 0.2), value: lifting)
         .animation(.easeOut(duration: 0.24), value: hovering)

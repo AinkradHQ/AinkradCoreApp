@@ -291,7 +291,7 @@ struct ToolCard: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(Space.s3)
-                .background(.black.opacity(0.25), in: coreShape(Radius.control))
+                .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
                 .padding([.horizontal, .bottom], Space.s2)
                 .agentCopyMenu(output.isEmpty ? summary : output)
                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -Space.s1)))

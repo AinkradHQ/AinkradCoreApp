@@ -420,7 +420,7 @@ private struct AuditDetail: View {
                         }
                     }
                     .padding(Space.s3)
-                    .background(.black.opacity(0.2), in: coreShape(Radius.control + 2))
+                    .background(GlassInk.sunk(0.2), in: coreShape(Radius.control + 2))
                 }
                 DisclosureGroup("Technical details", isExpanded: $technical) {
                     VStack(alignment: .leading, spacing: Space.s1) {

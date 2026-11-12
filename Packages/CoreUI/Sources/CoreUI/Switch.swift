@@ -44,11 +44,16 @@ public struct CoreSwitch: View {
         let lit = hovering || forced == .hover
         let pad = (Self.trackH - Self.knob) / 2
         return coreShape(Radius.chip)
-            .fill(isOn ? GlassInk.blue.opacity(lit ? 0.95 : 0.8) : Color.white.opacity(lit ? 0.32 : 0.24))
-            .overlay { coreShape(Radius.chip).strokeBorder(.white.opacity(isOn ? 0.3 : 0.2), lineWidth: 1) }
+            .fill(
+                isOn
+                    ? GlassInk.blue.opacity(lit ? 0.95 : 0.8)
+                    : GlassInk.adaptive(
+                        .white.opacity(lit ? 0.32 : 0.24), day: GlassInk.dayInk.opacity(lit ? 0.22 : 0.16))
+            )
+            .overlay { coreShape(Radius.chip).strokeBorder(GlassInk.rim(isOn ? 0.3 : 0.2), lineWidth: 1) }
             .overlay(alignment: .leading) {
                 coreShape(4).fill(.white).frame(width: Self.knob, height: Self.knob)
-                    .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+                    .shadow(color: GlassInk.shade(0.25), radius: 1, y: 1)
                     .offset(x: isOn ? Self.trackW - Self.knob - pad : pad)
             }
             .frame(width: Self.trackW, height: Self.trackH)

@@ -194,9 +194,8 @@ struct GreetingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
-    /// White on both skies: the day sky is a mid blue, where navy text sinks (Ahmed, 2026-11-05). A deep-blue shadow keeps it
-    /// readable over the bright clouds.
-    private var ink: Color { .white }
+    /// White on the night sky; dark ink on the veiled day sky (Ahmed, 2026-11-12: day is light glass with dark ink).
+    private var ink: Color { GlassInk.primary }
     private var dayPart: String {
         let h = Calendar.current.component(.hour, from: Date())
         return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
@@ -215,7 +214,7 @@ struct GreetingView: View {
         }
         .foregroundStyle(ink)
         .shadow(
-            color: Color(red: 0, green: 0.05, blue: 0.18).opacity(scheme == .dark ? 0.65 : 0.45),
+            color: scheme == .dark ? Color(red: 0, green: 0.05, blue: 0.18).opacity(0.65) : .white.opacity(0.6),
             radius: 12, y: 1
         )
         .opacity(shown ? 1 : 0)

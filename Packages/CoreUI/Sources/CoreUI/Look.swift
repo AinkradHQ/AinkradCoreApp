@@ -142,7 +142,7 @@ struct FrameModifier: ViewModifier {
             .clipShape(coreShape(max(radius - rim, Radius.chip)))
             .padding(rim)
             .coreGlass(radius: radius, interactive: false, tinted: false)
-            .overlay { coreShape(radius).strokeBorder(.white.opacity(active ? max(0.3, edge) : edge), lineWidth: 1) }
+            .overlay { coreShape(radius).strokeBorder(GlassInk.rim(active ? max(0.3, edge) : edge), lineWidth: 1) }
     }
 }
 
@@ -214,7 +214,7 @@ extension View {
     public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
         background(active ? GlassInk.wellHover : GlassInk.well, in: coreShape(radius))
             .overlay {
-                coreShape(radius).strokeBorder(active ? Color.white.opacity(0.28) : GlassInk.wellEdge, lineWidth: 1)
+                coreShape(radius).strokeBorder(active ? GlassInk.rim(0.28) : GlassInk.wellEdge, lineWidth: 1)
             }
     }
 }

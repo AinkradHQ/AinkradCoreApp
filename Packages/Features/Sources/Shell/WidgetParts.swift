@@ -5,13 +5,13 @@ import SwiftUI
 /// tiles, and vivid gauge colours. The glass is clear, so the sky decides the background; white with a soft shadow
 /// (DeskWidget) reads on both skies.
 enum WidgetInk {
-    static let primary = Color.white
-    static let secondary = Color.white.opacity(0.78)
-    static let track = Color.white.opacity(0.24)
-    static let well = Color.white.opacity(0.16)
-    static let wellEdge = Color.white.opacity(0.3)
-    static let blue = Color(red: 0.25, green: 0.6, blue: 1)
-    static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
+    static let primary = GlassInk.primary
+    static let secondary = GlassInk.adaptive(.white.opacity(0.78), day: GlassInk.secondary)
+    static let track = GlassInk.track
+    static let well = GlassInk.adaptive(.white.opacity(0.16), day: GlassInk.well)
+    static let wellEdge = GlassInk.wellEdge
+    static let blue = GlassInk.blue
+    static let green = GlassInk.green
 }
 
 /// Pieces the widgets share (`widgets.css`: header, section label, status square, meters, slot squares, load line).

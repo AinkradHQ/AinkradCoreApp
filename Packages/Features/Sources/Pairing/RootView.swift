@@ -35,6 +35,7 @@ public struct RootView: View {
     private var sky: some View {
         Color.clear.overlay {
             Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
+                .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
         }
         .clipped().ignoresSafeArea().accessibilityHidden(true)
     }
@@ -67,6 +68,7 @@ private struct BlockedView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .background {
             Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
+                .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
                 .clipped().accessibilityHidden(true)
         }
         .ignoresSafeArea()

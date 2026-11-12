@@ -142,7 +142,7 @@ struct SettingsView: View {
                 .animation(Motion.calm(Motion.out(0.26), reduce), value: shell.settings.selected)
             }
             .frame(width: Space.s8 * 8)
-            .background(Color.black.opacity(0.12))
+            .background(GlassInk.adaptive(.black.opacity(0.12), day: .white.opacity(0.25)))
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(alignment: .top, spacing: Space.s4) {
                     if let back = shell.settings.back {
@@ -210,7 +210,7 @@ struct SettingsView: View {
         .foregroundStyle(WidgetInk.primary)
         .containerRelativeFrame([.horizontal, .vertical]) { length, _ in length * 0.86 }
         .coreFrame(radius: Radius.panel + Space.s1, part: .settings)
-        .shadow(color: .black.opacity(0.3), radius: 40, y: 16)
+        .shadow(color: GlassInk.shade(0.3), radius: 40, y: 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")
         .transition(.opacity.combined(with: .scale(scale: reduce ? 1 : 0.95)))
@@ -244,8 +244,8 @@ struct SettingsView: View {
         // One selection that glides between rows (`s-glide`), not a background swapped per row.
         .background {
             if selected {
-                coreShape(Radius.control).fill(.white.opacity(0.18))
-                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
+                coreShape(Radius.control).fill(GlassInk.lift(0.18))
+                    .overlay { coreShape(Radius.control).strokeBorder(GlassInk.rim(0.3), lineWidth: 1) }
                     .matchedGeometryEffect(id: "nav", in: glide)
             }
         }
@@ -357,8 +357,8 @@ private struct SettingsBackTile: View {
             }
             .foregroundStyle(WidgetInk.primary)
             .frame(width: 72, height: 56)
-            .background(.white.opacity(hovering ? 0.16 : 0.1), in: coreShape(Radius.control + 4))
-            .overlay { coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.18), lineWidth: 1) }
+            .background(GlassInk.lift(hovering ? 0.16 : 0.1), in: coreShape(Radius.control + 4))
+            .overlay { coreShape(Radius.control + 4).strokeBorder(GlassInk.rim(0.18), lineWidth: 1) }
             .contentShape(coreShape(Radius.control + 4))
         }
         .buttonStyle(.plain)
