@@ -24,7 +24,7 @@ struct BrainM3Tests {
         let (m, _, c) = await make(noLocalModel: true)
         defer { withExtendedLifetime(m) {} }
         #expect(c.items.count == 7 && m.tabCount(.inbox) == 7)
-        #expect(c.inbox.queuedItems == 23 && c.inbox.queued.map(\.name) == ["Personal notes", "workan-space"])
+        #expect(c.inbox.queuedItems == 23 && c.inbox.queued.map(\.name) == ["Personal notes", "acme-shop"])
         #expect(c.selected?.id == "c1")
     }
 
@@ -116,13 +116,13 @@ struct BrainM3Tests {
         let (m, host, c) = await make()
         defer { withExtendedLifetime(m) {} }
         await c.loadRunners()
-        await c.toggleRunner("vps-1")
-        #expect(c.runnerSheet?.name == "vps-1 (Azure)")
+        await c.toggleRunner("build-box")
+        #expect(c.runnerSheet?.name == "build-box (cloud)")
         #expect(await c.turnOnRunner())
-        #expect(c.runners.first { $0.id == "vps-1" }?.enabled == true && host.reasons.count == 1)
-        await c.toggleRunner("vps-1")  // off: no prompt
-        #expect(c.runners.first { $0.id == "vps-1" }?.enabled == false && host.reasons.count == 1)
-        await c.toggleRunner("vps-1")
+        #expect(c.runners.first { $0.id == "build-box" }?.enabled == true && host.reasons.count == 1)
+        await c.toggleRunner("build-box")  // off: no prompt
+        #expect(c.runners.first { $0.id == "build-box" }?.enabled == false && host.reasons.count == 1)
+        await c.toggleRunner("build-box")
         #expect(await c.turnOnRunner())
         #expect(host.reasons.count == 2)
     }
@@ -131,10 +131,10 @@ struct BrainM3Tests {
         let (m, host, c) = await make()
         defer { withExtendedLifetime(m) {} }
         await c.loadRunners()
-        await c.toggleRunner("vps-1")
+        await c.toggleRunner("build-box")
         host.declines = true
         #expect(await c.turnOnRunner() == false)
-        #expect(c.runners.first { $0.id == "vps-1" }?.enabled == false && c.runnerSheet != nil)
+        #expect(c.runners.first { $0.id == "build-box" }?.enabled == false && c.runnerSheet != nil)
     }
 
     @Test func anOfflineRunnerHasNoSwitch() async {
@@ -248,7 +248,7 @@ struct BrainM3Tests {
         nonisolated(unsafe) var policySent: [String: Any] = [:]
         t.routes["GET \(base)/sources"] = { _ in [row(false, offered: false)] }
         t.routes["GET /api/v1/runners"] = { _ in
-            [["id": "d_1", "name": "vps-1", "policy": ["terminals": true, "agents": true, "agent_capacity": 2]]]
+            [["id": "d_1", "name": "build-box", "policy": ["terminals": true, "agents": true, "agent_capacity": 2]]]
         }
         t.routes["PUT /api/v1/runners/d_1/policy"] = { b in
             log.append("policy")
@@ -262,7 +262,8 @@ struct BrainM3Tests {
         let svc = CoreBrainService(transport: t)
         let list = try await svc.runners()
         #expect(
-            list.first?.name == "vps-1" && list.first?.tools.map(\.name) == ["Claude Code"] && list.first?.items == 4)
+            list.first?.name == "build-box" && list.first?.tools.map(\.name) == ["Claude Code"]
+                && list.first?.items == 4)
         let on = try await svc.setRunnerHistory("d_1", enabled: true)
         #expect(log == ["policy", "source"] && policySent["share_history"] as? Bool == true)
         #expect(policySent["agent_capacity"] as? Int == 2 && on.enabled && on.restarting)

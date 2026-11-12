@@ -30,14 +30,14 @@ struct SampleInbox: Sendable {
                 source: "Imported note (sample)", by: "Import (sample)", age: "3 h ago",
                 flag: "Looks like an instruction. Shown as quoted text only."),
             Candidate(
-                id: "c4", room: "automotive-ai", type: .preference,
+                id: "c4", room: "globex", type: .preference,
                 title: "Sample: write release notes in plain sentences",
                 text: "Sample text for an employer room.", source: "Chat (sample)", by: "Claude Code (sample)",
                 age: "5 h ago"),
         ]
         conflicts = [
             Conflict(
-                id: "k1", room: "workan-space", title: "Sample: net payment terms",
+                id: "k1", room: "acme-shop", title: "Sample: net payment terms",
                 a: ConflictSide(
                     text: "Sample: customers pay within 30 days.", source: "Contract note (sample)",
                     authority: .projectOwner, scope: "All customers", when: "Oct 2"),
@@ -48,7 +48,7 @@ struct SampleInbox: Sendable {
         ]
         blocked = [
             BlockedNote(
-                id: "b1", room: "automotive-ai", title: "Sample note blocked: it contained a secret",
+                id: "b1", room: "globex", title: "Sample note blocked: it contained a secret",
                 ruleName: "Secret scanner", ruleAbout: "Keys and passwords are never saved in a room.",
                 source: "Pasted terminal log (sample)", by: "Capture (sample)", age: "40 min ago")
         ]

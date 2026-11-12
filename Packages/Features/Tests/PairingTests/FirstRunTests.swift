@@ -213,9 +213,9 @@ struct FirstRunTests {
         let profile = UserProfile(defaults: d)
         let m = FirstRunModel(driver: FakeDriver(), profile: profile) {}
         #expect(m.step == .name)
-        m.nameText = "  Ahmed "
+        m.nameText = "  Sam "
         m.submitName()
-        #expect(profile.name == "Ahmed" && m.step == .address)
+        #expect(profile.name == "Sam" && m.step == .address)
         m.endpointText = ""
         m.submitAddress()
         #expect(m.step == .address && m.endpointError != nil)

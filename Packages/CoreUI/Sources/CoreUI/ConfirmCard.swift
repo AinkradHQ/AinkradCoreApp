@@ -120,6 +120,7 @@ public struct ChoiceTile: View {
     let on: Bool
     let keys: String?
     let run: () -> Void
+    @Environment(\.corePalette) private var palette
     public init(choice: ConfirmChoice, on: Bool, keys: String?, run: @escaping () -> Void) {
         self.choice = choice
         self.on = on
@@ -142,7 +143,9 @@ public struct ChoiceTile: View {
             .foregroundStyle(on ? .white : GlassInk.primary)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
-                on ? hue.opacity(choice.destructive ? 0.85 : 0.6) : GlassInk.well, in: coreShape(Radius.control + 2)
+                // By day the white label needs a strong fill: 0.6 blue over white is a washed 2.6:1.
+                on ? hue.opacity(choice.destructive || palette.isDay ? 0.92 : 0.6) : GlassInk.well,
+                in: coreShape(Radius.control + 2)
             )
             .animation(Motion.out(Motion.hover), value: on)
             .overlay {

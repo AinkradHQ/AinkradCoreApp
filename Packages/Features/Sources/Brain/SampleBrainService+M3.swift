@@ -8,7 +8,7 @@ struct SampleM3: Sendable {
     var runners: [RunnerHistory]
     let queued: [QueuedRoom]
 
-    static let model = "Qwen3 14B on MacBook Air"
+    static let model = "Qwen3 14B on Laptop"
 
     static var rooms: [RoomSummary] {
         func room(_ id: String, _ name: String, _ kind: RoomKind, _ p: ProviderClass, _ n: Int, _ by: [TypeShare])
@@ -23,7 +23,7 @@ struct SampleM3: Sendable {
             room("core", "AinkradCore", .product, .approvedCloud, 1412, [cc, .init("Codex", 301), .init("Docs", 269)]),
             room(
                 "app", "AinkradCoreApp", .product, .approvedCloud, 688, [.init("Claude Code", 512), .init("Docs", 176)]),
-            room("workan-space", "workan-space", .product, .local, 204, [.init("Claude Code", 204)]),
+            room("acme-shop", "acme-shop", .product, .local, 204, [.init("Claude Code", 204)]),
             room("personal", "Personal notes", .personal, .local, 1032, [.init("Vault", 1032)]),
         ]
     }
@@ -38,17 +38,17 @@ struct SampleM3: Sendable {
         var out = [SourceWire(id: "core_transcript", device: "core", kind: "core_transcript", enabled: false)]
         for (kind, n, on) in mac {
             out.append(
-                SourceWire(id: "mac_\(kind)", device: "MacBook Air", kind: kind, enabled: on, lastRun: hour, items: n))
+                SourceWire(id: "mac_\(kind)", device: "Laptop", kind: kind, enabled: on, lastRun: hour, items: n))
         }
         out.append(
             SourceWire(
-                id: "jira", device: "core", kind: "jira", roots: ["Workan", "KAN, AUT and OPT projects"],
+                id: "jira", device: "core", kind: "jira", roots: ["Acme", "SHOP, NW and GLX projects"],
                 lastRun: "2026-11-12T11:00:00Z",
                 items: 1204))
         out.append(
             SourceWire(
                 id: "github", device: "core", kind: "github", enabled: false,
-                roots: ["AhmedMElhalaby", "pull requests and reviews in 14 repositories"], items: 0))
+                roots: ["sam-dev", "pull requests and reviews in 14 repositories"], items: 0))
         return out
     }()
 
@@ -117,12 +117,12 @@ struct SampleM3: Sendable {
                         "…full screen only, no resize, no exit…")
                 ]),
             cand(
-                "c6", "workan-space", "workan-space", .fact,
+                "c6", "acme-shop", "acme-shop", .fact,
                 "Tenant dashboards read from the API, never from the database.",
                 "Claude Code", "2 Nov",
                 [
                     src(
-                        "s7", "Claude Code session", "workan-space · 2 Nov, 15:30",
+                        "s7", "Claude Code session", "acme-shop · 2 Nov, 15:30",
                         "…the dashboard only talks to the API…")
                 ]),
             cand(
@@ -151,9 +151,9 @@ struct SampleM3: Sendable {
         }
         return [
             RunnerHistory(
-                id: "air", name: "MacBook Air", enabled: true, tools: tools(300, 80, 12), items: 148,
+                id: "air", name: "Laptop", enabled: true, tools: tools(300, 80, 12), items: 148,
                 lastRun: "1 hour ago"),
-            RunnerHistory(id: "vps-1", name: "vps-1 (Azure)", tools: tools(412, 87, nil)),
+            RunnerHistory(id: "build-box", name: "build-box (cloud)", tools: tools(412, 87, nil)),
             RunnerHistory(
                 id: "studio", name: "Mac Studio", online: false, tools: tools(nil, nil, nil), lastRun: "yesterday"),
         ]
@@ -165,14 +165,14 @@ struct SampleM3: Sendable {
             s.m3 && s.noLocalModel
             ? [
                 QueuedRoom(room: "personal", name: "Personal notes", items: 14),
-                QueuedRoom(room: "workan-space", name: "workan-space", items: 9),
+                QueuedRoom(room: "acme-shop", name: "acme-shop", items: 9),
             ]
             : []
         policies =
             s.m3
             ? [
                 "core": Self.policy(s, local: false), "app": Self.policy(s, local: false),
-                "workan-space": Self.policy(s, local: true, auto: s.autoAccept),
+                "acme-shop": Self.policy(s, local: true, auto: s.autoAccept),
                 "personal": Self.policy(s, local: true),
             ] : [:]
         for q in queued { policies[q.room]?.queued = q.items }

@@ -62,9 +62,9 @@ struct SyncTests {
             """
         let r = try JSONDecoder().decode(SyncResultWire.self, from: Data(json.utf8))
         #expect(r.newRooms == 2 && r.routed.first?.sources == 2 && r.notice)
-        let s = r.summary { $0 == "r-opt" ? "Optimus" : nil }
+        let s = r.summary { $0 == "r-opt" ? "Northwind" : nil }
         #expect(s.contains("5 items found, 3 kept, 2 already known, 1 skipped"))
-        #expect(s.contains("Added to Optimus") && s.contains("1 unsorted, 2 new rooms"))
+        #expect(s.contains("Added to Northwind") && s.contains("1 unsorted, 2 new rooms"))
         var idle = SyncResultWire()
         idle.idle = "nothing_new"
         #expect(idle.summary() == "Nothing new.")

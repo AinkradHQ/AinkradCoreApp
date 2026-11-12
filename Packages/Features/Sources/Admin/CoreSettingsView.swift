@@ -119,15 +119,19 @@ private struct LimitRow: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: Space.s2) {
-                        Text(SettingWords.title(setting)).coreFont(size: MacTextSize.headline, weight: .semibold)
-                        if setting.isOverride {
-                            SettingsChip(text: "Changed", symbol: "pencil", hue: hue)
-                        }
-                        if SettingWords.needsRestart(setting) {
-                            SettingsChip(text: "After a restart", symbol: "arrow.clockwise", hue: GlassInk.amber)
-                                .help("Your Core reads this only when it starts.")
-                        }
+                    Text(SettingWords.title(setting)).coreFont(size: MacTextSize.headline, weight: .semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // Under the name, never beside it: a long name used to squeeze the chips to "Cha…" and wrap itself.
+                    if setting.isOverride || SettingWords.needsRestart(setting) {
+                        HStack(spacing: Space.s2) {
+                            if setting.isOverride {
+                                SettingsChip(text: "Changed", symbol: "pencil", hue: hue)
+                            }
+                            if SettingWords.needsRestart(setting) {
+                                SettingsChip(text: "After a restart", symbol: "arrow.clockwise", hue: GlassInk.amber)
+                                    .help("Your Core reads this only when it starts.")
+                            }
+                        }.fixedSize()
                     }
                     Text(SettingWords.line(setting)).foregroundStyle(GlassInk.secondary)
                         .fixedSize(horizontal: false, vertical: true)

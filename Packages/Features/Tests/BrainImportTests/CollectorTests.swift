@@ -73,13 +73,13 @@ func session(cwd: String, _ turns: [(String, String)]) -> String {
         let root = try fixtureRoot()
         try write(
             root, "-synthetic-work-alpha/s1.jsonl",
-            session(cwd: "/synthetic/work/alpha", [("user", "Fix the parser"), ("assistant", "Done, see KAN-12")]))
+            session(cwd: "/synthetic/work/alpha", [("user", "Fix the parser"), ("assistant", "Done, see SHOP-12")]))
         // an unknown record and a tool call block are skipped, a tool result is trimmed
         let (items, report) = try await gather(root)
         #expect(items.count == 1)
         let i = items[0]
         #expect(i.source_kind == "claude_code")
-        #expect(i.text == "User: Fix the parser\n\nAssistant: Done, see KAN-12")
+        #expect(i.text == "User: Fix the parser\n\nAssistant: Done, see SHOP-12")
         #expect(i.title == "Fix the parser")
         #expect(i.project_hint == "/synthetic/work/alpha")
         #expect(i.started_at == "2026-11-01T09:00:00Z" && i.ended_at == "2026-11-02T09:00:00Z")

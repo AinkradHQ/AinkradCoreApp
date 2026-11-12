@@ -502,6 +502,7 @@ public final class AccountsDemo {
         default: break
         }
         model.use(svc)
+        model.connections.use(SampleConnections(), sample: true)  // the Connections tab counts its sample connections
         try? await Task.sleep(for: .milliseconds(500))
         let page: AccountsPage =
             switch scene {
@@ -574,8 +575,11 @@ public final class AccountsDemo {
             }
             AccountDialogs.openConnect(model, provider: "anthropic", flow: f)
         case "key-rotate": AccountDialogs.openConnect(model, provider: "anthropic", replacing: model.account(1)!)
-        case "signin-intro": AccountDialogs.openConnect(model, provider: "claude-sub")
+        case "signin-intro":
+            ConnectWizardState.debugStep = .key  // the wizard opens on the provider list; a plan's sign-in is step 2
+            AccountDialogs.openConnect(model, provider: "claude-sub")
         case "signin-url", "signin-working", "signin-done", "signin-failed":
+            ConnectWizardState.debugStep = .key
             AccountDialogs.openConnect(model, provider: "claude-sub")
             model.signIn = SignInFlow(
                 stage: scene == "signin-url"

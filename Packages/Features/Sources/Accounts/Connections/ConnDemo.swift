@@ -13,6 +13,9 @@ extension AccountsDemo {
         "conn-disconnect", "conn-off", "conn-app-notset", "conn-app-set", "conn-app-saving",
         "conn-app-error", "conn-app-readonly", "conn-default-menu", "conn-default-cleared", "conn-replace",
         "conn-replace-working", "conn-replace-error", "conn-replace-done",
+        // The sign-in service (#95): Jira's browser step, GitHub connected with its repositories, and the refusals.
+        "conn-jira-signin", "conn-github-connected", "conn-error-service", "conn-error-not-yours",
+        "conn-error-signin-first", "conn-error-signin-again",
     ]
 
     func showConnections(_ scene: String) async {
@@ -52,6 +55,27 @@ extension AccountsDemo {
                     title: "The code ran out before you approved it.",
                     fix: "Codes work for 15 minutes. Try again for a new code, then approve it on github.com."))
         case "conn-done": await open("github", then: .connected(1))
+        case "conn-jira-signin": await open("jira")
+        case "conn-github-connected":
+            await open("github", then: .connected(1))
+            m.picked = ["sample/core", "sample/app", "sample/docs"]
+        case "conn-error-service":
+            await open("github", then: .failed(title: ConnSay.serviceDown, fix: "Nothing was connected."))
+        case "conn-error-not-yours":
+            await open(
+                "github",
+                then: .failed(
+                    title: ConnSay.notYours, fix: "Choose repositories with the GitHub account you signed in with."))
+        case "conn-error-signin-first":
+            await open(
+                "github",
+                then: ConnSay.installFailure(
+                    CoreError.http(status: 401, code: "github_sign_in_needed", message: ""), hasGitHub: false))
+        case "conn-error-signin-again":
+            await open(
+                "github",
+                then: ConnSay.installFailure(
+                    CoreError.http(status: 401, code: "github_sign_in_needed", message: ""), hasGitHub: true))
         case "conn-token":
             shell.present(
                 ShellDialog(id: "connection-connect") {

@@ -11,21 +11,21 @@ extension HomeSnapshot {
     }
 
     public static let sample = HomeSnapshot(
-        greetingName: "Ahmed", coreName: "Home Core",
+        greetingName: "Sam", coreName: "Home Core",
         machines: [
             Machine(id: "mac-studio", os: "macOS 27", online: true, slots: 4, used: 2, load: series(0.19, 0.04, 1)),
             Machine(id: "linux-01", os: "Ubuntu 26.04", online: true, slots: 2, used: 0, load: series(0.15, 0.03, 2)),
             Machine(
-                id: "oracle-arm", os: "Ubuntu 26.04 (arm64)", online: true, slots: 2, used: 1,
+                id: "home-server", os: "Ubuntu 26.04 (arm64)", online: true, slots: 2, used: 1,
                 load: series(0.10, 0.03, 3)),
         ],
         running: [
-            Run(id: "s1", tool: "claude-code", name: "E2-14 Citadel bootstrap", minutes: 38),
-            Run(id: "s4", tool: "claude-code", name: "E3 plan review", minutes: 27),
+            Run(id: "s1", tool: "claude-code", name: "Login rate limit", minutes: 38),
+            Run(id: "s4", tool: "claude-code", name: "Checkout plan review", minutes: 27),
         ],
         events: [
             Event(
-                id: "e1", text: "Claude wants to push feat/e2-14", source: "mac-studio", minutesAgo: 1,
+                id: "e1", text: "Claude wants to push feat/login-rate-limit", source: "mac-studio", minutesAgo: 1,
                 symbol: "lock.shield"),
             Event(
                 id: "e2", text: "cargo test passed · 412 tests", source: "mac-studio", minutesAgo: 3,
@@ -39,7 +39,7 @@ extension HomeSnapshot {
 public enum SampleWorld {
     public static func install(into shell: ShellModel) {
         shell.home = .sample
-        if !shell.profile.hasName { shell.profile.set("Ahmed") }
+        if !shell.profile.hasName { shell.profile.set("Sam") }
         for e in launcherEntries(shell) { shell.launcher.register(e) }
         shell.launcher.recents = ["core", "agents.list", "terminals"]
         approvals(shell)
@@ -57,10 +57,10 @@ public enum SampleWorld {
     static func approvals(_ shell: ShellModel) {
         let rows = [
             (
-                "Claude wants to push feat/e2-14-citadel-bootstrap",
+                "Claude wants to push feat/login-rate-limit",
                 "mac-studio · needs Touch ID · expires in 5 min", "now"
             ),
-            ("Claude wants to read GH_TOKEN", "oracle-arm · needs Touch ID · expires in 5 min", "2 min"),
+            ("Claude wants to read GH_TOKEN", "home-server · needs Touch ID · expires in 5 min", "2 min"),
             ("codex wants to run cargo add prometheus-client", "linux-01 · needs Touch ID · expires in 5 min", "4 min"),
         ]
         for (i, r) in rows.enumerated() { shell.bell.add(approval(shell, id: "agents.appr-\(i)", r.0, r.1, r.2)) }
@@ -124,8 +124,8 @@ public enum SampleWorld {
             ) {
                 SampleList(
                     rows: [
-                        ("E2-14 Citadel bootstrap", "claude-code · mac-studio", SessionState.running),
-                        ("E3 plan review", "claude-code · oracle-arm", .running),
+                        ("Login rate limit", "claude-code · mac-studio", SessionState.running),
+                        ("Checkout plan review", "claude-code · home-server", .running),
                         ("Hoard test fixtures", "claude-code · mac-studio", .starting),
                         ("E2-12 notifications", "codex · linux-01", .ended),
                     ])
@@ -137,9 +137,9 @@ public enum SampleWorld {
             ) {
                 SampleList(
                     rows: [
-                        ("zsh", "~/AinkradCore · mac-studio", SessionState.running),
-                        ("bash", "~/ainkrad/logs · linux-01", .running),
-                        ("zsh", "~/AinkradCore · mac-studio", .ended),
+                        ("zsh", "~/acme-shop · mac-studio", SessionState.running),
+                        ("bash", "~/acme-shop/logs · linux-01", .running),
+                        ("zsh", "~/acme-shop · mac-studio", .ended),
                     ])
             }
         case "runners":
@@ -148,7 +148,7 @@ public enum SampleWorld {
                     rows: [
                         ("mac-studio", "macOS 27 · 2 of 4 slots", SessionState.running),
                         ("linux-01", "Ubuntu 26.04 · idle", .running),
-                        ("oracle-arm", "Ubuntu 26.04 (arm64) · 1 of 2 slots", .running),
+                        ("home-server", "Ubuntu 26.04 (arm64) · 1 of 2 slots", .running),
                     ])
             }
         case "citadel":

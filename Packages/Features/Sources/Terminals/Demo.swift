@@ -66,7 +66,7 @@ public final class TerminalsDemo {
 
     nonisolated static let esc = "\u{1b}"
     nonisolated static let screen: String = {
-        let p = "\(esc)[38;2;127;184;255m~/AinkradCore\(esc)[0m $ "
+        let p = "\(esc)[38;2;127;184;255m~/acme-shop\(esc)[0m $ "
         let ok = "\(esc)[38;2;52;211;153mok\(esc)[0m"
         let dim = "\(esc)[38;2;111;129;155m"
         return [
@@ -77,7 +77,7 @@ public final class TerminalsDemo {
             "test scopes::agent_cannot_read_secrets ... \(ok)",
             "test result: \(ok). 412 passed; 0 failed; 38.2s",
             p + "git status",
-            "On branch feat/e2-14-citadel-bootstrap",
+            "On branch feat/login-rate-limit",
             "nothing to commit, working tree clean",
             p,
         ].joined(separator: "\r\n")
@@ -132,7 +132,7 @@ public final class TerminalsDemo {
         service.runnerList = [
             Self.runner("mac-studio", arch: "aarch64", load: 2, capacity: 4, avg1: 3.1, cores: 16),
             Self.runner("linux-01", arch: "x86_64", load: 0, capacity: 2, avg1: 1.2, cores: 8),
-            Self.runner("oracle-arm", arch: "aarch64", load: 1, capacity: 2, avg1: 0.4, cores: 4),
+            Self.runner("home-server", arch: "aarch64", load: 1, capacity: 2, avg1: 0.4, cores: 4),
         ]
         // A runner that reports its policy, so "What it offers" shows the AI-sessions-at-once stepper.
         service.runnerList[0].policy = RunnerPolicy(terminals: true, agents: true, capacity: 2)
@@ -140,11 +140,11 @@ public final class TerminalsDemo {
             Self.item("t_1a2b3c4d5e6f7a8b", runner: "mac-studio", attached: 1),
             Self.item("t_2b3c4d5e6f7a8b9c", runner: "linux-01", attached: 1, cols: 64, rows: 24, ageMinutes: 190),
             Self.item(
-                "t_3c4d5e6f7a8b9c0d", runner: "oracle-arm", attached: 0, orphaned: true, cols: 80, rows: 24,
+                "t_3c4d5e6f7a8b9c0d", runner: "home-server", attached: 0, orphaned: true, cols: 80, rows: 24,
                 ageMinutes: 1460),
             Self.item(
                 "t_4d5e6f7a8b9c0d1e", runner: "mac-studio", status: "exited", attached: 0, code: 0, ageMinutes: 64),
-            Self.item("t_5e6f7a8b9c0d1e2f", runner: "oracle-arm", attached: 0, cols: 80, rows: 24, ageMinutes: 980),
+            Self.item("t_5e6f7a8b9c0d1e2f", runner: "home-server", attached: 0, cols: 80, rows: 24, ageMinutes: 980),
             Self.item(
                 "t_6f7a8b9c0d1e2f3a", runner: "linux-01", status: "exited", attached: 0, signal: "host_lost", cols: 100,
                 rows: 30, ageMinutes: 300),

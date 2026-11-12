@@ -18,9 +18,11 @@ struct ConversationWordsTests {
 
     @Test func eventsAreSentenceCaseWithTheRunner() {
         #expect(
-            ConversationWords.event(.started(harness: "claude", resumed: false), runner: "Oracle")
-                == "Started on Oracle")
-        #expect(ConversationWords.event(.started(harness: nil, resumed: true), runner: "Oracle") == "Woke up on Oracle")
+            ConversationWords.event(.started(harness: "claude", resumed: false), runner: "Home server")
+                == "Started on Home server")
+        #expect(
+            ConversationWords.event(.started(harness: nil, resumed: true), runner: "Home server")
+                == "Woke up on Home server")
         #expect(ConversationWords.event(.gap(from: 3, to: 9), runner: "") == "Entries 3 to 9 were not kept")
         #expect(ConversationWords.event(.ended(kind: "succeeded", reason: nil), runner: "") == "Ended: finished")
         #expect(ConversationWords.event(.note(type: "compacted", detail: ""), runner: "") == "Compacted")
@@ -63,9 +65,9 @@ struct ConversationWordsTests {
     @Test func oneNoticeAtATimeMostUrgentFirst() {
         let lost = session(.lost)
         // Lost wins over a reconnect or a leftover notice: it is the only one that carries Resume.
-        #expect(ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: true, notice: nil)?.resume == true)
+        #expect(ConversationWords.banner(lost, runner: "Build box", reconnecting: true, notice: nil)?.resume == true)
         #expect(
-            ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: false, notice: InlineNotice(title: "X"))?
+            ConversationWords.banner(lost, runner: "Build box", reconnecting: false, notice: InlineNotice(title: "X"))?
                 .title == "Session lost")
         let live = session(.waiting)
         #expect(
@@ -74,9 +76,9 @@ struct ConversationWordsTests {
         #expect(
             ConversationWords.banner(live, runner: "", reconnecting: false, notice: InlineNotice(title: "X"))?.title
                 == "X")
-        let b = ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: false, notice: nil)
+        let b = ConversationWords.banner(lost, runner: "Build box", reconnecting: false, notice: nil)
         #expect(
-            b?.title == "Session lost" && b?.text == "Azure Dev dropped it. The transcript is kept."
+            b?.title == "Session lost" && b?.text == "Build box dropped it. The transcript is kept."
                 && b?.resume == true)
         #expect(ConversationWords.banner(session(.waiting), runner: "", reconnecting: false, notice: nil) == nil)
         #expect(

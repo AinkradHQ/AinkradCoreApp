@@ -35,9 +35,9 @@ struct ActivityChecksTests {
         m.activity.clearFilters()
         #expect(m.activity.filter.room == .room("ainkrad") && !m.activity.filter.isActive)
         // Switching the viewing room moves the starting filter with it.
-        m.view("voutra")
+        m.view("initech")
         m.activity.enter()
-        #expect(m.activity.filter.room == .room("voutra"))
+        #expect(m.activity.filter.room == .room("initech"))
     }
 
     @Test func filtersCombine() async {
@@ -65,11 +65,11 @@ struct ActivityChecksTests {
     @Test func aSealedRoomsRowsNeverShow() async {
         let (m, _) = await loaded()
         let sealed = ActivityEvent(
-            seq: 1, at: "now", actor: "You", device: "Mac", action: "Searched", room: "althaqeel", result: .ok,
+            seq: 1, at: "now", actor: "You", device: "Mac", action: "Searched", room: "umbrella", result: .ok,
             kind: .access)
         m.activity.receive(sealed)
         m.activity.filter.room = .all
-        #expect(!m.activity.visible.contains { $0.room == "althaqeel" })
+        #expect(!m.activity.visible.contains { $0.room == "umbrella" })
     }
 
     @Test func blockedRowsNameTheRule() async {
@@ -156,7 +156,7 @@ struct ActivityChecksTests {
             for n in titles { #expect(!t.contains(n)) }
         }
         for k in [NeedKind.paused, .blocked, .check] {
-            #expect(!BrainWords.push(kind: k, n: 2).contains("Optimus"))
+            #expect(!BrainWords.push(kind: k, n: 2).contains("Northwind"))
         }
     }
 
@@ -193,7 +193,7 @@ struct ActivityChecksTests {
         let svc = try #require(m.service as? SampleBrainService)
         await svc.failNext(["leakage"])
         await m.checks.run("leakage")
-        #expect(m.health == .paused && m.pausedNames == ["AutomotiveAi", "Optimus"])
+        #expect(m.health == .paused && m.pausedNames == ["Globex", "Northwind"])
         #expect(m.checks.items.first { $0.id == "leakage" }?.outcome == .fail)
         await m.checks.run("leakage")
         #expect(m.checks.items.first { $0.id == "leakage" }?.outcome == .pass)
@@ -217,7 +217,7 @@ struct ActivityChecksTests {
         let (m, _) = await loaded(s)
         #expect(m.health == .paused)
         let line = BrainWords.pausedLine(names: m.pausedNames)
-        #expect(line.contains("AutomotiveAi and Optimus"))
+        #expect(line.contains("Globex and Northwind"))
         #expect(m.bellTexts.contains("Search is paused for 2 rooms"))
         #expect(m.checks.items.first { $0.id == "leakage" }.map(m.checks.state) == .fail)
     }

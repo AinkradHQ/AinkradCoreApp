@@ -205,7 +205,7 @@ struct AuditPlainWordsTests {
     @Test func idsFromDetailsStayOutOfTheSentence() {
         let a = row(nil, nil, #"{"device":"d_71wsK2"}"#)
         #expect(AuditWords.sentence(a) { _ in nil }.what == "a device")
-        #expect(AuditWords.sentence(a, deviceName: { _ in "Ahmed's iPhone" }) { _ in nil }.what == "“Ahmed's iPhone”")
+        #expect(AuditWords.sentence(a, deviceName: { _ in "Sam's iPhone" }) { _ in nil }.what == "“Sam's iPhone”")
     }
 
     @Test func namesAreNotTreatedAsIds() {

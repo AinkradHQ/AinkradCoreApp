@@ -11,7 +11,7 @@ actor SampleImportTransport: BrainTransport {
             id: "ainkrad", name: "Ainkrad", kind: "product", signals: ["path"], itemCount: 1412,
             sampleTitles: ["Sample: queue migration order", "Sample: runner rewrite plan"]),
         ProposalCard(
-            id: "workan-space", name: "Workan space", kind: "product", signals: ["path"], itemCount: 204,
+            id: "acme-shop", name: "Acme Shop", kind: "product", signals: ["path"], itemCount: 204,
             sampleTitles: ["Sample: tenant dashboard"]),
         ProposalCard(
             id: "pricing", name: "Pricing experiments", kind: "project", itemCount: 14,

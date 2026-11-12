@@ -169,7 +169,7 @@ struct FirstRunView: View {
             title("Welcome to Ainkrad")
             note("What should we call you? Home greets you with it. It stays on this Mac.")
             CoreTextField(
-                "Your name", placeholder: "Ahmed", text: $model.nameText, autofocus: true,
+                "Your name", placeholder: "Sam", text: $model.nameText, autofocus: true,
                 onSubmit: { model.submitName() })
             HStack {
                 Button("Not now") {

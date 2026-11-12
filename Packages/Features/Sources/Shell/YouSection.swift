@@ -10,7 +10,7 @@ struct YouSection: View {
         GlassSection(
             "Your name", sub: "Home greets you with it. It stays on this Mac.", symbol: "person", hue: GlassInk.blue
         ) {
-            CoreTextField("Your name", placeholder: "Ahmed", text: $draft, onSubmit: save)
+            CoreTextField("Your name", placeholder: "Sam", text: $draft, onSubmit: save)
                 .onChange(of: draft) { _, new in profile.set(new) }
         }
         .foregroundStyle(GlassInk.primary)

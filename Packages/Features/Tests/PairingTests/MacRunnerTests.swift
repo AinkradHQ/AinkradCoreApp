@@ -57,7 +57,7 @@ struct MacRunnerTests {
                 r.revoked.append(id)
                 return r.revokeFailure
             })
-        return (MacRunnerModel(control: c, deps: deps, defaults: defaults, macName: "Ahmed's Mac"), c, r, defaults)
+        return (MacRunnerModel(control: c, deps: deps, defaults: defaults, macName: "Sam's Mac"), c, r, defaults)
     }
 
     @Test func itIsOnByDefaultWithTerminalsAndSaysTheWarning() {
@@ -69,7 +69,7 @@ struct MacRunnerTests {
     @Test func turningItOnMakesAnInvitePairsWithItAndStartsTheAgentWithTerminals() async {
         let (m, c, r, _) = make()
         await m.reconcile()
-        #expect(r.invites == ["Ahmed's Mac"])
+        #expect(r.invites == ["Sam's Mac"])
         #expect(c.paired == ["core.example:7700/FP.SECRET"])
         #expect(c.registered == true)
         #expect(m.state == .running && m.deviceID == "d_mac" && m.runnerID == "d_mac")
