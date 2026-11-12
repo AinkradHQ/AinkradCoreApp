@@ -19,10 +19,12 @@ extension AgentsModel {
     // MARK: panes
 
     public func openList() {
-        var spec = PaneSpec(id: Self.listPane, title: "Agents", sub: "Home Core", symbol: "sparkles", chip: listChip) {
+        var spec = PaneSpec(
+            id: Self.listPane, title: "AI Sessions", sub: "Home Core", symbol: "text.cursor", chip: listChip
+        ) {
             AgentsListView(model: self)
         }
-        spec.tab = "Agents"
+        spec.tab = "AI Sessions"
         shell.openPane(spec)
     }
 
@@ -58,6 +60,7 @@ extension AgentsModel {
 
     /// A session's name: its prompt's first line, else the harness and the id's tail.
     public func title(_ s: AgentSessionInfo) -> String {
+        if let t = s.title, !t.isEmpty { return t }
         if let t = titles[s.id] { return t }
         if let line = transcripts[s.id]?.entries.lazy.compactMap({ e -> String? in
             if case .user(let t) = e.kind { return AgentWords.title(prompt: t) }
@@ -123,7 +126,18 @@ extension AgentsModel {
         if advanced || runner != nil {
             shell.present(ShellDialog(id: "agents.new") { NewSessionSheet(model: self) })
         } else {
-            shell.present(ShellDialog(id: "agents.quick") { QuickSessionView(model: self) })
+            // ⌘N: the session opens at once with the defaults and an empty composer. A refusal shows as a sheet.
+            Task { [weak self] in
+                guard let self, let n = await self.startLiveSession() else { return }
+                self.shell.presentSheet(
+                    title: n.title, message: n.detail,
+                    actions: [
+                        ShellSheetAction("Close"),
+                        ShellSheetAction("Advanced…", primary: true) { [weak self] in
+                            self?.openNewSession(advanced: true)
+                        },
+                    ])
+            }
         }
     }
 
@@ -136,28 +150,29 @@ extension AgentsModel {
     func registerBase() {
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.list", title: "Agents", sub: "Your agent sessions", symbol: "sparkles",
-                keywords: ["sessions", "claude", "codex", "agent"]
+                id: "agents.list", title: "AI sessions", sub: "Your AI sessions", symbol: "text.cursor",
+                keywords: ["sessions", "claude", "codex", "agent", "ai"]
             ) { [weak self] in self?.openList() })
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.new", title: "New agent session", sub: "One prompt, the defaults · needs Touch ID",
-                symbol: "plus", keywords: ["start", "create", "agent", "claude", "codex"], isAction: true
+                id: "agents.new", title: "New AI session", sub: "Opens at once with the defaults · needs Touch ID",
+                symbol: "plus", keywords: ["start", "create", "agent", "claude", "codex", "ai"], isAction: true
             ) { [weak self] in self?.openNewSession() })
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.new-advanced", title: "New agent session (advanced)…",
-                sub: "Choose the harness, runner, model, mode and secrets", symbol: "slider.horizontal.3",
+                id: "agents.new-advanced", title: "New AI session (advanced)…",
+                sub: "Choose the tool, runner, folder or repo, model and account order", symbol: "slider.horizontal.3",
                 keywords: ["start", "agent", "harness", "codex", "model"], isAction: true
             ) { [weak self] in self?.openNewSession(advanced: true) })
         shell.launcher.register(
             LauncherEntry(
-                id: "agents.inbox", title: "Approvals", sub: "what agents are waiting on you for",
+                id: "agents.inbox", title: "Approvals", sub: "what AI sessions are waiting on you for",
                 symbol: "lock.shield", keywords: ["inbox", "approve", "touch id", "deny"]
             ) { [weak self] in self?.openInbox() })
         shell.launcher.register(
             LauncherEntry(
-                id: "settings.agents", title: "Agents settings", sub: "Surface and the defaults for new sessions",
+                id: "settings.agents", title: "AI Sessions settings",
+                sub: "Surface and the defaults for new AI sessions",
                 symbol: "gearshape", keywords: ["appearance", "defaults", "harness", "agent"]
             ) { [weak self] in
                 self?.shell.settings.selected = "agents"
@@ -165,18 +180,18 @@ extension AgentsModel {
             })
         shell.settings.section(
             SettingsSection(
-                id: "agents", group: .apps, title: "Agents", sub: "Surface and the defaults for new sessions",
-                symbol: "sparkles", order: 30
+                id: "agents", group: .apps, title: "AI Sessions", sub: "Surface and the defaults for new AI sessions",
+                symbol: "text.cursor", order: 30
             ) { AgentSettingsView(model: self) })
         shell.settings.section(
             SettingsSection(
-                id: "agent-chains", group: .apps, title: "Agents and chains",
-                sub: "Which chain each agent draws its accounts from", symbol: "link", order: 31
+                id: "agent-chains", group: .apps, title: "Account orders",
+                sub: "Which order of accounts AI sessions draw from", symbol: "link", order: 31
             ) { AgentChainsSection(model: self) })
         shell.launcher.register(
             LauncherEntry(
-                id: "settings.agent-chains", title: "Agents and chains",
-                sub: "Settings, Agents · bind an agent to a chain", symbol: "link",
+                id: "settings.agent-chains", title: "Account orders",
+                sub: "Settings, AI Sessions · the order of accounts", symbol: "link",
                 keywords: ["bind", "unbind", "chain", "agent", "fallback", "accounts"]
             ) { [weak self] in self?.openChainBinding() })
         shell.settings.section(
@@ -199,7 +214,7 @@ extension AgentsModel {
                     id: "agents.s-\(s.id)", title: title(s),
                     sub: "\(AgentWords.harnessName(s.harness)) · \(runnerName(s.runner)) · \(st)",
                     symbol: Self.harnessSymbol(s.harness),
-                    keywords: ["agent", "session", s.harness, runnerName(s.runner), st]
+                    keywords: ["agent", "ai", "session", s.harness, runnerName(s.runner), st]
                 ) { [weak self] in self?.openSession(s.id) })
         }
         launcherIDs = ids
@@ -224,7 +239,7 @@ extension AgentsModel {
             let id = r.key
             if primed, !announced.contains(id) {
                 announced.insert(id)
-                let h = sessions.session(r.session).map { AgentWords.harnessName($0.harness) } ?? "An agent"
+                let h = sessions.session(r.session).map { AgentWords.harnessName($0.harness) } ?? "An AI session"
                 CoreAnnounce.settled("approval", "\(h) needs approval")
                 if notifyApprovals {
                     notifier.post(
@@ -255,7 +270,7 @@ extension AgentsModel {
         let left = r.remaining(now: now).map { "expires in \(AgentWords.clock($0))" }
         return BellItem(
             id: r.key, kind: .approval,
-            title: "\(s.map { AgentWords.harnessName($0.harness) } ?? "An agent") wants to use \(r.tool)",
+            title: "\(s.map { AgentWords.harnessName($0.harness) } ?? "An AI session") wants to use \(r.tool)",
             sub: [s.map { runnerName($0.runner) }, r.input.isEmpty ? nil : r.input, left].compactMap { $0 }
                 .joined(separator: " · "),
             time: AgentWords.ago(r.requestedAt, now: now),

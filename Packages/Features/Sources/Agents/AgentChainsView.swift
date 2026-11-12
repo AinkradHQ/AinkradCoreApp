@@ -22,7 +22,7 @@ struct AgentChainsSection: View {
 
     private var intro: String {
         let d = model.defaultChain.map { "the default chain, \($0.name)" } ?? "the default chain"
-        return "Pick the chain each agent draws its accounts from. An agent with none uses \(d)."
+        return "Pick the order of accounts each AI session draws from. One with none uses \(d)."
     }
 
     @ViewBuilder private var content: some View {
@@ -70,8 +70,8 @@ struct AgentChainsSection: View {
             let agents = model.knownAgents
             if agents.isEmpty {
                 CoreStateCard(
-                    symbol: "sparkles", title: "No agent has its own chain",
-                    line: "Every session uses the default chain. Bind an agent below to give it another.")
+                    symbol: "sparkles", title: "No order of its own yet",
+                    line: "Every AI session uses the default order. Bind one below to give it another.")
             } else {
                 VStack(spacing: Space.s2) {
                     ForEach(agents, id: \.self) { row($0) }

@@ -6,6 +6,44 @@ public import struct Foundation.Date
 extension Components {
     /// Types generated from the `#/components/schemas` section of the OpenAPI document.
     public enum Schemas {
+        /// What `POST /accounts/{id}/check` answers.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AccountChecked`.
+        public struct AccountChecked: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AccountChecked/latency_ms`.
+            public var latencyMs: Swift.Int64?
+            /// `ok`, or why not. A Claude plan: `token_expired`, `limit_reached`, `no_runner` (none that
+            /// may hold the token is online), `runner_outdated`, `runner_busy`, `runner_failed`,
+            /// `egress_not_proven`, `sandbox_unavailable`, `unreachable`, `timeout` or `failed`. An
+            /// API-key account: the key test's class (`ok`, `auth_failed`, ...) or `no_runner`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountChecked/result`.
+            public var result: Swift.String
+            /// The runner device that made the check; absent when none was asked.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AccountChecked/runner`.
+            public var runner: Swift.String?
+            /// Creates a new `AccountChecked`.
+            ///
+            /// - Parameters:
+            ///   - latencyMs:
+            ///   - result: `ok`, or why not. A Claude plan: `token_expired`, `limit_reached`, `no_runner` (none that
+            ///   - runner: The runner device that made the check; absent when none was asked.
+            public init(
+                latencyMs: Swift.Int64? = nil,
+                result: Swift.String,
+                runner: Swift.String? = nil
+            ) {
+                self.latencyMs = latencyMs
+                self.result = result
+                self.runner = runner
+            }
+            public enum CodingKeys: String, CodingKey {
+                case latencyMs = "latency_ms"
+                case result
+                case runner
+            }
+        }
         /// What an `admin` write answers: the account and the runners its key may be leased to.
         ///
         /// - Remark: Generated from `#/components/schemas/AccountDetail`.
@@ -501,6 +539,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/id`.
             public var id: Swift.String
+            /// While `waiting`: since when.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/idle_since`.
+            public var idleSince: Components.Schemas.Timestamp?
             /// Its row: page `listAgentSessions` with `before`.
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/index`.
@@ -509,6 +551,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/last_seq`.
             public var lastSeq: Swift.Int64
+            /// A live conversation (`createAgentSession`'s `live`): the state is `waiting` between answers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/live`.
+            public var live: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/AgentSession/model`.
             public var model: Swift.String?
             /// Once over: `{"kind": "succeeded" | "failed" | "cancelled" | "token_cap" | "stalled" |
@@ -541,11 +587,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/skip_pools`.
             public var skipPools: [Swift.Int64]?
-            /// `starting`, `running`, `interrupted` (its runner restarted; it is resumed), `ended`,
-            /// `lost`.
+            /// `starting`, `running` (working), `waiting` (a live session finished its answer and waits
+            /// for the user's next message; it still holds its runner slot), `interrupted` (its runner
+            /// restarted; it is resumed), `ended`, `lost`.
             ///
             /// - Remark: Generated from `#/components/schemas/AgentSession/state`.
             public var state: Swift.String
+            /// A short name: the first message's start, or the one `titleAgentSession` set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentSession/title`.
+            public var title: Swift.String?
             /// - Remark: Generated from `#/components/schemas/AgentSession/updated_at`.
             public var updatedAt: Components.Schemas.Timestamp
             /// The last status class its own gateway reported: `ok`, `rate_limited`, `quota`,
@@ -578,8 +629,10 @@ extension Components {
             ///   - harness:
             ///   - harnessSession: The harness's own session id, what a resume continues.
             ///   - id: `as_…`.
+            ///   - idleSince: While `waiting`: since when.
             ///   - index: Its row: page `listAgentSessions` with `before`.
             ///   - lastSeq: The newest transcript `seq` stored.
+            ///   - live: A live conversation (`createAgentSession`'s `live`): the state is `waiting` between answers.
             ///   - model:
             ///   - outcome: Once over: `{"kind": "succeeded" | "failed" | "cancelled" | "token_cap" | "stalled" |
             ///   - repicked: How many accounts a launch refused after the pick before the one it holds (at most 2).
@@ -588,7 +641,8 @@ extension Components {
             ///   - runner: The runner's device id, `d_…`.
             ///   - secrets: The secrets it is leased at each start, by name.
             ///   - skipPools: The pools a budget stop took out of the run's chain. Admin only.
-            ///   - state: `starting`, `running`, `interrupted` (its runner restarted; it is resumed), `ended`,
+            ///   - state: `starting`, `running` (working), `waiting` (a live session finished its answer and waits
+            ///   - title: A short name: the first message's start, or the one `titleAgentSession` set.
             ///   - updatedAt:
             ///   - upstreamClass: The last status class its own gateway reported: `ok`, `rate_limited`, `quota`,
             ///   - usage:
@@ -609,8 +663,10 @@ extension Components {
                 harness: Swift.String,
                 harnessSession: Swift.String? = nil,
                 id: Swift.String,
+                idleSince: Components.Schemas.Timestamp? = nil,
                 index: Swift.Int64? = nil,
                 lastSeq: Swift.Int64,
+                live: Swift.Bool? = nil,
                 model: Swift.String? = nil,
                 outcome: OpenAPIRuntime.OpenAPIObjectContainer? = nil,
                 repicked: Swift.Int64? = nil,
@@ -620,6 +676,7 @@ extension Components {
                 secrets: [Swift.String]? = nil,
                 skipPools: [Swift.Int64]? = nil,
                 state: Swift.String,
+                title: Swift.String? = nil,
                 updatedAt: Components.Schemas.Timestamp,
                 upstreamClass: Swift.String? = nil,
                 usage: Components.Schemas.AgentUsage? = nil,
@@ -640,8 +697,10 @@ extension Components {
                 self.harness = harness
                 self.harnessSession = harnessSession
                 self.id = id
+                self.idleSince = idleSince
                 self.index = index
                 self.lastSeq = lastSeq
+                self.live = live
                 self.model = model
                 self.outcome = outcome
                 self.repicked = repicked
@@ -651,6 +710,7 @@ extension Components {
                 self.secrets = secrets
                 self.skipPools = skipPools
                 self.state = state
+                self.title = title
                 self.updatedAt = updatedAt
                 self.upstreamClass = upstreamClass
                 self.usage = usage
@@ -672,8 +732,10 @@ extension Components {
                 case harness
                 case harnessSession = "harness_session"
                 case id
+                case idleSince = "idle_since"
                 case index
                 case lastSeq = "last_seq"
+                case live
                 case model
                 case outcome
                 case repicked
@@ -683,10 +745,30 @@ extension Components {
                 case secrets
                 case skipPools = "skip_pools"
                 case state
+                case title
                 case updatedAt = "updated_at"
                 case upstreamClass = "upstream_class"
                 case usage
                 case waiting
+            }
+        }
+        /// A new title for a session.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AgentTitle`.
+        public struct AgentTitle: Codable, Hashable, Sendable {
+            /// At most 60 characters; empty clears it (the list then shows the session's harness).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AgentTitle/title`.
+            public var title: Swift.String
+            /// Creates a new `AgentTitle`.
+            ///
+            /// - Parameters:
+            ///   - title: At most 60 characters; empty clears it (the list then shows the session's harness).
+            public init(title: Swift.String) {
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case title
             }
         }
         /// - Remark: Generated from `#/components/schemas/AgentTranscript`.
@@ -1332,6 +1414,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ClaimBody/code`.
             public var code: Swift.String?
+            /// What to call this device: 1 to 64 characters of plain text, no control characters. It
+            /// becomes the device's name in place of the pairing's (an invite's is `owner`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ClaimBody/device_name`.
+            public var deviceName: Swift.String?
             /// `secure_enclave`, `strongbox`, `tee`, `tpm` or `software`: a claim.
             ///
             /// - Remark: Generated from `#/components/schemas/ClaimBody/key_storage`.
@@ -1365,6 +1452,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - code: The typed code (`ABCDE-FGHJK`, any case); or `secret`.
+            ///   - deviceName: What to call this device: 1 to 64 characters of plain text, no control characters. It
             ///   - keyStorage: `secure_enclave`, `strongbox`, `tee`, `tpm` or `software`: a claim.
             ///   - platform:
             ///   - pop: The routine key's ES256 signature (raw r||s, base64url) over the UTF-8 string
@@ -1374,6 +1462,7 @@ extension Components {
             ///   - stepupSpki: The step-up key, where the device has one.
             public init(
                 code: Swift.String? = nil,
+                deviceName: Swift.String? = nil,
                 keyStorage: Swift.String? = nil,
                 platform: Swift.String? = nil,
                 pop: Swift.String,
@@ -1383,6 +1472,7 @@ extension Components {
                 stepupSpki: Swift.String? = nil
             ) {
                 self.code = code
+                self.deviceName = deviceName
                 self.keyStorage = keyStorage
                 self.platform = platform
                 self.pop = pop
@@ -1393,6 +1483,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case code
+                case deviceName = "device_name"
                 case keyStorage = "key_storage"
                 case platform
                 case pop
@@ -1406,6 +1497,10 @@ extension Components {
                 self.code = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .code
+                )
+                self.deviceName = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .deviceName
                 )
                 self.keyStorage = try container.decodeIfPresent(
                     Swift.String.self,
@@ -1437,6 +1532,7 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "code",
+                    "device_name",
                     "key_storage",
                     "platform",
                     "pop",
@@ -2556,7 +2652,10 @@ extension Components {
             /// `action`, `actor_kind`, `actor_id`, `entity_kind`, `entity_id`, `entity_ref`, `details`;
             /// a device is named by its `d_…` id in `entity_ref`, with `entity_id` null), or a kind a
             /// module writes. The registered kinds are listed in `x-event-kinds`. The payload of
-            /// `agent.state` is `{session, state, reason, …}`: a chain session that waits for an account
+            /// `agent.state` is `{session, state, reason, …}`: a live session that finished its answer is
+            /// `state: "waiting"` with `reason: "turn_ended"` (its transcript has the harness's
+            /// `turn_ended` and a `waiting` entry), and `state: "running"` with `reason: "message"` when
+            /// the next message starts an answer. A chain session that waits for an account
             /// says `reason: "waiting"` and `waiting: {until, why, since}` (`until` an RFC 3339 time, `since`
             /// the first wait in unix seconds), and one whose launch refused its account, so another was
             /// picked across a provider or harness, says `reason: "repicked"`, and a run a failover moved across
@@ -2692,6 +2791,56 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case kind
                 case userId = "user_id"
+            }
+        }
+        /// One lease of a group's grant: hand `lease` to the runner. No `Debug`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/GroupLease`.
+        public struct GroupLease: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/GroupLease/expires_at`.
+            public var expiresAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/GroupLease/lease`.
+            public var lease: Swift.String
+            /// The member's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/GroupLease/secret`.
+            public var secret: Swift.String
+            /// Creates a new `GroupLease`.
+            ///
+            /// - Parameters:
+            ///   - expiresAt:
+            ///   - lease:
+            ///   - secret: The member's name.
+            public init(
+                expiresAt: Components.Schemas.Timestamp,
+                lease: Swift.String,
+                secret: Swift.String
+            ) {
+                self.expiresAt = expiresAt
+                self.lease = lease
+                self.secret = secret
+            }
+            public enum CodingKeys: String, CodingKey {
+                case expiresAt = "expires_at"
+                case lease
+                case secret
+            }
+        }
+        /// The leases a group lent, one per member the runner may have. No `Debug`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/GroupLeaseGrant`.
+        public struct GroupLeaseGrant: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/GroupLeaseGrant/leases`.
+            public var leases: [Components.Schemas.GroupLease]
+            /// Creates a new `GroupLeaseGrant`.
+            ///
+            /// - Parameters:
+            ///   - leases:
+            public init(leases: [Components.Schemas.GroupLease]) {
+                self.leases = leases
+            }
+            public enum CodingKeys: String, CodingKey {
+                case leases
             }
         }
         /// What the server is and speaks, for anyone.
@@ -3037,6 +3186,33 @@ extension Components {
                 case runner
             }
         }
+        /// - Remark: Generated from `#/components/schemas/InstallToolBody`.
+        public struct InstallToolBody: Codable, Hashable, Sendable {
+            /// `claude`, `codex`, `node`, `git`, `python`, `go`, `rust` or `docker`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstallToolBody/tool`.
+            public var tool: Swift.String
+            /// Creates a new `InstallToolBody`.
+            ///
+            /// - Parameters:
+            ///   - tool: `claude`, `codex`, `node`, `git`, `python`, `go`, `rust` or `docker`.
+            public init(tool: Swift.String) {
+                self.tool = tool
+            }
+            public enum CodingKeys: String, CodingKey {
+                case tool
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.tool = try container.decode(
+                    Swift.String.self,
+                    forKey: .tool
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "tool"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/InviteCreated`.
         public struct InviteCreated: Codable, Hashable, Sendable {
             /// A runner invite's end (15 minutes); absent for a device invite, which never expires.
@@ -3328,6 +3504,15 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/LeasedSecret/expires_at`.
             public var expiresAt: Components.Schemas.Timestamp
+            /// - Remark: Generated from `#/components/schemas/LeasedSecret/file_mode`.
+            public var fileMode: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LeasedSecret/file_name`.
+            public var fileName: Swift.String?
+            /// `text`, `multiline`, `file` (the value is base64: decode it, write it as `file_name`
+            /// with `file_mode`) or `env_bundle` (the value is `NAME=value` lines).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LeasedSecret/kind`.
+            public var kind: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LeasedSecret/name`.
             public var name: Swift.String
             /// - Remark: Generated from `#/components/schemas/LeasedSecret/value`.
@@ -3339,18 +3524,27 @@ extension Components {
             /// - Parameters:
             ///   - delivery:
             ///   - expiresAt: Drop it by then, or at the session's end.
+            ///   - fileMode:
+            ///   - fileName:
+            ///   - kind: `text`, `multiline`, `file` (the value is base64: decode it, write it as `file_name`
             ///   - name:
             ///   - value:
             ///   - version:
             public init(
                 delivery: Swift.String,
                 expiresAt: Components.Schemas.Timestamp,
+                fileMode: Swift.String? = nil,
+                fileName: Swift.String? = nil,
+                kind: Swift.String? = nil,
                 name: Swift.String,
                 value: Swift.String,
                 version: Swift.Int64
             ) {
                 self.delivery = delivery
                 self.expiresAt = expiresAt
+                self.fileMode = fileMode
+                self.fileName = fileName
+                self.kind = kind
                 self.name = name
                 self.value = value
                 self.version = version
@@ -3358,6 +3552,9 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case delivery
                 case expiresAt = "expires_at"
+                case fileMode = "file_mode"
+                case fileName = "file_name"
+                case kind
                 case name
                 case value
                 case version
@@ -3701,6 +3898,13 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NewAgentSession/harness`.
             public var harness: Swift.String?
+            /// One live conversation (default `true`): the harness stays up after each answer, the state
+            /// is `waiting` until the next `sendAgentMessage`, and the session ends only on `cancel`,
+            /// `kill`, the idle end (`agents.idle_end_secs`) or when the CLI exits by itself. `false`, or
+            /// a runner that does not offer it (the answer's `live` says), runs one answer and ends.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewAgentSession/live`.
+            public var live: Swift.Bool?
             /// The model id as the provider names it. For a session served by the auth gateway it must be
             /// one of the ids priced for its provider, exactly: the gateway resolves no alias.
             ///
@@ -3710,6 +3914,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NewAgentSession/policy`.
             public var policy: OpenAPIRuntime.OpenAPIObjectContainer?
+            /// The first message. Absent or empty: the session starts with no message, like opening the
+            /// CLI: its harness is up, the state is `waiting`, and the first message comes through
+            /// `sendAgentMessage`. A message gives the session its `title` (its first 60 characters).
+            ///
             /// - Remark: Generated from `#/components/schemas/NewAgentSession/prompt`.
             public var prompt: Swift.String?
             /// The runner's device id, `d_…`.
@@ -3732,9 +3940,10 @@ extension Components {
             ///   - chain: A fallback chain's id: the session draws its account from it, one at a time. Needs
             ///   - connectionAccess: Capability names the session may call through its connections (`read_repo`,
             ///   - harness: `claude`, `codex`, `opencode`, `agy` (what the runner's `agent` driver takes). Omit it
+            ///   - live: One live conversation (default `true`): the harness stays up after each answer, the state
             ///   - model: The model id as the provider names it. For a session served by the auth gateway it must be
             ///   - policy: `{"mode": "ask" | "accept_edits" | "sandboxed", "allow": […]}`; default `ask`.
-            ///   - prompt:
+            ///   - prompt: The first message. Absent or empty: the session starts with no message, like opening the
             ///   - runner: The runner's device id, `d_…`.
             ///   - secrets: At most 16. Each is leased to the runner at each start (secrets broker, gate G-SEC).
             ///   - workspace: The repo and worktree to work in (`{"repo_url", "base_branch", "branch", …}`); absent, a
@@ -3743,6 +3952,7 @@ extension Components {
                 chain: Swift.Int64? = nil,
                 connectionAccess: [Swift.String]? = nil,
                 harness: Swift.String? = nil,
+                live: Swift.Bool? = nil,
                 model: Swift.String? = nil,
                 policy: OpenAPIRuntime.OpenAPIObjectContainer? = nil,
                 prompt: Swift.String? = nil,
@@ -3754,6 +3964,7 @@ extension Components {
                 self.chain = chain
                 self.connectionAccess = connectionAccess
                 self.harness = harness
+                self.live = live
                 self.model = model
                 self.policy = policy
                 self.prompt = prompt
@@ -3766,6 +3977,7 @@ extension Components {
                 case chain
                 case connectionAccess = "connection_access"
                 case harness
+                case live
                 case model
                 case policy
                 case prompt
@@ -3966,6 +4178,33 @@ extension Components {
                 case installationId = "installation_id"
                 case site
                 case token
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NewGroupLease`.
+        public struct NewGroupLease: Codable, Hashable, Sendable {
+            /// The runner's device id, `d_…`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewGroupLease/runner`.
+            public var runner: Swift.String
+            /// Each lease's lifetime; default and most `secrets.lease_secs`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewGroupLease/ttl_secs`.
+            public var ttlSecs: Swift.Int64?
+            /// Creates a new `NewGroupLease`.
+            ///
+            /// - Parameters:
+            ///   - runner: The runner's device id, `d_…`.
+            ///   - ttlSecs: Each lease's lifetime; default and most `secrets.lease_secs`.
+            public init(
+                runner: Swift.String,
+                ttlSecs: Swift.Int64? = nil
+            ) {
+                self.runner = runner
+                self.ttlSecs = ttlSecs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case runner
+                case ttlSecs = "ttl_secs"
             }
         }
         /// - Remark: Generated from `#/components/schemas/NewInviteBody`.
@@ -4280,13 +4519,34 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NewSecret/delivery`.
             public var delivery: Swift.String?
+            /// One line, at most 200 characters.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecret/description`.
+            public var description: Swift.String?
+            /// Kind `file`: an octal mode the owner can read, `0400` to `0777`; default `0600`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecret/file_mode`.
+            public var fileMode: Swift.String?
+            /// Required for kind `file`: `[A-Za-z0-9._-]{1,64}`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecret/file_name`.
+            public var fileName: Swift.String?
+            /// The name of a group made with `createSecretGroup`; one level.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecret/group`.
+            public var group: Swift.String?
+            /// `text` (the default), `multiline`, `file` or `env_bundle` (`NAME=value` lines).
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecret/kind`.
+            public var kind: Swift.String?
             /// - Remark: Generated from `#/components/schemas/NewSecret/name`.
             public var name: Swift.String
-            /// Runner device ids it may be leased to; default none.
+            /// Runner device ids it may be leased to; default none (a group's runners then apply).
             ///
             /// - Remark: Generated from `#/components/schemas/NewSecret/runners`.
             public var runners: [Swift.String]?
-            /// UTF-8 text, at most `secrets.max_bytes`; written, never read back.
+            /// UTF-8 text, at most `secrets.max_bytes`; for kind `file` the file's bytes in standard
+            /// base64 (at most 1 MiB decoded); written, never read back.
             ///
             /// - Remark: Generated from `#/components/schemas/NewSecret/value`.
             public var value: Swift.String
@@ -4294,25 +4554,78 @@ extension Components {
             ///
             /// - Parameters:
             ///   - delivery: `env` (the default), `file` or `askpass`.
+            ///   - description: One line, at most 200 characters.
+            ///   - fileMode: Kind `file`: an octal mode the owner can read, `0400` to `0777`; default `0600`.
+            ///   - fileName: Required for kind `file`: `[A-Za-z0-9._-]{1,64}`.
+            ///   - group: The name of a group made with `createSecretGroup`; one level.
+            ///   - kind: `text` (the default), `multiline`, `file` or `env_bundle` (`NAME=value` lines).
             ///   - name:
-            ///   - runners: Runner device ids it may be leased to; default none.
-            ///   - value: UTF-8 text, at most `secrets.max_bytes`; written, never read back.
+            ///   - runners: Runner device ids it may be leased to; default none (a group's runners then apply).
+            ///   - value: UTF-8 text, at most `secrets.max_bytes`; for kind `file` the file's bytes in standard
             public init(
                 delivery: Swift.String? = nil,
+                description: Swift.String? = nil,
+                fileMode: Swift.String? = nil,
+                fileName: Swift.String? = nil,
+                group: Swift.String? = nil,
+                kind: Swift.String? = nil,
                 name: Swift.String,
                 runners: [Swift.String]? = nil,
                 value: Swift.String
             ) {
                 self.delivery = delivery
+                self.description = description
+                self.fileMode = fileMode
+                self.fileName = fileName
+                self.group = group
+                self.kind = kind
                 self.name = name
                 self.runners = runners
                 self.value = value
             }
             public enum CodingKeys: String, CodingKey {
                 case delivery
+                case description
+                case fileMode = "file_mode"
+                case fileName = "file_name"
+                case group
+                case kind
                 case name
                 case runners
                 case value
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NewSecretGroup`.
+        public struct NewSecretGroup: Codable, Hashable, Sendable {
+            /// One line, at most 200 characters; default empty.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecretGroup/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NewSecretGroup/name`.
+            public var name: Swift.String
+            /// Active runner device ids; default none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewSecretGroup/runners`.
+            public var runners: [Swift.String]?
+            /// Creates a new `NewSecretGroup`.
+            ///
+            /// - Parameters:
+            ///   - description: One line, at most 200 characters; default empty.
+            ///   - name:
+            ///   - runners: Active runner device ids; default none.
+            public init(
+                description: Swift.String? = nil,
+                name: Swift.String,
+                runners: [Swift.String]? = nil
+            ) {
+                self.description = description
+                self.name = name
+                self.runners = runners
+            }
+            public enum CodingKeys: String, CodingKey {
+                case description
+                case name
+                case runners
             }
         }
         /// - Remark: Generated from `#/components/schemas/NewTerminal`.
@@ -4758,6 +5071,36 @@ extension Components {
                 case errorId = "error_id"
                 case floor
                 case message
+            }
+        }
+        /// The answer to a policy change.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PolicyResult`.
+        public struct PolicyResult: Codable, Hashable, Sendable {
+            /// The policy now saved on the runner.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PolicyResult/policy`.
+            public var policy: Components.Schemas.RunnerPolicyBody?
+            /// The runner is restarting to apply it: it is offline for a few seconds and then reports the
+            /// new policy in `GET /runners` (`policy`). False when nothing it runs changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PolicyResult/restarting`.
+            public var restarting: Swift.Bool?
+            /// Creates a new `PolicyResult`.
+            ///
+            /// - Parameters:
+            ///   - policy: The policy now saved on the runner.
+            ///   - restarting: The runner is restarting to apply it: it is offline for a few seconds and then reports the
+            public init(
+                policy: Components.Schemas.RunnerPolicyBody? = nil,
+                restarting: Swift.Bool? = nil
+            ) {
+                self.policy = policy
+                self.restarting = restarting
+            }
+            public enum CodingKeys: String, CodingKey {
+                case policy
+                case restarting
             }
         }
         /// - Remark: Generated from `#/components/schemas/Pool`.
@@ -5363,6 +5706,20 @@ extension Components {
         public struct RotateSecret: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/RotateSecret/delivery`.
             public var delivery: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/RotateSecret/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/RotateSecret/file_mode`.
+            public var fileMode: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/RotateSecret/file_name`.
+            public var fileName: Swift.String?
+            /// An empty string leaves the group.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RotateSecret/group`.
+            public var group: Swift.String?
+            /// Omitted keeps the kind; the other fields are those of `createSecret`, omitted keeps them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RotateSecret/kind`.
+            public var kind: Swift.String?
             /// - Remark: Generated from `#/components/schemas/RotateSecret/runners`.
             public var runners: [Swift.String]?
             /// - Remark: Generated from `#/components/schemas/RotateSecret/value`.
@@ -5371,19 +5728,39 @@ extension Components {
             ///
             /// - Parameters:
             ///   - delivery:
+            ///   - description:
+            ///   - fileMode:
+            ///   - fileName:
+            ///   - group: An empty string leaves the group.
+            ///   - kind: Omitted keeps the kind; the other fields are those of `createSecret`, omitted keeps them.
             ///   - runners:
             ///   - value:
             public init(
                 delivery: Swift.String? = nil,
+                description: Swift.String? = nil,
+                fileMode: Swift.String? = nil,
+                fileName: Swift.String? = nil,
+                group: Swift.String? = nil,
+                kind: Swift.String? = nil,
                 runners: [Swift.String]? = nil,
                 value: Swift.String
             ) {
                 self.delivery = delivery
+                self.description = description
+                self.fileMode = fileMode
+                self.fileName = fileName
+                self.group = group
+                self.kind = kind
                 self.runners = runners
                 self.value = value
             }
             public enum CodingKeys: String, CodingKey {
                 case delivery
+                case description
+                case fileMode = "file_mode"
+                case fileName = "file_name"
+                case group
+                case kind
                 case runners
                 case value
             }
@@ -5455,6 +5832,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Runner/os_pretty`.
             public var osPretty: Swift.String?
+            /// Harnesses with a login of their own on its host (`claude`, `codex`, ...); a plain session
+            /// of one is not refused as `no_account`. Absent until a runner of this version connected.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Runner/own_logins`.
+            public var ownLogins: [Swift.String]?
+            /// What the runner offers now: terminals, agents, agent capacity (`PUT /runners/{id}/policy`
+            /// sets it). Absent until a runner of this version connected.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Runner/policy`.
+            public var policy: Components.Schemas.RunnerPolicyBody?
             /// The user the runner process runs as, and whether that is root.
             ///
             /// - Remark: Generated from `#/components/schemas/Runner/runs_as`.
@@ -5468,7 +5855,8 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Runner/slots`.
             public var slots: Components.Schemas.RunnerSlots?
-            /// Agent harnesses it found, name to version (`claude` to `2.1.318`); empty when agents are off.
+            /// Tools it found on its host, name to version (`claude` to `2.1.318`, `git`, `node`, `python`,
+            /// `go`, `rust`, `docker`, `codex`); a tool that is not installed is not listed.
             ///
             /// - Remark: Generated from `#/components/schemas/Runner/tools`.
             public struct ToolsPayload: Codable, Hashable, Sendable {
@@ -5488,7 +5876,8 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// Agent harnesses it found, name to version (`claude` to `2.1.318`); empty when agents are off.
+            /// Tools it found on its host, name to version (`claude` to `2.1.318`, `git`, `node`, `python`,
+            /// `go`, `rust`, `docker`, `codex`); a tool that is not installed is not listed.
             ///
             /// - Remark: Generated from `#/components/schemas/Runner/tools`.
             public var tools: Components.Schemas.Runner.ToolsPayload?
@@ -5519,10 +5908,12 @@ extension Components {
             ///   - online: Connected to this Core now.
             ///   - os: `linux` or `macos`, once connected.
             ///   - osPretty: The system as a person names it, `Ubuntu 26.04`, as the runner reported it.
+            ///   - ownLogins: Harnesses with a login of their own on its host (`claude`, `codex`, ...); a plain session
+            ///   - policy: What the runner offers now: terminals, agents, agent capacity (`PUT /runners/{id}/policy`
             ///   - runsAs: The user the runner process runs as, and whether that is root.
             ///   - sandbox: `process` when the runner offers a process sandbox for agents, else `none`; absent when it
             ///   - slots: Sessions and terminals running now, and how many it takes.
-            ///   - tools: Agent harnesses it found, name to version (`claude` to `2.1.318`); empty when agents are off.
+            ///   - tools: Tools it found on its host, name to version (`claude` to `2.1.318`, `git`, `node`, `python`,
             ///   - updateAvailable: This Core's own version is newer than the runner's `version`. Absent until it connected.
             ///   - version: Its `ainkrad-runner` version, once connected.
             public init(
@@ -5542,6 +5933,8 @@ extension Components {
                 online: Swift.Bool? = nil,
                 os: Swift.String? = nil,
                 osPretty: Swift.String? = nil,
+                ownLogins: [Swift.String]? = nil,
+                policy: Components.Schemas.RunnerPolicyBody? = nil,
                 runsAs: Components.Schemas.RunnerRunsAs? = nil,
                 sandbox: Swift.String? = nil,
                 slots: Components.Schemas.RunnerSlots? = nil,
@@ -5565,6 +5958,8 @@ extension Components {
                 self.online = online
                 self.os = os
                 self.osPretty = osPretty
+                self.ownLogins = ownLogins
+                self.policy = policy
                 self.runsAs = runsAs
                 self.sandbox = sandbox
                 self.slots = slots
@@ -5589,6 +5984,8 @@ extension Components {
                 case online
                 case os
                 case osPretty = "os_pretty"
+                case ownLogins = "own_logins"
+                case policy
                 case runsAs = "runs_as"
                 case sandbox
                 case slots
@@ -5776,6 +6173,64 @@ extension Components {
                 case tiers
             }
         }
+        /// What a runner offers: terminals, agents, and how many agent sessions at once.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RunnerPolicyBody`.
+        public struct RunnerPolicyBody: Codable, Hashable, Sendable {
+            /// How many agent sessions run at once, 1 to 8.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RunnerPolicyBody/agent_capacity`.
+            public var agentCapacity: Swift.Int32
+            /// Agent sessions are offered. Refused (409 `policy_refused`, with the reason) when the
+            /// runner cannot run them: no process sandbox, no proven egress filter, or no agent tool installed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RunnerPolicyBody/agents`.
+            public var agents: Swift.Bool
+            /// Terminals are offered on the runner.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RunnerPolicyBody/terminals`.
+            public var terminals: Swift.Bool
+            /// Creates a new `RunnerPolicyBody`.
+            ///
+            /// - Parameters:
+            ///   - agentCapacity: How many agent sessions run at once, 1 to 8.
+            ///   - agents: Agent sessions are offered. Refused (409 `policy_refused`, with the reason) when the
+            ///   - terminals: Terminals are offered on the runner.
+            public init(
+                agentCapacity: Swift.Int32,
+                agents: Swift.Bool,
+                terminals: Swift.Bool
+            ) {
+                self.agentCapacity = agentCapacity
+                self.agents = agents
+                self.terminals = terminals
+            }
+            public enum CodingKeys: String, CodingKey {
+                case agentCapacity = "agent_capacity"
+                case agents
+                case terminals
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.agentCapacity = try container.decode(
+                    Swift.Int32.self,
+                    forKey: .agentCapacity
+                )
+                self.agents = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .agents
+                )
+                self.terminals = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .terminals
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "agent_capacity",
+                    "agents",
+                    "terminals"
+                ])
+            }
+        }
         /// Who the runner process is.
         ///
         /// - Remark: Generated from `#/components/schemas/RunnerRunsAs`.
@@ -5863,6 +6318,78 @@ extension Components {
                 case deleted
             }
         }
+        /// - Remark: Generated from `#/components/schemas/SecretGroupDeleted`.
+        public struct SecretGroupDeleted: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SecretGroupDeleted/deleted`.
+            public var deleted: Swift.Bool
+            /// Creates a new `SecretGroupDeleted`.
+            ///
+            /// - Parameters:
+            ///   - deleted:
+            public init(deleted: Swift.Bool) {
+                self.deleted = deleted
+            }
+            public enum CodingKeys: String, CodingKey {
+                case deleted
+            }
+        }
+        /// A group, never a value.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SecretGroupInfo`.
+        public struct SecretGroupInfo: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SecretGroupInfo/created_at`.
+            public var createdAt: Components.Schemas.Timestamp
+            /// One line: what the group is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretGroupInfo/description`.
+            public var description: Swift.String
+            /// The names of its secrets.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretGroupInfo/members`.
+            public var members: [Swift.String]
+            /// `[a-z][a-z0-9_.-]{0,63}`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretGroupInfo/name`.
+            public var name: Swift.String
+            /// The runner devices its members may be leased to unless they list their own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretGroupInfo/runners`.
+            public var runners: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/SecretGroupInfo/updated_at`.
+            public var updatedAt: Components.Schemas.Timestamp
+            /// Creates a new `SecretGroupInfo`.
+            ///
+            /// - Parameters:
+            ///   - createdAt:
+            ///   - description: One line: what the group is for.
+            ///   - members: The names of its secrets.
+            ///   - name: `[a-z][a-z0-9_.-]{0,63}`.
+            ///   - runners: The runner devices its members may be leased to unless they list their own.
+            ///   - updatedAt:
+            public init(
+                createdAt: Components.Schemas.Timestamp,
+                description: Swift.String,
+                members: [Swift.String],
+                name: Swift.String,
+                runners: [Swift.String],
+                updatedAt: Components.Schemas.Timestamp
+            ) {
+                self.createdAt = createdAt
+                self.description = description
+                self.members = members
+                self.name = name
+                self.runners = runners
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case createdAt = "created_at"
+                case description
+                case members
+                case name
+                case runners
+                case updatedAt = "updated_at"
+            }
+        }
         /// A secret, never its value.
         ///
         /// - Remark: Generated from `#/components/schemas/SecretInfo`.
@@ -5873,10 +6400,36 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SecretInfo/delivery`.
             public var delivery: Swift.String
+            /// One line: what it is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/description`.
+            public var description: Swift.String?
+            /// The runners a lease may go to: its own, else its group's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/effective_runners`.
+            public var effectiveRunners: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/file_mode`.
+            public var fileMode: Swift.String?
+            /// A `file` secret's name on the runner, and its octal mode (`0600`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/file_name`.
+            public var fileName: Swift.String?
+            /// The group it belongs to (`/api/v1/secret-groups`); none for no group.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/group`.
+            public var group: Swift.String?
             /// The master key it is sealed under.
             ///
             /// - Remark: Generated from `#/components/schemas/SecretInfo/key_id`.
             public var keyId: Swift.String
+            /// `text`, `multiline`, `file` or `env_bundle`. `size` is a file's decoded length.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/kind`.
+            public var kind: Swift.String?
+            /// When a runner last redeemed it; none before the first redemption.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/last_used_at`.
+            public var lastUsedAt: Components.Schemas.Timestamp?
             /// `[a-z][a-z0-9_.-]{0,63}`.
             ///
             /// - Remark: Generated from `#/components/schemas/SecretInfo/name`.
@@ -5895,6 +6448,10 @@ extension Components {
             public var size: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/SecretInfo/updated_at`.
             public var updatedAt: Components.Schemas.Timestamp
+            /// How many redemptions.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SecretInfo/use_count`.
+            public var useCount: Swift.Int64?
             /// 1 when stored, one more per rotation.
             ///
             /// - Remark: Generated from `#/components/schemas/SecretInfo/version`.
@@ -5904,43 +6461,75 @@ extension Components {
             /// - Parameters:
             ///   - createdAt:
             ///   - delivery: How a runner hands it to a session: `env`, `file` or `askpass`.
+            ///   - description: One line: what it is for.
+            ///   - effectiveRunners: The runners a lease may go to: its own, else its group's.
+            ///   - fileMode:
+            ///   - fileName: A `file` secret's name on the runner, and its octal mode (`0600`).
+            ///   - group: The group it belongs to (`/api/v1/secret-groups`); none for no group.
             ///   - keyId: The master key it is sealed under.
+            ///   - kind: `text`, `multiline`, `file` or `env_bundle`. `size` is a file's decoded length.
+            ///   - lastUsedAt: When a runner last redeemed it; none before the first redemption.
             ///   - name: `[a-z][a-z0-9_.-]{0,63}`.
             ///   - owner: The device that stored it, `d_…`.
             ///   - runners: The runner devices it may be leased to (its scope); empty: none.
             ///   - size: The value's length in bytes.
             ///   - updatedAt:
+            ///   - useCount: How many redemptions.
             ///   - version: 1 when stored, one more per rotation.
             public init(
                 createdAt: Components.Schemas.Timestamp,
                 delivery: Swift.String,
+                description: Swift.String? = nil,
+                effectiveRunners: [Swift.String]? = nil,
+                fileMode: Swift.String? = nil,
+                fileName: Swift.String? = nil,
+                group: Swift.String? = nil,
                 keyId: Swift.String,
+                kind: Swift.String? = nil,
+                lastUsedAt: Components.Schemas.Timestamp? = nil,
                 name: Swift.String,
                 owner: Swift.String,
                 runners: [Swift.String],
                 size: Swift.Int64,
                 updatedAt: Components.Schemas.Timestamp,
+                useCount: Swift.Int64? = nil,
                 version: Swift.Int64
             ) {
                 self.createdAt = createdAt
                 self.delivery = delivery
+                self.description = description
+                self.effectiveRunners = effectiveRunners
+                self.fileMode = fileMode
+                self.fileName = fileName
+                self.group = group
                 self.keyId = keyId
+                self.kind = kind
+                self.lastUsedAt = lastUsedAt
                 self.name = name
                 self.owner = owner
                 self.runners = runners
                 self.size = size
                 self.updatedAt = updatedAt
+                self.useCount = useCount
                 self.version = version
             }
             public enum CodingKeys: String, CodingKey {
                 case createdAt = "created_at"
                 case delivery
+                case description
+                case effectiveRunners = "effective_runners"
+                case fileMode = "file_mode"
+                case fileName = "file_name"
+                case group
                 case keyId = "key_id"
+                case kind
+                case lastUsedAt = "last_used_at"
                 case name
                 case owner
                 case runners
                 case size
                 case updatedAt = "updated_at"
+                case useCount = "use_count"
                 case version
             }
         }
@@ -7080,6 +7669,107 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/Timestamp`.
         public typealias Timestamp = Foundation.Date
+        /// One tool install, from start to its end.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ToolOperation`.
+        public struct ToolOperation: Codable, Hashable, Sendable {
+            /// The operation's id, `op_…`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/op`.
+            public var op: Swift.String?
+            /// 0 to 100.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/percent`.
+            public var percent: Swift.Int32?
+            /// Why it failed (`state` `failed`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/reason`.
+            public var reason: Swift.String?
+            /// The runner's device id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/runner`.
+            public var runner: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/started_at`.
+            public var startedAt: Components.Schemas.Timestamp?
+            /// `running`, `done` or `failed`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/state`.
+            public var state: Swift.String?
+            /// What it is doing now, a short sentence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/step`.
+            public var step: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/tool`.
+            public var tool: Swift.String?
+            /// When `done`: the tools the runner found after the install, name to version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/tools`.
+            public struct ToolsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Swift.String]
+                /// Creates a new `ToolsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Swift.String] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// When `done`: the tools the runner found after the install, name to version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ToolOperation/tools`.
+            public var tools: Components.Schemas.ToolOperation.ToolsPayload?
+            /// Creates a new `ToolOperation`.
+            ///
+            /// - Parameters:
+            ///   - op: The operation's id, `op_…`.
+            ///   - percent: 0 to 100.
+            ///   - reason: Why it failed (`state` `failed`).
+            ///   - runner: The runner's device id.
+            ///   - startedAt:
+            ///   - state: `running`, `done` or `failed`.
+            ///   - step: What it is doing now, a short sentence.
+            ///   - tool:
+            ///   - tools: When `done`: the tools the runner found after the install, name to version.
+            public init(
+                op: Swift.String? = nil,
+                percent: Swift.Int32? = nil,
+                reason: Swift.String? = nil,
+                runner: Swift.String? = nil,
+                startedAt: Components.Schemas.Timestamp? = nil,
+                state: Swift.String? = nil,
+                step: Swift.String? = nil,
+                tool: Swift.String? = nil,
+                tools: Components.Schemas.ToolOperation.ToolsPayload? = nil
+            ) {
+                self.op = op
+                self.percent = percent
+                self.reason = reason
+                self.runner = runner
+                self.startedAt = startedAt
+                self.state = state
+                self.step = step
+                self.tool = tool
+                self.tools = tools
+            }
+            public enum CodingKeys: String, CodingKey {
+                case op
+                case percent
+                case reason
+                case runner
+                case startedAt = "started_at"
+                case state
+                case step
+                case tool
+                case tools
+            }
+        }
         /// What to change about a connection; at least one field.
         ///
         /// - Remark: Generated from `#/components/schemas/UpdateConnection`.
@@ -7111,6 +7801,31 @@ extension Components {
                 case disabled
                 case label
                 case name
+            }
+        }
+        /// What changes; an omitted field is kept.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateSecretGroup`.
+        public struct UpdateSecretGroup: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/UpdateSecretGroup/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/UpdateSecretGroup/runners`.
+            public var runners: [Swift.String]?
+            /// Creates a new `UpdateSecretGroup`.
+            ///
+            /// - Parameters:
+            ///   - description:
+            ///   - runners:
+            public init(
+                description: Swift.String? = nil,
+                runners: [Swift.String]? = nil
+            ) {
+                self.description = description
+                self.runners = runners
+            }
+            public enum CodingKeys: String, CodingKey {
+                case description
+                case runners
             }
         }
         /// - Remark: Generated from `#/components/schemas/UsageByCompany`.

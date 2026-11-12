@@ -26,7 +26,7 @@ struct QuickBody: View {
 
     private var tiles: [(id: String, title: String, symbol: String, key: String?)] {
         [
-            ("agents.new", "New agent session", "play", nil), ("new-terminal", "New terminal", "terminal", nil),
+            ("agents.new", "New AI session", "play", nil), ("new-terminal", "New terminal", "terminal", nil),
             ("add-device", "Add device", "plus", nil), ("launcher", "Launcher", "magnifyingglass", "⌘K"),
         ]
     }

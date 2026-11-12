@@ -47,14 +47,14 @@ final class AgentsUITests: XCTestCase {
 
     func testTheListOpensASessionWithItsComposer() {
         run("agents")
-        XCTAssertTrue(element("Agents, Home Core").waitForExistence(timeout: 10), "the list pane opens")
+        XCTAssertTrue(element("AI Sessions, Home Core").waitForExistence(timeout: 10), "the list pane opens")
         XCTAssertTrue(app.buttons["New"].waitForExistence(timeout: 10))
         let row = containing("on mac-studio").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "sessions are listed")
         row.click()
         XCTAssertTrue(
-            app.textFields["agent-composer"].waitForExistence(timeout: 10), "a session pane has its composer")
-        let composer = app.textFields["agent-composer"]
+            app.textViews["agent-composer"].waitForExistence(timeout: 10), "a session pane has its composer")
+        let composer = app.textViews["agent-composer"]
         Thread.sleep(forTimeInterval: 1)  // the pane is still settling into place
         composer.click()
         composer.typeText("hi")
@@ -67,21 +67,21 @@ final class AgentsUITests: XCTestCase {
 
     func testSeveralPanesStayReadableToAccessibility() {
         run("agents")
-        XCTAssertTrue(element("Agents, Home Core").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("AI Sessions, Home Core").waitForExistence(timeout: 10))
         run("claude")
-        XCTAssertTrue(app.textFields["agent-composer"].waitForExistence(timeout: 10), "a session opens beside the list")
+        XCTAssertTrue(app.textViews["agent-composer"].waitForExistence(timeout: 10), "a session opens beside the list")
         run("codex")
         Thread.sleep(forTimeInterval: 1)
         // Reading the whole tree with several session panes open once overflowed the stack (see `agentCopyMenu`).
         XCTAssertGreaterThanOrEqual(
-            app.textFields.matching(identifier: "agent-composer").count, 2, "two sessions beside the list can be read")
+            app.textViews.matching(identifier: "agent-composer").count, 2, "two sessions beside the list can be read")
     }
 
     func testNewSessionSheetOpensFromTheLauncherAndEscapeClosesIt() {
-        run("new agent")
-        XCTAssertTrue(app.staticTexts["New agent session"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Start session"].exists)
+        run("new ai session (advanced)")
+        XCTAssertTrue(app.staticTexts["New AI session (advanced)"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Start AI session"].exists)
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(app.buttons["Start session"].waitForNonExistence(timeout: 5), "Esc closes the sheet")
+        XCTAssertTrue(app.buttons["Start AI session"].waitForNonExistence(timeout: 5), "Esc closes the sheet")
     }
 }

@@ -51,7 +51,10 @@ public final class TranscriptStore {
             added += 1
             absorb(e)
             if foldResult(e) { continue }
-            if case .toolUse(let id, _, _) = e.kind { toolSeq[id] = e.seq }
+            switch e.kind {
+            case .toolUse(let id, _, _), .toolEdit(let id, _, _, _, _, _, _), .toolTodos(let id, _): toolSeq[id] = e.seq
+            default: break
+            }
             if e.visible, !repeatsDecision(e) { entries.append(e) }
         }
         trim()
@@ -78,8 +81,21 @@ public final class TranscriptStore {
     /// A tool's result joins its call's row (one row for the pair, the way the prototype shows it).
     private func foldResult(_ e: TranscriptEntry) -> Bool {
         guard case .toolResult(let id, let name, let ok, let code, let out, let ms) = e.kind, let seq = toolSeq[id],
-            let i = entries.lastIndex(where: { $0.seq == seq }), case .toolUse(_, let n, let summary) = entries[i].kind
+            let i = entries.lastIndex(where: { $0.seq == seq })
         else { return false }
+        switch entries[i].kind {
+        case .toolEdit(let tid, let n, let path, let old, let new, _, _):
+            entries[i] = TranscriptEntry(
+                seq: seq, at: entries[i].at,
+                kind: .toolEdit(id: tid, name: n, path: path, old: old, new: new, ok: ok, durationMs: ms))
+            toolSeq[id] = nil
+            return true
+        case .toolTodos:
+            toolSeq[id] = nil
+            return true  // the CLI's own answer to a todo update says nothing
+        default: break
+        }
+        guard case .toolUse(_, let n, let summary) = entries[i].kind else { return false }
         entries[i] = TranscriptEntry(
             seq: seq, at: entries[i].at,
             kind: .toolDone(

@@ -47,6 +47,9 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/cap`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/cap/put(setAccountCap)`.
     func setAccountCap(_ input: Operations.SetAccountCap.Input) async throws -> Operations.SetAccountCap.Output
+    /// - Remark: HTTP `POST /api/v1/accounts/{id}/check`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/check/post(checkAccount)`.
+    func checkAccount(_ input: Operations.CheckAccount.Input) async throws -> Operations.CheckAccount.Output
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/limits`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/limits/put(setAccountLimit)`.
     func setAccountLimit(_ input: Operations.SetAccountLimit.Input) async throws -> Operations.SetAccountLimit.Output
@@ -74,12 +77,18 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/v1/agent-sessions/{id}`.
     /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/get(getAgentSession)`.
     func getAgentSession(_ input: Operations.GetAgentSession.Input) async throws -> Operations.GetAgentSession.Output
+    /// - Remark: HTTP `PATCH /api/v1/agent-sessions/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/patch(titleAgentSession)`.
+    func titleAgentSession(_ input: Operations.TitleAgentSession.Input) async throws -> Operations.TitleAgentSession.Output
     /// - Remark: HTTP `POST /api/v1/agent-sessions/{id}/approvals/{request}`.
     /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/approvals/{request}/post(decideAgentApproval)`.
     func decideAgentApproval(_ input: Operations.DecideAgentApproval.Input) async throws -> Operations.DecideAgentApproval.Output
     /// - Remark: HTTP `POST /api/v1/agent-sessions/{id}/cancel`.
     /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/cancel/post(cancelAgentSession)`.
     func cancelAgentSession(_ input: Operations.CancelAgentSession.Input) async throws -> Operations.CancelAgentSession.Output
+    /// - Remark: HTTP `POST /api/v1/agent-sessions/{id}/interrupt`.
+    /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/interrupt/post(interruptAgentSession)`.
+    func interruptAgentSession(_ input: Operations.InterruptAgentSession.Input) async throws -> Operations.InterruptAgentSession.Output
     /// - Remark: HTTP `POST /api/v1/agent-sessions/{id}/kill`.
     /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/kill/post(killAgentSession)`.
     func killAgentSession(_ input: Operations.KillAgentSession.Input) async throws -> Operations.KillAgentSession.Output
@@ -325,6 +334,30 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/v1/runners/{id}/noop`.
     /// - Remark: Generated from `#/paths//api/v1/runners/{id}/noop/post(runNoop)`.
     func runNoop(_ input: Operations.RunNoop.Input) async throws -> Operations.RunNoop.Output
+    /// - Remark: HTTP `PUT /api/v1/runners/{id}/policy`.
+    /// - Remark: Generated from `#/paths//api/v1/runners/{id}/policy/put(setRunnerPolicy)`.
+    func setRunnerPolicy(_ input: Operations.SetRunnerPolicy.Input) async throws -> Operations.SetRunnerPolicy.Output
+    /// - Remark: HTTP `POST /api/v1/runners/{id}/tools`.
+    /// - Remark: Generated from `#/paths//api/v1/runners/{id}/tools/post(installRunnerTool)`.
+    func installRunnerTool(_ input: Operations.InstallRunnerTool.Input) async throws -> Operations.InstallRunnerTool.Output
+    /// - Remark: HTTP `GET /api/v1/runners/{id}/tools/operations/{op}`.
+    /// - Remark: Generated from `#/paths//api/v1/runners/{id}/tools/operations/{op}/get(getRunnerToolOperation)`.
+    func getRunnerToolOperation(_ input: Operations.GetRunnerToolOperation.Input) async throws -> Operations.GetRunnerToolOperation.Output
+    /// - Remark: HTTP `GET /api/v1/secret-groups`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/get(listSecretGroups)`.
+    func listSecretGroups(_ input: Operations.ListSecretGroups.Input) async throws -> Operations.ListSecretGroups.Output
+    /// - Remark: HTTP `POST /api/v1/secret-groups`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/post(createSecretGroup)`.
+    func createSecretGroup(_ input: Operations.CreateSecretGroup.Input) async throws -> Operations.CreateSecretGroup.Output
+    /// - Remark: HTTP `PUT /api/v1/secret-groups/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/{id}/put(updateSecretGroup)`.
+    func updateSecretGroup(_ input: Operations.UpdateSecretGroup.Input) async throws -> Operations.UpdateSecretGroup.Output
+    /// - Remark: HTTP `DELETE /api/v1/secret-groups/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/{id}/delete(deleteSecretGroup)`.
+    func deleteSecretGroup(_ input: Operations.DeleteSecretGroup.Input) async throws -> Operations.DeleteSecretGroup.Output
+    /// - Remark: HTTP `POST /api/v1/secret-groups/{id}/leases`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/{id}/leases/post(leaseSecretGroup)`.
+    func leaseSecretGroup(_ input: Operations.LeaseSecretGroup.Input) async throws -> Operations.LeaseSecretGroup.Output
     /// - Remark: HTTP `POST /api/v1/secret-leases/redeem`.
     /// - Remark: Generated from `#/paths//api/v1/secret-leases/redeem/post(redeemSecretLease)`.
     func redeemSecretLease(_ input: Operations.RedeemSecretLease.Input) async throws -> Operations.RedeemSecretLease.Output
@@ -576,6 +609,17 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// - Remark: HTTP `POST /api/v1/accounts/{id}/check`.
+    /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/check/post(checkAccount)`.
+    public func checkAccount(
+        path: Operations.CheckAccount.Input.Path,
+        headers: Operations.CheckAccount.Input.Headers = .init()
+    ) async throws -> Operations.CheckAccount.Output {
+        try await checkAccount(Operations.CheckAccount.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// - Remark: HTTP `PUT /api/v1/accounts/{id}/limits`.
     /// - Remark: Generated from `#/paths//api/v1/accounts/{id}/limits/put(setAccountLimit)`.
     public func setAccountLimit(
@@ -683,6 +727,19 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// - Remark: HTTP `PATCH /api/v1/agent-sessions/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/patch(titleAgentSession)`.
+    public func titleAgentSession(
+        path: Operations.TitleAgentSession.Input.Path,
+        headers: Operations.TitleAgentSession.Input.Headers = .init(),
+        body: Operations.TitleAgentSession.Input.Body
+    ) async throws -> Operations.TitleAgentSession.Output {
+        try await titleAgentSession(Operations.TitleAgentSession.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// - Remark: HTTP `POST /api/v1/agent-sessions/{id}/approvals/{request}`.
     /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/approvals/{request}/post(decideAgentApproval)`.
     public func decideAgentApproval(
@@ -703,6 +760,17 @@ extension APIProtocol {
         headers: Operations.CancelAgentSession.Input.Headers = .init()
     ) async throws -> Operations.CancelAgentSession.Output {
         try await cancelAgentSession(Operations.CancelAgentSession.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `POST /api/v1/agent-sessions/{id}/interrupt`.
+    /// - Remark: Generated from `#/paths//api/v1/agent-sessions/{id}/interrupt/post(interruptAgentSession)`.
+    public func interruptAgentSession(
+        path: Operations.InterruptAgentSession.Input.Path,
+        headers: Operations.InterruptAgentSession.Input.Headers = .init()
+    ) async throws -> Operations.InterruptAgentSession.Output {
+        try await interruptAgentSession(Operations.InterruptAgentSession.Input(
             path: path,
             headers: headers
         ))
@@ -1516,6 +1584,96 @@ extension APIProtocol {
         try await runNoop(Operations.RunNoop.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// - Remark: HTTP `PUT /api/v1/runners/{id}/policy`.
+    /// - Remark: Generated from `#/paths//api/v1/runners/{id}/policy/put(setRunnerPolicy)`.
+    public func setRunnerPolicy(
+        path: Operations.SetRunnerPolicy.Input.Path,
+        headers: Operations.SetRunnerPolicy.Input.Headers = .init(),
+        body: Operations.SetRunnerPolicy.Input.Body
+    ) async throws -> Operations.SetRunnerPolicy.Output {
+        try await setRunnerPolicy(Operations.SetRunnerPolicy.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `POST /api/v1/runners/{id}/tools`.
+    /// - Remark: Generated from `#/paths//api/v1/runners/{id}/tools/post(installRunnerTool)`.
+    public func installRunnerTool(
+        path: Operations.InstallRunnerTool.Input.Path,
+        headers: Operations.InstallRunnerTool.Input.Headers = .init(),
+        body: Operations.InstallRunnerTool.Input.Body
+    ) async throws -> Operations.InstallRunnerTool.Output {
+        try await installRunnerTool(Operations.InstallRunnerTool.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `GET /api/v1/runners/{id}/tools/operations/{op}`.
+    /// - Remark: Generated from `#/paths//api/v1/runners/{id}/tools/operations/{op}/get(getRunnerToolOperation)`.
+    public func getRunnerToolOperation(
+        path: Operations.GetRunnerToolOperation.Input.Path,
+        headers: Operations.GetRunnerToolOperation.Input.Headers = .init()
+    ) async throws -> Operations.GetRunnerToolOperation.Output {
+        try await getRunnerToolOperation(Operations.GetRunnerToolOperation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `GET /api/v1/secret-groups`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/get(listSecretGroups)`.
+    public func listSecretGroups(headers: Operations.ListSecretGroups.Input.Headers = .init()) async throws -> Operations.ListSecretGroups.Output {
+        try await listSecretGroups(Operations.ListSecretGroups.Input(headers: headers))
+    }
+    /// - Remark: HTTP `POST /api/v1/secret-groups`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/post(createSecretGroup)`.
+    public func createSecretGroup(
+        headers: Operations.CreateSecretGroup.Input.Headers = .init(),
+        body: Operations.CreateSecretGroup.Input.Body
+    ) async throws -> Operations.CreateSecretGroup.Output {
+        try await createSecretGroup(Operations.CreateSecretGroup.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `PUT /api/v1/secret-groups/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/{id}/put(updateSecretGroup)`.
+    public func updateSecretGroup(
+        path: Operations.UpdateSecretGroup.Input.Path,
+        headers: Operations.UpdateSecretGroup.Input.Headers = .init(),
+        body: Operations.UpdateSecretGroup.Input.Body
+    ) async throws -> Operations.UpdateSecretGroup.Output {
+        try await updateSecretGroup(Operations.UpdateSecretGroup.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `DELETE /api/v1/secret-groups/{id}`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/{id}/delete(deleteSecretGroup)`.
+    public func deleteSecretGroup(
+        path: Operations.DeleteSecretGroup.Input.Path,
+        headers: Operations.DeleteSecretGroup.Input.Headers = .init()
+    ) async throws -> Operations.DeleteSecretGroup.Output {
+        try await deleteSecretGroup(Operations.DeleteSecretGroup.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `POST /api/v1/secret-groups/{id}/leases`.
+    /// - Remark: Generated from `#/paths//api/v1/secret-groups/{id}/leases/post(leaseSecretGroup)`.
+    public func leaseSecretGroup(
+        path: Operations.LeaseSecretGroup.Input.Path,
+        headers: Operations.LeaseSecretGroup.Input.Headers = .init(),
+        body: Operations.LeaseSecretGroup.Input.Body
+    ) async throws -> Operations.LeaseSecretGroup.Output {
+        try await leaseSecretGroup(Operations.LeaseSecretGroup.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// - Remark: HTTP `POST /api/v1/secret-leases/redeem`.

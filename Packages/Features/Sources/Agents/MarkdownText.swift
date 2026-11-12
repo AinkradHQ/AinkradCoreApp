@@ -9,6 +9,22 @@ enum MarkdownBlock: Equatable {
     case heading(String)
     case item(marker: String, text: String)
     case code(language: String, text: String)
+    case table(header: [String], rows: [[String]])
+    case quote(String)
+    case rule
+
+    /// Cells of a `| a | b |` line.
+    static func cells(_ line: String) -> [String] {
+        var t = line.trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("|") { t.removeFirst() }
+        if t.hasSuffix("|") { t.removeLast() }
+        return t.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    static func isSeparator(_ line: String) -> Bool {
+        let c = cells(line)
+        return !c.isEmpty && c.allSatisfy { !$0.isEmpty && $0.allSatisfy { "-:".contains($0) } && $0.contains("-") }
+    }
 
     static func parse(_ source: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
@@ -18,7 +34,13 @@ enum MarkdownBlock: Equatable {
             if !paragraph.isEmpty { blocks.append(.paragraph(paragraph.joined(separator: "\n"))) }
             paragraph = []
         }
-        for raw in source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+        let rawLines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var skip = 0
+        for (n, raw) in rawLines.enumerated() {
+            if skip > 0 {
+                skip -= 1
+                continue
+            }
             let line = raw.trimmingCharacters(in: .whitespaces)
             if var f = fence {
                 if line.hasPrefix("```") {
@@ -31,6 +53,22 @@ enum MarkdownBlock: Equatable {
             } else if line.hasPrefix("```") {
                 flush()
                 fence = (String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces), [])
+            } else if line.hasPrefix("|"), n + 1 < rawLines.count, isSeparator(rawLines[n + 1]) {
+                flush()
+                var rows: [[String]] = []
+                var k = n + 2
+                while k < rawLines.count, rawLines[k].trimmingCharacters(in: .whitespaces).hasPrefix("|") {
+                    rows.append(cells(rawLines[k]))
+                    k += 1
+                }
+                blocks.append(.table(header: cells(line), rows: rows))
+                skip = k - n - 1
+            } else if line.hasPrefix(">") {
+                flush()
+                blocks.append(.quote(String(line.drop(while: { $0 == ">" })).trimmingCharacters(in: .whitespaces)))
+            } else if line == "---" || line == "***" {
+                flush()
+                blocks.append(.rule)
             } else if line.isEmpty {
                 flush()
             } else if line.hasPrefix("#"), let h = line.drop(while: { $0 == "#" }).first, h == " " {
@@ -104,8 +142,17 @@ struct MarkdownText: View {
                         Text(marker).foregroundStyle(GlassInk.secondary).frame(minWidth: 16, alignment: .trailing)
                         Text(MarkdownBlock.inline(t)).lineSpacing(3).textSelection(.enabled)
                     }
-                case .code(_, let t):
-                    CodeBlock(text: t)
+                case .code(let lang, let t):
+                    CodeBlock(text: t, language: lang)
+                case .table(let header, let rows):
+                    MarkdownTable(header: header, rows: rows)
+                case .quote(let t):
+                    HStack(spacing: Space.s2) {
+                        coreShape(1.5).fill(GlassInk.blue.opacity(0.7)).frame(width: 3)
+                        Text(MarkdownBlock.inline(t)).foregroundStyle(GlassInk.secondary).textSelection(.enabled)
+                    }
+                case .rule:
+                    coreShape(0.5).fill(GlassInk.track).frame(height: 1)
                 }
             }
         }
@@ -117,13 +164,22 @@ struct MarkdownText: View {
 /// Monospaced card, scrolls sideways, with Copy.
 private struct CodeBlock: View {
     let text: String
+    var language = ""
     @State private var copied = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             ScrollView(.horizontal) {
-                Text(text).font(.system(size: MacTextSize.body - 1, design: .monospaced)).textSelection(.enabled)
-                    .fixedSize().padding(Space.s3).padding(.trailing, Space.s6)
+                Text(SyntaxHighlight.attributed(text)).font(.system(size: MacTextSize.body - 1, design: .monospaced))
+                    .textSelection(.enabled).fixedSize().padding(Space.s3).padding(
+                        .top, language.isEmpty ? 0 : Space.s3
+                    )
+                    .padding(.trailing, Space.s6)
+            }
+            if !language.isEmpty {
+                Text(language).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    .padding(.horizontal, Space.s3).padding(.top, Space.s2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             Button(copied ? "Copied" : "Copy") {
                 NSPasteboard.general.clearContents()
@@ -134,6 +190,32 @@ private struct CodeBlock: View {
             .foregroundStyle(GlassInk.secondary).padding(Space.s2)
         }
         .background(GlassInk.wellHover, in: coreShape(Radius.row))
+        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+    }
+}
+
+/// A Markdown table: header row in bold, cells aligned in columns, scrolls sideways when it does not fit.
+private struct MarkdownTable: View {
+    let header: [String]
+    let rows: [[String]]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            Grid(alignment: .leading, horizontalSpacing: Space.s4, verticalSpacing: Space.s2) {
+                GridRow {
+                    ForEach(Array(header.enumerated()), id: \.offset) { _, h in
+                        Text(MarkdownBlock.inline(h)).fontWeight(.semibold)
+                    }
+                }
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
+                    GridRow {
+                        ForEach(Array(r.enumerated()), id: \.offset) { _, c in Text(MarkdownBlock.inline(c)) }
+                    }
+                }
+            }
+            .textSelection(.enabled).padding(Space.s3)
+        }
+        .background(GlassInk.well, in: coreShape(Radius.row))
         .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }

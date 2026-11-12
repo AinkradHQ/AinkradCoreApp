@@ -33,7 +33,9 @@ struct TranscriptView: View {
                                 // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
                         }
-                        if session.live && store.load == .ready && !model.waiting(session.id) { Thinking() }
+                        if session.live && !session.idle && store.load == .ready && !model.waiting(session.id) {
+                            Thinking()
+                        }
                         Color.clear.frame(height: 1).id("end")
                             .onAppear { atEnd = true }
                             .onDisappear { atEnd = false }
@@ -111,7 +113,7 @@ struct TranscriptView: View {
                     .meta(palette).frame(maxWidth: .infinity)
                     .onAppear { model.loadEarlier(session.id) }
             } else if store.entries.isEmpty {
-                Text("Nothing here yet. The first entries arrive when the agent starts.").meta(palette)
+                Text("Nothing here yet. Type a message below to begin.").meta(palette)
                     .frame(maxWidth: .infinity)
             } else {
                 Label("Start of the session", systemImage: "flag.fill").coreFont(
@@ -129,13 +131,15 @@ extension View {
 }
 
 /// Three small squares, the agent working. They rest under Reduce Motion.
-private struct Thinking: View {
+struct Thinking: View {
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.3, paused: reduce)) { ctx in
             let t = Int(ctx.date.timeIntervalSinceReferenceDate / 0.3) % 3
             HStack(spacing: Space.s1) {
+                Text("thinking…").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    .padding(.trailing, Space.s1)
                 ForEach(0..<3, id: \.self) { i in
                     coreShape(2).fill(GlassInk.violet).frame(width: 7, height: 7)
                         .opacity(reduce || i == t ? 1 : 0.35).offset(y: reduce || i != t ? 0 : -3)
@@ -144,7 +148,7 @@ private struct Thinking: View {
             }
         }
         .padding(.vertical, Space.s1)
-        .accessibilityLabel("The agent is working")
+        .accessibilityLabel("The AI session is working")
     }
 }
 
@@ -204,6 +208,10 @@ struct EntryRow: View, Equatable {
             ToolCard(
                 name: name ?? "Result", summary: "", status: ok ? .ok(facts(nil, ms)) : .failed(facts(code, ms)),
                 output: output, expanded: $expanded)
+        case .toolEdit(_, let name, let path, let old, let new, let ok, let ms):
+            EditCard(name: name, path: path, old: old, new: new, ok: ok, ms: ms, expanded: $expanded)
+        case .toolTodos(_, let items): TodoCard(items: items)
+        case .turnEnded(let cost, let tokens): TurnDivider(at: entry.at, cost: cost, tokens: tokens)
         case .approvalRequest, .approvalDecided: EmptyView()  // drawn as one card by the transcript
         case .started(let h, let resumed):
             chip(resumed ? "woke up" : "started" + (h.map { " · \($0)" } ?? ""))
@@ -251,7 +259,7 @@ struct EntryRow: View, Equatable {
 
 /// A tool call as one compact row in the agent's column (N33): chevron, tool icon, a short summary, the time it took and a
 /// state mark. It opens to the full command and output, which animate in; a long command never shows in full by default.
-private struct ToolCard: View {
+struct ToolCard: View {
     enum Status {
         case running
         case ok(String)
@@ -306,14 +314,11 @@ private struct ToolCard: View {
                             Text("$ " + summary).coreFont(size: 12, design: .monospaced)
                                 .foregroundStyle(GlassInk.primary)
                         }
-                        if !output.isEmpty {
-                            Text(output).coreFont(size: 12, design: .monospaced).foregroundStyle(GlassInk.secondary)
-                        }
+                        if !output.isEmpty { FoldedOutput(text: output) }
                     }
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(Space.s3)
-                    .frame(maxHeight: 160, alignment: .top)
                     .background(.black.opacity(0.25), in: coreShape(Radius.control))
                     .padding([.horizontal, .bottom], Space.s2)
                     .agentCopyMenu(output.isEmpty ? summary : output)
@@ -321,11 +326,10 @@ private struct ToolCard: View {
                 }
             }
             .foregroundStyle(GlassInk.primary)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
             .background(GlassInk.well, in: coreShape(Radius.control + 2))
             .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             .clipShape(coreShape(Radius.control + 2))
-            Spacer(minLength: Space.s8)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
