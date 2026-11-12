@@ -14,10 +14,10 @@ public enum SettingsGroup: String, CaseIterable, Sendable {
     var hue: Color {
         switch self {
         case .mac: GlassInk.slate
-        case .apps: WidgetInk.blue
-        case .core: WidgetInk.blue
+        case .apps: GlassInk.blue
+        case .core: GlassInk.blue
         case .security: GlassInk.amber
-        case .notifications: WidgetInk.blue
+        case .notifications: GlassInk.blue
         }
     }
 }
@@ -125,7 +125,7 @@ struct SettingsView: View {
                     .padding(.bottom, Space.s3)
                     ForEach(shell.settings.grouped(), id: \.0) { group, list in
                         Text(group.rawValue).coreFont(size: MacTextSize.body, weight: .semibold)
-                            .foregroundStyle(WidgetInk.secondary).padding(.top, Space.s3).accessibilityAddTraits(
+                            .foregroundStyle(GlassInk.secondary).padding(.top, Space.s3).accessibilityAddTraits(
                                 .isHeader)
                         ForEach(list) { s in
                             Button {
@@ -174,7 +174,7 @@ struct SettingsView: View {
                             Text(current?.title ?? "").coreFont(size: MacTextSize.large + 6, weight: .bold)
                                 .accessibilityAddTraits(.isHeader)
                             if let sub = current?.sub {
-                                Text(sub).foregroundStyle(WidgetInk.secondary)
+                                Text(sub).foregroundStyle(GlassInk.secondary)
                             }
                         }
                         .id("title-\(current?.id ?? "")")
@@ -183,7 +183,7 @@ struct SettingsView: View {
                     Spacer()
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")
-                            .coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
+                            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                             .transition(.opacity).accessibilityLabel("Saved")
                     }
                     // The close button turns a quarter on hover (Reduce Motion: no turn).
@@ -207,7 +207,7 @@ struct SettingsView: View {
             .clipped()
         }
         // Most of the screen (Ahmed, 2026-11-05: larger), in the one frame: a glass rim around the Look's background.
-        .foregroundStyle(WidgetInk.primary)
+        .foregroundStyle(GlassInk.primary)
         .containerRelativeFrame([.horizontal, .vertical]) { length, _ in length * 0.86 }
         .coreFrame(radius: Radius.panel + Space.s1, part: .settings)
         .shadow(color: GlassInk.shade(0.3), radius: 40, y: 16)
@@ -238,7 +238,7 @@ struct SettingsView: View {
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .foregroundStyle(WidgetInk.primary)
+        .foregroundStyle(GlassInk.primary)
         .padding(.horizontal, Space.s2)
         .frame(minHeight: MacSize.controlLg + Space.s1)
         // One selection that glides between rows (`s-glide`), not a background swapped per row.
@@ -336,6 +336,11 @@ extension ShellModel {
                 id: "appearance", group: .mac, title: "Appearance", sub: "Night, day, or with the sun",
                 symbol: "circle.lefthalf.filled"
             ) { AppearanceSection(shell: self) })
+        settings.section(
+            SettingsSection(
+                id: "clocks", group: .mac, title: "Clocks", sub: "The second hand and seconds on Home", symbol: "clock",
+                order: 2
+            ) { ClockSettings() })
     }
 }
 
@@ -355,7 +360,7 @@ private struct SettingsBackTile: View {
                     .coreBounce(hovering)
                 Text(back.title).coreFont(size: 10, weight: .medium).lineLimit(1)
             }
-            .foregroundStyle(WidgetInk.primary)
+            .foregroundStyle(GlassInk.primary)
             .frame(width: 72, height: 56)
             .background(GlassInk.lift(hovering ? 0.16 : 0.1), in: coreShape(Radius.control + 4))
             .overlay { coreShape(Radius.control + 4).strokeBorder(GlassInk.rim(0.18), lineWidth: 1) }

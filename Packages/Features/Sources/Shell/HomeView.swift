@@ -12,19 +12,19 @@ struct DeskDrag {
     var origin: CGPoint { CGPoint(x: point.x - grab.width, y: point.y - grab.height) }
 }
 
-/// Home: the sky and the widget desk (`widgets.js`): an 8 x 5 snap grid on the prototype's 1440 x 900 stage, direct-manipulation
+/// Home: the sky and the widget desk (`widgets.js`): a 16 x 8 snap grid on the prototype's 1440 x 900 stage, direct-manipulation
 /// drag, a gallery, edit mode, Undo, persistence. The greeting sits between the columns.
 struct HomeView: View {
     @Bindable var shell: ShellModel
     @State private var drag: DeskDrag?
     @State private var arrived = false
+    @State private var greeting: CGRect = .zero
     @FocusState private var focus: UUID?
     @Environment(\.corePalette) private var palette
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     static let stageSpace = "stage"
-    static let galleryLeft = ShellMetrics.designSize.width - 12 - 340
 
     var body: some View {
         GeometryReader { geo in
@@ -48,32 +48,65 @@ struct HomeView: View {
                     Divider()
                     Button("Reset Layout") { shell.resetWidgets() }
                 }
-            GreetingView(profile: shell.profile).frame(maxWidth: .infinity).padding(.top, Self.greetingTop)
-                .allowsHitTesting(true)
-            ghost
-            ForEach(sorted) { item in card(item) }
+            ZStack(alignment: .topLeading) {
+                GreetingView(profile: shell.profile)
+                    .onGeometryChange(for: CGRect.self) {
+                        $0.frame(in: .named(Self.stageSpace))
+                    } action: {
+                        greeting = $0
+                    }
+                    .frame(maxWidth: .infinity).padding(.top, Self.greetingTop)
+                    // Clear glass would show it through a widget: it steps away while any widget covers it.
+                    .opacity(greetingCovered ? 0 : 1)
+                    .animation(.easeOut(duration: 0.2), value: greetingCovered)
+                    .accessibilityHidden(greetingCovered)
+                ghost
+                ForEach(sorted) { item in card(item) }
+            }
+            // The gallery dims Home behind it (home-clocks: blurred, 45%); a drag out of it shows Home again.
+            .blur(radius: dimmed ? Space.s2 : 0)
+            .opacity(dimmed ? 0.45 : 1)
+            .allowsHitTesting(!dimmed)
             // Hidden at rest: Add Widget and Edit Widgets live in the right-click menu on the sky. The bar shows only
-            // while editing or adding, so there is a Done to press.
-            if shell.editingWidgets || shell.addingWidget {
+            // while editing, so there is a Done to press; the gallery has its own Done.
+            if shell.editingWidgets && !shell.addingWidget {
                 controls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, Space.s2)
                     .transition(.opacity.combined(with: .offset(y: coreMove(reduce, 12))))
             }
             if shell.addingWidget {
+                // A click on the dimmed Home closes the gallery, as a click outside a dialog.
+                Color.clear.contentShape(Rectangle()).onTapGesture { shell.addingWidget = false }
+                    .allowsHitTesting(!holdingNew)
+                    .accessibilityHidden(true)
                 WidgetGallery(shell: shell, begin: beginFromGallery, move: moveDrag, end: endDrag)
-                    .frame(width: 340).frame(maxHeight: .infinity)
-                    .padding(.top, 46).padding(.bottom, 12).padding(.trailing, 12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .transition(.opacity.combined(with: .offset(x: coreMove(reduce, 24))))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .opacity(holdingNew ? 0 : 1)
+                    // coreModalEntrance runs the entrance; the transition only fades it out.
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
+            }
+            if holdingNew {
+                // Escape drops the held widget back into the gallery instead of onto Home.
+                Button("Cancel Drag") { endDrag(cancel: true) }.keyboardShortcut(.cancelAction).hidden()
             }
         }
         .coordinateSpace(name: Self.stageSpace)
         .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: shell.addingWidget)
     }
 
+    /// A widget from the gallery is in the hand: the gallery steps aside so Home shows where it lands.
+    private var holdingNew: Bool { drag?.isNew == true }
+    private var dimmed: Bool { shell.addingWidget && !holdingNew }
+
     /// The prototype puts the greeting in the upper third (about 24% of the height).
     private static let greetingTop = ShellMetrics.designSize.height * 0.24
 
     // MARK: layout
+
+    private var greetingCovered: Bool {
+        shown.contains {
+            CGRect(origin: DeskGrid.origin($0.x, $0.y), size: DeskGrid.frameSize($0.size)).intersects(greeting)
+        }
+    }
 
     /// Where each widget is drawn: the live layout, or the preview while one is held.
     private var shown: [WidgetItem] {
@@ -115,8 +148,8 @@ struct HomeView: View {
         if let d = drag, let c = d.cell, d.preview != nil {
             let o = DeskGrid.origin(c[0], c[1])
             let s = DeskGrid.frameSize(d.item.size)
-            coreShape(20).fill(palette.glassCard).overlay {
-                coreShape(20).strokeBorder(palette.navActiveEdge, lineWidth: 1.5)
+            coreShape(Radius.pane).fill(palette.glassCard).overlay {
+                coreShape(Radius.pane).strokeBorder(palette.navActiveEdge, lineWidth: 1.5)
             }
             .frame(width: s.width, height: s.height).offset(x: o.x, y: o.y).allowsHitTesting(false)
             .animation(Motion.calm(Motion.out(0.18), reduce), value: c)
@@ -138,18 +171,13 @@ struct HomeView: View {
     private func moveDrag(_ p: CGPoint) {
         guard var d = drag else { return }
         d.point = p
-        let over = !d.isNew || !shell.addingWidget || d.origin.x + d.grab.width < Self.galleryLeft
-        if over {
-            let c = DeskGrid.cell(at: d.origin, size: d.item.size)
-            if d.cell != [c.x, c.y] {
-                d.cell = [c.x, c.y]
-                let list = d.isNew ? shell.widgets.items + [d.item] : shell.widgets.items
-                d.preview = WidgetLayout.moving(d.item, to: c.x, c.y, in: list)
-                if d.preview == nil { d.cell = nil }
-            }
-        } else {
-            d.cell = nil
-            d.preview = nil
+        // The gallery hides while one of its widgets is held, so anywhere on the stage is over Home.
+        let c = DeskGrid.cell(at: d.origin, size: d.item.size)
+        if d.cell != [c.x, c.y] {
+            d.cell = [c.x, c.y]
+            let list = d.isNew ? shell.widgets.items + [d.item] : shell.widgets.items
+            d.preview = WidgetLayout.moving(d.item, to: c.x, c.y, in: list)
+            if d.preview == nil { d.cell = nil }
         }
         drag = d
     }

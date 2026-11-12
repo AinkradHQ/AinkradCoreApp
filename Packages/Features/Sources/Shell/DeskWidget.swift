@@ -13,17 +13,17 @@ struct DeskWidget: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var hovering = false
 
-    /// Apple widget corners: large and soft.
-    private var radius: CGFloat { 26 }
+    /// The pane radius (rect.css cards 16): a rounded rectangle, never a pill.
+    private var radius: CGFloat { Radius.pane }
 
     var body: some View {
         let size = DeskGrid.frameSize(item.size)
         ZStack(alignment: .topLeading) {
             WidgetBody(kind: item.kind, size: item.size, shell: shell)
-                .padding(18).padding(.top, editing ? 30 : 0)
+                .environment(\.widgetEditing, editing)
+                .padding(Space.s4)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
-                // The edit padding snaps (re-laying out a widget every frame was the cost); the fade below still animates.
-                .transaction(value: editing) { $0.animation = nil }
+                // The edit chrome floats over the content; nothing moves, so nothing is cut off at the bottom.
                 .opacity(editing ? 0.5 : 1)
                 .allowsHitTesting(!editing)
                 .animation(.easeOut(duration: 0.2), value: editing)
@@ -89,11 +89,12 @@ struct DeskWidget: View {
                 Button {
                     shell.resizeWidget(item.id, to: s)
                 } label: {
-                    Text("\(s.title) · \(s.cols)×\(s.rows)")
+                    Text("\(s.title) · \(s.cols / 2)×\(s.rows / 2)")
                     if s == item.size { Image(systemName: "checkmark") }
                 }
             }
         }
+        clockMenu
         Divider()
         Button(editing ? "Done Editing" : "Edit Widgets") { shell.editingWidgets.toggle() }
         Button("Add Widget…") { shell.addingWidget = true }
@@ -101,10 +102,22 @@ struct DeskWidget: View {
         Button("Remove", role: .destructive) { shell.removeWidget(item.id) }
     }
 
+    /// The clock settings, where the clock is (the same ones are in Settings → Clocks).
+    @ViewBuilder private var clockMenu: some View {
+        @Bindable var prefs = ClockPrefs.shared
+        if item.kind == .clock {
+            Picker("Second Hand", selection: $prefs.secondHand) {
+                ForEach(SecondHand.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+        } else if item.kind == .digital {
+            Toggle("Show Seconds", isOn: $prefs.showsSeconds)
+        }
+    }
+
     /// `.wd-edit`: the size choices at the top left, remove at the top right. They fade in; they are Tab stops only while editing.
     private var chrome: some View {
         HStack {
-            HStack(spacing: 3) {
+            HStack(spacing: 2) {
                 ForEach(item.kind.sizes, id: \.self) { s in
                     Button {
                         shell.resizeWidget(item.id, to: s)
@@ -112,13 +125,13 @@ struct DeskWidget: View {
                         sizeMark(s)
                     }
                     .buttonStyle(SizeChoiceStyle(selected: s == item.size))
-                    .accessibilityLabel("\(s.title), \(s.cols) by \(s.rows)")
+                    .accessibilityLabel(s.spoken)
                     .accessibilityAddTraits(s == item.size ? .isSelected : [])
-                    .help(s.title)
+                    .help(s.spoken)
                 }
             }
-            .padding(3).background(palette.panelStrong, in: coreShape(9))
-            .overlay { coreShape(9).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .padding(2).background(palette.panelStrong, in: coreShape(Radius.control))
+            .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             Spacer(minLength: 0)
             Button {
                 shell.removeWidget(item.id)
@@ -126,12 +139,12 @@ struct DeskWidget: View {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(SizeChoiceStyle(selected: false, destructive: true))
-            .background(palette.panelStrong, in: coreShape(6))
-            .overlay { coreShape(6).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+            .background(palette.panelStrong, in: coreShape(Radius.chip))
+            .overlay { coreShape(Radius.chip).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             .accessibilityLabel("Remove \(item.kind.title)")
             .help("Remove")
         }
-        .padding(8)
+        .padding(Space.s2)
         .opacity(editing ? 1 : 0)
         .allowsHitTesting(editing)
         .disabled(!editing)
@@ -140,10 +153,9 @@ struct DeskWidget: View {
     }
 
     private func sizeMark(_ s: WidgetSize) -> some View {
-        coreShape(1.5).frame(
-            width: CGFloat(5 * s.cols + 2 * (s.cols - 1)), height: CGFloat(5 * s.rows + 2 * (s.rows - 1))
-        )
-        .opacity(0.85)
+        // Drawn in Home cells (2 x 2 units each): a small is one square, a wide two side by side.
+        coreShape(2).frame(width: CGFloat(8 * (s.cols / 2) - 2), height: CGFloat(8 * (s.rows / 2) - 2))
+            .opacity(0.85)
     }
 }
 
@@ -158,9 +170,9 @@ struct SizeChoiceStyle: ButtonStyle {
             .foregroundStyle(
                 selected ? palette.primary : hovering && destructive ? palette.tone(.fail).ink : palette.text2
             )
-            .frame(minWidth: 22, minHeight: 22)
-            .background(selected ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(6))
-            .overlay { if selected { coreShape(6).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
+            .frame(minWidth: MacSize.controlSm, minHeight: MacSize.controlSm)
+            .background(selected ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.chip))
+            .overlay { if selected { coreShape(Radius.chip).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
             .animation(Motion.out(Motion.hover), value: hovering)

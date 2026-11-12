@@ -37,7 +37,7 @@ struct NeedsBody: View {
                 case .m:
                     WHead("bell", "Needs you") { badge }
                     ForEach(need.prefix(2)) { n in row(n) }
-                case .l:
+                case .l, .t:
                     WHead("bell", "Needs you") { badge }
                     ForEach(need.prefix(3)) { n in card(n) }
                     Spacer(minLength: 0)
@@ -49,7 +49,7 @@ struct NeedsBody: View {
                             WCaption("What it asks")
                             if let first = need.first {
                                 Text(first.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                                    .foregroundStyle(WidgetInk.primary)
+                                    .foregroundStyle(GlassInk.primary)
                                 if let s = first.sub { WCaption(s) }
                             }
                         }
@@ -57,7 +57,7 @@ struct NeedsBody: View {
                 }
             }
         }
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: need.map(\.id))
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: need.map(\.id))
     }
 
     private func row(_ n: BellItem) -> some View {
@@ -72,10 +72,10 @@ struct NeedsBody: View {
                 }
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(WidgetInk.primary)
+            .foregroundStyle(GlassInk.primary)
             .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-            .background(WidgetInk.well, in: coreShape(Radius.control + 2))
-            .contentShape(coreShape(Radius.control + 2))
+            .background(GlassInk.well, in: coreShape(Radius.control))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain).newRow(reduce)
     }
@@ -90,9 +90,9 @@ struct NeedsBody: View {
             if let s = n.sub { WCaption(s) }
             WActions(item: n)
         }
-        .foregroundStyle(WidgetInk.primary)
+        .foregroundStyle(GlassInk.primary)
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(WidgetInk.well, in: coreShape(Radius.control + 4))
+        .background(GlassInk.well, in: coreShape(Radius.row))
         .newRow(reduce)
     }
 }
@@ -114,16 +114,16 @@ struct EventsBody: View {
                     WHead("clock", "Latest")
                     if let e = ev.first {
                         Spacer(minLength: 0)
-                        Image(systemName: e.symbol).font(.system(size: 22)).foregroundStyle(WidgetInk.blue)
+                        Image(systemName: e.symbol).coreFont(size: 22).foregroundStyle(GlassInk.blue)
                             .accessibilityHidden(true)
                         Text(e.text).coreFont(size: MacTextSize.body, weight: .semibold)
-                            .foregroundStyle(WidgetInk.primary).lineLimit(2)
+                            .foregroundStyle(GlassInk.primary).lineLimit(2)
                         WCaption("\(when(e)) · \(e.source)")
                     }
                 case .m:
                     WHead("clock", "Recent events")
                     list(ev.prefix(3))
-                case .l:
+                case .l, .t:
                     WHead("clock", "Recent events")
                     list(ev.prefix(7))
                     Spacer(minLength: 0)
@@ -144,25 +144,26 @@ struct EventsBody: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             ForEach(ev) { e in
                 HStack(spacing: Space.s2) {
-                    Image(systemName: e.symbol).foregroundStyle(WidgetInk.blue).frame(width: 16)
+                    Image(systemName: e.symbol).foregroundStyle(GlassInk.blue).frame(width: 16)
                         .accessibilityHidden(true)
                     Text(e.text).coreFont(size: MacTextSize.body).lineLimit(1)
                     Spacer(minLength: Space.s2)
-                    Text(when(e)).coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
+                    Text(when(e)).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         .monospacedDigit()
                 }
-                .foregroundStyle(WidgetInk.primary)
+                .foregroundStyle(GlassInk.primary)
                 .accessibilityElement(children: .combine).newRow(reduce)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: ev.map(\.id))
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: ev.map(\.id))
     }
 }
 
 struct CoreBody: View {
     @Bindable var shell: ShellModel
     let size: WidgetSize
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var state: (word: String, tone: Tone, symbol: String) {
         switch shell.coreLink {
@@ -183,10 +184,10 @@ struct CoreBody: View {
             case .s:
                 WHead("heart.text.square", "Core")
                 HStack(spacing: Space.s2) {
-                    Image(systemName: s.symbol).font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(s.tone == .done ? WidgetInk.green : GlassInk.amber)
+                    Image(systemName: s.symbol).coreFont(size: 26, weight: .semibold)
+                        .foregroundStyle(s.tone == .done ? GlassInk.green : GlassInk.amber)
                         .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
-                    Text(s.word).coreFont(size: 28, weight: .bold).foregroundStyle(WidgetInk.primary)
+                    Text(s.word).coreFont(size: 28, weight: .bold).foregroundStyle(GlassInk.primary)
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
                 Spacer(minLength: 0)
@@ -205,7 +206,7 @@ struct CoreBody: View {
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 VStack(alignment: .leading, spacing: 0) {
                     Text(s.tone == .done ? "Healthy" : s.word).coreFont(size: 34, weight: .bold)
-                        .foregroundStyle(WidgetInk.primary)
+                        .foregroundStyle(GlassInk.primary)
                     WCaption(h.health.map { "\(h.coreName) · version \($0.version) · up \($0.uptime)" } ?? h.coreName)
                 }
                 if size == .x {
@@ -223,27 +224,25 @@ struct CoreBody: View {
                 }
             }
         }
-        .animation(.smooth(duration: 0.3), value: shell.coreLink)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.coreLink)
     }
 
     @ViewBuilder private func bars(alarms: Int, ratio: Double, h: HomeSnapshot) -> some View {
         WBarRow(
-            label: "Runners online", value: "\(h.machinesOnline) of \(h.machines.count)", fill: ratio,
-            tint: WidgetInk.green)
+            label: "Runners online", value: "\(h.machinesOnline) of \(h.machines.count)", fill: ratio)
         WBarRow(
             label: "Alarms", value: alarms == 0 ? "None" : "\(alarms)", fill: min(Double(alarms) / 5, 1),
-            tint: GlassInk.amber)
+            low: alarms > 0)
         if let c = h.health?.certificate, let health = h.health {
             WBarRow(
                 label: "Certificate", value: c + (health.certDaysLeft ?? 0 > 0 ? " left" : ""),
-                fill: health.certificateShare, tint: health.certificateLow ? GlassInk.amber : WidgetInk.green)
+                fill: health.certificateShare, low: health.certificateLow)
         } else {
             WGap(label: "Certificate")
         }
         if let b = h.health?.backup(now: Date()), let at = h.health?.lastBackupAt {
             WBarRow(
-                label: "Backup", value: b, fill: max(0, 1 - Date().timeIntervalSince(at) / (2 * 86_400)),
-                tint: WidgetInk.green)
+                label: "Backup", value: b, fill: max(0, 1 - Date().timeIntervalSince(at) / (2 * 86_400)))
         } else {
             WGap(label: "Backup")
         }
@@ -252,7 +251,7 @@ struct CoreBody: View {
     private func stat(_ k: String, _ v: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             WCaption(k)
-            Text(v).coreFont(size: 20, weight: .bold).foregroundStyle(WidgetInk.primary).lineLimit(1)
+            Text(v).coreFont(size: 20, weight: .bold).foregroundStyle(GlassInk.primary).lineLimit(1)
                 .minimumScaleFactor(0.6).contentTransition(.numericText())
         }
     }
@@ -266,15 +265,16 @@ struct TodayBody: View {
     var body: some View {
         let h = shell.home
         let waiting = shell.waitingOnYou
-        let rows: [(String, String, Double, Double, Color)] = [
-            ("Waiting for you", "\(waiting)", Double(waiting), min(Double(waiting), 5) / 5, GlassInk.amber),
+        // The last field is "needs you": only waiting approvals turn amber, and only while there are some.
+        let rows: [(String, String, Double, Double, Bool)] = [
+            ("Waiting for you", "\(waiting)", Double(waiting), min(Double(waiting), 5) / 5, waiting > 0),
             (
                 "AI sessions running", "\(h.runningAgents) of \(h.totalSlots)", Double(h.runningAgents),
-                Double(h.runningAgents) / Double(max(h.totalSlots, 1)), WidgetInk.blue
+                Double(h.runningAgents) / Double(max(h.totalSlots, 1)), false
             ),
             (
                 "Machines online", "\(h.machinesOnline) of \(h.machines.count)", Double(h.machinesOnline),
-                h.machines.isEmpty ? 0 : Double(h.machinesOnline) / Double(h.machines.count), WidgetInk.green
+                h.machines.isEmpty ? 0 : Double(h.machinesOnline) / Double(h.machines.count), false
             ),
         ]
         VStack(alignment: .leading, spacing: Space.s2) {
@@ -283,11 +283,11 @@ struct TodayBody: View {
                 WHead("calendar", "Today")
                 WFigure(value: Double(h.runningAgents), caption: "AI sessions running")
                 Spacer(minLength: 0)
-                Meter(value: rows[1].3)
+                CoreMeter(rows[1].3, label: "AI session slots in use")
             case .m:
                 WHead("calendar", "Today")
                 VStack(spacing: Space.s3) {
-                    ForEach(rows, id: \.0) { r in WBarRow(label: r.0, value: r.1, fill: r.3, tint: r.4) }
+                    ForEach(rows, id: \.0) { r in WBarRow(label: r.0, value: r.1, fill: r.3, low: r.4) }
                 }
             default:
                 WHead("calendar", "Today")
@@ -309,13 +309,13 @@ struct TodayBody: View {
         }
     }
 
-    private func big(_ rows: [(String, String, Double, Double, Color)]) -> some View {
+    private func big(_ rows: [(String, String, Double, Double, Bool)]) -> some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             ForEach(rows, id: \.0) { r in
                 VStack(alignment: .leading, spacing: Space.s1) {
                     WCaption(r.0)
-                    RollingNumber(value: r.2, size: 28, ink: WidgetInk.primary)
-                    Meter(value: r.3, tint: r.4)
+                    RollingNumber(value: r.2, size: 28, ink: GlassInk.primary)
+                    CoreMeter(r.3, low: r.4, label: r.0)
                 }
             }
         }
@@ -329,10 +329,10 @@ struct BoardBody: View {
 
     var body: some View {
         let total = Double(max(board.todo + board.doing + board.review + board.blocked + board.done, 1))
-        let cols: [(String, Int, Color)] = [
-            ("To do", board.todo, WidgetInk.secondary), ("In progress", board.doing, WidgetInk.blue),
-            ("In review", board.review, WidgetInk.blue), ("Blocked", board.blocked, GlassInk.amber),
-            ("Done", board.done, WidgetInk.green),
+        // Blocked is the one column that needs you: amber while anything is blocked.
+        let cols: [(String, Int, Bool)] = [
+            ("To do", board.todo, false), ("In progress", board.doing, false), ("In review", board.review, false),
+            ("Blocked", board.blocked, board.blocked > 0), ("Done", board.done, false),
         ]
         VStack(alignment: .leading, spacing: Space.s2) {
             WHead("list.bullet.rectangle", size == .s ? "Board" : "Citadel board")
@@ -341,10 +341,10 @@ struct BoardBody: View {
                 WFigure(value: Double(board.doing), caption: "in progress")
                 Spacer(minLength: 0)
                 WCaption("\(board.todo) to do · \(board.done) done")
-            case .m, .l:
+            case .m, .l, .t:
                 VStack(spacing: Space.s3) {
                     ForEach(size == .m ? Array(cols.prefix(3)) : cols, id: \.0) { c in
-                        WBarRow(label: c.0, value: "\(c.1)", fill: Double(c.1) / total, tint: c.2)
+                        WBarRow(label: c.0, value: "\(c.1)", fill: Double(c.1) / total, low: c.2)
                     }
                 }
                 Spacer(minLength: 0)
@@ -353,8 +353,8 @@ struct BoardBody: View {
                     ForEach(cols, id: \.0) { c in
                         WSub {
                             WCaption(c.0)
-                            RollingNumber(value: Double(c.1), size: 28, ink: WidgetInk.primary)
-                            Meter(value: Double(c.1) / total, tint: c.2)
+                            RollingNumber(value: Double(c.1), size: 28, ink: GlassInk.primary)
+                            CoreMeter(Double(c.1) / total, low: c.2, label: c.0)
                         }
                     }
                 }

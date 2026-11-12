@@ -23,7 +23,7 @@ struct WidgetLayoutTests {
 
     @Test func movingPushesTheOthersAside() throws {
         var l = WidgetLayout.standard()
-        let clock = try #require(l.items.first { $0.kind == .clock })
+        let clock = try #require(l.items.first { $0.kind == .digital })
         let spend = try #require(l.items.first { $0.kind == .spend })
         let ok946 = l.move(clock.id, to: spend.x, spend.y)
         #expect(ok946)
@@ -142,10 +142,29 @@ struct WidgetLayoutTests {
         #expect(events.size == .l && events.y + events.size.rows <= WidgetLayout.rows)
     }
 
-    @Test func noWidgetHasTheTallSize() {
-        #expect(WidgetSize.allCases.map(\.rawValue) == ["s", "m", "l", "x"])
-        #expect(WidgetKind.allCases.allSatisfy { !$0.sizes.isEmpty && $0.sizes.allSatisfy { $0.rawValue != "t" } })
+    @Test func onlyTheDigitalClockIsTall() {
+        #expect(WidgetSize.allCases.map(\.rawValue) == ["s", "m", "t", "l", "x"])
+        #expect(WidgetKind.allCases.filter { $0.sizes.contains(.t) } == [.digital])
+        #expect(WidgetKind.digital.sizes == [.m, .s, .t, .l] && WidgetKind.clock.sizes == [.s, .m, .l])
+        #expect(WidgetSize.t.cols == 2 && WidgetSize.t.rows == 4)
         #expect(WidgetSize.x.cols == 8 && WidgetSize.x.rows == 4 && WidgetSize.m.cols == 4 && WidgetSize.s.rows == 2)
+        #expect(WidgetSize.m.spoken == "Wide, 2 by 1" && WidgetSize.t.spoken == "Tall, 1 by 2")
+        #expect(WidgetSize.allCases.map(\.short) == ["S", "W", "T", "L", "X"])
+    }
+
+    @Test func addingNeverGivesAWidgetASizeItLacks() {
+        // Room for a 2 x 4 strip only: an analog clock asked for large must not fall back to tall.
+        var items: [WidgetItem] = []
+        for y in stride(from: 0, to: WidgetLayout.rows, by: 2) {
+            for x in stride(from: 2, to: WidgetLayout.cols, by: 2) {
+                items.append(WidgetItem(kind: .quick, size: .s, x: x, y: y))
+            }
+        }
+        var l = WidgetLayout(items: items)
+        let c = l.add(.clock, .l)
+        #expect(c.map { WidgetKind.clock.sizes.contains($0.size) } ?? true)
+        let d = l.add(.digital, .l)
+        #expect(d?.size == .t || d?.size == .s)
     }
 
     @Test func gridMathSnapsToCells() {
@@ -187,8 +206,8 @@ struct HomePrefsTests {
         #expect(!ShellModel(defaults: d).widgets.items.contains { $0.kind == .board })
         shell.toast?.undo?()
         #expect(shell.widgets.items.contains { $0.kind == .board })
-        shell.resizeWidget(try #require(shell.widgets.items.first { $0.kind == .clock }).id, to: .m)
-        #expect(ShellModel(defaults: d).widgets.items.first { $0.kind == .clock }?.size == .m)
+        shell.resizeWidget(try #require(shell.widgets.items.first { $0.kind == .digital }).id, to: .t)
+        #expect(ShellModel(defaults: d).widgets.items.first { $0.kind == .digital }?.size == .t)
     }
 
     @Test func resetGoesBackToTheDefault() {
@@ -220,5 +239,14 @@ struct WidgetDataTests {
         #expect(HomeSnapshot.state(M(id: "a", os: "x", online: false, slots: 2, used: 0)) == .offline)
         #expect(HomeSnapshot.state(M(id: "a", os: "x", online: true, slots: 2, used: 2)) == .busy)
         #expect(HomeSnapshot.state(M(id: "a", os: "x", online: true, slots: 2, used: 1)) == .online)
+    }
+
+    @Test func galleryActsOnlyOnASingleCopy() {
+        var l = WidgetLayout(items: [])
+        #expect(l.onlyCopy(of: .digital) == nil)
+        let first = l.add(.digital, .s)
+        #expect(first != nil && l.onlyCopy(of: .digital)?.id == first?.id)
+        #expect(l.add(.digital, .s) != nil)
+        #expect(l.onlyCopy(of: .digital) == nil)
     }
 }

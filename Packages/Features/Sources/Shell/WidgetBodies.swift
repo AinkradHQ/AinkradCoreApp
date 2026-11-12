@@ -25,7 +25,8 @@ struct WidgetBody: View {
         case .events: EventsBody(home: shell.home, size: size)
         case .core: CoreBody(shell: shell, size: size)
         case .quick: QuickBody(shell: shell, size: size)
-        case .clock: ClockBody(size: size)
+        case .clock: AnalogClockBody(size: size)
+        case .digital: DigitalClockBody(size: size)
         }
     }
 }
@@ -44,11 +45,11 @@ struct WRunRow: View {
                 Text(run.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 Spacer(minLength: Space.s2)
                 Text((showTool ? "\(run.tool) · " : "") + "\(run.minutes) min").coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(WidgetInk.secondary).monospacedDigit().lineLimit(1)
+                    .foregroundStyle(GlassInk.secondary).monospacedDigit().lineLimit(1)
                     .contentTransition(.numericText())
             }
-            .foregroundStyle(WidgetInk.primary)
-            Meter(value: min(Double(run.minutes) / 60, 1))
+            .foregroundStyle(GlassInk.primary)
+            CoreMeter(min(Double(run.minutes) / 60, 1), label: "\(run.minutes) minutes")
         }
         .accessibilityElement(children: .combine)
     }
@@ -76,7 +77,7 @@ struct RunningBody: View {
                     Spacer(minLength: 0)
                     HStack(spacing: Space.s1) {
                         ForEach(runs.prefix(4)) { r in
-                            Meter(value: min(Double(r.minutes) / 60, 1)).frame(maxWidth: .infinity)
+                            CoreMeter(min(Double(r.minutes) / 60, 1), label: r.name).frame(maxWidth: .infinity)
                         }
                     }
                 case .m:
@@ -85,7 +86,7 @@ struct RunningBody: View {
                         WFigure(value: Double(runs.count), caption: "running now").frame(width: 100)
                         list(runs.prefix(2), tool: false)
                     }
-                case .l:
+                case .l, .t:
                     WHead("text.cursor", "Running AI sessions") { needs }
                     WFigure(value: Double(runs.count), caption: "running")
                     list(runs.prefix(5), tool: true)
@@ -117,7 +118,7 @@ struct RunningBody: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             ForEach(runs) { r in WRunRow(run: r, showTool: tool).newRow(reduce) }
         }
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: runs.map(\.id))
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: runs.map(\.id))
     }
 }
 
@@ -148,25 +149,25 @@ struct SpendBody: View {
                     WHead("dollarsign", "Spend")
                     WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
                     Spacer(minLength: 0)
-                    Meter(value: home.monthTokensUsed)
+                    CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                     WCaption(tightest)
                 case .m:
                     WHead("dollarsign", "AI spend")
                     HStack(alignment: .top, spacing: Space.s4) {
                         VStack(alignment: .leading, spacing: Space.s2) {
                             WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
-                            Meter(value: home.monthTokensUsed)
+                            CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                         }
                         .frame(width: 130)
                         WColumns(values: week, labels: weekLabels)
                     }
-                case .l:
+                case .l, .t:
                     WHead("dollarsign", "AI spend")
                     HStack(alignment: .firstTextBaseline) {
                         WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
                         Spacer(minLength: 0)
                     }
-                    Meter(value: home.monthTokensUsed)
+                    CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                     WCaption(tightest)
                     WSub {
                         WCaption("Last 7 days")
@@ -178,7 +179,7 @@ struct SpendBody: View {
                     HStack(alignment: .top, spacing: Space.s4) {
                         VStack(alignment: .leading, spacing: Space.s3) {
                             WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
-                            Meter(value: home.monthTokensUsed)
+                            CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                             WCaption(tightest)
                             WBarRow(label: "Today", value: money(home.spendToday), fill: today)
                             WGap(label: "Spend by account")
@@ -219,18 +220,18 @@ struct WMachineRow: View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s2) {
                 Image(systemName: machine.os.hasPrefix("macOS") ? "laptopcomputer" : "server.rack")
-                    .foregroundStyle(WidgetInk.blue).accessibilityHidden(true)
+                    .foregroundStyle(GlassInk.blue).accessibilityHidden(true)
                 Text(machine.id).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 WRunnerBadge(machine: machine)
                 Spacer(minLength: Space.s2)
                 Text("\(machine.used) of \(machine.slots) AI sessions").coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(WidgetInk.secondary).monospacedDigit().lineLimit(1)
+                    .foregroundStyle(GlassInk.secondary).monospacedDigit().lineLimit(1)
             }
-            .foregroundStyle(WidgetInk.primary)
+            .foregroundStyle(GlassInk.primary)
             HStack(spacing: Space.s3) {
-                Meter(
-                    value: machine.slots > 0 ? Double(machine.used) / Double(machine.slots) : 0,
-                    tint: machine.used >= machine.slots && machine.slots > 0 ? GlassInk.amber : nil)
+                CoreMeter(
+                    machine.slots > 0 ? Double(machine.used) / Double(machine.slots) : 0,
+                    low: machine.used >= machine.slots && machine.slots > 0, label: "AI session slots in use")
                 if machine.load.count > 1 {
                     WLine(values: machine.load).frame(width: 80, height: 22)
                 }
@@ -256,9 +257,9 @@ struct MachinesBody: View {
                 case .s:
                     WHead("server.rack", "Machines")
                     HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
-                        RollingNumber(value: Double(home.machinesOnline), size: 38, ink: WidgetInk.primary)
+                        RollingNumber(value: Double(home.machinesOnline), size: 38, ink: GlassInk.primary)
                         Text("of \(ms.count)").coreFont(size: 18, weight: .semibold).foregroundStyle(
-                            WidgetInk.secondary)
+                            GlassInk.secondary)
                     }
                     WCaption("online")
                     Spacer(minLength: 0)
@@ -270,7 +271,7 @@ struct MachinesBody: View {
                 case .m:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
                     rows(ms.prefix(2))
-                case .l:
+                case .l, .t:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
                     rows(ms.prefix(4))
                     Spacer(minLength: 0)
@@ -282,7 +283,7 @@ struct MachinesBody: View {
                             WCaption("Load, last hour")
                             ForEach(ms.filter { $0.load.count > 1 }.prefix(2)) { m in
                                 WCaption(m.id)
-                                WLine(values: m.load, tint: m.online ? WidgetInk.blue : WidgetInk.secondary)
+                                WLine(values: m.load, tint: m.online ? GlassInk.blue : GlassInk.secondary)
                             }
                         }
                     }
@@ -293,9 +294,9 @@ struct MachinesBody: View {
 
     private func tint(_ m: HomeSnapshot.Machine) -> Color {
         switch HomeSnapshot.state(m) {
-        case .online: WidgetInk.green
+        case .online: GlassInk.green
         case .busy: GlassInk.amber
-        case .offline: WidgetInk.track
+        case .offline: GlassInk.track
         }
     }
 
@@ -304,42 +305,5 @@ struct MachinesBody: View {
             ForEach(ms) { m in WMachineRow(machine: m) }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-}
-
-struct ClockBody: View {
-    let size: WidgetSize
-    @Environment(\.homeLive) private var live
-    @Environment(\.corePalette) private var palette
-    /// The macOS clock widget: the dial is the widget. Wider sizes put the day and date beside or under it.
-    var body: some View {
-        switch size {
-        case .s:
-            // The dial nearly fills the widget, a thin glass rim around it (macOS).
-            AnalogClock().padding(-Space.s2).frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .m:
-            HStack(spacing: Space.s4) {
-                AnalogClock()
-                dateText(big: true)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        default:
-            VStack(spacing: Space.s3) {
-                AnalogClock().frame(maxWidth: .infinity)
-                dateText(big: false)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private func dateText(big: Bool) -> some View {
-        TimelineView(homeTicks(60, live: live)) { ctx in
-            VStack(alignment: big ? .leading : .center, spacing: 2) {
-                Text(ctx.date, format: .dateTime.weekday(.wide)).coreFont(size: big ? 20 : 15, weight: .semibold)
-                Text(ctx.date, format: .dateTime.month(.wide).day())
-                    .coreFont(size: MacTextSize.body).foregroundStyle(WidgetInk.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }

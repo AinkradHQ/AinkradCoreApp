@@ -5,6 +5,8 @@ import SwiftUI
 /// Building blocks of the macOS-style widgets (N9): a header with a blue symbol, a darker well for a chart or list, and
 /// Swift Charts for columns and load lines. Bars and charts animate to new values; Reduce Motion cross-fades instead.
 struct WHead<Trailing: View>: View {
+    @Environment(\.widgetEditing) private var editing
+    @Environment(\.accessibilityReduceMotion) private var reduce
     let symbol: String
     let title: String
     let trailing: Trailing
@@ -14,14 +16,21 @@ struct WHead<Trailing: View>: View {
         self.trailing = trailing()
     }
     var body: some View {
-        HStack(spacing: Space.s1 + 2) {
-            Image(systemName: symbol).foregroundStyle(WidgetInk.blue).accessibilityHidden(true)
+        HStack(spacing: Space.s2) {
+            Image(systemName: symbol).foregroundStyle(GlassInk.blue).accessibilityHidden(true)
             Text(title).lineLimit(1).accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s2)
             trailing
         }
-        .coreFont(size: MacTextSize.meta + 1, weight: .semibold).foregroundStyle(WidgetInk.secondary)
+        .coreFont(size: MacTextSize.headline, weight: .semibold).foregroundStyle(GlassInk.secondary)
+        // While editing, the edit bar owns the top of the widget: the title fades out in place (no layout shift).
+        .opacity(editing ? 0 : 1)
+        .animation(reduce ? nil : Motion.out(Motion.hover), value: editing)
     }
+}
+
+extension EnvironmentValues {
+    @Entry var widgetEditing = false
 }
 
 extension WHead where Trailing == EmptyView {
@@ -40,9 +49,9 @@ struct WFigure: View {
     var size: CGFloat = 38
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            RollingNumber(value: value, format: format, size: size, ink: WidgetInk.primary)
+            RollingNumber(value: value, format: format, size: size, ink: GlassInk.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(caption).coreFont(size: MacTextSize.body).foregroundStyle(WidgetInk.secondary).lineLimit(1)
+            Text(caption).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)
         }
         .accessibilityElement(children: .combine)
     }
@@ -54,7 +63,7 @@ struct WSub<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) { content }
             .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(WidgetInk.well, in: coreShape(14))
+            .background(GlassInk.well, in: coreShape(Radius.row))
     }
 }
 
@@ -62,7 +71,7 @@ struct WCaption: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary).lineLimit(1)
+        Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
     }
 }
 
@@ -72,8 +81,8 @@ struct WEmpty: View {
     let text: String
     var body: some View {
         VStack(spacing: Space.s2) {
-            Image(systemName: symbol).font(.system(size: 24, weight: .regular)).foregroundStyle(WidgetInk.secondary)
-            Text(text).coreFont(size: MacTextSize.body).foregroundStyle(WidgetInk.secondary).multilineTextAlignment(
+            Image(systemName: symbol).coreFont(size: 24).foregroundStyle(GlassInk.secondary)
+            Text(text).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).multilineTextAlignment(
                 .center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -88,9 +97,9 @@ struct WGap: View {
         HStack {
             Text(label).coreFont(size: MacTextSize.body, weight: .medium)
             Spacer(minLength: Space.s2)
-            Text("Not reported yet").coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary)
+            Text("Not reported yet").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
-        .foregroundStyle(WidgetInk.primary)
+        .foregroundStyle(GlassInk.primary)
         .accessibilityElement(children: .combine)
     }
 }
@@ -100,17 +109,18 @@ struct WBarRow: View {
     let label: String
     let value: String
     let fill: Double
-    var tint: Color = WidgetInk.blue
+    /// Amber, for a bar that says something needs you (alarms raised, a certificate running out). Blue otherwise.
+    var low = false
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s2) {
                 Text(label).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 Spacer(minLength: Space.s2)
-                Text(value).coreFont(size: MacTextSize.meta).foregroundStyle(WidgetInk.secondary).monospacedDigit()
+                Text(value).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
                     .lineLimit(1).contentTransition(.numericText())
             }
-            .foregroundStyle(WidgetInk.primary)
-            Meter(value: fill, tint: tint)
+            .foregroundStyle(GlassInk.primary)
+            CoreMeter(fill, low: low, label: label)
         }
         .accessibilityElement(children: .combine)
     }
@@ -125,41 +135,40 @@ struct WColumns: View {
         VStack(spacing: Space.s1) {
             Chart(Array(values.enumerated()), id: \.offset) { i, v in
                 BarMark(x: .value("Day", i), y: .value("Amount", v), width: .ratio(0.72))
-                    .foregroundStyle(i == values.count - 1 ? WidgetInk.blue : WidgetInk.blue.opacity(0.45))
+                    .foregroundStyle(i == values.count - 1 ? GlassInk.blue : GlassInk.blue.opacity(0.45))
                     .cornerRadius(3)
             }
             .chartXScale(domain: -0.5...(Double(max(values.count, 1)) - 0.5))
             .chartYScale(domain: 0...max(values.max() ?? 1, 0.0001))
             .chartXAxis(.hidden).chartYAxis(.hidden)
-            .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: values)
+            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: values)
             if !labels.isEmpty {
                 HStack {
                     ForEach(Array(labels.enumerated()), id: \.offset) { _, l in
                         Text(l).frame(maxWidth: .infinity)
                     }
                 }
-                .coreFont(size: 10).foregroundStyle(WidgetInk.secondary)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
         }
         .accessibilityHidden(true)
     }
 }
 
-/// A load line over a soft area, 0...1, newest at the right.
+/// A load line over a flat tinted area (no gradient), 0...1, newest at the right.
 struct WLine: View {
     let values: [Double]
-    var tint: Color = WidgetInk.blue
+    var tint: Color = GlassInk.blue
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         Chart(Array(values.enumerated()), id: \.offset) { i, v in
             AreaMark(x: .value("Time", i), y: .value("Load", v))
-                .foregroundStyle(
-                    LinearGradient(colors: [tint.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom))
+                .foregroundStyle(tint.opacity(0.2))
             LineMark(x: .value("Time", i), y: .value("Load", v)).foregroundStyle(tint)
                 .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
         .chartYScale(domain: 0...1).chartXAxis(.hidden).chartYAxis(.hidden)
-        .animation(Motion.calm(.smooth(duration: 0.4), reduce), value: values)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: values)
         .accessibilityHidden(true)
     }
 }
