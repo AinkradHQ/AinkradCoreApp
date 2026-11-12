@@ -12,11 +12,6 @@ struct OverviewTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             banner
-            if model.health == .paused {
-                CoreNotice(
-                    symbol: "exclamationmark.octagon", title: BrainWords.pausedLine(names: model.pausedNames),
-                    tone: .fail)
-            }
             if !model.visibleNeeds.isEmpty {
                 LazyVGrid(columns: needColumns, spacing: Space.s3) {
                     ForEach(model.visibleNeeds) { n in NeedTile(model: model, need: n) }
@@ -39,51 +34,28 @@ struct OverviewTab: View {
         .accessibilityIdentifier("brain-overview")
     }
 
-    /// Paused is red with the way out; Needs you is a blue count; Healthy is green. Same words on every surface.
+    /// Paused is red with the way out; Needs you is amber with its count; Healthy is green. Said once, on the CoreUI notice.
     @ViewBuilder private var banner: some View {
         let n = model.needsTotal
         switch model.health {
         case .paused:
-            HStack(alignment: .center, spacing: Space.s3) {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    HStack(spacing: Space.s2) {
-                        Text("Paused").coreFont(size: MacTextSize.large, weight: .semibold)
-                            .foregroundStyle(GlassInk.redInk)
-                        count(n, GlassInk.red)
-                    }
-                    Text(BrainWords.pausedWhy).foregroundStyle(GlassInk.secondary)
-                }
-                Spacer(minLength: Space.s3)
-                Button {
-                    Task { await model.clearPaused() }
-                } label: {
-                    Text("Clear pause with Touch ID")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.busy != nil)
+            CoreNotice(
+                symbol: "pause.circle", title: "Paused, \(n)", text: BrainWords.pausedLine(names: model.pausedNames),
+                tone: .fail
+            ) {
+                Button("Clear pause with Touch ID") { Task { await model.clearPaused() } }
+                    .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(model.busy != nil)
             }
-            .padding(Space.s4).background(GlassInk.red.opacity(0.14), in: coreShape(Radius.cardMac))
         case .needsYou:
-            head("Needs you", GlassInk.blue, n, "Some things wait for a decision. Nothing is wrong.")
+            CoreNotice(
+                symbol: "hand.raised", title: "Needs you, \(n)",
+                text: "Some things wait for a decision. Nothing is wrong.",
+                tone: .warn)
         case .healthy:
-            head("Healthy", GlassInk.green, nil, "Nothing waits for you. Every check is in date.")
+            CoreNotice(
+                symbol: "checkmark.circle", title: "Healthy", text: "Nothing waits for you. Every check is in date.",
+                tone: .done)
         }
-    }
-
-    private func head(_ title: String, _ hue: Color, _ n: Int?, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            HStack(spacing: Space.s2) {
-                Text(title).coreFont(size: MacTextSize.large, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
-                if let n { count(n, hue) }
-            }
-            Text(text).foregroundStyle(GlassInk.secondary)
-        }
-        .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
-        .background(hue.opacity(0.12), in: coreShape(Radius.cardMac))
-    }
-
-    private func count(_ n: Int, _ hue: Color) -> some View {
-        Text("\(n)").coreFont(size: MacTextSize.meta, weight: .bold).monospacedDigit()
-            .padding(.horizontal, 6).frame(minHeight: 18).background(hue, in: coreShape(5))
     }
 }
 

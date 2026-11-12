@@ -1,30 +1,22 @@
 import CoreUI
 import SwiftUI
 
-/// A short tinted note inside a card: an icon and one plain sentence. Blue informs, orange warns, red refuses.
+/// A note inside a card: the CoreUI notice, toned by what it says. Red refuses, amber needs you, blue and slate inform.
 struct InboxNote: View {
     let symbol: String
     let hue: Color
-    let text: Text
-    init(_ symbol: String, _ hue: Color = GlassInk.slate, _ text: Text) {
+    let title: String
+    let text: String
+    init(_ symbol: String, _ hue: Color = GlassInk.slate, _ title: String, _ text: String = "") {
         self.symbol = symbol
         self.hue = hue
+        self.title = title
         self.text = text
     }
-    init(_ symbol: String, _ hue: Color = GlassInk.slate, _ text: String) { self.init(symbol, hue, Text(text)) }
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-            Image(systemName: symbol).foregroundStyle(hue == GlassInk.slate ? GlassInk.secondary : hue)
-                .accessibilityHidden(true)
-            text.fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(hue.opacity(0.14), in: coreShape(Radius.control))
-        .overlay {
-            coreShape(Radius.control).strokeBorder(hue.opacity(hue == GlassInk.slate ? 0.2 : 0.45), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
+        CoreNotice(
+            symbol: symbol, title: title, text: text,
+            tone: hue == GlassInk.red ? .fail : hue == GlassInk.amber ? .warn : hue == GlassInk.blue ? .run : .queue)
     }
 }
 

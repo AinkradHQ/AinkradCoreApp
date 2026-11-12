@@ -15,7 +15,7 @@ struct InboxTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             strip
-            if let p = model.movePause { InboxNote("shield", GlassInk.red, Text("Paused. ").bold() + Text(p)) }
+            if let p = model.movePause { InboxNote("shield", GlassInk.red, "Paused", p) }
             HStack(alignment: .center, spacing: Space.s3) {
                 BrainTitle("Inbox")
                 Spacer(minLength: Space.s3)
@@ -129,11 +129,8 @@ struct InboxTab: View {
                     "When two memories in this room disagree, you see them side by side here.")
             }
             InboxNote(
-                "info.circle", GlassInk.slate,
-                Text("Two rooms that disagree are ").foregroundStyle(GlassInk.primary) + Text("not").bold()
-                    + Text(
-                        " a conflict. Each room keeps its own rule, and only disagreements inside this room show here.")
-            )
+                "info.circle", GlassInk.slate, "Two rooms that disagree are not a conflict",
+                "Only disagreements inside this room show here.")
         case .blocked:
             if let d = st.data, !d.blocked.isEmpty {
                 VStack(spacing: Space.s3) {
