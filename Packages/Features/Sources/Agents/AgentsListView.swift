@@ -97,7 +97,7 @@ struct AgentsListView: View {
             if compact { scopeMenu }
             filter(
                 $model.filters.tool, all: "Any tool",
-                ["claude", "codex", "opencode", "agy"].map { CoreSelectOption(Optional($0), AgentWords.toolName($0)) })
+                NewSessionSheet.tools.map { CoreSelectOption(Optional($0), AgentWords.toolName($0)) })
             if !compact {
                 filter(
                     $model.filters.runner, all: "Any runner",

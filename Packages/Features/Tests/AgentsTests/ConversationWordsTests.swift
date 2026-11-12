@@ -27,27 +27,53 @@ struct ConversationWordsTests {
         #expect(ConversationWords.event(.user("hi"), runner: "") == nil)
     }
 
-    @Test func turnsAreNumberedInOrder() {
+    @Test func turnsAreNumberedAndTimedFromTheirMessage() {
+        let t = { (s: TimeInterval) in Date(timeIntervalSince1970: s) }
         let e = [
-            TranscriptEntry(seq: 1, at: .now, kind: .user("a")),
-            TranscriptEntry(seq: 2, at: .now, kind: .turnEnded(costMicros: 40_000, tokens: nil)),
-            TranscriptEntry(seq: 3, at: .now, kind: .user("b")),
-            TranscriptEntry(seq: 4, at: .now, kind: .turnEnded(costMicros: nil, tokens: nil)),
+            TranscriptEntry(seq: 1, at: t(0), kind: .started(harness: "claude", resumed: false)),
+            TranscriptEntry(seq: 2, at: t(100), kind: .user("a")),
+            TranscriptEntry(seq: 3, at: t(141), kind: .turnEnded(costMicros: 40_000, tokens: nil)),
+            TranscriptEntry(seq: 4, at: t(200), kind: .user("b")),
+            TranscriptEntry(seq: 5, at: t(210), kind: .user("queued")),
+            TranscriptEntry(seq: 6, at: t(325), kind: .turnEnded(costMicros: nil, tokens: nil)),
+            TranscriptEntry(seq: 7, at: t(400), kind: .turnEnded(costMicros: nil, tokens: nil)),
         ]
-        #expect(ConversationWords.turnNumbers(e) == [2: 1, 4: 2])
-        #expect(ConversationWords.turn(1, cost: nil, tokens: nil) == ["Turn 1 done"])
-        #expect(ConversationWords.turn(2, cost: 40_000, tokens: nil).first == "Turn 2 done")
-        #expect(ConversationWords.turn(2, cost: 40_000, tokens: nil).count == 2)
+        let turns = ConversationWords.turns(e)
+        #expect(turns[3] == .init(number: 1, seconds: 41))
+        #expect(turns[6] == .init(number: 2, seconds: 125))
+        #expect(turns[7] == .init(number: 3, seconds: nil))
+        #expect(ConversationWords.turn(turns[3], cost: 40_000) == ["Turn 1 done", "41 s", "$0.04"])
+        #expect(ConversationWords.turn(turns[6], cost: nil) == ["Turn 2 done", "2 min 5 s"])
+        #expect(ConversationWords.turn(nil, cost: nil) == ["Turn done"])
+        #expect(ConversationWords.took(120) == "2 min")
+    }
+
+    @Test @MainActor func savedAgyFallsBackToClaude() {
+        #expect(AgentPrefs.harness("agy") == "claude")
+        #expect(AgentPrefs.harness(nil) == "claude")
+        #expect(AgentPrefs.harness("codex") == "codex")
+    }
+
+    @Test @MainActor func startFromIsSentOnlyForAnExistingFolder() {
+        #expect(NewSessionSheet.base(.folder, " dev ") == "dev")
+        #expect(NewSessionSheet.base(.repo, "dev") == nil)
+        #expect(NewSessionSheet.base(.fresh, "dev") == nil)
     }
 
     @Test func oneNoticeAtATimeMostUrgentFirst() {
         let lost = session(.lost)
-        #expect(
-            ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: true, notice: nil)?.title
-                == "Reconnecting")
+        // Lost wins over a reconnect or a leftover notice: it is the only one that carries Resume.
+        #expect(ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: true, notice: nil)?.resume == true)
         #expect(
             ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: false, notice: InlineNotice(title: "X"))?
-                .title == "X")
+                .title == "Session lost")
+        let live = session(.waiting)
+        #expect(
+            ConversationWords.banner(live, runner: "", reconnecting: true, notice: InlineNotice(title: "X"))?.title
+                == "Reconnecting")
+        #expect(
+            ConversationWords.banner(live, runner: "", reconnecting: false, notice: InlineNotice(title: "X"))?.title
+                == "X")
         let b = ConversationWords.banner(lost, runner: "Azure Dev", reconnecting: false, notice: nil)
         #expect(
             b?.title == "Session lost" && b?.text == "Azure Dev dropped it. The transcript is kept."

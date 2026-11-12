@@ -29,24 +29,39 @@ enum ConversationWords {
         return w.prefix(1).uppercased() + w.dropFirst()
     }
 
-    /// The turn number of every `turnEnded` entry, by seq, in one pass.
-    static func turnNumbers(_ entries: [TranscriptEntry]) -> [Int64: Int] {
-        var out: [Int64: Int] = [:]
+    /// One finished turn: its number and how long it took, from your message to the turn's end (nil without a message).
+    struct Turn: Equatable {
+        let number: Int
+        let seconds: Int?
+    }
+
+    /// Every `turnEnded` entry's turn, by seq, in one pass. The time is worked out from the entries' own timestamps.
+    static func turns(_ entries: [TranscriptEntry]) -> [Int64: Turn] {
+        var out: [Int64: Turn] = [:]
         var n = 0
+        var asked: Date?
         for e in entries {
-            if case .turnEnded = e.kind {
+            switch e.kind {
+            case .user: if asked == nil { asked = e.at }
+            case .turnEnded:
                 n += 1
-                out[e.seq] = n
+                out[e.seq] = Turn(number: n, seconds: asked.map { max(0, Int(e.at.timeIntervalSince($0).rounded())) })
+                asked = nil
+            default: break
             }
         }
         return out
     }
 
-    /// "Turn 1 done", then the tokens and the cost when the Core reported them; the time is added by the line.
-    static func turn(_ number: Int?, cost: Int64?, tokens: Int64?) -> [String] {
+    /// "41 s", "2 min 5 s".
+    static func took(_ seconds: Int) -> String {
+        seconds < 60 ? "\(seconds) s" : "\(seconds / 60) min" + (seconds % 60 == 0 ? "" : " \(seconds % 60) s")
+    }
+
+    /// "Turn 1 done · 41 s · $0.04" (ui-fixes mockup); the time of day is added by the line, the tokens go in its tooltip.
+    static func turn(_ turn: Turn?, cost: Int64?) -> [String] {
         [
-            number.map { "Turn \($0) done" } ?? "Turn done", tokens.map { "\(AgentWords.tokens($0)) tokens" },
-            AgentWords.cost(cost),
+            turn.map { "Turn \($0.number) done" } ?? "Turn done", turn?.seconds.map(took), AgentWords.cost(cost),
         ].compactMap { $0 }
     }
 
@@ -60,17 +75,18 @@ enum ConversationWords {
     }
 
     static func banner(_ s: AgentSessionInfo, runner: String, reconnecting: Bool, notice: InlineNotice?) -> Banner? {
+        // Lost first: it is the only notice that carries Resume, so nothing may hide it.
+        if s.state == .lost {
+            return Banner(
+                symbol: "wifi.exclamationmark", tone: .fail, title: "Session lost",
+                text: "\(runner) dropped it. The transcript is kept.", resume: true)
+        }
         if reconnecting {
             return Banner(
                 symbol: "arrow.triangle.2.circlepath", tone: .warn, title: "Reconnecting",
                 text: "It resumes from where it left off.")
         }
         if let n = notice { return Banner(symbol: n.symbol, tone: n.tone, title: n.title, text: n.detail) }
-        if s.state == .lost {
-            return Banner(
-                symbol: "wifi.exclamationmark", tone: .fail, title: "Session lost",
-                text: "\(runner) dropped it. The transcript is kept.", resume: true)
-        }
         if s.idleEnded {
             return Banner(
                 symbol: "moon.zzz", tone: .queue, title: "Ended (idle)",
@@ -134,13 +150,13 @@ struct WorkingBar: View {
             // A 1.2 s sweep, eased at both ends so it reads as calm travel rather than a tick.
             let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.2) / 1.2
             let p = reduce ? 0.5 : (1 - cos(t * 2 * .pi)) / 2
-            coreShape(2).fill(palette.track)
+            coreShape(Space.s1 / 2).fill(palette.track)
                 .overlay(alignment: .leading) {
-                    coreShape(2).fill(palette.primary).frame(width: seg).offset(x: (width - seg) * p)
+                    coreShape(Space.s1 / 2).fill(palette.primary).frame(width: seg).offset(x: (width - seg) * p)
                 }
         }
         .frame(width: width, height: Space.s1)
-        .clipShape(coreShape(2))
+        .clipShape(coreShape(Space.s1 / 2))
         .accessibilityHidden(true)
     }
 }

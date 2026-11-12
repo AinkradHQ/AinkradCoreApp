@@ -51,7 +51,7 @@ struct NewSessionSheet: View {
                         HStack(spacing: Space.s2) {
                             ForEach(Self.tools, id: \.self) { t in
                                 RadioRow(
-                                    AgentWords.toolName(t), subtitle: toolLine, symbol: AgentsModel.harnessSymbol(t),
+                                    AgentWords.toolName(t), symbol: AgentsModel.harnessSymbol(t),
                                     selected: harness == t
                                 ) { harness = t }
                             }
@@ -112,16 +112,13 @@ struct NewSessionSheet: View {
             }
             .frame(maxHeight: Space.s8 * 20)
             .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Cancel") { model.shell.closeDialog() }
-                    .buttonStyle(CoreButtonStyle(.plain)).keyboardShortcut(.cancelAction)
-                Spacer(minLength: Space.s3)
-                Button(busy ? "Starting…" : notice == nil ? "Start AI session" : "Try again") { if ready { start() } }
-                    .buttonStyle(CoreButtonStyle(.prominent, busy: busy))
-                    .coreShortcut(.command)
-                    .disabled(!ready && !busy)
-                    .help("Start the AI session (⌘Return)")
-            }
+            CoreDialogFooter(
+                cancel: CoreAction("Cancel", key: .cancel) { model.shell.closeDialog() },
+                primary: CoreAction(
+                    busy ? "Starting…" : notice == nil ? "Start AI session" : "Try again", key: .command
+                ) {
+                    if ready { start() }
+                }, busy: busy, enabled: ready || busy)
         }
         .onAppear {
             pickRunner()
@@ -161,11 +158,6 @@ struct NewSessionSheet: View {
         }
     }
 
-    private var toolLine: String {
-        let n = model.runners.filter { $0.online && $0.runsAgents }.count
-        return n == 0 ? "No runner offers it" : n == 1 ? "On 1 runner" : "On \(n) runners"
-    }
-
     private func hint(_ text: String) -> some View {
         Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             .fixedSize(horizontal: false, vertical: true)
@@ -195,6 +187,11 @@ struct NewSessionSheet: View {
         }
     }
 
+    /// "Start from" is only on screen for an existing folder; a repo works from its branch and a fresh folder has none.
+    static func base(_ place: Place, _ text: String) -> String? {
+        place == .folder ? text.trimmingCharacters(in: .whitespaces) : nil
+    }
+
     private func start() {
         guard let runner else { return }
         busy = true
@@ -208,7 +205,7 @@ struct NewSessionSheet: View {
         let new = NewAgentSession(
             runner: runner.id, harness: harness, model: llm.isEmpty ? nil : llm, prompt: "", mode: mode,
             chain: chain?.id, project: project, branch: place == .repo && !branch.isEmpty ? branch : nil,
-            base: base.trimmingCharacters(in: .whitespaces))
+            base: Self.base(place, base))
         Task {
             let n = await model.create(new)
             busy = false

@@ -5,6 +5,8 @@ import SwiftUI
 /// 1300 pt and wider the side panel shows beside it; at medium widths the Details strip toggles under the header; narrow
 /// windows keep one column and tighten the header.
 struct SessionView: View {
+    /// A comfortable reading width for the notices, transcript and composer, centred on wide windows.
+    static let readingWidth = Space.s8 * 24
     @Bindable var model: AgentsModel
     let sessionID: String
     @Environment(\.corePalette) private var palette
@@ -78,13 +80,13 @@ struct SessionView: View {
                     SessionRouteCues(model: model, session: s)
                 }
             }
-            .frame(maxWidth: 760).frame(maxWidth: .infinity)
+            .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
                 // A comfortable reading width, centred, on wide windows.
-                .frame(maxWidth: 760).frame(maxWidth: .infinity)
+                .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
             ComposerView(model: model, session: s, focused: $composing)
-                .frame(maxWidth: 760).frame(maxWidth: .infinity)
+                .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
         }
     }
 

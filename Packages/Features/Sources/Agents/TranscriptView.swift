@@ -27,12 +27,12 @@ struct TranscriptView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Space.s3) {
                         header(store)
-                        let turns = ConversationWords.turnNumbers(store.entries)
+                        let turns = ConversationWords.turns(store.entries)
                         ForEach(Self.visible(store.entries)) { e in
                             row(e, store, turn: turns[e.seq])
                                 .id(e.seq)
                                 // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
-                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
+                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
                         if session.live && !session.idle && store.load == .ready && !model.waiting(session.id) {
                             Thinking(since: session.updatedAt)
@@ -81,17 +81,19 @@ struct TranscriptView: View {
         }
     }
 
-    @ViewBuilder private func row(_ e: TranscriptEntry, _ store: TranscriptStore, turn: Int?) -> some View {
+    @ViewBuilder private func row(_ e: TranscriptEntry, _ store: TranscriptStore, turn: ConversationWords.Turn?)
+        -> some View
+    {
         if case .approvalRequest(let id, _, _, _) = e.kind, let r = store.approvals[id] {
             ApprovalEntryCard(model: model, request: r)
-                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
+                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
         } else {
             EntryRow(entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn) {
                 model.shell.launcher.entry("connections")?.run()
             }
             .equatable()
             // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
-            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: 6)))
+            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
         }
     }
 
@@ -137,7 +139,7 @@ struct Thinking: View {
             Text("Thinking…").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
             TimelineView(.periodic(from: since, by: 1)) { ctx in
                 Text(coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(since))))", "s"))
-                    .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2.opacity(0.7)).monospacedDigit()
+                    .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2).monospacedDigit()
             }
         }
         .padding(.vertical, Space.s1)
@@ -153,7 +155,7 @@ struct EntryRow: View, Equatable {
     let entry: TranscriptEntry
     var harness = "claude"
     var runner = ""
-    var turn: Int?
+    var turn: ConversationWords.Turn?
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
     @State private var expanded = false
@@ -202,7 +204,10 @@ struct EntryRow: View, Equatable {
             EditCard(name: name, path: path, old: old, new: new, ok: ok, ms: ms, expanded: $expanded)
         case .toolTodos(_, let items): TodoCard(items: items)
         case .turnEnded(let cost, let tokens):
-            line(ConversationWords.turn(turn, cost: cost, tokens: tokens)).help(AgentWords.exactCost(cost) ?? "")
+            line(ConversationWords.turn(turn, cost: cost))
+                .help(
+                    [tokens.map { "\(AgentWords.tokens($0)) tokens" }, AgentWords.exactCost(cost)].compactMap { $0 }
+                        .joined(separator: " · "))
         case .approvalRequest, .approvalDecided: EmptyView()  // drawn as one card by the transcript
         case .ended(let kind, let reason):
             line([ConversationWords.event(entry.kind, runner: runner) ?? ""])
@@ -278,7 +283,7 @@ struct ToolCard: View {
             if expanded {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     if !summary.isEmpty {
-                        Text("$ " + summary).coreFont(size: MacTextSize.meta + 1, design: .monospaced)
+                        Text("$ " + summary).coreFont(size: MacTextSize.meta, design: .monospaced)
                             .foregroundStyle(palette.text)
                     }
                     if !output.isEmpty { FoldedOutput(text: output) }

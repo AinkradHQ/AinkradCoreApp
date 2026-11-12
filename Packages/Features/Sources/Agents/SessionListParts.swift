@@ -112,7 +112,7 @@ struct SessionRow: View {
         HStack(spacing: Space.s3) {
             Image(systemName: AgentsModel.harnessSymbol(session.harness))
                 .coreFont(size: MacTextSize.meta, weight: .semibold)
-                .foregroundStyle(.white).frame(width: MacSize.controlSm, height: MacSize.controlSm)
+                .foregroundStyle(palette.btnInk).frame(width: MacSize.controlSm, height: MacSize.controlSm)
                 .background(hue, in: coreShape(Radius.chip)).accessibilityHidden(true)
             HStack(spacing: Space.s2) {
                 if pinned {

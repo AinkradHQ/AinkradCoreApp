@@ -36,10 +36,10 @@ struct ApprovalEntryCard: View {
                 chip(state)
             }
             if !request.input.isEmpty {
-                Text(PathWords.short(request.input)).coreFont(size: MacTextSize.meta + 1, design: .monospaced)
+                Text(PathWords.short(request.input)).coreFont(size: MacTextSize.meta, design: .monospaced)
                     .lineLimit(1)
                     .truncationMode(.tail).textSelection(.enabled)
-                    .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 + 2)
+                    .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.black.opacity(0.25), in: coreShape(Radius.control))
                     .help(request.input).agentCopyMenu(request.input)
@@ -70,7 +70,7 @@ struct ApprovalEntryCard: View {
             coreShape(Radius.cardMac).strokeBorder(
                 waiting ? GlassInk.amber.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
         }
-        .animation(reduce ? nil : .smooth(duration: 0.3), value: state)
+        .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 
     @ViewBuilder private func chip(_ state: ApprovalCardState) -> some View {
