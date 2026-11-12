@@ -6,28 +6,72 @@ import SwiftUI
 /// Blue carries identity, selection and every tile. `amber` is the single "needs you" state (attention, approval,
 /// warning). `green` and `red` mean ok and error, only ever on a status, never as a theme or a tint for a subject.
 public enum GlassInk {
-    public static let primary = Color.white
-    public static let secondary = Color.white.opacity(0.72)
-    public static let track = Color.white.opacity(0.24)
-    public static let well = Color.white.opacity(0.08)
-    public static let wellHover = Color.white.opacity(0.13)
-    /// Neutral edge: white 0.30, the least that reads 3:1 over the day glass (measured 2026-11-09).
-    public static let wellEdge = Color.white.opacity(0.3)
+    // Night is the deep-blue glass with white ink; day is light glass with dark ink (Ahmed, 2026-11-12: the approved
+    // day mockups, `tf.css` [data-theme=day]). Every token resolves against the appearance it is drawn in, so a subtree
+    // forced dark (the terminal) keeps the night values.
+    public static let primary = adaptive(.white, day: dayInk)
+    public static let secondary = adaptive(.white.opacity(0.72), day: dayInk.opacity(0.68))
+    public static let track = adaptive(.white.opacity(0.24), day: dayInk.opacity(0.14))
+    public static let well = adaptive(.white.opacity(0.08), day: .white.opacity(0.55))
+    public static let wellHover = adaptive(.white.opacity(0.13), day: .white.opacity(0.75))
+    /// Neutral edge: white 0.30 at night, the least that reads 3:1 over the glass (measured 2026-11-09); white 0.7 by day.
+    public static let wellEdge = adaptive(.white.opacity(0.3), day: .white.opacity(0.7))
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
-    public static let blue = Color(red: 0.25, green: 0.6, blue: 1)
+    public static let blue = adaptive(
+        Color(red: 0.25, green: 0.6, blue: 1), day: Color(red: 0.122, green: 0.42, blue: 0.878))
     /// Needs you: the one warm hue. Attention, approval waiting, a warning. Never decoration.
     public static let amber = Color(red: 1, green: 0.62, blue: 0.1)
-    /// Status only: ok. Muted use, on a state badge, meter or dot.
-    public static let green = Color(red: 0.2, green: 0.85, blue: 0.45)
+    /// Status only: ok. Muted use, on a state badge, meter or dot. Darker by day so it reads as text on light glass.
+    public static let green = adaptive(
+        Color(red: 0.2, green: 0.85, blue: 0.45), day: Color(red: 0.09, green: 0.5, blue: 0.23))
     /// Status only: error or a destructive action.
-    public static let red = Color(red: 1, green: 0.38, blue: 0.4)
-    // The same hues as TEXT: lighter, so red, amber and the blue link read 4.5:1 or better on the day glass (measured
-    // 2026-11-09: 3.05 to 4.34 before). Fills, tiles and bars keep the hues above.
-    public static let blueInk = Color(red: 0.52, green: 0.76, blue: 1)
-    public static let amberInk = Color(red: 1, green: 0.70, blue: 0.30)
-    public static let redInk = Color(red: 1, green: 0.64, blue: 0.62)
+    public static let red = adaptive(
+        Color(red: 1, green: 0.38, blue: 0.4), day: Color(red: 0.9, green: 0.2, blue: 0.165))
+    // The same hues as TEXT: lighter at night, darker by day, so red, amber and the blue link read 4.5:1 or better on
+    // the glass. Fills, tiles and bars keep the hues above.
+    public static let blueInk = adaptive(
+        Color(red: 0.52, green: 0.76, blue: 1), day: Color(red: 0.102, green: 0.361, blue: 0.776))
+    public static let amberInk = adaptive(
+        Color(red: 1, green: 0.70, blue: 0.30), day: Color(red: 0.64, green: 0.345, blue: 0))
+    public static let redInk = adaptive(
+        Color(red: 1, green: 0.64, blue: 0.62), day: Color(red: 0.784, green: 0.149, blue: 0.11))
 
-    /// The text colour for a fill hue: red, amber and blue have lighter inks that pass contrast; slate reads as secondary
+    /// Day: the mockups' pale veil over the sky, so dark ink reads on it (`tf.css` --veil).
+    public static let daySkyVeil = Color(red: 232 / 255, green: 241 / 255, blue: 251 / 255).opacity(0.45)
+    /// Day ink: `#0F172A`.
+    static let dayInk = Color(red: 15 / 255, green: 23 / 255, blue: 42 / 255)
+
+    /// A lift on the glass (selection, hover, keycaps, counts): white `o` at night; by day the stronger white that reads
+    /// over pale glass (the mockups' wells are 0.55 to 0.75); zero stays zero.
+    public static func lift(_ o: Double) -> Color {
+        adaptive(.white.opacity(o), day: .white.opacity(min(0.95, o * 5)))
+    }
+    /// A light edge: white `o` at night; by day the bright rim the mockups draw (0.7 to 0.9).
+    public static func rim(_ o: Double) -> Color {
+        adaptive(.white.opacity(o), day: .white.opacity(o <= 0 ? 0 : min(0.95, 0.5 + o)))
+    }
+    /// A recessed well (code, logs, quoted values): black `o` at night; by day a faint ink tint on the light glass.
+    public static func sunk(_ o: Double) -> Color { adaptive(.black.opacity(o), day: dayInk.opacity(0.05)) }
+    /// A drop shadow: black `o` at night; by day a soft blue shade at half the weight (`ds.css` --shade).
+    public static func shade(_ o: Double) -> Color {
+        adaptive(.black.opacity(o), day: Color(red: 40 / 255, green: 80 / 255, blue: 140 / 255).opacity(o * 0.5))
+    }
+
+    /// One colour for night and one for day, picked by the appearance the view is drawn in (NSApp holds Day/Night).
+    public static func adaptive(_ night: Color, day: Color) -> Color {
+        #if canImport(AppKit)
+        let n = NSColor(night)
+        let d = NSColor(day)
+        return Color(
+            nsColor: NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? n : d })
+        #else
+        let n = UIColor(night)
+        let d = UIColor(day)
+        return Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? n : d })
+        #endif
+    }
+
+    /// The text colour for a fill hue: red, amber and blue have inks that pass contrast; slate reads as secondary
     /// text; any other hue keeps its colour.
     public static func ink(_ hue: Color) -> Color {
         hue == red ? redInk : hue == amber ? amberInk : hue == blue ? blueInk : hue == slate ? secondary : hue
@@ -314,8 +358,8 @@ private struct ScrollThumb: View {
             let travel = metrics.visible - height
             let progress = min(max(metrics.offset / (metrics.content - metrics.visible), 0), 1)
             coreShape(2.5)
-                .fill(.white.opacity(hovering ? 0.55 : 0.38))
-                .overlay { coreShape(2.5).strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
+                .fill(GlassInk.primary.opacity(hovering ? 0.55 : 0.38))
+                .overlay { coreShape(2.5).strokeBorder(GlassInk.rim(0.25), lineWidth: 0.5) }
                 .frame(width: hovering ? 8 : 5, height: height)
                 .offset(y: travel * progress)
                 .padding(.trailing, 3)

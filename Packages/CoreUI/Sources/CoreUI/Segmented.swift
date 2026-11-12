@@ -92,11 +92,14 @@ private struct Segment<ID: Hashable & Sendable>: View {
                 }
                 Text(segment.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
             }
-            .foregroundStyle(.white.opacity(selected || hovering ? 1 : 0.8))
+            .foregroundStyle((selected ? Color.white : GlassInk.primary).opacity(selected || hovering ? 1 : 0.8))
             .padding(.horizontal, Space.s3)
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
-                coreShape(Radius.control).fill(hovering ? GlassInk.slate.opacity(0.28) : GlassInk.well)
+                coreShape(Radius.control).fill(
+                    hovering
+                        ? GlassInk.adaptive(GlassInk.slate.opacity(0.28), day: .white.opacity(0.85))
+                        : selected && palette.isDay ? .clear : GlassInk.well)
             }
             .background {
                 // The parent's animation glides the highlight between segments. Reduce Motion: it jumps and its colour fades.
@@ -109,7 +112,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
             }
             .overlay {
                 coreShape(Radius.control).strokeBorder(
-                    .white.opacity(selected || hovering ? 0.45 : 0.3), lineWidth: 1)
+                    GlassInk.rim(selected || hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
@@ -161,14 +164,14 @@ public struct GlassToggleTile: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                     if let sub {
-                        Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(.white.opacity(0.7))
+                        Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.primary.opacity(0.7))
                             .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if fill { Spacer(minLength: Space.s2) }
                 knob
             }
-            .foregroundStyle(.white.opacity(isOn || hovering ? 1 : 0.8))
+            .foregroundStyle(GlassInk.primary.opacity(isOn || hovering ? 1 : 0.8))
             .padding(.horizontal, Space.s3).padding(.vertical, sub == nil ? 0 : Space.s3)
             .frame(maxWidth: fill ? .infinity : nil, minHeight: MacSize.controlMd + 4)
             .background {
@@ -176,7 +179,7 @@ public struct GlassToggleTile: View {
                     .fill(hovering ? GlassInk.wellHover : GlassInk.well)  // neutral well: the switch carries "on"
             }
             .overlay {
-                coreShape(Radius.control).strokeBorder(.white.opacity(hovering ? 0.45 : 0.3), lineWidth: 1)
+                coreShape(Radius.control).strokeBorder(GlassInk.rim(hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
@@ -192,12 +195,14 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(5).fill(isOn ? GlassInk.blue : .white.opacity(0.18))
-            .frame(width: 30, height: 18)
-            .overlay(alignment: isOn ? .trailing : .leading) {
-                coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)
-                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
-            }
-            .accessibilityHidden(true)
+        coreShape(5).fill(
+            isOn ? GlassInk.blue : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
+        )
+        .frame(width: 30, height: 18)
+        .overlay(alignment: isOn ? .trailing : .leading) {
+            coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)
+                .shadow(color: GlassInk.shade(0.25), radius: 2, y: 1)
+        }
+        .accessibilityHidden(true)
     }
 }

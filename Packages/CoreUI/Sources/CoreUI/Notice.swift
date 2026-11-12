@@ -48,8 +48,15 @@ public struct CoreNotice<Action: View>: View {
             action
         }
         .padding(Space.s3)
-        .background(c.ink.opacity(0.14), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.35), lineWidth: 1) }
+        // Day: a neutral notice is a glass well (the mockups' .notice); a toned one takes its light chip tint.
+        .background(
+            !palette.isDay ? c.ink.opacity(0.14) : tone == .queue ? GlassInk.well : c.fill,
+            in: coreShape(Radius.cardMac)
+        )
+        .overlay {
+            coreShape(Radius.cardMac).strokeBorder(
+                palette.isDay && tone == .queue ? GlassInk.wellEdge : c.ink.opacity(0.35), lineWidth: 1)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(text.isEmpty ? title : "\(title). \(text)")
     }
@@ -84,7 +91,7 @@ public struct CoreDialogPanel<Content: View>: View {
         .coreFont(size: MacTextSize.body)
         .corePanel(radius: Radius.panel, padding: Space.s6)
         .frame(width: width)
-        .shadow(color: .black.opacity(0.3), radius: 34, y: 14)
+        .shadow(color: GlassInk.shade(0.3), radius: 34, y: 14)
         .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)

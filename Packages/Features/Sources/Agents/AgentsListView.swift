@@ -99,7 +99,7 @@ struct AgentsListView: View {
                     }
                     .accessibilityLabel("Search AI sessions")
                 Text("⌘F").coreFont(size: 10, weight: .medium).padding(.horizontal, 5)
-                    .background(.white.opacity(0.14), in: coreShape(4)).foregroundStyle(GlassInk.secondary)
+                    .background(GlassInk.lift(0.14), in: coreShape(4)).foregroundStyle(GlassInk.secondary)
             }
             .coreFont(size: MacTextSize.body).padding(.horizontal, Space.s3).frame(height: 34)
             .background(GlassInk.well, in: coreShape(Radius.control))

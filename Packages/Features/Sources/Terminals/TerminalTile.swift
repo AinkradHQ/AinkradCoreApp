@@ -68,7 +68,7 @@ struct TerminalTile: View {
         )
         .overlay {
             coreShape(Radius.cardMac).strokeBorder(
-                selected ? accent.opacity(0.7) : hovering ? .white.opacity(0.26) : GlassInk.wellEdge,
+                selected ? accent.opacity(0.7) : hovering ? GlassInk.rim(0.26) : GlassInk.wellEdge,
                 lineWidth: selected ? 1.5 : 1)
         }
         .opacity(item.isEnded ? 0.7 : 1)

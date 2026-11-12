@@ -266,7 +266,7 @@ struct StepUpSheet: View {
         .padding(Space.s6)
         .frame(width: Space.s8 * 13)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0)
-        .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
+        .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         // No fade or scale on the way in: Apple's Touch ID view cancels while it is see-through or still sizing.
         .onAppear {
             ripple = true

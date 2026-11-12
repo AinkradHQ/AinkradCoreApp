@@ -283,7 +283,7 @@ private struct PaneTab: View {
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
         .background {
             if on {
-                coreShape(Radius.control).fill(.white.opacity(0.14))
+                coreShape(Radius.control).fill(GlassInk.lift(0.14))
                     .matchedGeometryEffect(id: "on", in: indicator)
             }
         }
@@ -391,7 +391,7 @@ private struct PaneHost: View {
         }
         .overlay(alignment: .top) {
             if canDrag && (dragging || (hovering && !scrolling)) {
-                coreShape(2.5).fill(.white.opacity(gripHover ? 0.75 : 0.4))
+                coreShape(2.5).fill(GlassInk.primary.opacity(gripHover ? 0.75 : 0.4))
                     .frame(width: gripHover ? 64 : 44, height: 5)
                     .padding(.vertical, 6).padding(.horizontal, 24)
                     .contentShape(Rectangle())

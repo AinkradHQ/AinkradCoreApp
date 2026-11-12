@@ -127,9 +127,9 @@ private struct FieldSurface: ViewModifier {
 
     @ViewBuilder private func fill(lit: Bool) -> some View {
         if palette.isDay {
-            // Day: a darker well over the deep glass (white 0.12 to 0.2), so white text and the placeholder read 4.5:1 or
-            // better and the field reads as an input, not a disabled value (Phase 0, 2026-11-09).
-            coreShape(radius).fill(.white.opacity(focused ? 0.2 : lit ? 0.16 : 0.12))
+            // Day: fields are glass (night = wells, day = glass): the mockups' white field (`tf.css` --field 0.7) under
+            // dark ink, brighter when hovered or focused.
+            coreShape(radius).fill(.white.opacity(focused ? 0.9 : lit ? 0.8 : 0.7))
         } else {
             coreShape(radius).fill(focused || lit ? GlassInk.wellHover : GlassInk.well)
         }
@@ -138,8 +138,8 @@ private struct FieldSurface: ViewModifier {
     private var edge: AnyShapeStyle {
         if error { return AnyShapeStyle(palette.tone(.fail).ink) }
         if palette.isDay {
-            let rest = palette.increased ? 0.7 : 0.45
-            return AnyShapeStyle(Color.white.opacity(focused ? 0.8 : hovering || forced == .hover ? rest + 0.1 : rest))
+            if palette.increased { return AnyShapeStyle(GlassInk.dayInk.opacity(focused ? 0.5 : 0.35)) }
+            return AnyShapeStyle(Color.white.opacity(focused || hovering || forced == .hover ? 1 : 0.9))
         }
         // Night keeps its first well and edge.
         return AnyShapeStyle(focused ? Color.white.opacity(0.3) : Color.white.opacity(palette.increased ? 0.4 : 0.14))

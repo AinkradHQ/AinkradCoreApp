@@ -40,7 +40,7 @@ struct ApprovalEntryCard: View {
                         .truncationMode(.tail).textSelection(.enabled)
                         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 + 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.black.opacity(0.25), in: coreShape(Radius.control))
+                        .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
                         .help(request.input).agentCopyMenu(request.input)
                 }
                 if waiting {

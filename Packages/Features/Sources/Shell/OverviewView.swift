@@ -36,7 +36,7 @@ struct OverviewView: View {
         .padding(Space.s6)
         .frame(maxWidth: Space.s8 * 34)
         .corePanel(radius: Radius.panel + Space.s1, padding: 0, part: .popups)
-        .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
+        .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         .coreScaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
         .animation(Motion.out(Motion.ui), value: shown)
         .animation(.spring(duration: 0.25), value: selected)
@@ -62,7 +62,7 @@ struct OverviewView: View {
                 Spacer()
                 if index < 9 {
                     Text("\(index + 1)").coreFont(size: MacTextSize.meta, weight: .bold, design: .rounded)
-                        .frame(width: 22, height: 22).background(.white.opacity(0.14), in: coreShape(6))
+                        .frame(width: 22, height: 22).background(GlassInk.lift(0.14), in: coreShape(6))
                 }
             }
             VStack(alignment: .leading, spacing: 2) {

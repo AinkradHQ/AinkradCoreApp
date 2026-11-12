@@ -263,8 +263,8 @@ private struct LauncherItem: View {
             // One highlight that glides between rows (`shell-fx.css` .l-glide), not a background swapped per row.
             .background {
                 if selected {
-                    coreShape(Radius.row).fill(.white.opacity(0.18))
-                        .overlay { coreShape(Radius.row).strokeBorder(.white.opacity(0.3), lineWidth: 1) }
+                    coreShape(Radius.row).fill(GlassInk.lift(0.18))
+                        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.rim(0.3), lineWidth: 1) }
                         .matchedGeometryEffect(id: "selection", in: glide)
                 }
             }

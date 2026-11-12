@@ -100,7 +100,7 @@ struct NewTerminalView: View {
             BlinkingCursor()
         }
         .padding(Space.s3)
-        .background(Color.black.opacity(0.35), in: coreShape(Radius.row))
+        .background(GlassInk.sunk(0.35), in: coreShape(Radius.row))
         .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(

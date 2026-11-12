@@ -447,12 +447,14 @@ private struct RunnerBackTile: View {
     @State private var hovering = false
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.backward").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
-                .offset(x: hovering ? -2 : 0)
-                .frame(width: 36, height: 56)
-                .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(10))
-                .overlay { coreShape(10).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-                .contentShape(coreShape(10))
+            Image(systemName: "chevron.backward").font(.system(size: 15, weight: .bold)).foregroundStyle(
+                GlassInk.primary
+            )
+            .offset(x: hovering ? -2 : 0)
+            .frame(width: 36, height: 56)
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(10))
+            .overlay { coreShape(10).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .contentShape(coreShape(10))
         }
         .buttonStyle(.plain)
         .focusable(false)

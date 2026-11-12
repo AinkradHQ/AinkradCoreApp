@@ -17,6 +17,7 @@ struct SetupWizardView: View {
         ZStack {
             Color.clear.overlay {
                 Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
+                    .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
             }
             .clipped().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s4) {

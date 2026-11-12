@@ -147,7 +147,7 @@ struct SessionRow: View {
             HStack(spacing: 4) {
                 Text(t)
                 Text(key).coreFont(size: 9, weight: .medium).padding(.horizontal, 4)
-                    .background(.white.opacity(0.16), in: coreShape(3))
+                    .background(GlassInk.lift(0.16), in: coreShape(3))
             }
             .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s2).frame(height: 22)
             .background(GlassInk.well, in: coreShape(5))

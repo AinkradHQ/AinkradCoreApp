@@ -117,7 +117,7 @@ struct AddWizardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button("Copy") { copy(text) }.buttonStyle(.coreSecondary)
         }
-        .padding(Space.s3).background(.black.opacity(0.25), in: coreShape(Radius.control))
+        .padding(Space.s3).background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
     }
 
     private func copy(_ text: String) {
@@ -447,7 +447,7 @@ struct AddWizardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(copied ? "Copied" : "Copy", action: copy).buttonStyle(.coreSecondary)
         }
-        .padding(Space.s3).background(.black.opacity(0.25), in: coreShape(Radius.control))
+        .padding(Space.s3).background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
         .accessibilityHint("The command has a one-time secret; the copy is cleared after a minute.")
     }
 

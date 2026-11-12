@@ -118,7 +118,7 @@ struct ActivityRowView: View {
             )
             .overlay {
                 coreShape(Radius.cardMac).strokeBorder(
-                    selected ? Color.white.opacity(0.28) : GlassInk.wellEdge, lineWidth: 1)
+                    selected ? GlassInk.rim(0.28) : GlassInk.wellEdge, lineWidth: 1)
             }
             .contentShape(coreShape(Radius.cardMac))
         }
