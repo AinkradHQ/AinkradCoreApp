@@ -86,9 +86,9 @@ import Testing
         let m = make(box)
         await m.create(name: "linux-runner")
         box.status = "approved"
-        box.names = ["old", "Oracle VPS"]
+        box.names = ["old", "Cloud box"]
         await m.poll()
-        #expect(m.phase == .connected("Oracle VPS"))
+        #expect(m.phase == .connected("Cloud box"))
     }
 
     @Test func withdrawTakesItBack() async {

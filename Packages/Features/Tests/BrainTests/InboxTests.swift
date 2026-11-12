@@ -43,7 +43,7 @@ struct InboxTests {
         let (m, _, _) = await make()
         #expect(await m.reject("c2") == .done)
         #expect(m.inboxState.count(.waiting) == 2)
-        m.view("automotive-ai")
+        m.view("globex")
         await m.loadInbox()
         #expect(m.inboxState.count(.blocked) == 1 && m.inboxState.count(.waiting) == 1)
         m.inboxState.list = .blocked
@@ -53,7 +53,7 @@ struct InboxTests {
     }
 
     @Test func keepingALowerSourceOverAHigherOneAsksTouchID() async {
-        let (m, host, _) = await make(room: "workan-space")
+        let (m, host, _) = await make(room: "acme-shop")
         host.declines = true
         #expect(await m.keep("k1", .second) == .cancelled)  // team member over project owner
         #expect(m.inboxState.count(.conflicts) == 1 && host.reasons.count == 1)
@@ -93,15 +93,15 @@ struct InboxTests {
         let (m, _, _) = await make()
         m.inboxState.selected = ["u1"]
         _ = await m.approve("c1")
-        m.view("voutra")
+        m.view("initech")
         let s = m.inboxState
         #expect(s.data == nil && s.captures.isEmpty && s.done.isEmpty && s.selected.isEmpty && s.phase == .idle)
         await m.loadInbox()
-        #expect(s.data?.room == "voutra" && s.count(.waiting) == 0)
+        #expect(s.data?.room == "initech" && s.count(.waiting) == 0)
     }
 
     @Test func aSealedRoomShowsNothingButTheNoRoomListStillWorks() async {
-        let (m, _, _) = await make(room: "althaqeel")
+        let (m, _, _) = await make(room: "umbrella")
         #expect(m.inboxState.data == nil && m.inboxState.phase == .ready)
         #expect(m.inboxState.captures.count == 4)
         #expect(m.viewingLock == .sealed)
@@ -152,7 +152,7 @@ struct InboxTests {
         let texts = m.bellTexts + NeedKind.allCases0.map { BrainWords.push(kind: $0, n: 2) }
         for t in texts { for bad in titles { #expect(!t.localizedCaseInsensitiveContains(bad), "\(t)") } }
         #expect(m.bellTexts.contains("3 memories wait in Ainkrad"))
-        #expect(m.bellTexts.contains("1 note was blocked in AutomotiveAi"))
+        #expect(m.bellTexts.contains("1 note was blocked in Globex"))
         #expect(BrainWords.push(kind: .waiting, n: 3) == "3 memories wait in a room")
     }
 }
@@ -167,7 +167,7 @@ extension BrainModel {
         let host = self.host as? FakeHost
         let before = host?.reasons.count ?? 0
         host?.declines = true
-        view("automotive-ai")
+        view("globex")
         await loadInbox()
         _ = await discard(id)
         host?.declines = false

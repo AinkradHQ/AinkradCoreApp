@@ -40,7 +40,7 @@ public final class BrainDemo {
             for r in model.rooms { await c.loadPolicy(r.id) }
             if scene == "m3-edit", let first = c.items.first { c.startEdit(first.id) }
         case "m3-rules", "m3-local", "m3-room-queued":
-            let id = scene == "m3-rules" ? "core" : scene == "m3-local" ? "workan-space" : "personal"
+            let id = scene == "m3-rules" ? "core" : scene == "m3-local" ? "acme-shop" : "personal"
             model.show(.rooms)
             model.view(id)
             await model.inspect(id)
@@ -51,7 +51,7 @@ public final class BrainDemo {
             await model.sync?.reload()
             await c.loadRunners()
             if scene == "m3-runner-on" {
-                await c.toggleRunner("vps-1")
+                await c.toggleRunner("build-box")
                 BrainSheets.runnerHistory(model)
             }
         }
@@ -107,13 +107,13 @@ public final class BrainDemo {
         case "sources": model.show(.sources)
         case "room":
             model.show(.rooms)
-            await model.inspect("workan-space")
+            await model.inspect("acme-shop")
         case "new-room":
             model.show(.rooms)
             BrainSheets.openNewRoom(model)
         case "sealed":
             model.show(.overview)
-            model.view("althaqeel")
+            model.view("umbrella")
         case "inbox": model.show(.inbox)
         case "activity", "activity-empty", "activity-error": model.show(.activity)
         case "activity-blocked":
@@ -140,14 +140,14 @@ public final class BrainDemo {
             await c.load()
             c.selectedID = "speed"
             Task { await c.run("speed") }
-        case "inbox-conflict": await inbox(.conflicts, room: "workan-space")
-        case "inbox-blocked": await inbox(.blocked, room: "automotive-ai")
+        case "inbox-conflict": await inbox(.conflicts, room: "acme-shop")
+        case "inbox-blocked": await inbox(.blocked, room: "globex")
         case "inbox-noroom": await inbox(.noRoom)
         case "inbox-assign":
             await inbox(.noRoom)
             BrainSheets.assign(model, ["u1"])
         case "inbox-empty", "inbox-error", "inbox-offline": await inbox(.waiting)
-        case "inbox-sealed": await inbox(.waiting, room: "althaqeel")
+        case "inbox-sealed": await inbox(.waiting, room: "umbrella")
         case "inbox-noroom-selected":
             await inbox(.noRoom)
             model.inboxState.selected = ["u1", "u2"]

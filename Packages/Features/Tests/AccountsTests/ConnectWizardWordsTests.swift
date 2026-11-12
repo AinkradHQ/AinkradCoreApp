@@ -12,11 +12,11 @@ struct ConnectWizardWordsTests {
     }
 
     @Test func theInstallLineSaysWhereAndHowFar() {
-        #expect(ConnectWizardWords.installing(on: "Oracle", percent: 64) == "Installing on Oracle · 64%")
+        #expect(ConnectWizardWords.installing(on: "Home server", percent: 64) == "Installing on Home server · 64%")
     }
 
     @Test func aProviderNoRunnerCanServeIsDimmed() {
-        #expect(ConnectWizardWords.offered(.ready(runner: "Oracle", runnerID: "r1"), installable: false))
+        #expect(ConnectWizardWords.offered(.ready(runner: "Home server", runnerID: "r1"), installable: false))
         #expect(ConnectWizardWords.offered(.notInstalled, installable: true))
         #expect(!ConnectWizardWords.offered(.notInstalled, installable: false))
         #expect(

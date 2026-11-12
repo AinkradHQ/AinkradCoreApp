@@ -22,7 +22,7 @@ extension SampleBrainService {
         r.found = 6
         r.stored = 4
         r.duplicate = 2
-        r.routed = [RoutedWire(room: "optimus", sources: 3)]
+        r.routed = [RoutedWire(room: "northwind", sources: 3)]
         r.unsorted = 1
         return r
     }
@@ -65,9 +65,9 @@ extension SampleBrainService {
                 id: 5, pattern: "*.pem, *.key", origin: "seed", locked: true, reason: "Keys are never read",
                 room: "ainkrad"),
             RuleWire(
-                id: 6, pattern: "~/Projects/Workan/**", action: "route", reason: "File new items here automatically",
-                room: "workan-space"),
-            RuleWire(id: 7, pattern: "**/contracts/**", reason: "Contracts are never read", room: "workan-space"),
+                id: 6, pattern: "~/Projects/Acme/**", action: "route", reason: "File new items here automatically",
+                room: "acme-shop"),
+            RuleWire(id: 7, pattern: "**/contracts/**", reason: "Contracts are never read", room: "acme-shop"),
         ].map {
             var r = $0
             if !r.locked { r.enabled = sampleRuleOn[r.id] ?? true }

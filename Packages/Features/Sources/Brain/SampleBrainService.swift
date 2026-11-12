@@ -53,7 +53,7 @@ public actor SampleBrainService: BrainService {
     public nonisolated let importRoutes: BrainRoutes?
     var scenario: Scenario
     private var list: [RoomSummary]
-    private var pausedRooms = ["automotive-ai", "optimus"]
+    private var pausedRooms = ["globex", "northwind"]
     // Activity and Checks (SampleBrainService+Activity.swift).
     var checkList: [CheckItem]
     var failing: Set<String> = []
@@ -127,13 +127,13 @@ public actor SampleBrainService: BrainService {
             rows.append(SyncRow(device: "MacBook (sample)", at: "1 min ago"))
             rows.append(SyncRow(device: "iPhone (sample)", at: "4 min ago"))
         }
-        if r.id == "workan-space", rows.count > 1 {
+        if r.id == "acme-shop", rows.count > 1 {
             rows[1] = SyncRow(device: "MacBook (sample)", at: "3 h ago", state: .lag, lag: "3 h")
         }
         let cost: RoomCost? =
             r.provider == .approvedCloud
             ? RoomCost(
-                month: r.id == "workan-space" ? 31.8 : 14.2, cap: 30,
+                month: r.id == "acme-shop" ? 31.8 : 14.2, cap: 30,
                 series: [1, 1.2, 0.8, 1.4, 1, 0.9, 1.3, 1.1, 0.7, 1.2, 1, 1.4, 0.9, 1.1]) : nil
         return RoomDetail(
             room: r, status: status, sync: rows, backup: r.provider == .local ? nil : "3 h ago", cost: cost)
@@ -247,17 +247,17 @@ public actor SampleBrainService: BrainService {
                 records: 14),
             room("personal", "Personal", .personal, .synced, .local, records: 240, sync: "now"),
             room(
-                "workan-space", "Workan space", .product, .synced, .approvedCloud, records: 820, conflicts: 1,
+                "acme-shop", "Acme Shop", .product, .synced, .approvedCloud, records: 820, conflicts: 1,
                 models: 2, lease: Lease(left: "5 h", fraction: 0.21, state: .expiring)),
-            room("voutra", "Voutra", .product, .synced, .local, records: 410),
+            room("initech", "Initech", .product, .synced, .local, records: 410),
             room(
-                "automotive-ai", "AutomotiveAi", .employer, .synced, .local, records: 1130, waiting: 1,
+                "globex", "Globex", .employer, .synced, .local, records: 1130, waiting: 1,
                 sync: "now"),
-            room("optimus", "Optimus", .employer, .synced, .local, records: 640, sync: "now"),
+            room("northwind", "Northwind", .employer, .synced, .local, records: 640, sync: "now"),
             RoomSummary(
-                id: "althaqeel", name: "Althaqeel", kind: .employer, mode: .synced, provider: .local,
+                id: "umbrella", name: "Umbrella", kind: .employer, mode: .synced, provider: .local,
                 mounted: false, lease: Lease(left: "expired", fraction: 0, state: .expired)),
-            room("ulynk", "Ulynk", .client, .synced, .local, records: 188, sync: "now"),
+            room("hooli", "Hooli", .client, .synced, .local, records: 188, sync: "now"),
         ]
     }
 

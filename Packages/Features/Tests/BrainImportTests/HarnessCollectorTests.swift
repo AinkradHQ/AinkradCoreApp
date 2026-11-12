@@ -25,7 +25,7 @@ func jsonl(_ lines: [String]) -> String { lines.joined(separator: "\n") }
         #"{"timestamp":"2026-09-15T10:00:02Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>cwd</environment_context>"}]}}"#,
         #"{"timestamp":"2026-09-15T10:00:03Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Fix the parser"}]}}"#,
         #"{"timestamp":"2026-09-15T10:00:04Z","type":"response_item","payload":{"type":"reasoning","summary":[]}}"#,
-        #"{"timestamp":"2026-09-15T10:00:05Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done, see KAN-12"}]}}"#,
+        #"{"timestamp":"2026-09-15T10:00:05Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done, see SHOP-12"}]}}"#,
         #"{"timestamp":"2026-09-15T10:00:06Z","type":"event_msg","payload":{"type":"token_count"}}"#,
     ])
 
@@ -36,7 +36,7 @@ func jsonl(_ lines: [String]) -> String { lines.joined(separator: "\n") }
         #expect(items.count == 1)
         let i = items[0]
         #expect(i.source_kind == "codex")
-        #expect(i.text == "User: Fix the parser\n\nAssistant: Done, see KAN-12")
+        #expect(i.text == "User: Fix the parser\n\nAssistant: Done, see SHOP-12")
         #expect(i.title == "Fix the parser" && i.project_hint == "/synthetic/work/alpha")
         #expect(i.started_at == "2026-09-15T10:00:00Z" && i.ended_at == "2026-09-15T10:00:06Z")
         #expect(report.found == 1 && report.items == 1 && report.skipped.isEmpty)

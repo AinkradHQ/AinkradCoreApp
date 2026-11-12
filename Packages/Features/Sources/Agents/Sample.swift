@@ -236,7 +236,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                 id: "d_mac", name: "mac-studio", online: true, load: 2, capacity: 4, drivers: ["agent", "process"]),
             RunnerInfo(
                 id: "d_lin", name: "linux-01", online: true, load: 2, capacity: 2, drivers: ["agent", "process"]),
-            RunnerInfo(id: "d_ora", name: "oracle-arm", online: true, load: 1, capacity: 2, drivers: ["agent"]),
+            RunnerInfo(id: "d_ora", name: "home-server", online: true, load: 1, capacity: 2, drivers: ["agent"]),
             RunnerInfo(id: "d_old", name: "build-box", online: false, load: 0, capacity: 2, drivers: []),
         ]
         func ago(_ s: Double) -> Date { now.addingTimeInterval(-s) }
@@ -290,7 +290,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
             }
             return out
         }
-        let prompt = EntryKind.user("Bootstrap Citadel on the new Core and open the PR against development.")
+        let prompt = EntryKind.user("Add a rate limit to the login endpoint and open the PR against development.")
         func ask(_ id: String, _ tool: String, _ input: String, secs: Int = 300) -> EntryKind {
             .approvalRequest(id: id, tool: tool, input: input, timeoutSecs: secs)
         }
@@ -301,7 +301,9 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         api.add(
             a1,
             entries: head(
-                "claude", "Bootstrap Citadel on the new Core and open the PR against development.\nUse the e2-14 plan.")
+                "claude",
+                "Add a rate limit to the login endpoint and open the PR against development.\nUse the login-limit plan."
+            )
                 // Two finished turns, so the "Turn N done · time · cost" line shows. Costs are the session's running
                 // total, as the Core sends them; the store turns them into each turn's own.
                 + work(6) + [
@@ -319,7 +321,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                         id: "g1", name: "github.create_pull_request", ok: false, exitCode: nil,
                         output: "Personal GitHub may only read.", durationMs: 200),
                     .assistant("Ready to push the branch. That leaves this machine, so I need your approval."),
-                    ask("req_push", "Bash", "git push -u origin feat/e2-14-citadel-bootstrap"),
+                    ask("req_push", "Bash", "git push -u origin feat/login-rate-limit"),
                 ], endsAt: ago(8))
         api.ledgerList[a1.id] = SessionLedger(
             costMicros: 3_910_000, tokens: 141_700, unpriced: false, account: "claude-api-metered",

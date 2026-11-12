@@ -51,9 +51,9 @@ struct SecretWordsTests {
         #expect(SecretWords.lastUsedShort(s, now: now) == "Yesterday")
         s.lastUsedAt = now.addingTimeInterval(-3 * 86_400)
         #expect(SecretWords.lastUsedShort(s, now: now) == "3 days ago")
-        #expect(SecretWords.lent(to: "Azure Dev", secondsLeft: 41 * 60) == "Lent to Azure Dev · 41 min left")
-        #expect(SecretWords.lent(to: "Azure Dev", secondsLeft: 40) == "Lent to Azure Dev · 40 s left")
-        #expect(SecretWords.lent(to: "Azure Dev", secondsLeft: 0) == "Back from Azure Dev")
+        #expect(SecretWords.lent(to: "Build box", secondsLeft: 41 * 60) == "Lent to Build box · 41 min left")
+        #expect(SecretWords.lent(to: "Build box", secondsLeft: 40) == "Lent to Build box · 40 s left")
+        #expect(SecretWords.lent(to: "Build box", secondsLeft: 0) == "Back from Build box")
         #expect(SecretWords.header(count: 6) == "6 · values never come back")
     }
 
@@ -90,15 +90,15 @@ struct SecretWordsTests {
 
     @Test func thePreviewSaysWhoGetsItAndHow() {
         #expect(
-            SecretWords.preview(delivery: "file", runners: ["Azure Dev"])
-                == "AI sessions on Azure Dev get it as a file only they can read.")
+            SecretWords.preview(delivery: "file", runners: ["Build box"])
+                == "AI sessions on Build box get it as a file only they can read.")
         #expect(SecretWords.preview(delivery: "env", runners: []).hasPrefix("No runner may use it yet"))
     }
 
     @Test func rowsTellWhoUsesItAndWhenItChanged() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         #expect(SecretWords.usedBy([]) == "No runner yet")
-        #expect(SecretWords.usedBy(["Oracle", "vps-1"]) == "Oracle, vps-1")
+        #expect(SecretWords.usedBy(["Home server", "build-box"]) == "Home server, build-box")
         #expect(SecretWords.changed(item(ago: 7200), now: now) == "Changed 2 h ago")
         #expect(SecretWords.changed(item(ago: 30), now: now) == "Changed just now")
         #expect(SecretWords.versions(item(version: 1)) == "First value")
@@ -115,8 +115,8 @@ struct SecretWordsTests {
     }
 
     @Test func theDeleteDialogSaysWhereItIsUsed() {
-        let line = SecretWords.usage(item(runners: ["r1"], version: 3), runnerNames: ["Oracle"])
-        #expect(line.contains("Used on 1 runner (Oracle)") && line.contains("Changed 2 times"))
+        let line = SecretWords.usage(item(runners: ["r1"], version: 3), runnerNames: ["Home server"])
+        #expect(line.contains("Used on 1 runner (Home server)") && line.contains("Changed 2 times"))
         #expect(SecretWords.usage(item(), runnerNames: []).hasPrefix("No runner may use it."))
     }
 

@@ -52,30 +52,30 @@ struct BrainModelTests {
 
     @Test func switchingRoomsClearsTheOldRoomsViewFirst() async {
         let (m, _) = await make()
-        await m.inspect("workan-space")
-        #expect(m.inspected?.room.id == "workan-space")
-        m.view("voutra")
+        await m.inspect("acme-shop")
+        #expect(m.inspected?.room.id == "acme-shop")
+        m.view("initech")
         #expect(m.inspected == nil && m.inspectingID == nil)
-        #expect(m.viewingID == "voutra")
+        #expect(m.viewingID == "initech")
     }
 
     @Test func inspectingAnotherRoomNeverKeepsTheFirst() async {
         let (m, _) = await make()
         await m.inspect("ainkrad")
-        let task = Task { await m.inspect("voutra") }
+        let task = Task { await m.inspect("initech") }
         await Task.yield()
         #expect(m.inspected == nil)  // cleared before the new answer arrives
         await task.value
-        #expect(m.inspected?.room.id == "voutra")
+        #expect(m.inspected?.room.id == "initech")
     }
 
     @Test func sealedRoomHasNoNumbersAndNoView() async {
         let (m, _) = await make()
-        let r = m.room("althaqeel")
+        let r = m.room("umbrella")
         #expect(r?.counts == nil && r?.lock == .sealed)
-        await m.inspect("althaqeel")
+        await m.inspect("umbrella")
         #expect(m.inspected == nil)
-        m.view("althaqeel")
+        m.view("umbrella")
         #expect(m.viewingLock?.sentence == "This room is sealed. Open it to see its memories.")
     }
 
@@ -91,32 +91,32 @@ struct BrainModelTests {
     @Test func openingAsksForTouchIDAndCancelledLeavesItSealed() async {
         let (m, host) = await make()
         host.declines = true
-        #expect(await m.open("althaqeel") == false)
-        #expect(m.room("althaqeel")?.mounted == false)
+        #expect(await m.open("umbrella") == false)
+        #expect(m.room("umbrella")?.mounted == false)
         host.declines = false
-        #expect(await m.open("althaqeel"))
-        #expect(m.room("althaqeel")?.mounted == true)
+        #expect(await m.open("umbrella"))
+        #expect(m.room("umbrella")?.mounted == true)
         #expect(host.reasons.count == 2)
     }
 
     @Test func countsNeverIncludeUnmountedRooms() async {
         let (m, _) = await make()
-        #expect(m.recordsPerRoom.contains { $0.room.id == "althaqeel" } == false)
+        #expect(m.recordsPerRoom.contains { $0.room.id == "umbrella" } == false)
         #expect(m.recordsPerRoom.count == m.mountedRooms.count)
         #expect(m.visibleNeeds.allSatisfy { n in n.room.map { m.room($0)?.mounted == true } ?? true })
-        await m.seal("automotive-ai")
+        await m.seal("globex")
         // its needs vanish with it: a count is data too
-        #expect(m.visibleNeeds.contains { $0.room == "automotive-ai" } == false)
-        #expect(m.recordsPerRoom.contains { $0.room.id == "automotive-ai" } == false)
+        #expect(m.visibleNeeds.contains { $0.room == "globex" } == false)
+        #expect(m.recordsPerRoom.contains { $0.room.id == "globex" } == false)
     }
 
     @Test func pausedIsOneSentenceAndClearingNeedsTouchID() async {
         let (m, host) = await make(.init(paused: true))
         #expect(m.health == .paused)
-        #expect(m.pausedNames == ["AutomotiveAi", "Optimus"])
+        #expect(m.pausedNames == ["Globex", "Northwind"])
         #expect(
             BrainWords.pausedLine(names: m.pausedNames)
-                == "Search is stopped for AutomotiveAi and Optimus. Other rooms keep working, each one alone.")
+                == "Search is stopped for Globex and Northwind. Other rooms keep working, each one alone.")
         host.declines = true
         #expect(await m.clearPaused() == false)
         #expect(m.health == .paused)
@@ -128,7 +128,7 @@ struct BrainModelTests {
     @Test func notificationTextCarriesNamesAndCountsOnly() async {
         let (m, _) = await make()
         #expect(m.bellTexts.contains("3 memories wait in Ainkrad"))
-        #expect(m.bellTexts.contains("1 conflict to settle in Workan space"))
+        #expect(m.bellTexts.contains("1 conflict to settle in Acme Shop"))
         #expect(m.bellTexts.contains("4 captures have no room yet"))
         #expect(BrainWords.push(kind: .waiting, n: 3) == "3 memories wait in a room")
         // nothing in any line comes from a record: sample titles all start with "Sample:"

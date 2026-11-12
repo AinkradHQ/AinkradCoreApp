@@ -191,9 +191,9 @@ struct HomePrefsTests {
         let d = suite()
         let p = UserProfile(defaults: d)
         #expect(!p.hasName)
-        p.set("  Ahmed \nsecond line")
-        #expect(p.name == "Ahmed")
-        #expect(UserProfile(defaults: d).name == "Ahmed")
+        p.set("  Sam \nsecond line")
+        #expect(p.name == "Sam")
+        #expect(UserProfile(defaults: d).name == "Sam")
         p.set(String(repeating: "x", count: 80))
         #expect(p.name.count == 40)
     }

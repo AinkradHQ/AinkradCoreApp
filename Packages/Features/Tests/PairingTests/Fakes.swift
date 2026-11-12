@@ -56,7 +56,7 @@ final class FakeService: CoreService, @unchecked Sendable {
     func about() async throws -> CoreAbout {
         if let aboutError { throw aboutError }
         return CoreAbout(
-            server: "0.47.1", apiMajor: "v1", apiMinor: 47, build: "ab12cd3", device: "Ahmed's MacBook", scopes: scopes)
+            server: "0.47.1", apiMajor: "v1", apiMinor: 47, build: "ab12cd3", device: "Sam's MacBook", scopes: scopes)
     }
     func elevatedUntil() async -> Date? { elevated }
     func stepUp(reason: String) async throws -> Date {

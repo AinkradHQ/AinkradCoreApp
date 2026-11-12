@@ -130,7 +130,7 @@ struct SetupWizardView: View {
             title("What should we call you?")
             note("Home greets you with it. It stays on this Mac. You can change it later in Settings, Mac.")
             CoreTextField(
-                "Your name", placeholder: "Ahmed", text: $model.nameText, autofocus: true,
+                "Your name", placeholder: "Sam", text: $model.nameText, autofocus: true,
                 onSubmit: { model.finishName(save: true) })
             HStack {
                 Button("Not now") { model.finishName(save: false) }.coreGlassButton().coreShortcut(.cancel)

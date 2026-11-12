@@ -21,7 +21,7 @@ struct ConnectionChipTests {
     @Test func networkOnlyMattersWhenTheLinkIsDown() { #expect(of(.live, up: false) == .online) }
 
     @Test func words() {
-        #expect(ConnectionChipState.online.title(core: "core.ainkrad.io") == "core.ainkrad.io")
+        #expect(ConnectionChipState.online.title(core: "core.example.com") == "core.example.com")
         #expect(ConnectionChipState.reconnecting(attempt: 3).title(core: "x") == "Reconnecting… (try 3)")
         #expect(ConnectionChipState.noNetwork.title(core: "x") == "No network")
         #expect(ConnectionChipState.coreNotAnswering.title(core: "x") == "Core not answering · Retry")

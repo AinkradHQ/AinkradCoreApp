@@ -56,7 +56,7 @@ struct StepUpTestStore: KeyStore {
 
 @Suite struct PairingTests {
     @Test func theClaimCarriesTheMacsNameAndTheNameIsCleaned() async throws {
-        #expect(DevicePairing.clean("  Ahmed's MacBook Pro\n") == "Ahmed's MacBook Pro")
+        #expect(DevicePairing.clean("  Sam's MacBook Pro\n") == "Sam's MacBook Pro")
         #expect(DevicePairing.clean(String(repeating: "x", count: 100))?.count == 64)
         #expect(DevicePairing.clean("   ") == nil && DevicePairing.clean(nil) == nil)
         let core = FakeCore(clock: TestClock())

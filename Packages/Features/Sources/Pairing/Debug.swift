@@ -189,7 +189,7 @@ extension AppModel {
         shell.settings.hidden = []
         func about(_ scopes: [String]) -> CoreAbout {
             CoreAbout(
-                server: "0.47.1", apiMajor: "v1", apiMinor: 47, build: "3f9c2ab", device: "Ahmed's MacBook Pro",
+                server: "0.47.1", apiMajor: "v1", apiMinor: 47, build: "3f9c2ab", device: "Sam's MacBook Pro",
                 scopes: scopes)
         }
         switch scene {

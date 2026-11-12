@@ -184,12 +184,12 @@ extension SampleBrainService {
             2039, "12 min ago", "Claude Code (sample)", "Mac Studio", "Proposed a memory", "ainkrad", .ok, .changes,
             code: "memory.propose"),
         ev(
-            2038, "40 min ago", "Capture (sample)", "Mac Studio", "Saved a note", "automotive-ai", .blocked, .blocked,
+            2038, "40 min ago", "Capture (sample)", "Mac Studio", "Saved a note", "globex", .blocked, .blocked,
             code: "capture.save", reason: "A secret was found. Nothing was saved.",
             rule: BlockRule(
                 "secret_found", "Secret scanner", fix: "Remove the secret from the note and save again.")),
         ev(
-            2037, "1 h ago", "Cloud runner (sample)", "Runner", "Asked for context", "optimus", .blocked, .blocked,
+            2037, "1 h ago", "Cloud runner (sample)", "Runner", "Asked for context", "northwind", .blocked, .blocked,
             code: "context.request", reason: "This room is local only. Cloud AI sessions cannot read it.",
             rule: BlockRule(
                 "local_only", "Room is local only", fix: "Change the room to synced, or use a local model.")),
@@ -200,7 +200,7 @@ extension SampleBrainService {
         ev(2035, "2 h ago", "Sync", "iPhone", "Synced 6 changes", "ainkrad", .ok, .sync, code: "sync.push"),
         ev(2034, "3 h ago", "You", "Mac Studio", "Approved a memory", "ainkrad", .ok, .changes, code: "memory.approve"),
         ev(
-            2033, "3 h ago", "Sync", "MacBook", "Sync fell behind", "workan-space", .failed, .sync, code: "sync.fault",
+            2033, "3 h ago", "Sync", "MacBook", "Sync fell behind", "acme-shop", .failed, .sync, code: "sync.fault",
             reason: "The MacBook has not synced for 3 h."),
         ev(
             2032, "5 h ago", "Embedding (sample)", "Mac Studio", "Sent text to a cloud model", "ainkrad", .blocked,
@@ -208,7 +208,7 @@ extension SampleBrainService {
             rule: BlockRule(
                 "no_approval", "Provider rules", fix: "Approve the provider for this room, or use a local model.")),
         ev(
-            2031, "Yesterday", "You", "Mac Studio", "Changed storage mode", "ulynk", .ok, .changes,
+            2031, "Yesterday", "You", "Mac Studio", "Changed storage mode", "hooli", .ok, .changes,
             code: "room.mode.change"),
         ev(2030, "Yesterday", "Check", "Mac Studio", "Leakage check passed", nil, .ok, .access, code: "check.run"),
         ev(2029, "Yesterday", "You", "Mac Studio", "Revoked a device", "ainkrad", .ok, .changes, code: "device.revoke"),
@@ -217,17 +217,17 @@ extension SampleBrainService {
 
     static let older: [ActivityEvent] = [
         ev(
-            2027, "2 days ago", "You", "Mac Studio", "Approved a memory", "automotive-ai", .ok, .changes,
+            2027, "2 days ago", "You", "Mac Studio", "Approved a memory", "globex", .ok, .changes,
             code: "memory.approve"),
         ev(
             2026, "2 days ago", "Claude Code (sample)", "Mac Studio", "Searched", "ainkrad", .ok, .access,
             code: "memory.search"),
         ev(
-            2025, "3 days ago", "Cloud runner (sample)", "Runner", "Asked for context", "workan-space", .blocked,
+            2025, "3 days ago", "Cloud runner (sample)", "Runner", "Asked for context", "acme-shop", .blocked,
             .blocked, code: "context.request", reason: "The lease for this runner had expired.", rule: expiredRule),
-        ev(2024, "3 days ago", "Sync", "MacBook", "Synced 14 changes", "voutra", .ok, .sync, code: "sync.push"),
+        ev(2024, "3 days ago", "Sync", "MacBook", "Synced 14 changes", "initech", .ok, .sync, code: "sync.push"),
         ev(
-            2023, "4 days ago", "You", "Mac Studio", "Changed storage mode", "optimus", .ok, .changes,
+            2023, "4 days ago", "You", "Mac Studio", "Changed storage mode", "northwind", .ok, .changes,
             code: "room.mode.change"),
         ev(2022, "4 days ago", "Check", "Mac Studio", "Speed check passed", nil, .ok, .access, code: "check.run"),
         ev(
@@ -270,19 +270,19 @@ extension SampleBrainService {
             "eg-0399", "Yesterday", "ainkrad", .model, "Sample cloud model A", .approvedCloud, ["r2", "r4", "r5"],
             bytes: 4100, tin: 990, tout: 300, actor: "Claude Code (sample)", session: "sess-1a44", approval: "apr-p2"),
         call(
-            "eg-0410", "20 min ago", "workan-space", .model, "Sample cloud model A", .approvedCloud, ["r10"],
+            "eg-0410", "20 min ago", "acme-shop", .model, "Sample cloud model A", .approvedCloud, ["r10"],
             bytes: 2200, tin: 530, tout: 190, actor: "Cloud runner (sample)", session: "sess-c0de", approval: "apr-p2"),
         call(
-            "eg-0405", "3 h ago", "workan-space", .model, "Sample cloud model A", .approvedCloud, ["r11"],
+            "eg-0405", "3 h ago", "acme-shop", .model, "Sample cloud model A", .approvedCloud, ["r11"],
             block: .expired, actor: "Cloud runner (sample)", session: "sess-c0de", approval: "apr-p2"),
         call(
-            "eg-0407", "5 h ago", "automotive-ai", .embedding, "Sample cloud model B", .unapproved, ["r12"],
+            "eg-0407", "5 h ago", "globex", .embedding, "Sample cloud model B", .unapproved, ["r12"],
             block: .noApproval, actor: "Embedding (sample)", session: "job-77aa"),
         call(
-            "eg-0406", "5 h ago", "automotive-ai", .embedding, "Sample local model", .local, ["r12"], bytes: 700,
+            "eg-0406", "5 h ago", "globex", .embedding, "Sample local model", .local, ["r12"], bytes: 700,
             tin: 160, actor: "Embedding (sample)", session: "job-77ab"),
         call(
-            "eg-0403", "1 h ago", "optimus", .model, "Sample cloud model A", .approvedCloud, ["r13"],
+            "eg-0403", "1 h ago", "northwind", .model, "Sample cloud model A", .approvedCloud, ["r13"],
             block: .notListed, actor: "Cloud runner (sample)", session: "sess-bad1"),
     ]
 }

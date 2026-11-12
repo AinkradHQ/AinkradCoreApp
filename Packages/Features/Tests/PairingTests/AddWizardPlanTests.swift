@@ -29,8 +29,8 @@ struct AddWizardPlanTests {
         #expect(
             waiting.map(\.text) == ["Invite created · 15 minutes", "Waiting for the new device…", "Connection checked"])
         #expect(waiting.map(\.done) == [true, false, false])
-        let done = AddWizardWords.connectLines(invited: true, connected: "Azure Dev", checked: true)
-        #expect(done[1].text == "Azure Dev connected" && done.allSatisfy(\.done))
+        let done = AddWizardWords.connectLines(invited: true, connected: "Build box", checked: true)
+        #expect(done[1].text == "Build box connected" && done.allSatisfy(\.done))
     }
 
     @Test func onlyADeviceChoosesAccess() {

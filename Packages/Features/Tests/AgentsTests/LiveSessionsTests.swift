@@ -237,6 +237,6 @@ struct LiveSessionsTests {
     @Test func projectsAreNamedByTheirRepo() {
         #expect(LiveAgentsAPI.projectName("https://github.com/AinkradHQ/AinkradCore.git") == "AinkradCore")
         #expect(LiveAgentsAPI.projectName("git@github.com:AinkradHQ/AinkradCoreApp.git") == "AinkradCoreApp")
-        #expect(LiveAgentsAPI.projectName("/Users/me/code/workan-space/") == "workan-space")
+        #expect(LiveAgentsAPI.projectName("/Users/me/code/acme-shop/") == "acme-shop")
     }
 }
