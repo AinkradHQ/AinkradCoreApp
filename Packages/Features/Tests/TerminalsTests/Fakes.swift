@@ -59,6 +59,7 @@ final class FakeService: TerminalService, @unchecked Sendable {
     var attachResults: [Result<FakeLink, CoreError>] = []
     var createResult: Result<TerminalItem, CoreError> = .failure(.offline("x"))
     private(set) var attachAfters: [UInt64] = []
+    private(set) var attachRunners: [String?] = []
     private(set) var signals: [String] = []
     private(set) var closed: [String] = []
     private(set) var created: [(runner: String, program: String?)] = []
@@ -93,6 +94,10 @@ final class FakeService: TerminalService, @unchecked Sendable {
     func installTool(_ runner: String, tool: String) async throws -> String {
         lock.withLock { installed.append(tool) }
         return "op_1"
+    }
+    func attach(_ id: String, runner: String?, after: UInt64) async throws -> any TerminalLink {
+        lock.withLock { attachRunners.append(runner) }
+        return try await attach(id, after: after)
     }
     func attach(_ id: String, after: UInt64) async throws -> any TerminalLink {
         let r = lock.withLock { () -> Result<FakeLink, CoreError> in
