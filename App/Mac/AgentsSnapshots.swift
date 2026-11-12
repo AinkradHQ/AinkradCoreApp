@@ -14,7 +14,7 @@ enum AgentsSnapshots {
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
-        guard let window = NSApp.windows.first(where: { $0.title == "Ainkrad" }) else {
+        guard let window = await SnapshotCapture.mainWindow() else {
             return log("no main window")
         }
         let shell = app.shell
@@ -269,15 +269,7 @@ enum AgentsSnapshots {
     }
 
     private static func capture(_ window: NSWindow, to path: String) -> Bool {
-        guard
-            let image = CGWindowListCreateImage(
-                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
-                [.boundsIgnoreFraming, .nominalResolution])
-        else { return false }
-        guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
-            return false
-        }
-        return (try? png.write(to: URL(fileURLWithPath: path))) != nil
+        SnapshotCapture.png(window, to: path)
     }
 
     private static func log(_ s: String) { FileHandle.standardError.write(Data("SNAP \(s)\n".utf8)) }
