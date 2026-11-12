@@ -178,7 +178,7 @@ struct ActivityChecksTests {
         await m.checks.load()
         let c = m.checks!
         let t = Task { await c.run("speed") }
-        try? await Task.sleep(for: .milliseconds(100))
+        #expect(await until { c.anyRunning })
         #expect(c.anyRunning && c.state(c.items.first { $0.id == "speed" }!) == .running)
         await t.value
         #expect(!c.anyRunning)

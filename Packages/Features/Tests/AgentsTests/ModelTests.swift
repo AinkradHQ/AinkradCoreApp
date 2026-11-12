@@ -41,6 +41,7 @@ struct ModelTests {
         let defaults = UserDefaults(suiteName: "agents-tests-\(UUID())")!
         let m = AgentsModel(shell: ShellModel(), notifier: notifier, defaults: defaults, host: host)
         m.attach(api)
+        await m.firstLoad?.value  // attach's own load finishes first, so it cannot overlap the test's calls
         await m.reloadAll()
         return (m, api, host, notifier)
     }
@@ -158,7 +159,7 @@ struct ModelTests {
         let (m, api, _, _) = await make()
         let id = "as_01JC4X7Q3MZ8N5V2K9R001"
         // The open transcript loads in the background; read its end only once it is there.
-        for _ in 0..<400 where (m.transcripts[id]?.lastSeq ?? 0) == 0 { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(await until { (m.transcripts[id]?.lastSeq ?? 0) > 0 })
         let before = m.transcripts[id]?.lastSeq ?? 0
         api.append(id, [.assistant("more")])
         await m.handle(.event(AgentEvent(kind: "agent.transcript", session: id, from: before + 1, to: before + 1)))
@@ -197,8 +198,8 @@ struct ModelTests {
         let sheet = try #require(m.shell.sheet)
         #expect(sheet.actions.map(\.label) == ["Keep running", "Cancel session"])
         sheet.actions[1].run()
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(api.calls.contains("cancel") && m.sessions.session(id)?.over == true)
+        #expect(await until { m.sessions.session(id)?.over == true })
+        #expect(api.calls.contains("cancel"))
     }
 
     @Test func aCancelTheAgentHasNotObeyedYetShowsAsCancellingAndCannotBeRepeated() async throws {
@@ -209,7 +210,8 @@ struct ModelTests {
         m.confirmCancel(id)
         try #require(m.shell.sheet).actions[1].run()
         #expect(m.stopping[id] == .cancelling, "shown at once, before the Core answers")
-        try await Task.sleep(for: .milliseconds(200))
+        #expect(await until { api.calls.contains("cancel") })
+        await m.reloadAll()  // the Core has answered the cancel and the list is read again
         #expect(api.calls.filter { $0 == "cancel" }.count == 1)
         #expect(
             m.sessions.session(id)?.live == true && m.stopping[id] == .cancelling, "still running: reads as cancelling")
@@ -236,8 +238,8 @@ struct ModelTests {
         let (m, api, host, _) = await make()
         m.resume("as_01JC4X7Q3MZ8N5V2K9R011")
         m.wake("as_01JC4X7Q3MZ8N5V2K9R006")
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(api.calls.contains("resume") && api.calls.contains("wake") && host?.asked.count == 2)
+        #expect(await until { api.calls.contains("resume") && api.calls.contains("wake") })
+        #expect(host?.asked.count == 2)
     }
 
     @Test func aLiveSessionTakesMessagesAndAFinishedOneDoesNot() async throws {
@@ -263,12 +265,12 @@ struct ModelTests {
         api.update(id) { $0.state = .running }
         await m.reloadAll()
         m.stopTurn(id)
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(api.calls.contains("stopTurn") && m.sessions.session(id)?.idle == true)
+        #expect(await until { m.sessions.session(id)?.idle == true })
+        #expect(api.calls.contains("stopTurn"))
         #expect(m.canWrite(m.sessions.session(id)!) && !m.canStopTurn(m.sessions.session(id)!))
         m.end(id)
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(api.calls.contains("end") && m.sessions.session(id)?.live == false)
+        #expect(await until { m.sessions.session(id)?.live == false })
+        #expect(api.calls.contains("end"))
     }
 
     @Test func aNewLiveSessionOpensWithNoPromptAndWaits() async throws {

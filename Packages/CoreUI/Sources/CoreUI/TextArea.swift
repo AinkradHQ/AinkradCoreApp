@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A text field of several lines: the same surface, label and error as `CoreTextField`. It grows with the text from
-/// `minHeight` up to `maxHeight`, then scrolls. `label: nil` when the form names the field elsewhere.
+/// `minHeight` up to `maxHeight`, then scrolls. `design: .monospaced` is for keys and PEM blocks. `label: nil` when the form names the field elsewhere.
 public struct CoreTextArea: View {
     let label: String?
     let placeholder: String
@@ -11,6 +11,7 @@ public struct CoreTextArea: View {
     let minHeight: CGFloat
     let maxHeight: CGFloat
     let autofocus: Bool
+    let design: Font.Design
     let focus: FocusState<Bool>.Binding?
     @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
@@ -20,8 +21,9 @@ public struct CoreTextArea: View {
     public init(
         _ label: String?, placeholder: String, text: Binding<String>, error: String? = nil,
         size: CGFloat = MacTextSize.body, minHeight: CGFloat = Space.s8 * 2, maxHeight: CGFloat = Space.s8 * 5,
-        autofocus: Bool = false, focus: FocusState<Bool>.Binding? = nil
+        autofocus: Bool = false, focus: FocusState<Bool>.Binding? = nil, design: Font.Design = .default
     ) {
+        self.design = design
         self.label = label
         self.placeholder = placeholder
         self._text = text
@@ -40,7 +42,7 @@ public struct CoreTextArea: View {
         VStack(alignment: .leading, spacing: Space.s1) {
             if let label { CoreFieldLabel(label) }
             TextEditor(text: $text)
-                .coreFont(size: size).scrollContentBackground(.hidden)
+                .coreFont(size: size, design: design).scrollContentBackground(.hidden)
                 .focused(focus ?? $focused).focusEffectDisabled()
                 .padding(.horizontal, Space.s2).padding(.vertical, Space.s2)
                 .frame(minHeight: minHeight, maxHeight: maxHeight)
@@ -48,7 +50,7 @@ public struct CoreTextArea: View {
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
                         // TextEditor has no placeholder; drawn where its first line sits.
-                        Text(placeholder).coreFont(size: size).foregroundStyle(palette.text2)
+                        Text(placeholder).coreFont(size: size, design: design).foregroundStyle(palette.text2)
                             .padding(.horizontal, Space.s2 + 5).padding(.vertical, Space.s2)
                             .allowsHitTesting(false).accessibilityHidden(true)
                     }
