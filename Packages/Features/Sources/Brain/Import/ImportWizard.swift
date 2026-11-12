@@ -8,7 +8,7 @@ extension BrainModel {
     public func openImport() {
         guard let routes = service?.importRoutes, setup == .ready || setup == .notSetUp else { return }
         if importer == nil || importer?.step == .done {
-            importer = ImportModel(host: host, routes: routes, sources: importSources())
+            importer = ImportModel(host: host, routes: routes, sources: importSources(), resume: .standard())
         }
         guard let importer else { return }
         let shell = host.shell

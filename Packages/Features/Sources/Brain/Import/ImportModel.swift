@@ -33,7 +33,9 @@ public final class ImportModel {
     public private(set) var counts = RunCounts()
     /// What the Mac itself skipped before sending, by reason code.
     public private(set) var localSkipped: [String: Int] = [:]
-    public private(set) var toSend = 0
+    /// Files and bytes done over total for the current source, from file attributes.
+    public private(set) var progress = StreamProgress()
+    public private(set) var itemsFound = 0
     public private(set) var secondsLeft: Int?
     public internal(set) var failure: String?
     public private(set) var result: CommitResult?
@@ -44,9 +46,13 @@ public final class ImportModel {
     @ObservationIgnored private let uploaded = Uploader.Progress()
     @ObservationIgnored private var collectedSources: Set<String> = []
     @ObservationIgnored private var started: Date?
+    @ObservationIgnored private var baseline: UInt64?
+    @ObservationIgnored private let resume: ResumeStore?
+    @ObservationIgnored private var resumeState = ResumeState()
 
     public init(
         host: any AdminHost, routes: BrainRoutes, sources: [any ImportSource], poll: Duration = .seconds(1),
+        resume: ResumeStore? = nil,
         pause: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(for: .seconds(Double(1 << $0))) }
     ) {
         self.host = host
@@ -54,6 +60,7 @@ public final class ImportModel {
         self.sources = Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0) })
         self.poll = poll
         self.pause = pause
+        self.resume = resume
         choices = sources.map { Choice(id: $0.id, title: $0.title) }
         review = ReviewModel(host: host, routes: routes)
     }
@@ -94,33 +101,28 @@ public final class ImportModel {
         failure = nil
         phase = .reading
         started = Date()
+        baseline = nil
         defer { job = nil }
         do {
-            let id: String
-            if let run {
-                id = run
-            } else {
-                id = try await routes.startRun(kind: "full", sources: chosen.map(\.id))
-                run = id
-            }
-            var collected: [(source: String, items: [ImportItem])] = []
+            let id = try await runID()
             localSkipped = [:]
-            for c in chosen {
-                guard let source = sources[c.id], !collectedSources.contains(c.id) else { continue }
-                let (items, report) = await source.collect()
-                for (k, n) in report.skipped { localSkipped[k, default: 0] += n }
-                collected.append((c.id, items))
-            }
-            toSend = collected.reduce(0) { $0 + $1.items.count }
+            itemsFound = 0
             phase = .uploading
             startPoller(run: id)
             let uploader = Uploader(transport: RoutesImportTransport(routes: routes), pause: pause)
-            for (source, items) in collected {
-                try await uploader.upload(items, run: id, progress: uploaded)
-                do { _ = try await routes.collected(run: id, source: source) } catch let e as BrainHTTPError
+            for c in chosen {
+                let sid = c.id
+                guard let source = sources[sid], !collectedSources.contains(sid) else { continue }
+                let report = try await source.stream(
+                    run: id, uploader: uploader, uploaded: uploaded, resume: resumeState.sources[sid] ?? .init(),
+                    save: { [weak self] s in self?.remember(sid, s) },
+                    onProgress: { [weak self] p in await self?.apply(p) })
+                for (k, n) in report.skipped { localSkipped[k, default: 0] += n }
+                itemsFound += report.items
+                do { _ = try await routes.collected(run: id, source: sid) } catch let e as BrainHTTPError
                     where e.status == 409
                 {}  // already reported by an earlier attempt
-                collectedSources.insert(source)
+                collectedSources.insert(sid)
             }
             stopPoller()
             phase = .discovering
@@ -133,6 +135,42 @@ public final class ImportModel {
             stopPoller()
             failure = BrainWords.failure(error)
         }
+    }
+
+    /// The run in hand, or the one saved on this Mac if the Core still knows it, or a new one.
+    private func runID() async throws -> String {
+        if let run { return run }
+        let ids = chosen.map(\.id)
+        if let saved = resume?.load(), let r = saved.run, Set(saved.sources.keys).isSubset(of: ids),
+            (try? await routes.run(r)) != nil
+        {
+            resumeState = saved
+            run = r
+            return r
+        }
+        let id = try await routes.startRun(kind: "full", sources: ids)
+        run = id
+        resumeState = ResumeState()
+        resumeState.run = id
+        resume?.save(resumeState)
+        return id
+    }
+
+    private nonisolated func remember(_ source: String, _ s: SourceResume) {
+        Task { @MainActor in
+            resumeState.sources[source] = s
+            resume?.save(resumeState)
+        }
+    }
+
+    func apply(_ p: StreamProgress) {
+        progress = p
+        let base = baseline ?? p.bytesDone
+        baseline = base
+        guard let started, p.bytesDone > base else { return }
+        let elapsed = Date().timeIntervalSince(started)
+        let rate = Double(p.bytesDone - base) / max(elapsed, 0.001)
+        secondsLeft = elapsed > 2 ? Int((Double(p.bytesTotal - p.bytesDone) / rate).rounded(.up)) : nil
     }
 
     private func startPoller(run: String) {
@@ -155,11 +193,6 @@ public final class ImportModel {
     func refresh(run: String) async -> RunView? {
         guard let v = try? await routes.run(run) else { return nil }
         counts = v.counts
-        if toSend > 0, counts.answered > 0, let started {
-            let elapsed = Date().timeIntervalSince(started)
-            let rate = Double(counts.answered) / max(elapsed, 0.001)
-            secondsLeft = elapsed > 2 ? Int((Double(max(toSend - counts.answered, 0)) / rate).rounded(.up)) : nil
-        }
         return v
     }
 
@@ -178,7 +211,7 @@ public final class ImportModel {
     public var fraction: Double {
         switch phase {
         case .reading: 0
-        case .uploading: toSend == 0 ? 0 : min(1, Double(counts.answered) / Double(toSend))
+        case .uploading: progress.bytesTotal == 0 ? 0 : min(1, Double(progress.bytesDone) / Double(progress.bytesTotal))
         case .discovering: 1
         }
     }
@@ -186,10 +219,13 @@ public final class ImportModel {
     /// The one live status line.
     public var statusLine: String {
         switch phase {
-        case .reading: return "Reading your sessions. Nothing has left this Mac yet."
+        case .reading: return "Reading your sessions."
         case .discovering: return "Sorting what was kept into rooms. This uses no model."
         case .uploading:
-            var s = "\(toSend) found, \(counts.stored) kept, \(counts.duplicate) already known"
+            var s = "File \(min(progress.filesDone + 1, max(progress.filesTotal, 1))) of \(progress.filesTotal), "
+            s += "\(ImportWords.bytes(progress.bytesDone)) of \(ImportWords.bytes(progress.bytesTotal))"
+            if !progress.current.isEmpty { s += " (\(ImportWords.shortName(progress.current)))" }
+            s += ". \(itemsFound) found, \(counts.stored) kept, \(counts.duplicate) already known"
             let skips = ImportWords.skips(merged(localSkipped, counts.skipped))
             let refused = counts.refused + counts.rejected
             if refused > 0 || !skips.isEmpty {
@@ -224,6 +260,7 @@ public final class ImportModel {
             ) { try await self.routes.commit(run: run) }
             result = r
             await review.refresh()
+            resume?.clear()
             step = .done
         } catch is AdminDeclined {
             step = .review
