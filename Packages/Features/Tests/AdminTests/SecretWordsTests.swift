@@ -19,6 +19,13 @@ struct SecretWordsTests {
         #expect(SecretWords.Kind.file.blurb.contains("1 MB") && SecretWords.fileLimit == 1_048_576)
     }
 
+    @Test func dialogTitlesKeepANameInOnePiece() {
+        #expect(SecretWords.unbroken("aws-prod") == "aws\u{2011}prod")
+        #expect(SecretWords.unbroken("my key") == "my\u{00A0}key")
+        let long = SecretWords.unbroken("abcdefghijklmnopqrstuvwxyz0123456789", max: 11)
+        #expect(long == "abcde…56789" && long.count == 11)
+    }
+
     @Test func rowsShowLastUsedAndUseCount() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         var s = item()
@@ -29,6 +36,25 @@ struct SecretWordsTests {
         s.kind = "file"
         s.fileName = "aws.json"
         #expect(SecretWords.sealed(s) == "aws.json · Sealed · 20 B")
+    }
+
+    @Test("the list's columns say the mockup's short words")
+    func listColumnsUseShortWords() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        var s = item()
+        #expect(SecretWords.lastUsedShort(s, now: now) == "Never")
+        s.lastUsedAt = now.addingTimeInterval(-30)
+        #expect(SecretWords.lastUsedShort(s, now: now) == "Just now")
+        s.lastUsedAt = now.addingTimeInterval(-7200)
+        #expect(SecretWords.lastUsedShort(s, now: now) == "2 hours ago")
+        s.lastUsedAt = now.addingTimeInterval(-90_000)
+        #expect(SecretWords.lastUsedShort(s, now: now) == "Yesterday")
+        s.lastUsedAt = now.addingTimeInterval(-3 * 86_400)
+        #expect(SecretWords.lastUsedShort(s, now: now) == "3 days ago")
+        #expect(SecretWords.lent(to: "Azure Dev", secondsLeft: 41 * 60) == "Lent to Azure Dev · 41 min left")
+        #expect(SecretWords.lent(to: "Azure Dev", secondsLeft: 40) == "Lent to Azure Dev · 40 s left")
+        #expect(SecretWords.lent(to: "Azure Dev", secondsLeft: 0) == "Back from Azure Dev")
+        #expect(SecretWords.header(count: 6) == "6 · values never come back")
     }
 
     @Test func groupsAreSectionsAndTheRestIsNoGroup() {

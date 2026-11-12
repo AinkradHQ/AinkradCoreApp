@@ -5,6 +5,8 @@ import SwiftUI
 /// 1300 pt and wider the side panel shows beside it; at medium widths the Details strip toggles under the header; narrow
 /// windows keep one column and tighten the header.
 struct SessionView: View {
+    /// A comfortable reading width for the notices, transcript and composer, centred on wide windows.
+    static let readingWidth = Space.s8 * 24
     @Bindable var model: AgentsModel
     let sessionID: String
     @Environment(\.corePalette) private var palette
@@ -59,24 +61,32 @@ struct SessionView: View {
     private func conversation(_ s: AgentSessionInfo, wide: Bool, narrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             SessionHero(model: model, session: s, panel: wide)
-            VStack(spacing: Space.s2) {
-                if model.link == .reconnecting {
-                    NoticeBanner(
-                        notice: InlineNotice(
-                            title: "Reconnecting",
-                            detail: "What you see stays visible; it resumes from where it left off.",
-                            symbol: "arrow.triangle.2.circlepath"))
+            // One notice at a time, most urgent first; with none, the route cues (fallback, account) may speak.
+            Group {
+                if let b = ConversationWords.banner(
+                    s, runner: model.runnerName(s.runner), reconnecting: model.link == .reconnecting,
+                    notice: model.notices[sessionID])
+                {
+                    CoreNotice(symbol: b.symbol, title: b.title, text: b.text, tone: b.tone) {
+                        if b.resume {
+                            Button(action: { model.resume(s.id) }) { Label("Resume", systemImage: "arrow.clockwise") }
+                                .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                                .environment(\.coreKeycap, "R")
+                                .help("Continue the conversation in the same folder (R)")
+                        }
+                    }
+                    .transition(.opacity)
+                } else {
+                    SessionRouteCues(model: model, session: s)
                 }
-                if let n = model.notices[sessionID] { NoticeBanner(notice: n) }
-                StateBanner(model: model, session: s)
-                SessionRouteCues(model: model, session: s)
             }
-            .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
+            .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
+            .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
                 // A comfortable reading width, centred, on wide windows.
-                .frame(maxWidth: 820).frame(maxWidth: .infinity)
+                .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
             ComposerView(model: model, session: s, focused: $composing)
-                .frame(maxWidth: 820).frame(maxWidth: .infinity)
+                .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
         }
     }
 
@@ -93,43 +103,5 @@ struct SessionView: View {
     private func latest() -> KeyPress.Result {
         jump += 1
         return .handled
-    }
-}
-
-/// What the state means for you, and the one thing to do about it.
-struct StateBanner: View {
-    @Bindable var model: AgentsModel
-    let session: AgentSessionInfo
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        let r = model.runnerName(session.runner)
-        switch session.state {
-        case .lost:
-            row(
-                "wifi.exclamationmark", .fail, "Session lost",
-                "\(r) dropped it. The transcript up to that point is kept. Send a message to bring it back, or use Resume at the top right."
-            )
-        default:
-            if session.idleEnded {
-                row(
-                    "moon.zzz", .queue, "Ended (idle)",
-                    "Nobody came back, so it ended. Send a message to continue in the same conversation.")
-            } else if session.keepsOpen == false && !session.over {
-                row(
-                    "info.circle", .warn, "One answer, then it ends",
-                    "\(r) runs an older version that cannot keep the conversation open. Update the runner for live AI sessions."
-                )
-            } else if session.state.unknownRaw != nil {
-                row("questionmark.circle", .queue, session.state.rawValue, "This state is newer than this app.")
-            }
-        }
-    }
-
-    private func row<Buttons: View>(
-        _ symbol: String, _ tone: Tone, _ title: String, _ detail: String,
-        @ViewBuilder buttons: () -> Buttons = { EmptyView() }
-    ) -> some View {
-        CoreNotice(symbol: symbol, title: title, text: detail, tone: tone) { HStack(spacing: Space.s2) { buttons() } }
     }
 }

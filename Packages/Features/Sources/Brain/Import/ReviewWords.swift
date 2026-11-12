@@ -35,4 +35,30 @@ public enum ReviewWords {
         default: nil
         }
     }
+
+    /// "Project · 1,412 items", with the date range when there is one.
+    public static func line(_ card: ProposalCard) -> String {
+        if card.isUnsorted {
+            return "No room yet · \(BrainWords.plural(card.itemCount, "item", "items")) that fit no project"
+        }
+        var s = "\(kind(card.kind)) · \(BrainWords.plural(card.itemCount, "item", "items"))"
+        let r = range(card.first, card.last)
+        if !r.isEmpty { s += " · \(r)" }
+        return s
+    }
+
+    /// "3 accepted · 1 refused · 1 held": only the counts that are not zero.
+    public static func tally(_ cards: [ProposalCard]) -> String {
+        let live = cards.filter { $0.state != "merged" && !$0.isUnsorted }
+        let parts: [(Int, String)] = [
+            (live.filter { $0.state == "accepted" }.count, "accepted"),
+            (live.filter { $0.state == "refused" }.count, "refused"),
+            (live.filter(\.isHeld).count, "held"),
+        ]
+        return parts.filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
+    }
+
+    public static func importTitle(_ n: Int) -> String {
+        n == 0 ? "Import" : "Import \(BrainWords.plural(n, "room", "rooms"))"
+    }
 }

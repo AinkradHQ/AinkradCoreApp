@@ -122,7 +122,7 @@ private struct CheckRow: View {
                 Text("Last run").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Text(item.last).coreFont(size: MacTextSize.body, weight: .medium)
             }
-            .frame(width: Space.s8 * 2.6, alignment: .leading)
+            .frame(width: Space.s8 * 2.5, alignment: .leading)
             if let p = c.running[item.id] {
                 VStack(alignment: .leading, spacing: 3) {
                     CoreMeter(p, label: "\(item.name) progress")
@@ -131,7 +131,7 @@ private struct CheckRow: View {
                     )
                     .monospacedDigit()
                 }
-                .frame(width: Space.s8 * 6.2)
+                .frame(width: Space.s8 * 6)
             } else {
                 TrendBars(history: item.history).frame(width: Space.s8 * 3, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
@@ -141,7 +141,7 @@ private struct CheckRow: View {
                             GlassInk.secondary)
                     }
                 }
-                .frame(width: Space.s8 * 3.4, alignment: .leading)
+                .frame(width: Space.s8 * 3.5, alignment: .leading)
             }
             Button {
                 run(advanced: NSEvent.modifierFlags.contains(.option))

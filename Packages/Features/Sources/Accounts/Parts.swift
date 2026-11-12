@@ -64,8 +64,8 @@ struct VerdictBadge: View {
     }
 }
 
-/// A small worded action: CoreUI's small secondary button (the danger one when it removes something), with its hover,
-/// press and disabled states.
+/// A small worded action: CoreUI's small secondary button (the quiet danger one when it removes something), with its
+/// hover, press and disabled states.
 struct AccLink: View {
     let title: String
     var symbol: String?
@@ -76,7 +76,7 @@ struct AccLink: View {
         Button(action: action) {
             if let symbol { Label(title, systemImage: symbol) } else { Text(title) }
         }
-        .buttonStyle(CoreButtonStyle(danger ? .danger : .secondary, size: .small))
+        .buttonStyle(CoreButtonStyle(danger ? .quietDanger : .secondary, size: .small))
         .help(help ?? title)
     }
 }

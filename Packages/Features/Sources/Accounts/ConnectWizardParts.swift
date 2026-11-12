@@ -5,6 +5,8 @@ import SwiftUI
 enum ConnectWizardWords {
     /// The install bar's width on a provider row (accounts-connect.html: 140 pt).
     static let barWidth: CGFloat = Space.s8 * 4 + Space.s3
+    /// The mockup's install bar is 6 pt tall, a touch heavier than the 4 pt meters on cards.
+    static let barHeight: CGFloat = Space.s1 + Space.s1 / 2
 
     /// The dialog's title for a step: the panel names the step instead of a second heading inside it.
     static func title(_ step: ConnectWizardState.Step, provider: String, plan: Bool) -> String {
@@ -71,6 +73,8 @@ struct ProviderChoiceRow<Trailing: View>: View {
             trailing.frame(minWidth: Space.s8 * 6, alignment: .trailing).padding(.trailing, Space.s3)
         }
         .frame(minHeight: Space.s8 + Space.s4)
+        // The label fills the row's height; without this the rows share out the whole dialog's height.
+        .fixedSize(horizontal: false, vertical: true)
         .background(
             selected || (pressed && !dim) ? palette.uDimHover : hovering && !dim ? palette.uDim : .clear, in: shape
         )

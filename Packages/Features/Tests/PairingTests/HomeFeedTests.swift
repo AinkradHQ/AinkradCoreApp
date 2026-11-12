@@ -3,6 +3,7 @@ import CoreUI
 import Foundation
 import Shell
 import Testing
+import os
 
 @testable import Pairing
 
@@ -13,8 +14,13 @@ private struct FakeHome: HomeSource {
     var share = 0.0
     var auditList: [HomeAudit] = []
     var denied = false
+    /// How many times Home read the sessions: one per refresh.
+    let reads = OSAllocatedUnfairLock(initialState: 0)
 
-    func sessions() async throws -> [AgentSessionInfo] { sessionList }
+    func sessions() async throws -> [AgentSessionInfo] {
+        reads.withLock { $0 += 1 }
+        return sessionList
+    }
     func runners() async throws -> [HomeRunner] { runnerList }
     func costs() async throws -> [(at: Date, micros: Int64)] {
         if denied { throw URLError(.userAuthenticationRequired) }
@@ -87,15 +93,15 @@ private struct FakeHome: HomeSource {
 
     @Test func onlyHomeEventsRefreshAfterAQuietMoment() async throws {
         let shell = ShellModel(defaults: UserDefaults(suiteName: "feed-\(UUID())")!)
-        let feed = HomeFeed(
-            shell: shell, source: FakeHome(sessionList: [session("a", .running, ago: 60)]), quiet: .milliseconds(20))
+        let src = FakeHome(sessionList: [session("a", .running, ago: 60)])
+        let feed = HomeFeed(shell: shell, source: src, quiet: .milliseconds(20))
+        // Not a Home event: nothing is scheduled, so nothing is read.
         feed.event(kind: "device.added")
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(shell.home.runningAgents == 0)
+        // Two Home events in a row make one refresh.
         feed.event(kind: "agent.session.started")
         feed.event(kind: "agent.session.updated")
-        try await Task.sleep(for: .milliseconds(250))
-        #expect(shell.home.runningAgents == 1)
+        #expect(await until { shell.home.runningAgents == 1 })
+        #expect(src.reads.withLock { $0 } == 1, "the device event read nothing, the two agent events read once")
     }
 
     @Test func pairingEventsRefreshHomeAndReadInPlainWords() async throws {
@@ -106,7 +112,7 @@ private struct FakeHome: HomeSource {
         ])
         let feed = HomeFeed(shell: shell, source: src, quiet: .milliseconds(20), now: { [now] in now })
         feed.event(kind: "pairing.claimed")
-        try await Task.sleep(for: .milliseconds(250))
+        #expect(await until { shell.home.events.count == 2 })
         #expect(shell.home.events.map(\.text) == ["Pairing approved", "Pairing claimed"])
     }
 }

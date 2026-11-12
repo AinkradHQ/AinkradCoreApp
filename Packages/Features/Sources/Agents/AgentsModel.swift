@@ -68,6 +68,8 @@ public final class AgentsModel {
     public var selected: String?
     /// The runner the New session sheet starts on (set by the runner page); nil: the best ready one.
     public var newSessionRunner: String?
+    /// The project the New session sheet opens on (the empty session's "Or start in a project"); nil: a fresh folder.
+    var newSessionPlace: ConversationWords.Place?
     /// Each session's name: the first line of its prompt (Core sends no title yet, KAN-455). Filled on create, from a loaded
     /// transcript, or by `loadTitle` when a tile shows.
     public internal(set) var titles: [String: String] = [:]
@@ -99,6 +101,8 @@ public final class AgentsModel {
     let notifier: any ApprovalNotifier
     let defaults: UserDefaults
     @ObservationIgnored var feed: Task<Void, Never>?
+    /// The load `attach` starts; tests await it so it cannot overlap their own calls.
+    @ObservationIgnored var firstLoad: Task<Void, Never>?
     @ObservationIgnored var ticker: Task<Void, Never>?
     @ObservationIgnored var primed = false
     @ObservationIgnored var announced: Set<String> = []
@@ -220,7 +224,7 @@ public final class AgentsModel {
             }
         }
         Task { await refreshPermission() }
-        Task { await reloadAll() }
+        firstLoad = Task { await reloadAll() }
     }
 
     public func detach() {

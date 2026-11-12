@@ -23,6 +23,8 @@ public actor SampleBrainService: BrainService {
         public var inboxError = false
         /// Worst-case data for screenshots: very long and non-Latin room names, a thousand captures.
         public var worst = false
+        /// The Import wizard opens, on an invented Core (`SampleImportTransport`).
+        public var imports = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
@@ -42,6 +44,7 @@ public actor SampleBrainService: BrainService {
     }
 
     public nonisolated let isSample = true
+    public nonisolated let importRoutes: BrainRoutes?
     var scenario: Scenario
     private var list: [RoomSummary]
     private var pausedRooms = ["automotive-ai", "optimus"]
@@ -59,6 +62,7 @@ public actor SampleBrainService: BrainService {
 
     public init(_ scenario: Scenario = Scenario(), pace: Duration = .milliseconds(250)) {
         self.scenario = scenario
+        self.importRoutes = scenario.imports ? BrainRoutes(transport: SampleImportTransport()) : nil
         self.list = scenario.empty ? [] : Self.world(worst: scenario.worst)
         self.pace = pace
         self.checkList = Self.initialChecks(scenario)
