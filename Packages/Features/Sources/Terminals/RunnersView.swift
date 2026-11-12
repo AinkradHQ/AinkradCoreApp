@@ -115,6 +115,15 @@ struct BuiltInBadge: View {
     }
 }
 
+/// "This Mac": the runner inside this app (N16).
+struct ThisMacBadge: View {
+    var body: some View {
+        Text("This Mac").coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.blue)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .background(GlassInk.blue.opacity(0.18), in: coreShape(Radius.chip)).lineLimit(1).fixedSize()
+    }
+}
+
 /// The agent and terminal bars, separate, from `slots`; the old single work-slot bar when the Core sent none.
 struct RunnerBars: View {
     let facts: RunnerFacts
@@ -182,6 +191,7 @@ private struct RunnerCard: View {
                         HStack(spacing: Space.s2) {
                             Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                             if runner.builtIn { BuiltInBadge() }
+                            if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
                         }
                         Text(facts.system ?? "System not reported yet").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(palette.text2)

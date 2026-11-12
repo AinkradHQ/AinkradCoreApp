@@ -34,6 +34,12 @@ public protocol TerminalHost: AnyObject {
     /// `ElevationDeclined` when the person did not elevate (`elevationNotice` says why).
     /// `keepsEdit`: the person's input is still on screen (a form), so the notice may say so.
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T
+    /// The id of the runner that is this Mac's own (built into the app), for the "This Mac" badge; nil when there is none.
+    var thisMacRunnerID: String? { get }
+}
+
+extension TerminalHost {
+    public var thisMacRunnerID: String? { nil }
 }
 
 extension TerminalHost {

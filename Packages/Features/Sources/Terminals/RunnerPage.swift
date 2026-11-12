@@ -54,6 +54,7 @@ struct RunnerPage: View {
             Text(runner.name).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             if runner.builtIn { BuiltInBadge() }
+            if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
             RunnerChip(facts: facts)
             Spacer(minLength: Space.s3)
             Button {
