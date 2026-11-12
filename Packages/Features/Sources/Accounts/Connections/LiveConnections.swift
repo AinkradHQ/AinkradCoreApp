@@ -349,6 +349,12 @@ struct LiveConnectionsService: ConnectionsService {
         case "identity_unavailable":
             .failed(
                 title: "You signed in, but \(service) wouldn't say who you are.", fix: "Wait a minute and try again.")
+        case "signin_service":
+            .failed(title: ConnSay.serviceDown, fix: "Nothing was connected.")
+        case "installation_not_yours":
+            .failed(title: ConnSay.notYours, fix: "Choose repositories with the GitHub account you signed in with.")
+        case "no_github_sign_in", "bad_user_token":
+            .failed(title: ConnSay.signInAgain, fix: "Press Try again.")
         case "real_secret_refused", "secrets_disabled":
             .failed(title: "Connections are turned off on this Core.", fix: ConnSay.turnedOff)
         default:
@@ -371,7 +377,29 @@ struct LiveConnectionsService: ConnectionsService {
 
 /// Every failure in plain words with what to do, never a code.
 enum ConnSay {
-    static let notConfigured = "This service isn't set up yet. Use App registration on this page to set it up."
+    static let notConfigured =
+        "This service isn't set up on your Core. If it's self-hosted, use Your own app on this page."
+    static let serviceDown = "Ainkrad's sign-in service can't be reached. Try again in a minute."
+    static let notYours = "This GitHub install isn't yours."
+    static let signInFirst = "Sign in to GitHub first."
+    static let signInAgain = "Sign in to GitHub again."
+
+    /// The Core says "sign in to GitHub first" as a plain 409 (also when the token ran out).
+    static func needsGitHubSignIn(_ error: any Error) -> Bool {
+        guard case .http(409, let code, let message)? = CoreError.unwrapping(error) ?? error as? CoreError else {
+            return false
+        }
+        return code == "no_github_sign_in" || message.lowercased().contains("sign in to github")
+    }
+
+    /// Choosing repositories failed: the step the sheet shows. A person who just signed in has an expired token, so it is "again".
+    static func installFailure(_ error: any Error, hasGitHub: Bool) -> ConnFlow.Step {
+        if needsGitHubSignIn(error) {
+            let say = hasGitHub ? signInAgain : signInFirst
+            return .failed(title: say, fix: "Press Try again to sign in, then choose repositories.")
+        }
+        return .failed(title: "Couldn't use the repositories you chose.", fix: plain(error))
+    }
     static let turnedOff = "Press Turn on connections. This Mac does it for you."
 
     /// The Core's two refusals that mean "connections are off": the broker is off, or a real token isn't admitted yet.
@@ -407,7 +435,10 @@ enum ConnSay {
             return "That was tried a moment ago. Try again in \(max(Int((s ?? 5).rounded(.up)), 1)) seconds."
         case .http(let status, let code, let message):
             if isGate(code: code) { return "Connections are turned off on this Core. \(turnedOff)" }
+            if needsGitHubSignIn(error) { return signInFirst }
             switch code {
+            case "signin_service": return serviceDown
+            case "installation_not_yours": return notYours
             case "no_runner": return AccountsModel.noRunnerWords
             case "credential_rejected": return AccountsModel.credentialWords
             case "not_configured": return ConnSay.notConfigured

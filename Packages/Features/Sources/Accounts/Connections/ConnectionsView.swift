@@ -106,7 +106,6 @@ struct ConnectionsView: View {
 /// CN1: one section per kind with its connections as cards, or the empty state.
 struct ConnListPage: View {
     let model: ConnectionsModel
-    @State private var missing: [ConnKind] = []
     private let columns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
 
     var body: some View {
@@ -142,8 +141,8 @@ struct ConnListPage: View {
                             }
                             Spacer()
                             AccLink(
-                                title: "App registration", symbol: "gearshape",
-                                help: "The \(k.name) app Ainkrad signs in with. Admins only."
+                                title: "Use your own app", symbol: "gearshape",
+                                help: "Advanced. Only for a self-hosted Core. Admins only."
                             ) { ConnDialogs.openApp(model, k) }
                             AccLink(title: "Connect another", symbol: "plus") {
                                 ConnDialogs.openConnect(model, kind: k.id)
@@ -158,65 +157,23 @@ struct ConnListPage: View {
         }
     }
 
-    /// Step 1 only when an app is missing: set the sign-in up once. Then connect.
+    /// Ainkrad signs in for you, so there is nothing to set up first.
     private var empty: some View {
         AccStateCard(
             symbol: "link", title: "Nothing connected yet",
             text:
                 "Sign in to GitHub or Jira once, here. Core keeps the sign-in safe and lets your AI sessions read issues and code. They can't change anything until you allow it."
         ) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                if !missing.isEmpty {
-                    emptyStep(
-                        1, "Set up sign-in once",
-                        "\(missing.map(\.name).joined(separator: " and ")) need\(missing.count == 1 ? "s" : "") an app registered with your Core before anyone can sign in."
-                    ) {
-                        ForEach(missing) { k in
-                            AppActionTile(
-                                title: "Set up \(k.name)", symbol: "gearshape", key: "", hue: GlassInk.blue,
-                                prominent: true
-                            ) { ConnDialogs.openApp(model, k) }
-                        }
-                    }
-                }
-                emptyStep(
-                    missing.isEmpty ? 1 : 2, "Connect",
-                    "Sign in on the service's own website. Core never asks for a password."
-                ) {
-                    ForEach(model.liveKinds) { k in
-                        AppActionTile(
-                            title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.blue,
-                            prominent: missing.isEmpty
-                        ) { ConnDialogs.openConnect(model, kind: k.id) }
-                        .disabled(missing.contains { $0.id == k.id })
-                    }
+            HStack(spacing: Space.s2) {
+                ForEach(model.liveKinds) { k in
+                    AppActionTile(
+                        title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.blue,
+                        prominent: true
+                    ) { ConnDialogs.openConnect(model, kind: k.id) }
                 }
             }
             .frame(maxWidth: Space.s8 * 14, alignment: .leading)
         }
-        .task(id: model.liveKinds.map(\.id)) { await findMissing() }
-    }
-
-    private func emptyStep<C: View>(_ n: Int, _ title: String, _ line: String, @ViewBuilder _ c: () -> C) -> some View {
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: "\(n).square.fill").font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(GlassInk.blueInk).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s2) {
-                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: Space.s2) { c() }
-            }
-        }
-    }
-
-    /// The kinds whose app registration the Core does not have yet. A device that may not read it learns nothing here and
-    /// sees only Connect.
-    private func findMissing() async {
-        var out: [ConnKind] = []
-        for k in model.liveKinds {
-            if case .ready(let app) = await model.loadApp(k.id), !app.configured { out.append(k) }
-        }
-        missing = out
     }
 }
 
