@@ -49,6 +49,8 @@ public struct SyncResultWire: Codable, Sendable, Equatable {
         case "nothing_new": return "Nothing new."
         case "disabled": return "The Core's own AI sessions are switched off. Nothing was collected."
         case "running": return "A sync is already running."
+        case "no_connection": return "This runner doesn't share its history yet, or there is no connection to read."
+        case "no_repositories": return "Choose the repositories GitHub should read first."
         default: break
         }
         var s = "\(BrainWords.plural(found, "item", "items")) found, \(stored) kept, \(duplicate) already known"
@@ -138,6 +140,8 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var isCore: Bool { id == "core_transcript" }
     /// Jira and GitHub, read by the Core through the accounts in Connections.
     public var isConnection: Bool { id == "jira" || id == "github" }
+    /// A runner's AI tool history, `runner-<id>`.
+    public var isRunner: Bool { id.hasPrefix("runner-") }
 }
 
 struct SourcePutBody: Encodable {

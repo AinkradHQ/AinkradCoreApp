@@ -1,7 +1,7 @@
 import Foundation
 
 // Brain M3 routes on the Core's `brain` module (`modules/brain/api/openapi.core.json` on feat/brain-m3-core):
-// a room's Inbox, its policy and its distillations. Runner history has no route there yet (see the TODOs).
+// a room's Inbox, its policy and its distillations. Runner history is a source, `runner-<id>`, on `/sources`.
 
 struct InboxRecordWire: Decodable {
     var id: String
@@ -51,32 +51,6 @@ struct DistilWire: Decodable {
     var sources: Int
 }
 
-/// One runner as the history route lists it. TODO(brain-m3-core): confirm route and fields (plan section 5).
-struct RunnerHistoryWire: Codable {
-    struct Tool: Codable {
-        var id: String
-        var name: String
-        var found: Int?
-        var on: Bool
-    }
-    var id: String
-    var name: String
-    var online: Bool
-    var enabled: Bool
-    var tools: [Tool]
-    var items: Int?
-    var lastRun: String?
-    enum CodingKeys: String, CodingKey {
-        case id, name, online, enabled, tools, items
-        case lastRun = "last_run"
-    }
-}
-
-struct RunnerHistoryPutBody: Encodable {
-    var enabled: Bool
-    var tools: [String]
-}
-
 extension BrainRoutes {
     func inbox(room: String, limit: Int = 200) async throws -> InboxPageWire {
         try await call("GET", "/rooms/\(Self.seg(room))/inbox?status=candidate&limit=\(limit)")
@@ -91,12 +65,5 @@ extension BrainRoutes {
     }
     func distils(room: String) async throws -> [DistilWire] {
         try await call("GET", "/rooms/\(Self.seg(room))/distils")
-    }
-
-    // TODO(brain-m3-core): confirm route. Not on feat/brain-m3-core yet; this is the plan's section 5 shape.
-    func runnerHistory() async throws -> [RunnerHistoryWire] { try await call("GET", "/runners/history") }
-    // TODO(brain-m3-core): confirm route. Step-up on turn on, asked for by the caller every time.
-    func putRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistoryWire {
-        try await call("PUT", "/runners/\(Self.seg(id))/history", RunnerHistoryPutBody(enabled: enabled, tools: tools))
     }
 }

@@ -42,11 +42,13 @@ struct SampleM3: Sendable {
         }
         out.append(
             SourceWire(
-                id: "jira", device: "core", kind: "jira", roots: ["KAN", "AUT", "OPT"], lastRun: "2026-11-12T11:00:00Z",
+                id: "jira", device: "core", kind: "jira", roots: ["Workan", "KAN, AUT and OPT projects"],
+                lastRun: "2026-11-12T11:00:00Z",
                 items: 1204))
         out.append(
             SourceWire(
-                id: "github", device: "core", kind: "github", enabled: false, roots: ["14 repositories"], items: 0))
+                id: "github", device: "core", kind: "github", enabled: false,
+                roots: ["AhmedMElhalaby", "pull requests and reviews in 14 repositories"], items: 0))
         return out
     }()
 
@@ -152,7 +154,8 @@ struct SampleM3: Sendable {
                 id: "air", name: "MacBook Air", enabled: true, tools: tools(300, 80, 12, on: true), items: 148,
                 lastRun: "1 hour ago"),
             RunnerHistory(id: "vps-1", name: "vps-1 (Azure)", tools: tools(412, 87, nil)),
-            RunnerHistory(id: "studio", name: "Mac Studio", online: false, tools: tools(nil, nil, nil)),
+            RunnerHistory(
+                id: "studio", name: "Mac Studio", online: false, tools: tools(nil, nil, nil), lastRun: "yesterday"),
         ]
     }
 
@@ -169,7 +172,7 @@ struct SampleM3: Sendable {
             s.m3
             ? [
                 "core": Self.policy(s, local: false), "app": Self.policy(s, local: false),
-                "workan-space": Self.policy(s, local: true, auto: !s.noLocalModel),
+                "workan-space": Self.policy(s, local: true, auto: s.autoAccept),
                 "personal": Self.policy(s, local: true),
             ] : [:]
         for q in queued { policies[q.room]?.queued = q.items }

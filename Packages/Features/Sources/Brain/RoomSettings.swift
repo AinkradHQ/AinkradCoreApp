@@ -149,7 +149,7 @@ struct RoomSettings: View {
                 dim: false
             ) {
                 CoreSwitch(
-                    "Accept candidates automatically",
+                    "",
                     isOn: Binding(get: { p.autoAccept }, set: { on in Task { await c.setAutoAccept(room.id, on) } }))
             }
             ForEach(CandidateKind.allCases, id: \.self) { k in

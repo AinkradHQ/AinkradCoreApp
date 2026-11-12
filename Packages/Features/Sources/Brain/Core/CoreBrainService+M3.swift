@@ -96,23 +96,30 @@ extension CoreBrainService {
 
     // MARK: runner history
 
+    /// A runner's history is one source on `/sources`, `runner-<id>`, off until you turn it on. The runner must also
+    /// run with history sharing on, or a sync of it answers `no_connection`.
     public func runners() async throws -> [RunnerHistory] {
-        do { return try await routes.runnerHistory().map(Self.runner) } catch let e as BrainHTTPError
-            where [404, 405, 501].contains(e.status)
-        {
-            // This Core has no runner history route yet: the Sources page shows no Runners section.
-            return []
-        } catch let e as BrainHTTPError { throw Self.failure(e) }
+        try await wrap { try await routes.sources().compactMap(Self.runner) }
     }
 
     public func setRunnerHistory(_ id: String, enabled: Bool, tools: [String]) async throws -> RunnerHistory {
-        Self.runner(try await wrap { try await routes.putRunnerHistory(id, enabled: enabled, tools: tools) })
+        try await wrap {
+            let key = Self.runnerPrefix + id
+            guard let row = try await routes.sources().first(where: { $0.id == key }) else {
+                throw BrainFailure("That runner is gone.", code: "not_found")
+            }
+            return Self.runner(try await routes.putSource(row, enabled: enabled))
+                ?? RunnerHistory(id: id, name: row.device)
+        }
     }
 
-    static func runner(_ w: RunnerHistoryWire) -> RunnerHistory {
-        RunnerHistory(
-            id: w.id, name: w.name, online: w.online, enabled: w.enabled,
-            tools: w.tools.map { RunnerTool(id: $0.id, name: $0.name, found: $0.found, on: $0.on) },
-            items: w.items ?? 0, lastRun: w.lastRun)
+    static let runnerPrefix = "runner-"
+
+    static func runner(_ w: SourceWire) -> RunnerHistory? {
+        guard w.id.hasPrefix(runnerPrefix) else { return nil }
+        // TODO(brain-m3-core): the Core does not say which tools a runner has, or whether it is online.
+        return RunnerHistory(
+            id: String(w.id.dropFirst(runnerPrefix.count)), name: w.device, enabled: w.enabled, items: w.items ?? 0,
+            lastRun: SyncWords.date(w.lastRun).map { SyncWords.ago($0) })
     }
 }

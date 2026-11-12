@@ -88,6 +88,7 @@ public final class BrainDemo {
         if scene.hasPrefix("m3-") {
             s.m3 = true
             s.noLocalModel = scene == "m3-queued" || scene == "m3-room-queued"
+            s.autoAccept = scene == "m3-local"
         }
         if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))

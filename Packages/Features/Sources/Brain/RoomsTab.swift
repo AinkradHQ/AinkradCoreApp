@@ -174,7 +174,7 @@ private struct RoomPane: View {
 
     private var line: String {
         var parts = [room.kind.label]
-        if let c = room.counts { parts.append(BrainWords.plural(c.records, "item", "items")) }
+        if let c = room.counts { parts.append("\(c.records.formatted()) \(c.records == 1 ? "item" : "items")") }
         return parts.joined(separator: " · ")
     }
 
@@ -350,7 +350,7 @@ struct RuleRow: View {
                     .help("This rule is always on.").accessibilityHidden(true)
             }
             CoreSwitch(
-                rule.reason.isEmpty ? rule.pattern : rule.reason,
+                "",
                 isOn: Binding(get: { rule.enabled }, set: { on in Task { await sync.toggleRule(rule, on: on) } })
             )
             .disabled(rule.locked)

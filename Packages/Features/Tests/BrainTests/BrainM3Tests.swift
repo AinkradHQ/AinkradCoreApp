@@ -214,11 +214,31 @@ struct BrainM3Tests {
         #expect(p.autoAccept && p.kinds == [.fact] && p.autoKindsAllowed == [.fact])
     }
 
-    @Test func aCoreWithoutRunnerHistoryShowsNoRunners() async throws {
+    @Test func runnerHistoryIsTheRunnerSourceOnTheSourcesRoute() async throws {
         let t = FakeBrainTransport()
-        t.routes["GET \(BrainRoutes.base)/runners/history"] = { _ in
-            throw BrainHTTPError(status: 404, code: "not_found")
+        let base = BrainRoutes.base
+        @Sendable func row(_ id: String, _ on: Bool) -> [String: Any] {
+            [
+                "id": id, "device": "vps-1", "kind": "claude_code", "enabled": on, "roots": [String](),
+                "cursor": [String: Any](),
+            ]
         }
-        #expect(try await CoreBrainService(transport: t).runners().isEmpty)
+        nonisolated(unsafe) var sent: [String: Any] = [:]
+        t.routes["GET \(base)/sources"] = { _ in [row("core_transcript", true), row("runner-vps1", false)] }
+        t.routes["PUT \(base)/sources/runner-vps1"] = { b in
+            sent = (try? JSONSerialization.jsonObject(with: b ?? Data()) as? [String: Any]) ?? [:]
+            return row("runner-vps1", true)
+        }
+        let svc = CoreBrainService(transport: t)
+        let list = try await svc.runners()
+        #expect(list.map(\.id) == ["vps1"] && list[0].name == "vps-1" && list[0].enabled == false)
+        let on = try await svc.setRunnerHistory("vps1", enabled: true, tools: [])
+        #expect(on.enabled && sent["enabled"] as? Bool == true)
+    }
+
+    @Test func aSyncThatFindsNoSharedHistorySaysSo() {
+        var r = SyncResultWire()
+        r.idle = "no_connection"
+        #expect(r.summary().contains("doesn't share its history"))
     }
 }

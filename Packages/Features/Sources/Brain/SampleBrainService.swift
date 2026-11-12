@@ -27,6 +27,8 @@ public actor SampleBrainService: BrainService {
         public var m3 = false
         /// M3: no runner has a local model yet, so the local-only rooms queue their items.
         public var noLocalModel = false
+        /// M3: workan-space accepts its facts and open threads without a review.
+        public var autoAccept = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
@@ -121,7 +123,7 @@ public actor SampleBrainService: BrainService {
             rows.append(SyncRow(device: "MacBook (sample)", at: "1 min ago"))
             rows.append(SyncRow(device: "iPhone (sample)", at: "4 min ago"))
         }
-        if r.id == "workan-space" {
+        if r.id == "workan-space", rows.count > 1 {
             rows[1] = SyncRow(device: "MacBook (sample)", at: "3 h ago", state: .lag, lag: "3 h")
         }
         let cost: RoomCost? =

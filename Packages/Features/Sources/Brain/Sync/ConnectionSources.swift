@@ -14,7 +14,7 @@ struct SourceLine<Lead: View, Last: View>: View {
 
     var body: some View {
         let row = HStack(alignment: .center, spacing: Space.s4) {
-            lead.frame(width: Space.s8 + Space.s1, alignment: .leading)
+            lead.fixedSize(horizontal: false, vertical: true).frame(width: Space.s8 + Space.s1, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).coreFont(size: MacTextSize.body, weight: .medium)
                     .foregroundStyle(dim ? GlassInk.secondary : GlassInk.primary).lineLimit(1)
@@ -25,7 +25,7 @@ struct SourceLine<Lead: View, Last: View>: View {
                 .frame(width: Space.s8 * 3.5, alignment: .trailing)
             last.frame(width: Space.s8 * 4.5, alignment: .trailing)
         }
-        .padding(.horizontal, Space.s3).frame(minHeight: Space.s8 + Space.s4)
+        .padding(.horizontal, Space.s3).frame(height: Space.s8 + Space.s4)
         .modifier(BrainRowHover(enabled: !dim || tap != nil))
         .accessibilityElement(children: .contain)
         if let tap { Button(action: tap) { row }.buttonStyle(CoreQuietPressStyle(radius: Radius.control)) } else { row }
@@ -78,8 +78,8 @@ struct ConnectionSources: View {
     }
 
     static func sub(_ s: SourceWire) -> String {
-        let scope = s.roots.isEmpty ? "Nothing chosen yet" : s.roots.joined(separator: ", ")
-        return s.id == "jira" ? "Atlassian · \(scope)" : "GitHub · \(scope)"
+        let scope = s.roots.isEmpty ? "Nothing chosen yet" : s.roots.joined(separator: " · ")
+        return s.id == "jira" ? "Atlassian · \(scope)" : scope
     }
 
     static func last(_ s: SourceWire) -> String {
@@ -103,7 +103,7 @@ struct RunnerSources: View {
             VStack(spacing: 2) {
                 ForEach(c.runners) { r in
                     SourceLine(
-                        name: r.name, sub: r.online ? r.toolLine : "Offline since \(r.lastRun ?? "a while ago")",
+                        name: r.name, sub: r.online ? r.toolLine : r.lastRun.map { "Offline since \($0)" } ?? "Offline",
                         items: r.online ? r.items.formatted() : "", dim: !r.enabled || !r.online
                     ) {
                         if r.online {
@@ -156,6 +156,10 @@ struct RunnerHistorySheet: View {
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                     block("Read") {
+                        if s.runner.tools.isEmpty {
+                            Text("The AI tool histories stored on this runner")
+                                .padding(.horizontal, Space.s3).frame(minHeight: Space.s8, alignment: .leading)
+                        }
                         ForEach(s.runner.tools) { t in
                             HStack(spacing: Space.s3) {
                                 CoreCheckbox(
@@ -199,7 +203,7 @@ struct RunnerHistorySheet: View {
                             }
                         }
                         .buttonStyle(CoreButtonStyle(.prominent, busy: busy))
-                        .disabled(busy || s.tools.isEmpty)
+                        .disabled(busy)
                         .keyboardShortcut(.return, modifiers: .command)
                     }
                 }

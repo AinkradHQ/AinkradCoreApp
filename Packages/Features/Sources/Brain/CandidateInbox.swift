@@ -109,12 +109,16 @@ private struct CandidateList: View {
                 Spacer(minLength: Space.s2)
                 QuietFilter(
                     title: c.kindFilter?.plural ?? "All kinds",
-                    items: [("All kinds", c.kindFilter == nil, { c.kindFilter = nil })]
-                        + CandidateKind.allCases.map { k in (k.plural, c.kindFilter == k, { c.kindFilter = k }) })
+                    items: [CoreDropdownItem("All kinds", checked: c.kindFilter == nil) { c.kindFilter = nil }]
+                        + CandidateKind.allCases.map { k in
+                            CoreDropdownItem(k.plural, checked: c.kindFilter == k) { c.kindFilter = k }
+                        })
                 QuietFilter(
                     title: c.rooms.first { $0.id == c.roomFilter }?.name ?? "All rooms",
-                    items: [("All rooms", c.roomFilter == nil, { c.roomFilter = nil })]
-                        + c.rooms.map { r in (r.name, c.roomFilter == r.id, { c.roomFilter = r.id }) })
+                    items: [CoreDropdownItem("All rooms", checked: c.roomFilter == nil) { c.roomFilter = nil }]
+                        + c.rooms.map { r in
+                            CoreDropdownItem(r.name, checked: c.roomFilter == r.id) { c.roomFilter = r.id }
+                        })
             }
             .padding(.horizontal, Space.s3)
             ScrollView {
@@ -170,11 +174,11 @@ private struct CandidateList: View {
 /// A quiet "All kinds" style filter: words and a chevron on a well, opening the glass dropdown.
 private struct QuietFilter: View {
     let title: String
-    let items: [(String, Bool, @MainActor () -> Void)]
+    let items: [CoreDropdownItem]
     @State private var hovering = false
 
     var body: some View {
-        CoreDropdown(items: items.map { t, on, run in CoreDropdownItem(t, checked: on, run: run) }) {
+        CoreDropdown(items: items) {
             HStack(spacing: Space.s1) {
                 Text(title).lineLimit(1)
                 Image(systemName: "chevron.down").coreFont(size: MacTextSize.meta, weight: .semibold)
@@ -211,6 +215,7 @@ private struct CandidateRow: View {
                 .allowsHitTesting(hovering || selected)
             }
         }
+        .lineLimit(1)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityIdentifier("candidate-\(c.id)")

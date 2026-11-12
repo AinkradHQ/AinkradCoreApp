@@ -19,7 +19,7 @@ struct SourcesTab: View {
         let known = brain.importSources()
         let lines = self.lines(known)
         let unreadable = lines.filter { $0.source == nil }
-        let mac = lines.compactMap(\.source).filter { !$0.isConnection }
+        let mac = lines.compactMap(\.source).filter { !$0.isConnection && !$0.isRunner && !$0.isCore }
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s4) {
                 Text("Source").padding(.leading, Space.s8 + Space.s5)
@@ -68,7 +68,8 @@ struct SourcesTab: View {
     /// The Mac collectors, in their two groups, once "On this Mac" is open.
     @ViewBuilder private func macGroups(_ lines: [Line], _ unreadable: [Line]) -> some View {
         ForEach([SyncWords.sessionsGroup, SyncWords.notesGroup], id: \.self) { g in
-            let rows = lines.filter { $0.group == g && $0.source?.isConnection != true }.enumerated()
+            let rows = lines.filter { $0.group == g && $0.source?.isConnection != true && $0.source?.isRunner != true }
+                .enumerated()
                 .sorted { (Self.rank($0.element), $0.offset) < (Self.rank($1.element), $1.offset) }.map(\.element)
             if !rows.isEmpty {
                 Text(g).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
@@ -109,7 +110,7 @@ struct SourcesTab: View {
                 CoreSwitch(
                     l.title, isOn: Binding(get: { s.enabled }, set: { on in Task { await sync.toggle(s, on: on) } })
                 )
-                .frame(width: Space.s8 + Space.s1, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true).frame(width: Space.s8 + Space.s1, alignment: .leading)
             } else {
                 Color.clear.frame(width: Space.s8 + Space.s1, height: 1)
             }
