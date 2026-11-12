@@ -160,7 +160,7 @@ struct ComposerView: View {
                     )
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(ToolRowStyle())
+                .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
             }
         }
         .padding(Space.s1)

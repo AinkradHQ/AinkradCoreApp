@@ -135,7 +135,7 @@ struct Thinking: View {
     @Environment(\.corePalette) private var palette
     var body: some View {
         HStack(spacing: Space.s3) {
-            WorkingBar()
+            CoreWorkingBar()
             Text("Thinking…").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
             TimelineView(.periodic(from: since, by: 1)) { ctx in
                 Text(coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(since))))", "s"))
@@ -278,7 +278,7 @@ struct ToolCard: View {
                 .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(ToolRowStyle())
+            .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
             .help(summary.isEmpty ? name : summary)
             if expanded {
                 VStack(alignment: .leading, spacing: Space.s2) {
@@ -310,7 +310,7 @@ struct ToolCard: View {
         case .running:
             HStack(spacing: Space.s2) {
                 Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                WorkingBar(width: Space.s8)
+                CoreWorkingBar(width: Space.s8)
             }
         case .ok(let facts):
             HStack(spacing: Space.s2) {
@@ -329,26 +329,5 @@ struct ToolCard: View {
                     .foregroundStyle(palette.tone(.fail).ink).accessibilityLabel("Failed")
             }
         }
-    }
-}
-
-/// The press and hover of a tool row: the well lightens on hover, presses to 0.99 (darkens under Reduce Motion).
-struct ToolRowStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { ToolRowBody(configuration: configuration) }
-}
-
-private struct ToolRowBody: View {
-    let configuration: ButtonStyleConfiguration
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @State private var hovering = false
-    var body: some View {
-        configuration.label
-            .background(hovering || configuration.isPressed ? palette.uDim : .clear)
-            .overlay { Color.black.opacity(configuration.isPressed && reduce ? 0.12 : 0).allowsHitTesting(false) }
-            .scaleEffect(configuration.isPressed && !reduce ? 0.99 : 1)
-            .animation(Motion.out(Motion.hover), value: hovering)
-            .animation(Motion.press(Motion.press), value: configuration.isPressed)
-            .onHover { hovering = $0 }
     }
 }

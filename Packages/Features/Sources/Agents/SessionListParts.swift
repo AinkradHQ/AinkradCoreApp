@@ -73,7 +73,7 @@ private struct SidebarItem: View {
             .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
             .contentShape(Rectangle())
         }
-        .buttonStyle(ToolRowStyle())
+        .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
         .clipShape(coreShape(Radius.control))
         .background { if on { Color.clear.coreWell(radius: Radius.control, active: true) } }
         .foregroundStyle(on ? palette.text : palette.text2)
@@ -192,7 +192,7 @@ struct SectionHeader: View {
             .foregroundStyle(palette.text2)
             .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg).contentShape(Rectangle())
         }
-        .buttonStyle(ToolRowStyle())
+        .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
         .clipShape(coreShape(Radius.control))
         .accessibilityLabel("\(group.section.title), \(group.rows.count)")
         .accessibilityValue(collapsed ? "collapsed" : "expanded")

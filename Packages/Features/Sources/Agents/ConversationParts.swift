@@ -63,13 +63,13 @@ struct EditCard: View {
                     case false?:
                         Image(systemName: "xmark").fontWeight(.semibold).foregroundStyle(palette.tone(.fail).ink)
                             .accessibilityLabel("Failed")
-                    case nil: WorkingBar(width: Space.s8)
+                    case nil: CoreWorkingBar(width: Space.s8)
                     }
                 }
                 .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(ToolRowStyle()).help(path)
+            .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true)).help(path)
             if expanded {
                 DiffBlock(lines: lines).padding([.horizontal, .bottom], Space.s2)
                     .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -Space.s1)))
