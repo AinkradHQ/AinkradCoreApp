@@ -33,6 +33,19 @@ struct RunnerFactsTests {
         #expect(!none.terminalsOn && !none.agentsOn && none.tools.isEmpty && !none.commandsOn)
     }
 
+    @Test func terminalShellFactMapsAndStaysOutOfTools() {
+        func shell(_ v: String?) -> RunnerFacts {
+            var r = runner()
+            if let v { r.tools["terminal shell"] = v }
+            return RunnerFacts(runner: r)
+        }
+        #expect(shell("Ainkrad zsh").terminalShell == .ainkrad)
+        #expect(shell("login shell (zsh is not installed)").terminalShell == .login(reason: "zsh is not installed"))
+        #expect(shell("login shell").terminalShell == .login(reason: nil))
+        #expect(shell(nil).terminalShell == nil && shell("something new").terminalShell == nil)
+        #expect(shell("Ainkrad zsh").tools.isEmpty)
+    }
+
     @Test func accessWordsFollowTheScopes() {
         #expect(RunnerFacts.access(["terminal", "read"]) == "Can open terminals here")
         #expect(

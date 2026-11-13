@@ -124,6 +124,7 @@ public final class TerminalsDemo {
         "list", "live", "letterbox", "elsewhere", "detached", "orphaned", "exited", "gone", "host-lost",
         "runner-offline",
         "stepup-expired", "reconnecting", "resumed", "snapshot", "attaching", "failed", "runners", "runner-detail",
+        "runner-login-shell",
         "runner-degraded", "runner-offline-detail", "runner-busy", "new-terminal", "new-busy", "new-offline",
         "new-stepup", "end-confirm", "launcher", "bell", "instant", "instant-large",
     ]
@@ -137,6 +138,9 @@ public final class TerminalsDemo {
         ]
         // A runner that reports its policy, so "What it offers" shows the AI-sessions-at-once stepper.
         service.runnerList[0].policy = RunnerPolicy(terminals: true, agents: true, capacity: 2)
+        // The terminal-shell fact: both cases (linux-01 is an older runner and reports nothing).
+        service.runnerList[0].tools["terminal shell"] = "Ainkrad zsh"
+        service.runnerList[2].tools["terminal shell"] = "login shell (no Ainkrad shell profile installed)"
         service.terminalList = [
             Self.item("t_1a2b3c4d5e6f7a8b", runner: "mac-studio", attached: 1),
             Self.item("t_2b3c4d5e6f7a8b9c", runner: "linux-01", attached: 1, cols: 64, rows: 24, ageMinutes: 190),
@@ -232,6 +236,7 @@ public final class TerminalsDemo {
                 screen: false)
         case "runners": model.openRunners()
         case "runner-detail": model.openRunners(service.runnerList[0].id)
+        case "runner-login-shell": model.openRunners(service.runnerList[2].id)
         case "runner-degraded":
             service.runnerList[2].degraded = true
             await model.reload()

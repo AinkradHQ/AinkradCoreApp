@@ -313,6 +313,7 @@ struct RunnerPage: View {
                     }
                 }
                 row("Runs as", facts.runsAs)
+                if let shell = facts.terminalShell { shellRow(shell) }
                 row("Isolation", runner.isolationTiers.flatMap { $0.isEmpty ? nil : $0.joined(separator: ", ") })
                 row("Connected since", runner.connectedSince.map { $0.formatted(date: .abbreviated, time: .shortened) })
                 GridRow {
@@ -335,6 +336,30 @@ struct RunnerPage: View {
             Text(k).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             if let v { Text(v).lineLimit(2) } else { Text("Not reported yet").foregroundStyle(palette.text2) }
         }
+    }
+
+    /// "Terminal shell": plain for the Ainkrad shell; for the login shell the reason, quiet, and what to do about it.
+    private func shellRow(_ shell: RunnerFacts.TerminalShell) -> some View {
+        GridRow {
+            Text("Terminal shell").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            switch shell {
+            case .ainkrad:
+                Text("Ainkrad zsh")
+            case .login(let reason):
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Login shell")
+                    // The reason sits in the quiet line, which wraps: in the value line it was cut off.
+                    Text(
+                        (reason.map { $0.prefix(1).uppercased() + $0.dropFirst() + ". " } ?? "")
+                            + "Re-run the install command on this machine to get the Ainkrad shell."
+                    )
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .accessibilityIdentifier("runner-terminal-shell")
     }
 
     private var who: some View {
