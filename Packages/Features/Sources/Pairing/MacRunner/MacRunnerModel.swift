@@ -35,6 +35,11 @@ final class MacRunnerModel {
         "Can use your accounts: \(answer ?? "not reported yet")"
     }
 
+    /// Where the bundled runner keeps its terminals' sockets: `<default state>/terminals` (a plist names no `--state`).
+    static func terminalsDirectory(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        home.appending(path: ".ainkrad-runner/core/terminals", directoryHint: .isDirectory)
+    }
+
     private(set) var state: State
     private(set) var deviceID: String?
     private let control: any MacRunnerControl

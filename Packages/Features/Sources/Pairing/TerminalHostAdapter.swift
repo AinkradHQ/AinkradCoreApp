@@ -20,6 +20,12 @@ final class TerminalHostAdapter: TerminalHost, RunnerHost {
 
     func clearElevationNotice() { app.stepUpNotice = nil }
 
+    /// The runner inside this app, once it is registered and running: its terminals can be reached over its own sockets.
+    var localRunner: LocalRunner? {
+        guard let mac = app.macRunner, mac.state == .running, mac.terminals, let id = mac.runnerID else { return nil }
+        return LocalRunner(id: id, terminals: MacRunnerModel.terminalsDirectory())
+    }
+
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
         do { return try await app.elevated(reason, done: done, keepsEdit: keepsEdit, op) } catch is StepUpDeclined {
             throw ElevationDeclined()

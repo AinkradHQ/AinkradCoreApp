@@ -114,6 +114,7 @@ protocol TerminalLink: Sendable {
 }
 
 extension TerminalAttachment: TerminalLink {}
+extension LocalTerminalAttachment: TerminalLink {}
 
 /// The Core as the terminal screens use it. `LiveTerminalService` is the only real one.
 protocol TerminalService: Sendable {
@@ -126,6 +127,8 @@ protocol TerminalService: Sendable {
     /// Milliseconds the runner took to answer an empty round trip.
     func noop(_ runner: String) async throws -> Int
     func attach(_ id: String, after: UInt64) async throws -> any TerminalLink
+    /// Attaches to a terminal whose runner is `runner`: directly, when that runner is on this Mac, else through the Core.
+    func attach(_ id: String, runner: String?, after: UInt64) async throws -> any TerminalLink
     /// `PUT /runners/{id}/policy` (admin, step-up). `restarting`: the runner restarts to read it.
     func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool)
     /// `POST /runners/{id}/tools` (admin, step-up): the id of the install operation.
@@ -133,6 +136,9 @@ protocol TerminalService: Sendable {
 }
 
 extension TerminalService {
+    func attach(_ id: String, runner: String?, after: UInt64) async throws -> any TerminalLink {
+        try await attach(id, after: after)
+    }
     func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {
         (policy, false)
     }
@@ -141,6 +147,8 @@ extension TerminalService {
 
 struct LiveTerminalService: TerminalService {
     let connection: CoreConnection
+    /// The runner on this Mac, if the app runs one (the local path).
+    var localRunner: @Sendable () async -> LocalRunner? = { nil }
     private var client: Client { connection.client }
 
     func terminals() async throws -> [TerminalItem] {
@@ -219,6 +227,42 @@ struct LiveTerminalService: TerminalService {
 
     func attach(_ id: String, after: UInt64) async throws -> any TerminalLink {
         try await run { try await connection.attachTerminal(id, after: after) }
+    }
+
+    func attach(_ id: String, runner: String?, after: UInt64) async throws -> any TerminalLink {
+        if let runner, let local = try await attacher.attach(id, runner: runner, after: after) { return local }
+        return try await attach(id, after: after)
+    }
+
+    /// The local path's decisions, wired to this Core connection.
+    private var attacher: LocalAttacher {
+        LocalAttacher(
+            localRunner: localRunner,
+            supported: { await connection.serverSupports(minor: LocalAttacher.localMinor) },
+            source: { id in
+                LocalGrantSource(
+                    grant: { try await self.grantLocal(id) },
+                    sign: { try await self.connection.signWithRoutineKey($0) },
+                    release: { await self.releaseLocal(id) })
+            })
+    }
+
+    func grantLocal(_ id: String) async throws -> LocalTerminalGrant {
+        try await run {
+            switch try await client.grantLocalTerminal(path: .init(id: id)) {
+            case .ok(let o):
+                let g = try o.body.json
+                return LocalTerminalGrant(
+                    terminal: g.terminal, runner: g.runner, grant: g.grant, leaseSecs: Int(g.leaseSecs),
+                    socket: g.socket)
+            case .undocumented(let status, let payload): throw await Self.fail(status, payload)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    func releaseLocal(_ id: String) async {
+        _ = try? await client.releaseLocalTerminal(path: .init(id: id))
     }
 
     func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {

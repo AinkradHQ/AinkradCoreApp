@@ -21,15 +21,30 @@ public struct ElevationNotice: Equatable, Sendable {
     }
 }
 
+/// The runner that lives on this Mac (the one the app installed): terminals on it are attached through its own Unix sockets,
+/// without a round trip to the Core.
+public struct LocalRunner: Equatable, Sendable {
+    /// The runner's device id in the Core.
+    public var id: String
+    /// The runner's terminal folder (`<state>/terminals`), where each host keeps `<terminal>.local.sock`.
+    public var terminals: URL
+    public init(id: String, terminals: URL) {
+        self.id = id
+        self.terminals = terminals
+    }
+}
+
 /// What the terminal screens need from the app that owns the connection: the shell, and Touch ID through the one sheet.
 @MainActor
-public protocol TerminalHost: AnyObject {
+public protocol TerminalHost: AnyObject, Sendable {
     var shell: ShellModel { get }
     /// Whether the session is elevated right now.
     var isElevated: Bool { get }
     /// The inline outcome of the last Touch ID that did not elevate; cleared by the next attempt.
     var elevationNotice: ElevationNotice? { get }
     func clearElevationNotice()
+    /// The runner on this Mac, when the app runs one that is up; nil otherwise (every terminal then goes through the Core).
+    var localRunner: LocalRunner? { get }
     /// Runs `op` elevated: Touch ID first when needed, once more when the Core still says `step_up_required`. Throws
     /// `ElevationDeclined` when the person did not elevate (`elevationNotice` says why).
     /// `keepsEdit`: the person's input is still on screen (a form), so the notice may say so.
@@ -39,6 +54,7 @@ public protocol TerminalHost: AnyObject {
 }
 
 extension TerminalHost {
+    var localRunner: LocalRunner? { nil }
     public var thisMacRunnerID: String? { nil }
 }
 

@@ -48,6 +48,11 @@ actor SessionManager {
 
     func now() -> Int64 { Int64(clock.now().timeIntervalSince1970) }
 
+    /// ES256 over `message` with the routine key: the proof of possession a local terminal attach gives its host.
+    func signWithRoutineKey(_ message: Data) throws -> Data {
+        do { return try key.sign(message) } catch { throw CoreError.keyStore("the routine key could not sign") }
+    }
+
     // MARK: sessions
 
     func needsRefresh(_ s: CoreSession, at t: Int64) -> Bool {
