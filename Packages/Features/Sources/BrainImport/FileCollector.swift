@@ -37,11 +37,14 @@ public struct LineCollector: FileCollector {
     /// A project hint known from the path, and whether file times stand in for missing timestamps.
     let hint: @Sendable (URL) -> String?
     let usesFileTime: Bool
+    /// A title known from outside the file; nil leaves it to the first user turn.
+    let titleFor: @Sendable (URL) -> String?
 
     init(
         device: String, files: any FileAccess, chunk: Int, maxLine: Int, gauge: BufferGauge?, kind: String,
         defaultTitle: String, strictFirst: Bool = false, usesFileTime: Bool = false,
         hint: @escaping @Sendable (URL) -> String? = { _ in nil },
+        titleFor: @escaping @Sendable (URL) -> String? = { _ in nil },
         accepts: @escaping @Sendable (URL) -> Bool,
         decode: @escaping @Sendable ([String: Any], Bool) -> SessionStream.Read
     ) {
@@ -55,6 +58,7 @@ public struct LineCollector: FileCollector {
         self.strictFirst = strictFirst
         self.usesFileTime = usesFileTime
         self.hint = hint
+        self.titleFor = titleFor
         self.acceptsFile = accepts
         self.decode = decode
     }
@@ -64,7 +68,8 @@ public struct LineCollector: FileCollector {
     public func stream(file url: URL, sink: (ImportItem) async throws -> Void) async throws -> String? {
         var s = SessionStream(
             path: url.path, device: device, gauge: gauge, kind: kind, defaultTitle: defaultTitle, cwd: hint(url),
-            startedAt: usesFileTime ? files.modified(of: url).map(isoTime) : nil, strictFirst: strictFirst)
+            startedAt: usesFileTime ? files.modified(of: url).map(isoTime) : nil,
+            title: titleFor(url), strictFirst: strictFirst)
         var failure: Error?
         var skip: String?
         func emit(_ items: [ImportItem]) async -> Bool {

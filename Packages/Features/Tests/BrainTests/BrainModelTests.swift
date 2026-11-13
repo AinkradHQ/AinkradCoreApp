@@ -220,7 +220,7 @@ struct SampleImportTests {
         let m = ImportModel(
             host: FakeHost(), routes: routes, sources: SampleImportSource.all, poll: .milliseconds(1), pause: { _ in })
         await m.scan()
-        #expect(m.chosen.map(\.id) == ["claude_code", "codex", "opencode"])
+        #expect(m.chosen.map(\.id) == ["claude_code", "codex", "opencode", "antigravity"])
         m.start()
         for _ in 0..<500 where m.step != .review { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(m.step == .review && m.review.visible.last?.isUnsorted == true)
