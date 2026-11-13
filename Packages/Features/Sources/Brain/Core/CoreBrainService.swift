@@ -29,7 +29,8 @@ public final class CoreBrainService: BrainService, @unchecked Sendable {
         switch s.key {
         case "ok": break
         case "locked_mode0": return .locked("Keys and secrets are off on this Core, so the Brain is locked.")
-        case "missing": return .locked("The Brain has no key yet.")
+        // No key yet = never imported: the first import makes the key, so this is "not set up", not locked.
+        case "missing": return .notSetUp
         default: return .locked("The Brain is not available right now.")
         }
         return s.rooms == 0 ? .notSetUp : .ready
