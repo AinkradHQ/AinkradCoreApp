@@ -189,7 +189,7 @@ public final class BrainModel {
             if let id = inspectingID, room(id)?.lock != nil { clearRoomView() }
             if viewingLock != nil { clearRoomView() }
         } catch {
-            load = .failed(BrainWords.failure(error))
+            load = .failed(BrainWords.loadFailure(error))
         }
         refreshBell()
         host.shell.updatePane("brain", sub: .some(viewing?.name), chip: .some(chip))

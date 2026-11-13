@@ -65,6 +65,7 @@ public final class TerminalsDemo {
     }
 
     nonisolated static let esc = "\u{1b}"
+    nonisolated static let prompt = "\(esc)[38;2;127;184;255m~/acme-shop\(esc)[0m $ "
     nonisolated static let screen: String = {
         let p = "\(esc)[38;2;127;184;255m~/acme-shop\(esc)[0m $ "
         let ok = "\(esc)[38;2;52;211;153mok\(esc)[0m"
@@ -123,8 +124,9 @@ public final class TerminalsDemo {
         "list", "live", "letterbox", "elsewhere", "detached", "orphaned", "exited", "gone", "host-lost",
         "runner-offline",
         "stepup-expired", "reconnecting", "resumed", "snapshot", "attaching", "failed", "runners", "runner-detail",
+        "runner-login-shell",
         "runner-degraded", "runner-offline-detail", "runner-busy", "new-terminal", "new-busy", "new-offline",
-        "new-stepup", "end-confirm", "launcher", "bell",
+        "new-stepup", "end-confirm", "launcher", "bell", "instant", "instant-large",
     ]
 
     func reset() {
@@ -136,6 +138,9 @@ public final class TerminalsDemo {
         ]
         // A runner that reports its policy, so "What it offers" shows the AI-sessions-at-once stepper.
         service.runnerList[0].policy = RunnerPolicy(terminals: true, agents: true, capacity: 2)
+        // The terminal-shell fact: both cases (linux-01 is an older runner and reports nothing).
+        service.runnerList[0].tools["terminal shell"] = "Ainkrad zsh"
+        service.runnerList[2].tools["terminal shell"] = "login shell (no Ainkrad shell profile installed)"
         service.terminalList = [
             Self.item("t_1a2b3c4d5e6f7a8b", runner: "mac-studio", attached: 1),
             Self.item("t_2b3c4d5e6f7a8b9c", runner: "linux-01", attached: 1, cols: 64, rows: 24, ageMinutes: 190),
@@ -159,6 +164,7 @@ public final class TerminalsDemo {
     /// Shows one scene: panes are closed first, then what the scene needs is opened.
     public func show(_ scene: String) async {
         shell.closeAllPanes()
+        if !scene.hasPrefix("instant") { TerminalPrefs.shared.fontSize = 12 }
         // Let the closing panes leave before the next scene opens one with the same id.
         try? await Task.sleep(for: .milliseconds(450))
         shell.closeDialog()
@@ -194,6 +200,17 @@ public final class TerminalsDemo {
             await pane(0, .attached(letterbox: false))
             model.openList()
         case "live": await pane(0, .attached(letterbox: false))
+        case "instant", "instant-large":
+            TerminalPrefs.shared.fontSize = scene == "instant" ? 12 : 17
+            await pane(0, .attached(letterbox: false))
+            let s = model.sessions[id(0)]!
+            // CORE_DEMO_ECHO_DELAY_MS: how late each echo comes back, as over a slow link (default 300).
+            let ms = Int(ProcessInfo.processInfo.environment["CORE_DEMO_ECHO_DELAY_MS"] ?? "") ?? 300
+            s.surface.feed(Data("\r\n\(Self.prompt)".utf8))
+            Task {
+                await s.surface.debugSlowEcho(
+                    train: "gi", text: "t status --short", delay: .milliseconds(ms), hold: .milliseconds(ms * 10))
+            }
         case "letterbox":
             service.terminalList[0].attached = 2
             await model.reload()
@@ -219,6 +236,7 @@ public final class TerminalsDemo {
                 screen: false)
         case "runners": model.openRunners()
         case "runner-detail": model.openRunners(service.runnerList[0].id)
+        case "runner-login-shell": model.openRunners(service.runnerList[2].id)
         case "runner-degraded":
             service.runnerList[2].degraded = true
             await model.reload()
