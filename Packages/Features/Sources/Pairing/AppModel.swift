@@ -66,6 +66,9 @@ public final class AppModel {
     /// One per terminal Core has warned about: the toast it owns and the task that keeps its words fresh until `reap_at`.
     private var reaps: [String: (toast: UUID, watch: Task<Void, Never>)] = [:]
     private var expiry: Task<Void, Never>?
+    /// The clock and the wait the reap watch runs on; a test replaces both so no real time passes.
+    var reapNow: @Sendable () -> Date = { Date() }
+    var reapPause: @Sendable (TimeInterval) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
 
     /// The app: pairing and the connection live in the Keychain. `demo` (Debug) skips both and shows the sample desktop.
     public convenience init(keyStore: any KeyStore = makeKeychainKeyStore(), demo: Bool = false, sasFile: String? = nil)
@@ -399,14 +402,14 @@ public final class AppModel {
     private func reapWarning(_ f: [String: String]) {
         let tid = f["terminal"] ?? "unknown"
         clearReap(tid)
-        let at = AccountNotice.reapAt(f, now: Date())
+        let at = AccountNotice.reapAt(f, now: reapNow())
         let toastID = UUID()
         let keep: @Sendable @MainActor () -> Void = { [weak self] in
             self?.clearReap(tid)
             if tid != "unknown" { _ = self?.terminals?.openTerminal(tid) }
         }
         func show(first: Bool = false) {
-            let now = Date()
+            let now = reapNow()
             let words = AccountNotice.toast(
                 kind: "terminal.reap_warning", fields: f,
                 terminal: { [terminals] in terminals?.displayName(ofTerminal: $0) },
@@ -430,10 +433,17 @@ public final class AppModel {
         reaps[tid] = (
             toastID,
             Task { [weak self] in
-                while !Task.isCancelled, at.timeIntervalSinceNow > 0 {
-                    try? await Task.sleep(for: .seconds(min(15, max(at.timeIntervalSinceNow, 0.1))))
-                    guard !Task.isCancelled, let self else { return }
-                    if at.timeIntervalSinceNow > 0 { show() } else { self.clearReap(tid) }
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    // A `reap_at` that is already past (or passes while waiting) clears the entry; it never lingers.
+                    let left = at.timeIntervalSince(self.reapNow())
+                    if left <= 0 {
+                        self.clearReap(tid)
+                        return
+                    }
+                    await self.reapPause(min(15, left))
+                    guard !Task.isCancelled, at.timeIntervalSince(self.reapNow()) > 0 else { continue }
+                    show()
                 }
             }
         )
