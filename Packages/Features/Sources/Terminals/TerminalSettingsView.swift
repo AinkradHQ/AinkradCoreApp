@@ -75,6 +75,18 @@ struct TerminalSettingsView: View {
                             + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
                         selection: $prefs.defaultRunner, fill: true)
                 }
+                SettingRow("Instant typing", symbol: "keyboard") {
+                    CoreSegmented(
+                        "Instant typing",
+                        segments: [
+                            CoreSegment("automatic", "Automatic", symbol: "bolt"),
+                            CoreSegment("off", "Off", symbol: "bolt.slash"),
+                        ],
+                        selection: Binding(
+                            get: { prefs.instantTyping.rawValue },
+                            set: { prefs.instantTyping = InstantTypingMode(rawValue: $0) ?? .automatic }),
+                        fill: true)
+                }
                 HStack(spacing: Space.s2) {
                     GlassToggleTile(
                         "Open full pane", sub: "A new terminal fills its pane.",

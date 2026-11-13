@@ -79,14 +79,14 @@ final class TerminalSession {
             let l: any TerminalLink
             if prompt {
                 l = try await host.elevated("Attach to the terminal on \(machine).", done: "attached") {
-                    try await self.service.attach(self.id, after: after)
+                    try await self.service.attach(self.id, runner: self.item.runner, after: after)
                 }
             } else {
                 guard host.isElevated else {
                     link = .stepUp
                     return
                 }
-                l = try await service.attach(id, after: after)
+                l = try await service.attach(id, runner: item.runner, after: after)
             }
             begin(l, after: after)
         } catch is ElevationDeclined {
@@ -203,7 +203,7 @@ final class TerminalSession {
         }
         let after = cursor ?? 0
         do {
-            let l = try await service.attach(id, after: after)
+            let l = try await service.attach(id, runner: item.runner, after: after)
             begin(l, after: after)
             return true
         } catch let e as CoreError {

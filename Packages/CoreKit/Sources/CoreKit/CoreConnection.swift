@@ -79,6 +79,11 @@ public actor CoreConnection {
     /// Stops the background refresh. Event streams end with their consumers.
     public func close() async { await sessions.stopAutoRefresh() }
 
+    /// Signs `message` with this device's routine key (the local terminal path's proof of possession).
+    public func signWithRoutineKey(_ message: Data) async throws -> Data {
+        try await sessions.signWithRoutineKey(message)
+    }
+
     /// The API minor both sides speak (§14a), after the first handshake.
     public var negotiatedMinor: Int32? { get async { await sessions.negotiatedMinor } }
 

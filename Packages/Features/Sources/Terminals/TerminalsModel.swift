@@ -62,7 +62,10 @@ public final class TerminalsModel {
     private var registeredRunners: Set<String> = []
 
     public convenience init(host: any TerminalHost, connection: CoreConnection) {
-        self.init(host: host, service: LiveTerminalService(connection: connection))
+        self.init(
+            host: host,
+            service: LiveTerminalService(
+                connection: connection, localRunner: { [weak host] in await host?.localRunner }))
     }
 
     init(host: any TerminalHost, service: any TerminalService) {

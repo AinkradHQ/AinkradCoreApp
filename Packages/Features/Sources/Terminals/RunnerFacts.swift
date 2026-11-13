@@ -22,12 +22,27 @@ struct RunnerFacts: Equatable {
     /// The tools an agent can run here with their versions ("claude 2.1.318"), else the harness names the agent driver lists.
     var tools: [String] {
         if !runner.tools.isEmpty {
-            return runner.tools.keys.sorted().map { k in
+            return runner.tools.keys.filter { $0 != Self.shellKey }.sorted().map { k in
                 let v = runner.tools[k] ?? ""
                 return v.isEmpty ? k : "\(k) \(v)"
             }
         }
         return (runner.drivers.first { $0.name == "agent" }?.slots.keys.sorted()) ?? []
+    }
+    static let shellKey = "terminal shell"
+
+    /// What the runner says its terminals start: "Ainkrad zsh", or the login shell with the reason ("zsh is not installed").
+    /// nil when it does not report it (older runners) or says something this app does not know.
+    enum TerminalShell: Equatable {
+        case ainkrad
+        case login(reason: String?)
+    }
+    var terminalShell: TerminalShell? {
+        guard let v = runner.tools[Self.shellKey] else { return nil }
+        if v == "Ainkrad zsh" { return .ainkrad }
+        guard v.hasPrefix("login shell") else { return nil }
+        let reason = v.drop { $0 != "(" }.dropFirst().dropLast(v.hasSuffix(")") ? 1 : 0)
+        return .login(reason: reason.isEmpty ? nil : String(reason))
     }
     var commandsOn: Bool { runner.drivers.contains { $0.commands.contains("exec.run") } }
     var terminalCapacity: Int? {
