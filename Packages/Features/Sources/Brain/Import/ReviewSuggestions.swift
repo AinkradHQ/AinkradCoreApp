@@ -161,10 +161,11 @@ private struct ClosestHintRow: View {
     let hint: ClosestHint
     let review: ReviewModel
     var body: some View {
+        let item = review.hintItem(hint)
         CoreRow(
-            "Looks like it belongs in \(hint.roomName) (\(ReviewWords.score(hint.score)))",
-            subtitle: hint.runnerUp.map { "Next closest: \($0.roomName) (\(ReviewWords.score($0.score)))" }
-                ?? "An item in No room yet",
+            item.map { $0.title.isEmpty ? "Untitled" : $0.title } ?? "",
+            subtitle: "Looks like it belongs in \(hint.roomName) (\(ReviewWords.score(hint.score)))"
+                + (hint.runnerUp.map { " · next closest \($0.roomName) (\(ReviewWords.score($0.score)))" } ?? ""),
             symbol: "arrow.turn.down.right"
         ) {
             Buttons(

@@ -121,7 +121,14 @@ actor SampleImportTransport: BrainTransport {
             _ = try update(p[3]) { $0.itemCount -= ids.count }
             return try e.encode(made)
         case ("GET", 5, "items"):
-            let rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
+            var rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
+            if p[3] == ProposalCard.unsortedID {
+                rows += [
+                    ItemRow(id: "c1", cursor: 4, title: "Checkout page: tenant-level tax settings"),
+                    ItemRow(id: "c2", cursor: 5, title: "Pruning the old apple trees in spring"),
+                    ItemRow(id: "c3", cursor: 6, title: "Variant B of the pricing page"),
+                ]
+            }
             return try e.encode(ItemPage(items: rows, next: nil))
         case ("PATCH", 4, let id):
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]

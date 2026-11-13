@@ -24,9 +24,11 @@ extension ReviewModel {
             return from.suggestMerge?.into != m.to
         }
     }
+    /// Only hints whose item is known by name: a nameless suggestion tells the person nothing.
     public var closestHints: [ClosestHint] {
-        (semantic?.closest ?? []).filter { !dismissed.contains(Self.key($0)) }
+        (semantic?.closest ?? []).filter { hintItems[$0.itemId] != nil && !dismissed.contains(Self.key($0)) }
     }
+    public func hintItem(_ h: ClosestHint) -> ItemRow? { hintItems[h.itemId] }
     public var hasHints: Bool {
         !roomHints.isEmpty || !copyHints.isEmpty || !mergeHints.isEmpty || !closestHints.isEmpty
     }
@@ -87,6 +89,28 @@ extension ReviewModel {
     func readSemantic() async {
         guard let run, let v = try? await routes.semantic(run: run) else { return }
         semantic = v
+        await nameHintItems(v.closest.map(\.itemId))
+    }
+
+    /// Reads the Unsorted card's items page by page (never more than `maxPages`) until every id is named. One pass per id.
+    func nameHintItems(_ ids: [String], maxPages: Int = 30) async {
+        guard let run else { return }
+        var need = Set(ids).subtracting(hintItems.keys).subtracting(hintLooked)
+        guard !need.isEmpty else { return }
+        hintLooked.formUnion(need)
+        var after: Int?
+        for _ in 0..<maxPages {
+            guard
+                let page = try? await routes.items(
+                    run: run, proposal: ProposalCard.unsortedID, after: after, limit: 100)
+            else { return }
+            for row in page.items where need.contains(row.id) {
+                hintItems[row.id] = row
+                need.remove(row.id)
+            }
+            guard !need.isEmpty, let next = page.next else { return }
+            after = next
+        }
     }
 
     /// Reads now, and again every few seconds while the model works. Quiet: never sets a notice, never blocks.

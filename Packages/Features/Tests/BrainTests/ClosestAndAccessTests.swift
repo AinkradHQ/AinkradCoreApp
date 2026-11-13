@@ -36,6 +36,17 @@ struct ClosestAndAccessTests {
         t.routes["GET \(Self.base)/semantic"] = { _ in
             try JSONSerialization.jsonObject(with: JSONEncoder().encode(hints))
         }
+        // The Unsorted card names i1 and i3 (on two pages); nobody names i2.
+        t.routes["GET \(Self.base)/proposals/unsorted/items"] = { _ in
+            [
+                "items": [
+                    [
+                        "id": "i1", "cursor": 1, "title": "Tax settings", "started_at": "2026-11-01T10:00:00Z",
+                        "source_kind": "claude_code", "warnings": [String](),
+                    ]
+                ], "next": 1,
+            ]
+        }
         let moved = Seen()
         t.routes["PATCH \(Self.base)/items"] = { b in
             moved.body = b.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
@@ -53,6 +64,14 @@ struct ClosestAndAccessTests {
         let r = ReviewModel(host: FakeHost(), routes: BrainRoutes(transport: t))
         r.run = "r1"
         await r.readSemantic()
+        // A hint whose item no page names is hidden, not shown nameless.
+        #expect(r.closestHints.map(\.itemId) == ["i1"] && r.hintItem(r.closestHints[0])?.title == "Tax settings")
+        #expect(t.count("GET \(Self.base)/proposals/unsorted/items") >= 2)
+        let asked = t.count("GET \(Self.base)/proposals/unsorted/items")
+        await r.readSemantic()
+        #expect(t.count("GET \(Self.base)/proposals/unsorted/items") == asked)  // cached: no second walk
+        r.hintItems["i2"] = ItemRow(id: "i2", title: "Orchard pruning")
+        r.hintItems["i3"] = ItemRow(id: "i3", title: "Pricing variant")
         #expect(r.closestHints.count == 3 && r.hasHints)
         r.dismiss(r.closestHints[2])
         #expect(r.closestHints.count == 2 && t.count("PATCH \(Self.base)/items") == 0)

@@ -25,6 +25,10 @@ public final class ReviewModel {
     /// How long to wait between two reads while the model works.
     var pollEvery: Duration = .seconds(5)
     var watching: Task<Void, Never>?
+    /// Items named by a closest-room hint, read once from the Unsorted card and kept for this sheet.
+    var hintItems: [String: ItemRow] = [:]
+    /// Ids already looked for, so a poll never asks the Core for the same missing item again.
+    var hintLooked: Set<String> = []
 
     public init(host: any AdminHost, routes: BrainRoutes) {
         self.host = host
