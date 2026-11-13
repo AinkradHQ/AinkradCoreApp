@@ -263,7 +263,20 @@ public final class ImportModel {
         baseline = nil
         defer { job = nil }
         do {
-            let id = try await runID()
+            let (id, state) = try await runID()
+            // A saved run the Core already moved on: open where it is instead of sending to it again.
+            if state == "review" {
+                try await review.load(run: id)
+                step = .review
+                return
+            }
+            if state == "discovering" {
+                phase = .discovering
+                try await waitForReview(run: id)
+                try await review.load(run: id)
+                step = .review
+                return
+            }
             localSkipped = [:]
             itemsFound = 0
             phase = .uploading
@@ -299,23 +312,26 @@ public final class ImportModel {
         }
     }
 
-    /// The run in hand, or the one saved on this Mac if the Core still knows it, or a new one.
-    private func runID() async throws -> String {
-        if let run { return run }
+    /// The run in hand, or the one saved on this Mac if the Core still has it open, or a new one; with its state.
+    /// A saved run is resumed only while it is collecting, discovering or in review: one the Core has committed or
+    /// abandoned is forgotten, and a new run starts (sending to a closed run is refused, 409 "not collecting").
+    private func runID() async throws -> (String, String) {
+        if let run { return (run, "collecting") }
         let ids = chosen.map(\.id)
         if let saved = resume?.load(), let r = saved.run, Set(saved.sources.keys).isSubset(of: ids),
-            (try? await routes.run(r)) != nil
+            let view = try? await routes.run(r), ["collecting", "discovering", "review"].contains(view.state)
         {
             resumeState = saved
             run = r
-            return r
+            return (r, view.state)
         }
+        resume?.clear()
         let id = try await routes.startRun(kind: "full", sources: ids)
         run = id
         resumeState = ResumeState()
         resumeState.run = id
         resume?.save(resumeState)
-        return id
+        return (id, "collecting")
     }
 
     private nonisolated func remember(_ source: String, _ s: SourceResume) {

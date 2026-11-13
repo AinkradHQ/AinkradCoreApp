@@ -279,6 +279,29 @@ struct BrainImportFlowTests {
         m.start()
         await untilStep(m, .review)
         #expect(m.step == .review && m.run == "r1" && t.count("POST /modules/brain/v1/imports") == 0)
+        #expect(t.count("POST /modules/brain/v1/imports/r1/items") == 0, "a run in review is opened, not sent to again")
+    }
+
+    @Test func aSavedRunTheCoreClosedIsForgottenAndANewOneStarts() async throws {
+        let t = FakeBrainTransport()
+        let store = ResumeStore(
+            url: FileManager.default.temporaryDirectory.appendingPathComponent("brain-state-\(UUID().uuidString).json"))
+        var saved = ResumeState()
+        saved.run = "old"
+        store.save(saved)
+        t.routes["GET /modules/brain/v1/imports/old"] = { _ in runView("committed", stored: 2) }
+        t.routes["POST /modules/brain/v1/imports"] = { _ in ["run": "r1"] }
+        t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in ["results": []] }
+        t.routes["POST /modules/brain/v1/imports/r1/collected"] = { _ in runView("discovering", stored: 2) }
+        t.routes["GET /modules/brain/v1/imports/r1"] = { _ in runView("review", stored: 2) }
+        t.routes["GET /modules/brain/v1/imports/r1/proposals"] = { _ in [card("alpha")] }
+        let m = ImportModel(
+            host: FakeHost(), routes: BrainRoutes(transport: t), sources: [FakeSource()], poll: .milliseconds(1),
+            resume: store, pause: { _ in })
+        m.start()
+        await untilStep(m, .review)
+        #expect(m.run == "r1" && t.count("POST /modules/brain/v1/imports") == 1)
+        #expect(t.count("POST /modules/brain/v1/imports/old/items") == 0, "nothing is sent to a closed run")
     }
 
     @Test func statusLineReadsTheCoresCounts() async {
