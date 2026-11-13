@@ -23,6 +23,8 @@ public final class BrainModel {
     @ObservationIgnored public var importSources: @Sendable () -> [any ImportSource] = {
         ImportSources.standard()
     }
+    /// Where the wizard's Notes and docs look: the person's folders or a disk search. Tests and the Debug gallery replace it.
+    @ObservationIgnored public var importPlaces: ImportPlaces? = ImportPlaces.shared
     /// Sync now, sources and rules on the Rooms page; nil until a service attaches.
     public private(set) var sync: SyncModel?
     /// Every known room. A sealed one carries a name and mode only (`RoomSummary.counts` is nil).

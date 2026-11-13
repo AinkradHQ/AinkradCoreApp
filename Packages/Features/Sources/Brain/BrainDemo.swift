@@ -20,7 +20,7 @@ public final class BrainDemo {
         // The Brain M3 states of brain-m3.html, in the mockup's order.
         "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
         "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
-        "import", "import-review",
+        "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -93,7 +93,11 @@ public final class BrainDemo {
         }
         // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
         s.imports = true
-        model.importSources = { SampleImportSource.all }
+        let places = SampleImportSource.demoPlaces(
+            scene.hasPrefix("import-where-d") || scene == "import-where-searching" ? .disk : .folders,
+            endless: scene == "import-where-searching")
+        model.importPlaces = places
+        model.importSources = { SampleImportSource.withNotes(places) }
         if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))
             await model.reload()
@@ -157,7 +161,7 @@ public final class BrainDemo {
         case "worst-overview": model.show(.overview)
         case "worst-rooms": model.show(.rooms)
         case "worst-inbox": await inbox(.noRoom)
-        case "import":
+        case "import", "import-where-folders", "import-where-disk", "import-where-searching":
             model.show(.rooms)
             model.openImport()
         case "import-review":

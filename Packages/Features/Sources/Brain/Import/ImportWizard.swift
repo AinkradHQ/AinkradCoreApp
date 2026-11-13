@@ -11,7 +11,7 @@ extension BrainModel {
         if importer == nil || importer?.step == .done {
             importer = ImportModel(
                 host: host, routes: routes, sources: importSources(),
-                resume: service?.isSample == true ? nil : .standard())
+                resume: service?.isSample == true ? nil : .standard(), places: importPlaces)
             importer?.service = service
         }
         guard let importer, await importer.reviewExisting(run) else {
@@ -36,7 +36,7 @@ extension BrainModel {
         if importer == nil || importer?.step == .done {
             importer = ImportModel(
                 host: host, routes: routes, sources: importSources(),
-                resume: service?.isSample == true ? nil : .standard())
+                resume: service?.isSample == true ? nil : .standard(), places: importPlaces)
             importer?.service = service
         }
         guard let importer else { return }
@@ -118,8 +118,12 @@ private struct SourcesStep: View {
                     Text(g).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
                         .padding(.horizontal, Space.s3).padding(.top, Space.s2)
                         .accessibilityAddTraits(.isHeader)
+                    if g == SyncWords.notesGroup, model.places != nil { WhereBlock(model: model) }
                     ForEach($m.choices) { $c in
-                        if SyncWords.group(c.id) == g { row($c) }
+                        if SyncWords.group(c.id) == g {
+                            row($c)
+                            if c.id == "chat", model.places != nil { ChatFolderLine(model: model) }
+                        }
                     }
                 }
             }
@@ -127,9 +131,15 @@ private struct SourcesStep: View {
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .padding(.horizontal, Space.s3)
             WizardFooter(
-                back: ("Cancel", close), note: summary, primary: ("Start", { model.start() }), enabled: model.canStart)
+                back: (
+                    "Cancel",
+                    {
+                        model.stopSearch()
+                        close()
+                    }
+                ), note: summary, primary: ("Start", { model.start() }), enabled: model.canStart)
         }
-        .task { await model.scan() }
+        .task(id: ObjectIdentifier(model)) { await model.scan() }
     }
 
     private func row(_ c: Binding<ImportModel.Choice>) -> some View {

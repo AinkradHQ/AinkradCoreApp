@@ -126,16 +126,11 @@ public struct NotReadableSource: ImportSource {
 
 /// Every source the wizard offers on this Mac.
 public enum ImportSources {
-    public static var chatExportsFolder: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Documents/Chat exports")
-    }
-
-    public static func standard() -> [any ImportSource] {
+    /// The Notes and docs sources read where `places` points (nothing, until the person chooses): never a fixed folder.
+    public static func standard(places: ImportPlaces = .shared) -> [any ImportSource] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let device = Host.current().localizedName ?? "Mac"
-        let projects = home.appending(path: "Home/Projects")
         let agy = home.appending(path: ".gemini/antigravity-cli")
-        func markdown(_ l: MarkdownCollector.Layout) -> MarkdownCollector { .init(layout: l, device: device) }
         return [
             ClaudeCodeSource.standard(),
             FolderSource(
@@ -152,16 +147,10 @@ public enum ImportSources {
             NotReadableSource(
                 id: "kimi", title: "Kimi sessions",
                 reason: "No Kimi history was found on this Mac, so its format could not be checked.", absent: true),
-            FolderSource(id: "doc", title: "Project docs", root: projects, collector: markdown(.projectDocs)),
-            FolderSource(
-                id: "vault", title: "Notes vault (Ainkrad)", root: home.appending(path: "Ainkrad"),
-                collector: markdown(.vault)),
-            FolderSource(
-                id: "agents_md", title: "AGENTS.md and CLAUDE.md files", root: projects,
-                collector: markdown(.agentFiles)),
-            FolderSource(
-                id: "chat", title: "Chat exports", root: chatExportsFolder,
-                collector: ChatExportCollector(device: device)),
+            PlacesSource(.doc, places: places, device: device),
+            PlacesSource(.vault, places: places, device: device),
+            PlacesSource(.agents, places: places, device: device),
+            PlacesSource(.chat, places: places, device: device),
         ]
     }
 }

@@ -40,6 +40,8 @@ public final class ImportModel {
     /// Set by the pane: after a commit the imported Mac collectors are registered for incremental sync.
     @ObservationIgnored var service: (any BrainService)?
     let sources: [String: any ImportSource]
+    /// Where "Notes and docs" look; nil when the sources do not read from the person's choices (tests, the sample).
+    let places: ImportPlaces?
     let poll: Duration
     let pause: @Sendable (Int) async -> Void
 
@@ -72,7 +74,7 @@ public final class ImportModel {
 
     public init(
         host: any AdminHost, routes: BrainRoutes, sources: [any ImportSource], poll: Duration = .seconds(1),
-        resume: ResumeStore? = nil,
+        resume: ResumeStore? = nil, places: ImportPlaces? = nil,
         pause: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(for: .seconds(Double(1 << $0))) }
     ) {
         self.host = host
@@ -81,6 +83,10 @@ public final class ImportModel {
         self.poll = poll
         self.pause = pause
         self.resume = resume
+        self.places = places
+        mode = places?.mode ?? .folders
+        folders = places?.folders ?? []
+        chatFolder = places?.chat
         choices = sources.map {
             Choice(
                 id: $0.id, title: $0.title, on: $0.notReadable == nil, notReadable: $0.notReadable,
@@ -92,18 +98,147 @@ public final class ImportModel {
     // MARK: step 1
 
     public var chosen: [Choice] { choices.filter { $0.on && $0.notReadable == nil } }
-    public var canStart: Bool { step == .sources && !chosen.isEmpty && job == nil }
+    public var canStart: Bool { step == .sources && !chosen.isEmpty && job == nil && !searching }
     /// Something is running or waiting for the person: the pane says "Import in progress".
     public var isActive: Bool { run != nil && step != .done }
 
     /// Counts what each source holds, from file names only.
     public func scan() async {
-        for i in choices.indices {
-            guard let source = sources[choices[i].id] else { continue }
-            let r = await source.scan()
-            choices[i].found = r.found
-            choices[i].skipped = r.skipped
+        // Owned by the model, not by the sheet's task: a sheet that is redrawn does not cancel the count halfway.
+        searchJob?.cancel()
+        rescanJob?.cancel()
+        let job = Task {
+            if places != nil { suggestions = await suggest() }
+            await scanChoices(notesOnly: false)
         }
+        rescanJob = job
+        await job.value
+    }
+
+    private func scanChoices(notesOnly: Bool) async {
+        let notes = choices.indices.filter { SyncWords.group(choices[$0].id) == SyncWords.notesGroup }
+        let sessions = choices.indices.filter { !notes.contains($0) }
+        if notesOnly || places?.mode == .disk { for i in notes { choices[i].found = nil } }
+        // Sessions first: their counts do not wait for a whole-disk search.
+        for i in notesOnly ? [] : sessions { await count(i, stale: false) }
+        if let places, places.mode == .folders {
+            let chosen = places.folders
+            notAllowed = await Task.detached { chosen.filter { !Self.canRead($0) }.count }.value
+        }
+        if let places, places.mode == .disk, !notes.isEmpty { await searchDisk(places) }
+        for i in notes { await count(i, stale: true) }
+    }
+
+    /// `stale`: drop the answer when a newer change of place has already cancelled this recount.
+    private func count(_ i: Int, stale: Bool) async {
+        guard let source = sources[choices[i].id] else { return }
+        let r = await source.scan()
+        if stale, Task.isCancelled { return }
+        choices[i].found = r.found
+        choices[i].skipped = r.skipped
+    }
+
+    // MARK: where to look
+
+    public private(set) var mode: ImportPlaces.Mode = .folders
+    public private(set) var folders: [URL] = []
+    public private(set) var chatFolder: URL?
+    /// Folders the app found that look like projects or notes. Offered, never added on their own.
+    public private(set) var suggestions: [URL] = []
+    /// The whole-disk search is running; `checked` counts the files looked at so far.
+    public private(set) var searching = false
+    public private(set) var checked = 0
+    /// How the last search ended, for the line under the choice.
+    public private(set) var searched: DocWalker.Found?
+    @ObservationIgnored private var rescanJob: Task<Void, Never>?
+    @ObservationIgnored private var searchJob: Task<DocWalker.Found, Never>?
+
+    private func suggest() async -> [URL] {
+        guard let places, places.mode == .folders else { return [] }
+        let taken = places.folders
+        return await Task.detached { places.suggestions(excluding: taken) }.value
+    }
+
+    public func setMode(_ m: ImportPlaces.Mode) {
+        guard let places, m != mode, step == .sources else { return }
+        mode = m
+        places.mode = m
+        rescanNotes()
+    }
+
+    public func addFolders(_ urls: [URL]) {
+        guard let places else { return }
+        var seen = Set(folders.map(\.path))
+        let new = urls.filter { seen.insert($0.path).inserted }
+        guard !new.isEmpty else { return }
+        folders += new
+        places.folders = folders
+        suggestions.removeAll { s in folders.contains { $0.path == s.path } }
+        rescanNotes()
+    }
+
+    public func removeFolder(_ url: URL) {
+        guard let places else { return }
+        folders.removeAll { $0.path == url.path }
+        places.folders = folders
+        rescanNotes()
+        Task { suggestions = await suggest() }
+    }
+
+    public func setChatFolder(_ url: URL?) {
+        guard let places else { return }
+        chatFolder = url
+        places.chat = url
+        rescanNotes()
+    }
+
+    /// Stops a search that is running and keeps what it found so far.
+    public func stopSearch() { searchJob?.cancel() }
+
+    public func searchAgain() { rescanNotes() }
+
+    /// Waits for the recount a change of place started.
+    func settled() async { await rescanJob?.value }
+
+    private func rescanNotes() {
+        searchJob?.cancel()
+        rescanJob?.cancel()
+        rescanJob = Task { await scanChoices(notesOnly: true) }
+    }
+
+    /// Walks the home folder off the main actor, with the count shown live. Cancelling keeps the partial answer.
+    private func searchDisk(_ places: ImportPlaces) async {
+        searchGen += 1
+        let mine = searchGen
+        searching = true
+        checked = 0
+        searched = nil
+        let job = Task.detached { [weak self] in
+            places.runSearch { n in Task { @MainActor in self?.checked = n } }
+        }
+        searchJob = job
+        let found = await withTaskCancellationHandler {
+            await job.value
+        } onCancel: {
+            job.cancel()
+        }
+        guard mine == searchGen else { return }
+        searched = found
+        checked = found.checked
+        notAllowed = found.unreadable
+        searching = false
+    }
+
+    /// Folders macOS did not let this app open (Privacy & Security): chosen ones, or those a search met.
+    public private(set) var notAllowed = 0
+    @ObservationIgnored private var searchGen = 0
+
+    /// False only when macOS refuses the folder; a folder that is gone is not a privacy problem.
+    nonisolated static func canRead(_ url: URL) -> Bool {
+        do { _ = try FileManager.default.contentsOfDirectory(atPath: url.path) } catch let e as CocoaError {
+            return e.code != .fileReadNoPermission
+        } catch {}
+        return true
     }
 
     // MARK: step 2

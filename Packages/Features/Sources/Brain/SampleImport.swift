@@ -87,6 +87,48 @@ struct SampleImportSource: ImportSource {
         SampleImportSource(id: "antigravity", title: "Antigravity sessions", found: 18),
     ]
 
+    /// Sessions plus the Notes and docs kinds, whose counts follow what `places` is set to (invented numbers).
+    static func withNotes(_ places: ImportPlaces) -> [any ImportSource] {
+        all + [
+            SampleNotesSource(id: "doc", title: "Project docs", perFolder: 42, wholeDisk: 318, places: places),
+            SampleNotesSource(
+                id: "vault", title: "Notes (Obsidian vaults)", perFolder: 0, wholeDisk: 126, places: places),
+            SampleNotesSource(
+                id: "agents_md", title: "AGENTS.md, CLAUDE.md and README files", perFolder: 9, wholeDisk: 74,
+                places: places),
+            SampleNotesSource(id: "chat", title: "Chat exports", perFolder: 0, wholeDisk: 0, places: places),
+        ]
+    }
+
+    /// A made-up Mac: two folders chosen, two suggested, and a whole-disk search that counts up and finishes. Reads nothing.
+    static func demoPlaces(_ mode: ImportPlaces.Mode, endless: Bool = false) -> ImportPlaces {
+        let base = URL(fileURLWithPath: "/Users/sample")
+        return ImportPlaces(
+            mode: mode,
+            folders: [base.appending(path: "Work/Shop Docs"), base.appending(path: "Studio")],
+            search: { progress in
+                // `endless` stays at a count until stopped, so the walk can show the live line.
+                for n in stride(from: 1000, through: endless ? 0 : 48000, by: 12000) {
+                    progress(n)
+                    Thread.sleep(forTimeInterval: 0.02)
+                }
+                while endless && !Task.isCancelled {
+                    progress(1240)
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
+                var f = DocWalker.Found()
+                f.checked = endless ? 1240 : 48210
+                f.stopped = endless ? "cancelled" : nil
+                f.docFolders = ["/Users/sample/Work/Shop/Docs"]
+                return f
+            },
+            suggest: { taken in
+                [base.appending(path: "Code/Client Sites"), base.appending(path: "Notes Vault")].filter { s in
+                    !taken.contains { $0.path == s.path }
+                }
+            })
+    }
+
     func scan() async -> CollectReport {
         var r = CollectReport()
         r.found = found
@@ -106,5 +148,30 @@ struct SampleImportSource: ImportSource {
         r.items = found
         return r
     }
+}
+
+/// Debug only: a Notes and docs source with invented counts that follow the Where to look choice.
+struct SampleNotesSource: ImportSource {
+    let id: String
+    let title: String
+    let perFolder: Int
+    let wholeDisk: Int
+    let places: ImportPlaces
+
+    func scan() async -> CollectReport {
+        var r = CollectReport()
+        if id == "chat" {
+            r.found = places.chat == nil ? 0 : 6
+        } else {
+            r.found = places.mode == .disk ? wholeDisk : perFolder * places.folders.count
+            if r.found > 20 { r.skipped = ["restricted": 2, "deprecated:Sample": 3] }
+        }
+        return r
+    }
+
+    func stream(
+        run: String, uploader: Uploader, uploaded: Uploader.Progress, resume: SourceResume,
+        save: @Sendable (SourceResume) -> Void, onProgress: @Sendable (StreamProgress) async -> Void
+    ) async throws -> CollectReport { CollectReport() }
 }
 #endif
