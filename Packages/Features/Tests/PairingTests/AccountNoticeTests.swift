@@ -117,12 +117,42 @@ struct AccountNoticeTests {
         #expect(m.shell.toast == nil && m.shell.bell.items.isEmpty)
     }
 
-    @Test func theBellEntryGoesWhenReapAtPasses() async throws {
+    /// A clock the test moves by hand; the reap watch pauses by yielding, so no real time is ever waited on.
+    private final class Hand: @unchecked Sendable {
+        private let lock = NSLock()
+        private var t = Date(timeIntervalSince1970: 1_800_000_000)
+        var now: Date { lock.withLock { t } }
+        func advance(_ secs: Double) { lock.withLock { t = t.addingTimeInterval(secs) } }
+    }
+
+    private func reapModel(_ hand: Hand) -> AppModel {
         let m = AppModel(keyStore: makeMemoryKeyStore(), driver: FakeDriver()) { _ in FakeService() }
-        m.accountNotice("terminal.reap_warning", reapFields(in: 1))
+        m.reapNow = { hand.now }
+        m.reapPause = { _ in await Task.yield() }
+        return m
+    }
+
+    private func reapFields(at date: Date, _ id: String = "t_1") -> [String: String] {
+        ["terminal": id, "reason": "idle", "grace_secs": "120", "reap_at": ISO8601DateFormatter().string(from: date)]
+    }
+
+    @Test func theBellEntryGoesWhenReapAtPasses() async throws {
+        let hand = Hand()
+        let m = reapModel(hand)
+        m.accountNotice("terminal.reap_warning", reapFields(at: hand.now.addingTimeInterval(1)))
         #expect(m.shell.bell.items.count == 1)
-        try await Task.sleep(for: .seconds(2.5))
-        #expect(m.shell.bell.items.isEmpty && m.shell.toast == nil)
+        hand.advance(0.5)
+        for _ in 0..<20 { await Task.yield() }  // lets the watch run; the entry must still be there
+        #expect(m.shell.bell.items.count == 1)
+        hand.advance(0.5)
+        #expect(await until { m.shell.bell.items.isEmpty && m.shell.toast == nil })
+    }
+
+    @Test func aReapAtThatIsAlreadyPastClearsTheEntry() async {
+        let hand = Hand()
+        let m = reapModel(hand)
+        m.accountNotice("terminal.reap_warning", reapFields(at: hand.now.addingTimeInterval(-1)))
+        #expect(await until { m.shell.bell.items.isEmpty && m.shell.toast == nil })
     }
 
     @Test func closesInIsPlainMinutes() {
