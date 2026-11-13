@@ -347,10 +347,14 @@ struct RunnerPage: View {
                 Text("Ainkrad zsh")
             case .login(let reason):
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(reason.map { "Login shell (\($0))" } ?? "Login shell")
-                    Text("Re-run the install command on this machine to get the Ainkrad shell.")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Login shell")
+                    // The reason sits in the quiet line, which wraps: in the value line it was cut off.
+                    Text(
+                        (reason.map { $0.prefix(1).uppercased() + $0.dropFirst() + ". " } ?? "")
+                            + "Re-run the install command on this machine to get the Ainkrad shell."
+                    )
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityElement(children: .combine)
             }
