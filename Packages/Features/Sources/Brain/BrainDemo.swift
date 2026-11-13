@@ -21,7 +21,8 @@ public final class BrainDemo {
         "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
         "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
         "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
-        "import-review-ai-pending", "import-review-ai-ready", "ai-settings",
+        "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-closest", "ai-settings",
+        "room-ai-access",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -87,6 +88,7 @@ public final class BrainDemo {
         case "worst-overview", "worst-rooms", "worst-inbox": s.worst = true
         default: break
         }
+        if scene == "room-ai-access" { s.m3 = true }
         if scene.hasPrefix("m3-") {
             s.m3 = true
             s.noLocalModel = scene == "m3-queued" || scene == "m3-room-queued"
@@ -95,7 +97,9 @@ public final class BrainDemo {
         // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
         s.imports = true
         s.semantic =
-            scene == "import-review-ai-ready" ? "ready" : scene == "import-review-ai-pending" ? "pending" : "off"
+            scene == "import-review-ai-ready"
+            ? "ready"
+            : scene == "import-review-ai-closest" ? "closest" : scene == "import-review-ai-pending" ? "pending" : "off"
         let places = SampleImportSource.demoPlaces(
             scene.hasPrefix("import-where-d") || scene == "import-where-searching" ? .disk : .folders,
             endless: scene == "import-where-searching")
@@ -167,9 +171,16 @@ public final class BrainDemo {
         case "import", "import-where-folders", "import-where-disk", "import-where-searching":
             model.show(.rooms)
             model.openImport()
-        case "import-review", "import-review-ai-pending", "import-review-ai-ready":
+        case "import-review", "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-closest":
             model.show(.rooms)
             await model.openReview(SampleImportTransport.run)
+        case "room-ai-access":
+            model.show(.rooms)
+            model.view("acme-shop")
+            await model.inspect("acme-shop")
+            await model.candidates?.loadPolicy("acme-shop")
+            await model.candidates?.loadAccess("acme-shop")
+            model.candidates?.paneMode = .settings
         case "ai-settings":
             model.show(.rooms)
             model.host.shell.settings.selected = "brain-link"

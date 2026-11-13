@@ -31,6 +31,8 @@ public final class BrainCandidates {
     public internal(set) var draft: CandidateDraft?
     public internal(set) var busy = false
     public internal(set) var policies: [String: RoomPolicy] = [:]
+    /// Each room's extra AI allows. A room is absent until the Core answers (a Core before access has no answer).
+    public internal(set) var access: [String: RoomAccess] = [:]
     public var paneMode: RoomPaneMode = .items
     public internal(set) var runners: [RunnerHistory] = []
     /// The runner whose history collection the sheet is about to turn on.
@@ -48,6 +50,7 @@ public final class BrainCandidates {
         selectedID = nil
         draft = nil
         policies = [:]
+        access = [:]
         runners = []
         runnerSheet = nil
         notice = nil

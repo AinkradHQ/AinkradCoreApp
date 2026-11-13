@@ -23,6 +23,9 @@ public enum ReviewWords {
         }
     }
 
+    /// "0.93": the closeness of an item to a room.
+    public static func score(_ v: Double) -> String { String(format: "%.2f", v) }
+
     public static func warning(_ code: String) -> String { code == "mixed_employers" ? mixed : code }
 
     /// What a card says about its state, or nil for a plain proposed one.

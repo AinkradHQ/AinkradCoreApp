@@ -95,6 +95,10 @@ public struct BrainRoutes: Sendable {
     public func markItems(run: String, ids: [String], mark: String) async throws {
         _ = try await raw("PATCH", "/imports/\(Self.seg(run))/items", ItemsPatchBody(ids: ids, mark: mark))
     }
+    /// Moves items into another proposal of the run (PATCH items with `proposal`).
+    public func moveItems(run: String, ids: [String], to proposal: String) async throws {
+        _ = try await raw("PATCH", "/imports/\(Self.seg(run))/items", ItemsPatchBody(ids: ids, proposal: proposal))
+    }
     /// Step-up route: the caller asks for Touch ID around it.
     public func commit(run: String) async throws -> CommitResult {
         try await call("POST", "/imports/\(Self.seg(run))/commit")

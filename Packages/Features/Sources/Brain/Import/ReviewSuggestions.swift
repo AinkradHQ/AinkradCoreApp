@@ -13,6 +13,16 @@ struct ReviewSuggestions: View {
                     ForEach(review.roomHints, id: \.name) { RoomHintRow(hint: $0, review: review) }
                 }
             }
+            if !review.closestHints.isEmpty {
+                let all = review.closestHints
+                group("Closest rooms") {
+                    ForEach(all.prefix(Self.closestShown), id: \.itemId) { ClosestHintRow(hint: $0, review: review) }
+                    if all.count > Self.closestShown {
+                        Text("and \(all.count - Self.closestShown) more").coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3)
+                    }
+                }
+            }
             if !review.copyHints.isEmpty {
                 group("Near-copies") {
                     ForEach(review.copyHints, id: \.keep) { CopyHintRow(hint: $0, review: review) }
@@ -26,6 +36,8 @@ struct ReviewSuggestions: View {
         }
         .accessibilityIdentifier("brain-review-suggestions")
     }
+
+    static let closestShown = 5
 
     private func group<C: View>(_ title: String, @ViewBuilder rows: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -141,5 +153,27 @@ private struct MergeHintRow: View {
             }
         }
         .accessibilityIdentifier("brain-suggest-merge-\(hint.from)")
+    }
+}
+
+/// One item no rule placed, and the room it looks closest to. The runner-up is only a quiet second line.
+private struct ClosestHintRow: View {
+    let hint: ClosestHint
+    let review: ReviewModel
+    var body: some View {
+        CoreRow(
+            "Looks like it belongs in \(hint.roomName) (\(ReviewWords.score(hint.score)))",
+            subtitle: hint.runnerUp.map { "Next closest: \($0.roomName) (\(ReviewWords.score($0.score)))" }
+                ?? "An item in No room yet",
+            symbol: "arrow.turn.down.right"
+        ) {
+            Buttons(
+                accept: "Accept",
+                help: hint.inReview
+                    ? "Move this item into \(hint.roomName)." : "Make a room called \(hint.roomName) for this item.",
+                busy: review.busy, onAccept: { Task { await review.accept(hint) } },
+                onDismiss: { review.dismiss(hint) })
+        }
+        .accessibilityIdentifier("brain-suggest-closest-\(hint.itemId)")
     }
 }

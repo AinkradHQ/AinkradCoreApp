@@ -74,6 +74,13 @@ public protocol BrainService: Sendable {
     func runners() async throws -> [RunnerHistory]
     /// Turns a runner's history collection on or off. The caller has already asked for Touch ID when turning it on.
     func setRunnerHistory(_ id: String, enabled: Bool) async throws -> RunnerHistory
+
+    // MARK: AI access to a room
+
+    /// Who besides the matching project may see a room through an AI session (`GET /rooms/{room}/access`).
+    func roomAccess(room: String) async throws -> RoomAccess
+    /// Replaces one list. The caller has already asked for Touch ID.
+    func setRoomAccess(room: String, kind: AccessKind, values: [String]) async throws -> RoomAccess
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -110,6 +117,12 @@ extension BrainService {
     public func policy(room: String) async throws -> RoomPolicy { RoomPolicy() }
     public func setPolicy(room: String, _ change: PolicyChange) async throws -> RoomPolicy {
         throw BrainFailure("Room policy comes later.", code: "not_served")
+    }
+    public func roomAccess(room: String) async throws -> RoomAccess {
+        throw BrainFailure("AI access comes later.", code: "not_served")
+    }
+    public func setRoomAccess(room: String, kind: AccessKind, values: [String]) async throws -> RoomAccess {
+        throw BrainFailure("AI access comes later.", code: "not_served")
     }
     public func runners() async throws -> [RunnerHistory] { [] }
     public func setRunnerHistory(_ id: String, enabled: Bool) async throws -> RunnerHistory {

@@ -24,14 +24,21 @@ extension ReviewModel {
             return from.suggestMerge?.into != m.to
         }
     }
-    public var hasHints: Bool { !roomHints.isEmpty || !copyHints.isEmpty || !mergeHints.isEmpty }
+    public var closestHints: [ClosestHint] {
+        (semantic?.closest ?? []).filter { !dismissed.contains(Self.key($0)) }
+    }
+    public var hasHints: Bool {
+        !roomHints.isEmpty || !copyHints.isEmpty || !mergeHints.isEmpty || !closestHints.isEmpty
+    }
 
     static func key(_ h: RoomHint) -> String { "room:\(h.name)" }
     static func key(_ h: DuplicateHint) -> String { "copies:\(h.keep)" }
+    static func key(_ h: ClosestHint) -> String { "closest:\(h.itemId)" }
     static func key(_ h: MergeHint) -> String { "merge:\(h.from)>\(h.to)" }
 
     public func dismiss(_ h: RoomHint) { dismissed.insert(Self.key(h)) }
     public func dismiss(_ h: DuplicateHint) { dismissed.insert(Self.key(h)) }
+    public func dismiss(_ h: ClosestHint) { dismissed.insert(Self.key(h)) }
     public func dismiss(_ h: MergeHint) { dismissed.insert(Self.key(h)) }
 
     /// Unsorted gives the topic's items to a new room.
@@ -50,6 +57,22 @@ extension ReviewModel {
         guard let run else { return }
         await act {
             try await routes.markItems(run: run, ids: h.itemIds.filter { $0 != h.keep }, mark: "refused")
+            await refresh()
+            await readSemantic()
+        }
+    }
+
+    /// A room of this run takes the item by a move; a room filed earlier gets it as a new room named after it, the same
+    /// route as a topic. Never done by itself.
+    public func accept(_ h: ClosestHint) async {
+        guard let run else { return }
+        await act {
+            if h.inReview {
+                try await routes.moveItems(run: run, ids: [h.itemId], to: h.roomId)
+            } else {
+                _ = try await routes.split(
+                    run: run, proposal: ProposalCard.unsortedID, itemIDs: [h.itemId], name: h.roomName)
+            }
             await refresh()
             await readSemantic()
         }

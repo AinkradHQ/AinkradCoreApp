@@ -14,11 +14,15 @@ struct RoomSettings: View {
                 if p.needsLocalModel { queue(p) }
                 policy(p)
                 auto(p)
+                RoomAISessions(c: c, room: room)
             } else {
                 BrainSkeleton(shape: .list)
             }
         }
-        .task(id: room.id) { await c.loadPolicy(room.id) }
+        .task(id: room.id) {
+            await c.loadPolicy(room.id)
+            await c.loadAccess(room.id)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-settings")
     }

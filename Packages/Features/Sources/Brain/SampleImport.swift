@@ -9,6 +9,8 @@ actor SampleImportTransport: BrainTransport {
     /// The local AI's step for this run: `pending`, `ready` or `off`.
     private let semantic: String
     private var hints = SampleImportTransport.sampleHints
+    /// `closest` is the scene that shows only the closest-room suggestions.
+    private var state: String { semantic == "closest" ? "ready" : semantic }
     private var settings: [String: Int] = [
         "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
     ]
@@ -34,6 +36,15 @@ actor SampleImportTransport: BrainTransport {
             MergeHint(
                 from: "pricing-experiment", to: "acme-shop", fromName: "Pricing experiment", toName: "Acme Shop",
                 score: 0.92, reason: "close")
+        ],
+        closest: [
+            ClosestHint(
+                itemId: "c1", roomId: "acme-shop", roomName: "Acme Shop", inReview: true, score: 0.94,
+                runnerUp: ClosestRunnerUp(roomId: "pricing", roomName: "Pricing experiments", score: 0.89)),
+            ClosestHint(
+                itemId: "c2", roomId: "room-orchard", roomName: "Orchard Notes", inReview: false, score: 0.91,
+                runnerUp: ClosestRunnerUp(roomId: "ainkrad", roomName: "Ainkrad", score: 0.86)),
+            ClosestHint(itemId: "c3", roomId: "pricing", roomName: "Pricing experiments", inReview: true, score: 0.9),
         ])
     private var cards: [ProposalCard] = [
         ProposalCard(
@@ -72,17 +83,20 @@ actor SampleImportTransport: BrainTransport {
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
             let ids = Set(b["ids"] as? [String] ?? [])
             hints.duplicates.removeAll { !ids.isDisjoint(with: $0.itemIds) }
+            hints.closest.removeAll { ids.contains($0.itemId) }
+            if let to = b["proposal"] as? String { _ = try? update(to) { $0.itemCount += ids.count } }
             return Data("{}".utf8)
         case ("GET", 3, "proposals"):
             let tagged = cards.map { c -> ProposalCard in
                 var c = c
-                c.semantic = semantic
+                c.semantic = state
                 return c
             }
             return try e.encode(tagged)
         case ("GET", 3, "semantic"):
-            var v = semantic == "ready" ? hints : SemanticView()
-            v.state = semantic
+            var v = state == "ready" ? hints : SemanticView()
+            if semantic == "closest" { v = SemanticView(closest: hints.closest) }
+            v.state = state
             return try e.encode(v)
         case ("GET", 1, "settings"):
             return try e.encode(
@@ -99,6 +113,7 @@ actor SampleImportTransport: BrainTransport {
             let ids = b["item_ids"] as? [String] ?? []
             let name = b["name"] as? String ?? "New room"
             hints.rooms.removeAll { $0.name == name }
+            hints.closest.removeAll { ids.contains($0.itemId) }
             let made = ProposalCard(
                 id: name.lowercased().replacingOccurrences(of: " ", with: "-"), name: name, kind: "project",
                 itemCount: ids.count)
