@@ -112,6 +112,29 @@ enum AuditWords {
         return (who, verb, what)
     }
 
+    /// What started a row, in words; a row from before the Core recorded origins is "Unknown".
+    static func origin(_ o: AuditOrigin?) -> (label: String, symbol: String) {
+        switch o?.kind {
+        case "person": ("A person", "person.fill")
+        case "schedule": ("A schedule", "clock.fill")
+        case "brain_import": ("A Brain import", "square.and.arrow.down.fill")
+        case "brain_distil": ("Brain distilling", "sparkles")
+        case "ai_session": ("An AI session", "sparkles")
+        case "handoff": ("A hand-off", "arrow.triangle.branch")
+        case "system": ("Your Core", "server.rack")
+        default: ("Unknown", "questionmark.circle")
+        }
+    }
+
+    /// "A schedule" or "An AI session, started by a person" when the chain began somewhere else.
+    static func originSentence(_ o: AuditOrigin?) -> String {
+        guard let o else { return origin(nil).label }
+        let first = origin(o).label
+        return o.rootKind == o.kind
+            ? first
+            : "\(first), started by \(origin(AuditOrigin(kind: o.rootKind, reference: nil, rootKind: o.rootKind, rootReference: nil)).label.lowercased())"
+    }
+
     /// An opaque id the Core made (`d_71ws…`, `p_1`, `req4k2`): never shown in a sentence, only as hover help.
     static func isOpaqueID(_ s: String) -> Bool {
         s.range(
@@ -252,6 +275,10 @@ private struct AuditFilters: View {
                     selection: $model.filter.actor
                 )
                 .fixedSize()
+                chip(
+                    "Nobody watching", "moon.zzz.fill", GlassInk.slate, on: model.filter.nobodyWatching
+                ) { model.filter.nobodyWatching.toggle() }
+                .help("Only rows a person did not start: schedules, Brain, AI sessions and the Core itself")
                 if !model.filter.isEmpty {
                     AppActionTile(title: "Clear", symbol: "xmark", key: "", hue: GlassInk.slate) {
                         model.clearFilters()
@@ -362,6 +389,9 @@ private struct AuditList: View {
             (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
                 .lineLimit(1).truncationMode(.middle)
             Spacer(minLength: Space.s2)
+            Text(AuditWords.origin(a.origin).label).coreFont(size: MacTextSize.meta)
+                .foregroundStyle(a.origin == nil ? GlassInk.secondary.opacity(0.6) : GlassInk.secondary)
+                .lineLimit(1).frame(width: Space.s8 * 2.5, alignment: .leading)
             Text(a.at.formatted(date: .omitted, time: .shortened)).coreFont(size: MacTextSize.meta).monospacedDigit()
                 .foregroundStyle(GlassInk.secondary)
         }
@@ -402,6 +432,7 @@ private struct AuditDetail: View {
                     fact("clock.fill", AdminWords.whenExact(a.at))
                     fact(a.actor == .system ? "server.rack" : "person.fill", a.actor.label)
                     fact(area.symbol, area.title)
+                    fact(AuditWords.origin(a.origin).symbol, "Started by: " + AuditWords.originSentence(a.origin))
                 }
                 let rows = AuditWords.detailRows(a, deviceName: { admin.deviceNames[$0] })
                 let pairs = rows.plain

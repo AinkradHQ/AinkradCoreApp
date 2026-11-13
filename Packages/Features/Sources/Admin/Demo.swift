@@ -54,6 +54,7 @@ public final class AdminDemo {
                 (filter.kind.isEmpty || $0.action.hasPrefix(filter.kind))
                     && (filter.target.isEmpty || "\($0.entityKind ?? ""):\($0.entityRef ?? "")".contains(filter.target))
                     && (filter.actor == .any || $0.actor.kind == filter.actor.rawValue)
+                    && (!filter.nobodyWatching || ($0.origin.map { !$0.watched } ?? false))
                     && (before == nil || $0.seq < before!)
             }
             let page = Array(rows.prefix(limit))
@@ -67,7 +68,7 @@ public final class AdminDemo {
         "secrets", "secrets-new",
         "secrets-lease", "secrets-touchid-cancelled", "audit", "audit-selected", "audit-nomatch", "audit-connections",
         "audit-connection-history", "audit-accounts",
-        "audit-agents", "audit-one", "audit-many", "ops",
+        "audit-agents", "audit-nobody", "audit-one", "audit-many", "ops",
         "state-loading",
         "state-empty", "state-error", "state-scope", "banner-resuming", "banner-rate", "banner-renewing",
         "banner-restarted",
@@ -157,6 +158,11 @@ public final class AdminDemo {
             shell.settings.open("audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:2"])
             shell.open(.settings)
             try? await Task.sleep(for: .milliseconds(1200))
+        case "audit-nobody":
+            await open("audit")
+            admin.audit.filter.nobodyWatching = true
+            await admin.audit.reload()
+            admin.audit.selected = admin.audit.items.first?.seq
         case "audit-one", "audit-many":
             service.auditRows = scene == "audit-one" ? [DemoData.audit[0]] : DemoData.audit(1_000)
             admin.audit.reset()
@@ -310,9 +316,28 @@ nonisolated enum DemoData {
         ]
         return (0..<count).map { i in
             let k = kinds[(i * 5 + 3) % kinds.count]
+            // Mostly people; some rows started by a schedule, Brain or an AI session; the oldest few are from before origins.
+            let origin: AuditOrigin? =
+                switch i % 7 {
+                case 6:
+                    AuditOrigin(
+                        kind: "schedule", reference: "brain/sync", rootKind: "schedule", rootReference: "brain/sync")
+                case 4:
+                    AuditOrigin(
+                        kind: "ai_session", reference: "as_01JC4X7Q3MZ8", rootKind: "person",
+                        rootReference: "d_ph18x3Kz")
+                case 2:
+                    AuditOrigin(
+                        kind: "brain_distil", reference: nil, rootKind: "schedule", rootReference: "brain/distil")
+                default:
+                    i >= count - 6
+                        ? nil
+                        : AuditOrigin(
+                            kind: "person", reference: "d_ph18x3Kz", rootKind: "person", rootReference: "d_ph18x3Kz")
+                }
             return AuditItem(
                 seq: Int64(5_230 - i), at: Date().addingTimeInterval(-Double(i) * 1_020 - 300), action: k.0,
-                actor: i % 7 == 6 ? .system : .user(1), entityKind: k.1, entityRef: k.2, details: k.3)
+                actor: i % 7 == 6 ? .system : .user(1), entityKind: k.1, entityRef: k.2, details: k.3, origin: origin)
         }
     }
 
