@@ -112,6 +112,16 @@ extension CoreBrainService {
         }
     }
 
+    // MARK: AI access
+
+    public func roomAccess(room: String) async throws -> RoomAccess {
+        try await wrap { try await routes.roomAccess(room: room) }
+    }
+
+    public func setRoomAccess(room: String, kind: AccessKind, values: [String]) async throws -> RoomAccess {
+        try await wrap { try await routes.putRoomAccess(room: room, kind: kind, values: values) }
+    }
+
     // MARK: runner history
 
     /// A runner's history is one source on `/sources`, `runner-<id>`, off until you turn it on.

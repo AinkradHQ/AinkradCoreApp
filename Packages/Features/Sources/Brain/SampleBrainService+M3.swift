@@ -5,6 +5,10 @@ import Foundation
 struct SampleM3: Sendable {
     var items: [InboxCandidate]
     var policies: [String: RoomPolicy]
+    /// Made-up extra AI allows per room.
+    var access: [String: RoomAccess] = [
+        "acme-shop": RoomAccess(project: ["shop-admin"], runner: ["build-box"], session: ["sess-4f2a"])
+    ]
     var runners: [RunnerHistory]
     let queued: [QueuedRoom]
 
@@ -208,6 +212,17 @@ extension SampleBrainService {
         if p.model == .cloud { p.queued = 0 }
         m3.policies[room] = p
         return p
+    }
+
+    public func roomAccess(room: String) async throws -> RoomAccess {
+        m3.access[room] ?? RoomAccess()
+    }
+
+    public func setRoomAccess(room: String, kind: AccessKind, values: [String]) async throws -> RoomAccess {
+        var a = m3.access[room] ?? RoomAccess()
+        a[kind] = values.sorted()
+        m3.access[room] = a
+        return a
     }
 
     public func runners() async throws -> [RunnerHistory] { m3.runners }

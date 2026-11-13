@@ -68,6 +68,17 @@ public struct BrainRoutes: Sendable {
     func patch(run: String, proposal: String, _ body: ProposalPatchBody) async throws -> ProposalCard {
         try await call("PATCH", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))", body)
     }
+    /// Groups the run again; decisions on rooms that survive are kept.
+    public func regroup(run: String) async throws -> Regrouped {
+        try await call("POST", "/imports/\(Self.seg(run))/regroup")
+    }
+    public func semantic(run: String) async throws -> SemanticView {
+        try await call("GET", "/imports/\(Self.seg(run))/semantic")
+    }
+    public func settings() async throws -> [BrainSettingWire] { try await call("GET", "/settings") }
+    public func setSetting(_ name: String, _ value: Int) async throws -> BrainSettingWire {
+        try await call("PUT", "/settings/\(Self.seg(name))", SettingBody(value: value))
+    }
     public func merge(run: String, proposal: String, into: String) async throws -> ProposalCard {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/merge", MergeBody(into: into))
@@ -83,6 +94,10 @@ public struct BrainRoutes: Sendable {
     /// `mark` is `needed`, `refused` or `clear`.
     public func markItems(run: String, ids: [String], mark: String) async throws {
         _ = try await raw("PATCH", "/imports/\(Self.seg(run))/items", ItemsPatchBody(ids: ids, mark: mark))
+    }
+    /// Moves items into another proposal of the run (PATCH items with `proposal`).
+    public func moveItems(run: String, ids: [String], to proposal: String) async throws {
+        _ = try await raw("PATCH", "/imports/\(Self.seg(run))/items", ItemsPatchBody(ids: ids, proposal: proposal))
     }
     /// Step-up route: the caller asks for Touch ID around it.
     public func commit(run: String) async throws -> CommitResult {

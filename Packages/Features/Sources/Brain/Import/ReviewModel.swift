@@ -18,6 +18,17 @@ public final class ReviewModel {
     public var selected: Set<String> = []
     public internal(set) var notice: String?
     public private(set) var busy = false
+    /// The local model's suggestions, read from `/semantic`; nil until the first read or on a Core without it.
+    public internal(set) var semantic: SemanticView?
+    /// Suggestions the person dismissed. They stay in this sheet only.
+    public internal(set) var dismissed: Set<String> = []
+    /// How long to wait between two reads while the model works.
+    var pollEvery: Duration = .seconds(5)
+    var watching: Task<Void, Never>?
+    /// Items named by a closest-room hint, read once from the Unsorted card and kept for this sheet.
+    var hintItems: [String: ItemRow] = [:]
+    /// Ids already looked for, so a poll never asks the Core for the same missing item again.
+    var hintLooked: Set<String> = []
 
     public init(host: any AdminHost, routes: BrainRoutes) {
         self.host = host
@@ -50,6 +61,7 @@ public final class ReviewModel {
     func load(run: String) async throws {
         self.run = run
         cards = try await routes.proposals(run: run)
+        watchSemantic()
     }
 
     /// Re-reads the cards after an action that touches more than one (merge, split, refuse, commit).
@@ -64,7 +76,7 @@ public final class ReviewModel {
 
     // MARK: actions
 
-    private func act(_ work: () async throws -> Void) async {
+    func act(_ work: () async throws -> Void) async {
         busy = true
         notice = nil
         defer { busy = false }
@@ -114,6 +126,18 @@ public final class ReviewModel {
             _ = try await routes.merge(run: run, proposal: id, into: into)
             await refresh()
             if openID == id { closeCard() }
+        }
+    }
+
+    /// Groups the run again with the Core's current rules, then reads the cards. Decisions on surviving rooms are kept.
+    public func resort() async {
+        guard let run else { return }
+        await act {
+            _ = try await routes.regroup(run: run)
+            await refresh()
+            semantic = nil
+            watchSemantic()
+            closeCard()
         }
     }
 

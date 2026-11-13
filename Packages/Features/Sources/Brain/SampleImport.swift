@@ -6,6 +6,46 @@ import Foundation
 /// nothing on disk, and every room and count is made up.
 actor SampleImportTransport: BrainTransport {
     static let run = "sample-run"
+    /// The local AI's step for this run: `pending`, `ready` or `off`.
+    private let semantic: String
+    private var hints = SampleImportTransport.sampleHints
+    /// `closest` is the scene that shows only the closest-room suggestions.
+    private var state: String { semantic == "closest" ? "ready" : semantic }
+    private var settings: [String: Int] = [
+        "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
+    ]
+
+    init(semantic: String = "off") { self.semantic = semantic }
+
+    /// Made-up suggestions: two topics among Unsorted, two sets of near-copies, one merge no card hints at yet.
+    static let sampleHints = SemanticView(
+        state: "ready",
+        duplicates: [
+            DuplicateHint(keep: "d1", itemIds: ["d1", "d2", "d3"], score: 0.98, reason: "same text"),
+            DuplicateHint(keep: "d4", itemIds: ["d4", "d5"], score: 0.96, reason: "same text"),
+        ],
+        rooms: [
+            RoomHint(
+                name: "Garden planner", keywords: ["garden", "planting", "beds", "compost"],
+                itemIds: (1...12).map { "g\($0)" }, score: 0.9),
+            RoomHint(
+                name: "Trip budget", keywords: ["budget", "flights", "hotel"],
+                itemIds: (1...7).map { "t\($0)" }, score: 0.87),
+        ],
+        merges: [
+            MergeHint(
+                from: "pricing-experiment", to: "acme-shop", fromName: "Pricing experiment", toName: "Acme Shop",
+                score: 0.92, reason: "close")
+        ],
+        closest: [
+            ClosestHint(
+                itemId: "c1", roomId: "acme-shop", roomName: "Acme Shop", inReview: true, score: 0.94,
+                runnerUp: ClosestRunnerUp(roomId: "pricing", roomName: "Pricing experiments", score: 0.89)),
+            ClosestHint(
+                itemId: "c2", roomId: "room-orchard", roomName: "Orchard Notes", inReview: false, score: 0.91,
+                runnerUp: ClosestRunnerUp(roomId: "ainkrad", roomName: "Ainkrad", score: 0.86)),
+            ClosestHint(itemId: "c3", roomId: "pricing", roomName: "Pricing experiments", inReview: true, score: 0.9),
+        ])
     private var cards: [ProposalCard] = [
         ProposalCard(
             id: "ainkrad", name: "Ainkrad", kind: "product", signals: ["path"], itemCount: 1412,
@@ -16,6 +56,14 @@ actor SampleImportTransport: BrainTransport {
         ProposalCard(
             id: "pricing", name: "Pricing experiments", kind: "project", itemCount: 14,
             sampleTitles: ["Sample: price page test"]),
+        ProposalCard(
+            id: "acme-shop-api", name: "AcmeShopApi", kind: "product", signals: ["path"], itemCount: 9,
+            sampleTitles: ["Sample: tenant dashboard api"],
+            suggestMerge: MergeSuggestion(into: "acme-shop", name: "Acme Shop", reason: "prefix")),
+        ProposalCard(
+            id: "pricing-experiment", name: "Pricing experiment", kind: "project", itemCount: 5,
+            sampleTitles: ["Sample: price page variant"],
+            suggestMerge: MergeSuggestion(into: "pricing", name: "Pricing experiments", reason: "close")),
         ProposalCard(
             id: "acme", name: "Acme", kind: "employer", warnings: ["mixed_employers"], itemCount: 38,
             sampleTitles: ["Sample: two employers in one folder"]),
@@ -31,10 +79,56 @@ actor SampleImportTransport: BrainTransport {
         case ("GET", 2, _): return try e.encode(Self.view("review"))
         case ("POST", 3, "collected"): return try e.encode(Self.view("discovering"))
         case ("POST", 3, "items"): return Data(#"{"results":[]}"#.utf8)
-        case ("PATCH", 3, "items"): return Data("{}".utf8)
-        case ("GET", 3, "proposals"): return try e.encode(cards)
+        case ("PATCH", 3, "items"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let ids = Set(b["ids"] as? [String] ?? [])
+            hints.duplicates.removeAll { !ids.isDisjoint(with: $0.itemIds) }
+            hints.closest.removeAll { ids.contains($0.itemId) }
+            if let to = b["proposal"] as? String { _ = try? update(to) { $0.itemCount += ids.count } }
+            return Data("{}".utf8)
+        case ("GET", 3, "proposals"):
+            let tagged = cards.map { c -> ProposalCard in
+                var c = c
+                c.semantic = state
+                return c
+            }
+            return try e.encode(tagged)
+        case ("GET", 3, "semantic"):
+            var v = state == "ready" ? hints : SemanticView()
+            if semantic == "closest" { v = SemanticView(closest: hints.closest) }
+            v.state = state
+            return try e.encode(v)
+        case ("GET", 1, "settings"):
+            return try e.encode(
+                settings.sorted { $0.key < $1.key }.map {
+                    BrainSettingWire(name: $0.key, value: $0.value, default: 1, min: 0, max: 2, description: "")
+                })
+        case ("PUT", 2, _):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            settings[p[1]] = b["value"] as? Int ?? settings[p[1]]
+            return try e.encode(
+                BrainSettingWire(name: p[1], value: settings[p[1]] ?? 0, default: 1, min: 0, max: 2, description: ""))
+        case ("POST", 5, "split"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let ids = b["item_ids"] as? [String] ?? []
+            let name = b["name"] as? String ?? "New room"
+            hints.rooms.removeAll { $0.name == name }
+            hints.closest.removeAll { ids.contains($0.itemId) }
+            let made = ProposalCard(
+                id: name.lowercased().replacingOccurrences(of: " ", with: "-"), name: name, kind: "project",
+                itemCount: ids.count)
+            cards.insert(made, at: max(cards.count - 1, 0))
+            _ = try update(p[3]) { $0.itemCount -= ids.count }
+            return try e.encode(made)
         case ("GET", 5, "items"):
-            let rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
+            var rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
+            if p[3] == ProposalCard.unsortedID {
+                rows += [
+                    ItemRow(id: "c1", cursor: 4, title: "Checkout page: tenant-level tax settings"),
+                    ItemRow(id: "c2", cursor: 5, title: "Pruning the old apple trees in spring"),
+                    ItemRow(id: "c3", cursor: 6, title: "Variant B of the pricing page"),
+                ]
+            }
             return try e.encode(ItemPage(items: rows, next: nil))
         case ("PATCH", 4, let id):
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
@@ -44,6 +138,15 @@ actor SampleImportTransport: BrainTransport {
                     if let n = b["name"] as? String { c.name = n }
                     if let k = b["kind"] as? String { c.kind = k }
                 })
+        case ("POST", 3, "regroup"):
+            return try e.encode(Regrouped(proposals: cards.count, kept: cards.count, dropped: 0))
+        case ("POST", 5, "merge"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let into = b["into"] as? String ?? ""
+            let moved = cards.first { $0.id == p[3] }?.itemCount ?? 0
+            hints.merges.removeAll { $0.from == p[3] }
+            cards.removeAll { $0.id == p[3] }
+            return try e.encode(update(into) { $0.itemCount += moved })
         case ("POST", 5, "refuse"): return try e.encode(update(p[3]) { $0.state = "refused" })
         case ("POST", 3, "commit"):
             let made = cards.filter(\.isAccepted).map {

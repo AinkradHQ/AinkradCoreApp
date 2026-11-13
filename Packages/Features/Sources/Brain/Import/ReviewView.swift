@@ -24,12 +24,19 @@ struct ReviewStep: View {
                     Text(BrainWords.plural(r.visible.filter { !$0.isUnsorted }.count, "room", "rooms") + " found")
                         .coreFont(size: MacTextSize.headline, weight: .semibold)
                     Spacer(minLength: Space.s3)
+                    Button("Re-sort") { Task { await r.resort() } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(r.busy)
+                        .help("Group the rooms again. Your accepts, refusals and renames stay.")
                     Text(ReviewWords.tally(r.cards)).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).monospacedDigit()
                 }
+                SemanticStatusLine(review: r)
                 ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(r.visible) { ProposalRow(card: $0, review: r) }
+                    VStack(alignment: .leading, spacing: Space.s3) {
+                        if r.hasHints { ReviewSuggestions(review: r) }
+                        VStack(spacing: 2) {
+                            ForEach(r.visible) { ProposalRow(card: $0, review: r) }
+                        }
                     }
                 }
                 .frame(maxHeight: Space.s8 * 14)
@@ -50,8 +57,14 @@ struct ProposalRow: View {
     let review: ReviewModel
 
     var body: some View {
-        CoreRow(card.name, subtitle: ReviewWords.line(card), symbol: card.isUnsorted ? "list.bullet" : "folder") {
+        CoreRow(card.name, subtitle: subtitle, symbol: card.isUnsorted ? "list.bullet" : "folder") {
             HStack(spacing: Space.s2) {
+                // The hint sits in the subtitle (it wraps there); the row keeps only the button, so Accept/Refuse never shrink.
+                if let s = card.suggestMerge, card.state == "proposed" {
+                    Button("Merge") { Task { await review.merge(card.id, into: s.into) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Move everything in \(card.name) into \(s.name).")
+                }
                 if card.isUnsorted {
                     StateBadge("Waits in No room yet", tone: .queue, symbol: "tray")
                 } else {
@@ -62,6 +75,7 @@ struct ProposalRow: View {
                         segments: [CoreSegment("accept", "Accept"), CoreSegment("refuse", "Refuse")],
                         selection: Binding(get: { choice }, set: pick)
                     )
+                    .fixedSize()
                     .help(
                         review.acceptBlock(card)
                             ?? (card.isAccepted
@@ -81,6 +95,11 @@ struct ProposalRow: View {
             .disabled(review.busy)
         }
         .accessibilityIdentifier("brain-room-card-\(card.id)")
+    }
+
+    private var subtitle: String {
+        guard let s = card.suggestMerge, card.state == "proposed" else { return ReviewWords.line(card) }
+        return "\(ReviewWords.line(card)) · \(ReviewWords.suggestion(s))"
     }
 
     private var choice: String { card.isAccepted ? "accept" : card.state == "refused" ? "refuse" : "" }

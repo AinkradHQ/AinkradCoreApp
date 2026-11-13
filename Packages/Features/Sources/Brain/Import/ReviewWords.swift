@@ -23,6 +23,9 @@ public enum ReviewWords {
         }
     }
 
+    /// "0.93": the closeness of an item to a room.
+    public static func score(_ v: Double) -> String { String(format: "%.2f", v) }
+
     public static func warning(_ code: String) -> String { code == "mixed_employers" ? mixed : code }
 
     /// What a card says about its state, or nil for a plain proposed one.
@@ -57,6 +60,9 @@ public enum ReviewWords {
         ]
         return parts.filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
     }
+
+    /// "Looks like Optimus. Merge?"
+    public static func suggestion(_ s: MergeSuggestion) -> String { "Looks like \(s.name). Merge?" }
 
     public static func importTitle(_ n: Int) -> String {
         n == 0 ? "Import" : "Import \(BrainWords.plural(n, "room", "rooms"))"
