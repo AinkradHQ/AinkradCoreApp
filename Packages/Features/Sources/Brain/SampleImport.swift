@@ -6,6 +6,35 @@ import Foundation
 /// nothing on disk, and every room and count is made up.
 actor SampleImportTransport: BrainTransport {
     static let run = "sample-run"
+    /// The local AI's step for this run: `pending`, `ready` or `off`.
+    private let semantic: String
+    private var hints = SampleImportTransport.sampleHints
+    private var settings: [String: Int] = [
+        "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
+    ]
+
+    init(semantic: String = "off") { self.semantic = semantic }
+
+    /// Made-up suggestions: two topics among Unsorted, two sets of near-copies, one merge no card hints at yet.
+    static let sampleHints = SemanticView(
+        state: "ready",
+        duplicates: [
+            DuplicateHint(keep: "d1", itemIds: ["d1", "d2", "d3"], score: 0.98, reason: "same text"),
+            DuplicateHint(keep: "d4", itemIds: ["d4", "d5"], score: 0.96, reason: "same text"),
+        ],
+        rooms: [
+            RoomHint(
+                name: "Garden planner", keywords: ["garden", "planting", "beds", "compost"],
+                itemIds: (1...12).map { "g\($0)" }, score: 0.9),
+            RoomHint(
+                name: "Trip budget", keywords: ["budget", "flights", "hotel"],
+                itemIds: (1...7).map { "t\($0)" }, score: 0.87),
+        ],
+        merges: [
+            MergeHint(
+                from: "pricing-experiment", to: "acme-shop", fromName: "Pricing experiment", toName: "Acme Shop",
+                score: 0.92, reason: "close")
+        ])
     private var cards: [ProposalCard] = [
         ProposalCard(
             id: "ainkrad", name: "Ainkrad", kind: "product", signals: ["path"], itemCount: 1412,
@@ -39,8 +68,43 @@ actor SampleImportTransport: BrainTransport {
         case ("GET", 2, _): return try e.encode(Self.view("review"))
         case ("POST", 3, "collected"): return try e.encode(Self.view("discovering"))
         case ("POST", 3, "items"): return Data(#"{"results":[]}"#.utf8)
-        case ("PATCH", 3, "items"): return Data("{}".utf8)
-        case ("GET", 3, "proposals"): return try e.encode(cards)
+        case ("PATCH", 3, "items"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let ids = Set(b["ids"] as? [String] ?? [])
+            hints.duplicates.removeAll { !ids.isDisjoint(with: $0.itemIds) }
+            return Data("{}".utf8)
+        case ("GET", 3, "proposals"):
+            let tagged = cards.map { c -> ProposalCard in
+                var c = c
+                c.semantic = semantic
+                return c
+            }
+            return try e.encode(tagged)
+        case ("GET", 3, "semantic"):
+            var v = semantic == "ready" ? hints : SemanticView()
+            v.state = semantic
+            return try e.encode(v)
+        case ("GET", 1, "settings"):
+            return try e.encode(
+                settings.sorted { $0.key < $1.key }.map {
+                    BrainSettingWire(name: $0.key, value: $0.value, default: 1, min: 0, max: 2, description: "")
+                })
+        case ("PUT", 2, _):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            settings[p[1]] = b["value"] as? Int ?? settings[p[1]]
+            return try e.encode(
+                BrainSettingWire(name: p[1], value: settings[p[1]] ?? 0, default: 1, min: 0, max: 2, description: ""))
+        case ("POST", 5, "split"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let ids = b["item_ids"] as? [String] ?? []
+            let name = b["name"] as? String ?? "New room"
+            hints.rooms.removeAll { $0.name == name }
+            let made = ProposalCard(
+                id: name.lowercased().replacingOccurrences(of: " ", with: "-"), name: name, kind: "project",
+                itemCount: ids.count)
+            cards.insert(made, at: max(cards.count - 1, 0))
+            _ = try update(p[3]) { $0.itemCount -= ids.count }
+            return try e.encode(made)
         case ("GET", 5, "items"):
             let rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
             return try e.encode(ItemPage(items: rows, next: nil))
@@ -58,6 +122,7 @@ actor SampleImportTransport: BrainTransport {
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
             let into = b["into"] as? String ?? ""
             let moved = cards.first { $0.id == p[3] }?.itemCount ?? 0
+            hints.merges.removeAll { $0.from == p[3] }
             cards.removeAll { $0.id == p[3] }
             return try e.encode(update(into) { $0.itemCount += moved })
         case ("POST", 5, "refuse"): return try e.encode(update(p[3]) { $0.state = "refused" })

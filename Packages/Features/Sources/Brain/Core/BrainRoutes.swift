@@ -72,6 +72,13 @@ public struct BrainRoutes: Sendable {
     public func regroup(run: String) async throws -> Regrouped {
         try await call("POST", "/imports/\(Self.seg(run))/regroup")
     }
+    public func semantic(run: String) async throws -> SemanticView {
+        try await call("GET", "/imports/\(Self.seg(run))/semantic")
+    }
+    public func settings() async throws -> [BrainSettingWire] { try await call("GET", "/settings") }
+    public func setSetting(_ name: String, _ value: Int) async throws -> BrainSettingWire {
+        try await call("PUT", "/settings/\(Self.seg(name))", SettingBody(value: value))
+    }
     public func merge(run: String, proposal: String, into: String) async throws -> ProposalCard {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/merge", MergeBody(into: into))

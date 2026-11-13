@@ -90,9 +90,11 @@ public struct ProposalCard: Codable, Sendable, Equatable, Identifiable {
     public var config: RoomConfigWire
     /// A room this one looks like; the Core only hints, the user merges.
     public var suggestMerge: MergeSuggestion?
+    /// The local model's step for this run: `pending`, `ready` or `off`; nil from a Core without it.
+    public var semantic: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, kind, state, signals, warnings, first, last, room, config
+        case id, name, kind, state, signals, warnings, first, last, room, config, semantic
         case suggestMerge = "suggest_merge"
         case kindGuess = "kind_guess"
         case itemCount = "item_count"
@@ -111,9 +113,10 @@ public struct ProposalCard: Codable, Sendable, Equatable, Identifiable {
         id: String, name: String, kind: String = "product", kindGuess: String? = nil, state: String = "proposed",
         signals: [String] = [], warnings: [String] = [], itemCount: Int = 0, sampleTitles: [String] = [],
         first: String? = nil, last: String? = nil, room: String? = nil, config: RoomConfigWire = .init(),
-        suggestMerge: MergeSuggestion? = nil
+        suggestMerge: MergeSuggestion? = nil, semantic: String? = nil
     ) {
         self.suggestMerge = suggestMerge
+        self.semantic = semantic
         self.id = id
         self.name = name
         self.kind = kind

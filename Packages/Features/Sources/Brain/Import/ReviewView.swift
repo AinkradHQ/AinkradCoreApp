@@ -30,9 +30,13 @@ struct ReviewStep: View {
                     Text(ReviewWords.tally(r.cards)).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).monospacedDigit()
                 }
+                SemanticStatusLine(review: r)
                 ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(r.visible) { ProposalRow(card: $0, review: r) }
+                    VStack(alignment: .leading, spacing: Space.s3) {
+                        if r.hasHints { ReviewSuggestions(review: r) }
+                        VStack(spacing: 2) {
+                            ForEach(r.visible) { ProposalRow(card: $0, review: r) }
+                        }
                     }
                 }
                 .frame(maxHeight: Space.s8 * 14)

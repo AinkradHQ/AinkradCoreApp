@@ -31,6 +31,8 @@ public actor SampleBrainService: BrainService {
         public var autoAccept = false
         /// The Import wizard opens, on an invented Core (`SampleImportTransport`).
         public var imports = false
+        /// The local AI's step in the sample review: `pending`, `ready` or `off`.
+        public var semantic = "off"
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
@@ -71,7 +73,8 @@ public actor SampleBrainService: BrainService {
         self.scenario = scenario
         self.list = scenario.empty ? [] : scenario.m3 ? SampleM3.rooms : Self.world(worst: scenario.worst)
         self.m3 = SampleM3(scenario)
-        self.importRoutes = scenario.imports ? BrainRoutes(transport: SampleImportTransport()) : nil
+        self.importRoutes =
+            scenario.imports ? BrainRoutes(transport: SampleImportTransport(semantic: scenario.semantic)) : nil
         self.pace = pace
         self.checkList = Self.initialChecks(scenario)
         self.box = SampleInbox(empty: scenario.empty || scenario.emptyInbox)

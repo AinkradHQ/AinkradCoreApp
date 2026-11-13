@@ -42,6 +42,11 @@ final class BrainPrefs {
 struct BrainLookSection: View {
     let model: BrainModel
     @Bindable private var prefs = BrainPrefs.shared
+    @State private var ai: AISettings
+    init(model: BrainModel) {
+        self.model = model
+        _ai = State(initialValue: AISettings(routes: { [weak model] in model?.service?.importRoutes }))
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
@@ -68,6 +73,7 @@ struct BrainLookSection: View {
             } content: {
                 EmptyView()
             }
+            BrainAISection(settings: ai)
         }
         .foregroundStyle(GlassInk.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
