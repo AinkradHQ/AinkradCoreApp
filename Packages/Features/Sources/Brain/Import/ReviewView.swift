@@ -57,11 +57,10 @@ struct ProposalRow: View {
     let review: ReviewModel
 
     var body: some View {
-        CoreRow(card.name, subtitle: ReviewWords.line(card), symbol: card.isUnsorted ? "list.bullet" : "folder") {
+        CoreRow(card.name, subtitle: subtitle, symbol: card.isUnsorted ? "list.bullet" : "folder") {
             HStack(spacing: Space.s2) {
+                // The hint sits in the subtitle (it wraps there); the row keeps only the button, so Accept/Refuse never shrink.
                 if let s = card.suggestMerge, card.state == "proposed" {
-                    Text(ReviewWords.suggestion(s)).coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.blue).lineLimit(1)
                     Button("Merge") { Task { await review.merge(card.id, into: s.into) } }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .help("Move everything in \(card.name) into \(s.name).")
@@ -76,6 +75,7 @@ struct ProposalRow: View {
                         segments: [CoreSegment("accept", "Accept"), CoreSegment("refuse", "Refuse")],
                         selection: Binding(get: { choice }, set: pick)
                     )
+                    .fixedSize()
                     .help(
                         review.acceptBlock(card)
                             ?? (card.isAccepted
@@ -95,6 +95,11 @@ struct ProposalRow: View {
             .disabled(review.busy)
         }
         .accessibilityIdentifier("brain-room-card-\(card.id)")
+    }
+
+    private var subtitle: String {
+        guard let s = card.suggestMerge, card.state == "proposed" else { return ReviewWords.line(card) }
+        return "\(ReviewWords.line(card)) · \(ReviewWords.suggestion(s))"
     }
 
     private var choice: String { card.isAccepted ? "accept" : card.state == "refused" ? "refuse" : "" }
