@@ -19,6 +19,8 @@ public actor CoreConnection {
     let http: any CoreHTTP
     let makeSocket: @Sendable (URLRequest) -> any EventSocket
     let clock: any CoreClock
+    /// The events socket's ping timing (tests make it fast).
+    nonisolated let eventPing: EventPing
 
     /// A connection for the identity this device paired with. Throws `notPaired` before pairing.
     public static func open(keyStore: any KeyStore, clock: any CoreClock = SystemCoreClock()) throws -> CoreConnection {
@@ -39,8 +41,9 @@ public actor CoreConnection {
         identity: PairedIdentity, endpoint: CoreEndpoint, key: any DeviceKey, keyStore: any KeyStore,
         http: any CoreHTTP, transport: any ClientTransport,
         makeSocket: @escaping @Sendable (URLRequest) -> any EventSocket,
-        clock: any CoreClock
+        clock: any CoreClock, eventPing: EventPing = EventPing()
     ) {
+        self.eventPing = eventPing
         let sessions = SessionManager(endpoint: endpoint, identity: identity, key: key, http: http, clock: clock)
         self.sessions = sessions
         self.identity = identity
@@ -170,7 +173,8 @@ public actor CoreConnection {
     }
 
     nonisolated func events(after: Int64?, bufferSize: Int) -> AsyncStream<EventUpdate> {
-        let runner = EventRunner(sessions: sessions, endpoint: endpoint, clock: clock, makeSocket: makeSocket)
+        let runner = EventRunner(
+            sessions: sessions, endpoint: endpoint, clock: clock, makeSocket: makeSocket, timing: eventPing)
         return AsyncStream(bufferingPolicy: .bufferingOldest(bufferSize)) { continuation in
             let task = Task { await runner.run(after: after, into: continuation) }
             continuation.onTermination = { _ in task.cancel() }

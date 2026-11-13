@@ -111,6 +111,15 @@ struct EventBackpressure: Error {}
 /// A ping that nobody answered.
 struct SilentCore: Error {}
 
+/// The events socket's liveness check. `misses`: slow answers in a row before the Core counts as gone. One late pong is a busy
+/// link (a Brain import filling the upload), not a dead Core: the banner came back every few minutes on a stable connection.
+/// The Core itself allows three silent heartbeats.
+struct EventPing: Sendable {
+    var every: Duration = .seconds(10)
+    var within: Duration = .seconds(5)
+    var misses = 3
+}
+
 /// How a socket ended without an error to throw.
 enum FollowEnd { case closed, scopeChanged }
 
@@ -125,8 +134,10 @@ struct EventRunner: Sendable {
     /// A Core that was paused or lost the network still takes the TCP connection and answers nothing, so a socket with no
     /// error looks alive for ever. Ping every `pingEvery`; no pong within `pongWithin` means the Core is gone (the events socket
     /// answers pings; the Core pings it too). Real time, not the injected clock: it is about the network, not scheduling.
-    var pingEvery: Duration = .seconds(10)
-    var pongWithin: Duration = .seconds(5)
+    var pingEvery: Duration { timing.every }
+    var pongWithin: Duration { timing.within }
+    var missesAllowed: Int { timing.misses }
+    var timing = EventPing()
 
     func run(after: Int64?, into out: AsyncStream<EventUpdate>.Continuation) async {
         defer { out.finish() }
@@ -240,14 +251,24 @@ struct EventRunner: Sendable {
                 // A pong proves the upgrade went through: a quiet stream sends nothing else.
                 try await ping(socket)
                 out.yield(.live)
-                let (every, probe) = (pingEvery, ping)
+                let (every, allowed) = (pingEvery, missesAllowed)
+                let probe = { @Sendable (s: any EventSocket) async throws in try await ping(s, cancelOnSilence: false) }
                 let watchdog = Task {
+                    var misses = 0
                     while !Task.isCancelled {
                         try? await Task.sleep(for: every)
                         if Task.isCancelled { return }
-                        do { try await probe(socket) } catch {
-                            if error is SilentCore { silent.withLock { $0 = true } }
+                        do {
+                            try await probe(socket)
+                            misses = 0
+                        } catch is SilentCore {
+                            misses += 1
+                            if misses < allowed { continue }
+                            silent.withLock { $0 = true }
                             socket.cancel()  // ends the receive below
+                            return
+                        } catch {
+                            socket.cancel()
                             return
                         }
                     }
@@ -272,7 +293,7 @@ struct EventRunner: Sendable {
     }
 
     /// A ping that must be answered within `pongWithin`; on silence the socket is cancelled so nothing stays pending.
-    func ping(_ socket: any EventSocket) async throws {
+    func ping(_ socket: any EventSocket, cancelOnSilence: Bool = true) async throws {
         let wait = pongWithin
         let answered = OSAllocatedUnfairLock(initialState: false)
         try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
@@ -295,7 +316,7 @@ struct EventRunner: Sendable {
             }
             Task {
                 try? await Task.sleep(for: wait)
-                if finish(.failure(SilentCore())) { socket.cancel() }
+                if finish(.failure(SilentCore())), cancelOnSilence { socket.cancel() }
             }
         }
     }

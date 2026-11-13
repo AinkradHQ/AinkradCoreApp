@@ -306,10 +306,12 @@ struct Harness {
             endpoint: try CoreEndpoint(identity.endpoint), identity: identity, key: key, http: core, clock: clock)
     }
 
-    func connection(sockets: SocketFactory = SocketFactory([.failPing])) throws -> CoreConnection {
+    func connection(sockets: SocketFactory = SocketFactory([.failPing]), eventPing: EventPing = EventPing()) throws
+        -> CoreConnection
+    {
         CoreConnection(
             identity: identity, endpoint: try CoreEndpoint(identity.endpoint), key: key, keyStore: store, http: core,
-            transport: FakeTransport(core: core), makeSocket: { sockets.make($0) }, clock: clock)
+            transport: FakeTransport(core: core), makeSocket: { sockets.make($0) }, clock: clock, eventPing: eventPing)
     }
 }
 
@@ -326,6 +328,8 @@ final class FakeSocket: EventSocket, @unchecked Sendable {
         case wait
         /// Answers this many pings, then takes the connection and says nothing (a paused Core).
         case silentAfter(Int)
+        /// Ping number `n` (1-based) is answered only after `delay`; every other ping at once (a busy link).
+        case slowPing(Int, Duration)
     }
     let behavior: Behavior
     private let lock = NSLock()
@@ -337,6 +341,14 @@ final class FakeSocket: EventSocket, @unchecked Sendable {
     private var pings = 0
     func ping() async throws {
         if case .failPing = behavior { throw URLError(.cannotConnectToHost) }
+        if case .slowPing(let n, let delay) = behavior {
+            let k = lock.withLock { () -> Int in
+                pings += 1
+                return pings
+            }
+            if k == n { try await Task.sleep(for: delay) }
+            return
+        }
         guard case .silentAfter(let n) = behavior else { return }
         let n1 = lock.withLock { () -> Int in
             pings += 1

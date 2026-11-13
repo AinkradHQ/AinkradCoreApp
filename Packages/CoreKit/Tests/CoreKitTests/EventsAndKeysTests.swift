@@ -88,7 +88,8 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
     @Test func aCoreThatStopsAnsweringIsReconnectingNotLiveForEver() async throws {
         let h = try Harness()
         let sockets = SocketFactory([.silentAfter(1), .wait])
-        let conn = try h.connection(sockets: sockets)
+        let conn = try h.connection(
+            sockets: sockets, eventPing: EventPing(every: .milliseconds(30), within: .milliseconds(40), misses: 3))
         var order: [String] = []
         for await update in conn.events(after: 0) {
             if case .live = update { order.append("live") }
@@ -99,6 +100,43 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
         }
         #expect(order == ["live", "reconnecting"], "no pong: the stream says so instead of staying live")
         #expect(sockets.sockets.first?.cancelled == true)
+    }
+
+    @Test func oneSlowPongDoesNotDropALiveStream() async throws {
+        let h = try Harness()
+        // Ping 2 (the first watchdog probe) answers late; the rest answer at once.
+        let sockets = SocketFactory([.slowPing(2, .milliseconds(400)), .wait])
+        let fast = EventPing(every: .milliseconds(40), within: .milliseconds(60), misses: 3)
+        let conn = try h.connection(sockets: sockets, eventPing: fast)
+        let watch = Task {
+            var order: [String] = []
+            for await update in conn.events(after: 0) {
+                if case .live = update { order.append("live") }
+                if case .reconnecting = update { order.append("reconnecting") }
+            }
+            return order
+        }
+        try await Task.sleep(for: .milliseconds(900))
+        watch.cancel()
+        let order = await watch.value
+        #expect(order == ["live"], "a late pong is a busy link, not a dead Core: \(order)")
+        #expect(sockets.sockets.count == 1, "the socket was kept")
+    }
+
+    @Test func threeSilentPingsInARowStillReconnect() async throws {
+        let h = try Harness()
+        let sockets = SocketFactory([.silentAfter(1), .wait])
+        let fast = EventPing(every: .milliseconds(30), within: .milliseconds(40), misses: 3)
+        let conn = try h.connection(sockets: sockets, eventPing: fast)
+        var order: [String] = []
+        for await update in conn.events(after: 0) {
+            if case .live = update { order.append("live") }
+            if case .reconnecting = update {
+                order.append("reconnecting")
+                break
+            }
+        }
+        #expect(order == ["live", "reconnecting"])
     }
 
     @Test func scopeChangedGapsAndResetsTheCursorFromLatest() async throws {
