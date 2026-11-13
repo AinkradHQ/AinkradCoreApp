@@ -20,6 +20,7 @@ final class RegistryModel {
     /// Settings that gate a feature, in the order the screen shows them.
     nonisolated static let switchKeys = [
         "secrets.mode", "secrets.provider_accounts", "secrets.connections", "auth.passkey_admin",
+        "code_mode.hide_connection_tools",
     ]
 
     private(set) var items: [SettingItem] = []

@@ -33,6 +33,10 @@ enum SettingWords {
             id: "switching", title: "Account switching",
             sub: "What happens when an AI account hits its limit.", symbol: "arrow.triangle.swap", hue: GlassInk.blue),
         Group(
+            id: "code-mode", title: "Code Mode for AI sessions",
+            sub: "How much an AI session may do through the two Code Mode tools.", symbol: "curlybraces",
+            hue: GlassInk.blue),
+        Group(
             id: "background", title: "Background work", sub: "How often your Core does its routine work.",
             symbol: "gearshape.2.fill", hue: GlassInk.slate),
     ]
@@ -115,6 +119,33 @@ enum SettingWords {
         "audit.anchor_interval_secs": Entry(
             group: "background", title: "Audit copy every",
             line: "How often the audit log's fingerprint is saved off this machine, when backups are set up."),
+        "code_mode.calls_per_min": Entry(
+            group: "code-mode", title: "Operations per minute",
+            line: "The most operations one AI session may run each minute. Past it, calls are refused."),
+        "code_mode.max_run_calls": Entry(
+            group: "code-mode", title: "Operations per script", line: "The most operations one script may run."),
+        "code_mode.run_secs": Entry(
+            group: "code-mode", title: "A script may run for", line: "A script that runs longer is stopped."),
+        "code_mode.call_secs": Entry(
+            group: "code-mode", title: "One operation may take",
+            line: "An operation that takes longer is stopped and refused."),
+        "code_mode.concurrent": Entry(
+            group: "code-mode", title: "Operations at once",
+            line: "How many operations one AI session may have running at the same time."),
+        "code_mode.max_args_bytes": Entry(
+            group: "code-mode", title: "Largest request",
+            line: "The most data one operation accepts from an AI session."),
+        "code_mode.max_result_bytes": Entry(
+            group: "code-mode", title: "Largest answer",
+            line: "The most data one operation hands back. A bigger answer is cut and marked."),
+        "code_mode.approval_secs": Entry(
+            group: "code-mode", title: "You have to answer within",
+            line: "How long a risky operation waits for you before it is refused."),
+        "code_mode.idempotency_secs": Entry(
+            group: "code-mode", title: "Repeated writes are recognised for",
+            line: "The same write sent again inside this time returns the first answer instead of running twice."),
+        "code_mode.hide_connection_tools": Entry(
+            group: "code-mode", title: "Hide the old connection tools", line: ""),
         "secrets.mode": Entry(group: "secrets", title: "Keys and secrets", line: ""),
         "secrets.provider_accounts": Entry(group: "secrets", title: "Real provider keys", line: ""),
         "secrets.connections": Entry(group: "secrets", title: "Real connection tokens", line: ""),

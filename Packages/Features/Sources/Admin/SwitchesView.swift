@@ -59,11 +59,25 @@ struct SwitchesSection: View {
                                 : "Stop browser devices becoming admin."
                         })
                 }
+                if let h = model.item("code_mode.hide_connection_tools") {
+                    FlagCard(
+                        model: model, setting: h, index: 4, title: "Hide the old connection tools",
+                        symbol: "curlybraces", hue: GlassInk.blue,
+                        sub: "Let AI sessions on Code Mode see only its two tools, not every connection tool too.",
+                        offLine: "AI sessions see the old connection tools next to Code Mode. Nothing is removed.",
+                        onLine: "AI sessions on Code Mode see just its two tools. Connections work through it.",
+                        needs: nil, lessSafe: false, offSymbol: "list.bullet", onSymbol: "curlybraces",
+                        reason: {
+                            $0
+                                ? "Hide the old connection tools from AI sessions on Code Mode."
+                                : "Show the old connection tools again."
+                        })
+                }
                 if !model.runners.isEmpty {
                     GlassSection(
                         "Terminals on your runners",
                         sub: "Whether each runner can open terminals.",
-                        symbol: "terminal.fill", hue: GlassInk.blue, index: 4
+                        symbol: "terminal.fill", hue: GlassInk.blue, index: 5
                     ) {
                         ForEach(model.runners) { r in
                             let pty = r.drivers.contains("pty")
@@ -171,6 +185,8 @@ private struct FlagCard: View {
     let offLine: String
     let onLine: String
     let needs: String?
+    /// False for a switch that is a preference, not a safety trade: no "less safe" mark, calm colours.
+    var lessSafe = true
     var offSymbol = "checkmark.shield.fill"
     var onSymbol = "exclamationmark.shield.fill"
     let reason: (Bool) -> String
@@ -179,8 +195,10 @@ private struct FlagCard: View {
         let isOn = setting.value >= 1
         GlassSection(title, sub: sub, symbol: symbol, hue: hue, index: index) {
             HStack(spacing: Space.s2) {
-                Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
-                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
+                if lessSafe {
+                    Label("Less safe when on", systemImage: "exclamationmark.triangle.fill")
+                        .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.amberInk)
+                }
                 if model.busy == setting.key { ProgressView().controlSize(.small) }
                 GlassToggleTile(
                     isOn ? "On" : "Off", symbol: "togglepower", onSymbol: "power",
@@ -194,8 +212,10 @@ private struct FlagCard: View {
             }
         } content: {
             StatePanel(
-                symbol: isOn ? onSymbol : offSymbol, hue: isOn ? GlassInk.amber : GlassInk.green,
-                title: isOn ? "On · less safe" : "Off · safer", line: isOn ? onLine : offLine, trigger: isOn
+                symbol: isOn ? onSymbol : offSymbol,
+                hue: lessSafe ? (isOn ? GlassInk.amber : GlassInk.green) : (isOn ? GlassInk.blue : GlassInk.slate),
+                title: lessSafe ? (isOn ? "On · less safe" : "Off · safer") : (isOn ? "On" : "Off"),
+                line: isOn ? onLine : offLine, trigger: isOn
             ) { EmptyView() }
             if let needs {
                 Label(needs, systemImage: "arrow.turn.right.up").coreFont(size: MacTextSize.meta, weight: .semibold)

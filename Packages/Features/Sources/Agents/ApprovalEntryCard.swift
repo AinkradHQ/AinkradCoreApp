@@ -35,7 +35,9 @@ struct ApprovalEntryCard: View {
                 Spacer(minLength: Space.s2)
                 chip(state)
             }
-            if !request.input.isEmpty {
+            if let code = request.codeMode {
+                CodeModeAskView(ask: code, compact: true)
+            } else if !request.input.isEmpty {
                 Text(PathWords.short(request.input)).coreFont(size: MacTextSize.meta, design: .monospaced)
                     .lineLimit(1)
                     .truncationMode(.tail).textSelection(.enabled)

@@ -75,6 +75,8 @@ enum AuditWords {
         Area(id: "connection.", title: "Connections", symbol: "link", hue: GlassInk.blue),
         Area(id: "terminal.", title: "Terminals", symbol: "terminal.fill", hue: GlassInk.blue),
         Area(id: "agent.", title: "AI sessions", symbol: "sparkles", hue: GlassInk.blue),
+        Area(id: CodeModeAudit.areaPrefix, title: "Code Mode", symbol: "curlybraces", hue: GlassInk.blue),
+        Area(id: "brain.ai.", title: "Brain, by AI sessions", symbol: "books.vertical.fill", hue: GlassInk.blue),
     ]
 
     static func area(_ action: String) -> Area {
@@ -104,6 +106,7 @@ enum AuditWords {
     static func sentence(
         _ a: AuditItem, deviceName: (String) -> String? = { _ in nil }, title: (String) -> String?
     ) -> (who: String, verb: String, what: String) {
+        if let code = CodeModeAudit.sentence(a) { return code }
         let who = a.actor == .system ? "Your Core" : a.actor.label
         let tail = a.action.split(separator: ".", maxSplits: 1).dropFirst().first.map(String.init) ?? a.action
         let verb = verbs[tail] ?? tail.replacingOccurrences(of: "_", with: " ")
@@ -127,9 +130,12 @@ enum AuditWords {
     }
 
     /// "A schedule" or "An AI session, started by a person" when the chain began somewhere else.
-    static func originSentence(_ o: AuditOrigin?) -> String {
+    static func originSentence(_ o: AuditOrigin?, deviceName: (String) -> String? = { _ in nil }) -> String {
         guard let o else { return origin(nil).label }
         let first = origin(o).label
+        if o.rootKind == "person", o.kind != "person", let name = o.rootReference.flatMap(deviceName) {
+            return "\(first), started by \(name)"
+        }
         return o.rootKind == o.kind
             ? first
             : "\(first), started by \(origin(AuditOrigin(kind: o.rootKind, reference: nil, rootKind: o.rootKind, rootReference: nil)).label.lowercased())"
@@ -160,6 +166,15 @@ enum AuditWords {
         var technical: [(String, String)] = []
         for (k, v) in pairs(a.details) {
             let key = k.replacingOccurrences(of: "_", with: " ")
+            if k == "args_sha256" {  // a fingerprint of the arguments: for matching, not for reading
+                technical.append((key, v))
+                continue
+            }
+            if CodeModeAudit.isRow(a.action), let p = CodeModeAudit.plain(k, v) {
+                if !p.key.isEmpty { plain.append((p.key, p.value)) }
+                if k != "ms" && p.key != "" { technical.append((key, v)) }
+                continue
+            }
             guard isOpaqueID(v) else {
                 plain.append((key, v))
                 continue
@@ -237,14 +252,22 @@ private struct AuditFilters: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Space.s2) {
-                    chip("All", "square.grid.2x2.fill", GlassInk.slate, on: model.filter.kind.isEmpty) {
-                        model.filter.kind = ""
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Space.s2) {
+                        chip("All", "square.grid.2x2.fill", GlassInk.slate, on: model.filter.kind.isEmpty) {
+                            model.filter.kind = ""
+                        }
+                        ForEach(AuditWords.areas) { a in
+                            chip(a.title, a.symbol, a.hue, on: model.filter.kind == a.id) { model.filter.kind = a.id }
+                                .id(a.id)
+                        }
                     }
-                    ForEach(AuditWords.areas) { a in
-                        chip(a.title, a.symbol, a.hue, on: model.filter.kind == a.id) { model.filter.kind = a.id }
-                    }
+                }
+                // The chosen area stays in view when the row of areas is wider than the page.
+                .onAppear { proxy.scrollTo(model.filter.kind, anchor: .center) }
+                .onChange(of: model.filter.kind) { _, k in
+                    withAnimation(.smooth(duration: 0.25)) { proxy.scrollTo(k, anchor: .center) }
                 }
             }
             HStack(spacing: Space.s3) {
@@ -432,7 +455,9 @@ private struct AuditDetail: View {
                     fact("clock.fill", AdminWords.whenExact(a.at))
                     fact(a.actor == .system ? "server.rack" : "person.fill", a.actor.label)
                     fact(area.symbol, area.title)
-                    fact(AuditWords.origin(a.origin).symbol, "Started by: " + AuditWords.originSentence(a.origin))
+                    fact(
+                        AuditWords.origin(a.origin).symbol,
+                        "Started by: " + AuditWords.originSentence(a.origin, deviceName: { admin.deviceNames[$0] }))
                 }
                 let rows = AuditWords.detailRows(a, deviceName: { admin.deviceNames[$0] })
                 let pairs = rows.plain
@@ -446,7 +471,7 @@ private struct AuditDetail: View {
                                 Text(v).coreFont(size: MacTextSize.body, design: .monospaced).textSelection(
                                     .enabled
                                 )
-                                .multilineTextAlignment(.trailing)
+                                .multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }

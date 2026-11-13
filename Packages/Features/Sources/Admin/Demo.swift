@@ -68,7 +68,8 @@ public final class AdminDemo {
         "secrets", "secrets-new",
         "secrets-lease", "secrets-touchid-cancelled", "audit", "audit-selected", "audit-nomatch", "audit-connections",
         "audit-connection-history", "audit-accounts",
-        "audit-agents", "audit-nobody", "audit-one", "audit-many", "ops",
+        "audit-agents", "audit-code-mode", "audit-code-mode-nobody", "settings-code-mode", "switches-code-mode",
+        "audit-nobody", "audit-one", "audit-many", "ops",
         "state-loading",
         "state-empty", "state-error", "state-scope", "banner-resuming", "banner-rate", "banner-renewing",
         "banner-restarted",
@@ -158,6 +159,19 @@ public final class AdminDemo {
             shell.settings.open("audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:2"])
             shell.open(.settings)
             try? await Task.sleep(for: .milliseconds(1200))
+        case "audit-code-mode", "audit-code-mode-nobody":
+            service.auditRows = DemoData.codeModeAudit + DemoData.audit
+            admin.audit.reset()
+            await open("audit")
+            admin.audit.filter.kind = CodeModeAudit.areaPrefix
+            admin.audit.filter.nobodyWatching = scene == "audit-code-mode-nobody"
+            await admin.audit.reload()
+            admin.audit.selected = admin.audit.items.first?.seq
+            admin.audit.selected = admin.audit.items.dropFirst(2).first?.seq
+        case "settings-code-mode":
+            await open("core")
+            admin.registry.cursor = "code_mode.calls_per_min"
+        case "switches-code-mode": await open("switches")
         case "audit-nobody":
             await open("audit")
             admin.audit.filter.nobodyWatching = true
@@ -227,6 +241,16 @@ nonisolated enum DemoData {
             "auth.web_session_secs", 28_800, 28_800, 3_600, 86_400, "seconds",
             "How long a web session from a passkey sign-in lives, absolute."),
         s("auth.passkey_admin", 0, 0, 0, 1, "count", "1 lets a passkey hold the admin scope, 0 refuses it."),
+        s("code_mode.calls_per_min", 300, 300, 1, 6_000, "per_minute", "Code Mode: operations per minute."),
+        s("code_mode.max_run_calls", 100, 100, 1, 1_000, "count", "Code Mode: operations per script."),
+        s("code_mode.run_secs", 60, 60, 1, 110, "seconds", "Code Mode: wall time of one script."),
+        s("code_mode.call_secs", 30, 30, 1, 110, "seconds", "Code Mode: longest one operation may take."),
+        s("code_mode.concurrent", 4, 4, 1, 16, "count", "Code Mode: operations at once."),
+        s("code_mode.max_args_bytes", 65_536, 65_536, 256, 393_216, "bytes", "Code Mode: largest request."),
+        s("code_mode.max_result_bytes", 200_000, 200_000, 1_024, 250_000, "bytes", "Code Mode: largest answer."),
+        s("code_mode.approval_secs", 100, 100, 1, 110, "seconds", "Code Mode: time to answer a risky operation."),
+        s("code_mode.idempotency_secs", 600, 600, 10, 86_400, "seconds", "Code Mode: how long a write is remembered."),
+        s("code_mode.hide_connection_tools", 0, 0, 0, 1, "count", "Hides the old connection tools for Code Mode."),
         s("secrets.mode", 1, 0, 0, 2, "count", "The secrets broker and gate G-SEC: 0 off, 1 throwaway only, 2 real."),
         s("secrets.provider_accounts", 0, 0, 0, 1, "count", "The narrow gate for AI provider accounts."),
         s("secrets.lease_secs", 120, 120, 10, 900, "seconds", "The longest lifetime of a secret lease."),
@@ -299,6 +323,34 @@ nonisolated enum DemoData {
     ]
 
     nonisolated static var audit: [AuditItem] { audit(60) }
+
+    /// What AI sessions did through Code Mode and in the Brain, newest first, over the ordinary rows. Made-up names.
+    nonisolated static var codeModeAudit: [AuditItem] {
+        let project = "customer-portal"
+        let phone = AuditOrigin(
+            kind: "ai_session", reference: "as_01JC4X7Q3MZ8", rootKind: "person", rootReference: "d_ph18x3Kz")
+        func row(_ i: Int, _ action: String, _ json: String) -> AuditItem {
+            AuditItem(
+                seq: Int64(9_000 - i), at: Date().addingTimeInterval(-Double(i) * 190 - 60), action: action,
+                actor: .user(1), entityKind: nil, entityRef: nil, details: json, origin: phone)
+        }
+        func call(_ op: String, _ risk: String, _ outcome: String, _ ms: Int, code: String? = nil) -> String {
+            "{\n  \"args_sha256\": \"9f2c61a07b8d4e15c3a90b7e2d48f6a1c5e07b93d2f84a6c1e5b07d93a4f8c26\",\n  \"code\": \(code.map { "\"\($0)\"" } ?? "null"),\n  \"ms\": \(ms),\n  \"op\": \"\(op)\",\n  \"outcome\": \"\(outcome)\",\n  \"project\": \"\(project)\",\n  \"risk\": \"\(risk)\",\n  \"session\": \"as_01JC4X7Q3MZ8\"\n}"
+        }
+        return [
+            row(0, "code_mode.call", call("brainAiSearch", "read", "ok", 84)),
+            row(1, "code_mode.call", call("connections.jira.create_issue", "risky", "ok", 1_320)),
+            row(
+                2, "code_mode.call",
+                call("connections.jira.create_issue", "risky", "denied", 12, code: "approval_denied")),
+            row(3, "code_mode.call", call("brainAiProjectState", "read", "ok", 61)),
+            row(4, "brain.ai.proposed", "{\n  \"project\": \"\(project)\",\n  \"room\": \"portal\"\n}"),
+            row(5, "code_mode.call", call("brainAiPropose", "write", "ok", 140)),
+            row(6, "code_mode.call", call("connections.github.get_issue", "read", "error", 30_002, code: "timeout")),
+            row(7, "brain.ai.refused", "{\n  \"project\": \"\(project)\"\n}"),
+            row(8, "code_mode.call", call("listAudit", "read", "ok", 47)),
+        ]
+    }
 
     nonisolated static func audit(_ count: Int) -> [AuditItem] {
         let kinds: [(String, String, String, String)] = [

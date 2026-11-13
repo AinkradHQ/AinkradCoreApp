@@ -45,6 +45,23 @@ enum AgentsSnapshots {
             a.debugList("normal")
         }
         a.debugPermission("allowed")
+        if env["CORE_AGENTS_ONLY"] == "codemode-open" {
+            a.debugOpenRows()
+            await a.debugCodeMode(session: id(3))
+            only { a.openSession(id(3)) }
+            await shot("codemode-transcript-open", wait: 2)
+            NSApp.terminate(nil)
+            return
+        }
+        if env["CORE_AGENTS_ONLY"] == "codemode" {
+            await a.debugCodeMode(session: id(3))
+            only { a.openSession(id(3)) }
+            await shot("codemode-transcript", wait: 2)
+            a.openInbox()
+            await shot("codemode-approval-inbox", wait: 1.5)
+            NSApp.terminate(nil)
+            return
+        }
         if env["CORE_AGENTS_ONLY"] == "chains" {
             await chainShots(a, shell, only: only) { n, w in await shot(n, wait: w) }
             NSApp.terminate(nil)
