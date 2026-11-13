@@ -67,9 +67,9 @@ struct BrainScreensTests {
     }
 
     @Test func sourcesGroupAndDropTheSessionsWord() {
-        let all = ImportSources.standard()
+        let all = ImportSources.standard(places: ImportPlaces())
         #expect(SyncWords.title("claude_code", all) == "Claude Code")
-        #expect(SyncWords.title("vault", all) == "Notes vault (Ainkrad)")
+        #expect(SyncWords.title("vault", all) == "Notes (Obsidian vaults)")
         #expect(SyncWords.title("core_transcript", all) == "AI sessions on this Core")
         #expect(SyncWords.group("agents_md") == "Notes and docs" && SyncWords.group("codex") == "AI sessions")
         #expect(SourcesTab.unreadableNote(["Antigravity", "Kimi"]).hasPrefix("Antigravity and Kimi keep their"))
@@ -77,7 +77,9 @@ struct BrainScreensTests {
 
     @Test func kimiIsAbsentWhileAntigravityIsUnreadable() {
         let t = FakeBrainTransport()
-        let m = ImportModel(host: FakeHost(), routes: BrainRoutes(transport: t), sources: ImportSources.standard())
+        let m = ImportModel(
+            host: FakeHost(), routes: BrainRoutes(transport: t), sources: ImportSources.standard(places: ImportPlaces())
+        )
         #expect(m.choices.first { $0.id == "kimi" }?.absent == true)
         #expect(m.choices.first { $0.id == "antigravity" }?.absent == false)
         #expect(m.choices.first { $0.id == "chat" }?.title == "Chat exports")
