@@ -214,12 +214,17 @@ extension AgentsModel {
                     output: "error: the script made too many calls (line 1) [too_many_calls]\n[100 calls, 8210 ms]",
                     durationMs: 8_300),
                 .assistant("Now I will file the issue. That reaches Jira, so it needs your approval."),
-                .approvalRequest(
-                    id: "cm_k3x9", tool: "ainkrad.connections.jira.create_issue", input: ask, timeoutSecs: 900),
             ], at: Date().addingTimeInterval(-400))
+        // The Core holds this one itself: it is listed by the approvals route, not written in the transcript.
+        fake.held[session] = [
+            CoreApproval(
+                id: "cm_k3x9", tool: "ainkrad.connections.jira.create_issue", input: ask,
+                requestedAt: Date().addingTimeInterval(-60), expiresAt: Date().addingTimeInterval(840))
+        ]
         await apply(AgentEvent(kind: "agent.approval_requested", session: session))
         await refreshSession(session)
         await store(session).refresh(fake, knownLast: 0)
+        await loadHeld(session)
         syncDerived()
     }
 }

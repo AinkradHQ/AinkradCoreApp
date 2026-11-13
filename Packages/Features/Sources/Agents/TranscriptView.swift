@@ -34,6 +34,11 @@ struct TranscriptView: View {
                                 // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
+                        // The Core's own holds are not transcript entries: they stand after the last one, newest last.
+                        ForEach(store.heldList) { r in
+                            ApprovalEntryCard(model: model, request: r)
+                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
+                        }
                         if session.live && !session.idle && store.load == .ready && !model.waiting(session.id) {
                             Thinking(since: session.updatedAt)
                         }
@@ -56,6 +61,7 @@ struct TranscriptView: View {
                     }
                 }
                 .onChange(of: jump) { _, _ in toEnd(proxy) }
+                .onChange(of: store.heldList.count) { _, _ in if atEnd { toEnd(proxy) } }
                 if !atEnd {
                     // A quiet glass control centred over the composer, not an action tile.
                     Button(action: { toEnd(proxy) }) { Label("Latest", systemImage: "chevron.down") }

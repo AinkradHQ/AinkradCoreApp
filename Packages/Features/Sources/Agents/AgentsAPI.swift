@@ -47,6 +47,8 @@ public protocol AgentsAPI: Sendable {
     /// `text` is the next turn; nil continues with no new message.
     func wake(_ id: String, key: String, text: String?) async throws
     func decide(_ id: String, request: String, approved: Bool) async throws -> AgentSessionInfo
+    /// The Code Mode writes the Core holds for a person now. They are not transcript entries, so this is the only way to see them.
+    func approvals(_ id: String) async throws -> [CoreApproval]
     func events() -> AsyncStream<AgentFeed>
     /// What Core's ledger holds for a session (`admin`), or nil when this device can't read it.
     func ledger(_ session: String) async throws -> SessionLedger?

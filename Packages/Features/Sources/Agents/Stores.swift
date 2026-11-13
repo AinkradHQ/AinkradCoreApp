@@ -36,6 +36,34 @@ public final class TranscriptStore {
 
     public var hasEarlier: Bool { heldAfter > 0 }
 
+    /// The Core-held ids the last `holdCore` listed.
+    private var coreHeld: Set<String> = []
+    /// Every id the Core ever listed here, so an answered one stays as a card after the Core stops listing it.
+    private var coreSeen: Set<String> = []
+
+    /// The Core-held cards of this session, drawn after the transcript's own entries.
+    var heldList: [ApprovalRequest] { approvalList.filter { coreSeen.contains($0.id) } }
+
+    /// Takes the Core's list of Code Mode writes it holds now. One it no longer lists was closed (answered, expired, or its
+    /// session ended): if nobody here answered it, it goes, because the Core has no word on how it ended.
+    func holdCore(_ list: [CoreApproval]) {
+        for a in list {
+            var r = ApprovalRequest(
+                id: a.id, session: sessionID, tool: a.tool, input: a.input, requestedAt: a.requestedAt,
+                timeoutSecs: max(1, Int(a.expiresAt.timeIntervalSince(a.requestedAt).rounded())))
+            r.decision = approvals[a.id]?.decision
+            r.decidedAt = approvals[a.id]?.decidedAt
+            approvals[a.id] = r
+            coreSeen.insert(a.id)
+        }
+        let now = Set(list.map(\.id))
+        for gone in coreHeld.subtracting(now) where approvals[gone]?.decision == nil {
+            approvals[gone] = nil
+            coreSeen.remove(gone)
+        }
+        coreHeld = now
+    }
+
     /// Pending (or lately decided) approvals, oldest first.
     public var approvalList: [ApprovalRequest] { approvals.values.sorted { $0.requestedAt < $1.requestedAt } }
 

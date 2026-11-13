@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// One approval in the transcript (N33), one card in the agent's column: what the agent wants in a sentence, the short
-/// command (full text on hover), and the result. While it waits it carries Allow and Deny (⌘↩ and ⌘⌫ on the first one).
+/// command (full text on hover), and the result. While it waits it carries Approve and Deny (⌘↩ and ⌘⌫ on the first one).
 struct ApprovalEntryCard: View {
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
@@ -90,7 +90,7 @@ struct ApprovalEntryCard: View {
             first && model.shell.activePane == AgentsModel.paneID(request.session) && !model.shell.coverOpen
         let tile = Button(action: { Task { await model.decide(request, approved: approve) } }) {
             if approve {
-                Label(elevated ? "Allow" : "Allow with Touch ID", systemImage: elevated ? "checkmark" : "touchid")
+                Label(elevated ? "Approve" : "Approve with Touch ID", systemImage: elevated ? "checkmark" : "touchid")
             } else {
                 Text("Deny")
             }
@@ -103,7 +103,7 @@ struct ApprovalEntryCard: View {
                 ? "Let \(who) \(ask.verb) (⌘Return). Asks for Touch ID when this Mac is locked."
                 : "Tell \(who) no (⌘Delete). It carries on without it."
         )
-        .accessibilityLabel(approve ? "Allow \(request.tool)" : "Deny \(request.tool)")
+        .accessibilityLabel(approve ? "Approve \(request.tool)" : "Deny \(request.tool)")
         return Group {
             if live {
                 if approve {

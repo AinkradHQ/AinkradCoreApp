@@ -224,6 +224,23 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
     }
 
+    public func approvals(_ id: String) async throws -> [CoreApproval] {
+        try await run {
+            switch try await client.listAgentApprovals(path: .init(id: id)) {
+            case .ok(let o):
+                return try o.body.json.approvals.map {
+                    let input =
+                        (try? JSONEncoder().encode($0.input)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    return CoreApproval(
+                        id: $0.id, tool: $0.tool, input: input, requestedAt: $0.requestedAt, expiresAt: $0.expiresAt)
+                }
+            case .notFound(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
     public func events() -> AsyncStream<AgentFeed> {
         let source = connection.events()
         return AsyncStream { out in

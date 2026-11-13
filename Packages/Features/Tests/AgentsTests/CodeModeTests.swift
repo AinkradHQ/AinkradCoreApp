@@ -1,3 +1,5 @@
+import CoreKit
+import Foundation
 import Shell
 import Testing
 
@@ -55,5 +57,53 @@ struct CodeModeTests {
         #expect(CodeModeWords.op("connections.github.get_issue").did == "read issue with GitHub")
         #expect(CodeModeWords.op("getCoreHealth").will == "check the Core's health")
         #expect(CodeModeWords.op("createWidget").will == "create widget")
+    }
+}
+
+@MainActor
+struct CoreHeldApprovalTests {
+    private static let input = #"{"summary":"Create an issue","args":{"project":"CP"},"reason":"Reaches Jira."}"#
+    private func held(_ id: String, at: Date = Date(timeIntervalSince1970: 1_000)) -> CoreApproval {
+        CoreApproval(
+            id: id, tool: "ainkrad.connections.jira.create_issue", input: Self.input, requestedAt: at,
+            expiresAt: at.addingTimeInterval(900))
+    }
+
+    @Test func aListedApprovalIsPendingUntilItsTimeRunsOut() {
+        let t = TranscriptStore(sessionID: "s")
+        t.holdCore([held("cm_1")])
+        let r = t.approvals["cm_1"]
+        #expect(r?.codeMode?.summary == "Create an issue" && r?.timeoutSecs == 900)
+        #expect(r?.status(now: Date(timeIntervalSince1970: 1_100), sessionOver: false) == .pending)
+        #expect(r?.status(now: Date(timeIntervalSince1970: 1_900), sessionOver: false) == .expired)
+    }
+
+    @Test func oneTheCoreNoLongerListsGoesUnlessYouAnsweredIt() {
+        let t = TranscriptStore(sessionID: "s")
+        t.holdCore([held("cm_1"), held("cm_2")])
+        t.mark("cm_2", approved: true)
+        t.holdCore([])
+        #expect(t.approvals["cm_1"] == nil)
+        #expect(t.approvals["cm_2"]?.decision == true)
+        #expect(t.heldList.map(\.id) == ["cm_2"])
+    }
+
+    @Test func aFetchFailureOrAnEmptyReadKeepsNothingStale() async {
+        let api = FakeAgentsAPI()
+        api.held["s"] = [held("cm_1")]
+        let m = (try? await api.approvals("s")) ?? []
+        #expect(m.map(\.id) == ["cm_1"])
+        _ = try? await api.decide("s", request: "cm_1", approved: false)
+        #expect(((try? await api.approvals("s")) ?? []).isEmpty)
+    }
+
+    @Test func closedAndUnknownRequestsAreNewsNotErrors() {
+        let gone = AgentsModel.closedApproval(CoreError.http(status: 404, code: "not_found", message: "x"))
+        let closed = AgentsModel.closedApproval(CoreError.http(status: 409, code: "approval_closed", message: "x"))
+        #expect(gone?.title == "The Core no longer has this request.")
+        #expect(closed?.title == "This request was already answered or timed out.")
+        #expect(gone?.tone == .queue && closed?.tone == .queue)
+        #expect(AgentsModel.closedApproval(CoreError.http(status: 409, code: "other", message: "x")) == nil)
+        #expect(AgentsModel.closedApproval(CoreError.http(status: 500, code: "boom", message: "x")) == nil)
     }
 }

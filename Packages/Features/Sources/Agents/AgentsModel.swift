@@ -248,7 +248,10 @@ public final class AgentsModel {
         agentNames = (try? await api.agents()) ?? []
         await loadBindings()
         for s in sessions.items where s.live && transcripts[s.id] == nil { _ = store(s.id) }
-        for (id, t) in transcripts { await t.refresh(api, knownLast: sessions.session(id)?.lastSeq ?? 0) }
+        for (id, t) in transcripts {
+            await t.refresh(api, knownLast: sessions.session(id)?.lastSeq ?? 0)
+            await loadHeld(id)
+        }
         syncDerived()
         primed = true
     }
@@ -267,6 +270,7 @@ public final class AgentsModel {
         if first, let api {
             Task { [weak self] in
                 await t.refresh(api, knownLast: self?.sessions.session(id)?.lastSeq ?? 0)
+                await self?.loadHeld(id)
                 self?.syncDerived()
             }
         }
@@ -308,9 +312,16 @@ public final class AgentsModel {
         case "agent.approval_requested", "agent.approval_decided":
             await refreshSession(id)
             await store(id).refresh(api, knownLast: lastSeq(id))
+            await loadHeld(id)
         default: break  // a kind this build does not know
         }
         syncDerived()
+    }
+
+    /// The Code Mode writes the Core holds for this session. A failed read keeps what is shown.
+    func loadHeld(_ id: String) async {
+        guard let api, let list = try? await api.approvals(id) else { return }
+        store(id).holdCore(list)
     }
 
     func lastSeq(_ id: String) -> Int64 { sessions.session(id)?.lastSeq ?? 0 }
