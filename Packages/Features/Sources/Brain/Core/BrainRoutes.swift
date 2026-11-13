@@ -68,6 +68,10 @@ public struct BrainRoutes: Sendable {
     func patch(run: String, proposal: String, _ body: ProposalPatchBody) async throws -> ProposalCard {
         try await call("PATCH", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))", body)
     }
+    /// Groups the run again; decisions on rooms that survive are kept.
+    public func regroup(run: String) async throws -> Regrouped {
+        try await call("POST", "/imports/\(Self.seg(run))/regroup")
+    }
     public func merge(run: String, proposal: String, into: String) async throws -> ProposalCard {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/merge", MergeBody(into: into))

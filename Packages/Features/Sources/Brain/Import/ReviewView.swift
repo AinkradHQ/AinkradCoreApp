@@ -24,6 +24,9 @@ struct ReviewStep: View {
                     Text(BrainWords.plural(r.visible.filter { !$0.isUnsorted }.count, "room", "rooms") + " found")
                         .coreFont(size: MacTextSize.headline, weight: .semibold)
                     Spacer(minLength: Space.s3)
+                    Button("Re-sort") { Task { await r.resort() } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(r.busy)
+                        .help("Group the rooms again. Your accepts, refusals and renames stay.")
                     Text(ReviewWords.tally(r.cards)).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).monospacedDigit()
                 }
@@ -52,6 +55,13 @@ struct ProposalRow: View {
     var body: some View {
         CoreRow(card.name, subtitle: ReviewWords.line(card), symbol: card.isUnsorted ? "list.bullet" : "folder") {
             HStack(spacing: Space.s2) {
+                if let s = card.suggestMerge, card.state == "proposed" {
+                    Text(ReviewWords.suggestion(s)).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.blue).lineLimit(1)
+                    Button("Merge") { Task { await review.merge(card.id, into: s.into) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Move everything in \(card.name) into \(s.name).")
+                }
                 if card.isUnsorted {
                     StateBadge("Waits in No room yet", tone: .queue, symbol: "tray")
                 } else {

@@ -88,9 +88,12 @@ public struct ProposalCard: Codable, Sendable, Equatable, Identifiable {
     public var last: String?
     public var room: String?
     public var config: RoomConfigWire
+    /// A room this one looks like; the Core only hints, the user merges.
+    public var suggestMerge: MergeSuggestion?
 
     enum CodingKeys: String, CodingKey {
         case id, name, kind, state, signals, warnings, first, last, room, config
+        case suggestMerge = "suggest_merge"
         case kindGuess = "kind_guess"
         case itemCount = "item_count"
         case sampleTitles = "sample_titles"
@@ -107,8 +110,10 @@ public struct ProposalCard: Codable, Sendable, Equatable, Identifiable {
     public init(
         id: String, name: String, kind: String = "product", kindGuess: String? = nil, state: String = "proposed",
         signals: [String] = [], warnings: [String] = [], itemCount: Int = 0, sampleTitles: [String] = [],
-        first: String? = nil, last: String? = nil, room: String? = nil, config: RoomConfigWire = .init()
+        first: String? = nil, last: String? = nil, room: String? = nil, config: RoomConfigWire = .init(),
+        suggestMerge: MergeSuggestion? = nil
     ) {
+        self.suggestMerge = suggestMerge
         self.id = id
         self.name = name
         self.kind = kind
@@ -122,6 +127,19 @@ public struct ProposalCard: Codable, Sendable, Equatable, Identifiable {
         self.last = last
         self.room = room
         self.config = config
+    }
+}
+
+/// `into` is the proposal id to merge into; `reason` is `prefix` or `close`.
+public struct MergeSuggestion: Codable, Sendable, Equatable {
+    public var into: String
+    public var name: String
+    public var reason: String
+
+    public init(into: String, name: String, reason: String = "prefix") {
+        self.into = into
+        self.name = name
+        self.reason = reason
     }
 }
 
@@ -218,6 +236,11 @@ struct ProposalPatchBody: Encodable {
     var config: RoomConfigWire?
 }
 struct MergeBody: Encodable { var into: String }
+public struct Regrouped: Codable, Sendable, Equatable {
+    public var proposals: Int
+    public var kept: Int
+    public var dropped: Int
+}
 struct SplitBody: Encodable {
     var itemIds: [String]
     var name: String?

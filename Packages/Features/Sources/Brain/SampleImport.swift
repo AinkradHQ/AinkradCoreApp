@@ -17,6 +17,14 @@ actor SampleImportTransport: BrainTransport {
             id: "pricing", name: "Pricing experiments", kind: "project", itemCount: 14,
             sampleTitles: ["Sample: price page test"]),
         ProposalCard(
+            id: "acme-shop-api", name: "AcmeShopApi", kind: "product", signals: ["path"], itemCount: 9,
+            sampleTitles: ["Sample: tenant dashboard api"],
+            suggestMerge: MergeSuggestion(into: "acme-shop", name: "Acme Shop", reason: "prefix")),
+        ProposalCard(
+            id: "pricing-experiment", name: "Pricing experiment", kind: "project", itemCount: 5,
+            sampleTitles: ["Sample: price page variant"],
+            suggestMerge: MergeSuggestion(into: "pricing", name: "Pricing experiments", reason: "close")),
+        ProposalCard(
             id: "acme", name: "Acme", kind: "employer", warnings: ["mixed_employers"], itemCount: 38,
             sampleTitles: ["Sample: two employers in one folder"]),
         ProposalCard(id: ProposalCard.unsortedID, name: "Unsorted", kind: "unsorted", itemCount: 91),
@@ -44,6 +52,14 @@ actor SampleImportTransport: BrainTransport {
                     if let n = b["name"] as? String { c.name = n }
                     if let k = b["kind"] as? String { c.kind = k }
                 })
+        case ("POST", 3, "regroup"):
+            return try e.encode(Regrouped(proposals: cards.count, kept: cards.count, dropped: 0))
+        case ("POST", 5, "merge"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let into = b["into"] as? String ?? ""
+            let moved = cards.first { $0.id == p[3] }?.itemCount ?? 0
+            cards.removeAll { $0.id == p[3] }
+            return try e.encode(update(into) { $0.itemCount += moved })
         case ("POST", 5, "refuse"): return try e.encode(update(p[3]) { $0.state = "refused" })
         case ("POST", 3, "commit"):
             let made = cards.filter(\.isAccepted).map {

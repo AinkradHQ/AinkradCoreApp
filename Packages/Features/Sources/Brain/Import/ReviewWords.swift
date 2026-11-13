@@ -58,6 +58,9 @@ public enum ReviewWords {
         return parts.filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
     }
 
+    /// "Looks like Optimus. Merge?"
+    public static func suggestion(_ s: MergeSuggestion) -> String { "Looks like \(s.name). Merge?" }
+
     public static func importTitle(_ n: Int) -> String {
         n == 0 ? "Import" : "Import \(BrainWords.plural(n, "room", "rooms"))"
     }

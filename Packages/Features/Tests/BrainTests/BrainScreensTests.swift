@@ -122,8 +122,24 @@ struct BrainScreensTests {
         }
         let cards = [pc("a", "accepted"), pc("b", "accepted"), pc("c", "refused"), pc("d", "held"), pc("unsorted")]
         #expect(ReviewWords.tally(cards) == "2 accepted · 1 refused · 1 held")
+        #expect(ReviewWords.suggestion(MergeSuggestion(into: "a", name: "Optimus")) == "Looks like Optimus. Merge?")
         #expect(ReviewWords.importTitle(3) == "Import 3 rooms" && ReviewWords.importTitle(1) == "Import 1 room")
         #expect(ReviewWords.line(ProposalCard(id: "unsorted", name: "Unsorted")).hasPrefix("No room yet"))
+    }
+
+    @Test func aCardDecodesTheCoresMergeHint() throws {
+        let json = #"""
+            {"id":"p-1","name":"AcmeApi","kind":"general","kind_guess":"general","state":"proposed","signals":[],
+             "warnings":[],"item_count":2,"sample_titles":[],"config":{},
+             "suggest_merge":{"into":"p-2","name":"Acme","reason":"prefix"}}
+            """#
+        let c = try JSONDecoder().decode(ProposalCard.self, from: Data(json.utf8))
+        #expect(c.suggestMerge == MergeSuggestion(into: "p-2", name: "Acme", reason: "prefix"))
+        let plain = #"""
+            {"id":"p-1","name":"A","kind":"general","kind_guess":"general","state":"proposed","signals":[],
+             "warnings":[],"item_count":2,"sample_titles":[],"config":{}}
+            """#
+        #expect(try JSONDecoder().decode(ProposalCard.self, from: Data(plain.utf8)).suggestMerge == nil)
     }
 
     @Test func aRealCoreShowsInboxRoomsAndSources() {
