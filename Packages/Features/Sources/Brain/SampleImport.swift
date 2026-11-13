@@ -84,9 +84,7 @@ struct SampleImportSource: ImportSource {
         SampleImportSource(id: "claude_code", title: "Claude Code sessions", found: 1284),
         SampleImportSource(id: "codex", title: "Codex sessions", found: 212),
         SampleImportSource(id: "opencode", title: "OpenCode sessions", found: 37),
-        NotReadableSource(
-            id: "antigravity", title: "Antigravity sessions",
-            reason: "Its history is kept in a format Ainkrad cannot read yet."),
+        SampleImportSource(id: "antigravity", title: "Antigravity sessions", found: 18),
     ]
 
     func scan() async -> CollectReport {

@@ -134,6 +134,7 @@ public enum ImportSources {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let device = Host.current().localizedName ?? "Mac"
         let projects = home.appending(path: "Home/Projects")
+        let agy = home.appending(path: ".gemini/antigravity-cli")
         func markdown(_ l: MarkdownCollector.Layout) -> MarkdownCollector { .init(layout: l, device: device) }
         return [
             ClaudeCodeSource.standard(),
@@ -144,9 +145,10 @@ public enum ImportSources {
             FolderSource(
                 id: "cursor", title: "Cursor sessions", root: home.appending(path: ".cursor/projects"),
                 collector: HarnessCollectors.cursor(device: device)),
-            NotReadableSource(
-                id: "antigravity", title: "Antigravity sessions",
-                reason: "Its conversations are stored as binary records with no published format."),
+            FolderSource(
+                id: "antigravity", title: "Antigravity sessions", root: agy.appending(path: "brain"),
+                collector: AntigravityCollector(
+                    device: device, dbPath: agy.appending(path: "conversation_summaries.db").path)),
             NotReadableSource(
                 id: "kimi", title: "Kimi sessions",
                 reason: "No Kimi history was found on this Mac, so its format could not be checked.", absent: true),
