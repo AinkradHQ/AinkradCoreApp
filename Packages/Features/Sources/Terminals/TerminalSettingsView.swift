@@ -84,7 +84,7 @@ struct TerminalSettingsView: View {
                         ],
                         selection: Binding(
                             get: { prefs.instantTyping.rawValue },
-                            set: { prefs.instantTyping = InstantTypingMode(rawValue: $0) ?? .automatic }),
+                            set: { prefs.instantTyping = InstantTypingMode(rawValue: $0) ?? .off }),
                         fill: true)
                 }
                 HStack(spacing: Space.s2) {

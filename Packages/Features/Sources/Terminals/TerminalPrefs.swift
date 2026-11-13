@@ -41,7 +41,8 @@ final class TerminalPrefs {
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
     var openFullPane: Bool { didSet { save() } }
     var confirmEnd: Bool { didSet { save() } }
-    /// Local echo on a slow link (Settings, Terminal): Automatic turns itself on when the round trip is slow.
+    /// Local echo on a slow link (Settings, Terminal): Off by default (it glitched remote zsh, 2026-11-13); Automatic turns
+    /// itself on when the round trip is slow.
     var instantTyping: InstantTypingMode { didSet { save() } }
 
     enum CursorShape: String, CaseIterable { case block, underline, bar }
@@ -71,7 +72,7 @@ final class TerminalPrefs {
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
         confirmEnd = defaults.object(forKey: "terminal.confirmEnd") as? Bool ?? true
         instantTyping =
-            InstantTypingMode(rawValue: defaults.string(forKey: "terminal.instantTyping") ?? "") ?? .automatic
+            InstantTypingMode(rawValue: defaults.string(forKey: "terminal.instantTyping") ?? "") ?? .off
     }
 
     static let systemMono = "SF Mono"
