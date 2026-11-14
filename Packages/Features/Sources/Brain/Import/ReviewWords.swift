@@ -103,7 +103,7 @@ public enum ReviewWords {
         switch c.kind {
         case "duplicate", "move":
             let id = c.kind == "duplicate" ? c.to : c.itemIds.first ?? ""
-            return titles[id].flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled item"
+            return c.sentTitle ?? titles[id].flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled item"
         default: return c.fromName ?? c.from ?? "A room"
         }
     }

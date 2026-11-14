@@ -49,7 +49,7 @@ struct ReviewSemanticTests {
             try JSONSerialization.jsonObject(with: JSONEncoder().encode(Self.applied))
         }
         await settle(r)
-        #expect(r.semanticState == "ready" && r.tidy?.roomsAfter == 6)
+        #expect(r.semanticState == "ready" && r.tidy?.roomsAfter == 4)
         let n = t.count("GET \(Self.base)/semantic")
         try await Task.sleep(for: .milliseconds(30))
         #expect(t.count("GET \(Self.base)/semantic") == n)
@@ -95,7 +95,7 @@ struct ReviewSemanticTests {
         await settle(r)
         #expect(
             ReviewWords.tidied(try #require(r.tidy))
-                == "Local AI tidied this: merged 9 duplicates, folded 4 rooms, moved 2 items into rooms (10 → 6 rooms)")
+                == "Local AI tidied this: merged 9 duplicates, folded 5 rooms, moved 2 items into rooms (9 → 4 rooms)")
         await r.openChanges()
         let groups = ReviewWords.tidyGroups(r.tidyChanges ?? [])
         #expect(
@@ -104,9 +104,15 @@ struct ReviewSemanticTests {
             ])
         let names = groups.flatMap(\.changes).map { ReviewWords.changeTitle($0, titles: r.itemTitles) }
         #expect(!names.contains("Untitled item") && names.first == "Sample: queue migration order")
-        #expect(names.last == "Sample: price page test B" && names.contains("Shop admin"))
+        #expect(names.last == "Sample: price page test B" && names.contains("AcmeShopApi"))
         #expect(ReviewWords.change(groups[0].changes[0]) == "4 copies merged into this one")
         #expect(ReviewWords.change(groups[2].changes[1]) == "Folded into Pricing experiments")
+        // Titles the Core sent are used as they are; only the unnamed ones are looked up.
+        #expect(r.itemTitles["k1"] == nil && r.itemTitles["m1"] == nil && r.itemTitles["k2"] != nil)
+        // The Core applied the name hints: no Merge question is left while the tidy stands, and Undo brings them back.
+        #expect(r.cards.allSatisfy { $0.suggestMerge == nil } && r.visible.count == 5)
+        await r.undoTidy()
+        #expect(r.tidyUndone && r.cards.contains { $0.suggestMerge != nil })
     }
 
     @Test func undoAsksTheCoreThenRereadsTheRooms() async throws {

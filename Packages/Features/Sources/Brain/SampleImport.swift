@@ -18,17 +18,24 @@ actor SampleImportTransport: BrainTransport {
     /// Made-up work of the local AI: what it tidied by itself, applied until Undo.
     private var undone = false
     static let sampleTidy = TidySummary(
-        duplicatesMerged: 9, roomsMerged: 1, roomsFolded: 3, itemsMoved: 2, roomsBefore: 10, roomsAfter: 6)
+        duplicatesMerged: 9, roomsMerged: 2, roomsFolded: 3, itemsMoved: 2, roomsBefore: 9, roomsAfter: 4)
     static let sampleChanges = [
-        TidyChange(kind: "duplicate", itemIds: ["k1a", "k1b", "k1c", "k1d"], to: "k1"),
+        TidyChange(
+            kind: "duplicate", itemIds: ["k1a", "k1b", "k1c", "k1d"], to: "k1", toName: "Ainkrad",
+            toTitle: "Sample: queue migration order"),
         TidyChange(kind: "duplicate", itemIds: ["k2a", "k2b", "k2c"], to: "k2"),
         TidyChange(kind: "duplicate", itemIds: ["k3a", "k3b"], to: "k3"),
-        TidyChange(kind: "merge", from: "shop-admin", fromName: "Shop admin", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(kind: "merge", from: "acme-shop-api", fromName: "AcmeShopApi", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(
+            kind: "merge", from: "pricing-experiment", fromName: "Pricing experiment", to: "pricing",
+            toName: "Pricing experiments"),
         TidyChange(kind: "fold", from: "garden", fromName: "Garden notes", to: "unsorted", toName: "Unsorted"),
         TidyChange(
             kind: "fold", from: "pv", fromName: "Price page variant", to: "pricing", toName: "Pricing experiments"),
         TidyChange(kind: "fold", from: "osa", fromName: "Old shop api", to: "acme-shop", toName: "Acme Shop"),
-        TidyChange(kind: "move", itemIds: ["m1"], from: "unsorted", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(
+            kind: "move", itemIds: ["m1"], from: "unsorted", to: "acme-shop", toName: "Acme Shop",
+            itemTitles: ["Sample: checkout tax settings"]),
         TidyChange(kind: "move", itemIds: ["m2"], from: "unsorted", to: "pricing", toName: "Pricing experiments"),
     ]
     static let sampleTitles = [
@@ -74,8 +81,11 @@ actor SampleImportTransport: BrainTransport {
             if let to = b["proposal"] as? String { _ = try? update(to) { $0.itemCount += ids.count } }
             return Data("{}".utf8)
         case ("GET", 3, "proposals"):
-            let tagged = cards.map { c -> ProposalCard in
+            let tidied = state == "ready" && !undone
+            let merged: Set<String> = ["acme-shop-api", "pricing-experiment"]
+            let tagged = cards.filter { !tidied || !merged.contains($0.id) }.map { c -> ProposalCard in
                 var c = c
+                if tidied { c.suggestMerge = nil }
                 c.semantic = state
                 return c
             }

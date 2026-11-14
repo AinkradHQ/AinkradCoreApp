@@ -29,7 +29,7 @@ extension ReviewModel {
         showingChanges = true
         await act {
             let all = try await routes.tidyChanges(run: run).changes
-            await nameItems(all.compactMap(Self.namedItem))
+            await nameItems(all.filter { $0.sentTitle == nil }.compactMap(Self.namedItem))  // only what the Core left unnamed
             tidyChanges = all
         }
     }

@@ -113,15 +113,20 @@ public struct TidyChange: Codable, Sendable, Equatable {
     public var fromName: String?
     public var to: String
     public var toName: String?
+    /// Titles of `itemIds`, same order; `toTitle` is the kept copy's (duplicate only). Absent on an older #248.
+    public var itemTitles: [String]?
+    public var toTitle: String?
     enum CodingKeys: String, CodingKey {
         case kind, from, to
         case itemIds = "item_ids"
         case fromName = "from_name"
         case toName = "to_name"
+        case itemTitles = "item_titles"
+        case toTitle = "to_title"
     }
     public init(
         kind: String, itemIds: [String] = [], from: String? = nil, fromName: String? = nil, to: String,
-        toName: String? = nil
+        toName: String? = nil, itemTitles: [String]? = nil, toTitle: String? = nil
     ) {
         self.kind = kind
         self.itemIds = itemIds
@@ -129,6 +134,8 @@ public struct TidyChange: Codable, Sendable, Equatable {
         self.fromName = fromName
         self.to = to
         self.toName = toName
+        self.itemTitles = itemTitles
+        self.toTitle = toTitle
     }
     public init(from d: any Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
@@ -138,6 +145,14 @@ public struct TidyChange: Codable, Sendable, Equatable {
         fromName = try c.decodeIfPresent(String.self, forKey: .fromName)
         to = try c.decodeIfPresent(String.self, forKey: .to) ?? ""
         toName = try c.decodeIfPresent(String.self, forKey: .toName)
+        itemTitles = try c.decodeIfPresent([String].self, forKey: .itemTitles)
+        toTitle = try c.decodeIfPresent(String.self, forKey: .toTitle)
+    }
+
+    /// The title the Core sent for the item this change is about (the kept copy, or the moved item), if any.
+    public var sentTitle: String? {
+        let t = kind == "duplicate" ? toTitle : kind == "move" ? itemTitles?.first : nil
+        return t.flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
