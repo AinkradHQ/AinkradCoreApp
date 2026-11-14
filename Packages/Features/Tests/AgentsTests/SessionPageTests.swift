@@ -30,7 +30,7 @@ struct SessionPageTests {
 
     @Test func resultWords() {
         #expect(ApprovalCardState.waiting(left: 5).result == nil)
-        #expect(ApprovalCardState.allowed(at: nil).result == "Allowed")
+        #expect(ApprovalCardState.allowed(at: nil).result == "Approved")
         #expect(ApprovalCardState.deniedByYou(at: nil).result == "Denied by you")
         #expect(ApprovalCardState.deniedNoAnswer(minutes: 15).result == "Denied: no answer in 15 min")
         #expect(ApprovalCardState.deniedByYou(at: Date()).result?.hasPrefix("Denied by you · ") == true)

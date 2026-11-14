@@ -43,7 +43,7 @@ enum ApprovalCardState: Equatable {
     var result: String? {
         switch self {
         case .waiting: nil
-        case .allowed: "Allowed"
+        case .allowed: "Approved"
         case .deniedByYou(let at): "Denied by you" + Self.time(at)
         case .deniedNoAnswer(let m): "Denied: no answer" + (m.map { " in \($0) min" } ?? "")
         }

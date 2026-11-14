@@ -5,6 +5,7 @@ import Foundation
 /// Debug only: puts the module in a named state for the self-snapshot walk (no keys sent, nothing leaves the app).
 extension AgentsModel {
     public func debugDropHost() { host = nil }
+    public func debugOpenRows() { EntryRow.openAtStart = true }
 
     public func debugChains(_ list: [ChainOption]) {
         debugChainList = list.isEmpty ? nil : list
@@ -164,6 +165,67 @@ extension AgentsModel {
                     input: "rm -rf node_modules && pnpm install", timeoutSecs: 300)
             ])
         await apply(AgentEvent(kind: "agent.approval_requested", session: session))
+    }
+
+    /// Code Mode on a running session: a search, three scripts (done, done with console lines, refused) and a Core-held write
+    /// waiting for you. Made-up names only.
+    public func debugCodeMode(session: String) async {
+        guard let fake = api as? FakeAgentsAPI else { return }
+        let search = "mcp__ainkrad__ainkrad_search"
+        let run = "mcp__ainkrad__ainkrad_run"
+        let script = """
+            const found = await ainkrad.connections.jira.search_issues({ jql: "project = CP AND assignee = currentUser()" });
+            const open = found.issues.filter(i => i.status !== "Done");
+            console.log("found " + open.length + " open issues");
+            return { open: open.length, first: open[0]?.key };
+            """
+        let ask = """
+            {"summary":"Create the Jira issue “Rate-limit the login endpoint” in project CP","args":{"project":"CP","title":"Rate-limit the login endpoint","description":"Add a per-address limit and a short lockout, then document it for the support team.","assignee":"Mira Hollis","api_token":"[redacted]"},"reason":"It creates something in Jira, outside your Core."}
+            """
+        fake.update(session) {
+            $0.state = .running
+            $0.project = "customer-portal"
+        }
+        fake.append(
+            session,
+            [
+                .assistant("I will look for the open issues first, then file the missing one."),
+                .toolUse(id: "cm1", name: search, summary: "jira issues assigned to me"),
+                .toolResult(
+                    id: "cm1", name: search, ok: true, exitCode: nil,
+                    output: "connections.jira.search_issues\nconnections.jira.create_issue", durationMs: 240),
+                .toolUse(id: "cm2", name: run, summary: script),
+                .toolResult(
+                    id: "cm2", name: run, ok: true, exitCode: nil,
+                    output: "{\"open\":4,\"first\":\"CP-212\"}\nconsole:\nfound 4 open issues\n[1 call, 1180 ms]",
+                    durationMs: 1_400),
+                .toolUse(
+                    id: "cm3", name: run,
+                    summary: "await ainkrad.brainAiPropose({ room: \"portal\", title: \"Login limits\" })"),
+                .toolResult(
+                    id: "cm3", name: run, ok: false, exitCode: nil,
+                    output: "error: a call was turned down (line 1) [approval_denied]\n[1 call, 640 ms]",
+                    durationMs: 900),
+                .toolUse(
+                    id: "cm4", name: run,
+                    summary: "for (const i of ids) await ainkrad.connections.jira.get_issue({ key: i })"),
+                .toolResult(
+                    id: "cm4", name: run, ok: false, exitCode: nil,
+                    output: "error: the script made too many calls (line 1) [too_many_calls]\n[100 calls, 8210 ms]",
+                    durationMs: 8_300),
+                .assistant("Now I will file the issue. That reaches Jira, so it needs your approval."),
+            ], at: Date().addingTimeInterval(-400))
+        // The Core holds this one itself: it is listed by the approvals route, not written in the transcript.
+        fake.held[session] = [
+            CoreApproval(
+                id: "cm_k3x9", tool: "ainkrad.connections.jira.create_issue", input: ask,
+                requestedAt: Date().addingTimeInterval(-60), expiresAt: Date().addingTimeInterval(840))
+        ]
+        await apply(AgentEvent(kind: "agent.approval_requested", session: session))
+        await refreshSession(session)
+        await store(session).refresh(fake, knownLast: 0)
+        await loadHeld(session)
+        syncDerived()
     }
 }
 #endif

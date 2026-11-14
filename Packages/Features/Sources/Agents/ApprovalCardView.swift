@@ -1,4 +1,5 @@
 import CoreUI
+import Shell
 import SwiftUI
 
 /// An agent's request, in words (Ahmed, 2026-11-05: plain words, visual, keyboard driven): what it wants to do as a sentence,
@@ -45,7 +46,7 @@ struct ApprovalCardView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.title, weight: .bold)
                     Text(
-                        "On \(session.map { model.runnerName($0.runner) } ?? "a runner") · asked \(AgentWords.ago(request.requestedAt, now: now))"
+                        "\(request.codeModeOp == nil ? "" : session?.project.map { "AI session in \($0) · " } ?? "AI session · ")On \(session.map { model.runnerName($0.runner) } ?? "a runner") · asked \(AgentWords.ago(request.requestedAt, now: now))"
                     )
                     .foregroundStyle(GlassInk.secondary)
                     .help("Session \(request.session) · tool \(request.tool) · request \(request.id)")
@@ -60,7 +61,9 @@ struct ApprovalCardView: View {
                     }
                 }
             }
-            if !request.input.isEmpty {
+            if let code = request.codeMode {
+                CodeModeAskView(ask: code)
+            } else if !request.input.isEmpty {
                 HStack(alignment: .top, spacing: Space.s2) {
                     Image(systemName: ask.wellSymbol).foregroundStyle(GlassInk.secondary)
                     Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(5)
@@ -140,7 +143,7 @@ struct ApprovalCardView: View {
         return HStack(spacing: Space.s3) {
             IconTile(ok ? "checkmark" : "xmark", hue: hue, size: 26)
             Text("\(ok ? "Approved" : "Denied"): \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
-            Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced).foregroundStyle(
+            Text(request.shownInput).coreFont(size: MacTextSize.body, design: .monospaced).foregroundStyle(
                 GlassInk.secondary
             )
             .lineLimit(1).truncationMode(.tail)
@@ -156,7 +159,7 @@ struct ApprovalCardView: View {
             IconTile("clock.badge.xmark", hue: GlassInk.slate, size: 26)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Nobody answered in time: \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
-                Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced)
+                Text(request.shownInput).coreFont(size: MacTextSize.body, design: .monospaced)
                     .foregroundStyle(GlassInk.secondary).lineLimit(2)
                 Text("The AI session stopped waiting for this. Ask it again from the composer if you still want it.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
@@ -179,7 +182,11 @@ enum ApprovalWords {
     }
 
     static func ask(_ tool: String) -> Ask {
-        switch tool.lowercased() {
+        if tool.hasPrefix("ainkrad.") {
+            let op = CodeModeWords.op(String(tool.dropFirst("ainkrad.".count)))
+            return Ask(verb: op.will, symbol: "lock.shield.fill", wellSymbol: op.symbol)
+        }
+        return switch tool.lowercased() {
         case "bash", "shell", "exec", "command":
             Ask(verb: "run a command", symbol: "terminal.fill", wellSymbol: "chevron.right")
         case "edit", "write", "multiedit", "notebookedit", "apply_patch":

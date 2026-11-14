@@ -187,14 +187,29 @@ extension AgentsModel {
             syncDerived()
         } catch {
             t.unmark(r.id)
-            if let e = CoreError.unwrapping(error), case .http(let status, _, _) = e, status == 404 || status == 409 {
-                approvalNotices[r.id] = InlineNotice(
-                    title: "This request was already answered or expired.", detail: "Nothing was changed.",
-                    symbol: "clock.badge.exclamationmark", tone: .queue)
+            if let gone = Self.closedApproval(error) {
+                // Not a failure: the question is already closed. Re-read what the Core still holds so the card goes away.
+                approvalNotices[r.id] = gone
+                await loadHeld(r.session)
+                syncDerived()
             } else {
                 approvalNotices[r.id] = Self.notice(error, doing: approved ? "Approving" : "Denying")
             }
         }
+    }
+
+    /// 404: the Core does not know the request (it was answered long ago, or its session is gone). 409 `approval_closed`: it was
+    /// answered or timed out a moment ago. Both are plain news, so nothing here reads as an error.
+    static func closedApproval(_ error: Error) -> InlineNotice? {
+        guard let e = CoreError.unwrapping(error), case .http(let status, let code, _) = e else { return nil }
+        let title: String
+        switch (status, code) {
+        case (404, _): title = "The Core no longer has this request."
+        case (409, "approval_closed"): title = "This request was already answered or timed out."
+        default: return nil
+        }
+        return InlineNotice(
+            title: title, detail: "Nothing was changed.", symbol: "clock.badge.exclamationmark", tone: .queue)
     }
 
     // MARK: new session

@@ -249,7 +249,8 @@ extension AgentsModel {
                 CoreAnnounce.settled("approval", "\(h) needs approval")
                 if notifyApprovals {
                     notifier.post(
-                        id: id, title: "\(h) needs approval", body: "\(r.tool): \(r.input)".prefix(180).description,
+                        id: id, title: "\(h) needs approval",
+                        body: "\(r.tool): \(r.shownInput)".prefix(180).description,
                         session: r.session)
                 }
             } else {
@@ -277,7 +278,7 @@ extension AgentsModel {
         return BellItem(
             id: r.key, kind: .approval,
             title: "\(s.map { AgentWords.harnessName($0.harness) } ?? "An AI session") wants to use \(r.tool)",
-            sub: [s.map { runnerName($0.runner) }, r.input.isEmpty ? nil : r.input, left].compactMap { $0 }
+            sub: [s.map { runnerName($0.runner) }, r.shownInput.isEmpty ? nil : r.shownInput, left].compactMap { $0 }
                 .joined(separator: " · "),
             time: AgentWords.ago(r.requestedAt, now: now),
             actions: [

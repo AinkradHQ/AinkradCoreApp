@@ -249,7 +249,24 @@ public struct TranscriptPage: Equatable, Sendable {
     }
 }
 
-/// A tool call the agent waits on you for, read from its transcript. The Core has no list of approvals: they are entries.
+/// A Code Mode write the Core holds until you decide (`GET /agent-sessions/{id}/approvals`). `input` is the Core's JSON
+/// `{summary, args, reason}`, already redacted, the same text a harness approval carries.
+public struct CoreApproval: Equatable, Sendable {
+    public var id: String
+    public var tool: String
+    public var input: String
+    public var requestedAt: Date
+    public var expiresAt: Date
+    public init(id: String, tool: String, input: String, requestedAt: Date, expiresAt: Date) {
+        self.id = id
+        self.tool = tool
+        self.input = input
+        self.requestedAt = requestedAt
+        self.expiresAt = expiresAt
+    }
+}
+
+/// A tool call the agent waits on you for: a harness's own is read from its transcript, a Code Mode write from `CoreApproval`.
 public struct ApprovalRequest: Identifiable, Equatable, Sendable {
     public enum Status: Equatable, Sendable { case pending, approved, denied, expired }
     /// The request's id, what `decide` takes.

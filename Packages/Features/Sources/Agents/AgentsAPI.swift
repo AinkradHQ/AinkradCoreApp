@@ -47,6 +47,8 @@ public protocol AgentsAPI: Sendable {
     /// `text` is the next turn; nil continues with no new message.
     func wake(_ id: String, key: String, text: String?) async throws
     func decide(_ id: String, request: String, approved: Bool) async throws -> AgentSessionInfo
+    /// The Code Mode writes the Core holds for a person now. They are not transcript entries, so this is the only way to see them.
+    func approvals(_ id: String) async throws -> [CoreApproval]
     func events() -> AsyncStream<AgentFeed>
     /// What Core's ledger holds for a session (`admin`), or nil when this device can't read it.
     func ledger(_ session: String) async throws -> SessionLedger?
@@ -113,8 +115,11 @@ enum EntryParser {
                 id: str("id") ?? "", name: str("name"), ok: str("status") != "error", exitCode: int("exit_code"),
                 output: str("output") ?? "", durationMs: int("duration_ms"))
         case "approval_request":
+            let tool = str("tool") ?? "tool"
             return .approvalRequest(
-                id: str("id") ?? "", tool: str("tool") ?? "tool", input: summary(b["input"]),
+                id: str("id") ?? "", tool: tool,
+                // A Code Mode ask keeps its JSON whole (summary, args, reason) for the card; any other input is one cut line.
+                input: tool.hasPrefix("ainkrad.") ? wholeJSON(b["input"]) : summary(b["input"]),
                 timeoutSecs: int("timeout_secs"))
         case "approval_decided":
             return .approvalDecided(id: str("id") ?? "", approved: b["approved"] as? Bool ?? false)
@@ -173,6 +178,8 @@ enum EntryParser {
     static func summary(_ input: Any?) -> String {
         if let s = input as? String { return cut(s) }
         guard let o = input as? [String: Any] else { return "" }
+        // A Code Mode script is kept long: its row folds it away until you open it.
+        if let s = o["code"] as? String { return cut(s, 6_000) }
         for k in ["command", "file_path", "path", "pattern", "url", "query"] {
             if let s = o[k] as? String { return cut(s) }
         }
@@ -180,6 +187,15 @@ enum EntryParser {
             let s = String(data: d, encoding: .utf8)
         else { return "" }
         return cut(s)
+    }
+
+    static func wholeJSON(_ input: Any?) -> String {
+        if let s = input as? String { return cut(s, 8_000) }
+        guard let o = input as? [String: Any],
+            let d = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]),
+            let s = String(data: d, encoding: .utf8)
+        else { return "" }
+        return cut(s, 8_000)
     }
 
     private static func cut(_ s: String, _ n: Int = 400) -> String { s.count > n ? String(s.prefix(n)) + "…" : s }

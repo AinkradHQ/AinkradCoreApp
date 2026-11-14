@@ -34,6 +34,11 @@ struct TranscriptView: View {
                                 // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
+                        // The Core's own holds are not transcript entries: they stand after the last one, newest last.
+                        ForEach(store.heldList) { r in
+                            ApprovalEntryCard(model: model, request: r)
+                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
+                        }
                         if session.live && !session.idle && store.load == .ready && !model.waiting(session.id) {
                             Thinking(since: session.updatedAt)
                         }
@@ -56,6 +61,7 @@ struct TranscriptView: View {
                     }
                 }
                 .onChange(of: jump) { _, _ in toEnd(proxy) }
+                .onChange(of: store.heldList.count) { _, _ in if atEnd { toEnd(proxy) } }
                 if !atEnd {
                     // A quiet glass control centred over the composer, not an action tile.
                     Button(action: { toEnd(proxy) }) { Label("Latest", systemImage: "chevron.down") }
@@ -158,7 +164,10 @@ struct EntryRow: View, Equatable {
     var turn: ConversationWords.Turn?
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
-    @State private var expanded = false
+    @State private var expanded = EntryRow.openAtStart
+
+    /// Debug screenshots only: rows start open.
+    nonisolated(unsafe) static var openAtStart = false
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool {
         a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn
@@ -180,6 +189,14 @@ struct EntryRow: View, Equatable {
         case .assistant(let text):
             // Printed on the glass, no bubble.
             MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading).agentCopyMenu(text)
+        case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
+            CodeModeCard(
+                tool: CodeModeTool.of(name)!, summary: summary, status: .running, output: "", durationMs: nil,
+                expanded: $expanded)
+        case .toolDone(_, let name, let summary, let ok, _, let output, let ms) where CodeModeTool.of(name) != nil:
+            CodeModeCard(
+                tool: CodeModeTool.of(name)!, summary: summary, status: ok ? .done : .failed, output: output,
+                durationMs: ms, expanded: $expanded)
         case .toolUse(_, let name, let summary) where ConnCue.kind(name) != nil:
             ConnCue(tool: name, summary: summary, ok: nil, why: "")
         case .toolDone(_, let name, let summary, let ok, _, let output, _) where ConnCue.kind(name) != nil:

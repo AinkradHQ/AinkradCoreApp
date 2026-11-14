@@ -211,9 +211,17 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
 
     public func decide(_ id: String, request: String, approved: Bool) async throws -> AgentSessionInfo {
         try record("decide:\(approved)")
+        lock.withLock { held[id]?.removeAll { $0.id == request } }
         append(id, [.approvalDecided(id: request, approved: approved)])
         emit(.event(AgentEvent(kind: "agent.approval_decided", session: id, request: request)))
         return try await session(id)
+    }
+
+    /// What the Core holds for a person, by session. A decision removes it, as the Core does.
+    public var held: [String: [CoreApproval]] = [:]
+    public func approvals(_ id: String) async throws -> [CoreApproval] {
+        try record("approvals")
+        return lock.withLock { held[id] ?? [] }
     }
 
     public var ledgerList: [String: SessionLedger] = [:]
