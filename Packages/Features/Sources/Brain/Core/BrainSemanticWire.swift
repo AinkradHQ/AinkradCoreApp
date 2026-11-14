@@ -9,16 +9,22 @@ public struct SemanticView: Codable, Sendable, Equatable {
     public var merges: [MergeHint]
     /// For an item no rule placed: the room it looks closest to. Absent on a Core before API minor 66.
     public var closest: [ClosestHint]
+    /// While `pending`: how many items the local model has read. Absent otherwise, and on a Core before API minor 70.
+    public var progress: SemanticProgress?
+    /// What the Core tidied by itself once the step finished. Absent on an older Core.
+    public var tidy: TidyView?
 
     public init(
         state: String = "off", duplicates: [DuplicateHint] = [], rooms: [RoomHint] = [], merges: [MergeHint] = [],
-        closest: [ClosestHint] = []
+        closest: [ClosestHint] = [], progress: SemanticProgress? = nil, tidy: TidyView? = nil
     ) {
         self.state = state
         self.duplicates = duplicates
         self.rooms = rooms
         self.merges = merges
         self.closest = closest
+        self.progress = progress
+        self.tidy = tidy
     }
 
     public init(from d: any Decoder) throws {
@@ -28,6 +34,46 @@ public struct SemanticView: Codable, Sendable, Equatable {
         rooms = try c.decodeIfPresent([RoomHint].self, forKey: .rooms) ?? []
         merges = try c.decodeIfPresent([MergeHint].self, forKey: .merges) ?? []
         closest = try c.decodeIfPresent([ClosestHint].self, forKey: .closest) ?? []
+        progress = try c.decodeIfPresent(SemanticProgress.self, forKey: .progress)
+        tidy = try c.decodeIfPresent(TidyView.self, forKey: .tidy)
+    }
+}
+
+/// `done` of `total` items read by the local model ("Local AI: 1,240 of 2,980 items").
+public struct SemanticProgress: Codable, Sendable, Equatable {
+    public var done: Int
+    public var total: Int
+    public init(done: Int, total: Int) {
+        self.done = done
+        self.total = total
+    }
+}
+
+/// What the Core changed by itself: the room count before and after, and every change by name.
+public struct TidyView: Codable, Sendable, Equatable {
+    public var before: Int
+    public var after: Int
+    public var changes: [TidyChange]
+    public init(before: Int, after: Int, changes: [TidyChange]) {
+        self.before = before
+        self.after = after
+        self.changes = changes
+    }
+}
+
+/// One change. `kind` is `duplicate` (copies of `title` were left out), `fold` (the small room `title` went into
+/// `into`) or `merge` (the room `title` joined `into`).
+public struct TidyChange: Codable, Sendable, Equatable, Identifiable {
+    public var kind: String
+    public var title: String
+    public var into: String?
+    public var count: Int?
+    public var id: String { "\(kind):\(title):\(into ?? "")" }
+    public init(kind: String, title: String, into: String? = nil, count: Int? = nil) {
+        self.kind = kind
+        self.title = title
+        self.into = into
+        self.count = count
     }
 }
 

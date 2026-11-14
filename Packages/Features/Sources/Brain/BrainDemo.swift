@@ -21,7 +21,7 @@ public final class BrainDemo {
         "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
         "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
         "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
-        "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-closest", "ai-settings",
+        "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
         "room-ai-access",
     ]
 
@@ -97,9 +97,8 @@ public final class BrainDemo {
         // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
         s.imports = true
         s.semantic =
-            scene == "import-review-ai-ready"
-            ? "ready"
-            : scene == "import-review-ai-closest" ? "closest" : scene == "import-review-ai-pending" ? "pending" : "off"
+            scene == "import-review-ai-ready" || scene == "import-review-ai-changes"
+            ? "ready" : scene == "import-review-ai-pending" ? "pending" : "off"
         let places = SampleImportSource.demoPlaces(
             scene.hasPrefix("import-where-d") || scene == "import-where-searching" ? .disk : .folders,
             endless: scene == "import-where-searching")
@@ -171,9 +170,13 @@ public final class BrainDemo {
         case "import", "import-where-folders", "import-where-disk", "import-where-searching":
             model.show(.rooms)
             model.openImport()
-        case "import-review", "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-closest":
+        case "import-review", "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes":
             model.show(.rooms)
             await model.openReview(SampleImportTransport.run)
+            if scene == "import-review-ai-changes", let r = model.importer?.review {
+                await r.watching?.value
+                r.showingChanges = true
+            }
         case "room-ai-access":
             model.show(.rooms)
             model.view("acme-shop")

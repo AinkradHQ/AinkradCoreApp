@@ -64,6 +64,44 @@ public enum ReviewWords {
     /// "Looks like Optimus. Merge?"
     public static func suggestion(_ s: MergeSuggestion) -> String { "Looks like \(s.name). Merge?" }
 
+    /// "Local AI: 1,240 of 2,980 items", or a plain line on a Core that does not count.
+    public static func reading(_ p: SemanticProgress?) -> String {
+        guard let p else { return "Local AI: reading the items…" }
+        return "Local AI: \(p.done.formatted()) of \(p.total.formatted()) \(p.total == 1 ? "item" : "items")"
+    }
+
+    /// "Local AI tidied this: merged 52 duplicates, folded 14 rooms (35 → 21 rooms)". Small rooms folded and look-alike
+    /// rooms joined count together: both are a room that went into another.
+    public static func tidied(_ t: TidyView) -> String {
+        let dupes = t.changes.filter { $0.kind == "duplicate" }.reduce(0) { $0 + ($1.count ?? 1) }
+        let folds = t.changes.filter { $0.kind != "duplicate" }.count
+        let parts = [
+            dupes > 0 ? "merged \(BrainWords.plural(dupes, "duplicate", "duplicates"))" : nil,
+            folds > 0 ? "folded \(BrainWords.plural(folds, "room", "rooms"))" : nil,
+        ].compactMap { $0 }
+        let rooms = "\(t.before) → \(BrainWords.plural(t.after, "room", "rooms"))"
+        return "Local AI tidied this: \(parts.joined(separator: ", ")) (\(rooms))"
+    }
+
+    /// The changes by kind, in a fixed order, with the group's title and symbol.
+    public static func tidyGroups(_ t: TidyView) -> [(title: String, symbol: String, changes: [TidyChange])] {
+        [
+            ("Duplicates merged", "doc.on.doc", "duplicate"), ("Small rooms folded", "arrow.turn.down.right", "fold"),
+            ("Rooms joined", "arrow.triangle.merge", "merge"),
+        ].compactMap { title, symbol, kind in
+            let c = t.changes.filter { $0.kind == kind }
+            return c.isEmpty ? nil : (title, symbol, c)
+        }
+    }
+
+    /// The quiet line under one change: "3 copies kept as one", "Now in Acme Shop".
+    public static func change(_ c: TidyChange) -> String {
+        switch c.kind {
+        case "duplicate": return "\(BrainWords.plural(c.count ?? 2, "copy", "copies")) kept as one"
+        default: return c.into.map { "Now in \($0)" } ?? ""
+        }
+    }
+
     public static func importTitle(_ n: Int) -> String {
         n == 0 ? "Import" : "Import \(BrainWords.plural(n, "room", "rooms"))"
     }
