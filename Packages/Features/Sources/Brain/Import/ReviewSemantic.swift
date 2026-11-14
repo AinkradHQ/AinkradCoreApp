@@ -14,19 +14,66 @@ extension ReviewModel {
         semanticState == "pending" ? semantic?.progress.flatMap { $0.total > 0 ? $0 : nil } : nil
     }
 
-    /// What the Core tidied, once the step is done. Nil when it changed nothing.
-    public var tidy: TidyView? {
-        semanticState == "ready" ? semantic?.tidy.flatMap { $0.changes.isEmpty ? nil : $0 } : nil
+    /// What the Core tidied, once the step is done. Nil while it works, when it changed nothing, and after Undo.
+    public var tidy: TidySummary? {
+        guard semanticState == "ready", let t = semantic?.aiTidy, t.state != "undone" else { return nil }
+        return t.summary
     }
 
-    /// Puts back everything the Core tidied, then reads the rooms and the step again.
+    /// The person undid the tidy; Re-sort runs it again.
+    public var tidyUndone: Bool { semanticState == "ready" && semantic?.aiTidy?.state == "undone" }
+
+    /// Opens the list of changes in place of the rooms and reads it, with the items it names.
+    public func openChanges() async {
+        guard let run else { return }
+        showingChanges = true
+        await act {
+            let all = try await routes.tidyChanges(run: run).changes
+            await nameItems(all.compactMap(Self.namedItem))
+            tidyChanges = all
+        }
+    }
+
+    public func closeChanges() { showingChanges = false }
+
+    /// The item a change is about, when the change names an item rather than a room.
+    static func namedItem(_ c: TidyChange) -> String? {
+        switch c.kind {
+        case "duplicate": c.to
+        case "move": c.itemIds.first
+        default: nil
+        }
+    }
+
+    /// Puts back everything the Core tidied, then reads the rooms again.
     public func undoTidy() async {
         guard let run else { return }
         await act {
-            try await routes.undoTidy(run: run)
+            semantic = try await routes.undoTidy(run: run)
             showingChanges = false
+            tidyChanges = nil
             await refresh()
-            await readSemantic()
+        }
+    }
+
+    /// Reads the cards' item pages (never more than `maxPages` in all) until every id has a title.
+    func nameItems(_ ids: [String], maxPages: Int = 40) async {
+        guard let run else { return }
+        var need = Set(ids).subtracting(itemTitles.keys)
+        var pages = 0
+        for card in visible where !need.isEmpty {
+            var after: Int?
+            while pages < maxPages, !need.isEmpty {
+                pages += 1
+                guard let page = try? await routes.items(run: run, proposal: card.id, after: after, limit: 100)
+                else { break }
+                for row in page.items where need.contains(row.id) {
+                    itemTitles[row.id] = row.title
+                    need.remove(row.id)
+                }
+                guard let next = page.next else { break }
+                after = next
+            }
         }
     }
 

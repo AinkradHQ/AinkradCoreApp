@@ -21,7 +21,11 @@ public final class ReviewModel {
     /// The local model's suggestions, read from `/semantic`; nil until the first read or on a Core without it.
     public internal(set) var semantic: SemanticView?
     /// The list of what the local AI tidied is open in place of the rooms.
-    public var showingChanges = false
+    public internal(set) var showingChanges = false
+    /// The tidy's changes, read when the person opens them; nil until then.
+    public internal(set) var tidyChanges: [TidyChange]?
+    /// Titles of the items a change names (the kept copy, a moved item), read from the cards' item pages.
+    public internal(set) var itemTitles: [String: String] = [:]
     /// How long to wait between two reads while the model works.
     var pollEvery: Duration = .seconds(5)
     var watching: Task<Void, Never>?
@@ -132,6 +136,8 @@ public final class ReviewModel {
             _ = try await routes.regroup(run: run)
             await refresh()
             semantic = nil
+            tidyChanges = nil
+            showingChanges = false
             watchSemantic()
             closeCard()
         }

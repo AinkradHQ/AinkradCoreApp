@@ -175,7 +175,7 @@ public final class BrainDemo {
             await model.openReview(SampleImportTransport.run)
             if scene == "import-review-ai-changes", let r = model.importer?.review {
                 await r.watching?.value
-                r.showingChanges = true
+                await r.openChanges()
             }
         case "room-ai-access":
             model.show(.rooms)

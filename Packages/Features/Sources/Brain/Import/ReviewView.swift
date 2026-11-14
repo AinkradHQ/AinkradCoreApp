@@ -16,8 +16,8 @@ struct ReviewStep: View {
             }
             if r.opened != nil {
                 ReviewDetail(review: r)
-            } else if r.showingChanges, let t = r.tidy {
-                TidyChanges(review: r, tidy: t)
+            } else if r.showingChanges {
+                TidyChangesList(review: r)
             } else if r.visible.isEmpty {
                 Text("Nothing was found to put in a room.").foregroundStyle(GlassInk.secondary)
                     .padding(Space.s4).frame(maxWidth: .infinity).coreWell()

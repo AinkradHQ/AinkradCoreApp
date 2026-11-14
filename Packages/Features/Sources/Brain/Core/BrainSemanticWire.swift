@@ -11,12 +11,17 @@ public struct SemanticView: Codable, Sendable, Equatable {
     public var closest: [ClosestHint]
     /// While `pending`: how many items the local model has read. Absent otherwise, and on a Core before API minor 70.
     public var progress: SemanticProgress?
-    /// What the Core tidied by itself once the step finished. Absent on an older Core.
-    public var tidy: TidyView?
+    /// What the Core tidied by itself once the step finished. Absent while pending, when there was nothing to tidy, and
+    /// on a Core before API minor 71.
+    public var aiTidy: AiTidy?
+    enum CodingKeys: String, CodingKey {
+        case state, duplicates, rooms, merges, closest, progress
+        case aiTidy = "ai_tidy"
+    }
 
     public init(
         state: String = "off", duplicates: [DuplicateHint] = [], rooms: [RoomHint] = [], merges: [MergeHint] = [],
-        closest: [ClosestHint] = [], progress: SemanticProgress? = nil, tidy: TidyView? = nil
+        closest: [ClosestHint] = [], progress: SemanticProgress? = nil, aiTidy: AiTidy? = nil
     ) {
         self.state = state
         self.duplicates = duplicates
@@ -24,7 +29,7 @@ public struct SemanticView: Codable, Sendable, Equatable {
         self.merges = merges
         self.closest = closest
         self.progress = progress
-        self.tidy = tidy
+        self.aiTidy = aiTidy
     }
 
     public init(from d: any Decoder) throws {
@@ -35,7 +40,7 @@ public struct SemanticView: Codable, Sendable, Equatable {
         merges = try c.decodeIfPresent([MergeHint].self, forKey: .merges) ?? []
         closest = try c.decodeIfPresent([ClosestHint].self, forKey: .closest) ?? []
         progress = try c.decodeIfPresent(SemanticProgress.self, forKey: .progress)
-        tidy = try c.decodeIfPresent(TidyView.self, forKey: .tidy)
+        aiTidy = try c.decodeIfPresent(AiTidy.self, forKey: .aiTidy)
     }
 }
 
@@ -49,31 +54,90 @@ public struct SemanticProgress: Codable, Sendable, Equatable {
     }
 }
 
-/// What the Core changed by itself: the room count before and after, and every change by name.
-public struct TidyView: Codable, Sendable, Equatable {
-    public var before: Int
-    public var after: Int
-    public var changes: [TidyChange]
-    public init(before: Int, after: Int, changes: [TidyChange]) {
-        self.before = before
-        self.after = after
-        self.changes = changes
+/// `SemanticView.ai_tidy` (AinkradCore #248): the Core's own tidy of the proposal, `applied` or `undone`.
+public struct AiTidy: Codable, Sendable, Equatable {
+    public var state: String?
+    public var summary: TidySummary?
+    enum CodingKeys: String, CodingKey { case state, summary }
+    public init(state: String? = "applied", summary: TidySummary? = nil) {
+        self.state = state
+        self.summary = summary
     }
 }
 
-/// One change. `kind` is `duplicate` (copies of `title` were left out), `fold` (the small room `title` went into
-/// `into`) or `merge` (the room `title` joined `into`).
-public struct TidyChange: Codable, Sendable, Equatable, Identifiable {
+/// The counts of the tidy. Rooms do not count Unsorted.
+public struct TidySummary: Codable, Sendable, Equatable {
+    public var duplicatesMerged: Int?
+    public var roomsMerged: Int?
+    public var roomsFolded: Int?
+    public var itemsMoved: Int?
+    public var roomsBefore: Int?
+    public var roomsAfter: Int?
+    enum CodingKeys: String, CodingKey {
+        case duplicatesMerged = "duplicates_merged"
+        case roomsMerged = "rooms_merged"
+        case roomsFolded = "rooms_folded"
+        case itemsMoved = "items_moved"
+        case roomsBefore = "rooms_before"
+        case roomsAfter = "rooms_after"
+    }
+    public init(
+        duplicatesMerged: Int? = nil, roomsMerged: Int? = nil, roomsFolded: Int? = nil, itemsMoved: Int? = nil,
+        roomsBefore: Int? = nil, roomsAfter: Int? = nil
+    ) {
+        self.duplicatesMerged = duplicatesMerged
+        self.roomsMerged = roomsMerged
+        self.roomsFolded = roomsFolded
+        self.itemsMoved = itemsMoved
+        self.roomsBefore = roomsBefore
+        self.roomsAfter = roomsAfter
+    }
+}
+
+/// `GET /imports/{run}/semantic/changes`.
+public struct TidyChanges: Codable, Sendable, Equatable {
+    public var changes: [TidyChange]
+    public init(changes: [TidyChange]) { self.changes = changes }
+    public init(from d: any Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self)
+        changes = try c.decodeIfPresent([TidyChange].self, forKey: .changes) ?? []
+    }
+}
+
+/// One change. `duplicate`: `itemIds` merged into the kept item `to`. `merge`: room `from` into room `to`. `fold`: tiny
+/// room `from` into room `to` or `unsorted`. `move`: the Unsorted item `itemIds[0]` into room `to`.
+public struct TidyChange: Codable, Sendable, Equatable {
     public var kind: String
-    public var title: String
-    public var into: String?
-    public var count: Int?
-    public var id: String { "\(kind):\(title):\(into ?? "")" }
-    public init(kind: String, title: String, into: String? = nil, count: Int? = nil) {
+    public var itemIds: [String]
+    public var from: String?
+    public var fromName: String?
+    public var to: String
+    public var toName: String?
+    enum CodingKeys: String, CodingKey {
+        case kind, from, to
+        case itemIds = "item_ids"
+        case fromName = "from_name"
+        case toName = "to_name"
+    }
+    public init(
+        kind: String, itemIds: [String] = [], from: String? = nil, fromName: String? = nil, to: String,
+        toName: String? = nil
+    ) {
         self.kind = kind
-        self.title = title
-        self.into = into
-        self.count = count
+        self.itemIds = itemIds
+        self.from = from
+        self.fromName = fromName
+        self.to = to
+        self.toName = toName
+    }
+    public init(from d: any Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self)
+        kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? ""
+        itemIds = try c.decodeIfPresent([String].self, forKey: .itemIds) ?? []
+        from = try c.decodeIfPresent(String.self, forKey: .from)
+        fromName = try c.decodeIfPresent(String.self, forKey: .fromName)
+        to = try c.decodeIfPresent(String.self, forKey: .to) ?? ""
+        toName = try c.decodeIfPresent(String.self, forKey: .toName)
     }
 }
 

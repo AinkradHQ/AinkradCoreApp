@@ -8,7 +8,6 @@ actor SampleImportTransport: BrainTransport {
     static let run = "sample-run"
     /// The local AI's step for this run: `pending`, `ready` or `off`.
     private let semantic: String
-    private var hints = SampleImportTransport.sampleHints
     private var state: String { semantic }
     private var settings: [String: Int] = [
         "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
@@ -16,20 +15,26 @@ actor SampleImportTransport: BrainTransport {
 
     init(semantic: String = "off") { self.semantic = semantic }
 
-    /// Made-up work of the local AI: what it tidied by itself, by name.
-    static let sampleHints = SemanticView(
-        state: "ready",
-        tidy: TidyView(
-            before: 10, after: 6,
-            changes: [
-                TidyChange(kind: "duplicate", title: "Sample: queue migration order", count: 4),
-                TidyChange(kind: "duplicate", title: "Sample: runner rewrite plan", count: 3),
-                TidyChange(kind: "duplicate", title: "Sample: tenant dashboard", count: 2),
-                TidyChange(kind: "fold", title: "Garden notes", into: "Personal"),
-                TidyChange(kind: "fold", title: "Price page variant", into: "Pricing experiments"),
-                TidyChange(kind: "fold", title: "Old shop api", into: "Acme Shop"),
-                TidyChange(kind: "merge", title: "Shop admin", into: "Acme Shop"),
-            ]))
+    /// Made-up work of the local AI: what it tidied by itself, applied until Undo.
+    private var undone = false
+    static let sampleTidy = TidySummary(
+        duplicatesMerged: 9, roomsMerged: 1, roomsFolded: 3, itemsMoved: 2, roomsBefore: 10, roomsAfter: 6)
+    static let sampleChanges = [
+        TidyChange(kind: "duplicate", itemIds: ["k1a", "k1b", "k1c", "k1d"], to: "k1"),
+        TidyChange(kind: "duplicate", itemIds: ["k2a", "k2b", "k2c"], to: "k2"),
+        TidyChange(kind: "duplicate", itemIds: ["k3a", "k3b"], to: "k3"),
+        TidyChange(kind: "merge", from: "shop-admin", fromName: "Shop admin", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(kind: "fold", from: "garden", fromName: "Garden notes", to: "unsorted", toName: "Unsorted"),
+        TidyChange(
+            kind: "fold", from: "pv", fromName: "Price page variant", to: "pricing", toName: "Pricing experiments"),
+        TidyChange(kind: "fold", from: "osa", fromName: "Old shop api", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(kind: "move", itemIds: ["m1"], from: "unsorted", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(kind: "move", itemIds: ["m2"], from: "unsorted", to: "pricing", toName: "Pricing experiments"),
+    ]
+    static let sampleTitles = [
+        "k1": "Sample: queue migration order", "k2": "Sample: runner rewrite plan", "k3": "Sample: tenant dashboard",
+        "m1": "Sample: checkout tax settings", "m2": "Sample: price page test B",
+    ]
     private var cards: [ProposalCard] = [
         ProposalCard(
             id: "ainkrad", name: "Ainkrad", kind: "product", signals: ["path"], itemCount: 1412,
@@ -75,14 +80,12 @@ actor SampleImportTransport: BrainTransport {
                 return c
             }
             return try e.encode(tagged)
-        case ("GET", 3, "semantic"):
-            var v = state == "ready" ? hints : SemanticView()
-            if state == "pending" { v.progress = SemanticProgress(done: 1240, total: 2980) }
-            v.state = state
-            return try e.encode(v)
+        case ("GET", 3, "semantic"): return try e.encode(semanticView())
+        case ("GET", 4, "changes"):
+            return try e.encode(TidyChanges(changes: undone || state != "ready" ? [] : Self.sampleChanges))
         case ("POST", 4, "undo"):
-            hints.tidy = nil
-            return Data("{}".utf8)
+            undone = true
+            return try e.encode(semanticView())
         case ("GET", 1, "settings"):
             return try e.encode(
                 settings.sorted { $0.key < $1.key }.map {
@@ -105,6 +108,9 @@ actor SampleImportTransport: BrainTransport {
             return try e.encode(made)
         case ("GET", 5, "items"):
             var rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
+            rows += Self.sampleTitles.sorted { $0.key < $1.key }.enumerated().map {
+                ItemRow(id: $1.key, cursor: 10 + $0, title: $1.value)
+            }
             if p[3] == ProposalCard.unsortedID {
                 rows += [
                     ItemRow(id: "c1", cursor: 4, title: "Checkout page: tenant-level tax settings"),
@@ -138,6 +144,13 @@ actor SampleImportTransport: BrainTransport {
         default:
             throw BrainHTTPError(status: 404, code: "not_found", message: "The sample has no answer for this.")
         }
+    }
+
+    private func semanticView() -> SemanticView {
+        var v = SemanticView(state: state)
+        if state == "pending" { v.progress = SemanticProgress(done: 1240, total: 2980) }
+        if state == "ready" { v.aiTidy = AiTidy(state: undone ? "undone" : "applied", summary: Self.sampleTidy) }
+        return v
     }
 
     private func update(_ id: String, _ change: (inout ProposalCard) -> Void) throws -> ProposalCard {

@@ -22,10 +22,12 @@ struct SemanticStatusLine: View {
                         .buttonStyle(CoreButtonStyle(.plain, size: .small))
                         .help("Put back every room and item the local AI changed.")
                         .accessibilityIdentifier("brain-review-tidy-undo")
-                    Button("See changes") { review.showingChanges = true }
+                    Button("See changes") { Task { await review.openChanges() } }
                         .buttonStyle(CoreButtonStyle(.plain, size: .small))
                         .help("List every change by name.")
                         .accessibilityIdentifier("brain-review-tidy-changes")
+                } else if review.tidyUndone {
+                    words("Local AI changes undone. Re-sort runs it again.")
                 } else {
                     words("Local AI found nothing to tidy.")
                 }
@@ -44,15 +46,14 @@ struct SemanticStatusLine: View {
 }
 
 /// Every change the local AI made, grouped by kind, each by name. Opens in place of the rooms, like a room does.
-struct TidyChanges: View {
+struct TidyChangesList: View {
     let review: ReviewModel
-    let tidy: TidyView
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s2) {
                 Button {
-                    review.showingChanges = false
+                    review.closeChanges()
                 } label: {
                     Label("All rooms", systemImage: "chevron.left")
                 }
@@ -66,13 +67,18 @@ struct TidyChanges: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    ForEach(ReviewWords.tidyGroups(tidy), id: \.title) { g in
+                    if review.tidyChanges == nil {
+                        Text("Reading the changes…").foregroundStyle(GlassInk.secondary)
+                    }
+                    ForEach(ReviewWords.tidyGroups(review.tidyChanges ?? []), id: \.title) { g in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(g.title).coreFont(size: MacTextSize.meta, weight: .semibold)
                                 .foregroundStyle(GlassInk.secondary).padding(.bottom, Space.s1)
                                 .accessibilityAddTraits(.isHeader)
-                            ForEach(g.changes) { c in
-                                CoreRow(c.title, subtitle: ReviewWords.change(c), symbol: g.symbol)
+                            ForEach(Array(g.changes.enumerated()), id: \.offset) { _, c in
+                                CoreRow(
+                                    ReviewWords.changeTitle(c, titles: review.itemTitles),
+                                    subtitle: ReviewWords.change(c), symbol: g.symbol)
                             }
                         }
                     }
