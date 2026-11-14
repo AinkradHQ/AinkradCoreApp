@@ -20,15 +20,15 @@ public final class ReviewModel {
     public private(set) var busy = false
     /// The local model's suggestions, read from `/semantic`; nil until the first read or on a Core without it.
     public internal(set) var semantic: SemanticView?
-    /// Suggestions the person dismissed. They stay in this sheet only.
-    public internal(set) var dismissed: Set<String> = []
+    /// The list of what the local AI tidied is open in place of the rooms.
+    public internal(set) var showingChanges = false
+    /// The tidy's changes, read when the person opens them; nil until then.
+    public internal(set) var tidyChanges: [TidyChange]?
+    /// Titles of the items a change names (the kept copy, a moved item), read from the cards' item pages.
+    public internal(set) var itemTitles: [String: String] = [:]
     /// How long to wait between two reads while the model works.
     var pollEvery: Duration = .seconds(5)
     var watching: Task<Void, Never>?
-    /// Items named by a closest-room hint, read once from the Unsorted card and kept for this sheet.
-    var hintItems: [String: ItemRow] = [:]
-    /// Ids already looked for, so a poll never asks the Core for the same missing item again.
-    var hintLooked: Set<String> = []
 
     public init(host: any AdminHost, routes: BrainRoutes) {
         self.host = host
@@ -136,6 +136,8 @@ public final class ReviewModel {
             _ = try await routes.regroup(run: run)
             await refresh()
             semantic = nil
+            tidyChanges = nil
+            showingChanges = false
             watchSemantic()
             closeCard()
         }

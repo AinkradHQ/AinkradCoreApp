@@ -10,7 +10,10 @@ final class Seen: @unchecked Sendable { nonisolated(unsafe) var body: [String: A
 struct ReviewSemanticTests {
     static let base = "/modules/brain/v1/imports/r1"
 
-    func make(_ state: String, hints: SemanticView = SampleImportTransport.sampleHints) -> (
+    nonisolated static let applied = SemanticView(
+        state: "ready", aiTidy: AiTidy(summary: SampleImportTransport.sampleTidy))
+
+    func make(_ state: String, hints: SemanticView = Self.applied) -> (
         ReviewModel, FakeBrainTransport
     ) {
         let t = FakeBrainTransport()
@@ -43,10 +46,10 @@ struct ReviewSemanticTests {
         #expect(t.count("GET \(Self.base)/semantic") >= 2)
         // The Core now says ready: the next poll shows the hints and stops.
         t.routes["GET \(Self.base)/semantic"] = { _ in
-            try JSONSerialization.jsonObject(with: JSONEncoder().encode(SampleImportTransport.sampleHints))
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(Self.applied))
         }
         await settle(r)
-        #expect(r.semanticState == "ready" && r.hasHints)
+        #expect(r.semanticState == "ready" && r.tidy?.roomsAfter == 4)
         let n = t.count("GET \(Self.base)/semantic")
         try await Task.sleep(for: .milliseconds(30))
         #expect(t.count("GET \(Self.base)/semantic") == n)
@@ -55,7 +58,7 @@ struct ReviewSemanticTests {
     @Test func offOrNoModelShowsNothingAndAsksNothing() async throws {
         let (r, t) = make("off")
         try await r.load(run: "r1")
-        #expect(r.semanticState == nil && !r.hasHints && t.count("GET \(Self.base)/semantic") == 0)
+        #expect(r.semanticState == nil && r.tidy == nil && t.count("GET \(Self.base)/semantic") == 0)
         let t2 = FakeBrainTransport()  // an older Core: cards carry no `semantic`
         t2.routes["GET \(Self.base)/proposals"] = { _ in [[String: Any]]() }
         let old = ReviewModel(host: FakeHost(), routes: BrainRoutes(transport: t2))
@@ -63,53 +66,83 @@ struct ReviewSemanticTests {
         #expect(old.semanticState == nil && t2.count("GET \(Self.base)/semantic") == 0)
     }
 
-    @Test func mergeHintsNeedTwoRealRoomsAndSkipPairsTheCardAlreadyHints() async throws {
-        var v = SampleImportTransport.sampleHints
-        v.merges += [
-            MergeHint(from: "pricing-experiment", to: "unsorted", fromName: "x", toName: nil, score: 0.9),
-            MergeHint(from: "ghost", to: "acme-shop", fromName: "g", toName: "A", score: 0.9),
-        ]
-        let (r, _) = make("ready", hints: v)
-        try await r.load(run: "r1")
-        await settle(r)
-        #expect(r.mergeHints.map(\.to) == ["acme-shop"] && r.mergeHints.first?.from == "pricing-experiment")
+    @Test func progressAndTidyDecodeAndAnOlderCoreHasNeither() throws {
+        let json = Data(
+            #"""
+            {"state":"ready","progress":{"done":1240,"total":2980},
+             "ai_tidy":{"state":"applied","changes_url":"/x","summary":{"duplicates_merged":52,"rooms_merged":2,
+               "rooms_folded":12,"rooms_before":35,"rooms_after":21}}}
+            """#.utf8)
+        let v = try JSONDecoder().decode(SemanticView.self, from: json)
+        #expect(v.progress == SemanticProgress(done: 1240, total: 2980) && v.aiTidy?.summary?.roomsAfter == 21)
+        #expect(ReviewWords.reading(v.progress) == "Local AI: 1,240 of 2,980 items")
+        #expect(
+            ReviewWords.tidied(try #require(v.aiTidy?.summary))
+                == "Local AI tidied this: merged 52 duplicates, folded 14 rooms (35 → 21 rooms)")
+        let old = try JSONDecoder().decode(SemanticView.self, from: Data(#"{"state":"ready"}"#.utf8))
+        #expect(old.progress == nil && old.aiTidy == nil && ReviewWords.reading(nil) == "Local AI: reading the items…")
+        let c = try JSONDecoder().decode(
+            TidyChanges.self,
+            from: Data(
+                #"{"changes":[{"kind":"fold","item_ids":["a"],"from":"p9","from_name":"AD","to":"unsorted"}]}"#.utf8))
+        #expect(
+            c.changes.first?.fromName == "AD" && ReviewWords.change(c.changes[0]) == "Its items wait in No room yet")
     }
 
-    @Test func dismissIsLocalAndAcceptUsesTheExistingRoutes() async throws {
+    @Test func seeChangesNamesEveryChangeByTitleGroupedByKind() async throws {
+        let r = ReviewModel(host: FakeHost(), routes: BrainRoutes(transport: SampleImportTransport(semantic: "ready")))
+        try await r.load(run: SampleImportTransport.run)
+        await settle(r)
+        #expect(
+            ReviewWords.tidied(try #require(r.tidy))
+                == "Local AI tidied this: merged 9 duplicates, folded 5 rooms, moved 2 items into rooms (9 → 4 rooms)")
+        await r.openChanges()
+        let groups = ReviewWords.tidyGroups(r.tidyChanges ?? [])
+        #expect(
+            groups.map(\.title) == [
+                "Duplicates merged", "Rooms joined", "Small rooms folded", "Items moved into rooms",
+            ])
+        let names = groups.flatMap(\.changes).map { ReviewWords.changeTitle($0, titles: r.itemTitles) }
+        #expect(!names.contains("Untitled item") && names.first == "Sample: queue migration order")
+        #expect(names.last == "Sample: price page test B" && names.contains("AcmeShopApi"))
+        #expect(ReviewWords.change(groups[0].changes[0]) == "4 copies merged into this one")
+        #expect(ReviewWords.change(groups[2].changes[1]) == "Folded into Pricing experiments")
+        // Titles the Core sent are used as they are; only the unnamed ones are looked up.
+        #expect(r.itemTitles["k1"] == nil && r.itemTitles["m1"] == nil && r.itemTitles["k2"] != nil)
+        // The Core applied the name hints: no Merge question is left while the tidy stands, and Undo brings them back.
+        #expect(r.cards.allSatisfy { $0.suggestMerge == nil } && r.visible.count == 5)
+        await r.undoTidy()
+        #expect(r.tidyUndone && r.cards.contains { $0.suggestMerge != nil })
+    }
+
+    @Test func undoAsksTheCoreThenRereadsTheRooms() async throws {
         let (r, t) = make("ready")
-        t.routes["POST \(Self.base)/proposals/unsorted/split"] = { _ in
-            [
-                "id": "garden-planner", "name": "Garden planner", "kind": "project", "kind_guess": "project",
-                "state": "proposed", "signals": [String](), "warnings": [String](), "item_count": 12,
-                "sample_titles": [String](), "config": [String: Any](),
-            ]
+        t.routes["POST \(Self.base)/semantic/undo"] = { _ in
+            ["state": "ready", "ai_tidy": ["state": "undone"]]
         }
-        t.routes["PATCH \(Self.base)/items"] = { _ in [String: Any]() }
-        t.routes["POST \(Self.base)/proposals/pricing-experiment/merge"] = { _ in
-            [
-                "id": "acme-shop", "name": "Acme", "kind": "product", "kind_guess": "product", "state": "proposed",
-                "signals": [String](), "warnings": [String](), "item_count": 8, "sample_titles": [String](),
-                "config": [String: Any](),
-            ]
-        }
+        t.routes["GET \(Self.base)/semantic/changes"] = { _ in ["changes": [[String: Any]]()] }
         try await r.load(run: "r1")
         await settle(r)
-        let (room, copies, merge) = (r.roomHints[0], r.copyHints[0], r.mergeHints[0])
-        r.dismiss(r.roomHints[1])
-        #expect(r.roomHints.count == 1 && t.count("GET \(Self.base)/proposals") == 1)
+        await r.openChanges()
+        #expect(r.tidy != nil && r.showingChanges && r.tidyChanges == [])
+        await r.undoTidy()
+        #expect(t.count("POST \(Self.base)/semantic/undo") == 1 && r.notice == nil)
+        #expect(r.tidy == nil && r.tidyUndone && !r.showingChanges && t.count("GET \(Self.base)/proposals") == 2)
+    }
 
-        let seen = Seen()
-        t.routes["PATCH \(Self.base)/items"] = { b in
-            seen.body = b.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-            return [String: Any]()
+    @Test func theRoomsAreReadAgainWhenTheStepFinishes() async throws {
+        let (r, t) = make("pending")
+        try await r.load(run: "r1")
+        #expect(r.semanticProgress == nil)  // this pending view has no progress
+        t.routes["GET \(Self.base)/semantic"] = { _ in
+            ["state": "pending", "progress": ["done": 10, "total": 40]]
         }
-        await r.accept(copies)
-        #expect(seen.body?["mark"] as? String == "refused" && (seen.body?["ids"] as? [String]) == ["d2", "d3"])
-        await r.accept(room)
-        #expect(t.count("POST \(Self.base)/proposals/unsorted/split") == 1)
-        await r.accept(merge)
-        #expect(t.count("POST \(Self.base)/proposals/pricing-experiment/merge") == 1)
-        #expect(t.count("GET \(Self.base)/proposals") == 4)  // load, then one reload per accept
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(r.semanticProgress?.done == 10)
+        let before = t.count("GET \(Self.base)/proposals")
+        t.routes["GET \(Self.base)/semantic"] = { _ in ["state": "ready"] }
+        await settle(r)
+        #expect(t.count("GET \(Self.base)/proposals") == before + 1 && r.semanticProgress == nil)
     }
 
     @Test func aSettingKeepsTheCoresValueAndRollsBackOnAFailure() async {

@@ -8,44 +8,40 @@ actor SampleImportTransport: BrainTransport {
     static let run = "sample-run"
     /// The local AI's step for this run: `pending`, `ready` or `off`.
     private let semantic: String
-    private var hints = SampleImportTransport.sampleHints
-    /// `closest` is the scene that shows only the closest-room suggestions.
-    private var state: String { semantic == "closest" ? "ready" : semantic }
+    private var state: String { semantic }
     private var settings: [String: Int] = [
         "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
     ]
 
     init(semantic: String = "off") { self.semantic = semantic }
 
-    /// Made-up suggestions: two topics among Unsorted, two sets of near-copies, one merge no card hints at yet.
-    static let sampleHints = SemanticView(
-        state: "ready",
-        duplicates: [
-            DuplicateHint(keep: "d1", itemIds: ["d1", "d2", "d3"], score: 0.98, reason: "same text"),
-            DuplicateHint(keep: "d4", itemIds: ["d4", "d5"], score: 0.96, reason: "same text"),
-        ],
-        rooms: [
-            RoomHint(
-                name: "Garden planner", keywords: ["garden", "planting", "beds", "compost"],
-                itemIds: (1...12).map { "g\($0)" }, score: 0.9),
-            RoomHint(
-                name: "Trip budget", keywords: ["budget", "flights", "hotel"],
-                itemIds: (1...7).map { "t\($0)" }, score: 0.87),
-        ],
-        merges: [
-            MergeHint(
-                from: "pricing-experiment", to: "acme-shop", fromName: "Pricing experiment", toName: "Acme Shop",
-                score: 0.92, reason: "close")
-        ],
-        closest: [
-            ClosestHint(
-                itemId: "c1", roomId: "acme-shop", roomName: "Acme Shop", inReview: true, score: 0.94,
-                runnerUp: ClosestRunnerUp(roomId: "pricing", roomName: "Pricing experiments", score: 0.89)),
-            ClosestHint(
-                itemId: "c2", roomId: "room-orchard", roomName: "Orchard Notes", inReview: false, score: 0.91,
-                runnerUp: ClosestRunnerUp(roomId: "ainkrad", roomName: "Ainkrad", score: 0.86)),
-            ClosestHint(itemId: "c3", roomId: "pricing", roomName: "Pricing experiments", inReview: true, score: 0.9),
-        ])
+    /// Made-up work of the local AI: what it tidied by itself, applied until Undo.
+    private var undone = false
+    static let sampleTidy = TidySummary(
+        duplicatesMerged: 9, roomsMerged: 2, roomsFolded: 3, itemsMoved: 2, roomsBefore: 9, roomsAfter: 4)
+    static let sampleChanges = [
+        TidyChange(
+            kind: "duplicate", itemIds: ["k1a", "k1b", "k1c", "k1d"], to: "k1", toName: "Ainkrad",
+            toTitle: "Sample: queue migration order"),
+        TidyChange(kind: "duplicate", itemIds: ["k2a", "k2b", "k2c"], to: "k2"),
+        TidyChange(kind: "duplicate", itemIds: ["k3a", "k3b"], to: "k3"),
+        TidyChange(kind: "merge", from: "acme-shop-api", fromName: "AcmeShopApi", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(
+            kind: "merge", from: "pricing-experiment", fromName: "Pricing experiment", to: "pricing",
+            toName: "Pricing experiments"),
+        TidyChange(kind: "fold", from: "garden", fromName: "Garden notes", to: "unsorted", toName: "Unsorted"),
+        TidyChange(
+            kind: "fold", from: "pv", fromName: "Price page variant", to: "pricing", toName: "Pricing experiments"),
+        TidyChange(kind: "fold", from: "osa", fromName: "Old shop api", to: "acme-shop", toName: "Acme Shop"),
+        TidyChange(
+            kind: "move", itemIds: ["m1"], from: "unsorted", to: "acme-shop", toName: "Acme Shop",
+            itemTitles: ["Sample: checkout tax settings"]),
+        TidyChange(kind: "move", itemIds: ["m2"], from: "unsorted", to: "pricing", toName: "Pricing experiments"),
+    ]
+    static let sampleTitles = [
+        "k1": "Sample: queue migration order", "k2": "Sample: runner rewrite plan", "k3": "Sample: tenant dashboard",
+        "m1": "Sample: checkout tax settings", "m2": "Sample: price page test B",
+    ]
     private var cards: [ProposalCard] = [
         ProposalCard(
             id: "ainkrad", name: "Ainkrad", kind: "product", signals: ["path"], itemCount: 1412,
@@ -82,22 +78,24 @@ actor SampleImportTransport: BrainTransport {
         case ("PATCH", 3, "items"):
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
             let ids = Set(b["ids"] as? [String] ?? [])
-            hints.duplicates.removeAll { !ids.isDisjoint(with: $0.itemIds) }
-            hints.closest.removeAll { ids.contains($0.itemId) }
             if let to = b["proposal"] as? String { _ = try? update(to) { $0.itemCount += ids.count } }
             return Data("{}".utf8)
         case ("GET", 3, "proposals"):
-            let tagged = cards.map { c -> ProposalCard in
+            let tidied = state == "ready" && !undone
+            let merged: Set<String> = ["acme-shop-api", "pricing-experiment"]
+            let tagged = cards.filter { !tidied || !merged.contains($0.id) }.map { c -> ProposalCard in
                 var c = c
+                if tidied { c.suggestMerge = nil }
                 c.semantic = state
                 return c
             }
             return try e.encode(tagged)
-        case ("GET", 3, "semantic"):
-            var v = state == "ready" ? hints : SemanticView()
-            if semantic == "closest" { v = SemanticView(closest: hints.closest) }
-            v.state = state
-            return try e.encode(v)
+        case ("GET", 3, "semantic"): return try e.encode(semanticView())
+        case ("GET", 4, "changes"):
+            return try e.encode(TidyChanges(changes: undone || state != "ready" ? [] : Self.sampleChanges))
+        case ("POST", 4, "undo"):
+            undone = true
+            return try e.encode(semanticView())
         case ("GET", 1, "settings"):
             return try e.encode(
                 settings.sorted { $0.key < $1.key }.map {
@@ -112,8 +110,6 @@ actor SampleImportTransport: BrainTransport {
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
             let ids = b["item_ids"] as? [String] ?? []
             let name = b["name"] as? String ?? "New room"
-            hints.rooms.removeAll { $0.name == name }
-            hints.closest.removeAll { ids.contains($0.itemId) }
             let made = ProposalCard(
                 id: name.lowercased().replacingOccurrences(of: " ", with: "-"), name: name, kind: "project",
                 itemCount: ids.count)
@@ -122,6 +118,9 @@ actor SampleImportTransport: BrainTransport {
             return try e.encode(made)
         case ("GET", 5, "items"):
             var rows = (1...3).map { ItemRow(id: "i\($0)", cursor: $0, title: "Sample item \($0)") }
+            rows += Self.sampleTitles.sorted { $0.key < $1.key }.enumerated().map {
+                ItemRow(id: $1.key, cursor: 10 + $0, title: $1.value)
+            }
             if p[3] == ProposalCard.unsortedID {
                 rows += [
                     ItemRow(id: "c1", cursor: 4, title: "Checkout page: tenant-level tax settings"),
@@ -144,7 +143,6 @@ actor SampleImportTransport: BrainTransport {
             let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
             let into = b["into"] as? String ?? ""
             let moved = cards.first { $0.id == p[3] }?.itemCount ?? 0
-            hints.merges.removeAll { $0.from == p[3] }
             cards.removeAll { $0.id == p[3] }
             return try e.encode(update(into) { $0.itemCount += moved })
         case ("POST", 5, "refuse"): return try e.encode(update(p[3]) { $0.state = "refused" })
@@ -156,6 +154,13 @@ actor SampleImportTransport: BrainTransport {
         default:
             throw BrainHTTPError(status: 404, code: "not_found", message: "The sample has no answer for this.")
         }
+    }
+
+    private func semanticView() -> SemanticView {
+        var v = SemanticView(state: state)
+        if state == "pending" { v.progress = SemanticProgress(done: 1240, total: 2980) }
+        if state == "ready" { v.aiTidy = AiTidy(state: undone ? "undone" : "applied", summary: Self.sampleTidy) }
+        return v
     }
 
     private func update(_ id: String, _ change: (inout ProposalCard) -> Void) throws -> ProposalCard {

@@ -16,6 +16,8 @@ struct ReviewStep: View {
             }
             if r.opened != nil {
                 ReviewDetail(review: r)
+            } else if r.showingChanges {
+                TidyChangesList(review: r)
             } else if r.visible.isEmpty {
                 Text("Nothing was found to put in a room.").foregroundStyle(GlassInk.secondary)
                     .padding(Space.s4).frame(maxWidth: .infinity).coreWell()
@@ -32,11 +34,8 @@ struct ReviewStep: View {
                 }
                 SemanticStatusLine(review: r)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Space.s3) {
-                        if r.hasHints { ReviewSuggestions(review: r) }
-                        VStack(spacing: 2) {
-                            ForEach(r.visible) { ProposalRow(card: $0, review: r) }
-                        }
+                    VStack(spacing: 2) {
+                        ForEach(r.visible) { ProposalRow(card: $0, review: r) }
                     }
                 }
                 .frame(maxHeight: Space.s8 * 14)

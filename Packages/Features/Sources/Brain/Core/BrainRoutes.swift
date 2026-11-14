@@ -75,6 +75,14 @@ public struct BrainRoutes: Sendable {
     public func semantic(run: String) async throws -> SemanticView {
         try await call("GET", "/imports/\(Self.seg(run))/semantic")
     }
+    /// Every change the local AI's tidy made in this run (API minor 71).
+    public func tidyChanges(run: String) async throws -> TidyChanges {
+        try await call("GET", "/imports/\(Self.seg(run))/semantic/changes")
+    }
+    /// Puts the proposal back exactly as before the tidy; answers the step with `ai_tidy.state == "undone"`.
+    public func undoTidy(run: String) async throws -> SemanticView {
+        try await call("POST", "/imports/\(Self.seg(run))/semantic/undo")
+    }
     public func settings() async throws -> [BrainSettingWire] { try await call("GET", "/settings") }
     public func setSetting(_ name: String, _ value: Int) async throws -> BrainSettingWire {
         try await call("PUT", "/settings/\(Self.seg(name))", SettingBody(value: value))
