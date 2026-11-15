@@ -8,7 +8,9 @@ enum LivePairing {
         let url = try XCTUnwrap(env["CORE_IT_URL"])
         let code = try XCTUnwrap(env["CORE_IT_CODE"])  // ABCDEFGHJK, no dash
         let sasFile = try XCTUnwrap(env["CORE_IT_SAS_FILE"])
-        // Setup: who you are (skipped), where the Core is, the code.
+        // The setup wizard opens first; the typed-code path is its link. Then who you are (skipped), where the Core is, the code.
+        let typed = app.buttons["Pair with a typed code instead"]
+        if typed.waitForExistence(timeout: 20) { typed.click() }
         let notNow = app.buttons["Not now"]
         XCTAssertTrue(notNow.waitForExistence(timeout: 20), "first run starts with the name step")
         XCTAssertFalse(app.buttons["Show workspace"].exists, "no desktop before pairing")
@@ -53,6 +55,8 @@ enum LivePairing {
         XCTAssertTrue(
             connecting.waitForNonExistence(timeout: 30) && !app.buttons["Home Core, offline"].exists,
             "the status cluster is live")
+        // After pairing, the app offers to add this Mac as a runner, behind Touch ID. These tests bring their own runner: decline.
+        if app.staticTexts["Touch the sensor"].waitForExistence(timeout: 8) { app.buttons["Cancel"].firstMatch.click() }
 
     }
 }
