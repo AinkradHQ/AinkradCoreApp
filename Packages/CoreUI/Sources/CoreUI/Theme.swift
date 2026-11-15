@@ -126,6 +126,9 @@ private struct CoreThemeModifier: ViewModifier {
     func body(content: Content) -> some View {
         let palette = (scheme == .dark ? Palette.night : Palette.day).contrast(effectiveContrast)
         content
+            // Every open dropdown is drawn here, above all content (Ahmed, 2026-11-15). First, so the theme below (palette,
+            // ink, tint, font) reaches the menus too: attached last, they were drawn in the night palette by day.
+            .coreMenuLayer()
             .environment(\.corePalette, palette)
             .environment(\.coreSolidOnly, solidOnly)
             #if DEBUG
@@ -138,8 +141,6 @@ private struct CoreThemeModifier: ViewModifier {
             // No focus rings anywhere (Ahmed, 2026-11-05): the system ring and our own both stay off. Keyboard focus
             // still moves; the focused control is the one that answers Space and Return.
             .focusEffectDisabled()
-            // Every open dropdown is drawn here, above all content (Ahmed, 2026-11-15).
-            .coreMenuLayer()
     }
 }
 
