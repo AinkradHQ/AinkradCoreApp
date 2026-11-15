@@ -120,7 +120,7 @@ final class KeyTextView: NSTextView {
             super.doCommand(by: selector)
             return
         }
-        let shift = NSApp?.currentEvent?.modifierFlags.contains(.shift) ?? false
+        let shift = keyFlags.contains(.shift)
         let took: Bool =
             switch selector {
             case #selector(insertNewline(_:)): keys?.submit(shift) ?? false
@@ -139,6 +139,15 @@ final class KeyTextView: NSTextView {
         } else {
             super.doCommand(by: selector)
         }
+    }
+
+    /// The modifiers of the key being handled, taken from the key itself (the app's current event is not always it).
+    private var keyFlags: NSEvent.ModifierFlags = []
+
+    override func keyDown(with event: NSEvent) {
+        keyFlags = event.modifierFlags
+        defer { keyFlags = [] }
+        super.keyDown(with: event)
     }
 
     override func becomeFirstResponder() -> Bool {

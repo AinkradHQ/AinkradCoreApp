@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -33,13 +34,17 @@ struct SessionView: View {
             .focusEffectDisabled()
             .onAppear { focusStart(s) }
             .retakeFocus(after: model.shell, pane: AgentsModel.paneID(sessionID)) { focusStart(s) }
-            .onKeyPress(.return) { write(s) }
-            .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in write(s) }
-            .onKeyPress(.downArrow) { latest() }
-            .onKeyPress(.end) { latest() }
+            // The pane's keys step aside while a text field has the keyboard: SwiftUI hands them to the pane before the
+            // field, so Return, "/" and the arrows never reached the composer (2026-11-15, found by the composer self-test).
+            .onKeyPress(.return) { typing ? .ignored : write(s) }
+            .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in typing ? .ignored : write(s) }
+            .onKeyPress(.downArrow) { typing ? .ignored : latest() }
+            .onKeyPress(.end) { typing ? .ignored : latest() }
             .onKeyPress(characters: .letters) { press in
                 // Letters belong to the field while you write: no shortcut fires from typing.
-                guard let key = PaneKeys.shortcut(press.characters, typing: composing) else { return .ignored }
+                guard let key = PaneKeys.shortcut(press.characters, typing: composing || typing) else {
+                    return .ignored
+                }
                 switch key {
                 case "r" where s.state == .lost: model.resume(s.id)
                 case "r" where s.over: model.startAgain(s.id)
@@ -99,6 +104,9 @@ struct SessionView: View {
         composing = true
         return .handled
     }
+
+    /// A text field has the keyboard: the window's real first responder, not SwiftUI's focus state (which drifts).
+    private var typing: Bool { (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder is NSText }
 
     private func latest() -> KeyPress.Result {
         jump += 1

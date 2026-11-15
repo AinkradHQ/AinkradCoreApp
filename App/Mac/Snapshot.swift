@@ -24,6 +24,7 @@ enum SnapshotRunner {
         if env["CORE_OPEN_GALLERY"] == "1" { return await GallerySnapshot.open(env: env) }
         if let dir = env["CORE_GALLERY_SNAPSHOT"] { return await GallerySnapshot.run(dir: dir, env: env) }
         if let dir = env["CORE_AGENTS_SNAPSHOT"] { return await AgentsSnapshots.run(app, dir: dir, env: env) }
+        if let log = env["CORE_COMPOSER_TEST"] { return await ComposerSelfTest.run(app, log: log) }
         if let dir = env["CORE_ESC_CHECK"] { return await EscapeCheck.run(app, dir: dir) }
         if let dir = env["CORE_A11Y_AUDIT"] { return await A11yAudit.run(app, dir: dir, env: env) }
         if let dir = env["CORE_HOME_SNAPSHOT"] { return await HomeSnapshots.run(app, dir: dir, env: env) }
