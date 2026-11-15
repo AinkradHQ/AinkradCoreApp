@@ -100,11 +100,10 @@ public final class ImportPlaces: @unchecked Sendable {
         let guarded: Set<String> = [
             "Desktop", "Documents", "Downloads", "Library", "Movies", "Music", "Pictures", "Public", "Applications",
         ]
-        let skip = DocWalker.skipDirs
         func isDir(_ u: URL) -> Bool { (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
         func listable(_ u: URL) -> Bool {
             let n = u.lastPathComponent
-            return isDir(u) && !n.hasPrefix(".") && !skip.contains(n.lowercased())
+            return isDir(u) && !n.hasPrefix(".") && !DocWalker.shouldSkip(u)
         }
         func marked(_ d: URL) -> Bool {
             let kids = files.children(of: d)
