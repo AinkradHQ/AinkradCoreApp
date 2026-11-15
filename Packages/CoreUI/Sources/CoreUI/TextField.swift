@@ -130,9 +130,9 @@ private struct FieldSurface: ViewModifier {
 
     @ViewBuilder private func fill(lit: Bool) -> some View {
         if palette.isDay {
-            // Day: fields are glass (night = wells, day = glass): the mockups' white field (`tf.css` --field 0.7) under
-            // dark ink, brighter when hovered or focused.
-            coreShape(radius).fill(.white.opacity(focused ? 0.9 : lit ? 0.8 : 0.7))
+            // Day: a faint ink well, darker than the pane, so an empty field is seen (Ahmed, 2026-11-15); white when focused.
+            coreShape(radius).fill(
+                focused ? AnyShapeStyle(Color.white) : AnyShapeStyle(lit ? GlassInk.wellHover : GlassInk.well))
         } else {
             coreShape(radius).fill(focused || lit ? GlassInk.wellHover : GlassInk.well)
         }

@@ -12,10 +12,12 @@ public enum GlassInk {
     public static let primary = adaptive(.white, day: dayInk)
     public static let secondary = adaptive(.white.opacity(0.72), day: dayInk.opacity(0.68))
     public static let track = adaptive(.white.opacity(0.24), day: dayInk.opacity(0.14))
-    public static let well = adaptive(.white.opacity(0.08), day: .white.opacity(0.55))
-    public static let wellHover = adaptive(.white.opacity(0.13), day: .white.opacity(0.75))
+    // Day wells are a faint ink tint, darker than the pane: white on a near-white pane could not be seen (Ahmed,
+    // 2026-11-15). Night keeps its light wells.
+    public static let well = adaptive(.white.opacity(0.08), day: dayInk.opacity(0.045))
+    public static let wellHover = adaptive(.white.opacity(0.13), day: dayInk.opacity(0.075))
     /// Neutral edge: white 0.30 at night, the least that reads 3:1 over the glass (measured 2026-11-09); white 0.7 by day.
-    public static let wellEdge = adaptive(.white.opacity(0.3), day: .white.opacity(0.7))
+    public static let wellEdge = adaptive(.white.opacity(0.3), day: dayInk.opacity(0.12))
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
     /// The accent (Settings, Appearance; graphite by default). Named blue from when blue was the only accent.
     public static var blue: Color { AccentPrefs.shared.accent.fill }
@@ -43,7 +45,7 @@ public enum GlassInk {
     /// A lift on the glass (selection, hover, keycaps, counts): white `o` at night; by day the stronger white that reads
     /// over pale glass (the mockups' wells are 0.55 to 0.75); zero stays zero.
     public static func lift(_ o: Double) -> Color {
-        adaptive(.white.opacity(o), day: .white.opacity(min(0.95, o * 5)))
+        adaptive(.white.opacity(o), day: dayInk.opacity(min(0.12, o * 0.6)))
     }
     /// A light edge: white `o` at night; by day the bright rim the mockups draw (0.7 to 0.9).
     public static func rim(_ o: Double) -> Color {

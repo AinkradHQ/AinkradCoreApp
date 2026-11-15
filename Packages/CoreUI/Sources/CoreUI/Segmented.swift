@@ -98,7 +98,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .background {
                 coreShape(Radius.control).fill(
                     hovering
-                        ? GlassInk.adaptive(GlassInk.slate.opacity(0.28), day: .white.opacity(0.85))
+                        ? GlassInk.adaptive(GlassInk.slate.opacity(0.28), day: GlassInk.wellHover)
                         : selected && palette.isDay ? .clear : GlassInk.well)
             }
             .background {

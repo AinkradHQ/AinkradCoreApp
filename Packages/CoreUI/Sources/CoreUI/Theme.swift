@@ -33,10 +33,10 @@ public struct Palette: Sendable {
     public var btnInk: Color { theme["btnInk"] }
     /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
     /// Day: the mockups' lit white row with dark ink.
-    public var navActive: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.18) }
-    public var navActiveEdge: Color { isDay ? .white.opacity(0.9) : .white.opacity(0.3) }
+    public var navActive: Color { isDay ? GlassInk.dayInk.opacity(0.08) : .white.opacity(0.18) }
+    public var navActiveEdge: Color { isDay ? GlassInk.dayInk.opacity(0.1) : .white.opacity(0.3) }
     public var navActiveInk: Color { isDay ? theme["text"] : .white }
-    public var rowHover: Color { isDay ? .white.opacity(0.5) : .white.opacity(0.1) }
+    public var rowHover: Color { isDay ? GlassInk.dayInk.opacity(0.05) : .white.opacity(0.1) }
     /// Neutral edges: white 0.30 or more at night; Increase Contrast goes to 0.55 (day: a dark hairline instead).
     public var edge: Color {
         isDay
@@ -56,7 +56,7 @@ public struct Palette: Sendable {
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
     /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
     /// soft white well with a light edge, not a dark slab, in both themes.
-    public var glassCard: Color { isDay ? .white.opacity(0.55) : .white.opacity(0.08) }
+    public var glassCard: Color { isDay ? GlassInk.dayInk.opacity(0.04) : .white.opacity(0.08) }
     public var glassCardEdge: Color {
         isDay
             ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7)) : .white.opacity(increased ? 0.55 : 0.3)
@@ -64,8 +64,8 @@ public struct Palette: Sendable {
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
-    public var uDim: Color { isDay ? .white.opacity(0.6) : .white.opacity(0.1) }
-    public var uDimHover: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.16) }
+    public var uDim: Color { isDay ? GlassInk.dayInk.opacity(0.05) : .white.opacity(0.1) }
+    public var uDimHover: Color { isDay ? GlassInk.dayInk.opacity(0.08) : .white.opacity(0.16) }
 
     /// A state's ink and its chip fill. The fill is the same neutral well for every tone (Ahmed, 2026-11-15: no tinted
     /// fills); the colour stays on the word.
