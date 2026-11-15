@@ -38,7 +38,7 @@ struct SetupWizardView: View {
             .foregroundStyle(palette.text)
             .coreFont(size: MacTextSize.body)
             .padding(Space.s6)
-            .coreFrame(radius: Radius.panel, part: .dialogs)
+            .coreFrame(radius: Radius.pane, part: .dialogs)
             .frame(width: Space.s8 * 17)
             .accessibilityElement(children: .contain)
         }

@@ -100,7 +100,7 @@ public struct IconTile<Trigger: Equatable>: View {
         Image(systemName: symbol).coreFont(size: size * 0.46, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
             .coreBounce(bounce)
             .frame(width: size, height: size)
-            .background(GlassInk.well, in: coreShape(size > 40 ? Radius.control + 4 : Radius.control))
+            .background(GlassInk.well, in: coreShape(size > 40 ? Radius.cardMac : Radius.control))
             .accessibilityHidden(true)
     }
 }
@@ -243,7 +243,7 @@ public struct ScopeTile: View {
         self.on = on
     }
     public var body: some View {
-        HStack(alignment: .top, spacing: Space.s3) {
+        HStack(alignment: .center, spacing: Space.s3) {
             IconTile(symbol, hue: on ? hue : GlassInk.slate.opacity(0.5), bounce: on)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name.capitalized).coreFont(size: MacTextSize.body, weight: .semibold)

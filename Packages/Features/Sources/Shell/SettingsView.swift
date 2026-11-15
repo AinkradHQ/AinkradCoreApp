@@ -194,7 +194,7 @@ struct SettingsView: View {
         // Most of the screen (Ahmed, 2026-11-05: larger), in the one frame: a glass rim around the Look's background.
         .foregroundStyle(GlassInk.primary)
         .containerRelativeFrame([.horizontal, .vertical]) { length, _ in length * 0.86 }
-        .coreFrame(radius: Radius.panel + Space.s1, part: .settings)
+        .coreFrame(radius: Radius.pane + Space.s1, part: .settings)
         .shadow(color: GlassInk.shade(0.3), radius: 40, y: 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings")
@@ -339,8 +339,8 @@ private struct SettingsBackTile: View {
             }
             .foregroundStyle(GlassInk.primary)
             .frame(width: 72, height: 56)
-            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 4))
-            .contentShape(coreShape(Radius.control + 4))
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
         .keyboardShortcut(.leftArrow, modifiers: .command)

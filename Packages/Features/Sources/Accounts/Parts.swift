@@ -256,8 +256,8 @@ struct AccChip: View {
     var body: some View {
         Text(text).coreFont(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default)
             .padding(.horizontal, Space.s2).frame(minHeight: 22)
-            .background(GlassInk.well, in: coreShape(6))
-            .overlay { coreShape(6).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .background(GlassInk.well, in: coreShape(Radius.chip))
+            .overlay { coreShape(Radius.chip).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }
 
@@ -293,7 +293,9 @@ struct AccPick: View {
         } label: {
             HStack(spacing: Space.s2) {
                 Image(systemName: on ? "checkmark" : symbol).foregroundStyle(on ? .white : hue)
-                    .frame(width: 26, height: 26).background(on ? hue : hue.opacity(0.15), in: coreShape(7))
+                    .frame(width: 26, height: 26).background(
+                        on ? hue : hue.opacity(0.15), in: coreShape(Radius.control)
+                    )
                     .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
@@ -304,12 +306,12 @@ struct AccPick: View {
             .padding(Space.s2)
             .background(
                 on ? hue.opacity(0.14) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.control + 2)
+                in: coreShape(Radius.control)
             )
             .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
+                coreShape(Radius.control).strokeBorder(on ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
             }
-            .contentShape(coreShape(Radius.control + 2))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain).focusEffectDisabled().disabled(!enabled).opacity(enabled ? 1 : 0.45)
         .onHover { hovering = $0 }

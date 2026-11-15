@@ -98,7 +98,9 @@ struct SwitchesSection: View {
                                     .coreFont(size: MacTextSize.meta, weight: .semibold)
                                     .foregroundStyle(pty ? GlassInk.green : GlassInk.secondary)
                                     .padding(.horizontal, 8).frame(height: 24)
-                                    .background((pty ? GlassInk.green : GlassInk.slate).opacity(0.16), in: coreShape(6))
+                                    .background(
+                                        (pty ? GlassInk.green : GlassInk.slate).opacity(0.16),
+                                        in: coreShape(Radius.chip))
                             }
                             .help("Drivers: \(r.drivers.isEmpty ? "none reported" : r.drivers.joined(separator: ", "))")
                             .accessibilityElement(children: .combine)
@@ -258,9 +260,9 @@ private struct StatePanel<Trailing: View>: View {
                 .frame(width: 48, height: 48)
                 .background(
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(12)
+                    in: coreShape(Radius.cardMac)
                 )
-                .overlay { coreShape(12).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                .overlay { coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                 .shadow(color: hue.opacity(0.5), radius: 12)
                 .contentTransition(.symbolEffect(.replace))
                 .coreBounce(trigger)

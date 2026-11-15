@@ -37,7 +37,7 @@ struct TokenTests {
     @Test func radiiAreRoundedRectsNotPills() {
         #expect(Radius.control == 8 && Radius.chip == 6)
         #expect(
-            [Radius.chip, Radius.control, Radius.cardMac, Radius.row, Radius.pane, Radius.panel].allSatisfy {
+            [Radius.chip, Radius.control, Radius.cardMac, Radius.row, Radius.pane, Radius.pane].allSatisfy {
                 $0 > 0 && $0 <= 18
             })
     }

@@ -90,8 +90,8 @@ struct ShortcutsView: View {
         }
         .padding(Space.s5)
         .frame(width: Space.s8 * 14, height: Space.s8 * 16)
-        .corePanel(radius: Radius.panel, padding: 0)
-        .overlay { coreShape(Radius.panel).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .corePanel(radius: Radius.pane, padding: 0)
+        .overlay { coreShape(Radius.pane).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .task {
             // The root holds focus while the window is calm; take it once the overlay is in place.
             try? await Task.sleep(for: .milliseconds(80))

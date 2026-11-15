@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The desktop background (Ahmed, 2026-11-15): Settings, Appearance. Twelve wallpapers, six photos and six rendered
 /// landscapes, each with a night and a day version; Sky, Plain and the person's own picture after them.
-/// Images live in the app's `Wallpapers/` folder as `wall-<name>-<day|night>[-thumb].jpg`.
+/// Images live in the app's `Wallpapers/` folder as `wall-<name>-<day|night>.heic` (5K) and `-thumb.jpg`.
 public enum CoreWallpaper: String, CaseIterable, Sendable {
     case ridge, lake, mirage, forest, tide, coast, meadow, peaks, mirror, dunes, mesa, hills, sky, plain, picture
 
@@ -25,7 +25,8 @@ enum WallpaperCache {
     static func image(_ wall: CoreWallpaper, day: Bool, thumb: Bool) -> NSImage? {
         let name = "wall-\(wall.rawValue)-\(day ? "day" : "night")\(thumb ? "-thumb" : "")"
         if let hit = images[name] { return hit }
-        guard let url = Bundle.main.url(forResource: name, withExtension: "jpg"), let img = NSImage(contentsOf: url)
+        guard let url = Bundle.main.url(forResource: name, withExtension: thumb ? "jpg" : "heic"),
+            let img = NSImage(contentsOf: url)
         else { return nil }
         images[name] = img
         return img

@@ -190,7 +190,7 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(5).fill(
+        coreShape(Radius.chip).fill(
             isOn ? GlassInk.blue : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
         )
         .frame(width: 30, height: 18)

@@ -240,7 +240,7 @@ private struct LimitEditor: View {
             if let issue = model.issue { IssueLine(code: nil, text: issue.message) }
         }
         .padding(Space.s3)
-        .background(hue.opacity(0.08), in: coreShape(Radius.control + 2))
+        .background(hue.opacity(0.08), in: coreShape(Radius.control))
         .animation(.smooth(duration: 0.25), value: typed)
         .onKeyPress(.escape) {
             model.cancelEdit()
@@ -275,7 +275,7 @@ struct SettingsChip: View {
         Label(text, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
             .foregroundStyle(hue == GlassInk.slate ? GlassInk.secondary : hue)
             .padding(.horizontal, 8).frame(height: 22)
-            .background(hue.opacity(0.16), in: coreShape(6))
+            .background(hue.opacity(0.16), in: coreShape(Radius.chip))
     }
 }
 

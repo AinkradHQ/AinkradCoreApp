@@ -118,9 +118,9 @@ struct SubscriptionSignIn: View {
                         .accessibilityIdentifier("sign-in-code")
                 }
                 .padding(.horizontal, Space.s3).frame(minHeight: 44)
-                .background(codeFocus ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2))
+                .background(codeFocus ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
                 .overlay {
-                    coreShape(Radius.control + 2).strokeBorder(
+                    coreShape(Radius.control).strokeBorder(
                         codeFocus ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: codeFocus ? 1.5 : 1)
                 }
                 .focusEffectDisabled()
@@ -147,7 +147,7 @@ struct SubscriptionSignIn: View {
                 .foregroundStyle(.white).frame(width: 64, height: 64)
                 .background(
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(16)
+                    in: coreShape(Radius.pane)
                 )
             Text(title).coreFont(size: MacTextSize.large, weight: .bold)
             Text(line).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)

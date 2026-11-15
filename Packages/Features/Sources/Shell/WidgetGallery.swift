@@ -45,7 +45,7 @@ struct WidgetGallery: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s6)
         .frame(width: Space.s8 * 27.5)
-        .coreFrame(radius: Radius.panel)
+        .coreFrame(radius: Radius.pane)
         .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Widgets")

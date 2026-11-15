@@ -120,9 +120,10 @@ struct TerminalTile: View {
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)
             .background(
-                LinearGradient(colors: [hue, hue.opacity(0.65)], startPoint: .top, endPoint: .bottom), in: coreShape(7)
+                LinearGradient(colors: [hue, hue.opacity(0.65)], startPoint: .top, endPoint: .bottom),
+                in: coreShape(Radius.control)
             )
-            .overlay { coreShape(7).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+            .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
         }
         .buttonStyle(.plain)
     }
@@ -153,7 +154,7 @@ private struct TileScreen: View {
                 }
                 .foregroundStyle(.white.opacity(0.9))
                 .padding(.horizontal, 7).frame(height: 18)
-                .background(.black.opacity(0.35), in: coreShape(5))
+                .background(.black.opacity(0.35), in: coreShape(Radius.chip))
             }
             Spacer(minLength: Space.s3)
             HStack(spacing: 0) {

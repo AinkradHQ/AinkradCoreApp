@@ -90,12 +90,15 @@ extension CoreUIGallery {
                 }
             }
         }
-        GSpec("Radius", "Rounded rectangles only, never circles or pills.") {
+        GSpec(
+            "Radius",
+            "Four radii, one job each: chips, controls, cards and rows, panes and dialogs. Bars under 6 pt keep a small radius."
+        ) {
             HStack(alignment: .bottom, spacing: Space.s4) {
                 ForEach(
                     [
                         ("chip", Radius.chip), ("control", Radius.control), ("cardMac", Radius.cardMac),
-                        ("pane", Radius.pane), ("panel", Radius.panel), ("window", Radius.window),
+                        ("pane", Radius.pane), ("panel", Radius.pane), ("window", Radius.window),
                     ], id: \.0
                 ) { name, r in
                     GVariant("\(name) \(Int(r))") {

@@ -168,7 +168,7 @@ private struct BudgetCard: View {
                 Spacer(minLength: Space.s2)
                 Label(s.title, systemImage: s.symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(GlassInk.ink(s.hue)).padding(.horizontal, Space.s2).frame(height: 24)
-                    .background(s.hue.opacity(0.14), in: coreShape(6))
+                    .background(s.hue.opacity(0.14), in: coreShape(Radius.chip))
             }
             if let t = b.tokenShare {
                 bar(

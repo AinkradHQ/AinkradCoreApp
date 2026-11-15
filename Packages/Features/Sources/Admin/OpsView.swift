@@ -124,9 +124,9 @@ private struct Verdict: View {
                 .frame(width: 60, height: 60)
                 .background(
                     LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(14)
+                    in: coreShape(Radius.cardMac)
                 )
-                .overlay { coreShape(14).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                .overlay { coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                 .shadow(color: hue.opacity(0.55), radius: 14)
                 .contentTransition(.symbolEffect(.replace))
                 .symbolEffect(.pulse, options: .repeating, isActive: !ok && !reduce)
@@ -297,7 +297,7 @@ private struct RawMetrics: View {
                         .textSelection(.enabled).padding(Space.s3)
                 }
                 .frame(maxHeight: Space.s8 * 10)
-                .background(GlassInk.well, in: coreShape(Radius.control + 2))
+                .background(GlassInk.well, in: coreShape(Radius.control))
                 .transition(.opacity)
             }
         }

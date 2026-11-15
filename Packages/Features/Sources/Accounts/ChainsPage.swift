@@ -63,13 +63,13 @@ private struct ChainTab: View {
             .padding(.horizontal, Space.s3).frame(minHeight: 48)
             .background(
                 on ? GlassInk.blue.opacity(0.3) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.control + 2)
+                in: coreShape(Radius.control)
             )
             .overlay {
-                coreShape(Radius.control + 2).strokeBorder(
+                coreShape(Radius.control).strokeBorder(
                     on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
             }
-            .contentShape(coreShape(Radius.control + 2))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .focusable(false)
@@ -153,7 +153,7 @@ private struct EntryRow: View {
             Text("\(index + 1)").coreFont(size: MacTextSize.body, weight: .bold, design: .rounded)
                 .foregroundStyle(index == 0 ? .white : GlassInk.secondary)
                 .frame(width: 26, height: 26)
-                .background(index == 0 ? GlassInk.blue.opacity(0.85) : GlassInk.well, in: coreShape(7))
+                .background(index == 0 ? GlassInk.blue.opacity(0.85) : GlassInk.well, in: coreShape(Radius.control))
             AccTile(provider: entry.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
                 Text("\(model.providerName(entry.provider)) · \(model.pool(entry.pool)?.name ?? "Pool \(entry.pool)")")
@@ -164,7 +164,7 @@ private struct EntryRow: View {
             Spacer(minLength: Space.s2)
             AccChip(text: entry.model ?? "Provider's default model", mono: entry.model != nil)
         }
-        .padding(Space.s2).background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .padding(Space.s2).background(GlassInk.well, in: coreShape(Radius.control))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("chain-entry-\(index + 1)")
     }

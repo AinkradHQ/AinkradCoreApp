@@ -279,8 +279,8 @@ private struct ThemeTile: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(Space.s2)
-            .background(hovering ? GlassInk.wellHover : .clear, in: coreShape(Radius.cardMac + 4))
-            .contentShape(coreShape(Radius.cardMac + 4))
+            .background(hovering ? GlassInk.wellHover : .clear, in: coreShape(Radius.pane))
+            .contentShape(coreShape(Radius.pane))
         }
         .buttonStyle(.plain).focusable(false)
         .onHover { hovering = $0 }

@@ -134,7 +134,7 @@ struct BellGlance: View {
             }
         }
         .padding(Space.s4)
-        .coreFrame(radius: Radius.panel, part: .popups)
+        .coreFrame(radius: Radius.pane, part: .popups)
         .frame(width: ShellMetrics.bellWidth)
         .coreAnimation(Motion.out(Motion.ui), value: all.map(\.id))
         .accessibilityElement(children: .contain)
@@ -260,7 +260,7 @@ private struct BellCard: View {
             Image(systemName: item.symbol).font(.system(size: 12))
                 .frame(width: 22, height: 22)
                 .foregroundStyle(item.kind == .approval ? palette.primary : palette.text2)
-                .background(item.kind == .approval ? palette.navActive : palette.uDim, in: coreShape(7))
+                .background(item.kind == .approval ? palette.navActive : palette.uDim, in: coreShape(Radius.control))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
@@ -285,8 +285,8 @@ private struct BellCard: View {
             }
         }
         .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(14))
-        .overlay { coreShape(14).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .overlay { coreShape(Radius.cardMac).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.kindLabel): \(item.title)")
     }

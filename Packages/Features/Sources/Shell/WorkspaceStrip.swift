@@ -141,8 +141,8 @@ struct StackBadge: View {
         .coreFont(size: MacTextSize.meta, weight: .semibold)
         .foregroundStyle(.white)
         .padding(.horizontal, Space.s2).frame(height: 22)
-        .background(.black.opacity(0.45), in: coreShape(6))
-        .overlay { coreShape(6).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
+        .background(.black.opacity(0.45), in: coreShape(Radius.chip))
+        .overlay { coreShape(Radius.chip).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
         .padding(Space.s2)
         .frame(width: slot.width, height: slot.height, alignment: .bottomTrailing)
         .offset(x: slot.minX, y: slot.minY)

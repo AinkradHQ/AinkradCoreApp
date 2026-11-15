@@ -16,7 +16,7 @@ struct DialogCard<Content: View>: View {
             content
         }
         .foregroundStyle(palette.text)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .corePanel(radius: Radius.pane, padding: Space.s6)
         .frame(width: width)
         .shadow(color: GlassInk.shade(0.3), radius: 34, y: 14)
         .coreModalEntrance()

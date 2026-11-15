@@ -34,7 +34,7 @@ public struct CoreNotice<Action: View>: View {
 
     public var body: some View {
         let c = palette.tone(tone)
-        HStack(alignment: .top, spacing: Space.s3) {
+        HStack(alignment: .center, spacing: Space.s3) {
             ToneGlyph(symbol: symbol, ink: c.ink, size: 26)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
@@ -86,7 +86,7 @@ public struct CoreDialogPanel<Content: View>: View {
         }
         .foregroundStyle(palette.text)
         .coreFont(size: MacTextSize.body)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .corePanel(radius: Radius.pane, padding: Space.s6)
         .frame(width: width)
         .shadow(color: GlassInk.shade(0.3), radius: 34, y: 14)
         .coreModalEntrance()

@@ -81,16 +81,16 @@ private struct PoolTab: View {
             .padding(.leading, Space.s1).padding(.trailing, Space.s3).frame(minHeight: 48)
             .background {
                 if on {
-                    coreShape(Radius.control + 2).fill(hue.opacity(0.35))
+                    coreShape(Radius.control).fill(hue.opacity(0.35))
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
-                    coreShape(Radius.control + 2).fill(hovering ? GlassInk.wellHover : GlassInk.well)
+                    coreShape(Radius.control).fill(hovering ? GlassInk.wellHover : GlassInk.well)
                 }
             }
             .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
+                coreShape(Radius.control).strokeBorder(on ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
             }
-            .contentShape(coreShape(Radius.control + 2))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .focusable(false)
@@ -185,7 +185,7 @@ private struct MemberRow: View {
             Text("\(index + 1)").coreFont(size: MacTextSize.body, weight: .bold, design: .rounded)
                 .foregroundStyle(first ? .white : GlassInk.secondary)
                 .frame(width: 26, height: 26)
-                .background(first ? hue.opacity(0.85) : GlassInk.well, in: coreShape(7))
+                .background(first ? hue.opacity(0.85) : GlassInk.well, in: coreShape(Radius.control))
             AccTile(provider: pool.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
                 Text(a?.label ?? "Account \(id)").coreFont(size: MacTextSize.headline, weight: .semibold)
@@ -205,10 +205,10 @@ private struct MemberRow: View {
         }
         .padding(Space.s2)
         .background(
-            on ? hue.opacity(0.18) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2)
+            on ? hue.opacity(0.18) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control)
         )
-        .overlay { coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.7) : .clear, lineWidth: 1.5) }
-        .contentShape(coreShape(Radius.control + 2))
+        .overlay { coreShape(Radius.control).strokeBorder(on ? hue.opacity(0.7) : .clear, lineWidth: 1.5) }
+        .contentShape(coreShape(Radius.control))
         .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "m-\(id)" } }
         .onHover { hovering = $0 }
         .animation(.smooth(duration: 0.25), value: hovering)

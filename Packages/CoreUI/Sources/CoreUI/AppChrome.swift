@@ -89,7 +89,7 @@ public struct AppFilterTile: View {
                 if count >= 0 {  // a negative count hides the badge (a page with nothing to count)
                     Text("\(count)").coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
                         .padding(.horizontal, 6).frame(minHeight: 18)
-                        .background(GlassInk.lift(on ? 0.22 : 0.1), in: coreShape(5))
+                        .background(GlassInk.lift(on ? 0.22 : 0.1), in: coreShape(Radius.chip))
                         .contentTransition(.numericText())
                 }
             }
@@ -357,7 +357,7 @@ public struct StepTrack: View {
                 .coreFont(size: MacTextSize.meta, weight: i == at ? .semibold : .regular)
                 .foregroundStyle(i == at ? .white : GlassInk.secondary)
                 .padding(.horizontal, 8).frame(height: 24)
-                .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(6))
+                .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.chip))
             }
         }
         .fixedSize()

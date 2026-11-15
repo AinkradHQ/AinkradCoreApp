@@ -49,7 +49,7 @@ public struct LinkBanner: View {
 
     public var body: some View {
         let c = palette.tone(state.tone)
-        HStack(alignment: .top, spacing: Space.s3) {
+        HStack(alignment: .center, spacing: Space.s3) {
             Image(systemName: state.symbol).foregroundStyle(c.ink).frame(width: Space.s4, height: Space.s4)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {

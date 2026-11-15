@@ -69,7 +69,7 @@ struct TermCard: View {
         )
         // By day the card is the light glass dialog: a white backing so it does not turn grey on the dark terminal scrim.
         .background(
-            palette.isDay ? Color.white.opacity(0.94) : .clear, in: coreShape(Radius.panel + Space.s1))
+            palette.isDay ? Color.white.opacity(0.94) : .clear, in: coreShape(Radius.pane))
     }
 }
 

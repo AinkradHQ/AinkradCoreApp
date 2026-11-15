@@ -59,12 +59,12 @@ extension CoreUIGallery {
                     "Close this session?", message: "The AI session stops and its work is kept.", confirmTitle: "Close",
                     onConfirm: {}, onCancel: {}
                 )
-                .clipShape(coreShape(Radius.panel))
+                .clipShape(coreShape(Radius.pane))
                 CoreConfirmDialog(
                     "Delete this terminal?", message: "This cannot be undone from here.", confirmTitle: "Delete",
                     destructive: true, onConfirm: {}, onCancel: {}
                 )
-                .clipShape(coreShape(Radius.panel))
+                .clipShape(coreShape(Radius.pane))
             }
             HStack(spacing: Space.s3) {
                 Button("Open live") { confirm = true }.buttonStyle(CoreButtonStyle(.secondary))

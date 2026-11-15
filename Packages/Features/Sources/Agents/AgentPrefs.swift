@@ -136,7 +136,7 @@ private struct ModelField: View {
                     text = ""
                 } label: {
                     Image(systemName: "xmark").coreFont(size: 10, weight: .bold).frame(width: 22, height: 22)
-                        .background(GlassInk.well, in: coreShape(6))
+                        .background(GlassInk.well, in: coreShape(Radius.chip))
                 }
                 .buttonStyle(.plain).help("Use the harness default").transition(.scale.combined(with: .opacity))
             }

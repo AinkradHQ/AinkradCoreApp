@@ -86,7 +86,7 @@ struct LauncherView: View {
         .frame(maxHeight: Space.s8 * 18)
         .fixedSize(horizontal: false, vertical: true)
         // The one frame: a glass rim around the Look's background (Settings, Appearance).
-        .coreFrame(radius: Radius.panel + Space.s1, part: .launcher)
+        .coreFrame(radius: Radius.pane + Space.s1, part: .launcher)
         .background { numberShortcuts(rows) }
         // The root holds focus while the window is calm; the field takes it as it appears, so the first typed key lands.
         .defaultFocus($focused, true)

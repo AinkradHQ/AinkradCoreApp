@@ -179,7 +179,7 @@ struct StepUpSheet: View {
                 // Halos rippling out while it waits (rounded rectangles, like every shape in the app).
                 if !done && !missed && !reduce {
                     ForEach(0..<3, id: \.self) { i in
-                        coreShape(Radius.cardMac + 10).stroke(hue.opacity(0.5), lineWidth: 1.5)
+                        coreShape(Radius.pane).stroke(hue.opacity(0.5), lineWidth: 1.5)
                             .frame(width: 112, height: 112)
                             .coreScaleEffect(ripple ? 1.55 : 1)
                             .opacity(ripple ? 0 : 0.8)
@@ -188,12 +188,12 @@ struct StepUpSheet: View {
                                 value: ripple)
                     }
                 }
-                coreShape(Radius.cardMac + 6)
+                coreShape(Radius.pane)
                     .fill(
                         LinearGradient(
                             colors: [hue.opacity(0.55), hue.opacity(0.22)], startPoint: .top, endPoint: .bottom)
                     )
-                    .overlay { coreShape(Radius.cardMac + 6).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                    .overlay { coreShape(Radius.pane).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
                     .frame(width: 112, height: 112)
                     .shadow(color: hue.opacity(0.6), radius: done ? 30 : 18)
                 // A light sweep across the tile while it waits, under the Touch ID view: Apple's view cancels when anything
@@ -203,7 +203,7 @@ struct StepUpSheet: View {
                         .frame(width: 112, height: 26)
                         .offset(y: sweep ? 46 : -46)
                         .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: sweep)
-                        .clipShape(coreShape(Radius.cardMac + 6))
+                        .clipShape(coreShape(Radius.pane))
                         .frame(width: 112, height: 112)
                         .allowsHitTesting(false)
                 }
@@ -265,7 +265,7 @@ struct StepUpSheet: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s6)
         .frame(width: Space.s8 * 13)
-        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .corePanel(radius: Radius.pane + Space.s1, padding: 0)
         .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         // No fade or scale on the way in: Apple's Touch ID view cancels while it is see-through or still sizing.
         .onAppear {

@@ -285,8 +285,8 @@ private struct AuditFilters: View {
                     }
                 }
                 .padding(.horizontal, Space.s3).frame(height: 34)
-                .background(GlassInk.well, in: coreShape(Radius.control + 2))
-                .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .background(GlassInk.well, in: coreShape(Radius.control))
+                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
                 .focusEffectDisabled()
                 CoreSegmented(
                     "Who",
@@ -476,7 +476,7 @@ private struct AuditDetail: View {
                         }
                     }
                     .padding(Space.s3)
-                    .background(GlassInk.sunk(0.2), in: coreShape(Radius.control + 2))
+                    .background(GlassInk.sunk(0.2), in: coreShape(Radius.control))
                 }
                 DisclosureGroup("Technical details", isExpanded: $technical) {
                     VStack(alignment: .leading, spacing: Space.s1) {

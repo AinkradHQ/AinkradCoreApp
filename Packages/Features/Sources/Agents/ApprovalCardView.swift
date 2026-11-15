@@ -71,8 +71,8 @@ struct ApprovalCardView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(Space.s3)
-                .background(GlassInk.sunk(0.25), in: coreShape(Radius.control + 2))
-                .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
+                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
             if request.timeoutSecs != nil {
                 GeometryReader { g in
@@ -150,7 +150,7 @@ struct ApprovalCardView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s3).frame(minHeight: 40)
-        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .background(GlassInk.well, in: coreShape(Radius.control))
         .accessibilityElement(children: .combine)
     }
 
