@@ -109,6 +109,7 @@ enum EntryParser {
             let name = str("name") ?? "tool"
             if let e = edit(id: str("id") ?? "", name: name, input: b["input"]) { return e }
             if name.lowercased() == "todowrite", let t = todos(id: str("id") ?? "", input: b["input"]) { return t }
+            if let k = rich(id: str("id") ?? "", name: name, input: b["input"]) { return k }
             return .toolUse(id: str("id") ?? "", name: name, summary: summary(b["input"]))
         case "tool_result":
             return .toolResult(
@@ -161,6 +162,22 @@ enum EntryParser {
         case "write":
             return .toolEdit(
                 id: id, name: name, path: path, old: "", new: o["content"] as? String ?? "", ok: nil, durationMs: nil)
+        default: return nil
+        }
+    }
+
+    /// The tools drawn as their own card: a sub-agent (Task, Agent) and a plan (ExitPlanMode).
+    static func rich(id: String, name: String, input: Any?) -> EntryKind? {
+        guard let o = input as? [String: Any] else { return nil }
+        switch name.lowercased() {
+        case "task", "agent":
+            return .subAgent(
+                id: id, type: o["subagent_type"] as? String ?? "general-purpose",
+                task: o["description"] as? String ?? "A sub-agent", prompt: o["prompt"] as? String ?? "", result: nil,
+                ok: nil, durationMs: nil)
+        case "exitplanmode":
+            guard let plan = o["plan"] as? String else { return nil }
+            return .plan(id: id, text: plan)
         default: return nil
         }
     }

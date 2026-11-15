@@ -143,4 +143,53 @@ enum ComposerSelfTest {
         return nil
     }
 }
+/// Debug only. `CORE_SHOWCASE_SHOTS=<dir> [CORE_THEME=light|dark]` (with `CORE_DEMO=1`): opens the demo session holding every kind
+/// of content, captures its transcript a page at a time from the top, then a waiting session with its pinned approval.
+@MainActor
+enum ShowcaseShots {
+    static func run(_ app: AppModel, dir: String, env: [String: String]) async {
+        let theme = env["CORE_THEME"] == "light" ? "day" : "night"
+        NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
+        defer { NSApp.terminate(nil) }
+        try? await Task.sleep(for: .seconds(3))
+        guard let window = await SnapshotCapture.mainWindow() else { return }
+        let a = app.agents
+        for _ in 0..<100 where a.sessions.items.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")
+        try? await Task.sleep(for: .seconds(2.5))
+        let scroll = transcriptScroll(window.contentView)
+        let height = scroll?.documentView?.frame.height ?? 0
+        let page = max((scroll?.contentView.bounds.height ?? 600) - 80, 200)
+        var y = 0.0
+        var n = 1
+        while n <= 8 {
+            scroll?.contentView.scroll(to: NSPoint(x: 0, y: y))
+            if let s = scroll { s.reflectScrolledClipView(s.contentView) }
+            try? await Task.sleep(for: .seconds(1))
+            _ = SnapshotCapture.png(window, to: "\(dir)/showcase-\(n)-\(theme).png")
+            y += page
+            n += 1
+            if y >= height { break }
+        }
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
+        try? await Task.sleep(for: .seconds(2.5))
+        _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
+    }
+
+    /// The tallest scroll view in the window: the transcript.
+    private static func transcriptScroll(_ v: NSView?) -> NSScrollView? {
+        var best: NSScrollView?
+        func walk(_ v: NSView) {
+            if let s = v as? NSScrollView, (s.documentView?.frame.height ?? 0) > (best?.documentView?.frame.height ?? 0)
+            {
+                best = s
+            }
+            v.subviews.forEach(walk)
+        }
+        if let v { walk(v) }
+        return best
+    }
+}
 #endif

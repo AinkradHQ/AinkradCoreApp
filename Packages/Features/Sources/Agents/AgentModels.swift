@@ -197,6 +197,11 @@ public enum EntryKind: Equatable, Sendable {
     case toolEdit(id: String, name: String, path: String, old: String, new: String, ok: Bool?, durationMs: Int?)
     /// The CLI's todo list (TodoWrite), drawn as a checklist.
     case toolTodos(id: String, items: [TodoItem])
+    /// A sub-agent the session started (the Task / Agent tool): its kind, its job, the brief it was given, and once it
+    /// answers, what it reported (nil while it works).
+    case subAgent(id: String, type: String, task: String, prompt: String, result: String?, ok: Bool?, durationMs: Int?)
+    /// A plan the agent proposes (ExitPlanMode), in Markdown.
+    case plan(id: String, text: String)
     /// A turn is over: the harness is waiting for you. Carries what the turn cost, when the Core says. As parsed the cost is the
     /// session's total so far; in the store it is this turn's (`TranscriptStore.perTurn`).
     case turnEnded(costMicros: Int64?, tokens: Int64?)

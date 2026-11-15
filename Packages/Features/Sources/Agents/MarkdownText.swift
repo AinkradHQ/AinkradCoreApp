@@ -12,6 +12,8 @@ enum MarkdownBlock: Equatable {
     case table(header: [String], rows: [[String]])
     case quote(String)
     case rule
+    /// `![alt](src)` on a line of its own: a local file this Mac can read, or an https address.
+    case image(alt: String, src: String)
 
     /// Cells of a `| a | b |` line.
     static func cells(_ line: String) -> [String] {
@@ -19,6 +21,15 @@ enum MarkdownBlock: Equatable {
         if t.hasPrefix("|") { t.removeFirst() }
         if t.hasSuffix("|") { t.removeLast() }
         return t.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// `![alt](src)` alone on a line.
+    static func image(_ line: String) -> MarkdownBlock? {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        guard t.hasPrefix("!["), t.hasSuffix(")"), let mid = t.range(of: "](") else { return nil }
+        let alt = String(t[t.index(t.startIndex, offsetBy: 2)..<mid.lowerBound])
+        let src = String(t[mid.upperBound..<t.index(before: t.endIndex)])
+        return src.isEmpty ? nil : .image(alt: alt, src: src)
     }
 
     static func isSeparator(_ line: String) -> Bool {
@@ -71,6 +82,9 @@ enum MarkdownBlock: Equatable {
                 blocks.append(.rule)
             } else if line.isEmpty {
                 flush()
+            } else if let img = image(line) {
+                flush()
+                blocks.append(img)
             } else if line.hasPrefix("#"), let h = line.drop(while: { $0 == "#" }).first, h == " " {
                 flush()
                 blocks.append(.heading(String(line.drop(while: { $0 == "#" })).trimmingCharacters(in: .whitespaces)))
@@ -136,7 +150,9 @@ struct MarkdownText: View {
                 case .paragraph(let t):
                     Text(MarkdownBlock.inline(t)).lineSpacing(3).textSelection(.enabled)
                 case .heading(let t):
-                    Text(MarkdownBlock.inline(t)).fontWeight(.semibold).textSelection(.enabled)
+                    // A report's headings read as headings: one step up from the body.
+                    Text(MarkdownBlock.inline(t)).coreFont(size: MacTextSize.title, weight: .semibold)
+                        .padding(.top, Space.s1).textSelection(.enabled)
                 case .item(let marker, let t):
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                         Text(marker).foregroundStyle(GlassInk.secondary).frame(minWidth: 16, alignment: .trailing)
@@ -153,6 +169,8 @@ struct MarkdownText: View {
                     }
                 case .rule:
                     coreShape(0.5).fill(GlassInk.track).frame(height: 1)
+                case .image(let alt, let src):
+                    MarkdownImage(alt: alt, src: src)
                 }
             }
         }
@@ -215,5 +233,44 @@ private struct MarkdownTable: View {
             .textSelection(.enabled).padding(Space.s3)
         }
         .background(GlassInk.well, in: coreShape(Radius.row))
+    }
+}
+
+/// An image in an answer: a local file this Mac can read, or an https address (plain http is not fetched). It keeps its
+/// shape up to the reading width; what cannot load shows its words and address instead.
+private struct MarkdownImage: View {
+    let alt: String
+    let src: String
+
+    var body: some View {
+        Group {
+            if let url = URL(string: src), url.scheme == "https" {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        picture(image)
+                    } else if phase.error != nil {
+                        fallback
+                    } else {
+                        CoreSkeleton(coreShape(Radius.cardMac)).frame(width: Space.s8 * 8, height: Space.s8 * 5)
+                    }
+                }
+            } else if let img = NSImage(
+                contentsOf: URL(fileURLWithPath: src.hasPrefix("file://") ? String(src.dropFirst(7)) : src))
+            {
+                picture(Image(nsImage: img))
+            } else {
+                fallback
+            }
+        }
+        .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+    }
+
+    private func picture(_ image: Image) -> some View {
+        image.resizable().scaledToFit().frame(maxWidth: Space.s8 * 18, maxHeight: Space.s8 * 12, alignment: .leading)
+            .clipShape(coreShape(Radius.cardMac)).help(alt.isEmpty ? src : alt)
+    }
+
+    private var fallback: some View {
+        CoreChip(alt.isEmpty ? src : alt, symbol: "photo", minWidth: 0).help(src)
     }
 }

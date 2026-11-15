@@ -182,14 +182,22 @@ struct EntryRow: View, Equatable {
     var body: some View {
         switch entry.kind {
         case .user(let text):
-            HStack {
-                Spacer(minLength: Space.s8)
-                Text(text).coreFont(size: MacTextSize.body).foregroundStyle(palette.btnInk)
-                    .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-                    .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
-                    .textSelection(.enabled)
-                    .agentCopyMenu(text)
+            // The words in the bubble; attached images and files under it.
+            let parts = MessageFiles.split(text)
+            VStack(alignment: .trailing, spacing: Space.s2) {
+                if !parts.words.isEmpty {
+                    HStack {
+                        Spacer(minLength: Space.s8)
+                        Text(parts.words).coreFont(size: MacTextSize.body).foregroundStyle(palette.btnInk)
+                            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+                            .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
+                            .textSelection(.enabled)
+                            .agentCopyMenu(text)
+                    }
+                }
+                if !parts.files.isEmpty { MessageFilesView(paths: parts.files) }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
             .accessibilityLabel("You: \(text)")
         case .assistant(let text):
             // Printed on the glass, no bubble.
@@ -225,6 +233,9 @@ struct EntryRow: View, Equatable {
         case .toolEdit(_, let name, let path, let old, let new, let ok, let ms):
             EditCard(name: name, path: path, old: old, new: new, ok: ok, ms: ms, expanded: $expanded)
         case .toolTodos(_, let items): TodoCard(items: items)
+        case .subAgent(_, let type, let task, let prompt, let result, let ok, let ms):
+            SubAgentCard(type: type, task: task, prompt: prompt, result: result, ok: ok, durationMs: ms)
+        case .plan(_, let text): PlanCard(text: text)
         case .turnEnded(let cost, let tokens):
             line(ConversationWords.turn(turn, cost: cost))
                 .help(

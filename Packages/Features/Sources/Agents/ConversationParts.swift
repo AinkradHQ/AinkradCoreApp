@@ -91,7 +91,7 @@ struct TodoCard: View {
         let done = items.filter { $0.status == .completed }.count
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                Text("Plan").coreFont(size: MacTextSize.body, weight: .semibold)
+                Text("Tasks").coreFont(size: MacTextSize.body, weight: .semibold)
                 Text("\(done) of \(items.count)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .monospacedDigit()
             }
@@ -110,7 +110,7 @@ struct TodoCard: View {
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .coreWell()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Plan, \(done) of \(items.count) done")
+        .accessibilityLabel("Tasks, \(done) of \(items.count) done")
     }
 
     private func symbol(_ s: TodoItem.Status) -> String {

@@ -187,7 +187,9 @@ public final class AppModel {
             phase = .desktop
             shell.coreLink = .live
             #if DEBUG
-            agents.attach(FakeAgentsAPI.prototypeWorld())
+            let world = FakeAgentsAPI.prototypeWorld()
+            FakeAgentsAPI.addShowcase(to: world)  // one session with every kind of content
+            agents.attach(world)
             // No Core to approve against: a demo send skips Touch ID instead of always failing.
             agents.debugDropHost()
             brain.use(SampleBrainService())
