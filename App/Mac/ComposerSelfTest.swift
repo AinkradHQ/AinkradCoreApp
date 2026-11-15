@@ -139,6 +139,35 @@ enum ComposerSelfTest {
         check(
             "pasting an image attaches it", (a.attachments[s.id] ?? []).count == 1,
             "attachments = \(a.attachments[s.id] ?? [])")
+        // ⌘F from the message field: the find bar opens and takes the cursor (the field must let it go).
+        a.attachments[s.id] = nil
+        window.makeFirstResponder(tv)
+        try? await Task.sleep(for: .milliseconds(200))
+        if let e = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: .command, timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil, characters: "f", charactersIgnoringModifiers: "f",
+            isARepeat: false, keyCode: 3)
+        {
+            NSApp.sendEvent(e)  // as a key press arrives: the window's key equivalents first, then the menu
+        }
+        try? await Task.sleep(for: .milliseconds(800))
+        func findField(_ v: NSView?) -> NSTextField? {
+            guard let v else { return nil }
+            if let f = v as? NSTextField, f.placeholderString == "Find in this conversation" { return f }
+            for c in v.subviews { if let f = findField(c) { return f } }
+            return nil
+        }
+        note("find bar shown = \(findField(window.contentView) != nil)")
+        let fr = window.firstResponder
+        let inFind =
+            (fr as? NSTextView)?.isFieldEditor == true
+            && ((fr as? NSTextView)?.delegate as? NSTextField)?.placeholderString == "Find in this conversation"
+        check(
+            "⌘F opens find with the cursor in it", inFind,
+            "first responder = \(fr.map { String(describing: type(of: $0)) } ?? "none")")
+        await key("\u{1B}", 53)
+        try? await Task.sleep(for: .milliseconds(300))
+        window.makeFirstResponder(tv)
         await key("\u{1B}", 53)
         note("escape: first responder after = \(type(of: window.firstResponder as Any))")
     }

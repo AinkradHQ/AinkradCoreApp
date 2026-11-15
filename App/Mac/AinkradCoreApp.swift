@@ -59,6 +59,7 @@ struct AinkradCoreApp: App {
             keyStore: env["CORE_KEYSTORE"] == "memory" ? makeDebugKeyStore() : makeKeychainKeyStore(),
             demo: env["CORE_DEMO"] == "1", sasFile: env["CORE_IT_SAS_FILE"])
         if env["CORE_DEMO"] == "1" { SampleWorld.install(into: app.shell) }
+        if env["CORE_KEYSTORE"] == "memory" { app.debugSkipLocalTouchID() }
         return app
         #else
         return AppModel()

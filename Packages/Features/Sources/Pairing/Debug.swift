@@ -9,6 +9,11 @@ import Shell
 
 /// Debug only: puts the app in a named state for the self-snapshot runner (no keys sent, nothing leaves the app).
 extension AppModel {
+    /// Debug only, with `CORE_KEYSTORE=memory`: the step-up key is a software key with no Secure Enclave behind it, so the
+    /// local Touch ID check guards nothing; a live UI test cannot touch the sensor, so it is skipped. The Core still checks
+    /// the step-up signature.
+    public func debugSkipLocalTouchID() { stepUp.check = { _, _ in } }
+
     public static let firstRunScenes = [
         "empty", "address", "bootstrap", "typed", "qr", "claiming", "sas", "sas-approved", "waiting", "approved",
         "offline", "ratelimit",
