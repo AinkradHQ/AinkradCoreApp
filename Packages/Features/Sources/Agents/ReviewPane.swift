@@ -91,27 +91,38 @@ struct ReviewPane: View {
         return .handled
     }
 
+    /// The title with Close at the right; with more than one file, Accept all and Revert all on their own row under it, so
+    /// nothing wraps in the panel's width.
     private func header(_ files: [FileTouch]) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: "checklist").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
-                .frame(width: Space.s4).accessibilityHidden(true)
-            Text("Review").coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(.isHeader)
-            if !files.isEmpty { CountBadge(files.count, tone: .quiet) }
-            Spacer(minLength: 0)
-            if files.count > 1 {
-                Button("Accept all") { for f in files { store.set(session.id, f.path, .accepted) } }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Accept every changed file")
-                Button("Revert all") {
-                    for f in files { store.set(session.id, f.path, .revertAsked) }
-                    let list = files.map { "`\($0.path)`" }.joined(separator: ", ")
-                    let id = session.id
-                    Task { await model.say(id, "Please revert your changes to \(list) and tell me when it is done.") }
-                }
-                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(!model.canWrite(session))
-                .help("Ask for every change to be reverted")
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                Image(systemName: "checklist").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                    .frame(width: Space.s4).accessibilityHidden(true)
+                Text("Review").coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1).fixedSize()
+                    .accessibilityAddTraits(.isHeader)
+                if !files.isEmpty { CountBadge(files.count, tone: .quiet) }
+                Spacer(minLength: 0)
+                Button("Close") { close() }.buttonStyle(CoreButtonStyle(.plain, size: .small)).fixedSize()
+                    .help("Close the review (Esc or ⇧⌘R)").keyHint(.review)
             }
-            Button("Close") { close() }.buttonStyle(CoreButtonStyle(.plain, size: .small))
-                .help("Close the review (Esc)")
+            if files.count > 1 {
+                HStack(spacing: Space.s2) {
+                    Button("Accept all") { for f in files { store.set(session.id, f.path, .accepted) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).fixedSize()
+                        .help("Accept every changed file")
+                    Button("Revert all") {
+                        for f in files { store.set(session.id, f.path, .revertAsked) }
+                        let list = files.map { "`\($0.path)`" }.joined(separator: ", ")
+                        let id = session.id
+                        Task {
+                            await model.say(id, "Please revert your changes to \(list) and tell me when it is done.")
+                        }
+                    }
+                    .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).fixedSize()
+                    .disabled(!model.canWrite(session))
+                    .help("Ask for every change to be reverted")
+                }
+            }
         }
     }
 

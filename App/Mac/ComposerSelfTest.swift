@@ -250,6 +250,34 @@ enum ShowcaseShots {
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
         try? await Task.sleep(for: .seconds(2.5))
         _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
+        // ⇧⌘R from the message field: the Review pane with its diffs (the status report session has files touched).
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")
+        try? await Task.sleep(for: .seconds(2.5))
+        if let tv = composer(window.contentView) {
+            window.makeFirstResponder(tv)
+            if let e = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [.command, .shift],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                characters: "r", charactersIgnoringModifiers: "r", isARepeat: false, keyCode: 15)
+            {
+                _ = window.performKeyEquivalent(with: e)
+            }
+            try? await Task.sleep(for: .seconds(1))
+            _ = SnapshotCapture.png(window, to: "\(dir)/review-\(theme).png")
+        }
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
+        try? await Task.sleep(for: .seconds(2))
+        // ⌘ held: every button shows its key. The key goes to this process only, never to other apps.
+        CGEvent(keyboardEventSource: nil, virtualKey: 0x37, keyDown: true).map {
+            $0.flags = .maskCommand
+            $0.postToPid(getpid())
+        }
+        try? await Task.sleep(for: .seconds(1))
+        _ = SnapshotCapture.png(window, to: "\(dir)/keys-\(theme).png")
+        CGEvent(keyboardEventSource: nil, virtualKey: 0x37, keyDown: false).map { $0.postToPid(getpid()) }
+        try? await Task.sleep(for: .milliseconds(500))
         // Two sessions side by side: each pane is narrow, so the header shows its compact form.
         app.shell.closeAllPanes()
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")

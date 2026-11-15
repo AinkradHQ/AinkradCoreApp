@@ -100,6 +100,7 @@ struct ApprovalEntryCard: View {
                 : "Tell \(who) no (⌘Delete). It carries on without it."
         )
         .accessibilityLabel(approve ? "Approve \(request.tool)" : "Deny \(request.tool)")
+        .keyHint(live ? (approve ? "⌘↩" : "⌘⌫") : "")
         return Group {
             if live {
                 if approve {

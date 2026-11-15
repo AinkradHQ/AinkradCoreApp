@@ -104,7 +104,7 @@ struct ComposerView: View {
                 .coreFont(size: MacTextSize.body)
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
-                        .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)")
+                        .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)").keyHint(.attach)
                     modelPicker
                     Spacer(minLength: Space.s2)
                     if bytes > AgentsModel.messageLimit / 2 {
@@ -115,7 +115,7 @@ struct ComposerView: View {
                     if model.canStopTurn(session) {
                         Button("Stop turn") { model.stopTurn(session.id) }
                             .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "esc")
-                            .help("Stop the current turn (Esc or ⌘.). The session stays open.")
+                            .help("Stop the current turn (Esc or ⌘.). The session stays open.").keyHint("esc")
                     }
                     if enabled {
                         Button(action: { Task { await model.send(session.id) } }) {
@@ -123,6 +123,7 @@ struct ComposerView: View {
                         }
                         .buttonStyle(CoreButtonStyle(.prominent, size: .small)).environment(\.coreKeycap, "↩")
                         .disabled(!model.canSend(session.id))
+                        .keyHint("↩")
                         .help(
                             session.idle || !session.live
                                 ? "Send the message (Return)" : "Send it after this turn (Return)")
@@ -206,7 +207,7 @@ struct ComposerView: View {
                 .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
                 .background(GlassInk.well, in: coreShape(Radius.chip))
             }
-            .help("Switch the model for the rest of this session (⇧⌘M)")
+            .help("Switch the model for the rest of this session (⇧⌘M)").keyHint(.model)
         } else {
             CoreChip(label)
         }

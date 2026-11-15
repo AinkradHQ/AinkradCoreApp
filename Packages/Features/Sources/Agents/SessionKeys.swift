@@ -100,6 +100,27 @@ final class SessionUI {
     var shortcuts = false
     /// Bumped to ask the composer for its file picker.
     var attach = 0
+    /// ⌘ is held: every button shows its key (Ahmed, 2026-11-15), as Safari shows its tab numbers.
+    var showKeys = false
+    @ObservationIgnored var keysTask: Task<Void, Never>?
+
+    /// Follows the modifier keys: ⌘ held a moment shows the keys; letting go, or pressing a key, hides them.
+    func track(_ e: NSEvent, active: Bool) {
+        keysTask?.cancel()
+        let f = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard active, e.type == .flagsChanged, f.contains(.command), f.isSubset(of: [.command, .shift, .option]) else {
+            if showKeys { showKeys = false }
+            return
+        }
+        keysTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            self?.showKeys = true
+        }
+    }
+
+    /// Bumped to put the cursor in the message field (Edit, Quote).
+    var focusComposer = 0
     /// Open or fold every tool step: bumped with the wanted state.
     var steps = (gen: 0, open: false)
 }
@@ -158,4 +179,37 @@ struct ShortcutSheet: View {
             }
         }
     }
+}
+
+/// A control's key while ⌘ is held (SessionUI.showKeys): it covers the control's own face, inside its bounds, so it never
+/// overlaps a neighbour and nothing moves (Ahmed, 2026-11-15); letting go brings the name back. The key is always in the
+/// control's tooltip too.
+private struct KeyHint: ViewModifier {
+    let label: String
+    @Environment(\.sessionUI) private var ui
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    func body(content: Content) -> some View {
+        let on = ui?.showKeys == true && !label.isEmpty
+        content.overlay {
+            Text(label).coreFont(size: 11, weight: .semibold, design: .rounded).monospacedDigit()
+                .fixedSize()
+                .foregroundStyle(GlassInk.primary)
+                .padding(.horizontal, 4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(GlassInk.adaptive(Color(white: 0.16), day: Color(white: 0.96)), in: coreShape(Radius.chip))
+                .opacity(on ? 1 : 0)
+                .animation(reduce ? nil : Motion.out(Motion.hover), value: on)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+extension View {
+    /// Shows `label` ("⇧⌘T") on this control while ⌘ is held.
+    func keyHint(_ label: String) -> some View { modifier(KeyHint(label: label)) }
+
+    /// The same, from the shortcut table.
+    func keyHint(_ key: SessionShortcut) -> some View { modifier(KeyHint(label: key.label)) }
 }

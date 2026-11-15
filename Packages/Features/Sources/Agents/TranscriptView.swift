@@ -113,7 +113,7 @@ struct TranscriptView: View {
                     Button(action: { toEnd(proxy) }) { Label("Latest", systemImage: "chevron.down") }
                         .buttonStyle(CoreButtonStyle(.plain, size: .small)).environment(\.coreKeycap, "↓")
                         .coreGlass(radius: Radius.chip)
-                        .help("Jump to the newest message (↓)")
+                        .help("Jump to the newest message (↓)").keyHint("↓")
                         .padding(.bottom, Space.s2)
                         .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                 }
@@ -127,6 +127,14 @@ struct TranscriptView: View {
             if let focus, es.contains(where: { $0.seq == focus }) { return true }
             return runOpen[seq] ?? runsAll ?? ColumnRow.openByDefault(es)
         }
+    }
+
+    private func latestUser(_ store: TranscriptStore) -> Int64? {
+        store.entries.last { if case .user = $0.kind { true } else { false } }?.seq
+    }
+
+    private func latestAnswer(_ store: TranscriptStore) -> Int64? {
+        store.entries.last { if case .assistant = $0.kind { true } else { false } }?.seq
     }
 
     /// The find bar's or a turn jump's mark behind an entry.
@@ -162,8 +170,9 @@ struct TranscriptView: View {
         } else {
             EntryRow(
                 entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
+                latest: e.seq == latestUser(store) || e.seq == latestAnswer(store),
                 openConnections: { model.shell.launcher.entry("connections")?.run() },
-                actions: EntryActions.make(model, session)
+                actions: EntryActions.make(model, session, ui: ui)
             )
             .equatable()
             // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
@@ -230,6 +239,8 @@ struct EntryRow: View, Equatable {
     var harness = "claude"
     var runner = ""
     var turn: ConversationWords.Turn?
+    /// Your latest message or the latest answer: it carries the action row.
+    var latest = false
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
     /// Copy, Edit, Resend, Retry, Quote. Only `canSend` is compared.
@@ -240,7 +251,7 @@ struct EntryRow: View, Equatable {
     nonisolated(unsafe) static var openAtStart = false
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool {
-        a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn
+        a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn && a.latest == b.latest
             && a.actions?.canSend == b.actions?.canSend
     }
     @Environment(\.corePalette) private var palette
@@ -263,7 +274,7 @@ struct EntryRow: View, Equatable {
                             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                             .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
                             .textSelection(.enabled)
-                            .messageActions(text: parts.words, user: true, actions)
+                            .messageActions(text: parts.words, user: true, latest: latest, actions)
                     }
                 }
                 if !parts.files.isEmpty { MessageFilesView(paths: parts.files) }
@@ -273,7 +284,7 @@ struct EntryRow: View, Equatable {
         case .assistant(let text):
             // Printed on the glass, no bubble.
             MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
-                .messageActions(text: text, user: false, actions)
+                .messageActions(text: text, user: false, latest: latest, actions)
         case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
             CodeModeCard(
                 tool: CodeModeTool.of(name)!, summary: summary, status: .running, output: "", durationMs: nil,

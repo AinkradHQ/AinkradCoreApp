@@ -9,11 +9,16 @@ struct EntryActions: Sendable {
     var edit: @MainActor @Sendable (String) -> Void = { _ in }
     var send: @MainActor @Sendable (String) -> Void = { _ in }
 
-    @MainActor static func make(_ model: AgentsModel, _ session: AgentSessionInfo) -> EntryActions {
+    @MainActor static func make(_ model: AgentsModel, _ session: AgentSessionInfo, ui: SessionUI? = nil) -> EntryActions
+    {
         let id = session.id
         return EntryActions(
             canSend: model.canReply(session),
-            edit: { model.drafts[id] = $0 },
+            // Edit and Quote fill the field and put the cursor in it, so the change is right there to see.
+            edit: { text in
+                model.drafts[id] = text
+                ui?.focusComposer += 1
+            },
             send: { text in Task { await model.say(id, text) } })
     }
 }
@@ -36,78 +41,85 @@ private struct Act: Identifiable {
     let run: () -> Void
 }
 
-/// Hover actions under a message and the same in its right-click menu. The bar always takes its room and only fades in,
-/// so nothing jumps; Reduce Motion drops the fade.
+/// The message actions (Ahmed, 2026-11-15: not on every message, not floating over the next row). Only your latest
+/// message and the latest answer carry a quiet row of icons under them: the answer's always shows, yours on hover with its
+/// room kept so nothing jumps. Every message keeps the same actions in its right-click menu.
 private struct MessageActions: ViewModifier {
     let text: String  // copied
     let words: String  // edit / resend
     let user: Bool
+    let latest: Bool
     let actions: EntryActions?
     @State private var hovering = false
-    @State private var hideTask: Task<Void, Never>?
+    @State private var copied = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
 
     private var list: [Act] {
         let a = actions ?? EntryActions()
-        let copy = Act(id: "Copy", symbol: "doc.on.doc", needsSend: false) {
+        let copy = Act(id: "Copy", symbol: copied ? "checkmark" : "doc.on.doc", needsSend: false) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
+            copied = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.2))
+                copied = false
+            }
         }
         guard actions != nil else { return [copy] }
         if user {
-            return [
-                copy, Act(id: "Edit", symbol: "pencil") { a.edit(words) },
-                Act(id: "Resend", symbol: "arrow.up.message") { a.send(words) },
-            ]
+            var l = [copy, Act(id: "Edit", symbol: "pencil") { a.edit(words) }]
+            if latest { l.append(Act(id: "Resend", symbol: "arrow.clockwise") { a.send(words) }) }
+            return l
         }
-        return [
-            copy, Act(id: "Retry", symbol: "arrow.clockwise") { a.send("Please try that again.") },
-            Act(id: "Quote", symbol: "text.quote") { a.edit(EntryQuote.draft(text)) },
-        ]
+        var l = [copy, Act(id: "Quote", symbol: "text.quote") { a.edit(EntryQuote.draft(text)) }]
+        if latest { l.insert(Act(id: "Retry", symbol: "arrow.clockwise") { a.send("Please try that again.") }, at: 1) }
+        return l
     }
 
     private var shown: [Act] { list.filter { !$0.needsSend || actions?.canSend == true } }
 
     func body(content: Content) -> some View {
-        // Floats over the message (no space kept for it): left of your bubble, at the top right of an answer. It stays a
-        // moment after the pointer leaves, so reaching for it never makes it vanish.
-        content
-            .overlay(alignment: user ? .leading : .topTrailing) {
+        VStack(alignment: user ? .trailing : .leading, spacing: Space.s1) {
+            content
+            if latest {
                 HStack(spacing: Space.s1) {
-                    ForEach(shown) { act in CoreIconButton(symbol: act.symbol, label: act.id, action: act.run) }
+                    ForEach(shown) { act in
+                        CoreIconButton(symbol: act.symbol, label: act.id, action: act.run)
+                            .help(help(act.id))
+                            .keyHint(act.id == "Copy" && !user ? "⇧⌘C" : "")
+                    }
                 }
-                .padding(Space.s1)
-                .coreWell(radius: Radius.control)
-                .alignmentGuide(.leading) { d in user ? d[.trailing] + Space.s2 : d[.leading] }
-                .opacity(hovering ? 1 : 0)
-                .allowsHitTesting(hovering)
-                .accessibilityHidden(!hovering)
-                .onHover { hover($0) }
+                .opacity(user && !hovering ? 0 : 1)
+                .allowsHitTesting(!user || hovering)
+                .accessibilityHidden(user && !hovering)
             }
-            .contentShape(Rectangle())
-            .onHover { hover($0) }
-            .animation(reduce ? nil : Motion.out(Motion.hover), value: hovering)
-            .contextMenu {
-                ForEach(shown) { act in Button(act.id, action: act.run) }
-            }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .animation(reduce ? nil : Motion.out(Motion.hover), value: hovering)
+        .contextMenu {
+            ForEach(shown) { act in Button(act.id, action: act.run) }
+        }
     }
 
-    private func hover(_ inside: Bool) {
-        hideTask?.cancel()
-        if inside {
-            hovering = true
-        } else {
-            hideTask = Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(350))
-                if !Task.isCancelled { hovering = false }
-            }
+    private func help(_ id: String) -> String {
+        switch id {
+        case "Copy": user ? "Copy your message" : "Copy the answer (⇧⌘C)"
+        case "Edit": "Put this message in the field to change and send again"
+        case "Resend": "Send this message again"
+        case "Retry": "Ask for the answer again"
+        default: "Quote the answer in a new message"
         }
     }
 }
 
 extension View {
-    /// Copy, Edit, Resend (your message) or Copy, Retry, Quote (an answer): hover row and context menu.
-    func messageActions(text: String, words: String? = nil, user: Bool, _ actions: EntryActions?) -> some View {
-        modifier(MessageActions(text: text, words: words ?? text, user: user, actions: actions))
+    /// Copy, Edit, Resend (your message) or Copy, Retry, Quote (an answer): a row under the latest of each, and the right-click
+    /// menu on every one.
+    func messageActions(
+        text: String, words: String? = nil, user: Bool, latest: Bool = false, _ actions: EntryActions?
+    ) -> some View {
+        modifier(MessageActions(text: text, words: words ?? text, user: user, latest: latest, actions: actions))
     }
 }

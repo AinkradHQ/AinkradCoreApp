@@ -1,9 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// The conversation's side panel (windows of 1300 pt and up, N42), four cards (Ahmed, 2026-11-15: fewer, calmer): the
-/// session's actions, files touched with their diffs, usage (context and cost), and where it runs (runner, account, tool,
-/// folder, branch). Under that width the same facts live in the Details strip.
+/// The conversation's side panel (windows of 1300 pt and up, N42), three cards (Ahmed, 2026-11-15: organised): the session
+/// (where it runs and its tools), files touched with their diffs, and usage (context and cost). One row style throughout. Under that width the same facts live in the Details strip.
 struct SessionSidePanel: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
@@ -26,7 +25,7 @@ struct SessionSidePanel: View {
     private func cards(_ files: [FileTouch]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
-                SessionActions(model: model, session: session, find: find, stacked: true)
+                SessionActions(model: model, session: session, find: find, stacked: true, facts: facts)
                     .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
                     .coreWell()
                 section(
@@ -63,12 +62,7 @@ struct SessionSidePanel: View {
                 ) {
                     let ctx = ConversationWords.context(
                         used: session.usage?.tokens ?? 0, window: ContextWindow.tokens(model: session.model))
-                    HStack {
-                        Text("Context").foregroundStyle(palette.text2)
-                        Spacer()
-                        Text(ctx.text).foregroundStyle(palette.text2).monospacedDigit()
-                    }
-                    .coreFont(size: MacTextSize.meta)
+                    PanelRow(label: "Context", value: ctx.text)
                     CoreMeter(ctx.fill, label: "Context used")
                     let turns = model.turnCosts(session.id)
                     let top = max(turns.map(\.cost).max() ?? 1, 1)
@@ -83,21 +77,8 @@ struct SessionSidePanel: View {
                         }
                         .coreFont(size: MacTextSize.meta)
                     }
-                    HStack {
-                        Text("Cost this session").fontWeight(.semibold)
-                        Spacer()
-                        Text(AgentWords.cost(session.usage?.costMicros) ?? "—").fontWeight(.semibold)
-                            .monospacedDigit()
-                            .help(AgentWords.exactCost(session.usage?.costMicros) ?? "")
-                    }
-                    .coreFont(size: MacTextSize.body)
-                }
-                section("Where it runs", symbol: "server.rack") {
-                    row("Runner", model.runnerName(session.runner))
-                    if let a = session.route?.account { row("Account", model.accountNames[a] ?? "an account") }
-                    row("Tool", AgentWords.toolName(session.harness) + (session.model.map { " · \($0)" } ?? ""))
-                    row("Folder", session.project ?? "Fresh folder")
-                    if let b = session.branch { row("Branch", b, mono: true) }
+                    PanelRow(label: "Cost this session", value: AgentWords.cost(session.usage?.costMicros) ?? "—")
+                        .help(AgentWords.exactCost(session.usage?.costMicros) ?? "")
                 }
             }
             .foregroundStyle(palette.text)
@@ -105,6 +86,16 @@ struct SessionSidePanel: View {
         }
         .scrollIndicators(.never)
         .task(id: session.id) { await model.followRoute(session.id) }
+    }
+
+    /// Where the session runs: the Session card's rows.
+    private var facts: [(String, String)] {
+        var f: [(String, String)] = [("Runner", model.runnerName(session.runner))]
+        if let a = session.route?.account { f.append(("Account", model.accountNames[a] ?? "an account")) }
+        f.append(("Tool", AgentWords.toolName(session.harness) + (session.model.map { " · \($0)" } ?? "")))
+        f.append(("Folder", session.project ?? "Fresh folder"))
+        if let b = session.branch { f.append(("Branch", b)) }
+        return f
     }
 
     private func diff(_ path: String) -> [DiffLine] {
@@ -117,17 +108,6 @@ struct SessionSidePanel: View {
             }
         }
         return out
-    }
-
-    private func row(_ k: String, _ v: String, mono: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-            Text(k).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
-                .frame(width: Space.s8 + Space.s6, alignment: .leading)
-            Text(v).coreFont(size: MacTextSize.body, design: mono ? .monospaced : .default).lineLimit(2)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
-        }
-        .coreFont(size: MacTextSize.meta)
     }
 
     /// One card of the side panel (Ahmed, 2026-11-15: separate cards, as on the landing page, in our components): its
@@ -145,11 +125,11 @@ struct SessionSidePanel: View {
                 Spacer(minLength: 0)
                 if let review {
                     Button("Review", action: review).buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Review the changes (⇧⌘R)")
+                        .help("Review the changes (⇧⌘R)").keyHint(.review)
                 }
                 if let action {
-                    Button(action.0, action: action.1).buttonStyle(CoreButtonStyle(.plain, size: .small))
-                        .help("Put \(action.0) in the message field (⇧⌘K)")
+                    Button(action.0, action: action.1).buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Put \(action.0) in the message field (⇧⌘K)").keyHint(.compact)
                 }
             }
             c()

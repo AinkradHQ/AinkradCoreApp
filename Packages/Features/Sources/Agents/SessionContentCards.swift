@@ -93,10 +93,10 @@ struct PlanCard: View {
                 HStack(spacing: Space.s2) {
                     Button("Go ahead", action: actions.goAhead)
                         .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                        .help("Approve the plan: the agent starts building it")
+                        .help("Approve the plan: the agent starts building it (⌘↩)").keyHint(.goAhead)
                     Button("Change it", action: actions.change)
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Write what to change in the plan")
+                        .help("Write what to change in the plan (⇧⌘↩)").keyHint(.changePlan)
                 }
             }
         }

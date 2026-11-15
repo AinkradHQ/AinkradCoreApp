@@ -62,8 +62,10 @@ struct ConversationFindBar: View {
             Text(query.isEmpty ? "" : count == 0 ? "No match" : "\(index + 1) of \(count)")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).monospacedDigit()
             CoreIconButton(symbol: "chevron.up", label: "Previous match") { step(-1) }.disabled(count == 0)
+                .help("Previous match (⇧⌘G)").keyHint(.findPrevious)
             CoreIconButton(symbol: "chevron.down", label: "Next match") { step(1) }.disabled(count == 0)
-            CoreIconButton(symbol: "xmark", label: "Close find") { close() }
+                .help("Next match (↩ or ⌘G)").keyHint(.findNext)
+            CoreIconButton(symbol: "xmark", label: "Close find") { close() }.help("Close (Esc)").keyHint("esc")
         }
         .coreFont(size: MacTextSize.body)
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg)

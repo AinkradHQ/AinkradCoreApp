@@ -156,6 +156,7 @@ struct ToolRunHeader: View {
         .help(open ? "Fold these steps (⌥⌘← folds them all)" : "Show each step (⌥⌘→ opens them all)")
         .accessibilityLabel(ToolStep.summary(steps))
         .accessibilityValue(open ? "Open" : "Folded")
+        .keyHint(open ? .collapseSteps : .expandSteps)
     }
 
     @ViewBuilder private var trailing: some View {

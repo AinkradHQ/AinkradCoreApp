@@ -88,7 +88,7 @@ struct SessionHero: View {
         if compact {
             CoreIconButton(symbol: "info.square", label: "Details", selected: showDetails) { toggleDetails() }
                 .help(showDetails ? "Hide the details (⌥⌘I)" : "Show the runner, account, tokens and cost (⌥⌘I)")
-                .accessibilityIdentifier("session-details")
+                .keyHint(.details).accessibilityIdentifier("session-details")
         } else {
             fullDetailsButton
         }
@@ -108,7 +108,7 @@ struct SessionHero: View {
                 ? "Hide the details under the header (⌥⌘I)" : "Show the runner, account, tokens and cost (⌥⌘I)"
         )
         .accessibilityValue(showDetails ? "Shown" : "Hidden")
-        .accessibilityIdentifier("session-details")
+        .keyHint(.details).accessibilityIdentifier("session-details")
     }
 
     private func strip(tone: Tone) -> some View {

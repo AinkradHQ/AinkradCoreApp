@@ -20,6 +20,7 @@ struct SessionView: View {
     /// What the screen has open (Open in…, the model menu, Review, the shortcut list), shared so a key opens what a click does.
     @State private var ui = SessionUI()
     @AppStorage("agents.detailsStrip") private var showDetails = true
+    @State private var keyMonitor: Any?
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -44,7 +45,22 @@ struct SessionView: View {
             .focusable()
             .focused($paneFocus)
             .focusEffectDisabled()
-            .onAppear { focusStart(s) }
+            .onAppear {
+                focusStart(s)
+                // ⌘ held shows every button's key; only the pane in front shows them.
+                let ui = ui
+                let shell = model.shell
+                let pane = AgentsModel.paneID(sessionID)
+                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { e in
+                    MainActor.assumeIsolated { ui.track(e, active: shell.activePane == pane) }
+                    return e
+                }
+            }
+            .onDisappear {
+                if let m = keyMonitor { NSEvent.removeMonitor(m) }
+                keyMonitor = nil
+                ui.showKeys = false
+            }
             .retakeFocus(after: model.shell, pane: AgentsModel.paneID(sessionID)) { focusStart(s) }
             // The pane's keys step aside while a text field has the keyboard: SwiftUI hands them to the pane before the
             // field, so Return, "/" and the arrows never reached the composer (2026-11-15, found by the composer self-test).
@@ -84,6 +100,11 @@ struct SessionView: View {
             }
             .animation(Motion.out(Motion.ui), value: ui.shortcuts)
             .environment(\.sessionUI, ui)
+            .onChange(of: ui.focusComposer) { _, _ in
+                // Whatever holds the keyboard lets go, then the field takes it.
+                composing = false
+                Task { @MainActor in composing = true }
+            }
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
@@ -122,7 +143,7 @@ struct SessionView: View {
                             Button(action: { model.resume(s.id) }) { Label("Resume", systemImage: "arrow.clockwise") }
                                 .buttonStyle(CoreButtonStyle(.prominent, size: .small))
                                 .environment(\.coreKeycap, "R")
-                                .help("Continue the conversation in the same folder (R)")
+                                .help("Continue the conversation in the same folder (R)").keyHint("R")
                         }
                     }
                     .transition(.opacity)
