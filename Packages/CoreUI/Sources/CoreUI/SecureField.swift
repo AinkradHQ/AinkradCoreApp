@@ -30,7 +30,7 @@ public struct CoreSecureField: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             CoreFieldLabel(label)
-            SecureField(palette.isDay ? "" : placeholder, text: $text)
+            SecureField("", text: $text)
                 .textFieldStyle(.plain)
                 .coreFont(size: MacTextSize.body)
                 .coreDayPlaceholder(

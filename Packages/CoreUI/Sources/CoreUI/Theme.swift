@@ -39,9 +39,7 @@ public struct Palette: Sendable {
     public var rowHover: Color { isDay ? GlassInk.dayInk.opacity(0.05) : .white.opacity(0.1) }
     /// Neutral edges: white 0.30 or more at night; Increase Contrast goes to 0.55 (day: a dark hairline instead).
     public var edge: Color {
-        isDay
-            ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7))
-            : increased ? .white.opacity(0.55) : theme["edge"]
+        GlassInk.primary.opacity(increased ? 0.45 : 0.15)
     }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
@@ -58,8 +56,7 @@ public struct Palette: Sendable {
     /// soft white well with a light edge, not a dark slab, in both themes.
     public var glassCard: Color { isDay ? GlassInk.dayInk.opacity(0.04) : .white.opacity(0.08) }
     public var glassCardEdge: Color {
-        isDay
-            ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7)) : .white.opacity(increased ? 0.55 : 0.3)
+        GlassInk.primary.opacity(increased ? 0.45 : 0.25)
     }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
@@ -170,7 +167,7 @@ extension View {
 private struct DimWhenDisabled: ViewModifier {
     let enabled: Bool
     @Environment(\.corePalette) private var palette
-    func body(content: Content) -> some View { content.opacity(enabled ? 1 : palette.isDay ? 0.6 : 0.45) }
+    func body(content: Content) -> some View { content.opacity(enabled ? 1 : 0.5) }
 }
 
 private struct CoreFocusLook: ViewModifier {

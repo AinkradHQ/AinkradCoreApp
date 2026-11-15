@@ -50,7 +50,8 @@ public struct CoreNotice<Action: View>: View {
         .padding(Space.s3)
         // Day: a neutral notice is a glass well (the mockups' .notice); a toned one takes its light chip tint.
         .background(
-            !palette.isDay ? c.ink.opacity(0.14) : tone == .queue ? GlassInk.well : c.fill,
+            // A plain well in both themes; the tone is on the glyph (Ahmed, 2026-11-15: same in night and day, less colour).
+            GlassInk.well,
             in: coreShape(Radius.cardMac)
         )
         .accessibilityElement(children: .contain)

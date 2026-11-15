@@ -55,7 +55,7 @@ public enum GlassInk {
     public static func sunk(_ o: Double) -> Color { adaptive(.black.opacity(o), day: dayInk.opacity(0.05)) }
     /// A drop shadow: black `o` at night; by day a soft blue shade at half the weight (`ds.css` --shade).
     public static func shade(_ o: Double) -> Color {
-        adaptive(.black.opacity(o), day: Color(red: 40 / 255, green: 80 / 255, blue: 140 / 255).opacity(o * 0.5))
+        adaptive(.black.opacity(o), day: .black.opacity(o * 0.5))
     }
 
     /// One colour for night and one for day, picked by the appearance the view is drawn in (NSApp holds Day/Night).

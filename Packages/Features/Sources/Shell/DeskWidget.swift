@@ -31,13 +31,13 @@ struct DeskWidget: View {
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipShape(coreShape(radius))
-        // By day the clear glass lets the bright sky through, so white ink measured 2.2 to 3.5:1. The panes' day look is a dark
-        // layer under the glass; the widgets get the same one (night is unchanged). Contrast measured 2026-11-09.
-        .background(palette.isDay ? Color.white.opacity(0.45) : Color.black.opacity(0), in: coreShape(radius))
+        // A backing under the clear glass in both themes, mirrored: dark at night, light by day, so ink reads over any
+        // wallpaper (Ahmed, 2026-11-15: same structure in night and day).
+        .background(GlassInk.adaptive(.black.opacity(0.25), day: .white.opacity(0.45)), in: coreShape(radius))
         // Apple's Liquid Glass draws its own edge and light; no extra stroke or ring on top.
         .coreGlass(radius: radius, interactive: false, tinted: false)
         .overlay {
-            coreShape(radius).fill(Color.white.opacity(hovering && !lifting ? (palette.isDay ? 0.15 : 0.04) : 0))
+            coreShape(radius).fill(GlassInk.lift(hovering && !lifting ? 0.06 : 0))
                 .allowsHitTesting(false)
         }
         .shadow(color: GlassInk.shade(0.12), radius: 14, y: 4)

@@ -99,7 +99,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
                 coreShape(Radius.control).fill(
                     hovering
                         ? GlassInk.adaptive(GlassInk.slate.opacity(0.28), day: GlassInk.wellHover)
-                        : selected && palette.isDay ? .clear : GlassInk.well)
+                        : selected ? .clear : GlassInk.well)
             }
             .background {
                 // The parent's animation glides the highlight between segments. Reduce Motion: it jumps and its colour fades.

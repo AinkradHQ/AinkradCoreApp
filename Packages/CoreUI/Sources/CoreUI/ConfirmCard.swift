@@ -144,7 +144,7 @@ public struct ChoiceTile: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 // By day the white label needs a strong fill: 0.6 blue over white is a washed 2.6:1.
-                on ? hue.opacity(choice.destructive || palette.isDay ? 0.92 : 0.6) : GlassInk.well,
+                on ? hue : GlassInk.well,
                 in: coreShape(Radius.control + 2)
             )
             .animation(Motion.out(Motion.hover), value: on)
