@@ -77,6 +77,8 @@ struct SessionIndex {
     /// Each session's sections: a live one is in its state section, and every one is in its time window.
     private var placed: [(s: AgentSessionInfo, state: SessionSection?, when: SessionSection)] = []
     private let inputs: Inputs
+    /// The sessions an approval waits on, as this index grouped them: rows read the same set, so a row in Needs you says so.
+    var needsYou: Set<String> { inputs.needsYou }
     private(set) var projects: [(name: String, count: Int)] = []
     private(set) var runners: [(id: String, count: Int)] = []
 

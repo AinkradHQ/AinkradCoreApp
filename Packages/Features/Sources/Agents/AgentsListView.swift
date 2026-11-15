@@ -35,7 +35,7 @@ struct AgentsListView: View {
                 filterBar(index, compact: compact)
                 HStack(alignment: .top, spacing: Space.s2) {
                     if !compact { SessionSidebar(model: model, index: index).frame(width: 210) }
-                    content(groups, rows, compact: compact)
+                    content(groups, rows, compact: compact, waiting: index.needsYou)
                 }
                 .padding(.horizontal, Space.s3)
             }
@@ -130,7 +130,9 @@ struct AgentsListView: View {
     // MARK: rows
 
     @ViewBuilder
-    private func content(_ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool) -> some View {
+    private func content(
+        _ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool, waiting waitingIDs: Set<String>
+    ) -> some View {
         switch model.sessions.load {
         case .idle, .loading:
             VStack(spacing: Space.s2) {
@@ -162,7 +164,7 @@ struct AgentsListView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                list(groups, rows, compact: compact)
+                list(groups, rows, compact: compact, waiting: waitingIDs)
             }
         }
     }
@@ -183,8 +185,9 @@ struct AgentsListView: View {
     }
 
     /// Keyboard: the list holds focus, ↑↓ move the cursor, ↩ opens, P pins, E ends, A archives.
-    private func list(_ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool) -> some View {
-        let waitingIDs = Set(model.pending.map(\.session))
+    private func list(
+        _ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool, waiting waitingIDs: Set<String>
+    ) -> some View {
         let now = Date()
         // The column only earns its place when the visible rows differ in last activity.
         let showActivity = Set(rows.map { AgentWords.ago($0.updatedAt, now: now) }).count > 1
@@ -193,34 +196,38 @@ struct AgentsListView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2, pinnedViews: []) {
-                        ForEach(groups) { g in
-                            SectionHeader(group: g, collapsed: collapsed.contains(g.section)) {
-                                if collapsed.contains(g.section) {
-                                    collapsed.remove(g.section)
-                                } else {
-                                    collapsed.insert(g.section)
+                        // One flat list of headers and rows: rows nested in a ForEach per group did not redraw in the lazy
+                        // stack when a session changed state or group (a live run showed Running under Needs you). A row's id
+                        // is its session's, which scrolling uses.
+                        ForEach(
+                            ListItem.flatten(groups, open: { !collapsed.contains($0) || !model.filters.search.isEmpty })
+                        ) {
+                            item in
+                            if let s = item.row {
+                                SessionRow(
+                                    session: s, title: model.title(s), runner: model.runnerName(s.runner),
+                                    waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
+                                    selected: model.selected == s.id, compact: compact, showActivity: showActivity,
+                                    now: now,
+                                    onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
+                                )
+                                .onTapGesture(count: 2) { model.openSession(s.id) }
+                                .onTapGesture {
+                                    model.selected = s.id
+                                    listFocus = true
                                 }
-                            }
-                            if !collapsed.contains(g.section) || !model.filters.search.isEmpty {
-                                ForEach(g.rows) { s in
-                                    SessionRow(
-                                        session: s, title: model.title(s), runner: model.runnerName(s.runner),
-                                        waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
-                                        selected: model.selected == s.id, compact: compact, showActivity: showActivity,
-                                        now: now,
-                                        onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
-                                    )
-                                    .id(s.id)
-                                    .onTapGesture(count: 2) { model.openSession(s.id) }
-                                    .onTapGesture {
-                                        model.selected = s.id
-                                        listFocus = true
+                                .accessibilityAddTraits(
+                                    model.selected == s.id ? [.isSelected, .isButton] : .isButton
+                                )
+                                .accessibilityAction { model.openSession(s.id) }
+                                .onAppear { model.loadTitle(s.id) }
+                            } else {
+                                SectionHeader(group: item.group, collapsed: collapsed.contains(item.group.section)) {
+                                    if collapsed.contains(item.group.section) {
+                                        collapsed.remove(item.group.section)
+                                    } else {
+                                        collapsed.insert(item.group.section)
                                     }
-                                    .accessibilityAddTraits(
-                                        model.selected == s.id ? [.isSelected, .isButton] : .isButton
-                                    )
-                                    .accessibilityAction { model.openSession(s.id) }
-                                    .onAppear { model.loadTitle(s.id) }
                                 }
                             }
                         }
@@ -303,5 +310,18 @@ struct NotificationAsk: View {
         .padding(Space.s3)
         .coreWell(radius: Radius.row)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// A header or a row of the session list, in one flat sequence for the lazy stack.
+struct ListItem: Identifiable {
+    let group: SessionGroup
+    let row: AgentSessionInfo?
+    var id: String { row?.id ?? "section:\(group.section)" }
+
+    static func flatten(_ groups: [SessionGroup], open: (SessionSection) -> Bool) -> [ListItem] {
+        groups.flatMap { g in
+            [ListItem(group: g, row: nil)] + (open(g.section) ? g.rows.map { ListItem(group: g, row: $0) } : [])
+        }
     }
 }
