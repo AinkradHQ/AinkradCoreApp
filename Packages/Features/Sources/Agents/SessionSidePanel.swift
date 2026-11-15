@@ -7,13 +7,26 @@ struct SessionSidePanel: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     @State private var openFile: String?
+    @State private var reviewing = false
     @Environment(\.corePalette) private var palette
 
     var body: some View {
         let files = model.filesTouched(session.id)
+        if reviewing {
+            ReviewPane(model: model, session: session, diff: diff) { reviewing = false }
+                .task(id: session.id) { await model.followRoute(session.id) }
+        } else {
+            cards(files)
+        }
+    }
+
+    private func cards(_ files: [FileTouch]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
-                section("Files touched", symbol: "doc", count: files.count) {
+                section(
+                    "Files touched", symbol: "doc", count: files.count,
+                    review: files.isEmpty ? nil : { reviewing = true }
+                ) {
                     if files.isEmpty {
                         Text("Nothing changed yet.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     } else {
@@ -114,7 +127,7 @@ struct SessionSidePanel: View {
     /// symbol and title, an optional count and one quiet action, then its content.
     private func section<C: View>(
         _ title: String, symbol: String, count: Int = 0, action: (String, () -> Void)? = nil,
-        @ViewBuilder _ c: () -> C
+        review: (() -> Void)? = nil, @ViewBuilder _ c: () -> C
     ) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
@@ -123,6 +136,10 @@ struct SessionSidePanel: View {
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(.isHeader)
                 if count > 0 { CountBadge(count, tone: .quiet) }
                 Spacer(minLength: 0)
+                if let review {
+                    Button("Review", action: review).buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Review the changes")
+                }
                 if let action {
                     Button(action.0, action: action.1).buttonStyle(CoreButtonStyle(.plain, size: .small))
                         .help("Put \(action.0) in the message field")
