@@ -43,7 +43,9 @@ public struct CoreDropdown<Label: View>: View {
     @State private var monitor: Any?
     @State private var triggerFrame = CGRect.zero
     @State private var panelFrame = CGRect.zero
+    @State private var menuID = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.coreMenuHost) private var host
 
     /// `isPresented` lets the owner see (and set) whether the panel is open, e.g. to keep its trigger visible.
     public init(items: [CoreDropdownItem], isPresented: Binding<Bool>? = nil, @ViewBuilder label: () -> Label) {
@@ -71,8 +73,13 @@ public struct CoreDropdown<Label: View>: View {
                 Color.clear.onChange(of: g.frame(in: .global), initial: true) { _, f in triggerFrame = f }
             }
         )
+        // The window's menu layer draws the panel above everything, below or above this button, wherever it fits.
+        .anchorPreference(key: MenuRequestKey.self, value: .bounds) { a in
+            open && host ? [MenuRequest(id: menuID, anchor: a, height: estimatedHeight, panel: AnyView(panel))] : []
+        }
+        // No menu layer above (a view outside coreTheme): the panel opens in place, under the button.
         .overlay(alignment: .bottomTrailing) {
-            if open {
+            if open && !host {
                 panel
                     .alignmentGuide(.bottom) { d in d[.top] - Space.s1 }
                     .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -Space.s1))))
@@ -152,6 +159,12 @@ public struct CoreDropdown<Label: View>: View {
 
     private var checks: Bool { items.contains { $0.checked } }
 
+    /// The panel's height before it is drawn: rows, gaps, padding and rim. Decides whether it opens below or above.
+    private var estimatedHeight: CGFloat {
+        let n = CGFloat(items.count)
+        return n * (MacSize.controlMd + Space.s1) + max(n - 1, 0) * Space.s1 + Space.s1 * 4
+    }
+
     private func choose(_ item: CoreDropdownItem) {
         open = false
         item.run()
@@ -169,7 +182,14 @@ public struct CoreDropdown<Label: View>: View {
 
     private func listen() {
         guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { e in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [
+            .keyDown, .leftMouseDown, .rightMouseDown, .scrollWheel,
+        ]) { e in
+            // Scrolling closes it, as a Mac menu does: the button may be leaving the screen.
+            if e.type == .scrollWheel {
+                open = false
+                return e
+            }
             if e.type != .keyDown {
                 // A click outside both the button and the panel closes it, and still reaches what was clicked.
                 let height = e.window?.contentView?.bounds.height ?? 0
@@ -191,5 +211,60 @@ public struct CoreDropdown<Label: View>: View {
     private func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+    }
+}
+
+/// A menu a dropdown asks the window's menu layer to draw (Ahmed, 2026-11-15: open below or above, wherever it fits).
+struct MenuRequest: Identifiable {
+    let id: UUID
+    let anchor: Anchor<CGRect>
+    let height: CGFloat
+    let panel: AnyView
+}
+
+struct MenuRequestKey: PreferenceKey {
+    static var defaultValue: [MenuRequest] { [] }
+    static func reduce(value: inout [MenuRequest], nextValue: () -> [MenuRequest]) { value += nextValue() }
+}
+
+extension EnvironmentValues {
+    /// Set by the window's menu layer (`coreTheme`): dropdowns below it hand it their panel.
+    @Entry var coreMenuHost = false
+}
+
+extension View {
+    /// The window's menu layer: every open dropdown drawn above all content, so no card or scroll view clips or covers it.
+    func coreMenuLayer() -> some View {
+        environment(\.coreMenuHost, true)
+            .overlayPreferenceValue(MenuRequestKey.self) { requests in
+                GeometryReader { g in
+                    ForEach(requests) { r in
+                        MenuPlacement(rect: g[r.anchor], bounds: g.size, height: r.height, panel: r.panel)
+                            .transition(.opacity)
+                    }
+                }
+            }
+    }
+}
+
+/// Puts a menu under its button when it fits (or when there is more room below), else above it; lined up with the
+/// button's leading edge, or its trailing edge when the leading side has no room.
+struct MenuPlacement: View {
+    let rect: CGRect
+    let bounds: CGSize
+    let height: CGFloat
+    let panel: AnyView
+    var body: some View {
+        let gap = Space.s1
+        let roomBelow = bounds.height - rect.maxY - gap
+        let roomAbove = rect.minY - gap
+        let below = roomBelow >= height + Space.s2 || roomBelow >= roomAbove
+        let leading = bounds.width - rect.minX >= Space.s8 * 10
+        panel
+            .frame(
+                width: max(leading ? bounds.width - rect.minX : rect.maxX, 1), alignment: leading ? .leading : .trailing
+            )
+            .frame(height: max(below ? roomBelow : roomAbove, 1), alignment: below ? .top : .bottom)
+            .offset(x: leading ? rect.minX : 0, y: below ? rect.maxY + gap : 0)
     }
 }

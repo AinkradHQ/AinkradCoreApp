@@ -141,6 +141,8 @@ private struct CoreThemeModifier: ViewModifier {
             // No focus rings anywhere (Ahmed, 2026-11-05): the system ring and our own both stay off. Keyboard focus
             // still moves; the focused control is the one that answers Space and Return.
             .focusEffectDisabled()
+            // Every open dropdown is drawn here, above all content (Ahmed, 2026-11-15).
+            .coreMenuLayer()
     }
 }
 
