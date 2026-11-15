@@ -48,7 +48,7 @@ struct TranscriptView: View {
                     }
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
                 }
-                .defaultScrollAnchor(.bottom)
+                .shortStartsAtTop()
                 .scrollIndicators(.never)
                 .animation(Motion.out(Motion.ui), value: store.entries.count)
                 .onChange(of: store.lastSeq) { _, _ in
@@ -345,6 +345,18 @@ struct ToolCard: View {
                 Image(systemName: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(palette.tone(.fail).ink).accessibilityLabel("Failed")
             }
+        }
+    }
+}
+
+extension View {
+    /// A short conversation starts at the top (no empty band above it); a long one still opens at its latest message.
+    @ViewBuilder fileprivate func shortStartsAtTop() -> some View {
+        if #available(macOS 15, *) {
+            defaultScrollAnchor(.top, for: .alignment).defaultScrollAnchor(.bottom, for: .initialOffset)
+                .defaultScrollAnchor(.bottom, for: .sizeChanges)
+        } else {
+            defaultScrollAnchor(.bottom)
         }
     }
 }

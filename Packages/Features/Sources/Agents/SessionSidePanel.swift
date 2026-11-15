@@ -13,82 +13,75 @@ struct SessionSidePanel: View {
         let files = model.filesTouched(session.id)
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
-                VStack(alignment: .leading, spacing: Space.s4) {
-                    Text("Details").coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(
-                        .isHeader)
-
-                    section("Files touched", count: files.count) {
-                        if files.isEmpty {
-                            Text("Nothing changed yet.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                        } else {
-                            ForEach(files) { f in
-                                Button {
-                                    openFile = openFile == f.path ? nil : f.path
-                                } label: {
-                                    HStack(spacing: Space.s2) {
-                                        Text(f.name).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1)
-                                            .truncationMode(.middle)
-                                        Spacer(minLength: Space.s2)
-                                        Text("+\(f.added)").foregroundStyle(palette.tone(.run).ink)
-                                        Text(f.created ? "new" : "−\(f.removed)").foregroundStyle(
-                                            palette.tone(f.created ? .run : .fail).ink)
-                                    }
-                                    .coreFont(size: MacTextSize.meta).monospacedDigit()
-                                    .padding(.vertical, Space.s1).contentShape(Rectangle())
+                section("Files touched", symbol: "doc", count: files.count) {
+                    if files.isEmpty {
+                        Text("Nothing changed yet.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    } else {
+                        ForEach(files) { f in
+                            Button {
+                                openFile = openFile == f.path ? nil : f.path
+                            } label: {
+                                HStack(spacing: Space.s2) {
+                                    Text(f.name).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1)
+                                        .truncationMode(.middle)
+                                    Spacer(minLength: Space.s2)
+                                    Text("+\(f.added)").foregroundStyle(palette.tone(.run).ink)
+                                    Text(f.created ? "new" : "−\(f.removed)").foregroundStyle(
+                                        palette.tone(f.created ? .run : .fail).ink)
                                 }
-                                .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
-                                .help("\(f.path)\nShow or hide its diff")
-                                if openFile == f.path { DiffBlock(lines: diff(f.path)).transition(.opacity) }
+                                .coreFont(size: MacTextSize.meta).monospacedDigit()
+                                .padding(.vertical, Space.s1).contentShape(Rectangle())
                             }
+                            .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
+                            .help("\(f.path)\nShow or hide its diff")
+                            if openFile == f.path { DiffBlock(lines: diff(f.path)).transition(.opacity) }
                         }
-                    }
-                    section("Folder and branch") {
-                        row("Project", session.project ?? "Fresh folder")
-                        if let b = session.branch { row("Branch", b, mono: true) }
-                    }
-                    section(
-                        "Context",
-                        action: model.canWrite(session) ? ("/compact", { model.drafts[session.id] = "/compact " }) : nil
-                    ) {
-                        let ctx = ConversationWords.context(
-                            used: session.usage?.tokens ?? 0, window: ContextWindow.tokens(model: session.model))
-                        CoreMeter(ctx.fill, label: "Context used")
-                        Text(ctx.text)
-                            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
-                    }
-                    section("Cost") {
-                        let turns = model.turnCosts(session.id)
-                        let top = max(turns.map(\.cost).max() ?? 1, 1)
-                        ForEach(turns, id: \.turn) { n, c in
-                            HStack(spacing: Space.s2) {
-                                Text("Turn \(n)").foregroundStyle(palette.text2).frame(
-                                    width: Space.s8 + Space.s4, alignment: .leading)
-                                CoreMeter(Double(c) / Double(top), label: "Turn \(n) cost")
-                                Text(AgentWords.cost(c) ?? "").monospacedDigit()
-                                    .frame(width: Space.s8 * 2, alignment: .trailing)
-                                    .help(AgentWords.exactCost(c) ?? "")
-                            }
-                            .coreFont(size: MacTextSize.meta)
-                        }
-                        HStack {
-                            Text("This session").fontWeight(.semibold)
-                            Spacer()
-                            Text(AgentWords.cost(session.usage?.costMicros) ?? "—").fontWeight(.semibold)
-                                .monospacedDigit()
-                                .help(AgentWords.exactCost(session.usage?.costMicros) ?? "")
-                        }
-                        .coreFont(size: MacTextSize.body)
-                    }
-                    section("Runner and account") {
-                        row("Runner", model.runnerName(session.runner))
-                        if let a = session.route?.account { row("Account", model.accountNames[a] ?? "an account") }
-                        row("Tool", AgentWords.toolName(session.harness) + (session.model.map { " · \($0)" } ?? ""))
                     }
                 }
-                .foregroundStyle(palette.text)
-                .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                .coreWell()
+                section("Folder and branch", symbol: "arrow.triangle.branch") {
+                    row("Project", session.project ?? "Fresh folder")
+                    if let b = session.branch { row("Branch", b, mono: true) }
+                }
+                section(
+                    "Context", symbol: "gauge.with.dots.needle.50percent",
+                    action: model.canWrite(session) ? ("/compact", { model.drafts[session.id] = "/compact " }) : nil
+                ) {
+                    let ctx = ConversationWords.context(
+                        used: session.usage?.tokens ?? 0, window: ContextWindow.tokens(model: session.model))
+                    CoreMeter(ctx.fill, label: "Context used")
+                    Text(ctx.text)
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                }
+                section("Cost", symbol: "dollarsign") {
+                    let turns = model.turnCosts(session.id)
+                    let top = max(turns.map(\.cost).max() ?? 1, 1)
+                    ForEach(turns, id: \.turn) { n, c in
+                        HStack(spacing: Space.s2) {
+                            Text("Turn \(n)").foregroundStyle(palette.text2).frame(
+                                width: Space.s8 + Space.s4, alignment: .leading)
+                            CoreMeter(Double(c) / Double(top), label: "Turn \(n) cost")
+                            Text(AgentWords.cost(c) ?? "").monospacedDigit()
+                                .frame(width: Space.s8 * 2, alignment: .trailing)
+                                .help(AgentWords.exactCost(c) ?? "")
+                        }
+                        .coreFont(size: MacTextSize.meta)
+                    }
+                    HStack {
+                        Text("This session").fontWeight(.semibold)
+                        Spacer()
+                        Text(AgentWords.cost(session.usage?.costMicros) ?? "—").fontWeight(.semibold)
+                            .monospacedDigit()
+                            .help(AgentWords.exactCost(session.usage?.costMicros) ?? "")
+                    }
+                    .coreFont(size: MacTextSize.body)
+                }
+                section("Runner and account", symbol: "server.rack") {
+                    row("Runner", model.runnerName(session.runner))
+                    if let a = session.route?.account { row("Account", model.accountNames[a] ?? "an account") }
+                    row("Tool", AgentWords.toolName(session.harness) + (session.model.map { " · \($0)" } ?? ""))
+                }
             }
+            .foregroundStyle(palette.text)
             .padding(.vertical, Space.s2)
         }
         .scrollIndicators(.never)
@@ -117,16 +110,18 @@ struct SessionSidePanel: View {
         .coreFont(size: MacTextSize.meta)
     }
 
-    /// One labelled section inside the Details card: a small meta label with an optional count and one quiet action.
+    /// One card of the side panel (Ahmed, 2026-11-15: separate cards, as on the landing page, in our components): its
+    /// symbol and title, an optional count and one quiet action, then its content.
     private func section<C: View>(
-        _ title: String, count: Int = 0, action: (String, () -> Void)? = nil,
+        _ title: String, symbol: String, count: Int = 0, action: (String, () -> Void)? = nil,
         @ViewBuilder _ c: () -> C
     ) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
-                    .accessibilityAddTraits(.isHeader)
-                CountBadge(count, tone: .quiet)
+                Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                    .frame(width: Space.s4).accessibilityHidden(true)
+                Text(title).coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(.isHeader)
+                if count > 0 { CountBadge(count, tone: .quiet) }
                 Spacer(minLength: 0)
                 if let action {
                     Button(action.0, action: action.1).buttonStyle(CoreButtonStyle(.plain, size: .small))
@@ -135,5 +130,7 @@ struct SessionSidePanel: View {
             }
             c()
         }
+        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+        .coreWell()
     }
 }
