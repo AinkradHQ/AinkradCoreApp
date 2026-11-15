@@ -197,7 +197,6 @@ struct ElevationPanel: View {
         .padding(Space.s4)
         .frame(width: Space.s8 * 10)
         .corePanel(radius: Radius.pane, padding: 0, part: .popups)
-        .overlay { coreShape(Radius.pane).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Admin unlock")
     }

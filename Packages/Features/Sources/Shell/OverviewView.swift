@@ -84,7 +84,6 @@ struct OverviewView: View {
                     .matchedGeometryEffect(id: "pick", in: lens)
             } else {
                 coreShape(Radius.cardMac).fill(GlassInk.well)
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
         }
         .coreScaleEffect(on ? 1.03 : 1)
