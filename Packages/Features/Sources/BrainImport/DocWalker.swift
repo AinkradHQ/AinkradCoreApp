@@ -141,12 +141,25 @@ public struct DocWalker: Sendable {
         return out
     }
 
-    /// The files a `Found` stands for, by kind. Re-reads the listed folders only.
+    /// True when `path` or any folder above it is one `shouldSkip` refuses: a list saved by an older walker may name
+    /// a dependency cache (`~/go/pkg/...`) the current walker would never enter.
+    static func isSkipped(_ path: String) -> Bool {
+        var u = URL(fileURLWithPath: path)
+        while u.path != "/" {
+            if shouldSkip(u) { return true }
+            u = u.deletingLastPathComponent()
+        }
+        return false
+    }
+
+    /// The files a `Found` stands for, by kind. Re-reads the listed folders only; a saved path the walker now skips
+    /// is dropped.
     public static func files(of found: Found) -> (docs: [URL], vault: [URL], agents: [URL]) {
-        (
-            found.docFolders.flatMap { markdown(under: URL(fileURLWithPath: $0)) },
-            found.vaults.flatMap { markdown(under: URL(fileURLWithPath: $0)) },
-            found.agentFiles.map { URL(fileURLWithPath: $0) }.filter {
+        let keep = { (l: [String]) in l.filter { !isSkipped($0) } }
+        return (
+            keep(found.docFolders).flatMap { markdown(under: URL(fileURLWithPath: $0)) },
+            keep(found.vaults).flatMap { markdown(under: URL(fileURLWithPath: $0)) },
+            keep(found.agentFiles).map { URL(fileURLWithPath: $0) }.filter {
                 FileManager.default.fileExists(atPath: $0.path)
             }
         )
