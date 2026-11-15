@@ -254,8 +254,8 @@ private struct LauncherItem: View {
             // One highlight that glides between rows (`shell-fx.css` .l-glide), not a background swapped per row.
             .background {
                 if selected {
-                    coreShape(Radius.row).fill(GlassInk.lift(0.18))
-                        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.rim(0.3), lineWidth: 1) }
+                    // The app's one selection: a quiet fill, no outline (Ahmed, 2026-11-15).
+                    coreShape(Radius.row).fill(palette.navActive)
                         .matchedGeometryEffect(id: "selection", in: glide)
                 }
             }
@@ -287,8 +287,8 @@ private struct LauncherItem: View {
 
     /// Each group has its colour, so the list reads at a glance; slate entries stay quiet.
     private var hue: Color {
-        if row.entry.tile == .slate { return .white.opacity(0.35) }
-        if row.entry.tile == .danger { return Color(red: 1, green: 0.38, blue: 0.4) }
+        if row.entry.tile == .slate { return GlassInk.slate }
+        if row.entry.tile == .danger { return GlassInk.red }
         if row.entry.tile == .view { return GlassInk.blue }
         switch row.group {
         case .recent, .topHit: return GlassInk.blue

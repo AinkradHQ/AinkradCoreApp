@@ -315,7 +315,6 @@ private struct SecretRow: View {
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .frame(minHeight: Space.s8 + Space.s4)
         .background(selected ? palette.uDimHover : hovering ? palette.rowHover : .clear, in: shape)
-        .overlay { if selected { shape.strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
         .contentShape(shape)
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }

@@ -221,8 +221,8 @@ struct SettingsView: View {
         // One selection that glides between rows (`s-glide`), not a background swapped per row.
         .background {
             if selected {
-                coreShape(Radius.control).fill(GlassInk.lift(0.18))
-                    .overlay { coreShape(Radius.control).strokeBorder(GlassInk.rim(0.3), lineWidth: 1) }
+                // The app's one selection: a quiet fill, no outline (Ahmed, 2026-11-15).
+                coreShape(Radius.control).fill(palette.navActive)
                     .matchedGeometryEffect(id: "nav", in: glide)
             }
         }
@@ -339,8 +339,7 @@ private struct SettingsBackTile: View {
             }
             .foregroundStyle(GlassInk.primary)
             .frame(width: 72, height: 56)
-            .background(GlassInk.lift(hovering ? 0.16 : 0.1), in: coreShape(Radius.control + 4))
-            .overlay { coreShape(Radius.control + 4).strokeBorder(GlassInk.rim(0.18), lineWidth: 1) }
+            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 4))
             .contentShape(coreShape(Radius.control + 4))
         }
         .buttonStyle(.plain)

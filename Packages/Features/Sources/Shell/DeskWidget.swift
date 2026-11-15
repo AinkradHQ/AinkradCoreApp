@@ -172,7 +172,6 @@ struct SizeChoiceStyle: ButtonStyle {
             )
             .frame(minWidth: MacSize.controlSm, minHeight: MacSize.controlSm)
             .background(selected ? palette.navActive : hovering ? palette.uDim : .clear, in: coreShape(Radius.chip))
-            .overlay { if selected { coreShape(Radius.chip).strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
             .animation(Motion.out(Motion.hover), value: hovering)
