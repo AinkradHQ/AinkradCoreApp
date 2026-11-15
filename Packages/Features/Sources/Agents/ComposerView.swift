@@ -46,6 +46,8 @@ struct ComposerView: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     var focused: FocusState<Bool>.Binding
+    /// ⌘F while typing: the session's find bar.
+    var find: () -> Void = {}
     @Environment(\.corePalette) private var palette
     @State private var pick = 0
     @State private var dropping = false
@@ -265,7 +267,8 @@ struct ComposerView: View {
                     focused.wrappedValue = false
                 }
                 return true
-            })
+            },
+            find: find)
     }
 
     /// The 📎 button: pick files to attach.

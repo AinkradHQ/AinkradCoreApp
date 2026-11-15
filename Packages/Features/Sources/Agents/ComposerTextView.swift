@@ -9,6 +9,8 @@ struct ComposerKeys {
     var down: () -> Bool
     var tab: () -> Bool
     var escape: () -> Bool
+    /// ⌘F (the menu's Find): the conversation's find bar, not the text view's own.
+    var find: () -> Void = {}
 }
 
 /// The composer's text field (Ahmed, 2026-11-15: Enter sometimes did not send, and the command list ignored the arrows).
@@ -118,6 +120,19 @@ final class KeyTextView: NSTextView {
     var keys: ComposerKeys?
     var onFocus: ((Bool) -> Void)?
     var onFiles: (([URL]) -> Void)?
+
+    /// ⌘F while the field has the cursor opens the conversation's find bar (no menu item owns ⌘F; the pane's own ⌘F handler
+    /// never hears it while AppKit's text view is first responder).
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, let keys,
+            event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+            event.charactersIgnoringModifiers?.lowercased() == "f"
+        {
+            keys.find()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     /// ⌘V: files and pasted images become attachments, words stay words.
     override func paste(_ sender: Any?) {

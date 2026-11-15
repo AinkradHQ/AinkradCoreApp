@@ -28,7 +28,7 @@ struct SessionView: View {
                 HStack(alignment: .top, spacing: 0) {
                     conversation(s, wide: wide, narrow: geo.size.width < Self.narrow)
                     if wide {
-                        SessionSidePanel(model: model, session: s, find: { finding = true }).frame(width: 320).padding(
+                        SessionSidePanel(model: model, session: s, find: openFind).frame(width: 320).padding(
                             .trailing, Space.s3
                         )
                         .padding(.top, Space.s2).transition(.opacity)
@@ -50,7 +50,7 @@ struct SessionView: View {
             // ⌘F finds in the conversation, wherever the keyboard is in the pane; ⌥↑ ⌥↓ jump between your messages.
             .onKeyPress(keys: ["f"]) { press in
                 guard press.modifiers.contains(.command) else { return .ignored }
-                finding = true
+                openFind()
                 return .handled
             }
             .onKeyPress(keys: [.upArrow, .downArrow]) { press in
@@ -81,7 +81,7 @@ struct SessionView: View {
 
     private func conversation(_ s: AgentSessionInfo, wide: Bool, narrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            SessionHero(model: model, session: s, panel: wide, find: { finding = true })
+            SessionHero(model: model, session: s, panel: wide, find: openFind)
             if finding {
                 ConversationFindBar(
                     query: $findQuery, count: hits.count, index: min(findIndex, max(hits.count - 1, 0)),
@@ -121,7 +121,7 @@ struct SessionView: View {
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump, focus: focusSeq)
                 .frame(maxWidth: .infinity)
             PinnedApprovals(model: model, session: s)
-            ComposerView(model: model, session: s, focused: $composing)
+            ComposerView(model: model, session: s, focused: $composing, find: openFind)
                 .frame(maxWidth: .infinity)
         }
         // A plan card's Go ahead approves the tool's pending plan request, or tells the agent to build; Change it starts a
@@ -134,6 +134,14 @@ struct SessionView: View {
 
     private var entries: [TranscriptEntry] { model.transcripts[sessionID]?.entries ?? [] }
     private var hits: [Int64] { ConversationSearch.hits(entries, findQuery) }
+
+    /// The composer asks for focus while `composing` is on, so it would take the cursor back from the find field: let it go.
+    private func openFind() {
+        composing = false
+        // The message field is AppKit's first responder and SwiftUI's focus does not take it from it: let it go first.
+        if let field = KeyTextView.focusedField { field.window?.makeFirstResponder(nil) }
+        finding = true
+    }
 
     private func findStep(_ d: Int) {
         guard !hits.isEmpty else { return }
