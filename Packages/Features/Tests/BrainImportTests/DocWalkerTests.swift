@@ -24,6 +24,7 @@ import Testing
         try write(root, "Library/Caches/Docs/x.md", "no")
         try write(root, "Work/app/node_modules/pkg/README.md", "no")
         try write(root, "Work/app/node_modules/pkg/Docs/d.md", "no")
+        try write(root, "Work/app/package.json", "{}")
         try write(root, "Work/app/build/README.md", "no")
         try write(root, "Work/app/DerivedData/README.md", "no")
         try write(root, "Work/app/.build/README.md", "no")
@@ -48,6 +49,37 @@ import Testing
         let files = DocWalker.files(of: f)
         #expect(files.docs.count == 2 && files.vault.count == 1 && files.agents.count == 5)
         #expect(files.vault[0].lastPathComponent == "idea.md")
+    }
+
+    @Test func dependencyAndDownloadCachesAreNeverCollected() throws {
+        let root = try fixtureRoot()
+        try write(root, "Work/shop/Docs/plan.md", "# plan")
+        try write(root, "Work/shop/README.md", "# shop")
+        try write(root, "Work/shop/go.mod", "module x")
+        try write(root, "Work/notes/build/Docs/keep.md", "# a user's own folder named build")
+        try write(root, "Work/shop/dist/Docs/no.md", "no")
+        try write(root, "Work/shop/target/README.md", "no")
+        let dead = [
+            "go/pkg/mod/github.com/a/b@v1.0.0/docs/x.md", "go/pkg/mod/github.com/a/b@v1.1.0/docs/x.md",
+            ".cache/x/Docs/a.md", "Library/Caches/x/docs/a.md", ".gem/x/docs/a.md", ".cocoapods/x/docs/a.md",
+            ".nvm/x/docs/a.md", ".pyenv/x/docs/a.md", ".local/share/x/docs/a.md", ".cargo/registry/x/docs/a.md",
+            "Work/a/Carthage/x/docs/a.md", "Work/a/.venv/x/docs/a.md", "Work/a/venv/x/docs/a.md",
+            "Work/a/__pycache__/docs/a.md", "Work/a/site-packages/x/docs/a.md", "Work/a/.npm/docs/a.md",
+            "Work/a/.pnpm-store/docs/a.md", "Work/a/.yarn/docs/a.md", "Work/a/.next/docs/a.md",
+            "Work/a/.terraform/docs/a.md", "Work/a/.gradle/docs/a.md", "Work/a/.m2/docs/a.md",
+            "Work/a/bower_components/x/docs/a.md", "Work/a/node_modules/x/docs/a.md", "Work/a/Pods/x/docs/a.md",
+            "Work/a/vendor/x/docs/a.md", "Work/a/DerivedData/x/docs/a.md", "Work/a/.build/x/docs/a.md",
+            ".rustup/x/docs/a.md",
+        ]
+        for d in dead { try write(root, d, "no") }
+        let f = DocWalker().walk(root: root)
+        #expect(Self.names(f.docFolders, under: root) == ["Work/notes/build/Docs", "Work/shop/Docs"])
+        #expect(Self.names(f.agentFiles, under: root) == ["Work/shop/README.md"])
+        // The re-read of a folder skips them too.
+        try write(root, "Work/shop/Docs/node_modules/pkg/a.md", "no")
+        try write(root, "Work/shop/Docs/go/pkg/mod/a.md", "no")
+        #expect(
+            DocWalker.markdown(under: root.appending(path: "Work/shop/Docs")).map(\.lastPathComponent) == ["plan.md"])
     }
 
     @Test func aFolderMacOSRefusesIsCountedNotFatal() throws {

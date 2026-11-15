@@ -29,11 +29,36 @@ public struct DocWalker: Sendable {
         public init() {}
     }
 
-    /// Never walked into. Names are compared in lower case.
+    /// Never walked into, at any depth. Names are compared in lower case.
     public static let skipDirs: Set<String> = [
-        "library", "node_modules", "build", "deriveddata", "dist", "target", "vendor", "pods", "caches", "cache",
-        "trash", ".trash",
+        "library", "node_modules", "deriveddata", "vendor", "pods", "caches", "cache", "trash", ".trash",
+        "carthage", ".build", ".cargo", ".rustup", ".gradle", ".m2", "bower_components", ".venv", "venv",
+        "__pycache__", "site-packages", ".npm", ".pnpm-store", ".yarn", ".next", ".terraform", ".cache", ".gem",
+        ".cocoapods", ".nvm", ".pyenv",
     ]
+    /// Build output, but also names a person's own docs folder can have: skipped only next to a repo or a manifest.
+    static let outputDirs: Set<String> = ["dist", "build", "target"]
+    static let manifests = [
+        ".git", "package.json", "Cargo.toml", "go.mod", "Package.swift", "pyproject.toml", "pom.xml", "build.gradle",
+        "build.gradle.kts", "CMakeLists.txt",
+    ]
+
+    /// True for a folder no walk goes into: a skipped name, a build-output name beside a repo or manifest, or a
+    /// well-known cache root (`go/pkg` and `$GOPATH/pkg` for the Go module cache, `.local/share`).
+    public static func shouldSkip(_ dir: URL) -> Bool {
+        let name = dir.lastPathComponent.lowercased()
+        if skipDirs.contains(name) { return true }
+        let parent = dir.deletingLastPathComponent()
+        if outputDirs.contains(name) {
+            return manifests.contains { FileManager.default.fileExists(atPath: parent.appending(path: $0).path) }
+        }
+        let up = parent.lastPathComponent.lowercased()
+        if (name == "pkg" && up == "go") || (name == "share" && up == ".local") { return true }
+        if name == "pkg", let gopath = ProcessInfo.processInfo.environment["GOPATH"], !gopath.isEmpty {
+            return gopath.split(separator: ":").contains { URL(fileURLWithPath: String($0)).path == parent.path }
+        }
+        return false
+    }
     static let agentNames: Set<String> = ["agents.md", "claude.md", "gemini.md", "memory.md"]
 
     public let limits: Limits
@@ -81,7 +106,7 @@ public struct DocWalker: Sendable {
             }
             let name = url.lastPathComponent
             if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                if Self.skipDirs.contains(name.lowercased()) {
+                if Self.shouldSkip(url) {
                     e.skipDescendants()
                 } else if fm.fileExists(atPath: url.appending(path: ".obsidian").path) {
                     found.vaults.append(url.path)
@@ -108,7 +133,7 @@ public struct DocWalker: Sendable {
         var out: [URL] = []
         for case let url as URL in e {
             if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                if skipDirs.contains(url.lastPathComponent.lowercased()) { e.skipDescendants() }
+                if shouldSkip(url) { e.skipDescendants() }
             } else if isMarkdown(url) {
                 out.append(url)
             }
@@ -116,12 +141,25 @@ public struct DocWalker: Sendable {
         return out
     }
 
-    /// The files a `Found` stands for, by kind. Re-reads the listed folders only.
+    /// True when `path` or any folder above it is one `shouldSkip` refuses: a list saved by an older walker may name
+    /// a dependency cache (`~/go/pkg/...`) the current walker would never enter.
+    static func isSkipped(_ path: String) -> Bool {
+        var u = URL(fileURLWithPath: path)
+        while u.path != "/" {
+            if shouldSkip(u) { return true }
+            u = u.deletingLastPathComponent()
+        }
+        return false
+    }
+
+    /// The files a `Found` stands for, by kind. Re-reads the listed folders only; a saved path the walker now skips
+    /// is dropped.
     public static func files(of found: Found) -> (docs: [URL], vault: [URL], agents: [URL]) {
-        (
-            found.docFolders.flatMap { markdown(under: URL(fileURLWithPath: $0)) },
-            found.vaults.flatMap { markdown(under: URL(fileURLWithPath: $0)) },
-            found.agentFiles.map { URL(fileURLWithPath: $0) }.filter {
+        let keep = { (l: [String]) in l.filter { !isSkipped($0) } }
+        return (
+            keep(found.docFolders).flatMap { markdown(under: URL(fileURLWithPath: $0)) },
+            keep(found.vaults).flatMap { markdown(under: URL(fileURLWithPath: $0)) },
+            keep(found.agentFiles).map { URL(fileURLWithPath: $0) }.filter {
                 FileManager.default.fileExists(atPath: $0.path)
             }
         )

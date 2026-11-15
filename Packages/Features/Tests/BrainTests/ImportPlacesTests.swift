@@ -80,6 +80,16 @@ private func found(_ kind: PlacesSource.Kind, _ places: ImportPlaces, home: URL?
         #expect(await found(.chat, ImportPlaces(chat: r)).found >= 1)
     }
 
+    @Test func savedPathsInsideADependencyCacheAreDropped() throws {
+        let home = try root()
+        try put(home, "go/pkg/mod/x/Docs/a.md")
+        try put(home, "Work/shop/Docs/b.md")
+        var f = DocWalker.Found()
+        f.docFolders = [home.appending(path: "go/pkg/mod/x/Docs").path, home.appending(path: "Work/shop/Docs").path]
+        let docs = DocWalker.files(of: f).docs
+        #expect(docs.count == 1 && docs[0].path.contains("Work/shop"))
+    }
+
     @Test func wholeDiskReadsWhatTheSearchFound() async throws {
         let home = try root()
         try put(home, "Work/shop/Docs/plan.md")
