@@ -104,6 +104,13 @@ enum ComposerSelfTest {
                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
                 characters: "v", charactersIgnoringModifiers: "v", isARepeat: false, keyCode: 9)
             {
+                // Another app in front: the menu has no key window to send Paste to, so hand it to the field directly.
+                if NSApp.keyWindow !== window {
+                    let sent = NSApp.sendAction(#selector(NSText.paste(_:)), to: window.firstResponder, from: nil)
+                    note("window not key: Paste sent to the field = \(sent)")
+                    try? await Task.sleep(for: .milliseconds(400))
+                    return
+                }
                 let byMenu = NSApp.mainMenu?.performKeyEquivalent(with: e) ?? false
                 if !byMenu { window.sendEvent(e) }
                 note("⌘V handled by the menu = \(byMenu)")
