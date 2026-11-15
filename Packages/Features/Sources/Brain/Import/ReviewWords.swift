@@ -50,15 +50,18 @@ public enum ReviewWords {
         return s
     }
 
-    /// "3 accepted · 1 refused · 1 held": only the counts that are not zero.
-    public static func tally(_ cards: [ProposalCard]) -> String {
-        let live = cards.filter { $0.state != "merged" && !$0.isUnsorted }
-        let parts: [(Int, String)] = [
-            (live.filter { $0.state == "accepted" }.count, "accepted"),
-            (live.filter { $0.state == "refused" }.count, "refused"),
-            (live.filter(\.isHeld).count, "held"),
-        ]
-        return parts.filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
+    /// "3 of 5 checked": Unsorted not counted.
+    public static func tally(checked: Int, of total: Int) -> String { "\(checked) of \(total) checked" }
+
+    /// The line above Import when some boxes are unticked: "2 rooms not checked will be deleted." Nil when none is.
+    public static func willDelete(rooms: Int, unsorted: Bool) -> String? {
+        switch (rooms, unsorted) {
+        case (0, false): nil
+        case (0, true): "The Unsorted items will be deleted."
+        case (let n, false): "\(BrainWords.plural(n, "room", "rooms")) not checked will be deleted."
+        case (let n, true):
+            "\(BrainWords.plural(n, "room", "rooms")) not checked and the Unsorted items will be deleted."
+        }
     }
 
     /// "Looks like Optimus. Merge?"

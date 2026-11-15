@@ -32,6 +32,12 @@ public final class ReviewModel {
     public internal(set) var sameProjectFor: String?
     /// The room whose "…" menu is open; its row draws above the rows under it so the menu is not covered.
     public var menuFor: String?
+    /// Rooms the person unticked. Every room starts ticked; ticking is local until Import, which sends the ticked ones.
+    public internal(set) var unchecked: Set<String> = []
+    /// Called after every tick, so the run's resume state keeps the selection.
+    @ObservationIgnored var onSelection: (Set<String>) -> Void = { _ in }
+    /// The connected Core takes the ticked rooms in the commit itself (API minor 73). Set by the pane.
+    public internal(set) var keepsInCommit = false
     /// How long to wait between two reads while the model works.
     var pollEvery: Duration = .seconds(5)
     var watching: Task<Void, Never>?
@@ -48,18 +54,27 @@ public final class ReviewModel {
         let live = cards.filter { $0.state != "merged" }
         return live.filter { !$0.isUnsorted } + live.filter(\.isUnsorted)
     }
-    public var accepted: [ProposalCard] { cards.filter(\.isAccepted) }
-    public var refusedCount: Int { cards.filter { $0.state == "refused" }.count }
     public var opened: ProposalCard? { cards.first { $0.id == openID } }
-    /// Import accepted rooms (n): at least one, and none that mixes two employers (the Core checks again).
-    public var canCommit: Bool { !accepted.isEmpty && !accepted.contains(where: \.isMixed) && !busy }
+    /// The rooms still to decide on: an imported one has no box.
+    public var open: [ProposalCard] { visible.filter { $0.state != "committed" } }
+    /// The ticked rooms, Unsorted not counted: what Import makes.
+    public var kept: [ProposalCard] { open.filter { !$0.isUnsorted && isChecked($0) } }
+    /// The unticked rooms, Unsorted too: what Import deletes.
+    public var dropped: [ProposalCard] { open.filter { !isChecked($0) } }
+    /// Unsorted's items wait in No room yet unless its box is unticked.
+    public var keepUnsorted: Bool { open.first(where: \.isUnsorted).map(isChecked) ?? true }
+    /// Import n rooms: at least one ticked (a room that mixes two employers cannot be ticked; the Core checks again).
+    public var canCommit: Bool { !kept.isEmpty && !busy }
 
-    /// Whether Accept works on this card, and if not, why.
-    public func acceptBlock(_ c: ProposalCard) -> String? {
-        if c.isUnsorted { return "Unsorted is not a room. Move its items to one first." }
-        if c.isMixed { return "Two employers are in this room. Split it first." }
-        if c.state == "refused" { return "This room was refused." }
-        return nil
+    /// Why this room's box cannot be ticked, if it cannot.
+    public func checkBlock(_ c: ProposalCard) -> String? {
+        !c.isUnsorted && c.isMixed ? "Two employers are in this room. Split it first." : nil
+    }
+    public func isChecked(_ c: ProposalCard) -> Bool { checkBlock(c) == nil && !unchecked.contains(c.id) }
+    /// Local only: nothing is sent until Import.
+    public func setChecked(_ id: String, _ on: Bool) {
+        if on { unchecked.remove(id) } else { unchecked.insert(id) }
+        onSelection(unchecked)
     }
 
     // MARK: loading
@@ -86,28 +101,33 @@ public final class ReviewModel {
         busy = true
         notice = nil
         defer { busy = false }
-        do { try await work() } catch { notice = BrainWords.failure(error) }
+        do { try await work() } catch { await failed(error) }
     }
 
-    public func accept(_ id: String) async {
-        guard let c = cards.first(where: { $0.id == id }) else { return }
-        if let why = acceptBlock(c) {
-            notice = why
+    /// A failed action in words. When the answer never came (a timeout, the link dropped) the Core may have done it,
+    /// so the cards are read again and the notice says so, never "Nothing was changed". A 404 or 409 means the cards
+    /// on screen are old (the tidy moved them): they are read again too.
+    func failed(_ error: Error) async {
+        if BrainWords.unsure(error) {
+            await refresh()
+            notice = BrainWords.noAnswer(error)
             return
         }
-        await patch(id, ProposalPatchBody(state: "accepted"))
+        if let e = error as? BrainHTTPError, [404, 409].contains(e.status) { await refresh() }
+        notice = BrainWords.failure(error)
     }
 
-    public func unaccept(_ id: String) async { await patch(id, ProposalPatchBody(state: "proposed")) }
-
-    /// The row's Accept / Refuse control. Accept on an accepted room takes it back out (the old "Undo accept"); a
-    /// blocked Accept says why in the notice instead of snapping back silently. Refuse sticks, so it never toggles.
-    public func choose(_ id: String, _ choice: String) async {
-        guard let c = cards.first(where: { $0.id == id }) else { return }
-        switch choice {
-        case "accept": c.isAccepted ? await unaccept(id) : await accept(id)
-        case "refuse" where c.state != "refused": await refuse(id)
-        default: break
+    /// For a Core older than API minor 73: the ticked rooms are accepted and the others taken back out, one call each,
+    /// before the plain commit. Unticked rooms are left out, not refused.
+    func acceptTicked() async throws {
+        guard let run else { return }
+        for c in open where !c.isUnsorted {
+            let want = isChecked(c)
+            if want != c.isAccepted {
+                replace(
+                    try await routes.patch(
+                        run: run, proposal: c.id, ProposalPatchBody(state: want ? "accepted" : "proposed")))
+            }
         }
     }
     public func rename(_ id: String, to name: String) async {
@@ -159,15 +179,6 @@ public final class ReviewModel {
             selected = []
             await refresh()
             await reopen(id)
-        }
-    }
-
-    /// Refusing writes a draft rule on the Core, so the same material is refused next time.
-    public func refuse(_ id: String) async {
-        guard let run else { return }
-        await act {
-            replace(try await routes.refuse(run: run, proposal: id))
-            if openID == id { closeCard() }
         }
     }
 

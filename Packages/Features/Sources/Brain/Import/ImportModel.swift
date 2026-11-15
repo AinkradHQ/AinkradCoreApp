@@ -266,14 +266,14 @@ public final class ImportModel {
             let (id, state) = try await runID()
             // A saved run the Core already moved on: open where it is instead of sending to it again.
             if state == "review" {
-                try await review.load(run: id)
+                try await loadReview(id)
                 step = .review
                 return
             }
             if state == "discovering" {
                 phase = .discovering
                 try await waitForReview(run: id)
-                try await review.load(run: id)
+                try await loadReview(id)
                 step = .review
                 return
             }
@@ -302,7 +302,7 @@ public final class ImportModel {
             stopPoller()
             phase = .discovering
             try await waitForReview(run: id)
-            try await review.load(run: id)
+            try await loadReview(id)
             step = .review
         } catch is CancellationError {
             stopPoller()
@@ -457,7 +457,7 @@ public final class ImportModel {
         if run == id, step == .review { return true }
         guard !isActive else { return false }
         do {
-            try await review.load(run: id)
+            try await loadReview(id)
             run = id
             step = .review
             return true
@@ -467,15 +467,34 @@ public final class ImportModel {
         }
     }
 
+    /// Loads the review and the boxes the person unticked before (kept with the run's resume state, so a reopen or a
+    /// restart keeps them). Every tick is saved there.
+    private func loadReview(_ id: String) async throws {
+        try await review.load(run: id)
+        let mine = resumeState.run == id
+        review.unchecked = mine ? Set(resumeState.unchecked ?? []) : []
+        review.onSelection = { [weak self] s in
+            guard let self, mine else { return }
+            self.resumeState.unchecked = s.sorted()
+            self.resume?.save(self.resumeState)
+        }
+    }
+
     // MARK: step 4
 
+    /// Imports the ticked rooms. A Core with API minor 73 refuses every unticked room in the same call (and Unsorted's
+    /// items when its box is unticked); an older one gets the ticked rooms accepted first and leaves the rest out.
     public func commit() async {
         guard step == .review, review.canCommit, let run else { return }
         step = .importing
+        let inOne = review.keepsInCommit
+        let keep = review.kept.map(\.id)
+        let keepUnsorted = review.keepUnsorted
         do {
+            if !inOne { try await review.acceptTicked() }
             let r = try await host.elevated(
-                "Import the accepted rooms into the Brain.", done: "imported", keepsEdit: false
-            ) { try await self.routes.commit(run: run) }
+                "Import the checked rooms into the Brain.", done: "imported", keepsEdit: false
+            ) { try await self.routes.commit(run: run, keep: inOne ? keep : nil, keepUnsorted: keepUnsorted) }
             result = r
             await review.refresh()
             resume?.clear()
@@ -487,7 +506,7 @@ public final class ImportModel {
             step = .review
         } catch {
             step = .review
-            review.notice = BrainWords.failure(error)
+            await review.failed(error)
         }
     }
 

@@ -15,6 +15,7 @@ extension BrainModel {
             importer?.service = service
         }
         importer?.review.canSameProject = remembersSameProject
+        importer?.review.keepsInCommit = keepsInCommit
         guard let importer, await importer.reviewExisting(run) else {
             sync?.notice = "Finish the import in progress first."
             return
@@ -41,6 +42,7 @@ extension BrainModel {
             importer?.service = service
         }
         importer?.review.canSameProject = remembersSameProject
+        importer?.review.keepsInCommit = keepsInCommit
         guard let importer else { return }
         let shell = host.shell
         shell.present(
@@ -246,7 +248,7 @@ private struct ImportingStep: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             Text("Touch ID confirms the import.").foregroundStyle(GlassInk.secondary)
             VStack(spacing: 2) {
-                ForEach(model.review.accepted) { c in
+                ForEach(model.review.kept) { c in
                     CoreRow(c.name, subtitle: BrainWords.plural(c.itemCount, "item", "items"), symbol: "folder") {
                         CoreBusyBar().frame(width: Space.s8 * 2).accessibilityHidden(true)
                     }

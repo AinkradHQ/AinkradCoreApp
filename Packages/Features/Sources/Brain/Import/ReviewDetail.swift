@@ -49,15 +49,7 @@ struct ReviewDetail: View {
             if let s = ReviewWords.state(c) { BrainChip(s, GlassInk.blue) }
             ForEach(c.warnings, id: \.self) { BrainChip(ReviewWords.warning($0), GlassInk.red) }
             Spacer()
-            if c.isAccepted {
-                Button("Undo accept") { Task { await review.unaccept(c.id) } }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            } else {
-                let block = review.acceptBlock(c)
-                Button("Accept") { Task { await review.accept(c.id) } }
-                    .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(block != nil)
-                    .help(block ?? "Put this room in the import.")
-            }
+            if c.state != "committed" { RoomBox(card: c, review: review) }
         }
         .disabled(review.busy)
     }
@@ -96,9 +88,6 @@ struct ReviewDetail: View {
                 }
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(review.selected.isEmpty)
                 .help("Choose items below first.")
-                if !c.isUnsorted, c.state != "refused" {
-                    Button("Refuse") { Task { await review.refuse(c.id) } }.buttonStyle(CoreButtonStyle(.secondary))
-                }
             }
         }
         .disabled(review.busy)
