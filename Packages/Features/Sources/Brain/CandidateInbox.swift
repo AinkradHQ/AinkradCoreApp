@@ -25,7 +25,8 @@ struct CandidateInboxTab: View {
             case .ready: ready
             }
         }
-        .task(id: c.phase == .idle) { if c.phase == .idle { await c.load() } }
+        // Not `.task(id:)`: `load` leaves `.idle` at once, which would cancel the very task that runs it.
+        .onChange(of: c.phase == .idle, initial: true) { _, idle in if idle { Task { await c.load() } } }
         .task {
             for r in model.rooms where c.policy(r.id) == nil { await c.loadPolicy(r.id) }
         }

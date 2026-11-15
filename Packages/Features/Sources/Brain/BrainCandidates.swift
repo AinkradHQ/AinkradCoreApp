@@ -79,8 +79,7 @@ public final class BrainCandidates {
             if selectedID == nil || !items.contains(where: { $0.id == selectedID }) { selectedID = visible.first?.id }
             phase = .ready
         } catch is CancellationError {
-            // The Inbox left the screen mid-load: nothing failed. The next appearance loads again.
-            if phase == .loading { phase = .idle }
+            // Cancelled by its caller: nothing failed, and the phase stays for the next load to settle.
         } catch {
             phase = .failed(BrainWords.failure(error))
         }
