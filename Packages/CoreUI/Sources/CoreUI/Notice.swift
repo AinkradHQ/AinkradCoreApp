@@ -53,10 +53,6 @@ public struct CoreNotice<Action: View>: View {
             !palette.isDay ? c.ink.opacity(0.14) : tone == .queue ? GlassInk.well : c.fill,
             in: coreShape(Radius.cardMac)
         )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                palette.isDay && tone == .queue ? GlassInk.wellEdge : c.ink.opacity(0.35), lineWidth: 1)
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(text.isEmpty ? title : "\(title). \(text)")
     }

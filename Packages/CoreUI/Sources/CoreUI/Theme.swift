@@ -67,7 +67,13 @@ public struct Palette: Sendable {
     public var uDim: Color { isDay ? .white.opacity(0.6) : .white.opacity(0.1) }
     public var uDimHover: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.16) }
 
-    public func tone(_ tone: Tone) -> (ink: Color, fill: Color) {
+    /// A state's ink and its chip fill. The fill is the same neutral well for every tone (Ahmed, 2026-11-15: no tinted
+    /// fills); the colour stays on the word.
+    public func tone(_ tone: Tone) -> (ink: Color, fill: Color) { (toneInk(tone), GlassInk.well) }
+
+    private func toneInk(_ tone: Tone) -> Color { toneColours(tone).ink }
+
+    private func toneColours(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {
         case .run: (theme["chipRun"], theme["chipRunBg"])
         case .done: (GlassInk.blueInk, GlassInk.blueInk.opacity(0.14))

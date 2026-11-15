@@ -46,11 +46,10 @@ public struct CoreSwitch: View {
         return coreShape(Radius.chip)
             .fill(
                 isOn
-                    ? GlassInk.blue.opacity(lit ? 0.95 : 0.8)
+                    ? GlassInk.blue.opacity(lit ? 0.9 : 1)
                     : GlassInk.adaptive(
                         .white.opacity(lit ? 0.32 : 0.24), day: GlassInk.dayInk.opacity(lit ? 0.22 : 0.16))
             )
-            .overlay { coreShape(Radius.chip).strokeBorder(GlassInk.rim(isOn ? 0.3 : 0.2), lineWidth: 1) }
             .overlay(alignment: .leading) {
                 coreShape(4).fill(.white).frame(width: Self.knob, height: Self.knob)
                     .shadow(color: GlassInk.shade(0.25), radius: 1, y: 1)

@@ -148,9 +148,6 @@ public struct ChoiceTile: View {
                 in: coreShape(Radius.control + 2)
             )
             .animation(Motion.out(Motion.hover), value: on)
-            .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? GlassInk.rim(0.4) : GlassInk.wellEdge, lineWidth: 1)
-            }
             .contentShape(coreShape(Radius.control + 2))
         }
         .buttonStyle(CoreTilePress())

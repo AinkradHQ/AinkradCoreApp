@@ -88,7 +88,6 @@ public struct CoreChip: View {
         .padding(.horizontal, Space.s2)
         .frame(minWidth: minWidth, minHeight: MacSize.chip)
         .background(GlassInk.well, in: coreShape(Radius.chip))
-        .overlay { coreShape(Radius.chip).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .fixedSize()
         .layoutPriority(2)
     }

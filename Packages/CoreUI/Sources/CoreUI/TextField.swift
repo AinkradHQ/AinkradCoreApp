@@ -113,7 +113,10 @@ private struct FieldSurface: ViewModifier {
         let lit = hovering || forced == .hover
         content
             .background { fill(lit: lit) }
-            .overlay { coreShape(radius).strokeBorder(edge, lineWidth: 1) }
+            // The edge only where it says something: an error, focus, or Increase Contrast (Ahmed, 2026-11-15: no outlines).
+            .overlay {
+                if error || focused || palette.increased { coreShape(radius).strokeBorder(edge, lineWidth: 1) }
+            }
             .shadow(
                 color: palette.isDay
                     ? Color(red: 40 / 255, green: 80 / 255, blue: 140 / 255).opacity(focused ? 0.16 : 0.1)

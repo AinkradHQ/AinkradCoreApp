@@ -77,7 +77,7 @@ public enum GlassInk {
     }
 }
 
-/// A white glyph on a gradient tile in a subject's hue. It bounces when `bounce` changes.
+/// A glyph in a subject's hue on a flat well. It bounces when `bounce` changes.
 public struct IconTile<Trigger: Equatable>: View {
     let symbol: String
     let hue: Color
@@ -90,17 +90,11 @@ public struct IconTile<Trigger: Equatable>: View {
         self.bounce = bounce
     }
     public var body: some View {
-        Image(systemName: symbol).coreFont(size: size * 0.46, weight: .semibold).foregroundStyle(.white)
+        // Flat (Ahmed, 2026-11-15: less colour, less glow): the glyph in its hue on a quiet well, no gradient, no edge.
+        Image(systemName: symbol).coreFont(size: size * 0.46, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
             .coreBounce(bounce)
             .frame(width: size, height: size)
-            .background(
-                LinearGradient(colors: [hue, hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(size > 40 ? Radius.control + 4 : Radius.control)
-            )
-            .overlay {
-                coreShape(size > 40 ? Radius.control + 4 : Radius.control).strokeBorder(
-                    .white.opacity(0.25), lineWidth: 1)
-            }
+            .background(GlassInk.well, in: coreShape(size > 40 ? Radius.control + 4 : Radius.control))
             .accessibilityHidden(true)
     }
 }
@@ -264,10 +258,7 @@ public struct ScopeTile: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Selection is blue; the subject colour stays on the icon tile.
-        .background(on ? GlassInk.blue.opacity(0.16) : GlassInk.well, in: coreShape(Radius.row))
-        .overlay {
-            coreShape(Radius.row).strokeBorder(on ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
-        }
+        .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.row))
         .opacity(on ? 1 : 0.75)
         .animation(Motion.out(Motion.ui), value: on)
         .accessibilityElement(children: .combine)

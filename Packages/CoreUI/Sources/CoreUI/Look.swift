@@ -210,11 +210,8 @@ public struct AppLookTabs: View {
 
 extension View {
     /// A card or component inside content (Ahmed, 2026-11-06: the glass frame is only for panes, dialogs, pop-ups and
-    /// menus, never for what sits inside them): a plain well with a hairline edge, lit when active.
+    /// menus, never for what sits inside them): a plain well, lit when active (no edge since 2026-11-15).
     public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
         background(active ? GlassInk.wellHover : GlassInk.well, in: coreShape(radius))
-            .overlay {
-                coreShape(radius).strokeBorder(active ? GlassInk.rim(0.28) : GlassInk.wellEdge, lineWidth: 1)
-            }
     }
 }

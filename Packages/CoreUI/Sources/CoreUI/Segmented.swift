@@ -104,15 +104,11 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .background {
                 // The parent's animation glides the highlight between segments. Reduce Motion: it jumps and its colour fades.
                 if reduce {
-                    coreShape(Radius.control).fill(GlassInk.blue.opacity(selected ? 0.8 : 0))
+                    coreShape(Radius.control).fill(GlassInk.blue.opacity(selected ? 1 : 0))
                 } else if selected {
-                    coreShape(Radius.control).fill(GlassInk.blue.opacity(0.8))
+                    coreShape(Radius.control).fill(GlassInk.blue)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 }
-            }
-            .overlay {
-                coreShape(Radius.control).strokeBorder(
-                    GlassInk.rim(selected || hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
@@ -177,9 +173,6 @@ public struct GlassToggleTile: View {
             .background {
                 coreShape(Radius.control)
                     .fill(hovering ? GlassInk.wellHover : GlassInk.well)  // neutral well: the switch carries "on"
-            }
-            .overlay {
-                coreShape(Radius.control).strokeBorder(GlassInk.rim(hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
