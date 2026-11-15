@@ -169,6 +169,7 @@ public struct CoreUIGallery: View {
                 )
                 .frame(width: Space.s8 * 5)
                 SurfaceModeTabs(mode: $look.mode)
+                CoreSwitch("Glass", isOn: $look.glass)
                 Spacer(minLength: 0)
             }
             HStack(spacing: Space.s5) {

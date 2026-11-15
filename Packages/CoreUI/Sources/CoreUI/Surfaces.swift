@@ -50,11 +50,15 @@ private struct GlassModifier: ViewModifier {
     let tinted: Bool
     let frosted: Bool
     @Environment(\.coreSolidOnly) private var solid
+    @Environment(\.coreLook) private var look
     /// Night glass is always dark; day glass is light.
     private var scheme: ColorScheme { palette.isDay ? .light : .dark }
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
-        if solid {
+        if !LookPrefs.shared.glass {
+            // Glass off (Settings trial, 2026-11-15): the content background instead, no Liquid Glass.
+            content.environment(\.colorScheme, scheme).background(AppSurfaceFill(look, radius: radius))
+        } else if solid {
             // Reduce Transparency: a solid panel fill instead of Liquid Glass (glass is not documented to honour the setting).
             content.environment(\.colorScheme, scheme).background(palette.panelStrong, in: shape)
         } else if #available(macOS 26, iOS 26, *) {
