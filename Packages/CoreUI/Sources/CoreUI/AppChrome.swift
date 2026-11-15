@@ -228,11 +228,22 @@ public struct GlassSlider: View {
         self.percent = percent
     }
 
+    /// The value, landing on a step whatever the pointer does.
+    private var snapped: Binding<Double> {
+        Binding(
+            get: { value },
+            set: { raw in
+                let v = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
+                if v != value { value = v }
+            })
+    }
+
     public var body: some View {
         HStack(spacing: Space.s3) {
             Text(low).foregroundStyle(GlassInk.secondary).lineLimit(1)
             // Apple's own slider, for its Liquid Glass knob (Ahmed, 2026-11-15), tinted with the accent.
-            Slider(value: $value, in: range, step: step).labelsHidden().tint(GlassInk.blue)
+            // The step is applied here, not given to the Slider: a stepped Slider draws tick marks.
+            Slider(value: snapped, in: range).labelsHidden().tint(GlassInk.blue)
                 .accessibilityLabel("\(low) to \(high)")
                 .accessibilityValue("\(percent(value))\(unit == "%" ? " percent" : unit)")
             Text(high).foregroundStyle(GlassInk.secondary).lineLimit(1)
