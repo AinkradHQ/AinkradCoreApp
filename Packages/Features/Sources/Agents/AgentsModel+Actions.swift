@@ -44,15 +44,28 @@ extension AgentsModel {
     /// A live session takes a message at any time (it queues while a turn runs). Wake and Resume are recovery only.
     public func canReply(_ s: AgentSessionInfo) -> Bool { canWrite(s) }
 
+    /// The message as sent: the words, then each attached file as an `@path` the tool reads.
+    // ponytail: paths reach the tool as text, so they work for sessions on this Mac only; an upload API in the Core is the
+    // upgrade path for remote runners.
+    public static func outgoing(words: String, files: [URL]) -> String {
+        let refs = files.map { "@" + $0.path }.joined(separator: " ")
+        if refs.isEmpty { return words }
+        return words.isEmpty ? refs : words + "\n\n" + refs
+    }
+    public func outgoing(_ id: String) -> String {
+        Self.outgoing(words: drafts[id] ?? "", files: attachments[id] ?? [])
+    }
+
     public func canSend(_ id: String) -> Bool {
-        let text = drafts[id] ?? ""
+        let text = outgoing(id)
         guard let s = sessions.session(id) else { return false }
         return canReply(s) && !text.isEmpty && text.utf8.count <= Self.messageLimit && !sending.contains(id)
     }
     public static let messageLimit = 16 * 1024
 
     public func send(_ id: String) async {
-        guard let api, canSend(id), let text = drafts[id] else { return }
+        guard let api, canSend(id) else { return }
+        let text = outgoing(id)
         sending.insert(id)
         note(id, nil)
         defer { sending.remove(id) }
@@ -63,6 +76,7 @@ extension AgentsModel {
                 try await api.send(id, text: text)
             }
             drafts[id] = ""
+            attachments[id] = nil
             nameFromFirstMessage(id, text)
             sessions.upsert(s)
             if let t = transcripts[id] { await t.refresh(api, knownLast: s.lastSeq) }

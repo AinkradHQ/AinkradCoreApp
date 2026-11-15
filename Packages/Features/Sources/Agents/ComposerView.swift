@@ -1,6 +1,7 @@
 import AppKit
 import CoreUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The commands the CLI takes in its streaming mode; picking one fills the field, and Return sends it like any message.
 enum SlashCommands {
@@ -47,6 +48,8 @@ struct ComposerView: View {
     var focused: FocusState<Bool>.Binding
     @Environment(\.corePalette) private var palette
     @State private var pick = 0
+    @State private var dropping = false
+    private var files: [URL] { model.attachments[session.id] ?? [] }
 
     private var draft: Binding<String> {
         Binding(get: { model.drafts[session.id] ?? "" }, set: { model.drafts[session.id] = $0 })
@@ -77,6 +80,7 @@ struct ComposerView: View {
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
             VStack(alignment: .leading, spacing: Space.s2) {
+                if !files.isEmpty { attachmentsRow }
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
                         Text(placeholder).foregroundStyle(palette.text2).padding(.horizontal, Space.s1 + 1)
@@ -87,7 +91,7 @@ struct ComposerView: View {
                         font: AgentPrefs.shared.nsFont(
                             size: MacTextSize.scaled(
                                 MacTextSize.body, by: TextSizePrefs.shared.scale * AgentPrefs.shared.textScale)),
-                        minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5, keys: keys)
+                        minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5, keys: keys, onFiles: add)
                 }
                 .coreFont(size: MacTextSize.body)
                 HStack(spacing: Space.s2) {
@@ -123,6 +127,23 @@ struct ComposerView: View {
             .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
             .contentShape(coreShape(Radius.cardMac))
             .onTapGesture { if enabled { focused.wrappedValue = true } }
+            // Files dropped anywhere on the composer attach, like a chat app.
+            .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
+                guard enabled else { return false }
+                for p in providers {
+                    _ = p.loadObject(ofClass: URL.self) { url, _ in
+                        guard let url else { return }
+                        Task { @MainActor in add([url]) }
+                    }
+                }
+                return true
+            }
+            .overlay {
+                if dropping {
+                    coreShape(Radius.cardMac).strokeBorder(GlassInk.blue, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                        .allowsHitTesting(false)
+                }
+            }
             .coreDimWhenDisabled(enabled || session.over)
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
@@ -211,14 +232,77 @@ struct ComposerView: View {
             })
     }
 
+    /// The 📎 button: pick files to attach.
     private func attach() {
         let p = NSOpenPanel()
         p.canChooseFiles = true
         p.canChooseDirectories = false
         p.allowsMultipleSelection = true
         guard p.runModal() == .OK else { return }
-        let refs = p.urls.map { "@" + $0.path }.joined(separator: " ")
-        draft.wrappedValue += (text.isEmpty || text.hasSuffix(" ") ? "" : " ") + refs + " "
+        add(p.urls)
         focused.wrappedValue = true
     }
+
+    /// Attach files, once each.
+    private func add(_ urls: [URL]) {
+        var list = files
+        for u in urls where !list.contains(u) { list.append(u) }
+        model.attachments[session.id] = list
+    }
+
+    /// The attached files above the field: a thumbnail for an image, a document glyph otherwise, and a way to remove each.
+    private var attachmentsRow: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            ScrollView(.horizontal) {
+                HStack(spacing: Space.s2) {
+                    ForEach(files, id: \.self) { url in AttachmentChip(url: url) { remove(url) } }
+                }
+            }
+            .scrollIndicators(.never)
+            // ponytail: "this Mac" is guessed from the runner's name; the Core does not say which runner is local yet.
+            if !Self.onThisMac(model.runnerName(session.runner)) {
+                Label(
+                    "Files are read from this Mac; \(model.runnerName(session.runner)) can't open them yet.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+            }
+        }
+    }
+
+    private func remove(_ url: URL) { model.attachments[session.id] = files.filter { $0 != url } }
+
+    static func onThisMac(_ runner: String) -> Bool {
+        let here = (Host.current().localizedName ?? "").lowercased()
+        let r = runner.lowercased()
+        return r.contains("this mac") || (!here.isEmpty && (r == here || r.hasPrefix(here) || here.hasPrefix(r)))
+    }
+}
+
+/// One attached file: an image's thumbnail or a document glyph, its name, and ✕ to remove it.
+private struct AttachmentChip: View {
+    let url: URL
+    let remove: () -> Void
+    private var isImage: Bool {
+        ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff"].contains(url.pathExtension.lowercased())
+    }
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            if isImage, let img = NSImage(contentsOf: url) {
+                Image(nsImage: img).resizable().scaledToFill().frame(width: 28, height: 28)
+                    .clipShape(coreShape(Radius.chip))
+            } else {
+                Image(systemName: "doc").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                    .frame(width: 28, height: 28).background(GlassInk.well, in: coreShape(Radius.chip))
+            }
+            Text(url.lastPathComponent).coreFont(size: MacTextSize.meta).lineLimit(1).truncationMode(.middle)
+                .frame(maxWidth: Space.s8 * 5, alignment: .leading)
+            CoreIconButton(symbol: "xmark", label: "Remove \(url.lastPathComponent)", action: remove)
+        }
+        .padding(.leading, Space.s1).padding(.trailing, Space.s1).padding(.vertical, Space.s1)
+        .background(GlassInk.wellHover, in: coreShape(Radius.control))
+        .help(url.path)
+    }
+
 }

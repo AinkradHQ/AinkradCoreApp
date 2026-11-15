@@ -24,6 +24,8 @@ struct ComposerTextView: NSViewRepresentable {
     let minHeight: CGFloat
     let maxHeight: CGFloat
     let keys: ComposerKeys
+    /// Files pasted or dropped into the field (a pasted image without a file is saved first).
+    let onFiles: ([URL]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -60,6 +62,7 @@ struct ComposerTextView: NSViewRepresentable {
         guard let tv = scroll.documentView as? KeyTextView else { return }
         // Fresh closures on every update: nothing stale (the old monitor kept the first session's closure).
         tv.keys = keys
+        tv.onFiles = onFiles
         tv.onFocus = { [weak coordinator = context.coordinator] on in coordinator?.focusChanged(on) }
         tv.isEditable = enabled
         tv.isSelectable = true
@@ -114,6 +117,36 @@ struct ComposerTextView: NSViewRepresentable {
 final class KeyTextView: NSTextView {
     var keys: ComposerKeys?
     var onFocus: ((Bool) -> Void)?
+    var onFiles: (([URL]) -> Void)?
+
+    /// ⌘V: files and pasted images become attachments, words stay words.
+    override func paste(_ sender: Any?) {
+        if let files = Self.files(from: .general), !files.isEmpty {
+            onFiles?(files)
+        } else {
+            super.paste(sender)
+        }
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        if let files = Self.files(from: sender.draggingPasteboard), !files.isEmpty {
+            onFiles?(files)
+            return true
+        }
+        return super.performDragOperation(sender)
+    }
+
+    /// The files on a pasteboard: file URLs; else an image with no words beside it (a screenshot), saved to a file. Nil
+    /// when it holds words, so a rich copy from a page still pastes its text.
+    static func files(from pb: NSPasteboard) -> [URL]? {
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+            !urls.isEmpty
+        {
+            return urls
+        }
+        guard pb.string(forType: .string) == nil, let image = NSImage(pasteboard: pb) else { return nil }
+        return AttachmentStore.save(image).map { [$0] }
+    }
 
     override func doCommand(by selector: Selector) {
         if hasMarkedText() || keys == nil {
@@ -160,5 +193,19 @@ final class KeyTextView: NSTextView {
         let ok = super.resignFirstResponder()
         if ok { onFocus?(false) }
         return ok
+    }
+}
+
+/// Where pasted images are kept so a tool can read them by path: the app's caches, one PNG each.
+enum AttachmentStore {
+    static func save(_ image: NSImage) -> URL? {
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+            let png = rep.representation(using: .png, properties: [:]),
+            let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        else { return nil }
+        let dir = caches.appending(path: "com.ainkrad.core/attachments")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appending(path: "pasted-\(UUID().uuidString.prefix(8)).png")
+        return (try? png.write(to: url)) != nil ? url : nil
     }
 }

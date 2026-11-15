@@ -69,6 +69,16 @@ enum ComposerSelfTest {
         let after = a.transcripts[s.id]?.entries.count ?? -1
         check(
             "return sends", draft().isEmpty, "draft after = \(draft().debugDescription), entries \(before) → \(after)")
+        // A message with a file: the words, then the file as @path.
+        let file = URL(fileURLWithPath: NSTemporaryDirectory() + "self-test.png")
+        a.attachments[s.id] = [file]
+        a.drafts[s.id] = "see this"
+        try? await Task.sleep(for: .milliseconds(300))
+        await key("\r", 36)
+        try? await Task.sleep(for: .seconds(1.5))
+        check(
+            "a file goes with the message", draft().isEmpty && (a.attachments[s.id] ?? []).isEmpty,
+            "draft = \(draft().debugDescription), attachments left = \((a.attachments[s.id] ?? []).count)")
         await key("\u{1B}", 53)
         note("escape: first responder after = \(type(of: window.firstResponder as Any))")
     }

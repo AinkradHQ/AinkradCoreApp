@@ -51,6 +51,8 @@ public final class AgentsModel {
     public var filter: AgentFilter = .all
     /// What is typed in each session's composer.
     public var drafts: [String: String] = [:]
+    /// Files attached to each session's message, sent as `@path` after its words (pasted, dropped or picked).
+    public var attachments: [String: [URL]] = [:]
     /// The quick popup's prompt, carried into the advanced sheet.
     public var draftPrompt = ""
     /// The chain picked on the quick sheet's chip, carried into the advanced sheet.
