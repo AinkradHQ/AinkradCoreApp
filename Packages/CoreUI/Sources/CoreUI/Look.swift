@@ -60,9 +60,6 @@ public final class LookPrefs {
     public static let shared = LookPrefs()
     public var mode: SurfaceMode { didSet { save() } }
     public var opacity: Double { didSet { save() } }
-    /// Liquid Glass around panes, panels, dialogs, menus, widgets and glass controls (Ahmed, 2026-11-15: trying the app
-    /// without it). Off: each surface is its content background with plain rounded corners. Off by default for the trial.
-    public var glass: Bool { didSet { save() } }
     /// Advanced: a part's own Look; a part that is missing follows the content background.
     public private(set) var custom: [LookPart: CoreLook]
     /// Posted on every change, for surfaces drawn outside SwiftUI (the terminal screen).
@@ -72,7 +69,6 @@ public final class LookPrefs {
     private init() {
         mode = SurfaceMode(rawValue: d.string(forKey: "look.mode") ?? "") ?? CoreLook.standard.mode
         opacity = d.object(forKey: "look.opacity") as? Double ?? CoreLook.standard.opacity
-        glass = d.object(forKey: "look.glass") as? Bool ?? false
         var c: [LookPart: CoreLook] = [:]
         for part in LookPart.allCases {
             if let m = SurfaceMode(rawValue: d.string(forKey: "look.\(part.rawValue).mode") ?? "") {
@@ -85,7 +81,6 @@ public final class LookPrefs {
     private func save() {
         d.set(mode.rawValue, forKey: "look.mode")
         d.set(opacity, forKey: "look.opacity")
-        d.set(glass, forKey: "look.glass")
         for part in LookPart.allCases {
             d.set(custom[part]?.mode.rawValue, forKey: "look.\(part.rawValue).mode")
             d.set(custom[part]?.opacity, forKey: "look.\(part.rawValue).opacity")
@@ -140,30 +135,19 @@ struct FrameModifier: ViewModifier {
     @Environment(\.coreLook) private var inForce
     func body(content: Content) -> some View {
         let prefs = LookPrefs.shared
-        let look = part.flatMap { prefs.custom[$0] } ?? inForce
-        if !prefs.glass {
-            // No glass: the content background alone, with plain rounded corners and no rim.
+        var look = part.flatMap { prefs.custom[$0] } ?? inForce
+        // Floating surfaces sit over other content, so they stay more solid than the panes (Ahmed, 2026-11-15).
+        if let part, Self.floating.contains(part), prefs.custom[part] == nil { look.opacity = max(look.opacity, 0.88) }
+        // No glass (Ahmed, 2026-11-15): the content background with plain rounded corners; depth from a soft shadow.
+        return
             content
-                .foregroundStyle(GlassInk.primary)
-                .background { if fill { AppSurfaceFill(look, radius: radius) } }
-                .clipShape(coreShape(radius))
-                // Without the glass rim, depth comes from a soft shadow: panes over the wallpaper, and the launcher,
-                // dialogs and menus over what they cover.
-                .shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
-        } else {
-            framed(content, look: look)
-        }
+            .foregroundStyle(GlassInk.primary)
+            .background { if fill { AppSurfaceFill(look, radius: radius) } }
+            .clipShape(coreShape(radius))
+            .shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
     }
 
-    private func framed(_ content: Content, look: CoreLook) -> some View {
-        content
-            .foregroundStyle(GlassInk.primary)
-            .background { if fill { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) } }
-            .clipShape(coreShape(max(radius - rim, Radius.chip)))
-            .padding(rim)
-            .coreGlass(radius: radius, interactive: false, tinted: false)
-            .overlay { coreShape(radius).strokeBorder(GlassInk.rim(active ? max(0.3, edge) : edge), lineWidth: 1) }
-    }
+    private static let floating: Set<LookPart> = [.launcher, .dialogs, .popups, .dropdowns]
 }
 
 /// What a pane's content asks of the pane's background: Appearance's Look, its app's own, or nothing because it draws its
