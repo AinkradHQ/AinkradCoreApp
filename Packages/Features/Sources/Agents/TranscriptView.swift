@@ -8,6 +8,8 @@ struct TranscriptView: View {
     let store: TranscriptStore?
     let session: AgentSessionInfo
     var jump = 0
+    /// An entry to bring into view and mark: the find bar's current match or a turn jump.
+    var focus: Int64?
     @State private var atEnd = true
     /// A scroll to the end is queued for the next frame: a burst of entries asks once, not once each.
     @State private var scrollQueued = false
@@ -30,6 +32,11 @@ struct TranscriptView: View {
                         let turns = ConversationWords.turns(store.entries)
                         ForEach(Self.visible(store.entries)) { e in
                             row(e, store, turn: turns[e.seq])
+                                .background {
+                                    if e.seq == focus {
+                                        coreShape(Radius.control).fill(GlassInk.blue.opacity(0.16)).padding(-Space.s1)
+                                    }
+                                }
                                 .id(e.seq)
                                 // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
@@ -63,6 +70,10 @@ struct TranscriptView: View {
                     }
                 }
                 .onChange(of: jump) { _, _ in toEnd(proxy) }
+                .onChange(of: focus) { _, f in
+                    guard let f else { return }
+                    withAnimation(Motion.calm(Motion.out(Motion.move), reduce)) { proxy.scrollTo(f, anchor: .center) }
+                }
                 .onChange(of: store.heldList.count) { _, _ in if atEnd { toEnd(proxy) } }
                 if !atEnd {
                     // A quiet glass control centred over the composer, not an action tile.
@@ -99,9 +110,11 @@ struct TranscriptView: View {
                     .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
             }
         } else {
-            EntryRow(entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn) {
-                model.shell.launcher.entry("connections")?.run()
-            }
+            EntryRow(
+                entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
+                openConnections: { model.shell.launcher.entry("connections")?.run() },
+                actions: EntryActions.make(model, session)
+            )
             .equatable()
             // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
             .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
@@ -169,6 +182,8 @@ struct EntryRow: View, Equatable {
     var turn: ConversationWords.Turn?
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
+    /// Copy, Edit, Resend, Retry, Quote. Only `canSend` is compared.
+    var actions: EntryActions?
     @State private var expanded = EntryRow.openAtStart
 
     /// Debug screenshots only: rows start open.
@@ -176,6 +191,7 @@ struct EntryRow: View, Equatable {
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool {
         a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn
+            && a.actions?.canSend == b.actions?.canSend
     }
     @Environment(\.corePalette) private var palette
 
@@ -192,7 +208,7 @@ struct EntryRow: View, Equatable {
                             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                             .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
                             .textSelection(.enabled)
-                            .agentCopyMenu(text)
+                            .messageActions(text: parts.words, user: true, actions)
                     }
                 }
                 if !parts.files.isEmpty { MessageFilesView(paths: parts.files) }
@@ -201,7 +217,8 @@ struct EntryRow: View, Equatable {
             .accessibilityLabel("You: \(text)")
         case .assistant(let text):
             // Printed on the glass, no bubble.
-            MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading).agentCopyMenu(text)
+            MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
+                .messageActions(text: text, user: false, actions)
         case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
             CodeModeCard(
                 tool: CodeModeTool.of(name)!, summary: summary, status: .running, output: "", durationMs: nil,
