@@ -180,8 +180,8 @@ struct BellGlance: View {
                             Image(systemName: "chevron.forward").font(.system(size: 9, weight: .semibold))
                                 .rotationEffect(.degrees(shut.contains(g) ? 0 : 90)).frame(width: 12)
                             Text(g.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                            Text("\(rows.count)").coreFont(size: MacTextSize.meta).monospacedDigit()
-                                .foregroundStyle(palette.text2)
+                                .foregroundStyle(palette.text)
+                            CountBadge(rows.count, tone: g == .agents || g == .approvals ? .needsYou : .quiet)
                             if let h = g.hint {
                                 Text(h).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                             }
@@ -204,89 +204,75 @@ struct BellGlance: View {
         if shown.isEmpty { empty }
     }
 
-    /// Nothing here: a calm picture and one line on what will show up.
+    /// Nothing here: the gallery's state card.
     private var empty: some View {
-        VStack(spacing: Space.s2) {
-            Image(systemName: tab == .approvals ? "checkmark.seal" : "bell")
-                .font(.system(size: MacTextSize.large * 1.6, weight: .medium))
-                .foregroundStyle(palette.primary)
-                .coreBounce(arrived)
-                .frame(width: MacSize.controlLg * 2, height: MacSize.controlLg * 1.6)
-                .coreGlass(radius: Radius.control, interactive: false)
-            Text(tab == .approvals ? "Nothing needs your approval" : "You're all caught up")
-                .coreFont(size: MacTextSize.body, weight: .semibold)
-            Text(
-                tab == .approvals
-                    ? "When an AI session asks to do something, it waits here for you."
-                    : "Approvals and alerts from your Core show up here."
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Space.s4)
+        CoreStateCard(
+            symbol: tab == .approvals ? "checkmark.seal" : "bell",
+            title: tab == .approvals ? "Nothing needs your approval" : "You're all caught up",
+            line: tab == .approvals
+                ? "When an AI session asks to do something, it waits here for you."
+                : "Approvals and alerts from your Core show up here."
+        )
         .transition(.opacity)
     }
 
     @ViewBuilder private var runners: some View {
         ForEach(shell.home.machines) { m in
-            HStack(alignment: .top, spacing: Space.s2) {
-                coreShape(2).fill(m.online ? palette.tone(.run).ink : palette.tone(.queue).ink)
-                    .frame(width: 8, height: 8).padding(.top, 5).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(m.id).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    if !m.online {
-                        Text("Offline").foregroundStyle(palette.text2)
-                    } else {
-                        Text(m.used == 0 ? "Idle" : "\(m.used) running").foregroundStyle(palette.text2)
-                    }
-                }
-                .coreFont(size: MacTextSize.body)
-                Spacer(minLength: 0)
-                Text(m.slots > 0 ? "\(m.used)/\(m.slots)" : "").coreFont(size: MacTextSize.body, design: .monospaced)
-                    .foregroundStyle(palette.text2)
+            CoreRow(
+                m.id, subtitle: !m.online ? "Offline" : m.used == 0 ? "Idle" : "\(m.used) of \(m.slots) running",
+                symbol: "server.rack"
+            ) {
+                StateBadge(m.online ? "Online" : "Offline", tone: m.online ? .run : .queue, symbol: "circle")
             }
-            .padding(Space.s2).accessibilityElement(children: .combine)
         }
     }
 }
 
+/// One notification: the gallery's card with an icon tile, the words, and its actions under them.
 private struct BellCard: View {
     let item: BellItem
     let perform: (BellAction) -> Void
     @Environment(\.corePalette) private var palette
 
+    /// Needs you is amber, an alarm red, the rest quiet: the colour is on the tile only.
+    private var hue: Color {
+        switch item.kind {
+        case .approval: GlassInk.amber
+        case .alarm: GlassInk.red
+        case .runner, .event: GlassInk.slate
+        }
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: item.symbol).font(.system(size: 12))
-                .frame(width: 22, height: 22)
-                .foregroundStyle(item.kind == .approval ? palette.primary : palette.text2)
-                .background(item.kind == .approval ? palette.navActive : palette.uDim, in: coreShape(Radius.control))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(item.title).coreFont(size: MacTextSize.headline, weight: .semibold)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: Space.s2)
-                    if let time = item.time {
-                        Text(time).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                    }
-                }
-                if let sub = item.sub { Text(sub).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2) }
-                if !item.actions.isEmpty {
-                    HStack(spacing: Space.s2) {
-                        Spacer(minLength: 0)
-                        ForEach(item.actions) { a in
-                            Button(a.label) { perform(a) }
-                                .buttonStyle(CoreButtonStyle(a.primary ? .prominent : .secondary, size: .small))
+        VStack(alignment: .leading, spacing: Space.s3) {
+            HStack(alignment: .center, spacing: Space.s3) {
+                IconTile(item.symbol, hue: hue, size: MacSize.controlLg)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                        Text(item.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                            .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: Space.s2)
+                        if let time = item.time {
+                            Text(time).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         }
                     }
-                    .padding(.top, Space.s1)
+                    if let sub = item.sub {
+                        Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(2)
+                    }
+                }
+            }
+            if !item.actions.isEmpty {
+                HStack(spacing: Space.s2) {
+                    Spacer(minLength: 0)
+                    ForEach(item.actions) { a in
+                        Button(a.label) { perform(a) }
+                            .buttonStyle(CoreButtonStyle(a.primary ? .prominent : .secondary, size: .small))
+                    }
                 }
             }
         }
         .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .coreWell()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.kindLabel): \(item.title)")
     }
