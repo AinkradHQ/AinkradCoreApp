@@ -86,6 +86,9 @@ public enum ReviewWords {
         return s
     }
 
+    /// The tidy's line when the Core declined it (API minor 72). No Undo, no See changes: nothing changed.
+    public static let declined = "The local AI was not sure, so it changed nothing."
+
     /// The changes by kind, in a fixed order, with the group's title and symbol.
     public static func tidyGroups(_ all: [TidyChange]) -> [(title: String, symbol: String, changes: [TidyChange])] {
         [

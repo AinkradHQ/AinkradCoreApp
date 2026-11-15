@@ -239,6 +239,16 @@ struct ProposalPatchBody: Encodable {
     var config: RoomConfigWire?
 }
 struct MergeBody: Encodable { var into: String }
+/// One remembered "same project": rooms named `from` (normalized, e.g. `shopapi`) are filed as `to`.
+public struct RoomAlias: Codable, Sendable, Equatable, Identifiable {
+    public var from: String
+    public var to: String
+    public var id: String { from }
+    public init(from: String, to: String) {
+        self.from = from
+        self.to = to
+    }
+}
 public struct Regrouped: Codable, Sendable, Equatable {
     public var proposals: Int
     public var kept: Int

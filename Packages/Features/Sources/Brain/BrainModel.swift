@@ -25,6 +25,12 @@ public final class BrainModel {
     }
     /// Where the wizard's Notes and docs look: the person's folders or a disk search. Tests and the Debug gallery replace it.
     @ObservationIgnored public var importPlaces: ImportPlaces? = ImportPlaces.shared
+    /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
+    public var apiMinor: Int? {
+        didSet { importer?.review.canSameProject = remembersSameProject }
+    }
+    /// "Same project as…" and its list in Settings (Core API minor 72). The sample always has it.
+    public var remembersSameProject: Bool { isSample || (apiMinor ?? 0) >= 72 }
     /// Sync now, sources and rules on the Rooms page; nil until a service attaches.
     public private(set) var sync: SyncModel?
     /// Every known room. A sealed one carries a name and mode only (`RoomSummary.counts` is nil).
