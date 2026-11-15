@@ -144,7 +144,7 @@ extension CoreUIGallery {
             }
         }
         GSpec(
-            "GlassSlider", "A value between two named ends. Apple's slider with its Liquid Glass knob, in the accent."
+            "GlassSlider", "A value between two named ends. The knob turns to Liquid Glass while dragged."
         ) {
             GlassSlider(value: $slider, low: "See-through", high: "Solid").frame(maxWidth: Space.s8 * 14)
         }
@@ -164,11 +164,14 @@ extension CoreUIGallery {
 
     @ViewBuilder var selection: some View {
         GSpec(
-            "CoreSwitch", "On or off, takes effect at once. Apple's switch with its Liquid Glass knob, in the accent."
+            "CoreSwitch",
+            "On or off, takes effect at once. Our rounded switch; its knob turns to Liquid Glass while pressed or flipping."
         ) {
             HStack(spacing: Space.s4) {
                 CoreSwitch("On", isOn: $switchOn)
                 CoreSwitch("Off", isOn: $switchOff)
+                CoreSwitch("Hover", isOn: $switchOff).environment(\.coreForcedInteraction, .hover)
+                CoreSwitch("Pressed: glass knob", isOn: $switchOn).environment(\.coreForcedInteraction, .pressed)
                 CoreSwitch("Disabled on", isOn: .constant(true)).disabled(true)
                 CoreSwitch("Disabled off", isOn: .constant(false)).disabled(true)
             }

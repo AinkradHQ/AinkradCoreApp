@@ -130,6 +130,7 @@ public struct GlassToggleTile: View {
     let onSymbol: String
     let fill: Bool
     @Binding var isOn: Bool
+    @State private var flipping = false
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -180,15 +181,22 @@ public struct GlassToggleTile: View {
         .focusable(false)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
+        .onChange(of: isOn) { flipping = CoreGlassKnob.flash { flipping = false } }
         .animation(Motion.out(Motion.ui), value: isOn)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
     }
 
-    /// Apple's switch, the same as `CoreSwitch` (Ahmed, 2026-11-15). A click on it flips it with its glass knob; a click
-    /// anywhere else on the tile flips it too.
+    /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        Toggle(title, isOn: $isOn).toggleStyle(.switch).labelsHidden().tint(GlassInk.blue).accessibilityHidden(true)
+        coreShape(5).fill(
+            isOn ? GlassInk.blue : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
+        )
+        .frame(width: 30, height: 18)
+        .overlay(alignment: isOn ? .trailing : .leading) {
+            CoreGlassKnob(width: 14, height: 14, radius: 4, active: flipping).padding(2)
+        }
+        .accessibilityHidden(true)
     }
 }
