@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// The AI Sessions list, variant B (N42): a sidebar of what needs you, when, projects and runners, and a flat dense list. Built
+/// The AI Sessions list, variant B (N42): a sidebar of what needs you, when and projects, and a flat dense list. Built
 /// for hundreds of sessions: lazy rows, pages loaded from the Core as you scroll, ended ones archived after 14 days.
 struct AgentsListView: View {
     @Bindable var model: AgentsModel
@@ -38,7 +38,6 @@ struct AgentsListView: View {
                     content(groups, rows, compact: compact)
                 }
                 .padding(.horizontal, Space.s3)
-                keyHints
             }
         }
         .foregroundStyle(palette.text)
@@ -106,20 +105,8 @@ struct AgentsListView: View {
                     $model.filters.project, all: "Any project",
                     index.projects.map { CoreSelectOption(Optional($0.name), $0.name) })
             }
-            filter(
-                $model.filters.state, all: "Any state",
-                SessionFilters.Facet.allCases.map { CoreSelectOption(Optional($0), Self.facetWords($0)) })
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
-    }
-
-    private static func facetWords(_ f: SessionFilters.Facet) -> String {
-        switch f {
-        case .needsYou: "Needs you"
-        case .running: "Running"
-        case .waiting: "Waiting for you"
-        case .ended: "Ended"
-        }
     }
 
     /// One filter: a quiet chevron select (CoreSelect) whose first choice clears it.
@@ -132,19 +119,12 @@ struct AgentsListView: View {
     /// Narrow panes drop the sidebar: its entries become one select.
     private var scopeMenu: some View {
         let all: [(String, SessionScope)] = [
-            ("Active", .active), ("Needs you", .needsYou), ("Running", .running), ("Waiting for you", .waiting),
-            ("Pinned", .pinned), ("Today", .today), ("Yesterday", .yesterday), ("This week", .thisWeek),
+            ("Active", .active), ("Needs you", .needsYou), ("Running", .running), ("Pinned", .pinned),
+            ("Ended", .ended), ("Today", .today), ("Yesterday", .yesterday), ("This week", .thisWeek),
             ("Earlier", .earlier), ("Archive", .archive),
         ]
         return CoreSelect(nil, selection: $model.scope, options: all.map { CoreSelectOption($0.1, $0.0) })
             .frame(width: Space.s8 * 5)
-    }
-
-    private var keyHints: some View {
-        // A vertical list: up and down, which never flip on a right-to-left line.
-        Text("↑ ↓ move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive")
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s2)
     }
 
     // MARK: rows
@@ -187,13 +167,15 @@ struct AgentsListView: View {
         }
     }
 
-    private func columnHeads(compact: Bool) -> some View {
+    private func columnHeads(compact: Bool, showActivity: Bool) -> some View {
         HStack(spacing: Space.s3) {
             Text("Title and project").frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, MacSize.controlSm + Space.s3)
             if !compact { Text("Runner").frame(width: SessionColumns.runner, alignment: .leading) }
             Text("State").frame(width: SessionColumns.state, alignment: .leading)
-            if !compact { Text("Last activity").frame(width: SessionColumns.activity, alignment: .leading) }
+            if !compact && showActivity {
+                Text("Last activity").frame(width: SessionColumns.activity, alignment: .leading)
+            }
             Text("Cost").frame(width: SessionColumns.cost, alignment: .trailing)
         }
         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).padding(.horizontal, Space.s3)
@@ -204,8 +186,10 @@ struct AgentsListView: View {
     private func list(_ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool) -> some View {
         let waitingIDs = Set(model.pending.map(\.session))
         let now = Date()
+        // The column only earns its place when the visible rows differ in last activity.
+        let showActivity = Set(rows.map { AgentWords.ago($0.updatedAt, now: now) }).count > 1
         return VStack(alignment: .leading, spacing: 0) {
-            columnHeads(compact: compact)
+            columnHeads(compact: compact, showActivity: showActivity)
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2, pinnedViews: []) {
@@ -222,7 +206,8 @@ struct AgentsListView: View {
                                     SessionRow(
                                         session: s, title: model.title(s), runner: model.runnerName(s.runner),
                                         waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
-                                        selected: model.selected == s.id, compact: compact, now: now,
+                                        selected: model.selected == s.id, compact: compact, showActivity: showActivity,
+                                        now: now,
                                         onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
                                     )
                                     .id(s.id)

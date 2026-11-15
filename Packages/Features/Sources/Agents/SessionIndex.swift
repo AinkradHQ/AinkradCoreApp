@@ -2,7 +2,7 @@ import Foundation
 
 /// What the AI Sessions sidebar can show (N42, variant B). Pure, so the grouping is tested without a Core.
 enum SessionSection: Hashable, CaseIterable {
-    case pinned, needsYou, running, waiting, today, yesterday, thisWeek, earlier, archive
+    case pinned, needsYou, running, waiting, ended, today, yesterday, thisWeek, earlier, archive
 
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum SessionSection: Hashable, CaseIterable {
         case .needsYou: "Needs you"
         case .running: "Running"
         case .waiting: "Waiting for you"
+        case .ended: "Ended"
         case .today: "Today"
         case .yesterday: "Yesterday"
         case .thisWeek: "This week"
@@ -24,15 +25,16 @@ enum SessionSection: Hashable, CaseIterable {
         case .needsYou: "hand.raised"
         case .running: "waveform"
         case .waiting: "text.cursor"
+        case .ended: "checkmark.circle"
         case .today, .yesterday, .thisWeek, .earlier: "clock"
         case .archive: "archivebox"
         }
     }
 }
 
-/// One entry of the sidebar: Active (the three live sections), a time window, the Archive, a project or a runner.
+/// One entry of the sidebar (`.needsYou` covers an approval waiting and a session idle for your next message): Active (the three live sections), a time window, the Archive, a project or a runner.
 enum SessionScope: Hashable {
-    case active, needsYou, running, waiting, pinned, today, yesterday, thisWeek, earlier, archive
+    case active, needsYou, running, waiting, ended, pinned, today, yesterday, thisWeek, earlier, archive
     case project(String)
     case runner(String)
 }
@@ -92,6 +94,8 @@ struct SessionIndex {
                 counts[Self.scope(when), default: 0] += 1
                 if let state { counts[Self.scope(state), default: 0] += 1 }
                 if state != nil { counts[.active, default: 0] += 1 }
+                if state == .waiting { counts[.needsYou, default: 0] += 1 }
+                if !s.live { counts[.ended, default: 0] += 1 }
                 if i.pinned.contains(s.id) { counts[.pinned, default: 0] += 1 }
             }
             if let p = i.project(s) { projects[p, default: 0] += 1 }
@@ -109,6 +113,7 @@ struct SessionIndex {
         case .needsYou: .needsYou
         case .running: .running
         case .waiting: .waiting
+        case .ended: .ended
         case .today: .today
         case .yesterday: .yesterday
         case .thisWeek: .thisWeek
@@ -176,9 +181,10 @@ struct SessionIndex {
         switch scope {
         case .archive: return archived
         case .active: return !archived && r.state != nil
-        case .needsYou: return !archived && r.state == .needsYou
+        case .needsYou: return !archived && (r.state == .needsYou || r.state == .waiting)
         case .running: return !archived && r.state == .running
         case .waiting: return !archived && r.state == .waiting
+        case .ended: return !archived && !r.s.live
         case .pinned: return !archived && inputs.pinned.contains(r.s.id)
         case .today: return r.when == .today
         case .yesterday: return r.when == .yesterday
@@ -202,8 +208,10 @@ struct SessionIndex {
         let rest = rows.filter { !(inputs.pinned.contains($0.s.id) && $0.when != .archive && scope != .pinned) }
         switch scope {
         case .active:
-            for sec in [SessionSection.needsYou, .running, .waiting] {
-                let g = rest.filter { $0.state == sec }
+            for sec in [SessionSection.needsYou, .running] {
+                let g = rest.filter {
+                    sec == .needsYou ? ($0.state == .needsYou || $0.state == .waiting) : $0.state == sec
+                }
                 if !g.isEmpty { out.append(SessionGroup(section: sec, rows: sorted(g))) }
             }
             if searching {
@@ -230,6 +238,7 @@ struct SessionIndex {
         case .needsYou: .needsYou
         case .running: .running
         case .waiting: .waiting
+        case .ended: .ended
         case .today: .today
         case .yesterday: .yesterday
         case .thisWeek: .thisWeek

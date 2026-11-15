@@ -38,45 +38,9 @@ enum ComposerReturn: Equatable {
     }
 }
 
-/// A TextEditor is an NSTextView, which takes Return itself (`insertNewline`) before SwiftUI's `onKeyPress` hears it, so Return
-/// never sent. While the field is focused, one local key monitor sees Return first; `handle(shift)` says whether it took it.
-private struct ReturnMonitor: ViewModifier {
-    let active: Bool
-    let handle: (Bool) -> Bool
-    @State private var monitor: Any?
-
-    func body(content: Content) -> some View {
-        content
-            .onChange(of: active, initial: true) { _, on in on ? install() : remove() }
-            .onDisappear { remove() }
-    }
-
-    private func install() {
-        guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
-            guard e.keyCode == 36 || e.keyCode == 76,
-                e.modifierFlags.intersection([.command, .option, .control]).isEmpty,
-                // IME composition owns Return until it is done.
-                (e.window?.firstResponder as? NSTextView)?.hasMarkedText() != true
-            else { return e }
-            return MainActor.assumeIsolated { handle(e.modifierFlags.contains(.shift)) } ? nil : e
-        }
-    }
-
-    private func remove() {
-        if let m = monitor { NSEvent.removeMonitor(m) }
-        monitor = nil
-    }
-}
-
-extension View {
-    fileprivate func onReturn(active: Bool, _ handle: @escaping (Bool) -> Bool) -> some View {
-        modifier(ReturnMonitor(active: active, handle: handle))
-    }
-}
-
 /// The message field under a conversation. Always open while the session is live: Return sends (⇧Return a new line), the
-/// message queues while a turn runs, ↑ on an empty field edits the last message, Esc stops the turn, "/" opens the commands.
+/// message queues while a turn runs, ↑ on an empty field edits the last message, Esc stops the turn, "/" opens the commands
+/// (↑ ↓ pick, Return or Tab take one). The keys come from `ComposerTextView`, so they work whatever SwiftUI thinks has focus.
 struct ComposerView: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
@@ -118,47 +82,14 @@ struct ComposerView: View {
                         Text(placeholder).foregroundStyle(palette.text2).padding(.horizontal, Space.s1 + 1)
                             .allowsHitTesting(false)
                     }
-                    TextEditor(text: draft)
-                        .accessibilityIdentifier("agent-composer")
-                        .scrollContentBackground(.hidden).focused(focused).focusEffectDisabled().disabled(!enabled)
-                        .onReturn(active: focused.wrappedValue && enabled) { shift in
-                            switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
-                            case .newline: return false
-                            case .fill(let name):
-                                draft.wrappedValue = name + " "
-                            case .send:
-                                Task { await model.send(session.id) }
-                            }
-                            return true
-                        }
-                        .onKeyPress(.upArrow, phases: .down) { _ in
-                            if !commands.isEmpty {
-                                pick = max(0, pick - 1)
-                                return .handled
-                            }
-                            guard text.isEmpty, let last = model.lastUserMessage(session.id) else { return .ignored }
-                            draft.wrappedValue = last
-                            return .handled
-                        }
-                        .onKeyPress(.downArrow, phases: .down) { _ in
-                            guard !commands.isEmpty else { return .ignored }
-                            pick = min(commands.count - 1, pick + 1)
-                            return .handled
-                        }
-                        .onKeyPress(.escape, phases: .down) { _ in
-                            if !commands.isEmpty {
-                                draft.wrappedValue = ""
-                            } else if model.canStopTurn(session) {
-                                model.stopTurn(session.id)
-                            } else {
-                                focused.wrappedValue = false
-                            }
-                            return .handled
-                        }
+                    ComposerTextView(
+                        text: draft, focused: focused, enabled: enabled,
+                        font: AgentPrefs.shared.nsFont(
+                            size: MacTextSize.scaled(
+                                MacTextSize.body, by: TextSizePrefs.shared.scale * AgentPrefs.shared.textScale)),
+                        minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5, keys: keys)
                 }
                 .coreFont(size: MacTextSize.body)
-                .frame(minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5).fixedSize(
-                    horizontal: false, vertical: true)
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
                         .disabled(!enabled).help("Attach a file: adds its path to the message")
@@ -188,9 +119,11 @@ struct ComposerView: View {
                 }
             }
             .padding(Space.s3)
-            .coreFieldSurface(focused: on, radius: Radius.cardMac)
+            // A plain field, no outline (Ahmed, 2026-11-15); a slightly stronger well while writing.
+            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
+            .onTapGesture { if enabled { focused.wrappedValue = true } }
             .coreDimWhenDisabled(enabled || session.over)
-            hints
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
         .onChange(of: text) { _, _ in pick = 0 }
@@ -235,11 +168,47 @@ struct ComposerView: View {
         }
     }
 
-    /// The keys, as quiet words under the composer.
-    private var hints: some View {
-        Text("⇧↩ new line · ↑ edit last message · esc stop turn · / commands")
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .center)
+    /// Every key the field hands over (one place, read fresh on each update).
+    private var keys: ComposerKeys {
+        ComposerKeys(
+            submit: { shift in
+                switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
+                case .newline: return false
+                case .fill(let name): draft.wrappedValue = name + " "
+                case .send: Task { await model.send(session.id) }
+                }
+                return true
+            },
+            up: {
+                if !commands.isEmpty {
+                    pick = max(0, pick - 1)
+                    return true
+                }
+                guard text.isEmpty, let last = model.lastUserMessage(session.id) else { return false }
+                draft.wrappedValue = last
+                return true
+            },
+            down: {
+                guard !commands.isEmpty else { return false }
+                pick = min(commands.count - 1, pick + 1)
+                return true
+            },
+            tab: {
+                // Tab takes the highlighted command; otherwise the field moves focus on (KeyTextView).
+                guard !commands.isEmpty else { return false }
+                draft.wrappedValue = commands[min(pick, commands.count - 1)].name + " "
+                return true
+            },
+            escape: {
+                if !commands.isEmpty {
+                    draft.wrappedValue = ""
+                } else if model.canStopTurn(session) {
+                    model.stopTurn(session.id)
+                } else {
+                    focused.wrappedValue = false
+                }
+                return true
+            })
     }
 
     private func attach() {

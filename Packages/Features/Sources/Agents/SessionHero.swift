@@ -1,8 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// The top of a conversation (ui-fixes ai-session-conversation): one line with a flat blue tile, a 15 pt title, one state
-/// badge and the actions. Below 1300 pt, where there is no side panel, the Details button (test-fixes decision 1, variant B)
+/// The top of a conversation: one slim line with the state badge on the left and the actions on the right (the window tab
+/// already carries the title). Below 1300 pt, where there is no side panel, the Details button (test-fixes decision 1, variant B)
 /// shows or hides a strip of runner, account, order, tokens and cost under it, remembered on this Mac.
 struct SessionHero: View {
     @Bindable var model: AgentsModel
@@ -18,12 +18,7 @@ struct SessionHero: View {
         let st = AgentWords.status(session, waiting: waiting)
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
-                // One flat blue tile for every AI session (no gradient, no per-tool hue).
-                IconTile("bubble.left", hue: waiting ? GlassInk.amber : GlassInk.blue, size: MacSize.controlMd)
-                    .accessibilityHidden(true)
-                Text(model.title(session)).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-                    .truncationMode(.tail).help(model.title(session) + "\n" + session.id)
-                    .accessibilityAddTraits(.isHeader)
+                // The window tab already names the session; the header is just its state and actions.
                 StateBadge(st.label, tone: st.tone, symbol: st.symbol).help(subtitle)
                 Spacer(minLength: Space.s3)
                 if empty {
@@ -54,6 +49,7 @@ struct SessionHero: View {
         .task(id: session.id) { await model.followLedger(session.id) }
         .task(id: session.id) { await model.followRoute(session.id) }
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(model.title(session))
     }
 
     /// A session with nothing in it yet is the quick "New AI session" page: the header offers Advanced….
@@ -144,13 +140,9 @@ struct SessionHero: View {
         HStack(spacing: Space.s2) {
             if session.live {
                 Button(action: { model.confirmEnd(session.id) }) {
-                    Label {
-                        Text("End session").foregroundStyle(palette.tone(.fail).ink)
-                    } icon: {
-                        Image(systemName: "stop").foregroundStyle(palette.tone(.fail).ink)
-                    }
+                    Label("End session", systemImage: "stop")
                 }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
                 .disabled(model.stopping[session.id] != nil)
                 .help("End the session: the CLI exits and the transcript stays. Esc stops only the current turn.")
             } else if session.state != .lost {

@@ -29,7 +29,7 @@ struct ApprovalEntryCard: View {
         let busy = model.deciding.contains(request.id)
         return VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                Image(systemName: ask.symbol).foregroundStyle(waiting ? GlassInk.amberInk : palette.text2)
+                IconTile(ask.symbol, hue: waiting ? GlassInk.amber : GlassInk.slate, size: MacSize.controlMd)
                     .accessibilityHidden(true)
                 Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
                 Spacer(minLength: Space.s2)
@@ -43,7 +43,7 @@ struct ApprovalEntryCard: View {
                     .truncationMode(.tail).textSelection(.enabled)
                     .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
+                    .background(GlassInk.well, in: coreShape(Radius.control))
                     .help(request.input).agentCopyMenu(request.input)
             }
             if waiting {
@@ -66,8 +66,8 @@ struct ApprovalEntryCard: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // The one amber state: an approval that needs you. Decided, it is a plain well like the tool rows.
-        .background(waiting ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
+        // Needs-you is shown by the amber tile and the badge, not by a tinted card.
+        .coreWell()
         .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 

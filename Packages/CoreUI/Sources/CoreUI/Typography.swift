@@ -34,13 +34,25 @@ public final class TextSizePrefs {
     private init() { scale = MacTextSize.scale }
 }
 
+extension EnvironmentValues {
+    /// A screen's own text size on top of the app's (an app setting, e.g. AI Sessions' text size): 1 leaves it as it is.
+    @Entry public var coreTextScale: Double = 1
+    /// A screen's own typeface for text that uses the default design (an app setting); monospaced text keeps its own.
+    @Entry public var coreFontDesign: Font.Design? = nil
+}
+
 private struct CoreFontModifier: ViewModifier {
     let size: CGFloat
     let weight: Font.Weight
     let design: Font.Design
+    @Environment(\.coreTextScale) private var screenScale
+    @Environment(\.coreFontDesign) private var screenDesign
     func body(content: Content) -> some View {
-        content.font(
-            .system(size: MacTextSize.scaled(size, by: TextSizePrefs.shared.scale), weight: weight, design: design))
+        let face = design == .default ? (screenDesign ?? .default) : design
+        return content.font(
+            .system(
+                size: MacTextSize.scaled(size, by: TextSizePrefs.shared.scale * screenScale), weight: weight,
+                design: face))
     }
 }
 

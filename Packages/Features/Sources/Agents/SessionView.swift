@@ -88,6 +88,9 @@ struct SessionView: View {
             ComposerView(model: model, session: s, focused: $composing)
                 .frame(maxWidth: Self.readingWidth).frame(maxWidth: .infinity)
         }
+        // The conversation's own text size and typeface (Settings, AI Sessions, Text).
+        .environment(\.coreTextScale, AgentPrefs.shared.textScale)
+        .environment(\.coreFontDesign, AgentPrefs.shared.fontDesign)
     }
 
     private func focusStart(_ s: AgentSessionInfo) {

@@ -32,15 +32,16 @@ struct LiveSessionsTests {
                 title: { $0.id }, runnerName: { $0 }, project: { $0.project }))
     }
 
-    @Test func activeHasNeedsYouRunningWaitingAndPinnedOnTop() {
+    /// "Needs you" holds both a pending approval and a session waiting for your next message (2026-11-15: one entry).
+    @Test func activeHasPinnedOnTopThenNeedsYouThenRunning() {
         let items = [
             session("run", .running), session("wait", .waiting), session("need", .running), session("pin", .waiting),
             session("old", .ended, ageDays: 1),
         ]
         let g = index(items, needs: ["need"], pinned: ["pin"]).groups(scope: .active, filters: .init())
-        #expect(g.map(\.section) == [.pinned, .needsYou, .running, .waiting])
+        #expect(g.map(\.section) == [.pinned, .needsYou, .running])
         #expect(g[0].rows.map(\.id) == ["pin"])
-        #expect(g[3].rows.map(\.id) == ["wait"])
+        #expect(Set(g[1].rows.map(\.id)) == ["need", "wait"])
     }
 
     @Test func endedSessionsArchiveAfterFourteenDaysAndEarlierIsEightToFourteen() {

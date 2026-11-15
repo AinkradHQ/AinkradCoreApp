@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Left column of the AI Sessions list (variant B): what needs attention, when, projects, runners.
+/// Left column of the AI Sessions list (variant B): what needs attention, when, projects.
 struct SessionSidebar: View {
     @Bindable var model: AgentsModel
     let index: SessionIndex
@@ -14,24 +14,18 @@ struct SessionSidebar: View {
                 item("Active", .active, hot: false)
                 item("Needs you", .needsYou, hot: true)
                 item("Running", .running)
-                item("Waiting for you", .waiting)
                 item("Pinned", .pinned)
+                item("Ended", .ended)
                 heading("When")
-                item("Today", .today)
-                item("Yesterday", .yesterday)
-                item("This week", .thisWeek)
-                item("Earlier", .earlier)
-                item("Archive", .archive)
+                item("Today", .today, hideEmpty: true)
+                item("Yesterday", .yesterday, hideEmpty: true)
+                item("This week", .thisWeek, hideEmpty: true)
+                item("Earlier", .earlier, hideEmpty: true)
+                item("Archive", .archive, hideEmpty: true)
                 if !index.projects.isEmpty {
                     heading("Projects")
                     ForEach(index.projects, id: \.name) { p in
                         item(p.name, .project(p.name), count: p.count)
-                    }
-                }
-                if !index.runners.isEmpty {
-                    heading("Runners")
-                    ForEach(index.runners, id: \.id) { r in
-                        item(model.runnerName(r.id), .runner(r.id), count: r.count)
                     }
                 }
             }
@@ -47,9 +41,14 @@ struct SessionSidebar: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    private func item(_ title: String, _ scope: SessionScope, hot: Bool = false, count: Int? = nil) -> some View {
+    @ViewBuilder
+    private func item(
+        _ title: String, _ scope: SessionScope, hot: Bool = false, count: Int? = nil, hideEmpty: Bool = false
+    ) -> some View {
         let n = count ?? index.counts[scope] ?? 0
-        return SidebarItem(title: title, count: n, hot: hot, on: model.scope == scope) { model.scope = scope }
+        if !(hideEmpty && n == 0 && model.scope != scope) {
+            SidebarItem(title: title, count: n, hot: hot, on: model.scope == scope) { model.scope = scope }
+        }
     }
 }
 
@@ -100,6 +99,7 @@ struct SessionRow: View {
     let pinned: Bool
     let selected: Bool
     let compact: Bool
+    var showActivity = true
     let now: Date
     let onPin: () -> Void
     let onEnd: () -> Void
@@ -138,7 +138,7 @@ struct SessionRow: View {
             }
             StateBadge(st.label, tone: st.tone, symbol: st.symbol).frame(
                 width: SessionColumns.state, alignment: .leading)
-            if !compact {
+            if !compact && showActivity {
                 Text(AgentWords.ago(session.updatedAt, now: now))
                     .frame(width: SessionColumns.activity, alignment: .leading)
             }

@@ -133,7 +133,8 @@ private struct ButtonSurface: ViewModifier {
                 case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.9 : 1))
                 case .secondary: shape.fill(hover ? GlassInk.wellHover : GlassInk.well)
                 case .plain: shape.fill(hover ? GlassInk.wellHover : .clear)
-                case .quietDanger: shape.fill(GlassInk.red.opacity(hover ? 0.22 : 0.1))
+                // Quiet danger: red words, a tint only on hover.
+                case .quietDanger: shape.fill(GlassInk.red.opacity(hover ? 0.14 : 0))
                 }
             }
             // No outlines (Ahmed, 2026-11-15): a fill step is the only hover.
