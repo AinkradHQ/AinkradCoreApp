@@ -21,8 +21,10 @@ struct NeedsBody: View {
 
     var body: some View {
         let need = shell.bell.items.filter(\.needsPerson)
+        // The same count as the top bar's "waiting" (approvals), so the two never disagree; alarms stay rows in the list.
+        let waiting = shell.waitingOnYou
         let badge: StateBadge? =
-            need.isEmpty ? nil : StateBadge("\(need.count) waiting", tone: .warn, symbol: "hand.raised")
+            waiting == 0 ? nil : StateBadge("\(waiting) waiting", tone: .warn, symbol: "hand.raised")
         VStack(alignment: .leading, spacing: Space.s2) {
             if need.isEmpty {
                 WHead("bell", "Needs you")
@@ -195,8 +197,8 @@ struct CoreBody: View {
             case .m:
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 HStack(alignment: .top, spacing: Space.s5) {
-                    stat("Certificate", h.health?.certificate ?? "Not reported yet")
-                    stat("Backup", h.health?.backupAge(now: Date()) ?? "Not reported yet")
+                    if let c = h.health?.certificate { stat("Certificate", c) }
+                    if let b = h.health?.backupAge(now: Date()) { stat("Backup", b) }
                     stat("Runners", "\(h.machinesOnline) of \(h.machines.count)")
                     Spacer(minLength: 0)
                 }
@@ -209,19 +211,8 @@ struct CoreBody: View {
                         .foregroundStyle(GlassInk.primary)
                     WCaption(h.health.map { "\(h.coreName) · version \($0.version) · up \($0.uptime)" } ?? h.coreName)
                 }
-                if size == .x {
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        VStack(spacing: Space.s3) { bars(alarms: alarms, ratio: ratio, h: h) }
-                        WSub {
-                            WCaption("Answer time")
-                            WGap(label: "Last hour")
-                            WGap(label: "Errors today")
-                        }
-                    }
-                } else {
-                    bars(alarms: alarms, ratio: ratio, h: h)
-                    Spacer(minLength: 0)
-                }
+                bars(alarms: alarms, ratio: ratio, h: h)
+                Spacer(minLength: 0)
             }
         }
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.coreLink)
@@ -237,14 +228,10 @@ struct CoreBody: View {
             WBarRow(
                 label: "Certificate", value: c + (health.certDaysLeft ?? 0 > 0 ? " left" : ""),
                 fill: health.certificateShare, low: health.certificateLow)
-        } else {
-            WGap(label: "Certificate")
         }
         if let b = h.health?.backup(now: Date()), let at = h.health?.lastBackupAt {
             WBarRow(
                 label: "Backup", value: b, fill: max(0, 1 - Date().timeIntervalSince(at) / (2 * 86_400)))
-        } else {
-            WGap(label: "Backup")
         }
     }
 
@@ -328,7 +315,6 @@ struct BoardBody: View {
     let size: WidgetSize
 
     var body: some View {
-        let total = Double(max(board.todo + board.doing + board.review + board.blocked + board.done, 1))
         // Blocked is the one column that needs you: amber while anything is blocked.
         let cols: [(String, Int, Bool)] = [
             ("To do", board.todo, false), ("In progress", board.doing, false), ("In review", board.review, false),
@@ -344,7 +330,14 @@ struct BoardBody: View {
             case .m, .l, .t:
                 VStack(spacing: Space.s3) {
                     ForEach(size == .m ? Array(cols.prefix(3)) : cols, id: \.0) { c in
-                        WBarRow(label: c.0, value: "\(c.1)", fill: Double(c.1) / total, low: c.2)
+                        // A count per column, no bar: a share of the board is not progress (Ahmed, 2026-11-15).
+                        HStack {
+                            Text(c.0).coreFont(size: MacTextSize.body, weight: .medium)
+                            Spacer(minLength: Space.s2)
+                            Text("\(c.1)").coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
+                                .foregroundStyle(c.2 ? GlassInk.amberInk : GlassInk.primary)
+                        }
+                        .foregroundStyle(GlassInk.primary)
                     }
                 }
                 Spacer(minLength: 0)
@@ -354,7 +347,6 @@ struct BoardBody: View {
                         WSub {
                             WCaption(c.0)
                             RollingNumber(value: Double(c.1), size: 28, ink: GlassInk.primary)
-                            CoreMeter(Double(c.1) / total, low: c.2, label: c.0)
                         }
                     }
                 }

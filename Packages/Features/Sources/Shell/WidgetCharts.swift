@@ -1,4 +1,3 @@
-import Charts
 import CoreUI
 import SwiftUI
 
@@ -132,18 +131,22 @@ struct WColumns: View {
     var labels: [String] = []
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
+        // Plain rounded bars, newest the strongest (Swift Charts drew nothing here in any capture).
+        let peak = max(values.max() ?? 0, 0.0001)
         VStack(spacing: Space.s1) {
-            Chart(Array(values.enumerated()), id: \.offset) { i, v in
-                BarMark(x: .value("Day", i), y: .value("Amount", v), width: .ratio(0.72))
-                    .foregroundStyle(i == values.count - 1 ? GlassInk.blue : GlassInk.blue.opacity(0.45))
-                    .cornerRadius(3)
+            GeometryReader { g in
+                HStack(alignment: .bottom, spacing: Space.s1) {
+                    ForEach(Array(values.enumerated()), id: \.offset) { i, v in
+                        coreShape(3).fill(GlassInk.blue.opacity(i == values.count - 1 ? 1 : 0.45))
+                            .frame(height: max(2, g.size.height * v / peak))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .bottom)
             }
-            .chartXScale(domain: -0.5...(Double(max(values.count, 1)) - 0.5))
-            .chartYScale(domain: 0...max(values.max() ?? 1, 0.0001))
-            .chartXAxis(.hidden).chartYAxis(.hidden)
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: values)
             if !labels.isEmpty {
-                HStack {
+                HStack(spacing: Space.s1) {
                     ForEach(Array(labels.enumerated()), id: \.offset) { _, l in
                         Text(l).frame(maxWidth: .infinity)
                     }
@@ -151,24 +154,6 @@ struct WColumns: View {
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
         }
-        .accessibilityHidden(true)
-    }
-}
-
-/// A load line over a flat tinted area (no gradient), 0...1, newest at the right.
-struct WLine: View {
-    let values: [Double]
-    var tint: Color = GlassInk.blue
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        Chart(Array(values.enumerated()), id: \.offset) { i, v in
-            AreaMark(x: .value("Time", i), y: .value("Load", v))
-                .foregroundStyle(tint.opacity(0.2))
-            LineMark(x: .value("Time", i), y: .value("Load", v)).foregroundStyle(tint)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-        }
-        .chartYScale(domain: 0...1).chartXAxis(.hidden).chartYAxis(.hidden)
-        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: values)
         .accessibilityHidden(true)
     }
 }

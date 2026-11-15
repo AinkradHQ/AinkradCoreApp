@@ -17,7 +17,7 @@ struct WidgetLayoutTests {
 
     @Test func standardLayoutIsValid() {
         let l = WidgetLayout.standard()
-        #expect(l.items.count == 10)
+        #expect(l.items.count == 9)
         #expect(noOverlap(l.items))
     }
 
@@ -36,9 +36,9 @@ struct WidgetLayoutTests {
 
     @Test func movingIsClampedToTheGrid() throws {
         var l = WidgetLayout.standard()
-        let today = try #require(l.items.first { $0.kind == .today })
-        _ = l.move(today.id, to: 99, 99)
-        let t = try #require(l.items.first { $0.id == today.id })
+        let needs = try #require(l.items.first { $0.kind == .needs })
+        _ = l.move(needs.id, to: 99, 99)
+        let t = try #require(l.items.first { $0.id == needs.id })
         #expect(t.x + t.size.cols <= WidgetLayout.cols && t.y + t.size.rows <= WidgetLayout.rows)
         #expect(noOverlap(l.items))
     }
@@ -93,7 +93,7 @@ struct WidgetLayoutTests {
         let board = try #require(l.items.first { $0.kind == .board })
         let removed = l.remove(board.id)
         let gone = try #require(removed)
-        #expect(l.items.count == 9)
+        #expect(l.items.count == 8)
         let ok1904 = l.restore(gone)
         #expect(ok1904)
         #expect(l.items.contains { $0.id == board.id })
@@ -215,7 +215,7 @@ struct HomePrefsTests {
         let shell = ShellModel(defaults: d)
         shell.addWidget(.core, .s)
         shell.resetWidgets()
-        #expect(shell.widgets == .standard() || shell.widgets.items.count == 10)
+        #expect(shell.widgets == .standard() || shell.widgets.items.count == 9)
     }
 }
 

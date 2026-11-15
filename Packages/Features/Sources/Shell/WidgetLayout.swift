@@ -67,10 +67,11 @@ public struct WidgetLayout: Equatable, Sendable {
 
     /// The first layout: the desk of the N9 mockup (its small clock is the digital one).
     public static func standard() -> WidgetLayout {
+        // Each card fits what it holds, and the wallpaper shows under the desk (Ahmed, 2026-11-15). No Today card: it
+        // repeated Running and Machines.
         let d: [(WidgetKind, WidgetSize, Int, Int)] = [
-            (.running, .x, 0, 0), (.spend, .l, 8, 0), (.machines, .l, 12, 0), (.needs, .m, 0, 4), (.core, .m, 4, 4),
-            (.events, .l, 8, 4), (.digital, .s, 12, 4), (.quick, .s, 14, 4), (.today, .m, 4, 6),
-            (.board, .m, 0, 6),
+            (.running, .m, 0, 0), (.spend, .l, 4, 0), (.machines, .m, 8, 0), (.digital, .s, 12, 0), (.quick, .s, 14, 0),
+            (.needs, .m, 0, 2), (.events, .m, 8, 2), (.core, .m, 12, 2), (.board, .m, 0, 4),
         ].filter { $0.0 != .board || WidgetKind.boardShown }
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
     }
