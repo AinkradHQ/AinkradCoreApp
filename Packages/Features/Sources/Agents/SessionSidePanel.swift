@@ -6,6 +6,7 @@ import SwiftUI
 struct SessionSidePanel: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
+    var find: (() -> Void)?
     @State private var openFile: String?
     @State private var reviewing = false
     @Environment(\.corePalette) private var palette
@@ -23,6 +24,9 @@ struct SessionSidePanel: View {
     private func cards(_ files: [FileTouch]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
+                SessionActions(model: model, session: session, find: find, stacked: true)
+                    .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                    .coreWell()
                 section(
                     "Files touched", symbol: "doc", count: files.count,
                     review: files.isEmpty ? nil : { reviewing = true }

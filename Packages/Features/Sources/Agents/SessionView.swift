@@ -28,8 +28,10 @@ struct SessionView: View {
                 HStack(alignment: .top, spacing: 0) {
                     conversation(s, wide: wide, narrow: geo.size.width < Self.narrow)
                     if wide {
-                        SessionSidePanel(model: model, session: s).frame(width: 320).padding(.trailing, Space.s3)
-                            .padding(.top, Space.s2).transition(.opacity)
+                        SessionSidePanel(model: model, session: s, find: { finding = true }).frame(width: 320).padding(
+                            .trailing, Space.s3
+                        )
+                        .padding(.top, Space.s2).transition(.opacity)
                     }
                 }
             }

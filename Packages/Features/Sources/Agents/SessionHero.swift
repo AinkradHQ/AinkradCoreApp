@@ -1,4 +1,3 @@
-import AppKit
 import CoreUI
 import SwiftUI
 
@@ -30,7 +29,7 @@ struct SessionHero: View {
                         .help("Choose the tool, runner, folder or repo, model and account order")
                 }
                 if !panel { detailsButton }
-                actions
+                if !panel { SessionActions(model: model, session: session, find: find) }
             }
             .frame(minHeight: MacSize.controlLg)
             if showDetails && !panel {
@@ -135,107 +134,5 @@ struct SessionHero: View {
             }
         default: return "Working on \(r)."
         }
-    }
-
-    /// A live session has one action: End session, a quiet red outline. A finished one has recovery only: Wake (secondary)
-    /// and Start again (blue). A lost one has Resume in the notice above the transcript, so nothing here.
-    @ViewBuilder private var actions: some View {
-        HStack(spacing: Space.s2) {
-            if let find {
-                CoreIconButton(symbol: "magnifyingglass", label: "Find in this conversation", action: find)
-                    .help("Find in this conversation (⌘F)")
-            }
-            if session.live || session.state != .lost {
-                terminalHere
-                openIn
-            }
-            if session.live {
-                Button(action: { model.confirmEnd(session.id) }) {
-                    Label("End session", systemImage: "stop")
-                }
-                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
-                .disabled(model.stopping[session.id] != nil)
-                .help("End the session: the CLI exits and the transcript stays. Esc stops only the current turn.")
-            } else if session.state != .lost {
-                if session.stoppedByBudget {
-                    Button("Raise budget…") { model.raiseBudget(session) }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Open the budget that stopped this session, raise it, then resume")
-                    Button("Open Accounts") { model.openAccounts() }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                }
-                if case .succeeded? = session.outcome {
-                    Button(action: { model.wake(session.id) }) { Label("Wake", systemImage: "alarm") }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "W")
-                        .help("Bring the process back on its runner, with the same conversation (W)")
-                }
-                Button(action: { model.startAgain(session.id) }) {
-                    Label("Start again", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent, size: .small)).environment(\.coreKeycap, "R")
-                .help("Start a new AI session with the same first message and runner. This one stays as it is (R)")
-            }
-        }
-    }
-
-    // MARK: Terminal here, Open in…
-
-    private var terminalHere: some View {
-        Button {
-            model.host?.openTerminal(on: session.runner)
-        } label: {
-            Label("Terminal here", systemImage: "terminal")
-        }
-        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-        .help(
-            "Open a new terminal on \(model.runnerName(session.runner)). The Core cannot start it in the session's folder yet."
-        )
-        .accessibilityIdentifier("session-terminal-here")
-    }
-
-    /// The session's folder on this Mac. The Core sends only the folder's name (`project`), never its path, so this is nil until
-    /// the Core adds one; the menu below already uses it when it exists. Needs Core support.
-    private var localFolder: URL? { nil }
-
-    private var onThisMac: Bool { model.host?.thisMacRunnerID == session.runner }
-
-    private var openIn: some View {
-        CoreDropdown(items: openInItems) { Label("Open in…", systemImage: "folder") }
-            .help("Reveal the folder in Finder, open it in an editor, or copy it")
-            .accessibilityIdentifier("session-open-in")
-    }
-
-    private var openInItems: [CoreDropdownItem] {
-        if onThisMac, let url = localFolder {
-            var items = [
-                CoreDropdownItem("Reveal in Finder", symbol: "folder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                }
-            ]
-            for (name, id) in [
-                ("Visual Studio Code", "com.microsoft.VSCode"), ("Cursor", "com.todesktop.230313mzl4w4u92"),
-                ("Xcode", "com.apple.dt.Xcode"),
-            ] {
-                guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { continue }
-                items.append(
-                    CoreDropdownItem("Open in \(name)", symbol: "chevron.left.forwardslash.chevron.right") {
-                        NSWorkspace.shared.open(
-                            [url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
-                    })
-            }
-            items.append(CoreDropdownItem("Copy path", symbol: "doc.on.doc") { copy(url.path) })
-            return items
-        }
-        return [
-            CoreDropdownItem("Copy folder name", symbol: "doc.on.doc", enabled: session.project != nil) {
-                copy(session.project ?? "")
-            },
-            CoreDropdownItem("On \(model.runnerName(session.runner)): open it there", enabled: false) {},
-        ]
-    }
-
-    private func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
     }
 }
