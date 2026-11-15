@@ -2,17 +2,33 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// The desktop background (Ahmed, 2026-11-15): Settings, Appearance. Plain by default, calm for long days.
+/// The desktop background (Ahmed, 2026-11-15): Settings, Appearance. Twelve wallpapers, six photos and six rendered
+/// landscapes, each with a night and a day version; Sky, Plain and the person's own picture after them.
+/// Images live in the app's `Wallpapers/` folder as `wall-<name>-<day|night>[-thumb].jpg`.
 public enum CoreWallpaper: String, CaseIterable, Sendable {
-    case plain, soft, sky, picture
+    case ridge, lake, mirage, forest, tide, coast, meadow, peaks, mirror, dunes, mesa, hills, sky, plain, picture
 
-    public var title: String {
-        switch self {
-        case .plain: "Plain"
-        case .soft: "Soft"
-        case .sky: "Sky"
-        case .picture: "Your picture"
-        }
+    public static let standard = CoreWallpaper.ridge
+    /// Everything but the custom picture, in the order Settings shows them.
+    public static let presets = allCases.filter { $0 != .picture }
+
+    public var title: String { self == .picture ? "Your picture" : rawValue.capitalized }
+    /// The two wallpapers drawn from files: every case but Sky, Plain and the picture.
+    var isFile: Bool { ![.sky, .plain, .picture].contains(self) }
+}
+
+/// Decoded wallpapers, kept so a redraw never decodes again. Thumbnails are small; a full image is ~37 MB decoded, and
+/// only the ones actually shown are loaded.
+@MainActor
+enum WallpaperCache {
+    private static var images: [String: NSImage] = [:]
+    static func image(_ wall: CoreWallpaper, day: Bool, thumb: Bool) -> NSImage? {
+        let name = "wall-\(wall.rawValue)-\(day ? "day" : "night")\(thumb ? "-thumb" : "")"
+        if let hit = images[name] { return hit }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "jpg"), let img = NSImage(contentsOf: url)
+        else { return nil }
+        images[name] = img
+        return img
     }
 }
 
@@ -25,9 +41,9 @@ public final class WallpaperPrefs {
     private let d = UserDefaults.standard
 
     private init() {
-        choice = CoreWallpaper(rawValue: d.string(forKey: "look.wallpaper") ?? "") ?? .plain
+        choice = CoreWallpaper(rawValue: d.string(forKey: "look.wallpaper") ?? "") ?? .standard
         picture = Self.file.flatMap { NSImage(contentsOf: $0) }
-        if choice == .picture, picture == nil { choice = .plain }
+        if choice == .picture, picture == nil { choice = .standard }
     }
 
     /// Asks for an image, keeps a copy and shows it. Cancel leaves everything as it was.
@@ -52,40 +68,34 @@ public final class WallpaperPrefs {
     private static var file: URL? { target.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil } }
 }
 
-/// The wallpaper in force, filling its space. `choice` and `day` are for thumbnails; nil follows the setting and the
-/// appearance it is drawn in.
+/// The wallpaper in force, filling its space. `choice` and `day` are for thumbnails (`thumb` loads the small file); nil
+/// follows the setting and the appearance it is drawn in.
 public struct WallpaperView: View {
     let choice: CoreWallpaper?
     let day: Bool?
+    let thumb: Bool
     @Environment(\.colorScheme) private var scheme
-    public init(_ choice: CoreWallpaper? = nil, day: Bool? = nil) {
+    public init(_ choice: CoreWallpaper? = nil, day: Bool? = nil, thumb: Bool = false) {
         self.choice = choice
         self.day = day
+        self.thumb = thumb
     }
 
     public var body: some View {
         let prefs = WallpaperPrefs.shared
         let isDay = day ?? (scheme == .light)
+        let wall = choice ?? prefs.choice
         Color.clear.overlay {
-            switch choice ?? prefs.choice {
-            // Neutral graphite and paper, as on ainkrad.io: no tint, no stars.
-            case .plain:
-                isDay ? Color(red: 0.949, green: 0.953, blue: 0.961) : Color(red: 0.055, green: 0.059, blue: 0.067)
-            case .soft:
-                LinearGradient(
-                    colors: isDay
-                        ? [Color(red: 0.973, green: 0.976, blue: 0.98), Color(red: 0.902, green: 0.91, blue: 0.925)]
-                        : [Color(red: 0.094, green: 0.102, blue: 0.118), Color(red: 0.039, green: 0.043, blue: 0.051)],
-                    startPoint: .top, endPoint: .bottom)
-            case .sky:
+            if wall.isFile, let img = WallpaperCache.image(wall, day: isDay, thumb: thumb) {
+                Image(nsImage: img).resizable().scaledToFill()
+            } else if wall == .sky {
                 Image(isDay ? "HomeSkyDay" : "HomeSky", bundle: .main).resizable().scaledToFill()
                     .overlay(isDay ? GlassInk.daySkyVeil : .clear)
-            case .picture:
-                if let p = prefs.picture {
-                    Image(nsImage: p).resizable().scaledToFill()
-                } else {
-                    isDay ? Color(red: 0.949, green: 0.953, blue: 0.961) : Color(red: 0.055, green: 0.059, blue: 0.067)
-                }
+            } else if wall == .picture, let p = prefs.picture {
+                Image(nsImage: p).resizable().scaledToFill()
+            } else {
+                // Plain: neutral graphite and paper, as on ainkrad.io.
+                isDay ? Color(red: 0.949, green: 0.953, blue: 0.961) : Color(red: 0.055, green: 0.059, blue: 0.067)
             }
         }
         .clipped()

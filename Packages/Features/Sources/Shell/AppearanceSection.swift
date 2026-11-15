@@ -15,6 +15,8 @@ struct AppearanceSection: View {
     @Bindable private var textSize = TextSizePrefs.shared
     @Bindable private var accent = AccentPrefs.shared
     @Bindable private var wallpaper = WallpaperPrefs.shared
+    /// All the wallpapers, or only the first row. Open from the start when the chosen one is not in that row.
+    @State private var allWallpapers = !CoreWallpaper.presets.prefix(4).contains(WallpaperPrefs.shared.choice)
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
     var body: some View {
@@ -48,20 +50,28 @@ struct AppearanceSection: View {
                 }
             }
             GlassSection(
-                "Wallpaper", sub: "Behind every window. Plain is the calmest for long days.", symbol: "photo",
+                "Wallpaper", sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
                 hue: GlassInk.blue, index: 2
             ) {
-                if wallpaper.choice == .picture {
-                    AppActionTile(title: "Change picture…", symbol: "photo", key: "", hue: GlassInk.slate) {
-                        wallpaper.choosePicture()
+                HStack(spacing: Space.s2) {
+                    if wallpaper.choice == .picture {
+                        AppActionTile(title: "Change picture…", symbol: "photo", key: "", hue: GlassInk.slate) {
+                            wallpaper.choosePicture()
+                        }
                     }
-                } else {
-                    Text(wallpaper.choice.title).coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
+                    AppActionTile(
+                        title: allWallpapers ? "Show less" : "See all",
+                        symbol: allWallpapers ? "chevron.up" : "chevron.down", key: "", hue: GlassInk.slate
+                    ) { withAnimation(Motion.out(Motion.ui)) { allWallpapers.toggle() } }
                 }
             } content: {
-                HStack(alignment: .top, spacing: Space.s3) {
-                    ForEach(CoreWallpaper.allCases, id: \.self) { w in
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),
+                    alignment: .leading, spacing: Space.s3
+                ) {
+                    ForEach(allWallpapers ? CoreWallpaper.allCases : Array(CoreWallpaper.presets.prefix(4)), id: \.self)
+                    {
+                        w in
                         WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil)
                         {
                             if w == .picture && wallpaper.picture == nil {
@@ -70,6 +80,7 @@ struct AppearanceSection: View {
                                 withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = w }
                             }
                         }
+                        .transition(.opacity)
                     }
                 }
             }
@@ -180,7 +191,7 @@ private struct WallpaperTile: View {
                                 .foregroundStyle(GlassInk.secondary)
                         }
                     } else {
-                        WallpaperView(choice)
+                        WallpaperView(choice, thumb: true)
                     }
                 }
                 .frame(maxWidth: .infinity).frame(height: 72)
@@ -311,7 +322,7 @@ private struct ThemeTile: View {
     }
 
     /// The chosen wallpaper as this theme shows it.
-    private func sky(day: Bool) -> some View { WallpaperView(day: day) }
+    private func sky(day: Bool) -> some View { WallpaperView(day: day, thumb: true) }
 }
 
 /// One part in Appearance, Advanced: its name, Same (follows the content background) or its own look, and a slider when
