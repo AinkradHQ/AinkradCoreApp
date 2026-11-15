@@ -85,6 +85,24 @@ extension AgentsModel {
         }
     }
 
+    /// Sends `text` to the session as you, leaving your draft as it is: the actions that speak to the agent for you (revert
+    /// a file, a review comment, retry, approve a plan). Same Touch ID step-up and errors as a typed message.
+    public func say(_ id: String, _ text: String) async {
+        guard let api, let s = sessions.session(id), canReply(s), !text.isEmpty, !sending.contains(id) else { return }
+        sending.insert(id)
+        note(id, nil)
+        defer { sending.remove(id) }
+        do {
+            let s = try await elevated("Send a message to \(AgentWords.toolName(s.harness)).") {
+                try await api.send(id, text: text)
+            }
+            sessions.upsert(s)
+            if let t = transcripts[id] { await t.refresh(api, knownLast: s.lastSeq) }
+        } catch {
+            note(id, Self.notice(error, doing: "Sending"))
+        }
+    }
+
     // MARK: cancel, kill, resume, wake
 
     /// Cancel and Kill ask first: what the agent already did stays, but it stops.
