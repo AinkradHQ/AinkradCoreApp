@@ -8,11 +8,7 @@ struct AgentMark: View {
     var size: CGFloat = MacSize.controlLg
     @Environment(\.corePalette) private var palette
     var body: some View {
-        Image(systemName: AgentsModel.harnessSymbol(harness))
-            .coreFont(size: MacTextSize.title, weight: .medium)
-            .foregroundStyle(palette.btnInk)
-            .frame(width: size, height: size)
-            .background(harness == "claude" ? palette.btnPrimary : palette.navActive, in: coreShape(Radius.control))
+        IconTile(AgentsModel.harnessSymbol(harness), hue: GlassInk.blue, size: size)
             .accessibilityHidden(true)
     }
 }
@@ -43,8 +39,8 @@ struct MeterBar: View {
     }
 }
 
-/// A row that is a button: the card tint at rest, lighter on hover, the nav colour when selected, and the one focus ring, drawn
-/// from this row's own focus (a row never shows the ring because another control has it).
+/// A row that is a button: the card tint at rest, lighter on hover, the nav colour when selected or focused. Waiting is shown by the
+/// row's own amber tile or badge, never an outline.
 struct AgentRowButton<Label: View>: View {
     let id: String
     var focus: FocusState<String?>.Binding
@@ -64,21 +60,8 @@ struct AgentRowButton<Label: View>: View {
             .focusEffectDisabled()
             .background(
                 selected || focus.wrappedValue == id
-                    ? GlassInk.lift(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                    ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
-            )
-            .overlay {
-                // Waiting on you: an orange edge that stands out in a long list; selected: a white one.
-                if waiting {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.6), lineWidth: 1.5)
-                } else if selected || focus.wrappedValue == id {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.rim(0.3), lineWidth: 1)
-                } else {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1)
-                }
-            }
-            .shadow(
-                color: (waiting ? GlassInk.amber : GlassInk.blue).opacity(hovering || waiting ? 0.3 : 0), radius: 14
             )
             .coreScaleEffect(hovering ? 1.015 : 1)
             .animation(Motion.out(Motion.hover), value: hovering)

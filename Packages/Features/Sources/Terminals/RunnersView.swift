@@ -97,13 +97,9 @@ struct OfferChip: View {
     let symbol: String
     let title: String
     let on: Bool
-    @Environment(\.corePalette) private var palette
     var body: some View {
-        Label("\(title) \(on ? "on" : "off")", systemImage: symbol)
-            .coreFont(size: MacTextSize.meta, weight: .medium)
-            .foregroundStyle(on ? palette.primary : palette.text2)
-            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(on ? palette.tone(.done).fill : palette.uDim, in: coreShape(Radius.chip))
+        let label = "\(title) \(on ? "on" : "off")"
+        if on { StateBadge(label, tone: .done, symbol: symbol) } else { CoreChip(label, symbol: symbol, minWidth: 0) }
     }
 }
 
@@ -120,12 +116,7 @@ struct ThisMacBadge: View {
 /// A blue word beside a runner's name.
 private struct RunnerTag: View {
     let text: String
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        Text(text).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(palette.primary)
-            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(palette.tone(.done).fill, in: coreShape(Radius.chip)).lineLimit(1).fixedSize()
-    }
+    var body: some View { CoreChip(text, minWidth: 0).lineLimit(1).fixedSize() }
 }
 
 /// What a runner's state means right now, as one line in a well: "Very busy: load 3.2 per core…".

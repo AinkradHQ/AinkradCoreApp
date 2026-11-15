@@ -131,7 +131,6 @@ struct DeskWidget: View {
                 }
             }
             .padding(2).background(palette.panelStrong, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             Spacer(minLength: 0)
             Button {
                 shell.removeWidget(item.id)
@@ -140,7 +139,6 @@ struct DeskWidget: View {
             }
             .buttonStyle(SizeChoiceStyle(selected: false, destructive: true))
             .background(palette.panelStrong, in: coreShape(Radius.chip))
-            .overlay { coreShape(Radius.chip).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
             .accessibilityLabel("Remove \(item.kind.title)")
             .help("Remove")
         }

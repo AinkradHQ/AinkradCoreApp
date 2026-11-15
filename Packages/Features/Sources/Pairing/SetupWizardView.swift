@@ -163,7 +163,7 @@ struct SetupWizardView: View {
                 .coreGlassButton().accessibilityHint("Copies the install command")
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.glassCard, in: coreShape(Radius.row))
+            .background(GlassInk.well, in: coreShape(Radius.control))
             Text("It checks the release signature before it runs anything, and needs root to set Core up as a service.")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -268,9 +268,8 @@ private struct ChoiceCard: View {
             }
             .frame(maxWidth: .infinity, minHeight: Space.s8 * 4, alignment: .topLeading)
             .padding(Space.s4)
-            .background(hover ? palette.glassCardEdge : palette.glassCard, in: coreShape(Radius.row))
-            .overlay { coreShape(Radius.row).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
-            .contentShape(coreShape(Radius.row))
+            .coreWell(active: hover)
+            .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }

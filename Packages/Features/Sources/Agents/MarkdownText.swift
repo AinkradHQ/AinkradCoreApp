@@ -190,7 +190,6 @@ private struct CodeBlock: View {
             .foregroundStyle(GlassInk.secondary).padding(Space.s2)
         }
         .background(GlassInk.wellHover, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }
 
@@ -216,6 +215,5 @@ private struct MarkdownTable: View {
             .textSelection(.enabled).padding(Space.s3)
         }
         .background(GlassInk.well, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
     }
 }

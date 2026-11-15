@@ -112,8 +112,7 @@ struct AboutBlock: View {
                 }
             }
             .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
-            .background(GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .coreWell()
         }
     }
 
@@ -124,8 +123,7 @@ struct AboutBlock: View {
             Text(value).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(2)
         }
         .padding(Space.s4).frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .help(help ?? title)
     }
 }

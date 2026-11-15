@@ -109,7 +109,6 @@ private struct DeviceHeader: View {
     var body: some View {
         HStack(spacing: Space.s4) {
             IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 56, bounce: shown)
-                .shadow(color: hue.opacity(0.45), radius: 12)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 HStack(spacing: Space.s2) {
                     Text(device.name).coreFont(size: MacTextSize.large + 6, weight: .bold)
@@ -132,26 +131,16 @@ private struct OnlyAdminWarning: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        let t = palette.tone(.warn)
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(t.ink).frame(width: Space.s4)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                Text("Only one admin device").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text(
-                    "\(device.name) is the only device that can manage this Core. If you lose it, you would be locked out. Add a second admin device, such as your iPhone."
-                )
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s2)
+        CoreNotice(
+            symbol: "exclamationmark.triangle", title: "Only one admin device",
+            text:
+                "\(device.name) is the only device that can manage this Core. If you lose it, you would be locked out. Add a second admin device, such as your iPhone.",
+            tone: .warn
+        ) {
             AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.blue) {
                 app.openAddDevice(admin: true)
             }
         }
-        .coreFont(size: MacTextSize.body)
-        .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
-        .background(t.fill, in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("only-admin")
     }
@@ -260,14 +249,9 @@ private struct DeviceCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Space.s4)
             .background(
-                selected ? hue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    selected ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-            }
-            .shadow(color: hue.opacity(selected ? 0.3 : 0), radius: 12)
             .opacity(device.revoked ? 0.6 : 1)
             .contentShape(coreShape(Radius.cardMac))
         }
@@ -355,13 +339,7 @@ struct LastSeenLine: View {
 struct Chip: View {
     let text: String
     var tint: Tone?
-    @Environment(\.corePalette) private var palette
-    var body: some View {
-        Text(text).coreFont(size: MacTextSize.meta, design: .monospaced).lineLimit(1)
-            .foregroundStyle(tint.map { palette.tone($0).ink } ?? palette.text)
-            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(palette.uDim, in: coreShape(Radius.chip))
-    }
+    var body: some View { CoreChip(text) }
 }
 
 /// The scopes a device holds: all five as one word, else the first two and how many more.

@@ -304,7 +304,6 @@ private struct SecretRow: View {
                 if selected {
                     actions.padding(Space.s1)
                         .background(palette.panelStrong, in: coreShape(Radius.control))
-                        .overlay { coreShape(Radius.control).strokeBorder(palette.edge, lineWidth: 1) }
                         .transition(.opacity)
                 }
             }

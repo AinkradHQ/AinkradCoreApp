@@ -110,10 +110,10 @@ struct SessionRow: View {
         let st = AgentWords.status(session, waiting: waiting)
         let hue = SessionTile.hue(session.harness)
         HStack(spacing: Space.s3) {
-            Image(systemName: AgentsModel.harnessSymbol(session.harness))
-                .coreFont(size: MacTextSize.meta, weight: .semibold)
-                .foregroundStyle(palette.btnInk).frame(width: MacSize.controlSm, height: MacSize.controlSm)
-                .background(hue, in: coreShape(Radius.chip)).accessibilityHidden(true)
+            IconTile(
+                AgentsModel.harnessSymbol(session.harness), hue: waiting ? GlassInk.amber : hue, size: MacSize.controlSm
+            )
+            .accessibilityHidden(true)
             HStack(spacing: Space.s2) {
                 if pinned {
                     Image(systemName: "pin.fill").coreFont(size: MacTextSize.floor).foregroundStyle(palette.text2)
@@ -150,7 +150,7 @@ struct SessionRow: View {
         .padding(.horizontal, Space.s3).frame(height: Space.s8 + Space.s1)
         .background {
             if selected {
-                Color.clear.coreWell(radius: Radius.control, active: true)
+                coreShape(Radius.control).fill(palette.navActive)
             } else if hover {
                 coreShape(Radius.control).fill(palette.uDim)
             }

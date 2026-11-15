@@ -46,10 +46,6 @@ struct ConnCue: View {
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
         .background(refused ? GlassInk.amber.opacity(0.12) : GlassInk.well, in: coreShape(Radius.control))
-        .overlay {
-            coreShape(Radius.control).strokeBorder(
-                refused ? GlassInk.amber.opacity(0.35) : GlassInk.wellEdge, lineWidth: 1)
-        }
         .accessibilityElement(children: .combine)
     }
 }

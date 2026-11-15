@@ -48,6 +48,7 @@ private struct ChainTab: View {
     let chain: ChainItem
     let on: Bool
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
     var body: some View {
         Button {
             withAnimation(.smooth(duration: 0.3)) { model.chainSelection = chain.id }
@@ -62,13 +63,9 @@ private struct ChainTab: View {
             .foregroundStyle(GlassInk.primary)
             .padding(.horizontal, Space.s3).frame(minHeight: 48)
             .background(
-                on ? GlassInk.blue.opacity(0.3) : hovering ? GlassInk.wellHover : GlassInk.well,
+                on ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.control)
             )
-            .overlay {
-                coreShape(Radius.control).strokeBorder(
-                    on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: 1)
-            }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
@@ -148,12 +145,13 @@ private struct EntryRow: View {
     let model: AccountsModel
     let index: Int
     let entry: ChainEntryItem
+    @Environment(\.corePalette) private var palette
     var body: some View {
         HStack(spacing: Space.s3) {
             Text("\(index + 1)").coreFont(size: MacTextSize.body, weight: .bold, design: .rounded)
-                .foregroundStyle(index == 0 ? .white : GlassInk.secondary)
+                .foregroundStyle(index == 0 ? GlassInk.primary : GlassInk.secondary)
                 .frame(width: 26, height: 26)
-                .background(index == 0 ? GlassInk.blue.opacity(0.85) : GlassInk.well, in: coreShape(Radius.control))
+                .background(index == 0 ? palette.navActive : GlassInk.well, in: coreShape(Radius.control))
             AccTile(provider: entry.provider).scaleEffect(0.85)
             VStack(alignment: .leading, spacing: 0) {
                 Text("\(model.providerName(entry.provider)) · \(model.pool(entry.pool)?.name ?? "Pool \(entry.pool)")")

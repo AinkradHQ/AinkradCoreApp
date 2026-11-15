@@ -62,30 +62,21 @@ struct CostsPage: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .animation(.smooth(duration: 0.4), value: value)
         .accessibilityElement(children: .combine)
     }
 
     private var unpriced: some View {
-        HStack(spacing: Space.s3) {
-            Image(systemName: "tag.slash.fill").font(.system(size: 18, weight: .semibold)).foregroundStyle(
-                GlassInk.amber)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(CostWords.tokens(model.unpricedTokens)) tokens had no price")
-                    .coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("They count as tokens but not as spend. Set a price for their model to count them from now on.")
-                    .foregroundStyle(GlassInk.secondary)
-            }
-            Spacer(minLength: Space.s3)
+        CoreNotice(
+            symbol: "tag.slash.fill", title: "\(CostWords.tokens(model.unpricedTokens)) tokens had no price",
+            text: "They count as tokens but not as spend. Set a price for their model to count them from now on.",
+            tone: .warn
+        ) {
             AppActionTile(title: "Open prices", symbol: "tag", key: "", hue: GlassInk.amber) {
                 withAnimation(.smooth(duration: 0.3)) { model.page = .prices }
             }
         }
-        .padding(Space.s3)
-        .background(GlassInk.amber.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.4), lineWidth: 1) }
     }
 
     private func accounts(_ total: UsageWindowItem) -> some View {
@@ -194,17 +185,14 @@ struct SpendBarRow: View {
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.track.opacity(0.5))
                     coreShape(3)
-                        .fill(
-                            LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                        )
+                        .fill(hue)
                         .frame(width: max(4, g.size.width * min(1, share) * (shown ? 1 : 0)))
                 }
             }
             .frame(height: 6)
         }
         .padding(Space.s3)
-        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell(active: hovering)
         .onHover { hovering = $0 }
         .onAppear { withAnimation(.smooth(duration: 0.7)) { shown = true } }
         .animation(.smooth(duration: 0.4), value: share)

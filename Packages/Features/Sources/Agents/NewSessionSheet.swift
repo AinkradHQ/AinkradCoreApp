@@ -66,12 +66,6 @@ struct NewSessionSheet: View {
                                 ) { harness = t }
                                 .frame(maxWidth: .infinity)
                                 .background(GlassInk.well, in: coreShape(Radius.row))
-                                .overlay {
-                                    if harness != t {
-                                        coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1)
-                                            .allowsHitTesting(false)
-                                    }
-                                }
                             }
                         }
                     }

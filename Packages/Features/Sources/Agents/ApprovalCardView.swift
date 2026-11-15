@@ -72,19 +72,13 @@ struct ApprovalCardView: View {
                 }
                 .padding(Space.s3)
                 .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
-                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
             if request.timeoutSecs != nil {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3)
-                            .fill(
-                                LinearGradient(
-                                    colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                            )
+                        coreShape(3).fill(hue)
                             .frame(width: g.size.width * min(1, max(0, ratio)))
-                            .shadow(color: hue.opacity(0.5), radius: 5)
                     }
                 }
                 .frame(height: 6)
@@ -104,10 +98,6 @@ struct ApprovalCardView: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
         .background(GlassInk.amber.opacity(0.08), in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                GlassInk.amber.opacity(keys ? 0.6 : 0.35), lineWidth: keys ? 1.5 : 1)
-        }
         .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s2))))
     }
 

@@ -68,10 +68,6 @@ struct ApprovalEntryCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         // The one amber state: an approval that needs you. Decided, it is a plain well like the tool rows.
         .background(waiting ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                waiting ? GlassInk.amber.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
-        }
         .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 

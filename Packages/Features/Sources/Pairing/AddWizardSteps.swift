@@ -86,7 +86,7 @@ extension AddWizardView {
                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 12)
             }
-            .padding(Space.s5).frame(maxWidth: .infinity).background(palette.uDim, in: coreShape(Radius.cardMac))
+            .padding(Space.s5).frame(maxWidth: .infinity).coreWell()
         case .mac:
             HStack(alignment: .top, spacing: Space.s4) {
                 QRImage(text: AddWizardPlan.macReleases.absoluteString).frame(width: Space.s8 * 5, height: Space.s8 * 5)
@@ -107,7 +107,7 @@ extension AddWizardView {
                         }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     }
-                    .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.cardMac))
+                    .padding(Space.s3).coreWell()
                     CoreTextField("Name", placeholder: AddKind.mac.defaultName, text: $model.name)
                 }
             }
@@ -128,7 +128,7 @@ extension AddWizardView {
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
-        .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.control))
+        .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.control))
     }
 
     /// A Linux server with a runner invite: the one command, its countdown, and what it does.
@@ -213,7 +213,7 @@ extension AddWizardView {
                 }
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
-            .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.cardMac))
+            .padding(Space.s3).coreWell()
             CoreTextField("Name", placeholder: model.kind?.defaultName ?? "runner", text: $model.name)
             // fill: both tiles take the dialog's width, so their edges line up.
             GlassToggleTile(
@@ -291,7 +291,7 @@ extension AddWizardView {
                     if let invite = m?.invite, m?.used != true, m?.ended != true {
                         QRImage(text: invite.link.text)
                     } else {
-                        coreShape(Radius.cardMac).fill(palette.uDim)
+                        Color.clear.coreWell()
                             .overlay { if m?.invite == nil, !model.makeFailed { CoreBusyBar().padding(Space.s4) } }
                     }
                 }

@@ -9,8 +9,7 @@ struct ForgetSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(spacing: Space.s4) {
-                IconTile("link.badge.plus", hue: GlassInk.blue, size: 56).shadow(
-                    color: GlassInk.blue.opacity(0.45), radius: 14)
+                IconTile("link.badge.plus", hue: GlassInk.blue, size: 56)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
                         app.service == nil
@@ -27,8 +26,7 @@ struct ForgetSection: View {
                 .accessibilityIdentifier("forget-core")
             }
             .padding(Space.s4)
-            .background(GlassInk.blue.opacity(0.08), in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.35), lineWidth: 1) }
+            .coreWell()
             HStack(alignment: .top, spacing: Space.s3) {
                 fact("key.slash", GlassInk.red, "This Mac's keys", "Deleted from this Mac.")
                 fact("qrcode", GlassInk.blue, "To come back", "A new pairing code from an admin device.")
@@ -51,7 +49,6 @@ struct ForgetSection: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
     }
 }

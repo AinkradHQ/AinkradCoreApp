@@ -48,8 +48,7 @@ struct AccountSlice: View {
         }
         .padding(Space.s4)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-slice")
     }

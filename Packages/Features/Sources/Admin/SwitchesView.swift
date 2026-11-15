@@ -94,13 +94,9 @@ struct SwitchesSection: View {
                                     .foregroundStyle(GlassInk.secondary)
                                 }
                                 Spacer()
-                                Label(pty ? "On" : "Off", systemImage: pty ? "checkmark.circle.fill" : "minus.circle")
-                                    .coreFont(size: MacTextSize.meta, weight: .semibold)
-                                    .foregroundStyle(pty ? GlassInk.green : GlassInk.secondary)
-                                    .padding(.horizontal, 8).frame(height: 24)
-                                    .background(
-                                        (pty ? GlassInk.green : GlassInk.slate).opacity(0.16),
-                                        in: coreShape(Radius.chip))
+                                StateBadge(
+                                    pty ? "On" : "Off", tone: pty ? .done : .queue,
+                                    symbol: pty ? "checkmark.circle.fill" : "minus.circle")
                             }
                             .help("Drivers: \(r.drivers.isEmpty ? "none reported" : r.drivers.joined(separator: ", "))")
                             .accessibilityElement(children: .combine)
@@ -231,7 +227,7 @@ private struct FlagCard: View {
 }
 
 /// What a switch means now, as a picture: a large glyph tile in the state's colour that swaps and bounces when the state
-/// changes, the state's name and its line, and a light that sweeps across the panel once on every change.
+/// changes, the state's name and its line.
 private struct StatePanel<Trailing: View>: View {
     let symbol: String
     let hue: Color
@@ -239,8 +235,6 @@ private struct StatePanel<Trailing: View>: View {
     let line: String
     let trigger: AnyHashable
     @ViewBuilder let trailing: Trailing
-    @State private var sweep = false
-    @Environment(\.accessibilityReduceMotion) private var reduce
 
     init(
         symbol: String, hue: Color, title: String, line: String, trigger: some Hashable,
@@ -256,16 +250,7 @@ private struct StatePanel<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: symbol).font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .background(
-                    LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(Radius.cardMac)
-                )
-                .overlay { coreShape(Radius.cardMac).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                .shadow(color: hue.opacity(0.5), radius: 12)
-                .contentTransition(.symbolEffect(.replace))
-                .coreBounce(trigger)
+            IconTile(symbol, hue: hue, size: 48, bounce: trigger)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).coreFont(size: MacTextSize.headline, weight: .bold).foregroundStyle(GlassInk.ink(hue))
                     .contentTransition(.opacity)
@@ -275,25 +260,8 @@ private struct StatePanel<Trailing: View>: View {
             trailing
         }
         .padding(Space.s3)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.35), lineWidth: 1) }
-        .overlay {
-            GeometryReader { g in
-                LinearGradient(
-                    colors: [.clear, .white.opacity(0.14), .clear], startPoint: .leading, endPoint: .trailing
-                )
-                .frame(width: g.size.width * 0.35)
-                .offset(x: sweep ? g.size.width : -g.size.width * 0.35)
-            }
-            .clipShape(coreShape(Radius.cardMac))
-            .allowsHitTesting(false)
-        }
+        .coreWell()
         .animation(Motion.out(Motion.ui), value: hue)
-        .onChange(of: trigger) { _, _ in
-            guard !reduce else { return }
-            sweep = false
-            withAnimation(.easeInOut(duration: 0.9)) { sweep = true }
-        }
         .accessibilityElement(children: .combine)
     }
 }
@@ -304,8 +272,7 @@ private struct LiveDot: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         coreShape(3).fill(GlassInk.green).frame(width: 9, height: 9)
-            .overlay { coreShape(3).strokeBorder(.black.opacity(0.4), lineWidth: 1) }
-            .shadow(color: GlassInk.green.opacity(on ? 0.9 : 0.3), radius: on ? 6 : 2)
+            .opacity(on ? 1 : 0.5)
             .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(), value: on)
             .onAppear { on = true }
     }

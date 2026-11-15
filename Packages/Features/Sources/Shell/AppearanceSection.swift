@@ -143,8 +143,7 @@ struct AppearanceSection: View {
                 }
             }
             .padding(Space.s3)
-            .background(GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .coreWell()
         }
         .foregroundStyle(GlassInk.primary)
         .focusable().focused($focus).focusEffectDisabled()
@@ -253,6 +252,7 @@ private struct ThemeTile: View {
     let choice: ThemeChoice
     let selected: Bool
     let action: () -> Void
+    @Environment(\.corePalette) private var palette
     @State private var hovering = false
 
     var body: some View {
@@ -270,16 +270,14 @@ private struct ThemeTile: View {
                             .padding(Space.s2).transition(.scale.combined(with: .opacity))
                         }
                     }
-                    .overlay {
-                        coreShape(Radius.cardMac).strokeBorder(
-                            selected ? GlassInk.blue : GlassInk.wellEdge, lineWidth: selected ? 2 : 1)
-                    }
                 Text(choice.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(Space.s2)
-            .background(hovering ? GlassInk.wellHover : .clear, in: coreShape(Radius.pane))
+            .background(
+                selected ? palette.navActive : hovering ? GlassInk.wellHover : .clear, in: coreShape(Radius.pane)
+            )
             .contentShape(coreShape(Radius.pane))
         }
         .buttonStyle(.plain).focusable(false)

@@ -19,10 +19,7 @@ struct SessionHero: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
                 // One flat blue tile for every AI session (no gradient, no per-tool hue).
-                Image(systemName: "bubble.left")
-                    .coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(palette.btnInk)
-                    .frame(width: MacSize.controlMd, height: MacSize.controlMd)
-                    .background(palette.btnPrimary, in: coreShape(Radius.control))
+                IconTile("bubble.left", hue: waiting ? GlassInk.amber : GlassInk.blue, size: MacSize.controlMd)
                     .accessibilityHidden(true)
                 Text(model.title(session)).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                     .truncationMode(.tail).help(model.title(session) + "\n" + session.id)

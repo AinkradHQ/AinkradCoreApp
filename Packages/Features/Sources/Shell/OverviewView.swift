@@ -79,8 +79,6 @@ struct OverviewView: View {
         .background {
             if on {
                 coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.22))
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.6), lineWidth: 1.5) }
-                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 16)
                     .matchedGeometryEffect(id: "pick", in: lens)
             } else {
                 coreShape(Radius.cardMac).fill(GlassInk.well)

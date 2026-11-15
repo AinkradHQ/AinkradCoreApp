@@ -184,6 +184,7 @@ struct ConnCard: View {
     let item: ConnItem
     @State private var menuOpen = false
     @State private var moreHover = false
+    @Environment(\.corePalette) private var palette
 
     /// The rarer actions: Test and Disconnect stay on the card.
     private var menuItems: [CoreDropdownItem] {
@@ -259,7 +260,7 @@ struct ConnCard: View {
                 .accessibilityLabel("More actions for \(item.name)")
             }
         }
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(on ? 0.7 : 0), lineWidth: 1.5) }
+        .overlay { if on { coreShape(Radius.cardMac).fill(palette.navActive).allowsHitTesting(false) } }
         .contextMenu {
             ForEach(menuItems) { i in
                 Button(i.title, role: i.destructive ? .destructive : nil) { i.run() }.disabled(!i.enabled)

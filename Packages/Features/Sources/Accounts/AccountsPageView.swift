@@ -13,7 +13,6 @@ struct BackTile: View {
             .offset(x: hovering ? -2 : 0)
             .frame(width: 36, height: 56)
             .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)

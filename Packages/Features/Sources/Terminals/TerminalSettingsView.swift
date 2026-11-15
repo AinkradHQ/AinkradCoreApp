@@ -126,7 +126,6 @@ private struct TerminalPreview: View {
         .background {
             if prefs.lookBlur { coreShape(Radius.cardMac).fill(.ultraThinMaterial) }
         }
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .animation(.easeOut(duration: 0.2), value: prefs.fontSize)
         .animation(Motion.out(Motion.hover), value: prefs.lookOpacity)
         .accessibilityLabel("Preview of the terminal")
@@ -139,6 +138,7 @@ private struct ThemeTile: View {
     let lens: Namespace.ID
     let pick: () -> Void
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
     var body: some View {
         Button(action: pick) {
             VStack(alignment: .leading, spacing: Space.s2) {
@@ -164,8 +164,7 @@ private struct ThemeTile: View {
             .padding(Space.s2)
             .background {
                 if on {
-                    coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.16))
-                        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.5), lineWidth: 1) }
+                    coreShape(Radius.cardMac).fill(palette.navActive)
                         .matchedGeometryEffect(id: "theme", in: lens)
                 } else {
                     coreShape(Radius.cardMac).fill(hovering ? GlassInk.wellHover : GlassInk.well)
@@ -187,6 +186,7 @@ private struct CursorTile: View {
     let on: Bool
     let blink: Bool
     let pick: () -> Void
+    @Environment(\.corePalette) private var palette
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
@@ -195,10 +195,7 @@ private struct CursorTile: View {
                 Text(shape.rawValue.capitalized).coreFont(size: MacTextSize.meta, weight: .medium)
             }
             .frame(maxWidth: .infinity, minHeight: 64)
-            .background(on ? GlassInk.blue.opacity(0.18) : GlassInk.well, in: coreShape(Radius.row))
-            .overlay {
-                coreShape(Radius.row).strokeBorder(on ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
-            }
+            .background(on ? palette.navActive : GlassInk.well, in: coreShape(Radius.row))
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)

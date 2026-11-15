@@ -339,7 +339,7 @@ private struct SettingsBackTile: View {
             }
             .foregroundStyle(GlassInk.primary)
             .frame(width: 72, height: 56)
-            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .coreWell(active: hovering)
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)

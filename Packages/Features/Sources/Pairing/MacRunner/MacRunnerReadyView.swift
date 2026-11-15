@@ -53,7 +53,7 @@ struct MacRunnerReadyView: View {
             Spacer(minLength: 0)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell(radius: Radius.row)
+        .coreWell()
         .accessibilityElement(children: .combine)
     }
 }

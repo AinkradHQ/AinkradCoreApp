@@ -124,8 +124,7 @@ struct BudgetsPage: View {
             }
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .coreWell()
         .animation(.smooth(duration: 0.4), value: title)
     }
 
@@ -166,9 +165,9 @@ private struct BudgetCard: View {
                         .foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s2)
-                Label(s.title, systemImage: s.symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(GlassInk.ink(s.hue)).padding(.horizontal, Space.s2).frame(height: 24)
-                    .background(s.hue.opacity(0.14), in: coreShape(Radius.chip))
+                StateBadge(
+                    s.title, tone: b.standing == .fine ? .done : b.standing == .warning ? .warn : .fail,
+                    symbol: s.symbol)
             }
             if let t = b.tokenShare {
                 bar(
@@ -207,13 +206,7 @@ private struct BudgetCard: View {
             .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
-        .background(
-            selected ? s.hue.opacity(0.1) : hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac)
-        )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                selected ? s.hue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-        }
+        .coreWell(active: selected || hovering)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { withAnimation(.smooth(duration: 0.25)) { model.cursor = "g-\(b.id)" } }
         .onHover { hovering = $0 }
@@ -236,9 +229,7 @@ private struct BudgetCard: View {
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.track.opacity(0.6))
                     coreShape(3)
-                        .fill(
-                            LinearGradient(colors: [hue.opacity(0.55), hue], startPoint: .leading, endPoint: .trailing)
-                        )
+                        .fill(hue)
                         .frame(width: g.size.width * min(1, share))
                     // The warning point, as a notch on the track.
                     coreShape(1).fill(GlassInk.secondary.opacity(0.7)).frame(width: 2, height: 10)

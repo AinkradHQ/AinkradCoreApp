@@ -72,8 +72,7 @@ private struct AccountsBanner: View {
                 }
             }
             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-            .background(GlassInk.amber.opacity(0.14), in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.amber.opacity(0.35), lineWidth: 1) }
+            .coreWell()
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("accounts-banner")
         }
@@ -115,14 +114,7 @@ private struct AccountRow: View {
             .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3)
-        .background(
-            on || hovering ? GlassInk.wellHover : GlassInk.well,
-            in: coreShape(Radius.cardMac)
-        )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                on ? GlassInk.blue.opacity(0.7) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
-        }
+        .coreWell(active: on || hovering)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture { openIt() }
         .onHover { hovering = $0 }
@@ -196,8 +188,7 @@ private struct OrderList: View {
             }
         }
         .padding(Space.s4)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-order")
     }
@@ -305,8 +296,7 @@ private struct AdvancedRow: View {
             }
         }
         .padding(Space.s3)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .accessibilityIdentifier("accounts-advanced")
     }
 }

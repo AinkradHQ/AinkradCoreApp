@@ -316,8 +316,7 @@ struct NotificationAsk: View {
             }
         }
         .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .coreWell(radius: Radius.row)
         .accessibilityElement(children: .contain)
     }
 }
