@@ -12,6 +12,8 @@ public struct CoreSwitch: View {
     @State private var hovering = false
     @State private var pressing = false
     @State private var flipping = false
+    /// How far the knob has been slid while held, in points.
+    @State private var drag: CGFloat = 0
 
     private static let trackW: CGFloat = 36
     private static let trackH: CGFloat = 20
@@ -27,31 +29,62 @@ public struct CoreSwitch: View {
     func flip() { isOn.toggle() }
 
     public var body: some View {
-        Button(action: flip) {
-            HStack(spacing: Space.s2) {
-                track
-                if !title.isEmpty { Text(title).coreFont(size: MacTextSize.body, weight: .medium) }
-            }
-            .contentShape(Rectangle())
+        HStack(spacing: Space.s2) {
+            track
+            if !title.isEmpty { Text(title).coreFont(size: MacTextSize.body, weight: .medium) }
         }
-        .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.97))
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0).onChanged { _ in pressing = true }.onEnded { _ in pressing = false }
+        .contentShape(Rectangle())
+        // Press, hold and slide, as Apple's switch (Ahmed, 2026-11-15): the knob follows the pointer and lands on the
+        // side it is let go on. A press that barely moves, however long, flips it on release.
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { d in
+                    pressing = true
+                    drag = d.translation.width
+                }
+                .onEnded { d in
+                    pressing = false
+                    if abs(d.translation.width) < Self.slop {
+                        flip()
+                    } else {
+                        let on = knobX > Self.mid
+                        if on != isOn { isOn = on }
+                    }
+                    drag = 0
+                },
+            isEnabled: enabled
         )
+        .focusable(enabled).focusEffectDisabled()
+        .onKeyPress(.space) {
+            flip()
+            return .handled
+        }
         .onChange(of: isOn) { flipping = CoreGlassKnob.flash { flipping = false } }
         .onHover { hovering = $0 }
         .coreDimWhenDisabled(enabled)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(title.isEmpty ? "Switch" : title)
         .accessibilityValue(isOn ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
+        .accessibilityAction { if enabled { flip() } }
     }
+
+    private static var pad: CGFloat { (trackH - knob) / 2 }
+    private static var maxX: CGFloat { trackW - knob - pad }
+    private static var mid: CGFloat { (pad + maxX) / 2 }
+    /// Movement below this is a press, not a slide.
+    private static let slop: CGFloat = 3
+    /// Where the knob is drawn: its side, plus the drag while held, kept inside the track.
+    private var knobX: CGFloat { min(max((isOn ? Self.maxX : Self.pad) + drag, Self.pad), Self.maxX) }
+    private var sliding: Bool { pressing && abs(drag) >= Self.slop }
 
     private var track: some View {
         let lit = hovering || forced == .hover
-        let pad = (Self.trackH - Self.knob) / 2
+        // While sliding, the track already shows the side the knob would land on.
+        let on = sliding ? knobX > Self.mid : isOn
         return coreShape(Radius.chip)
             .fill(
-                isOn
+                on
                     ? GlassInk.blue.opacity(lit ? 0.9 : 1)
                     : GlassInk.adaptive(
                         .white.opacity(lit ? 0.32 : 0.24), day: GlassInk.dayInk.opacity(lit ? 0.22 : 0.16))
@@ -60,10 +93,14 @@ public struct CoreSwitch: View {
                 CoreGlassKnob(
                     width: Self.knob, height: Self.knob, radius: 4, active: pressing || flipping || forced == .pressed
                 )
-                .offset(x: isOn ? Self.trackW - Self.knob - pad : pad)
+                .offset(x: knobX)
+                // The knob follows the pointer with no easing; letting go glides it to its side.
+                .transaction { if sliding { $0.animation = nil } }
             }
             .frame(width: Self.trackW, height: Self.trackH)
             .animation(reduce ? nil : Motion.out(Motion.ui), value: isOn)
+            .animation(reduce ? nil : Motion.out(Motion.ui), value: drag == 0)
+            .animation(Motion.out(Motion.hover), value: on)
             .animation(Motion.out(Motion.hover), value: lit)
     }
 }
