@@ -117,11 +117,14 @@ struct BrainScreensTests {
     }
 
     @Test func reviewWordsCountOnlyWhatIsThere() {
-        func pc(_ id: String, _ state: String = "proposed") -> ProposalCard {
-            ProposalCard(id: id, name: id, state: state)
-        }
-        let cards = [pc("a", "accepted"), pc("b", "accepted"), pc("c", "refused"), pc("d", "held"), pc("unsorted")]
-        #expect(ReviewWords.tally(cards) == "2 accepted · 1 refused · 1 held")
+        #expect(ReviewWords.tally(checked: 3, of: 5) == "3 of 5 checked")
+        #expect(ReviewWords.willDelete(rooms: 0, unsorted: false) == nil)
+        #expect(ReviewWords.willDelete(rooms: 1, unsorted: false) == "1 room not checked will be deleted.")
+        #expect(ReviewWords.willDelete(rooms: 2, unsorted: false) == "2 rooms not checked will be deleted.")
+        #expect(ReviewWords.willDelete(rooms: 0, unsorted: true) == "The Unsorted items will be deleted.")
+        #expect(
+            ReviewWords.willDelete(rooms: 2, unsorted: true)
+                == "2 rooms not checked and the Unsorted items will be deleted.")
         #expect(ReviewWords.suggestion(MergeSuggestion(into: "a", name: "Optimus")) == "Looks like Optimus. Merge?")
         #expect(ReviewWords.importTitle(3) == "Import 3 rooms" && ReviewWords.importTitle(1) == "Import 1 room")
         #expect(ReviewWords.line(ProposalCard(id: "unsorted", name: "Unsorted")).hasPrefix("No room yet"))

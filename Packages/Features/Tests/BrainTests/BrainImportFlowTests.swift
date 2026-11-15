@@ -151,17 +151,22 @@ struct BrainImportFlowTests {
         #expect(t.count("POST /modules/brain/v1/imports") == 1, "one run, not two")
     }
 
-    @Test func aMixedEmployerCardCannotBeAcceptedOrCommitted() async {
+    @Test func everyRoomStartsTickedButOneThatMixesTwoEmployers() async {
         let t = FakeBrainTransport()
         let (m, _) = wizard(t)
         m.start()
         await untilStep(m, .review)
-        await m.review.accept("acme")
-        #expect(m.review.accepted.isEmpty && m.review.notice == "Two employers are in this room. Split it first.")
-        await m.review.accept("unsorted")
-        #expect(m.review.accepted.isEmpty)
-        #expect(m.review.canCommit == false)
-        #expect(t.count("PATCH /modules/brain/v1/imports/r1/proposals/acme") == 0, "refused before the Core")
+        let r = m.review
+        #expect(r.kept.map(\.id) == ["alpha"] && r.keepUnsorted && r.canCommit)
+        #expect(r.checkBlock(r.cards[1]) == "Two employers are in this room. Split it first.")
+        r.setChecked("acme", true)
+        #expect(r.kept.map(\.id) == ["alpha"], "a mixed room cannot be ticked")
+        #expect(r.dropped.map(\.id) == ["acme"])
+        r.setChecked("alpha", false)
+        #expect(r.kept.isEmpty && !r.canCommit)
+        r.setChecked("unsorted", false)
+        #expect(!r.keepUnsorted)
+        #expect(t.log.allSatisfy { !$0.hasPrefix("PATCH") && !$0.hasSuffix("/refuse") }, "ticking is local only")
     }
 
     @Test func reviewActionsRoundTripThroughTheCore() async {
@@ -177,7 +182,6 @@ struct BrainImportFlowTests {
                 return current
             }
         }
-        t.routes["POST " + base + "/refuse"] = { _ in card("alpha", state: "refused") }
         t.routes["PATCH /modules/brain/v1/imports/r1/items"] = { _ in ["changed": 1] }
         t.routes["GET " + base + "/items"] = { _ in
             [
@@ -191,8 +195,6 @@ struct BrainImportFlowTests {
         }
         m.start()
         await untilStep(m, .review)
-        await m.review.accept("alpha")
-        #expect(m.review.accepted.map(\.id) == ["alpha"] && m.review.canCommit)
         await m.review.rename("alpha", to: "Side project")
         await m.review.setKind("alpha", "personal")
         #expect(m.review.cards.first { $0.id == "alpha" }?.name == "Side project")
@@ -202,31 +204,6 @@ struct BrainImportFlowTests {
         m.review.selected = ["i1"]
         await m.review.markSelected("needed")
         #expect(m.review.items.first?.mark == "needed" && m.review.selected.isEmpty)
-        await m.review.refuse("alpha")
-        #expect(m.review.cards.first { $0.id == "alpha" }?.state == "refused" && m.review.openID == nil)
-    }
-
-    @Test func acceptAgainUndoesItAndABlockedAcceptSaysWhy() async {
-        let t = FakeBrainTransport()
-        let (m, _) = wizard(t)
-        let held = NSLock()
-        nonisolated(unsafe) var state = "proposed"
-        t.routes["PATCH /modules/brain/v1/imports/r1/proposals/alpha"] = { b in
-            let o = (try? JSONSerialization.jsonObject(with: b ?? Data()) as? [String: Any]) ?? [:]
-            return held.withLock {
-                state = o["state"] as? String ?? state
-                return card("alpha", state: state)
-            }
-        }
-        m.start()
-        await untilStep(m, .review)
-        await m.review.choose("alpha", "accept")
-        #expect(m.review.accepted.map(\.id) == ["alpha"])
-        await m.review.choose("alpha", "accept")
-        #expect(m.review.accepted.isEmpty, "Accept again takes it back out")
-        #expect(m.review.cards.first { $0.id == "alpha" }?.state == "proposed")
-        await m.review.choose("acme", "accept")
-        #expect(m.review.notice == "Two employers are in this room. Split it first.")
     }
 
     @Test func commitAsksTouchIDAndHeldRoomsAreShownHeld() async {
@@ -247,7 +224,6 @@ struct BrainImportFlowTests {
         }
         m.start()
         await untilStep(m, .review)
-        await m.review.accept("alpha")
         host.declines = true
         await m.commit()
         #expect(m.step == .review && t.count("POST /modules/brain/v1/imports/r1/commit") == 0)

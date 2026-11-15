@@ -239,6 +239,15 @@ struct ProposalPatchBody: Encodable {
     var config: RoomConfigWire?
 }
 struct MergeBody: Encodable { var into: String }
+/// Import with one box per room (API minor 73): the ticked rooms are imported, every other open room is refused.
+struct KeepBody: Encodable {
+    var keep: [String]
+    var keepUnsorted: Bool
+    enum CodingKeys: String, CodingKey {
+        case keep
+        case keepUnsorted = "keep_unsorted"
+    }
+}
 /// One remembered "same project": rooms named `from` (normalized, e.g. `shopapi`) are filed as `to`.
 public struct RoomAlias: Codable, Sendable, Equatable, Identifiable {
     public var from: String

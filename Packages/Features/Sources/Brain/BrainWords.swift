@@ -1,3 +1,4 @@
+import Admin
 import Foundation
 
 /// Every sentence the Brain says outside a view, so the wording is one thing and a test can read it. None of it can carry
@@ -38,7 +39,22 @@ public enum BrainWords {
 
     public static func failure(_ error: Error) -> String {
         if let e = error as? BrainHTTPError { return CoreBrainService.failure(e).sentence }
-        return (error as? BrainFailure)?.sentence ?? "Something went wrong. Nothing was changed."
+        if let f = error as? BrainFailure { return f.sentence }
+        // No answer came (a timeout, the link dropped): the Core may have done it, so never "Nothing was changed".
+        return (error as? LocalizedError)?.errorDescription ?? "The Core did not answer."
+    }
+
+    /// The answer never came, so whether the Core did it is unknown: a timeout, a dropped link, a refused session. A
+    /// Core refusal, a known failure, a declined Touch ID and a cancel are certain, so they are not.
+    public static func unsure(_ error: Error) -> Bool {
+        !(error is BrainHTTPError || error is BrainFailure || error is AdminDeclined || error is CancellationError)
+    }
+
+    /// `unsure`, after the list was read again: what happened, and that the list now shows the Core's state.
+    public static func noAnswer(_ error: Error) -> String {
+        let why = (error as? LocalizedError)?.errorDescription.map { $0.hasSuffix(".") ? $0 : $0 + "." }
+        return (why ?? "The Core took too long to answer.")
+            + " It may have done it anyway: the list shows what it has now."
     }
 
     /// The Core answered 404 for a Brain route: it is an older Core, built without the Brain.

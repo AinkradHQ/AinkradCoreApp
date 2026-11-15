@@ -119,9 +119,11 @@ public struct BrainRoutes: Sendable {
     public func moveItems(run: String, ids: [String], to proposal: String) async throws {
         _ = try await raw("PATCH", "/imports/\(Self.seg(run))/items", ItemsPatchBody(ids: ids, proposal: proposal))
     }
-    /// Step-up route: the caller asks for Touch ID around it.
-    public func commit(run: String) async throws -> CommitResult {
-        try await call("POST", "/imports/\(Self.seg(run))/commit")
+    /// Step-up route: the caller asks for Touch ID around it. With `keep` (API minor 73) the Core imports those rooms and
+    /// refuses every other open one in the same call; without it, it imports the accepted rooms.
+    public func commit(run: String, keep: [String]? = nil, keepUnsorted: Bool = true) async throws -> CommitResult {
+        try await call(
+            "POST", "/imports/\(Self.seg(run))/commit", keep.map { KeepBody(keep: $0, keepUnsorted: keepUnsorted) })
     }
 
     /// One path segment, escaped so an id can never add a slash or a query.

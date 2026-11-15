@@ -23,7 +23,7 @@ public final class BrainDemo {
         "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
         "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
         "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
-        "room-ai-access",
+        "import-review-unchecked", "room-ai-access",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -174,12 +174,17 @@ public final class BrainDemo {
             model.show(.rooms)
             model.openImport()
         case "import-review", "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes",
-            "import-review-ai-declined", "import-review-same-menu", "import-review-same-project":
+            "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
+            "import-review-unchecked":
             model.show(.rooms)
             await model.openReview(SampleImportTransport.run)
             if let r = model.importer?.review {
                 if scene == "import-review-same-menu" { r.menuFor = "acme-shop-api" }
                 if scene == "import-review-same-project" { r.openSameProject("acme-shop-api") }
+                if scene == "import-review-unchecked", let room = r.open.first(where: { !$0.isUnsorted }) {
+                    r.setChecked(room.id, false)
+                    r.setChecked(ProposalCard.unsortedID, false)
+                }
             }
             if scene == "import-review-ai-changes", let r = model.importer?.review {
                 await r.watching?.value

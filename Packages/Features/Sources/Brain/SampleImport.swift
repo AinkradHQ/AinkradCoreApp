@@ -163,7 +163,9 @@ actor SampleImportTransport: BrainTransport {
             return try e.encode(update(into) { $0.itemCount += moved })
         case ("POST", 5, "refuse"): return try e.encode(update(p[3]) { $0.state = "refused" })
         case ("POST", 3, "commit"):
-            let made = cards.filter(\.isAccepted).map {
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let keep = b["keep"] as? [String]
+            let made = cards.filter { keep?.contains($0.id) ?? $0.isAccepted }.map {
                 RoomMade(proposal: $0.id, room: $0.id, name: $0.name, kind: $0.kind, sources: 1, created: true)
             }
             return try e.encode(CommitResult(rooms: made, held: [], rulesEnabled: 0, state: "committed"))

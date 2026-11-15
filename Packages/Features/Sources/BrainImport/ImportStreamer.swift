@@ -26,6 +26,8 @@ public struct SourceResume: Codable, Sendable, Equatable {
 public struct ResumeState: Codable, Sendable, Equatable {
     public var run: String?
     public var sources: [String: SourceResume] = [:]
+    /// The review's unticked rooms of `run`; nil in a file written before the boxes.
+    public var unchecked: [String]?
     public init() {}
 }
 

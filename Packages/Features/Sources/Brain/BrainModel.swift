@@ -27,8 +27,13 @@ public final class BrainModel {
     @ObservationIgnored public var importPlaces: ImportPlaces? = ImportPlaces.shared
     /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
     public var apiMinor: Int? {
-        didSet { importer?.review.canSameProject = remembersSameProject }
+        didSet {
+            importer?.review.canSameProject = remembersSameProject
+            importer?.review.keepsInCommit = keepsInCommit
+        }
     }
+    /// Import takes the ticked rooms in one call (Core API minor 73). The sample always has it.
+    public var keepsInCommit: Bool { isSample || (apiMinor ?? 0) >= 73 }
     /// "Same project as…" and its list in Settings (Core API minor 72). The sample always has it.
     public var remembersSameProject: Bool { isSample || (apiMinor ?? 0) >= 72 }
     /// Sync now, sources and rules on the Rooms page; nil until a service attaches.
