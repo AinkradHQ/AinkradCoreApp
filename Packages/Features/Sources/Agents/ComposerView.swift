@@ -101,7 +101,7 @@ struct ComposerView: View {
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
                         .disabled(!enabled).help("Attach a file: adds its path to the message")
-                    CoreChip(AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model"))
+                    modelPicker
                     stateChip
                     Spacer(minLength: Space.s2)
                     if bytes > AgentsModel.messageLimit / 2 {
@@ -192,6 +192,38 @@ struct ComposerView: View {
             }
         }
     }
+
+    /// The tool and its model; for Claude Code a menu that switches the model with the tool's own `/model` command. Other
+    /// tools show their model as a label (they have no in-session switch the app can send).
+    @ViewBuilder private var modelPicker: some View {
+        let label = AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model")
+        if session.harness == "claude", enabled {
+            CoreDropdown(
+                items: Self.claudeModels.map { m in
+                    CoreDropdownItem(
+                        m.title, checked: (session.model ?? "").lowercased().contains(m.id), note: m.note
+                    ) { Task { await model.say(session.id, "/model \(m.id)") } }
+                }
+            ) {
+                HStack(spacing: Space.s1) {
+                    Text(label)
+                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                }
+                .coreFont(size: MacTextSize.meta, weight: .medium)
+                .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+                .background(GlassInk.well, in: coreShape(Radius.chip))
+            }
+            .help("Switch the model for the rest of this session")
+        } else {
+            CoreChip(label)
+        }
+    }
+
+    static let claudeModels: [(id: String, title: String, note: String?)] = [
+        ("default", "Default", "the account's choice"), ("opus", "Opus", "most capable"),
+        ("sonnet", "Sonnet", "balanced"),
+        ("haiku", "Haiku", "fastest"),
+    ]
 
     /// Every key the field hands over (one place, read fresh on each update).
     private var keys: ComposerKeys {
