@@ -65,9 +65,21 @@ struct SubAgentCard: View {
     }
 }
 
-/// A plan the agent proposes (ExitPlanMode): titled, its Markdown in full (headings, steps, tables, code).
+/// What a plan card can do in the open session (set by SessionView): go ahead with the plan, or start a change to it.
+struct PlanActions {
+    var goAhead: () -> Void
+    var change: () -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var planActions: PlanActions? = nil
+}
+
+/// A plan the agent proposes (ExitPlanMode): titled, its Markdown in full (headings, steps, tables, code), and in a live
+/// session Go ahead / Change it.
 struct PlanCard: View {
     let text: String
+    @Environment(\.planActions) private var actions
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -77,6 +89,16 @@ struct PlanCard: View {
                 Spacer(minLength: 0)
             }
             MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
+            if let actions {
+                HStack(spacing: Space.s2) {
+                    Button("Go ahead", action: actions.goAhead)
+                        .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                        .help("Approve the plan: the agent starts building it")
+                    Button("Change it", action: actions.change)
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Write what to change in the plan")
+                }
+            }
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .coreWell()

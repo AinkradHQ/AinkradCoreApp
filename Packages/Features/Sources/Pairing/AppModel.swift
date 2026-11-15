@@ -735,6 +735,10 @@ public final class AppModel {
 }
 
 extension AppModel: AgentsHost {
+    public var thisMacRunnerID: String? { macRunner.runnerID }
+
+    public func openTerminal(on runner: String) { terminals?.open(on: runner) }
+
     /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
     public func elevate(reason: String, force: Bool) async -> InlineNotice? {
         if isElevated && !force { return nil }

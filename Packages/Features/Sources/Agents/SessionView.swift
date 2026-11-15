@@ -12,6 +12,11 @@ struct SessionView: View {
     @FocusState private var paneFocus: Bool
     @FocusState private var composing: Bool
     @State private var jump = 0
+    // Find in the conversation (⌘F) and turn jumps (⌥↑ ⌥↓).
+    @State private var finding = false
+    @State private var findQuery = ""
+    @State private var findIndex = 0
+    @State private var focusSeq: Int64?
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -40,6 +45,17 @@ struct SessionView: View {
             .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in typing ? .ignored : write(s) }
             .onKeyPress(.downArrow) { typing ? .ignored : latest() }
             .onKeyPress(.end) { typing ? .ignored : latest() }
+            // ⌘F finds in the conversation, wherever the keyboard is in the pane; ⌥↑ ⌥↓ jump between your messages.
+            .onKeyPress(keys: ["f"]) { press in
+                guard press.modifiers.contains(.command) else { return .ignored }
+                finding = true
+                return .handled
+            }
+            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                guard press.modifiers.contains(.option), !typing else { return .ignored }
+                turnStep(press.key == .upArrow ? -1 : 1)
+                return .handled
+            }
             .onKeyPress(characters: .letters) { press in
                 // Letters belong to the field while you write: no shortcut fires from typing.
                 guard let key = PaneKeys.shortcut(press.characters, typing: composing || typing) else {
@@ -63,7 +79,22 @@ struct SessionView: View {
 
     private func conversation(_ s: AgentSessionInfo, wide: Bool, narrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            SessionHero(model: model, session: s, panel: wide)
+            SessionHero(model: model, session: s, panel: wide, find: { finding = true })
+            if finding {
+                ConversationFindBar(
+                    query: $findQuery, count: hits.count, index: min(findIndex, max(hits.count - 1, 0)),
+                    step: { findStep($0) },
+                    close: {
+                        finding = false
+                        focusSeq = nil
+                    }
+                )
+                .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
+                .onChange(of: findQuery) { _, _ in
+                    findIndex = 0
+                    focusSeq = hits.first
+                }
+            }
             // One notice at a time, most urgent first; with none, the route cues (fallback, account) may speak.
             Group {
                 if let b = ConversationWords.banner(
@@ -85,15 +116,54 @@ struct SessionView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
-            TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
+            TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump, focus: focusSeq)
                 .frame(maxWidth: .infinity)
             PinnedApprovals(model: model, session: s)
             ComposerView(model: model, session: s, focused: $composing)
                 .frame(maxWidth: .infinity)
         }
+        // A plan card's Go ahead approves the tool's pending plan request, or tells the agent to build; Change it starts a
+        // message.
+        .environment(\.planActions, model.canReply(s) ? planActions(s) : nil)
         // The conversation's own text size and typeface (Settings, AI Sessions, Text).
         .environment(\.coreTextScale, AgentPrefs.shared.textScale)
         .environment(\.coreFontDesign, AgentPrefs.shared.fontDesign)
+    }
+
+    private var entries: [TranscriptEntry] { model.transcripts[sessionID]?.entries ?? [] }
+    private var hits: [Int64] { ConversationSearch.hits(entries, findQuery) }
+
+    private func findStep(_ d: Int) {
+        guard !hits.isEmpty else { return }
+        findIndex = (findIndex + d + hits.count) % hits.count
+        focusSeq = hits[findIndex]
+    }
+
+    private func turnStep(_ d: Int) {
+        let turns = ConversationSearch.turns(entries)
+        guard !turns.isEmpty else { return }
+        let at = focusSeq.flatMap { f in turns.firstIndex { $0 >= f } } ?? turns.count
+        focusSeq = turns[min(max(at + d, 0), turns.count - 1)]
+    }
+
+    private func planActions(_ s: AgentSessionInfo) -> PlanActions {
+        PlanActions(
+            goAhead: {
+                let plan = model.transcripts[s.id]?.approvalList.first {
+                    $0.tool.lowercased() == "exitplanmode" && $0.status(now: Date(), sessionOver: s.over) == .pending
+                }
+                Task {
+                    if let plan {
+                        await model.decide(plan, approved: true)
+                    } else {
+                        await model.say(s.id, "The plan is approved. Go ahead and build it.")
+                    }
+                }
+            },
+            change: {
+                model.drafts[s.id] = "Change the plan: "
+                composing = true
+            })
     }
 
     private func focusStart(_ s: AgentSessionInfo) {

@@ -418,6 +418,17 @@ public final class TerminalsModel {
         }
     }
 
+    /// Opens a terminal on `runner` at once; the New terminal sheet shows only if that fails.
+    public func open(on runner: String) {
+        Task {
+            if runners.isEmpty { await reload() }
+            let m = NewTerminalModel(model: self, runner: runner)
+            guard m.canOpen else { return openNew(form: m) }
+            await m.submit()
+            if m.error != nil { openNew(form: m) }
+        }
+    }
+
     func openNew(runner: String? = nil, form: NewTerminalModel? = nil) {
         let m = form ?? NewTerminalModel(model: self, runner: runner)
         newTerminal = m
