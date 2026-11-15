@@ -78,6 +78,9 @@ public final class BrainCandidates {
             inbox = try await service.candidates()
             if selectedID == nil || !items.contains(where: { $0.id == selectedID }) { selectedID = visible.first?.id }
             phase = .ready
+        } catch is CancellationError {
+            // The Inbox left the screen mid-load: nothing failed. The next appearance loads again.
+            if phase == .loading { phase = .idle }
         } catch {
             phase = .failed(BrainWords.failure(error))
         }
@@ -171,6 +174,7 @@ public final class BrainCandidates {
             var p = try await service.policy(room: room)
             p.queued = max(p.queued, inbox.queued.first { $0.room == room }?.items ?? 0)
             policies[room] = p
+        } catch is CancellationError {
         } catch { notice = BrainWords.failure(error) }
     }
 
@@ -227,7 +231,9 @@ public final class BrainCandidates {
 
     public func loadRunners() async {
         guard let service else { return }
-        do { runners = try await service.runners() } catch { notice = BrainWords.failure(error) }
+        do { runners = try await service.runners() } catch is CancellationError {} catch {
+            notice = BrainWords.failure(error)
+        }
     }
 
     /// Off is one tap. On opens the sheet that says what is read, and every turn on asks for Touch ID.

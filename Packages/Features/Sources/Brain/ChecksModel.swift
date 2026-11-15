@@ -69,6 +69,7 @@ public final class ChecksModel {
         do {
             report = try await service.checks()
             phase = .ready
+        } catch is CancellationError {
         } catch {
             phase = .failed(BrainWords.failure(error))
         }

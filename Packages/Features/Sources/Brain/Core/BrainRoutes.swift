@@ -1,5 +1,6 @@
 import BrainImport
 import Foundation
+import os
 
 /// A signed request to the Core. The app's `CoreConnection` is the real one; tests use a fake.
 public protocol BrainTransport: Sendable {
@@ -31,12 +32,46 @@ public struct BrainRoutes: Sendable {
     ) async throws -> T {
         let data = try await raw(method, path, body)
         do { return try JSONDecoder().decode(T.self, from: data) } catch {
-            throw BrainHTTPError(status: 200, code: "bad_answer", message: "The Core's answer was not the Brain's.")
+            let why = Self.describe(error)
+            Self.log.error(
+                "\(method, privacy: .public) \(Self.logged(path), privacy: .public) 200 not read: \(why, privacy: .public)"
+            )
+            throw BrainHTTPError(status: 200, code: "bad_answer", message: why)
         }
     }
 
     func raw(_ method: String, _ path: String, _ body: (any Encodable)? = nil) async throws -> Data {
-        try await transport.send(method, Self.base + path, body: body.map { try JSONEncoder().encode($0) })
+        do {
+            return try await transport.send(method, Self.base + path, body: body.map { try JSONEncoder().encode($0) })
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            Self.log.error(
+                "\(method, privacy: .public) \(Self.logged(path), privacy: .public) failed: \(String(describing: error), privacy: .public)"
+            )
+            throw error
+        }
+    }
+
+    /// Every failed Brain call: method, path (never the query, which can hold search words), status or decode error.
+    static let log = Logger(subsystem: "com.ainkrad.core", category: "brain")
+    static func logged(_ path: String) -> String { base + (path.split(separator: "?").first.map(String.init) ?? path) }
+
+    /// A decode error as its field path and what was wrong: `items.3.started_at is missing`.
+    static func describe(_ error: Error) -> String {
+        guard let d = error as? DecodingError else { return String(describing: error) }
+        func at(_ c: DecodingError.Context) -> String {
+            let p = c.codingPath.map { $0.intValue.map(String.init) ?? $0.stringValue }.joined(separator: ".")
+            return p.isEmpty ? "the answer" : p
+        }
+        switch d {
+        case .keyNotFound(let k, let c):
+            return "\(c.codingPath.isEmpty ? "" : at(c) + ".")\(k.stringValue) is missing"
+        case .typeMismatch(let t, let c): return "\(at(c)) is not \(t)"
+        case .valueNotFound(let t, let c): return "\(at(c)) is null, not \(t)"
+        case .dataCorrupted(let c): return "\(at(c)) is not JSON: \(c.debugDescription)"
+        @unknown default: return String(describing: d)
+        }
     }
 
     // MARK: status and rooms
