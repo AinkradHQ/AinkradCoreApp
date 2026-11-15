@@ -26,6 +26,12 @@ public final class ReviewModel {
     public internal(set) var tidyChanges: [TidyChange]?
     /// Titles of the items a change names (the kept copy, a moved item), read from the cards' item pages.
     public internal(set) var itemTitles: [String: String] = [:]
+    /// The connected Core remembers "Same project as…" (API minor 72). Set by the pane.
+    public internal(set) var canSameProject = false
+    /// The room whose "Same project as…" picker is open in place of the rooms.
+    public internal(set) var sameProjectFor: String?
+    /// The room whose "…" menu is open; its row draws above the rows under it so the menu is not covered.
+    public var menuFor: String?
     /// How long to wait between two reads while the model works.
     var pollEvery: Duration = .seconds(5)
     var watching: Task<Void, Never>?
@@ -138,6 +144,7 @@ public final class ReviewModel {
             semantic = nil
             tidyChanges = nil
             showingChanges = false
+            sameProjectFor = nil
             watchSemantic()
             closeCard()
         }

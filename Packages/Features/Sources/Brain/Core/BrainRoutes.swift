@@ -91,6 +91,18 @@ public struct BrainRoutes: Sendable {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/merge", MergeBody(into: into))
     }
+    /// `p` is the same project as `into` (API minor 72): a merge the Core also remembers, so later imports file `p`'s
+    /// items as `into`'s project. Answers the card of `into`.
+    public func sameProject(run: String, proposal: String, into: String) async throws -> ProposalCard {
+        try await call(
+            "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/same-project", MergeBody(into: into))
+    }
+    /// The remembered "same project" names (API minor 72).
+    public func aliases() async throws -> [RoomAlias] { try await call("GET", "/aliases") }
+    /// Forgets one; answers the ones left. The next Re-sort keeps the two rooms apart again.
+    public func removeAlias(_ from: String) async throws -> [RoomAlias] {
+        try await call("DELETE", "/aliases/\(Self.seg(from))")
+    }
     public func split(run: String, proposal: String, itemIDs: [String], name: String?) async throws -> ProposalCard {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/split",

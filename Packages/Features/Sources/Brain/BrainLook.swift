@@ -43,9 +43,11 @@ struct BrainLookSection: View {
     let model: BrainModel
     @Bindable private var prefs = BrainPrefs.shared
     @State private var ai: AISettings
+    @State private var same: SameProjectList
     init(model: BrainModel) {
         self.model = model
         _ai = State(initialValue: AISettings(routes: { [weak model] in model?.service?.importRoutes }))
+        _same = State(initialValue: SameProjectList(routes: { [weak model] in model?.service?.importRoutes }))
     }
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
@@ -74,8 +76,10 @@ struct BrainLookSection: View {
                 EmptyView()
             }
             BrainAISection(settings: ai)
+            if model.remembersSameProject { SameProjectSection(list: same) }
         }
         .foregroundStyle(GlassInk.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task { if model.remembersSameProject { await same.reload() } }
     }
 }

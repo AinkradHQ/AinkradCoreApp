@@ -22,6 +22,7 @@ public final class BrainDemo {
         "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
         "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
         "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
+        "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
         "room-ai-access",
     ]
 
@@ -98,7 +99,9 @@ public final class BrainDemo {
         s.imports = true
         s.semantic =
             scene == "import-review-ai-ready" || scene == "import-review-ai-changes"
-            ? "ready" : scene == "import-review-ai-pending" ? "pending" : "off"
+            ? "ready"
+            : scene == "import-review-ai-pending"
+                ? "pending" : scene == "import-review-ai-declined" ? "declined" : "off"
         let places = SampleImportSource.demoPlaces(
             scene.hasPrefix("import-where-d") || scene == "import-where-searching" ? .disk : .folders,
             endless: scene == "import-where-searching")
@@ -170,9 +173,14 @@ public final class BrainDemo {
         case "import", "import-where-folders", "import-where-disk", "import-where-searching":
             model.show(.rooms)
             model.openImport()
-        case "import-review", "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes":
+        case "import-review", "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes",
+            "import-review-ai-declined", "import-review-same-menu", "import-review-same-project":
             model.show(.rooms)
             await model.openReview(SampleImportTransport.run)
+            if let r = model.importer?.review {
+                if scene == "import-review-same-menu" { r.menuFor = "acme-shop-api" }
+                if scene == "import-review-same-project" { r.openSameProject("acme-shop-api") }
+            }
             if scene == "import-review-ai-changes", let r = model.importer?.review {
                 await r.watching?.value
                 await r.openChanges()

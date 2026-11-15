@@ -26,6 +26,8 @@ struct SemanticStatusLine: View {
                         .buttonStyle(CoreButtonStyle(.plain, size: .small))
                         .help("List every change by name.")
                         .accessibilityIdentifier("brain-review-tidy-changes")
+                } else if review.tidyDeclined {
+                    words(ReviewWords.declined)
                 } else if review.tidyUndone {
                     words("Local AI changes undone. Re-sort runs it again.")
                 } else {

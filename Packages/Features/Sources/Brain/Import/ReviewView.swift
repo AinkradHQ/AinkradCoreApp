@@ -16,6 +16,8 @@ struct ReviewStep: View {
             }
             if r.opened != nil {
                 ReviewDetail(review: r)
+            } else if r.sameProjectFor != nil {
+                SameProjectPicker(review: r)
             } else if r.showingChanges {
                 TidyChangesList(review: r)
             } else if r.visible.isEmpty {
@@ -63,6 +65,7 @@ struct ProposalRow: View {
                     Button("Merge") { Task { await review.merge(card.id, into: s.into) } }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .help("Move everything in \(card.name) into \(s.name).")
+                        .fixedSize()
                 }
                 if card.isUnsorted {
                     StateBadge("Waits in No room yet", tone: .queue, symbol: "tray")
@@ -82,6 +85,7 @@ struct ProposalRow: View {
                                 : "Accept puts it in the import. Refuse leaves it out, next time too.")
                     )
                 }
+                if review.offersSameProject(card) { ProposalMenu(card: card, review: review) }
                 Button {
                     Task { await review.openCard(card.id) }
                 } label: {
@@ -93,6 +97,7 @@ struct ProposalRow: View {
             }
             .disabled(review.busy)
         }
+        .zIndex(review.menuFor == card.id ? 1 : 0)
         .accessibilityIdentifier("brain-room-card-\(card.id)")
     }
 

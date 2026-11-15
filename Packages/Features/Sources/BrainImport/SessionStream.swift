@@ -80,7 +80,7 @@ struct SessionStream {
         }
         guard let turn = r.turn, !turn.text.isEmpty else { return .items([]) }
         let text = turn.text
-        if title == nil, turn.role == "user" { title = text }
+        if title == nil, turn.role == "user", !Self.isInjected(text) { title = text }
         let entry = "\(turn.role == "user" ? "User" : "Assistant"): \(text)"
         var out: [ImportItem] = []
         if !cur.isEmpty, cur.utf8.count + entry.utf8.count + 2 > ItemFormat.partBytes {
@@ -119,6 +119,20 @@ struct SessionStream {
         if let h = held { out += make(h, multi: true) }
         held = part
         return out
+    }
+
+    /// A user turn the harness wrote, not the person: CLAUDE.md / AGENTS.md text, a system reminder, a slash command's
+    /// echo. It is kept in the item, but never names it.
+    static func isInjected(_ text: String) -> Bool {
+        let t = text.drop { $0.isWhitespace }
+        let line = t.prefix { $0 != "\n" }
+        let tags = [
+            "<system-reminder>", "<command-", "<local-command-", "<environment_context>", "<user_instructions>",
+            "Caveat:",
+        ]
+        if tags.contains(where: { t.hasPrefix($0) }) { return true }
+        return (line.hasPrefix("# ") || line.hasPrefix("Contents of "))
+            && (line.contains("CLAUDE.md") || line.contains("AGENTS.md") || line.contains("claudeMd"))
     }
 
     private mutating func make(_ part: String, multi: Bool) -> [ImportItem] {

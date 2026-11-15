@@ -14,6 +14,7 @@ extension BrainModel {
                 resume: service?.isSample == true ? nil : .standard(), places: importPlaces)
             importer?.service = service
         }
+        importer?.review.canSameProject = remembersSameProject
         guard let importer, await importer.reviewExisting(run) else {
             sync?.notice = "Finish the import in progress first."
             return
@@ -39,6 +40,7 @@ extension BrainModel {
                 resume: service?.isSample == true ? nil : .standard(), places: importPlaces)
             importer?.service = service
         }
+        importer?.review.canSameProject = remembersSameProject
         guard let importer else { return }
         let shell = host.shell
         shell.present(
