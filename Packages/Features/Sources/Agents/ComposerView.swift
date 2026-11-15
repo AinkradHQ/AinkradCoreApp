@@ -46,8 +46,9 @@ struct ComposerView: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     var focused: FocusState<Bool>.Binding
-    /// ⌘F while typing: the session's find bar.
-    var find: () -> Void = {}
+    /// A session shortcut pressed while typing (`SessionShortcut`): true when the session took it.
+    var command: (SessionShortcut) -> Bool = { _ in false }
+    @Environment(\.sessionUI) private var ui
     @Environment(\.corePalette) private var palette
     @State private var pick = 0
     @State private var dropping = false
@@ -71,6 +72,7 @@ struct ComposerView: View {
                 .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
                 .coreWell()
+                .readingColumn()
                 .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
         } else {
             composer
@@ -102,9 +104,8 @@ struct ComposerView: View {
                 .coreFont(size: MacTextSize.body)
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
-                        .disabled(!enabled).help("Attach a file: adds its path to the message")
+                        .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)")
                     modelPicker
-                    stateChip
                     Spacer(minLength: Space.s2)
                     if bytes > AgentsModel.messageLimit / 2 {
                         Text("\(coreDecimal(Double(bytes) / 1024, 1)) / 16 KiB")
@@ -114,7 +115,7 @@ struct ComposerView: View {
                     if model.canStopTurn(session) {
                         Button("Stop turn") { model.stopTurn(session.id) }
                             .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "esc")
-                            .help("Stop the current turn (Esc). The session stays open.")
+                            .help("Stop the current turn (Esc or ⌘.). The session stays open.")
                     }
                     if enabled {
                         Button(action: { Task { await model.send(session.id) } }) {
@@ -152,8 +153,10 @@ struct ComposerView: View {
             }
             .coreDimWhenDisabled(enabled || session.over)
         }
+        .readingColumn()
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
         .onChange(of: text) { _, _ in pick = 0 }
+        .onChange(of: ui?.attach) { _, _ in if enabled { attach() } }
     }
 
     private func palette(_ list: [(name: String, help: String)]) -> some View {
@@ -182,19 +185,6 @@ struct ComposerView: View {
         .accessibilityLabel("Commands")
     }
 
-    /// What the session is doing, beside the tool: blue while it works, amber while an approval waits. Nothing when idle.
-    @ViewBuilder private var stateChip: some View {
-        if model.waiting(session.id) {
-            StateBadge("Waiting for your answer", tone: .warn, symbol: "hand.raised")
-        } else if model.canStopTurn(session) {
-            TimelineView(.periodic(from: session.updatedAt, by: 1)) { ctx in
-                StateBadge(
-                    "Thinking · " + coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(session.updatedAt))))", "s"),
-                    tone: .done, symbol: "ellipsis")
-            }
-        }
-    }
-
     /// The tool and its model; for Claude Code a menu that switches the model with the tool's own `/model` command. Other
     /// tools show their model as a label (they have no in-session switch the app can send).
     @ViewBuilder private var modelPicker: some View {
@@ -205,7 +195,8 @@ struct ComposerView: View {
                     CoreDropdownItem(
                         m.title, checked: (session.model ?? "").lowercased().contains(m.id), note: m.note
                     ) { Task { await model.say(session.id, "/model \(m.id)") } }
-                }
+                },
+                isPresented: Binding(get: { ui?.modelMenu ?? false }, set: { ui?.modelMenu = $0 })
             ) {
                 HStack(spacing: Space.s1) {
                     Text(label)
@@ -215,7 +206,7 @@ struct ComposerView: View {
                 .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
                 .background(GlassInk.well, in: coreShape(Radius.chip))
             }
-            .help("Switch the model for the rest of this session")
+            .help("Switch the model for the rest of this session (⇧⌘M)")
         } else {
             CoreChip(label)
         }
@@ -268,7 +259,7 @@ struct ComposerView: View {
                 }
                 return true
             },
-            find: find)
+            command: { e in SessionShortcut.match(e).map(command) ?? false })
     }
 
     /// The 📎 button: pick files to attach.

@@ -9,8 +9,8 @@ struct ComposerKeys {
     var down: () -> Bool
     var tab: () -> Bool
     var escape: () -> Bool
-    /// ⌘F (the menu's Find): the conversation's find bar, not the text view's own.
-    var find: () -> Void = {}
+    /// A session shortcut (⌘F, ⌘↩, ⇧⌘R…, `SessionShortcut`): true when the session took it.
+    var command: (NSEvent) -> Bool = { _ in false }
 }
 
 /// The composer's text field (Ahmed, 2026-11-15: Enter sometimes did not send, and the command list ignored the arrows).
@@ -121,16 +121,10 @@ final class KeyTextView: NSTextView {
     var onFocus: ((Bool) -> Void)?
     var onFiles: (([URL]) -> Void)?
 
-    /// ⌘F while the field has the cursor opens the conversation's find bar (no menu item owns ⌘F; the pane's own ⌘F handler
-    /// never hears it while AppKit's text view is first responder).
+    /// The session's shortcuts while the field has the cursor (⌘F opens the conversation's find bar, not the text view's):
+    /// the pane's own key handler never hears them while AppKit's text view is first responder.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if window?.firstResponder === self, let keys,
-            event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-            event.charactersIgnoringModifiers?.lowercased() == "f"
-        {
-            keys.find()
-            return true
-        }
+        if window?.firstResponder === self, let keys, keys.command(event) { return true }
         return super.performKeyEquivalent(with: event)
     }
 

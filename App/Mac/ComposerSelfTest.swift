@@ -148,7 +148,14 @@ enum ComposerSelfTest {
             windowNumber: window.windowNumber, context: nil, characters: "f", charactersIgnoringModifiers: "f",
             isARepeat: false, keyCode: 3)
         {
-            NSApp.sendEvent(e)  // as a key press arrives: the window's key equivalents first, then the menu
+            // As a key press arrives: the window's key equivalents first, then the menu. A window that is not key (another
+            // app is in front) never gets the event from the app, so hand it to the window's key equivalents directly.
+            if window.isKeyWindow {
+                NSApp.sendEvent(e)
+            } else {
+                note("window not key: ⌘F sent to the window's key equivalents")
+                _ = window.performKeyEquivalent(with: e)
+            }
         }
         try? await Task.sleep(for: .milliseconds(800))
         func findField(_ v: NSView?) -> NSTextField? {
@@ -170,6 +177,34 @@ enum ComposerSelfTest {
         window.makeFirstResponder(tv)
         await key("\u{1B}", 53)
         note("escape: first responder after = \(type(of: window.firstResponder as Any))")
+        // Session shortcuts typed in the message field reach the session (ComposerKeys.command): ⇧⌘K puts /compact in the
+        // field; ⇧⌘C copies the agent's last words.
+        func chord(_ c: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags) {
+            window.makeFirstResponder(tv)
+            guard
+                let e = NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: flags,
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                    characters: c, charactersIgnoringModifiers: c, isARepeat: false, keyCode: code)
+            else { return }
+            _ = window.performKeyEquivalent(with: e)
+        }
+        a.drafts[s.id] = ""
+        chord("k", 40, [.command, .shift])
+        try? await Task.sleep(for: .milliseconds(300))
+        check(
+            "⇧⌘K from the field puts /compact in it", a.drafts[s.id] == "/compact ",
+            "draft = \"\(a.drafts[s.id] ?? "")\"")
+        a.drafts[s.id] = ""
+        NSPasteboard.general.clearContents()
+        chord("c", 8, [.command, .shift])
+        try? await Task.sleep(for: .milliseconds(300))
+        let last = (a.transcripts[s.id]?.entries ?? []).reversed().lazy.compactMap { e -> String? in
+            if case .assistant(let t) = e.kind { t } else { nil }
+        }.first
+        let copied = NSPasteboard.general.string(forType: .string)
+        check("⇧⌘C copies the last answer", last != nil && copied == last, "copied \(copied?.count ?? 0) characters")
+        a.shell.toast = nil
     }
 
     private static func find(_ v: NSView?) -> NSTextView? {
@@ -194,24 +229,57 @@ enum ShowcaseShots {
         app.shell.closeAllPanes()
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")
         try? await Task.sleep(for: .seconds(2.5))
+        // Scrolled with wheel events, as a person scrolls: SwiftUI ignores a clip view moved behind its back, and its lazy
+        // column then draws nothing at the new offset.
         let scroll = transcriptScroll(window.contentView)
-        let height = scroll?.documentView?.frame.height ?? 0
         let page = max((scroll?.contentView.bounds.height ?? 600) - 80, 200)
-        var y = 0.0
+        for _ in 0..<40 { wheel(scroll, dy: 2000) }  // to the top
+        try? await Task.sleep(for: .seconds(1))
         var n = 1
+        var last = -1.0
         while n <= 8 {
-            scroll?.contentView.scroll(to: NSPoint(x: 0, y: y))
-            if let s = scroll { s.reflectScrolledClipView(s.contentView) }
-            try? await Task.sleep(for: .seconds(1))
             _ = SnapshotCapture.png(window, to: "\(dir)/showcase-\(n)-\(theme).png")
-            y += page
+            let y = scroll?.contentView.bounds.origin.y ?? 0
+            if y == last { break }
+            last = y
+            wheel(scroll, dy: -page)
+            try? await Task.sleep(for: .seconds(1))
             n += 1
-            if y >= height { break }
         }
         app.shell.closeAllPanes()
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
         try? await Task.sleep(for: .seconds(2.5))
         _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
+        // ⌘/ from the message field: the list of the screen's keys.
+        if let tv = composer(window.contentView) {
+            window.makeFirstResponder(tv)
+            if let e = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: .command,
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                characters: "/", charactersIgnoringModifiers: "/", isARepeat: false, keyCode: 44)
+            {
+                _ = window.performKeyEquivalent(with: e)
+            }
+            try? await Task.sleep(for: .seconds(1))
+            _ = SnapshotCapture.png(window, to: "\(dir)/shortcuts-\(theme).png")
+        }
+    }
+
+    private static func composer(_ v: NSView?) -> NSTextView? {
+        guard let v else { return nil }
+        if let t = v as? NSTextView, t.accessibilityIdentifier() == "agent-composer" { return t }
+        for sub in v.subviews { if let t = composer(sub) { return t } }
+        return nil
+    }
+
+    /// One scroll-wheel step of `dy` points (positive scrolls up), handed straight to the scroll view.
+    private static func wheel(_ scroll: NSScrollView?, dy: Double) {
+        guard let scroll,
+            let cg = CGEvent(
+                scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(dy), wheel2: 0, wheel3: 0),
+            let e = NSEvent(cgEvent: cg)
+        else { return }
+        scroll.scrollWheel(with: e)
     }
 
     /// The tallest scroll view in the window: the transcript.

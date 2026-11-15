@@ -12,6 +12,7 @@ struct SessionActions: View {
     var stacked = false
 
     @Environment(\.corePalette) private var palette
+    @Environment(\.sessionUI) private var ui
 
     /// A live session has one action: End session, a quiet red outline. A finished one has recovery only: Wake (secondary)
     /// and Start again (blue). A lost one has Resume in the notice above the transcript, so nothing here.
@@ -26,6 +27,7 @@ struct SessionActions: View {
                     Text("Session").coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(
                         .isHeader)
                     Spacer(minLength: 0)
+                    keysButton
                     findButton
                     if session.live { state }
                 }
@@ -34,6 +36,7 @@ struct SessionActions: View {
             }
         } else {
             HStack(spacing: Space.s2) {
+                keysButton
                 findButton
                 if session.live || session.state != .lost { folderTools }
                 state
@@ -45,6 +48,14 @@ struct SessionActions: View {
         if let find {
             CoreIconButton(symbol: "magnifyingglass", label: "Find in this conversation", action: find)
                 .help("Find in this conversation (⌘F)")
+        }
+    }
+
+    /// ⌘/: the list of this screen's keys.
+    @ViewBuilder private var keysButton: some View {
+        if let ui {
+            CoreIconButton(symbol: "keyboard", label: "Keyboard shortcuts") { ui.shortcuts.toggle() }
+                .help("Show every keyboard shortcut of this screen (⌘/)")
         }
     }
 
@@ -62,7 +73,7 @@ struct SessionActions: View {
             }
             .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
             .disabled(model.stopping[session.id] != nil)
-            .help("End the session: the CLI exits and the transcript stays. Esc stops only the current turn.")
+            .help("End the session: the CLI exits and the transcript stays (⇧⌘E). Esc stops only the current turn.")
         } else if session.state != .lost {
             if session.stoppedByBudget {
                 Button("Raise budget…") { model.raiseBudget(session) }
@@ -92,9 +103,9 @@ struct SessionActions: View {
         } label: {
             Label("Terminal here", systemImage: "terminal")
         }
-        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
         .help(
-            "Open a new terminal on \(model.runnerName(session.runner)). The Core cannot start it in the session's folder yet."
+            "Open a new terminal on \(model.runnerName(session.runner)) (⇧⌘T). The Core cannot start it in the session's folder yet."
         )
         .accessibilityIdentifier("session-terminal-here")
     }
@@ -106,9 +117,18 @@ struct SessionActions: View {
     private var onThisMac: Bool { model.host?.thisMacRunnerID == session.runner }
 
     private var openIn: some View {
-        CoreDropdown(items: openInItems) { Label("Open in…", systemImage: "folder") }
-            .help("Reveal the folder in Finder, open it in an editor, or copy it")
-            .accessibilityIdentifier("session-open-in")
+        // Drawn like Terminal here beside it: the same quiet tile, the same size.
+        CoreDropdown(
+            items: openInItems, isPresented: Binding(get: { ui?.openIn ?? false }, set: { ui?.openIn = $0 })
+        ) {
+            Label("Open in…", systemImage: "folder")
+                .coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.primary)
+                .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlMd)
+                .background(GlassInk.well, in: coreShape(Radius.control))
+                .contentShape(coreShape(Radius.control))
+        }
+        .help("Reveal the folder in Finder, open it in an editor, or copy it (⇧⌘O)")
+        .accessibilityIdentifier("session-open-in")
     }
 
     private var openInItems: [CoreDropdownItem] {

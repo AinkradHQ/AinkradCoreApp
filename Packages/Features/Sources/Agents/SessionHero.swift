@@ -1,8 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// The top of a conversation: one slim line with the state badge on the left and the actions on the right (the window tab
-/// already carries the title). Below 1300 pt, where there is no side panel, the Details button (test-fixes decision 1, variant B)
+/// The top of a conversation: one slim line with the session's title, tool and runner on the left and the actions on the
+/// right (Ahmed, 2026-11-15: the tab cut the title short; the state is said once, in the conversation, not here too). Below 1300 pt, where there is no side panel, the Details button (test-fixes decision 1, variant B)
 /// shows or hides a strip of runner, account, order, tokens and cost under it, remembered on this Mac.
 struct SessionHero: View {
     @Bindable var model: AgentsModel
@@ -16,12 +16,10 @@ struct SessionHero: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        let waiting = model.waiting(session.id)
-        let st = AgentWords.status(session, waiting: waiting)
+        let st = AgentWords.status(session, waiting: model.waiting(session.id))
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
-                // The window tab already names the session; the header is just its state and actions.
-                StateBadge(st.label, tone: st.tone, symbol: st.symbol).help(subtitle)
+                titleLine
                 Spacer(minLength: Space.s3)
                 if empty {
                     Button("Advanced…") { model.openNewSession(advanced: true) }
@@ -47,11 +45,25 @@ struct SessionHero: View {
             }
         }
         .foregroundStyle(palette.text)
+        .readingColumn()
         .padding(.horizontal, Space.s4).padding(.top, Space.s3).padding(.bottom, Space.s2)
         .task(id: session.id) { await model.followLedger(session.id) }
         .task(id: session.id) { await model.followRoute(session.id) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(model.title(session))
+    }
+
+    /// "Write a status report for the fleet · Claude Code · mac-studio": the title in full, then where it runs, quieter.
+    private var titleLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+            Text(model.title(session)).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                .truncationMode(.tail).layoutPriority(1)
+            Text([AgentWords.toolName(session.harness), model.runnerName(session.runner)].joined(separator: " · "))
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+        }
+        .help(model.title(session) + "\n" + subtitle)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     /// A session with nothing in it yet is the quick "New AI session" page: the header offers Advanced….
@@ -68,7 +80,10 @@ struct SessionHero: View {
             Label("Details", systemImage: "info.square")
         }
         .buttonStyle(CoreButtonStyle(showDetails ? .prominent : .secondary, size: .small))
-        .help(showDetails ? "Hide the details under the header" : "Show the runner, account, tokens and cost")
+        .help(
+            showDetails
+                ? "Hide the details under the header (⌥⌘I)" : "Show the runner, account, tokens and cost (⌥⌘I)"
+        )
         .accessibilityValue(showDetails ? "Shown" : "Hidden")
         .accessibilityIdentifier("session-details")
     }

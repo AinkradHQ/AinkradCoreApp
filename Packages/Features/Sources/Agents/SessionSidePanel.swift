@@ -1,20 +1,22 @@
 import CoreUI
 import SwiftUI
 
-/// The conversation's side panel (windows of 1300 pt and up, N42): files touched with their diffs, folder and branch, context
-/// as a bar, cost per turn, the runner and the account. Under that width the same facts live in the Details strip.
+/// The conversation's side panel (windows of 1300 pt and up, N42), four cards (Ahmed, 2026-11-15: fewer, calmer): the
+/// session's actions, files touched with their diffs, usage (context and cost), and where it runs (runner, account, tool,
+/// folder, branch). Under that width the same facts live in the Details strip.
 struct SessionSidePanel: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     var find: (() -> Void)?
     @State private var openFile: String?
-    @State private var reviewing = false
     @Environment(\.corePalette) private var palette
+    @Environment(\.sessionUI) private var ui
+    private var reviewing: Bool { ui?.reviewing ?? false }
 
     var body: some View {
         let files = model.filesTouched(session.id)
         if reviewing {
-            ReviewPane(model: model, session: session, diff: diff) { reviewing = false }
+            ReviewPane(model: model, session: session, diff: diff) { ui?.reviewing = false }
                 .task(id: session.id) { await model.followRoute(session.id) }
         } else {
             cards(files)
@@ -29,7 +31,7 @@ struct SessionSidePanel: View {
                     .coreWell()
                 section(
                     "Files touched", symbol: "doc", count: files.count,
-                    review: files.isEmpty ? nil : { reviewing = true }
+                    review: files.isEmpty ? nil : { ui?.reviewing = true }
                 ) {
                     if files.isEmpty {
                         Text("Nothing changed yet.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
@@ -55,21 +57,19 @@ struct SessionSidePanel: View {
                         }
                     }
                 }
-                section("Folder and branch", symbol: "arrow.triangle.branch") {
-                    row("Project", session.project ?? "Fresh folder")
-                    if let b = session.branch { row("Branch", b, mono: true) }
-                }
                 section(
-                    "Context", symbol: "gauge.with.dots.needle.50percent",
+                    "Usage", symbol: "gauge.with.dots.needle.50percent",
                     action: model.canWrite(session) ? ("/compact", { model.drafts[session.id] = "/compact " }) : nil
                 ) {
                     let ctx = ConversationWords.context(
                         used: session.usage?.tokens ?? 0, window: ContextWindow.tokens(model: session.model))
+                    HStack {
+                        Text("Context").foregroundStyle(palette.text2)
+                        Spacer()
+                        Text(ctx.text).foregroundStyle(palette.text2).monospacedDigit()
+                    }
+                    .coreFont(size: MacTextSize.meta)
                     CoreMeter(ctx.fill, label: "Context used")
-                    Text(ctx.text)
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
-                }
-                section("Cost", symbol: "dollarsign") {
                     let turns = model.turnCosts(session.id)
                     let top = max(turns.map(\.cost).max() ?? 1, 1)
                     ForEach(turns, id: \.turn) { n, c in
@@ -84,7 +84,7 @@ struct SessionSidePanel: View {
                         .coreFont(size: MacTextSize.meta)
                     }
                     HStack {
-                        Text("This session").fontWeight(.semibold)
+                        Text("Cost this session").fontWeight(.semibold)
                         Spacer()
                         Text(AgentWords.cost(session.usage?.costMicros) ?? "—").fontWeight(.semibold)
                             .monospacedDigit()
@@ -92,10 +92,12 @@ struct SessionSidePanel: View {
                     }
                     .coreFont(size: MacTextSize.body)
                 }
-                section("Runner and account", symbol: "server.rack") {
+                section("Where it runs", symbol: "server.rack") {
                     row("Runner", model.runnerName(session.runner))
                     if let a = session.route?.account { row("Account", model.accountNames[a] ?? "an account") }
                     row("Tool", AgentWords.toolName(session.harness) + (session.model.map { " · \($0)" } ?? ""))
+                    row("Folder", session.project ?? "Fresh folder")
+                    if let b = session.branch { row("Branch", b, mono: true) }
                 }
             }
             .foregroundStyle(palette.text)
@@ -119,7 +121,8 @@ struct SessionSidePanel: View {
 
     private func row(_ k: String, _ v: String, mono: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-            Text(k).foregroundStyle(palette.text2).frame(width: Space.s8 + Space.s6, alignment: .leading)
+            Text(k).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                .frame(width: Space.s8 + Space.s6, alignment: .leading)
             Text(v).coreFont(size: MacTextSize.body, design: mono ? .monospaced : .default).lineLimit(2)
                 .truncationMode(.middle)
             Spacer(minLength: 0)
@@ -142,11 +145,11 @@ struct SessionSidePanel: View {
                 Spacer(minLength: 0)
                 if let review {
                     Button("Review", action: review).buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Review the changes")
+                        .help("Review the changes (⇧⌘R)")
                 }
                 if let action {
                     Button(action.0, action: action.1).buttonStyle(CoreButtonStyle(.plain, size: .small))
-                        .help("Put \(action.0) in the message field")
+                        .help("Put \(action.0) in the message field (⇧⌘K)")
                 }
             }
             c()

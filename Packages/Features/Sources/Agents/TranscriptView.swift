@@ -13,6 +13,10 @@ struct TranscriptView: View {
     @State private var atEnd = true
     /// A scroll to the end is queued for the next frame: a burst of entries asks once, not once each.
     @State private var scrollQueued = false
+    /// Runs of tool steps the person opened or folded (by first seq); ⌥⌘→ / ⌥⌘← set them all.
+    @State private var runOpen: [Int64: Bool] = [:]
+    @State private var runsAll: Bool?
+    @Environment(\.sessionUI) private var ui
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -30,16 +34,23 @@ struct TranscriptView: View {
                     LazyVStack(alignment: .leading, spacing: Space.s3) {
                         header(store)
                         let turns = ConversationWords.turns(store.entries)
-                        ForEach(Self.visible(store.entries)) { e in
-                            row(e, store, turn: turns[e.seq])
-                                .background {
-                                    if e.seq == focus {
-                                        coreShape(Radius.control).fill(GlassInk.blue.opacity(0.16)).padding(-Space.s1)
+                        ForEach(columnRows(store)) { c in
+                            Group {
+                                switch c.kind {
+                                case .entry(let e, let inRun):
+                                    marked(e) { row(e, store, turn: turns[e.seq]) }
+                                        .padding(.leading, inRun ? Space.s4 : 0)
+                                case .run(let es, let open):
+                                    ToolRunHeader(entries: es, open: open) {
+                                        withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+                                            runOpen[es[0].seq] = !open
+                                        }
                                     }
                                 }
-                                .id(e.seq)
-                                // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
-                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
+                            }
+                            .id(c.id)
+                            // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
+                            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
                         // The Core's own holds are not transcript entries: they stand after the last one, newest last.
                         ForEach(store.heldList.filter { $0.status(now: Date(), sessionOver: session.over) != .pending })
@@ -55,6 +66,7 @@ struct TranscriptView: View {
                             .onAppear { atEnd = true }
                             .onDisappear { atEnd = false }
                     }
+                    .readingColumn()
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
                 }
                 .shortStartsAtTop()
@@ -70,9 +82,20 @@ struct TranscriptView: View {
                     }
                 }
                 .onChange(of: jump) { _, _ in toEnd(proxy) }
+                .onChange(of: ui?.steps.gen) { _, _ in
+                    guard let ui else { return }
+                    withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+                        runOpen = [:]
+                        runsAll = ui.steps.open
+                    }
+                }
                 .onChange(of: focus) { _, f in
                     guard let f else { return }
-                    withAnimation(Motion.calm(Motion.out(Motion.move), reduce)) { proxy.scrollTo(f, anchor: .center) }
+                    // A match inside a folded run opens it (columnRows), so the entry itself is in the column.
+                    let target = f
+                    withAnimation(Motion.calm(Motion.out(Motion.move), reduce)) {
+                        proxy.scrollTo(target, anchor: .center)
+                    }
                 }
                 .onChange(of: store.heldList.count) { _, _ in if atEnd { toEnd(proxy) } }
                 if !atEnd {
@@ -84,6 +107,23 @@ struct TranscriptView: View {
                         .padding(.bottom, Space.s2)
                         .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                 }
+            }
+        }
+    }
+
+    private func columnRows(_ store: TranscriptStore) -> [ColumnRow] {
+        ColumnRow.rows(TranscriptItem.items(Self.visible(store.entries))) { seq, es in
+            // A run holding the find bar's match opens, so the mark can show.
+            if let focus, es.contains(where: { $0.seq == focus }) { return true }
+            return runOpen[seq] ?? runsAll ?? ColumnRow.openByDefault(es)
+        }
+    }
+
+    /// The find bar's or a turn jump's mark behind an entry.
+    private func marked(_ e: TranscriptEntry, @ViewBuilder _ c: () -> some View) -> some View {
+        c().background {
+            if e.seq == focus {
+                coreShape(Radius.control).fill(GlassInk.blue.opacity(0.16)).padding(-Space.s1)
             }
         }
     }
@@ -194,8 +234,13 @@ struct EntryRow: View, Equatable {
             && a.actions?.canSend == b.actions?.canSend
     }
     @Environment(\.corePalette) private var palette
+    @Environment(\.sessionUI) private var ui
 
     var body: some View {
+        content.onChange(of: ui?.steps.gen) { _, _ in if let ui { expanded = ui.steps.open } }
+    }
+
+    @ViewBuilder private var content: some View {
         switch entry.kind {
         case .user(let text):
             // The words in the bubble; attached images and files under it.
@@ -254,10 +299,14 @@ struct EntryRow: View, Equatable {
             SubAgentCard(type: type, task: task, prompt: prompt, result: result, ok: ok, durationMs: ms)
         case .plan(_, let text): PlanCard(text: text)
         case .turnEnded(let cost, let tokens):
-            line(ConversationWords.turn(turn, cost: cost))
+            // The quietest line in the column (Ahmed, 2026-11-15): the time and the exact numbers wait in the tooltip.
+            line(ConversationWords.turn(turn, cost: cost), time: false)
+                .opacity(0.7)
                 .help(
-                    [tokens.map { "\(AgentWords.tokens($0)) tokens" }, AgentWords.exactCost(cost)].compactMap { $0 }
-                        .joined(separator: " · "))
+                    [
+                        entry.at.formatted(date: .omitted, time: .shortened),
+                        tokens.map { "\(AgentWords.tokens($0)) tokens" }, AgentWords.exactCost(cost),
+                    ].compactMap { $0 }.joined(separator: " · "))
         case .approvalRequest, .approvalDecided: EmptyView()  // drawn as one card by the transcript
         case .ended(let kind, let reason):
             line([ConversationWords.event(entry.kind, runner: runner) ?? ""])
@@ -274,8 +323,8 @@ struct EntryRow: View, Equatable {
     }
 
     /// An event as one quiet centred line (N42): "Turn 1 done · 1.9K tokens · $0.04 · 10:38". No rules, no dashes.
-    private func line(_ parts: [String]) -> some View {
-        Text((parts + [entry.at.formatted(date: .omitted, time: .shortened)]).joined(separator: " · "))
+    private func line(_ parts: [String], time: Bool = true) -> some View {
+        Text((parts + (time ? [entry.at.formatted(date: .omitted, time: .shortened)] : [])).joined(separator: " · "))
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
             .lineLimit(1).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s1)

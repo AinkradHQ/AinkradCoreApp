@@ -17,6 +17,9 @@ struct SessionView: View {
     @State private var findQuery = ""
     @State private var findIndex = 0
     @State private var focusSeq: Int64?
+    /// What the screen has open (Open in…, the model menu, Review, the shortcut list), shared so a key opens what a click does.
+    @State private var ui = SessionUI()
+    @AppStorage("agents.detailsStrip") private var showDetails = true
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -47,11 +50,11 @@ struct SessionView: View {
             .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in typing ? .ignored : write(s) }
             .onKeyPress(.downArrow) { typing ? .ignored : latest() }
             .onKeyPress(.end) { typing ? .ignored : latest() }
-            // ⌘F finds in the conversation, wherever the keyboard is in the pane; ⌥↑ ⌥↓ jump between your messages.
-            .onKeyPress(keys: ["f"]) { press in
-                guard press.modifiers.contains(.command) else { return .ignored }
-                openFind()
-                return .handled
+            // The session's shortcuts (⌘F, ⌘↩, ⇧⌘R…), wherever the keyboard is in the pane; the message field hands over the
+            // same ones itself (ComposerKeys.command). ⌥↑ ⌥↓ jump between your messages.
+            .onKeyPress(phases: .down) { press in
+                guard let key = SessionShortcut.match(press.key.character, press.modifiers) else { return .ignored }
+                return run(key, s) ? .handled : .ignored
             }
             .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                 guard press.modifiers.contains(.option), !typing else { return .ignored }
@@ -71,6 +74,14 @@ struct SessionView: View {
                 }
                 return .handled
             }
+            .overlay(alignment: .top) {
+                if ui.shortcuts {
+                    ShortcutSheet { ui.shortcuts = false }.padding(.top, Space.s8 * 2).padding(.horizontal, Space.s4)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Motion.out(Motion.ui), value: ui.shortcuts)
+            .environment(\.sessionUI, ui)
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
@@ -91,6 +102,7 @@ struct SessionView: View {
                         focusSeq = nil
                     }
                 )
+                .readingColumn()
                 .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
                 .onChange(of: findQuery) { _, _ in
                     findIndex = 0
@@ -116,12 +128,12 @@ struct SessionView: View {
                     SessionRouteCues(model: model, session: s)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .readingColumn()
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump, focus: focusSeq)
                 .frame(maxWidth: .infinity)
-            PinnedApprovals(model: model, session: s)
-            ComposerView(model: model, session: s, focused: $composing, find: openFind)
+            PinnedApprovals(model: model, session: s).readingColumn().padding(.horizontal, Space.s4)
+            ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
                 .frame(maxWidth: .infinity)
         }
         // A plan card's Go ahead approves the tool's pending plan request, or tells the agent to build; Change it starts a
@@ -130,6 +142,69 @@ struct SessionView: View {
         // The conversation's own text size and typeface (Settings, AI Sessions, Text).
         .environment(\.coreTextScale, AgentPrefs.shared.textScale)
         .environment(\.coreFontDesign, AgentPrefs.shared.fontDesign)
+    }
+
+    /// Runs a session shortcut; false when it does not apply now, so the key goes on (to the text field, say).
+    private func run(_ key: SessionShortcut, _ s: AgentSessionInfo) -> Bool {
+        let pending = (model.transcripts[s.id]?.approvalList ?? [])
+            .contains { $0.status(now: Date(), sessionOver: s.over) == .pending }
+        switch key {
+        case .find: openFind()
+        case .findNext, .findPrevious:
+            guard finding else { return false }
+            findStep(key == .findNext ? 1 : -1)
+        // A waiting approval's own buttons hold ⌘↩ and ⌘⌫; with none, ⌘↩ and ⇧⌘↩ answer the newest plan.
+        case .goAhead, .changePlan:
+            guard !pending, model.canReply(s), latestPlan != nil else { return false }
+            let a = planActions(s)
+            if key == .goAhead { a.goAhead() } else { a.change() }
+        case .stopTurn:
+            guard model.canStopTurn(s) else { return false }
+            model.stopTurn(s.id)
+        case .endSession:
+            guard s.live, model.stopping[s.id] == nil else { return false }
+            model.confirmEnd(s.id)
+        case .terminal:
+            guard s.live || s.state != .lost else { return false }
+            model.host?.openTerminal(on: s.runner)
+        case .openIn:
+            guard s.live || s.state != .lost else { return false }
+            ui.openIn.toggle()
+        case .review:
+            guard !model.filesTouched(s.id).isEmpty else { return false }
+            ui.reviewing.toggle()
+        case .attach:
+            guard model.canWrite(s) else { return false }
+            ui.attach += 1
+        case .model:
+            guard s.harness == "claude", model.canWrite(s) else { return false }
+            ui.modelMenu.toggle()
+        case .compact:
+            guard model.canWrite(s) else { return false }
+            model.drafts[s.id] = "/compact "
+            composing = true
+        case .copyAnswer:
+            guard let text = lastAnswer else { return false }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            model.shell.showToast("Copied the last answer", actionTitle: "")
+        case .expandSteps, .collapseSteps:
+            ui.steps = (ui.steps.gen + 1, key == .expandSteps)
+        case .details: withAnimation(Motion.out(Motion.ui)) { showDetails.toggle() }
+        case .shortcuts: ui.shortcuts.toggle()
+        }
+        return true
+    }
+
+    /// The newest plan the agent proposed, if the conversation has one.
+    private var latestPlan: Int64? {
+        entries.last { if case .plan = $0.kind { true } else { false } }?.seq
+    }
+
+    /// The agent's last words, for ⇧⌘C.
+    private var lastAnswer: String? {
+        for e in entries.reversed() { if case .assistant(let t) = e.kind { return t } }
+        return nil
     }
 
     private var entries: [TranscriptEntry] { model.transcripts[sessionID]?.entries ?? [] }
@@ -211,7 +286,7 @@ struct PinnedApprovals: View {
                 VStack(spacing: Space.s2) {
                     ForEach(pending) { r in ApprovalEntryCard(model: model, request: r) }
                 }
-                .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
+                .padding(.bottom, Space.s2)
                 .transition(.opacity)
             }
         }
