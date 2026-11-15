@@ -232,7 +232,28 @@ extension View {
     /// A card or component inside content (Ahmed, 2026-11-06: the glass frame is only for panes, dialogs, pop-ups and
     /// menus, never for what sits inside them): a raised card, one step lighter than the pane with a soft shadow, lit when active.
     public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
-        background(active ? GlassInk.cardHover : GlassInk.card, in: coreShape(radius))
+        background { CardFill(radius: radius, active: active) }
             .shadow(color: GlassInk.shade(0.14), radius: 6, y: 2)
+    }
+}
+
+/// A card's fill (Ahmed, 2026-11-15): it follows the Content background one step weaker than the pane, so a card never
+/// glows solid white on a see-through pane. Its opacity scales with the Look's; a Blurred look gives it a light blur of
+/// its own; Reduce Transparency makes it solid.
+struct CardFill: View {
+    let radius: CGFloat
+    let active: Bool
+    @Environment(\.coreLook) private var look
+    @Environment(\.coreSolidOnly) private var solid
+
+    var body: some View {
+        let shape = coreShape(radius)
+        // Night: a light lift over the dark pane. Day: white, as see-through as the Look allows.
+        let day = solid ? 0.95 : min(0.92, 0.2 + look.opacity * 0.55) + (active ? 0.08 : 0)
+        let night = (solid ? 0.08 : 0.06) + (active ? 0.03 : 0)
+        ZStack {
+            if look.mode.blur && !solid { shape.fill(.ultraThinMaterial).opacity(0.4) }
+            shape.fill(GlassInk.adaptive(.white.opacity(night), day: .white.opacity(day)))
+        }
     }
 }
