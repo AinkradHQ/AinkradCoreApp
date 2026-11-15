@@ -134,11 +134,10 @@ public struct ShellView: View {
         let ws = shell.surface == .workspace
         let day = scheme == .light
         return Color.clear.overlay {
-            Image(day ? "HomeSkyDay" : "HomeSky", bundle: .main).resizable().scaledToFill()
+            WallpaperView()
                 .colorMultiply(Color(white: ws ? (day ? 0.9 : 0.62) : 1))
                 .saturation(ws ? (day ? 0.8 : 0.85) : 1)
                 .scaleEffect(ws && !reduce ? 1.03 : 1)
-                .overlay(day ? GlassInk.daySkyVeil : .clear)
         }
         .clipped()
         .animation(Motion.calm(Motion.out(0.5), reduce), value: ws)

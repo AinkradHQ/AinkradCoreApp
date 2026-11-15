@@ -17,8 +17,8 @@ public enum GlassInk {
     /// Neutral edge: white 0.30 at night, the least that reads 3:1 over the glass (measured 2026-11-09); white 0.7 by day.
     public static let wellEdge = adaptive(.white.opacity(0.3), day: .white.opacity(0.7))
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
-    public static let blue = adaptive(
-        Color(red: 0.25, green: 0.6, blue: 1), day: Color(red: 0.122, green: 0.42, blue: 0.878))
+    /// The accent (Settings, Appearance; graphite by default). Named blue from when blue was the only accent.
+    public static var blue: Color { AccentPrefs.shared.accent.fill }
     /// Needs you: the one warm hue. Attention, approval waiting, a warning. Never decoration.
     public static let amber = Color(red: 1, green: 0.62, blue: 0.1)
     /// Status only: ok. Muted use, on a state badge, meter or dot. Darker by day so it reads as text on light glass.
@@ -29,8 +29,7 @@ public enum GlassInk {
         Color(red: 1, green: 0.38, blue: 0.4), day: Color(red: 0.9, green: 0.2, blue: 0.165))
     // The same hues as TEXT: lighter at night, darker by day, so red, amber and the blue link read 4.5:1 or better on
     // the glass. Fills, tiles and bars keep the hues above.
-    public static let blueInk = adaptive(
-        Color(red: 0.52, green: 0.76, blue: 1), day: Color(red: 0.102, green: 0.361, blue: 0.776))
+    public static var blueInk: Color { AccentPrefs.shared.accent.ink }
     public static let amberInk = adaptive(
         Color(red: 1, green: 0.70, blue: 0.30), day: Color(red: 0.64, green: 0.345, blue: 0))
     public static let redInk = adaptive(

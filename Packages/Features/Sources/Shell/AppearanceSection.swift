@@ -13,12 +13,14 @@ struct AppearanceSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
     @Bindable private var textSize = TextSizePrefs.shared
+    @Bindable private var accent = AccentPrefs.shared
+    @Bindable private var wallpaper = WallpaperPrefs.shared
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Theme", sub: "The desktop sky and the glass follow it.", symbol: "circle.lefthalf.filled",
+                "Theme", sub: "Night or day for every window.", symbol: "circle.lefthalf.filled",
                 hue: GlassInk.blue
             ) {
                 Text(now).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
@@ -31,8 +33,49 @@ struct AppearanceSection: View {
                 }
             }
             GlassSection(
+                "Accent", sub: "Selection, the main button and switches. Status colours stay as they are.",
+                symbol: "paintbrush", hue: GlassInk.blue, index: 1
+            ) {
+                Text(accent.accent.title).coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
+            } content: {
+                HStack(spacing: Space.s3) {
+                    ForEach(CoreAccent.allCases, id: \.self) { a in
+                        AccentTile(accent: a, selected: accent.accent == a) {
+                            withAnimation(Motion.out(Motion.ui)) { accent.accent = a }
+                        }
+                    }
+                }
+            }
+            GlassSection(
+                "Wallpaper", sub: "Behind every window. Plain is the calmest for long days.", symbol: "photo",
+                hue: GlassInk.blue, index: 2
+            ) {
+                if wallpaper.choice == .picture {
+                    AppActionTile(title: "Change picture…", symbol: "photo", key: "", hue: GlassInk.slate) {
+                        wallpaper.choosePicture()
+                    }
+                } else {
+                    Text(wallpaper.choice.title).coreFont(size: MacTextSize.meta, weight: .semibold)
+                        .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
+                }
+            } content: {
+                HStack(alignment: .top, spacing: Space.s3) {
+                    ForEach(CoreWallpaper.allCases, id: \.self) { w in
+                        WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil)
+                        {
+                            if w == .picture && wallpaper.picture == nil {
+                                wallpaper.choosePicture()
+                            } else {
+                                withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = w }
+                            }
+                        }
+                    }
+                }
+            }
+            GlassSection(
                 "Text size", sub: "How large the words are in every window. 100% is the usual size.",
-                symbol: "textformat.size", hue: GlassInk.blue, index: 1
+                symbol: "textformat.size", hue: GlassInk.blue, index: 3
             ) {
                 Text(textSize.scale.formatted(.percent.precision(.fractionLength(0))))
                     .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
@@ -44,7 +87,7 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",
-                symbol: "square.on.square", hue: GlassInk.blue, index: 2
+                symbol: "square.on.square", hue: GlassInk.blue, index: 4
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
@@ -52,7 +95,7 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
-                hue: GlassInk.slate, index: 3
+                hue: GlassInk.slate, index: 5
             ) {
                 AppActionTile(
                     title: advanced ? "Hide" : "Show", symbol: advanced ? "chevron.up" : "chevron.down", key: "",
@@ -119,6 +162,81 @@ struct AppearanceSection: View {
     }
 }
 
+/// One wallpaper as a small picture with its name; "Your picture" asks for one the first time.
+private struct WallpaperTile: View {
+    let choice: CoreWallpaper
+    let selected: Bool
+    let hasPicture: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Group {
+                    if choice == .picture && !hasPicture {
+                        GlassInk.well.overlay {
+                            Image(systemName: "plus").font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(GlassInk.secondary)
+                        }
+                    } else {
+                        WallpaperView(choice)
+                    }
+                }
+                .frame(maxWidth: .infinity).frame(height: 72)
+                .clipShape(coreShape(Radius.cardMac))
+                .overlay {
+                    coreShape(Radius.cardMac).strokeBorder(
+                        GlassInk.primary.opacity(selected ? 0.6 : hovering ? 0.3 : 0.1), lineWidth: selected ? 1.5 : 1)
+                }
+                Text(choice == .picture && !hasPicture ? "Choose a picture…" : choice.title)
+                    .coreFont(size: MacTextSize.meta, weight: selected ? .semibold : .regular)
+                    .foregroundStyle(selected ? GlassInk.primary : GlassInk.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel("\(choice.title) wallpaper")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// One accent as a rounded swatch with its name; the chosen one carries a check.
+private struct AccentTile: View {
+    let accent: CoreAccent
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: Space.s2) {
+                coreShape(Radius.control).fill(accent.fill)
+                    .frame(width: 56, height: 32)
+                    .overlay {
+                        if selected {
+                            Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .overlay {
+                        coreShape(Radius.control).strokeBorder(
+                            GlassInk.primary.opacity(selected ? 0.6 : hovering ? 0.3 : 0), lineWidth: 1.5
+                        ).padding(-3)
+                    }
+                Text(accent.title).coreFont(size: MacTextSize.meta, weight: selected ? .semibold : .regular)
+                    .foregroundStyle(selected ? GlassInk.primary : GlassInk.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel("\(accent.title) accent")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
 /// One theme as a sky tile with its name and a line under it; the chosen one carries a blue edge and a check.
 private struct ThemeTile: View {
     let choice: ThemeChoice
@@ -163,8 +281,8 @@ private struct ThemeTile: View {
 
     private var line: String {
         switch choice {
-        case .night: "Always the night sky."
-        case .day: "Always the day sky."
+        case .night: "Always night."
+        case .day: "Always day."
         case .sun: "Day from 7:00 to 18:00, night after."
         case .system: "Light or dark, as your Mac is set."
         }
@@ -172,19 +290,19 @@ private struct ThemeTile: View {
 
     @ViewBuilder private var thumb: some View {
         switch choice {
-        case .night: sky("HomeSky")
-        case .day: sky("HomeSkyDay")
+        case .night: sky(day: false)
+        case .day: sky(day: true)
         case .sun:
             GeometryReader { g in
                 HStack(spacing: 0) {
-                    sky("HomeSky").frame(width: g.size.width / 2).clipped()
-                    sky("HomeSkyDay").frame(width: g.size.width / 2).clipped()
+                    sky(day: false).frame(width: g.size.width / 2).clipped()
+                    sky(day: true).frame(width: g.size.width / 2).clipped()
                 }
             }
         case .system:
             ZStack {
-                sky("HomeSkyDay")
-                sky("HomeSky").mask(
+                sky(day: true)
+                sky(day: false).mask(
                     LinearGradient(colors: [.black, .clear], startPoint: .bottomLeading, endPoint: .topTrailing))
                 Image(systemName: "laptopcomputer").font(.system(size: 34, weight: .medium)).foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.5), radius: 8)
@@ -192,9 +310,8 @@ private struct ThemeTile: View {
         }
     }
 
-    private func sky(_ name: String) -> some View {
-        Image(name, bundle: .main).resizable().scaledToFill()
-    }
+    /// The chosen wallpaper as this theme shows it.
+    private func sky(day: Bool) -> some View { WallpaperView(day: day) }
 }
 
 /// One part in Appearance, Advanced: its name, Same (follows the content background) or its own look, and a slider when

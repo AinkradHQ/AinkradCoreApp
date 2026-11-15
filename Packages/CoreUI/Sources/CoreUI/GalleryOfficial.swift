@@ -50,8 +50,7 @@ struct OfficialGlassSection: View {
     private var sky: some View {
         ZStack {
             LinearGradient(colors: [palette.surface, palette.bg], startPoint: .top, endPoint: .bottom)
-            Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
-            if scheme != .dark { GlassInk.daySkyVeil }
+            WallpaperView()
         }
     }
 

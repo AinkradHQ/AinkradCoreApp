@@ -21,8 +21,7 @@ struct FirstRunView: View {
     var body: some View {
         ZStack {
             Color.clear.overlay {
-                Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
-                    .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
+                WallpaperView()
             }
             .clipped().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s4) {
