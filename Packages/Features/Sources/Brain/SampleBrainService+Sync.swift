@@ -35,21 +35,23 @@ extension SampleBrainService {
         ]
     }
 
-    public func latest(room: String) async throws -> [LatestItem] {
-        [
-            LatestItem(
-                itemID: "l1", type: "decision", sourceKind: "claude_code",
-                title: "Sample: run the queue migration before the runner rewrite", startedAt: "2026-11-11T10:00:00Z"),
-            LatestItem(
-                itemID: "l2", type: "rule", sourceKind: "codex",
-                title: "Sample: change the webhook addresses last", startedAt: "2026-11-09T10:00:00Z"),
-            LatestItem(
-                itemID: "l3", type: "fact", sourceKind: "opencode",
-                title: "Sample: everything is kept encrypted with one brain key", startedAt: "2026-11-06T10:00:00Z"),
-            LatestItem(
-                itemID: "l4", type: "task", sourceKind: "claude_code",
-                title: "Sample: decide which providers may read the rooms", startedAt: "2026-11-05T10:00:00Z"),
-        ]
+    public func latest(room: String) async throws -> RoomLatest {
+        RoomLatest(
+            items: [
+                LatestItem(
+                    itemID: "l1", type: "decision", sourceKind: "claude_code",
+                    title: "Sample: run the queue migration before the runner rewrite",
+                    startedAt: "2026-11-11T10:00:00Z"),
+                LatestItem(
+                    itemID: "l2", type: "rule", sourceKind: "codex",
+                    title: "Sample: change the webhook addresses last", startedAt: "2026-11-09T10:00:00Z"),
+                LatestItem(
+                    itemID: "l3", type: "fact", sourceKind: "opencode",
+                    title: "Sample: everything is kept encrypted with one brain key", startedAt: "2026-11-06T10:00:00Z"),
+                LatestItem(
+                    itemID: "l4", type: "task", sourceKind: "claude_code",
+                    title: "Sample: decide which providers may read the rooms", startedAt: "2026-11-05T10:00:00Z"),
+            ], records: 4)
     }
 
     public func rules() async throws -> [RuleWire] {

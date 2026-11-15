@@ -201,6 +201,7 @@ public final class BrainModel {
             // A room that sealed or lost its lease under us must not stay on screen.
             if let id = inspectingID, room(id)?.lock != nil { clearRoomView() }
             if viewingLock != nil { clearRoomView() }
+        } catch is CancellationError {
         } catch {
             load = .failed(BrainWords.loadFailure(error))
         }
@@ -241,6 +242,7 @@ public final class BrainModel {
             let d = try await service.room(id)
             // Only if nothing changed while the answer was on its way.
             if inspectingID == id { inspected = d }
+        } catch is CancellationError {
         } catch {
             if inspectingID == id { notice = BrainWords.failure(error) }
         }

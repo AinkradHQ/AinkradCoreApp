@@ -37,6 +37,8 @@ public enum BrainWords {
         bell(kind: kind, n: n, room: kind == .check || kind == .unclassified ? nil : "a room")
     }
 
+    /// The failure in words, with its real cause: a Core refusal, an answer that could not be read, or the connection's
+    /// own reason (offline, timed out, Touch ID). Never a bare "something went wrong".
     public static func failure(_ error: Error) -> String {
         if let e = error as? BrainHTTPError { return CoreBrainService.failure(e).sentence }
         if let f = error as? BrainFailure { return f.sentence }
@@ -56,6 +58,10 @@ public enum BrainWords {
         return (why ?? "The Core took too long to answer.")
             + " It may have done it anyway: the list shows what it has now."
     }
+
+    /// Under a room's Latest list while nothing in it was distilled yet.
+    public static let importedOnly =
+        "These are imported items. Add an AI account in Settings to turn them into notes."
 
     /// The Core answered 404 for a Brain route: it is an older Core, built without the Brain.
     public static let notOnCore = "The Brain isn't on this Core yet. Update the Core."

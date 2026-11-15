@@ -222,6 +222,17 @@ public struct SnippetPiece: Sendable, Equatable {
 
 struct SearchWire: Codable { var hits: [SearchHit] }
 
+/// `GET /rooms/{room}/latest`: the room's newest sources, and how many records it holds.
+public struct RoomLatest: Codable, Sendable, Equatable {
+    public var items: [LatestItem]
+    /// Records (distilled notes) in the room. None while nothing was distilled: the items are only imported.
+    public var records: Int
+    public init(items: [LatestItem] = [], records: Int = 0) {
+        self.items = items
+        self.records = records
+    }
+}
+
 /// One of a room's newest items, for the room's "Latest" list. `type` is a `MemoryType` raw value.
 public struct LatestItem: Codable, Sendable, Equatable, Identifiable {
     public var itemID: String
@@ -291,6 +302,9 @@ extension BrainRoutes {
         let safe = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=#"))
         let q = query.addingPercentEncoding(withAllowedCharacters: safe) ?? ""
         return try await call("GET", "/rooms/\(Self.seg(room))/search?q=\(q)&limit=\(limit)", as: SearchWire.self).hits
+    }
+    func latest(room: String, limit: Int = 30) async throws -> RoomLatest {
+        try await call("GET", "/rooms/\(Self.seg(room))/latest?limit=\(limit)")
     }
     public func rules() async throws -> [RuleWire] { try await call("GET", "/rules") }
     /// Step-up route: the caller asks for Touch ID around it.

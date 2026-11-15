@@ -233,7 +233,7 @@ struct SampleImportTests {
     @Test func sampleRulesNameRoomsAndLatestIsNewestFirst() async throws {
         let svc = SampleBrainService()
         #expect(try await svc.rules().contains { $0.room == "ainkrad" })
-        let days = try await svc.latest(room: "ainkrad").map(\.startedAt)
+        let days = try await svc.latest(room: "ainkrad").items.map(\.startedAt)
         #expect(!days.isEmpty && days == days.sorted(by: >))
     }
 }
