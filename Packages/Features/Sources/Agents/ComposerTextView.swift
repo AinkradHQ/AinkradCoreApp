@@ -138,6 +138,12 @@ final class KeyTextView: NSTextView {
 
     /// The files on a pasteboard: file URLs; else an image with no words beside it (a screenshot), saved to a file. Nil
     /// when it holds words, so a rich copy from a page still pastes its text.
+    /// Whether a pasteboard holds files or a lone image, without saving anything (menu validation asks often).
+    static func hasFiles(_ pb: NSPasteboard) -> Bool {
+        pb.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+            || (pb.string(forType: .string) == nil && NSImage.canInit(with: pb))
+    }
+
     static func files(from pb: NSPasteboard) -> [URL]? {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
             !urls.isEmpty
@@ -183,16 +189,37 @@ final class KeyTextView: NSTextView {
         super.keyDown(with: event)
     }
 
+    /// The composer field that holds the keyboard, if any: the pane's own shortcuts step aside while it does. Read from
+    /// the field itself, not the key window (which is not always ours) nor SwiftUI's focus (which drifts).
+    nonisolated(unsafe) static weak var focusedField: KeyTextView?
+
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
-        if ok { onFocus?(true) }
+        if ok {
+            Self.focusedField = self
+            onFocus?(true)
+        }
         return ok
     }
 
     override func resignFirstResponder() -> Bool {
         let ok = super.resignFirstResponder()
-        if ok { onFocus?(false) }
+        if ok {
+            if Self.focusedField === self { Self.focusedField = nil }
+            onFocus?(false)
+        }
         return ok
+    }
+
+    /// Paste stays on for files and images: a plain-text field reads words only, so the system greyed Paste out for a
+    /// copied image and ⌘V never reached `paste(_:)`.
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        super.readablePasteboardTypes + [.fileURL, .png, .tiff]
+    }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(paste(_:)), Self.hasFiles(.general) { return true }
+        return super.validateUserInterfaceItem(item)
     }
 }
 

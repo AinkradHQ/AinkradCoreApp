@@ -188,6 +188,8 @@ public final class AppModel {
             shell.coreLink = .live
             #if DEBUG
             agents.attach(FakeAgentsAPI.prototypeWorld())
+            // No Core to approve against: a demo send skips Touch ID instead of always failing.
+            agents.debugDropHost()
             brain.use(SampleBrainService())
             #endif
             return

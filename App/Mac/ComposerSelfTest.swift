@@ -19,7 +19,10 @@ enum ComposerSelfTest {
         try? await Task.sleep(for: .seconds(3))
         guard let window = await SnapshotCapture.mainWindow() else { return note("FAIL no main window") }
         let a = app.agents
-        a.debugDropHost()  // no Touch ID in a test run
+        // CORE_COMPOSER_KEEP_HOST=1 keeps Touch ID in the way of a send, as in a person's own demo run.
+        let keepHost = ProcessInfo.processInfo.environment["CORE_COMPOSER_KEEP_HOST"] == "1"
+        if !keepHost { a.debugDropHost() }
+        note("touch id gate: \(keepHost ? "on" : "off")")
         for _ in 0..<100 where a.sessions.items.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
         guard let s = a.sessions.items.first(where: { a.canWrite($0) }) else { return note("FAIL no writable session") }
         app.shell.closeAllPanes()
@@ -79,6 +82,56 @@ enum ComposerSelfTest {
         check(
             "a file goes with the message", draft().isEmpty && (a.attachments[s.id] ?? []).isEmpty,
             "draft = \(draft().debugDescription), attachments left = \((a.attachments[s.id] ?? []).count)")
+        note("notice after sending: \(a.notices[s.id].map { "\($0.title) \($0.detail ?? "")" } ?? "none")")
+
+        // ⌘V through the app's menu, as a person pastes. The clipboard is put back afterwards.
+        let pb = NSPasteboard.general
+        let saved: [[NSPasteboard.PasteboardType: Data]] = (pb.pasteboardItems ?? []).map { item in
+            Dictionary(uniqueKeysWithValues: item.types.compactMap { t in item.data(forType: t).map { (t, $0) } })
+        }
+        defer {
+            pb.clearContents()
+            pb.writeObjects(
+                saved.map { d in
+                    let item = NSPasteboardItem()
+                    for (t, v) in d { item.setData(v, forType: t) }
+                    return item
+                })
+        }
+        func commandV() async {
+            if let e = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: .command,
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                characters: "v", charactersIgnoringModifiers: "v", isARepeat: false, keyCode: 9)
+            {
+                let byMenu = NSApp.mainMenu?.performKeyEquivalent(with: e) ?? false
+                if !byMenu { window.sendEvent(e) }
+                note("⌘V handled by the menu = \(byMenu)")
+            }
+            try? await Task.sleep(for: .milliseconds(400))
+        }
+        a.attachments[s.id] = nil
+        let doc = URL(fileURLWithPath: NSTemporaryDirectory() + "self-test.txt")
+        try? "x".write(to: doc, atomically: true, encoding: .utf8)
+        pb.clearContents()
+        pb.writeObjects([doc as NSURL])
+        await commandV()
+        check(
+            "pasting a file attaches it", (a.attachments[s.id] ?? []) == [doc],
+            "attachments = \(a.attachments[s.id] ?? [])")
+        a.attachments[s.id] = nil
+        pb.clearContents()
+        pb.writeObjects([
+            NSImage(size: NSSize(width: 4, height: 4), flipped: false) { r in
+                NSColor.red.setFill()
+                r.fill()
+                return true
+            }
+        ])
+        await commandV()
+        check(
+            "pasting an image attaches it", (a.attachments[s.id] ?? []).count == 1,
+            "attachments = \(a.attachments[s.id] ?? [])")
         await key("\u{1B}", 53)
         note("escape: first responder after = \(type(of: window.firstResponder as Any))")
     }

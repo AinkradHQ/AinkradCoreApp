@@ -35,7 +35,9 @@ struct TranscriptView: View {
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
                         // The Core's own holds are not transcript entries: they stand after the last one, newest last.
-                        ForEach(store.heldList) { r in
+                        ForEach(store.heldList.filter { $0.status(now: Date(), sessionOver: session.over) != .pending })
+                        {
+                            r in
                             ApprovalEntryCard(model: model, request: r)
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
@@ -91,8 +93,11 @@ struct TranscriptView: View {
         -> some View
     {
         if case .approvalRequest(let id, _, _, _) = e.kind, let r = store.approvals[id] {
-            ApprovalEntryCard(model: model, request: r)
-                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
+            // A pending one is pinned above the composer (PinnedApprovals); answered or expired, it stays here as history.
+            if r.status(now: Date(), sessionOver: session.over) != .pending {
+                ApprovalEntryCard(model: model, request: r)
+                    .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
+            }
         } else {
             EntryRow(entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn) {
                 model.shell.launcher.entry("connections")?.run()

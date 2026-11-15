@@ -79,6 +79,10 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
+            // What went wrong with the last send (or resume, wake...), right where you typed it.
+            if let n = model.notices[session.id] {
+                CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.tone)
+            }
             VStack(alignment: .leading, spacing: Space.s2) {
                 if !files.isEmpty { attachmentsRow }
                 ZStack(alignment: .topLeading) {

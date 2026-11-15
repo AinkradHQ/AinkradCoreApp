@@ -68,7 +68,7 @@ struct SessionView: View {
             Group {
                 if let b = ConversationWords.banner(
                     s, runner: model.runnerName(s.runner), reconnecting: model.link == .reconnecting,
-                    notice: model.notices[sessionID])
+                    notice: nil)
                 {
                     CoreNotice(symbol: b.symbol, title: b.title, text: b.text, tone: b.tone) {
                         if b.resume {
@@ -87,6 +87,7 @@ struct SessionView: View {
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump)
                 .frame(maxWidth: .infinity)
+            PinnedApprovals(model: model, session: s)
             ComposerView(model: model, session: s, focused: $composing)
                 .frame(maxWidth: .infinity)
         }
@@ -106,10 +107,33 @@ struct SessionView: View {
     }
 
     /// A text field has the keyboard: the window's real first responder, not SwiftUI's focus state (which drifts).
-    private var typing: Bool { (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder is NSText }
+    private var typing: Bool {
+        KeyTextView.focusedField != nil || (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder is NSText
+    }
 
     private func latest() -> KeyPress.Result {
         jump += 1
         return .handled
+    }
+}
+
+/// What waits on you, pinned above the composer with its timer (Ahmed, 2026-11-15): never scrolled out of sight. Answered
+/// or expired, a request leaves here and stays in the transcript as history. Rechecked every second for expiry.
+struct PinnedApprovals: View {
+    @Bindable var model: AgentsModel
+    let session: AgentSessionInfo
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            let pending = (model.transcripts[session.id]?.approvalList ?? [])
+                .filter { $0.status(now: ctx.date, sessionOver: session.over) == .pending }
+            if !pending.isEmpty {
+                VStack(spacing: Space.s2) {
+                    ForEach(pending) { r in ApprovalEntryCard(model: model, request: r) }
+                }
+                .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
+                .transition(.opacity)
+            }
+        }
     }
 }
