@@ -10,6 +10,8 @@ struct SessionActions: View {
     var find: (() -> Void)?
     /// The side panel's card: a titled header with Find and End session, the folder tools under it.
     var stacked = false
+    /// A narrow header: icons only, their names in the tooltips.
+    var compact = false
 
     @Environment(\.corePalette) private var palette
     @Environment(\.sessionUI) private var ui
@@ -69,7 +71,11 @@ struct SessionActions: View {
     @ViewBuilder private var state: some View {
         if session.live {
             Button(action: { model.confirmEnd(session.id) }) {
-                Label("End session", systemImage: "stop")
+                if compact {
+                    Image(systemName: "stop").accessibilityLabel("End session")
+                } else {
+                    Label("End session", systemImage: "stop").lineLimit(1)
+                }
             }
             .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
             .disabled(model.stopping[session.id] != nil)
@@ -101,9 +107,13 @@ struct SessionActions: View {
         Button {
             model.host?.openTerminal(on: session.runner)
         } label: {
-            Label("Terminal here", systemImage: "terminal")
+            if compact {
+                Image(systemName: "terminal").accessibilityLabel("Terminal here")
+            } else {
+                Label("Terminal here", systemImage: "terminal").lineLimit(1)
+            }
         }
-        .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
+        .buttonStyle(CoreButtonStyle(.secondary, size: compact ? .small : .medium))
         .help(
             "Open a new terminal on \(model.runnerName(session.runner)) (⇧⌘T). The Core cannot start it in the session's folder yet."
         )
@@ -121,11 +131,19 @@ struct SessionActions: View {
         CoreDropdown(
             items: openInItems, isPresented: Binding(get: { ui?.openIn ?? false }, set: { ui?.openIn = $0 })
         ) {
-            Label("Open in…", systemImage: "folder")
-                .coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.primary)
-                .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlMd)
-                .background(GlassInk.well, in: coreShape(Radius.control))
-                .contentShape(coreShape(Radius.control))
+            Group {
+                if compact {
+                    Image(systemName: "folder").accessibilityLabel("Open in…")
+                } else {
+                    Label("Open in…", systemImage: "folder").lineLimit(1)
+                }
+            }
+            .coreFont(size: compact ? MacTextSize.meta : MacTextSize.body, weight: .semibold)
+            .foregroundStyle(GlassInk.primary)
+            .padding(.horizontal, compact ? Space.s2 : Space.s3)
+            .frame(minHeight: compact ? MacSize.controlSm : MacSize.controlMd)
+            .background(GlassInk.well, in: coreShape(compact ? Radius.chip : Radius.control))
+            .contentShape(coreShape(compact ? Radius.chip : Radius.control))
         }
         .help("Reveal the folder in Finder, open it in an editor, or copy it (⇧⌘O)")
         .accessibilityIdentifier("session-open-in")

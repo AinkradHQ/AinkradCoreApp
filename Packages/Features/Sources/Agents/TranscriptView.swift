@@ -71,6 +71,16 @@ struct TranscriptView: View {
                 }
                 .shortStartsAtTop()
                 .scrollIndicators(.never)
+                // Soft edges (Ahmed, 2026-11-15: content was cut hard under the header and above the composer).
+                .mask {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                            .frame(height: Space.s4)
+                        Color.black
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: Space.s4)
+                    }
+                }
                 .animation(Motion.out(Motion.ui), value: store.entries.count)
                 .onChange(of: store.lastSeq) { _, _ in
                     guard atEnd, !scrollQueued else { return }

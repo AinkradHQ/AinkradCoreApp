@@ -23,13 +23,15 @@ struct SessionView: View {
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
+    /// Under this width (and no side panel) the header's actions show as icons, so they never squeeze the title.
+    static let compact: CGFloat = 1100
 
     var body: some View {
         if let s = model.sessions.session(sessionID) {
             GeometryReader { geo in
                 let wide = geo.size.width >= Self.panelWidth
                 HStack(alignment: .top, spacing: 0) {
-                    conversation(s, wide: wide, narrow: geo.size.width < Self.narrow)
+                    conversation(s, wide: wide, compact: geo.size.width < Self.compact)
                     if wide {
                         SessionSidePanel(model: model, session: s, find: openFind).frame(width: 320).padding(
                             .trailing, Space.s3
@@ -90,9 +92,9 @@ struct SessionView: View {
         }
     }
 
-    private func conversation(_ s: AgentSessionInfo, wide: Bool, narrow: Bool) -> some View {
+    private func conversation(_ s: AgentSessionInfo, wide: Bool, compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            SessionHero(model: model, session: s, panel: wide, find: openFind)
+            SessionHero(model: model, session: s, panel: wide, compact: compact, find: openFind)
             if finding {
                 ConversationFindBar(
                     query: $findQuery, count: hits.count, index: min(findIndex, max(hits.count - 1, 0)),

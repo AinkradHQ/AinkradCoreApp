@@ -9,6 +9,8 @@ struct SessionHero: View {
     let session: AgentSessionInfo
     /// The window is wide: the side panel carries the details, so no strip and no Details button.
     var panel = false
+    /// A narrow pane: the actions show as icons (their names in the tooltips), so they never squeeze the title.
+    var compact = false
     /// Opens the find bar (⌘F).
     var find: (() -> Void)?
     @AppStorage("agents.detailsStrip") private var showDetails = true
@@ -26,8 +28,13 @@ struct SessionHero: View {
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .help("Choose the tool, runner, folder or repo, model and account order")
                 }
-                if !panel { detailsButton }
-                if !panel { SessionActions(model: model, session: session, find: find) }
+                if !panel {
+                    Group {
+                        detailsButton
+                        SessionActions(model: model, session: session, find: find, compact: compact)
+                    }
+                    .fixedSize()
+                }
             }
             .frame(minHeight: MacSize.controlLg)
             if showDetails && !panel {
@@ -57,9 +64,13 @@ struct SessionHero: View {
     private var titleLine: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
             Text(model.title(session)).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                .truncationMode(.tail).layoutPriority(1)
-            Text([AgentWords.toolName(session.harness), model.runnerName(session.runner)].joined(separator: " · "))
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+                .truncationMode(.tail)
+            // Where it runs only when it fits whole: never a clipped "(".
+            ViewThatFits(in: .horizontal) {
+                Text([AgentWords.toolName(session.harness), model.runnerName(session.runner)].joined(separator: " · "))
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).fixedSize()
+                Color.clear.frame(width: 0, height: 0)
+            }
         }
         .help(model.title(session) + "\n" + subtitle)
         .accessibilityElement(children: .combine)
@@ -73,10 +84,22 @@ struct SessionHero: View {
     }
 
     /// Decision 1 (test-fixes, variant B): Details shows or hides the strip under the header; the choice is remembered.
-    private var detailsButton: some View {
-        Button {
-            withAnimation(reduce ? nil : Motion.out(Motion.ui)) { showDetails.toggle() }
-        } label: {
+    @ViewBuilder private var detailsButton: some View {
+        if compact {
+            CoreIconButton(symbol: "info.square", label: "Details", selected: showDetails) { toggleDetails() }
+                .help(showDetails ? "Hide the details (⌥⌘I)" : "Show the runner, account, tokens and cost (⌥⌘I)")
+                .accessibilityIdentifier("session-details")
+        } else {
+            fullDetailsButton
+        }
+    }
+
+    private func toggleDetails() {
+        withAnimation(reduce ? nil : Motion.out(Motion.ui)) { showDetails.toggle() }
+    }
+
+    private var fullDetailsButton: some View {
+        Button(action: toggleDetails) {
             Label("Details", systemImage: "info.square")
         }
         .buttonStyle(CoreButtonStyle(showDetails ? .prominent : .secondary, size: .small))

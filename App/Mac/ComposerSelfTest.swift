@@ -250,6 +250,15 @@ enum ShowcaseShots {
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
         try? await Task.sleep(for: .seconds(2.5))
         _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
+        // Two sessions side by side: each pane is narrow, so the header shows its compact form.
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
+        try? await Task.sleep(for: .seconds(2.5))
+        _ = SnapshotCapture.png(window, to: "\(dir)/split-\(theme).png")
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
+        try? await Task.sleep(for: .seconds(2))
         // ⌘/ from the message field: the list of the screen's keys.
         if let tv = composer(window.contentView) {
             window.makeFirstResponder(tv)
