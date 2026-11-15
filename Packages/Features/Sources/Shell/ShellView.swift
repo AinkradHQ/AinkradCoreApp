@@ -199,9 +199,8 @@ public struct ShellView: View {
         .transition(d.id == "step-up" ? .identity : .opacity)
     }
 
-    static let scrim = GlassInk.adaptive(
-        Color(red: 3 / 255, green: 8 / 255, blue: 20 / 255).opacity(0.52),
-        day: Color(red: 220 / 255, green: 232 / 255, blue: 248 / 255).opacity(0.35))
+    /// A neutral dark dim in both themes, as a Mac sheet dims its window (Ahmed, 2026-11-15: the pale day wash hid the desk).
+    static let scrim = GlassInk.adaptive(Color.black.opacity(0.42), day: Color.black.opacity(0.2))
 
     /// `Mac.sheet`: every confirmation is the one ConfirmCard (visual, animated, keyboard driven), over the scrim. The safe
     /// choice comes first and starts highlighted.

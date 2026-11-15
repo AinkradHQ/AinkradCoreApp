@@ -147,6 +147,9 @@ struct FrameModifier: ViewModifier {
                 .foregroundStyle(GlassInk.primary)
                 .background { if fill { AppSurfaceFill(look, radius: radius) } }
                 .clipShape(coreShape(radius))
+                // Without the glass rim, depth comes from a soft shadow: panes over the wallpaper, and the launcher,
+                // dialogs and menus over what they cover.
+                .shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
         } else {
             framed(content, look: look)
         }
@@ -227,8 +230,9 @@ public struct AppLookTabs: View {
 
 extension View {
     /// A card or component inside content (Ahmed, 2026-11-06: the glass frame is only for panes, dialogs, pop-ups and
-    /// menus, never for what sits inside them): a plain well, lit when active (no edge since 2026-11-15).
+    /// menus, never for what sits inside them): a raised card, one step lighter than the pane with a soft shadow, lit when active.
     public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
-        background(active ? GlassInk.wellHover : GlassInk.well, in: coreShape(radius))
+        background(active ? GlassInk.cardHover : GlassInk.card, in: coreShape(radius))
+            .shadow(color: GlassInk.shade(0.14), radius: 6, y: 2)
     }
 }

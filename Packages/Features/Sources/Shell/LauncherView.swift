@@ -240,16 +240,7 @@ private struct LauncherItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s3) {
-                Image(systemName: row.entry.symbol).coreFont(size: MacTextSize.body + 1, weight: .semibold)
-                    .foregroundStyle(.white)
-                    .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                    .background(
-                        LinearGradient(
-                            colors: [hue.opacity(0.95), hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                        in: coreShape(Radius.control)
-                    )
-                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .accessibilityHidden(true)
+                IconTile(row.entry.symbol, hue: hue, size: MacSize.controlLg)
                 title
                 Spacer(minLength: Space.s2)
                 if let sub = row.entry.sub {

@@ -17,6 +17,10 @@ public enum GlassInk {
     public static let well = adaptive(.white.opacity(0.08), day: dayInk.opacity(0.045))
     public static let wellHover = adaptive(.white.opacity(0.13), day: dayInk.opacity(0.075))
     /// Neutral edge: white 0.30 at night, the least that reads 3:1 over the glass (measured 2026-11-09); white 0.7 by day.
+    /// A card on a pane: one step lighter than the pane in both themes, raised by a soft shadow (Ahmed, 2026-11-15:
+    /// cards must be seen without glass). Fields, rows and buttons inside it use `well`.
+    public static let card = adaptive(Color(red: 1, green: 1, blue: 1, opacity: 0.06), day: .white.opacity(0.94))
+    public static let cardHover = adaptive(Color(red: 1, green: 1, blue: 1, opacity: 0.09), day: .white)
     public static let wellEdge = adaptive(.white.opacity(0.3), day: dayInk.opacity(0.12))
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
     /// The accent (Settings, Appearance; graphite by default). Named blue from when blue was the only accent.

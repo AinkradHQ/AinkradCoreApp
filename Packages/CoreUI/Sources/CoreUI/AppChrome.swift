@@ -20,10 +20,15 @@ public struct AppSurfaceFill: View {
     /// The one tint every app's surface uses (Ahmed, 2026-11-05: the same settings must look the same in every app).
     /// The Terminals app's Deep Blue.
     /// The Terminals app's Deep Blue at night; white by day (light glass).
-    public static let tint = GlassInk.adaptive(Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255), day: .white)
+    /// Neutral since 2026-11-15 (Ahmed: calm, the landing page's tones): near-black at night, light grey by day, so a white
+    /// card stands out on a pane.
+    public static let tint = GlassInk.adaptive(
+        Color(red: 14 / 255, green: 15 / 255, blue: 17 / 255),
+        day: Color(red: 238 / 255, green: 239 / 255, blue: 242 / 255))
     /// The Solid look's colour.
     public static let solid = GlassInk.adaptive(
-        Color(red: 0.05, green: 0.06, blue: 0.09), day: Color(red: 0.96, green: 0.972, blue: 0.988))
+        Color(red: 14 / 255, green: 15 / 255, blue: 17 / 255),
+        day: Color(red: 238 / 255, green: 239 / 255, blue: 242 / 255))
     public init(
         style: AppSurfaceStyle, opacity: Double, tint: Color = AppSurfaceFill.tint, blur: Bool = true,
         radius: CGFloat = Radius.cardMac

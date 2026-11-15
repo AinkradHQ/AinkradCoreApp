@@ -153,22 +153,7 @@ struct SettingsView: View {
                     } else {
                         if let current {
                             // The section's own icon, large, bouncing in each time the section changes.
-                            Image(systemName: current.symbol).font(.system(size: 26, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .coreBounce(current.id)
-                                .contentTransition(.symbolEffect(.replace))
-                                .frame(width: 56, height: 56)
-                                .background(
-                                    LinearGradient(
-                                        colors: [current.group.hue, current.group.hue.opacity(0.6)], startPoint: .top,
-                                        endPoint: .bottom),
-                                    in: coreShape(Radius.control + 4)
-                                )
-                                .overlay {
-                                    coreShape(Radius.control + 4).strokeBorder(.white.opacity(0.25), lineWidth: 1)
-                                }
-                                .shadow(color: current.group.hue.opacity(0.5), radius: 12)
-                                .accessibilityHidden(true)
+                            IconTile(current.symbol, hue: current.group.hue, size: 56, bounce: current.id)
                         }
                         VStack(alignment: .leading, spacing: Space.s1 / 2) {
                             Text(current?.title ?? "").coreFont(size: MacTextSize.large + 6, weight: .bold)
@@ -224,15 +209,7 @@ struct SettingsView: View {
 
     private func navRow(_ s: SettingsSection, selected: Bool) -> some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: s.symbol).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(.white)
-                .coreBounce(selected)
-                .frame(width: MacSize.controlMd + 2, height: MacSize.controlMd + 2)
-                .background(
-                    LinearGradient(
-                        colors: [s.group.hue, s.group.hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(Radius.control)
-                )
-                .accessibilityHidden(true)
+            IconTile(s.symbol, hue: s.group.hue, size: MacSize.controlMd + 2, bounce: selected)
             // Two lines at large text sizes instead of "Agents and ch…".
             Text(s.title).coreFont(size: MacTextSize.headline, weight: selected ? .semibold : .regular)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
