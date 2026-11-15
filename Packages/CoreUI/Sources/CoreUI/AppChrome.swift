@@ -214,9 +214,6 @@ public struct GlassSlider: View {
     let unit: String
     /// Every value lands on a step: 5 % by default, 1 pt for a size.
     let step: Double
-    @State private var dragging = false
-    @FocusState private var focused: Bool
-    @Environment(\.layoutDirection) private var direction
 
     public init(
         value: Binding<Double>, in range: ClosedRange<Double> = 0...1, low: String, high: String, unit: String = "%",
@@ -234,52 +231,14 @@ public struct GlassSlider: View {
     public var body: some View {
         HStack(spacing: Space.s3) {
             Text(low).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            GeometryReader { g in
-                let f = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
-                let x = g.size.width * CGFloat(min(max(f, 0), 1))
-                ZStack(alignment: .leading) {
-                    coreShape(3).fill(GlassInk.adaptive(.white.opacity(0.14), day: GlassInk.dayInk.opacity(0.12)))
-                        .frame(height: 6)
-                    coreShape(3).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
-                    coreShape(6).fill(.white).frame(width: 18, height: 18)
-                        .shadow(color: GlassInk.shade(0.35), radius: 3, y: 1)
-                        .offset(x: direction == .rightToLeft ? 9 - x : x - 9)
-                }
-                .frame(maxHeight: .infinity)
-                // Dragging follows the pointer with no easing; only the keyboard path glides (move()).
-                .transaction { if dragging { $0.animation = nil } }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { d in
-                            dragging = true
-                            let along = min(max(d.location.x / max(g.size.width, 1), 0), 1)
-                            let t = direction == .rightToLeft ? 1 - along : along
-                            let raw = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
-                            let snapped = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
-                            if snapped != value { value = snapped }
-                        }
-                        .onEnded { _ in dragging = false })
-            }
-            .frame(height: 24)
+            // Apple's own slider, for its Liquid Glass knob (Ahmed, 2026-11-15), tinted with the accent.
+            Slider(value: $value, in: range, step: step).labelsHidden().tint(GlassInk.blue)
+                .accessibilityLabel("\(low) to \(high)")
+                .accessibilityValue("\(percent(value))\(unit == "%" ? " percent" : unit)")
             Text(high).foregroundStyle(GlassInk.secondary).lineLimit(1)
             Text("\(percent(value))\(unit)").coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
                 .contentTransition(.numericText()).frame(width: 46, alignment: .trailing)
         }
-        .focusable().focused($focused).focusEffectDisabled()
-        .coreSideKeys { move(Double($0)) }
-        .accessibilityElement()
-        .accessibilityLabel("\(low) to \(high)")
-        .accessibilityValue("\(percent(value))\(unit == "%" ? " percent" : unit)")
-        .accessibilityAdjustableAction { direction in
-            _ = move(direction == .increment ? 1 : -1)
-        }
-    }
-
-    private func move(_ steps: Double) -> KeyPress.Result {
-        let next = ((value / step).rounded() + steps) * step
-        withAnimation(Motion.out(Motion.hover)) { value = min(max(next, range.lowerBound), range.upperBound) }
-        return .handled
     }
 }
 

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The gallery's sections, in the sidebar's order.
 public enum GallerySection: String, CaseIterable, Identifiable, Sendable {
-    case foundations, styles, buttons, inputs, selection, status, feedback, data, surfaces, navigation, apple
+    case foundations, styles, buttons, inputs, selection, status, feedback, data, surfaces, navigation
     public var id: String { rawValue }
     var title: String {
         switch self {
@@ -17,7 +17,6 @@ public enum GallerySection: String, CaseIterable, Identifiable, Sendable {
         case .data: "Data"
         case .surfaces: "Surfaces"
         case .navigation: "Navigation"
-        case .apple: "Apple glass"
         }
     }
     var symbol: String {
@@ -32,7 +31,6 @@ public enum GallerySection: String, CaseIterable, Identifiable, Sendable {
         case .data: "chart.bar"
         case .surfaces: "square.on.square"
         case .navigation: "sidebar.left"
-        case .apple: "sparkles"
         }
     }
     var sub: String {
@@ -47,7 +45,6 @@ public enum GallerySection: String, CaseIterable, Identifiable, Sendable {
         case .data: "Meters, sparks, heat and slots"
         case .surfaces: "Wells, frames, sheets, dialogs and panes"
         case .navigation: "Headers, steps, sections and rows"
-        case .apple: "Apple's own Liquid Glass next to ours"
         }
     }
 }
@@ -199,14 +196,6 @@ public struct CoreUIGallery: View {
         case .data: data
         case .surfaces: surfaces
         case .navigation: navigation
-        case .apple:
-            #if os(macOS)
-            if #available(macOS 26, *) {
-                OfficialGlassSection()
-            } else {
-                Text("Needs macOS 26.").foregroundStyle(GlassInk.secondary)
-            }
-            #endif
         }
     }
 }

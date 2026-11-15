@@ -186,16 +186,9 @@ public struct GlassToggleTile: View {
         .accessibilityAddTraits(.isToggle)
     }
 
-    /// A small rounded switch: the knob slides and the track fills.
+    /// Apple's switch, the same as `CoreSwitch` (Ahmed, 2026-11-15). A click on it flips it with its glass knob; a click
+    /// anywhere else on the tile flips it too.
     private var knob: some View {
-        coreShape(5).fill(
-            isOn ? GlassInk.blue : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
-        )
-        .frame(width: 30, height: 18)
-        .overlay(alignment: isOn ? .trailing : .leading) {
-            coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)
-                .shadow(color: GlassInk.shade(0.25), radius: 2, y: 1)
-        }
-        .accessibilityHidden(true)
+        Toggle(title, isOn: $isOn).toggleStyle(.switch).labelsHidden().tint(GlassInk.blue).accessibilityHidden(true)
     }
 }

@@ -1,19 +1,11 @@
 import SwiftUI
 
-/// A switch drawn as rounded rectangles (track and knob), never a pill or a circle. The knob slides on the UI ease; under
-/// Reduce Motion it jumps. Space or a click flips it. On is the theme blue (a setting, not a status).
+/// The switch (Ahmed, 2026-11-15): Apple's own, for its Liquid Glass knob, tinted with the accent. The word beside it is
+/// ours. Space or a click flips it.
 public struct CoreSwitch: View {
     let title: String
     @Binding var isOn: Bool
-    @Environment(\.corePalette) private var palette
     @Environment(\.isEnabled) private var enabled
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(\.coreForcedInteraction) private var forced
-    @State private var hovering = false
-
-    private static let trackW: CGFloat = 36
-    private static let trackH: CGFloat = 20
-    private static let knob: CGFloat = 14
 
     /// `title` is the word beside the switch and the VoiceOver label; pass "" when the row names it elsewhere.
     public init(_ title: String = "", isOn: Binding<Bool>) {
@@ -25,38 +17,15 @@ public struct CoreSwitch: View {
     func flip() { isOn.toggle() }
 
     public var body: some View {
-        Button(action: flip) {
-            HStack(spacing: Space.s2) {
-                track
-                if !title.isEmpty { Text(title).coreFont(size: MacTextSize.body, weight: .medium) }
+        HStack(spacing: Space.s2) {
+            Toggle(title.isEmpty ? "Switch" : title, isOn: $isOn)
+                .toggleStyle(.switch).labelsHidden().tint(GlassInk.blue)
+            if !title.isEmpty {
+                Text(title).coreFont(size: MacTextSize.body, weight: .medium)
+                    .onTapGesture { if enabled { flip() } }
+                    .accessibilityHidden(true)
             }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.97))
-        .onHover { hovering = $0 }
         .coreDimWhenDisabled(enabled)
-        .accessibilityLabel(title.isEmpty ? "Switch" : title)
-        .accessibilityValue(isOn ? "On" : "Off")
-        .accessibilityAddTraits(.isToggle)
-    }
-
-    private var track: some View {
-        let lit = hovering || forced == .hover
-        let pad = (Self.trackH - Self.knob) / 2
-        return coreShape(Radius.chip)
-            .fill(
-                isOn
-                    ? GlassInk.blue.opacity(lit ? 0.9 : 1)
-                    : GlassInk.adaptive(
-                        .white.opacity(lit ? 0.32 : 0.24), day: GlassInk.dayInk.opacity(lit ? 0.22 : 0.16))
-            )
-            .overlay(alignment: .leading) {
-                coreShape(4).fill(.white).frame(width: Self.knob, height: Self.knob)
-                    .shadow(color: GlassInk.shade(0.25), radius: 1, y: 1)
-                    .offset(x: isOn ? Self.trackW - Self.knob - pad : pad)
-            }
-            .frame(width: Self.trackW, height: Self.trackH)
-            .animation(reduce ? nil : Motion.out(Motion.ui), value: isOn)
-            .animation(Motion.out(Motion.hover), value: lit)
     }
 }
