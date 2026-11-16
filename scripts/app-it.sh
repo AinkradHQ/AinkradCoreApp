@@ -256,9 +256,15 @@ if [ "$MODE" = agents ]; then
   fi
   echo "== xcodebuild test (CORE_IT=1): the agents screens against the Core and the runner"
   cd "$HERE"
+  # APP_IT_XCTESTRUN=<file>: run tests built elsewhere (`build-for-testing` on a Mac with the new Xcode), for a test
+  # Mac whose Xcode cannot build this project (the Air).
+  if [ -n "${APP_IT_XCTESTRUN:-}" ]; then
+    XCB=(xcodebuild test-without-building -xctestrun "$APP_IT_XCTESTRUN" -destination "platform=macOS")
+  else
+    XCB=(xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build test)
+  fi
   TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
-    nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
-    -resultBundlePath "$W/agents.xcresult" -only-testing:AinkradCoreMacUITests/AgentsLiveUITests test 2>&1 \
+    nice -n 19 "${XCB[@]}" -resultBundlePath "$W/agents.xcresult" -only-testing:AinkradCoreMacUITests/AgentsLiveUITests 2>&1 \
     | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
   STATUS=${PIPESTATUS[0]}
   # The window shots the test kept, out of the result bundle (OUT=<dir> to keep them).

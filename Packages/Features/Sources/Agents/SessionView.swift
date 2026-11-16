@@ -143,7 +143,11 @@ struct SessionView: View {
                         // After SwiftUI has settled its own focus for the click.
                         Task { @MainActor in
                             try? await Task.sleep(for: .milliseconds(40))
-                            guard ComposerFocus.shouldReturn(window.firstResponder) else { return }
+                            // The find bar or the shortcut list holds the keyboard: leave it (the live test found Find
+                            // losing its cursor to the message field, 2026-11-16).
+                            guard !ui.finding, !ui.shortcuts, ComposerFocus.shouldReturn(window.firstResponder) else {
+                                return
+                            }
                             ui.focusField()
                         }
                     }
@@ -223,6 +227,7 @@ struct SessionView: View {
                     step: { findStep($0) },
                     close: {
                         finding = false
+                        ui.finding = false
                         focusSeq = nil
                     }
                 )
@@ -360,6 +365,7 @@ struct SessionView: View {
         // The message field is AppKit's first responder and SwiftUI's focus does not take it from it: let it go first.
         if let field = KeyTextView.focusedField { field.window?.makeFirstResponder(nil) }
         finding = true
+        ui.finding = true
     }
 
     private func findStep(_ d: Int) {

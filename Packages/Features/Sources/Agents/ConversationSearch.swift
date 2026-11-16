@@ -70,6 +70,12 @@ struct ConversationFindBar: View {
         .coreFont(size: MacTextSize.body)
         .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg)
         .background(GlassInk.well, in: coreShape(Radius.control))
+        // Take the cursor, and again once the click that opened the bar has settled (a click on Find otherwise won focus
+        // back; the live UI test found it, 2026-11-16).
         .onAppear { focused = true }
+        .task {
+            try? await Task.sleep(for: .milliseconds(120))
+            focused = true
+        }
     }
 }

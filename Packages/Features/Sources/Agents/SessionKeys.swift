@@ -97,6 +97,8 @@ enum SessionShortcut: CaseIterable {
 @MainActor @Observable
 final class SessionUI {
     var openIn = false
+    /// The find bar is open: clicks leave the cursor where it is (in the find field), never back to the message field.
+    var finding = false
     var modelMenu = false
     var reviewing = false
     var shortcuts = false

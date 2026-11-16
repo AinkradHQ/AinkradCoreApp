@@ -224,6 +224,26 @@ enum ComposerSelfTest {
         check(
             "a click in the conversation puts the cursor back in the field", window.firstResponder === tv,
             "first responder = \(window.firstResponder.map { String(describing: type(of: $0)) } ?? "none")")
+        // With the find bar open, a click elsewhere leaves the cursor in the find field (the click handler took it back to
+        // the message field, which the live test caught on 2026-11-16).
+        chord("f", 3, .command)
+        try? await Task.sleep(for: .milliseconds(400))
+        let mid = window.convertPoint(toScreen: NSPoint(x: window.frame.width * 0.75, y: window.frame.height / 2))
+        let topY = (NSScreen.screens.first?.frame.height ?? 0) - mid.y
+        for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+            CGEvent(
+                mouseEventSource: nil, mouseType: type, mouseCursorPosition: CGPoint(x: mid.x, y: topY),
+                mouseButton: .left)?.postToPid(getpid())
+            try? await Task.sleep(for: .milliseconds(80))
+        }
+        try? await Task.sleep(for: .milliseconds(500))
+        let frF = window.firstResponder
+        let stays = ((frF as? NSTextView)?.delegate as? NSTextField)?.placeholderString == "Find in this conversation"
+        check(
+            "with Find open, a click leaves the cursor in the find field", stays,
+            "first responder = \(frF.map { String(describing: type(of: $0)) } ?? "none")")
+        await key("\u{1B}", 53)
+        try? await Task.sleep(for: .milliseconds(300))
         // The sidebar switches the pane to another session in place: no new tab.
         if let other = a.sessions.items.first(where: { $0.id != s.id }) {
             let before = app.shell.panes.count
