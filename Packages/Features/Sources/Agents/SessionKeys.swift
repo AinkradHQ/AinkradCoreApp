@@ -145,11 +145,35 @@ struct ShortcutSheet: View {
     let close: () -> Void
     @Environment(\.corePalette) private var palette
 
-    private static let more: [(String, String)] = [
-        ("⌘⌫", "Deny a waiting request"), ("↩", "Send, or queue it while a turn runs (⇧↩ a new line)"),
-        ("↑", "Edit queued messages, or your last one (empty field)"),
-        ("esc", "Stop the turn, or leave the field"), ("/", "Commands"), ("⌥↑ ⌥↓", "Your previous or next message"),
-        ("↓", "Jump to the newest message"), ("R", "Resume or start again"), ("W", "Wake a finished session"),
+    private typealias Row = (String, String)
+    private static func keys(_ list: [SessionShortcut]) -> [Row] { list.map { ($0.label, $0.title) } }
+
+    /// The keys in groups with headings (review 2026-11-16: one unlabelled list of 33 read as a wall).
+    private static let left: [(String, [Row])] = [
+        (
+            "Message field",
+            [
+                ("↩", "Send, or queue it while a turn runs"), ("⇧↩", "A new line"),
+                ("↑", "Edit queued messages, or your last one (empty field)"), ("/", "Commands"),
+                ("esc", "Stop the turn, or leave the field"),
+            ] + keys([.stopTurn, .attach, .model, .compact])
+        ),
+        (
+            "Approvals and plans",
+            keys([.goAhead, .changePlan]) + [("⌘⌫", "Deny a waiting request")]
+        ),
+    ]
+    private static let right: [(String, [Row])] = [
+        ("Conversation", keys([.find, .findNext, .findPrevious, .copyAnswer, .expandSteps, .collapseSteps])),
+        ("Session", keys([.terminal, .openIn, .review, .endSession])),
+        ("Panels", keys([.sidebar, .details, .shortcuts])),
+        (
+            "When not typing",
+            [
+                ("⌥↑ ⌥↓", "Your previous or next message"), ("↓", "Jump to the newest message"),
+                ("R", "Resume or start again"), ("W", "Wake a finished session"),
+            ]
+        ),
     ]
 
     var body: some View {
@@ -161,8 +185,8 @@ struct ShortcutSheet: View {
                 CoreIconButton(symbol: "xmark", label: "Close", action: close).help("Close (Esc)")
             }
             HStack(alignment: .top, spacing: Space.s6) {
-                column(SessionShortcut.allCases.map { ($0.label, $0.title) })
-                column(Self.more)
+                column(Self.left)
+                column(Self.right)
             }
         }
         .padding(Space.s4)
@@ -178,15 +202,21 @@ struct ShortcutSheet: View {
         .accessibilityLabel("Keyboard shortcuts")
     }
 
-    private func column(_ rows: [(String, String)]) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
-                HStack(spacing: Space.s3) {
-                    Text(r.0).coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
-                        .foregroundStyle(palette.text2).frame(width: Space.s8 + Space.s4, alignment: .trailing)
-                    Text(r.1).coreFont(size: MacTextSize.body)
+    private func column(_ groups: [(String, [Row])]) -> some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, g in
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    Text(g.0).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
+                        .padding(.leading, Space.s8 + Space.s4 + Space.s3).accessibilityAddTraits(.isHeader)
+                    ForEach(Array(g.1.enumerated()), id: \.offset) { _, r in
+                        HStack(spacing: Space.s3) {
+                            Text(r.0).coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
+                                .foregroundStyle(palette.text2).frame(width: Space.s8 + Space.s4, alignment: .trailing)
+                            Text(r.1).coreFont(size: MacTextSize.body)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                 }
-                .accessibilityElement(children: .combine)
             }
         }
     }

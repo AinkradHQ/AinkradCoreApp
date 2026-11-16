@@ -129,6 +129,8 @@ struct SessionSwitcher: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
+        // The first message becomes the title, as in the list (not "Claude · K9R011").
+        .onAppear { model.loadTitle(s.id) }
         .help("\(model.title(s))\n\(st.label)")
         .accessibilityLabel("\(model.title(s)), \(st.label)")
         .accessibilityAddTraits(on ? .isSelected : [])

@@ -59,7 +59,7 @@ public enum SessionState: CoreState {
         (.running, "running", "Running", .run, "waveform"),
         // A live AI session between turns: the process is up and waits for your next message.
         (.waiting, "waiting", "Waiting for you", .done, "text.cursor"),
-        (.interrupted, "interrupted", "Resuming", .warn, "arrow.clockwise"),
+        (.interrupted, "interrupted", "Resuming", .queue, "arrow.clockwise"),  // amber is for Needs you only
         (.ended, "ended", "Ended", .queue, "stop.circle"),
         (.lost, "lost", "Lost", .fail, "wifi.exclamationmark"),
     ]

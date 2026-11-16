@@ -8,7 +8,7 @@ struct StatesTests {
     @Test func knownValuesDecode() throws {
         let s = try JSONDecoder().decode(SessionState.self, from: Data(#""interrupted""#.utf8))
         #expect(s == .interrupted)
-        #expect(s.label == "Resuming" && s.tone == .warn && s.symbol == "arrow.clockwise")
+        #expect(s.label == "Resuming" && s.tone == .queue && s.symbol == "arrow.clockwise")
         #expect(RunState(rawValue: "timed_out") == .timedOut)
         #expect(AccountState(rawValue: "over_budget").label == "Budget reached")
     }

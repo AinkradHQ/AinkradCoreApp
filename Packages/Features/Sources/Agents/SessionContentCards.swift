@@ -28,12 +28,22 @@ struct PlanCard: View {
             MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
             if let actions {
                 HStack(spacing: Space.s2) {
-                    Button("Go ahead", action: actions.goAhead)
-                        .buttonStyle(GraphiteButtonStyle())
-                        .help("Approve the plan: the agent starts building it (⌘↩)").keyHint(.goAhead)
-                    Button("Change it", action: actions.change)
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
-                        .help("Write what to change in the plan (⇧⌘↩)").keyHint(.changePlan)
+                    Button(action: actions.goAhead) {
+                        HStack(spacing: Space.s2) {
+                            Text("Go Ahead")
+                            Text("⌘↩").coreFont(size: MacTextSize.meta).opacity(0.7)
+                        }
+                    }
+                    .buttonStyle(GraphiteButtonStyle())
+                    .help("Approve the plan: the agent starts building it (⌘↩)").keyHint(.goAhead)
+                    Button(action: actions.change) {
+                        HStack(spacing: Space.s2) {
+                            Text("Change Plan…")
+                            Text("⇧⌘↩").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
+                        }
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
+                    .help("Write what to change in the plan (⇧⌘↩)").keyHint(.changePlan)
                 }
             }
         }

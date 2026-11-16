@@ -83,7 +83,8 @@ struct QueuedStack: View {
                     .transition(
                         .asymmetric(
                             insertion: reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s3)),
-                            removal: .opacity))
+                            // Sent at the turn's end, it lifts toward the conversation as it fades.
+                            removal: reduce ? .opacity : .opacity.combined(with: .offset(y: -Space.s4))))
             }
         }
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: list)

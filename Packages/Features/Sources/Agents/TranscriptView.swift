@@ -62,6 +62,12 @@ struct TranscriptView: View {
                         if session.live && !session.idle && store.load == .ready && !model.waiting(session.id) {
                             Thinking(since: session.updatedAt)
                         }
+                        // While an approval waits, say so where the work would show (the turn is not running).
+                        if session.live, store.load == .ready,
+                            let asked = model.pending.first(where: { $0.session == session.id })?.requestedAt
+                        {
+                            Thinking(since: asked, words: "Waiting for your approval", working: false)
+                        }
                         Color.clear.frame(height: 1).id("end")
                             .onAppear { atEnd = true }
                             .onDisappear { atEnd = false }
@@ -215,11 +221,18 @@ extension View {
 /// The AI session working: a blue bar that slides, "Thinking…" and how long. The bar rests under Reduce Motion.
 struct Thinking: View {
     let since: Date
+    var words = "Thinking…"
+    /// False while it waits on you: the bar rests.
+    var working = true
     @Environment(\.corePalette) private var palette
     var body: some View {
         HStack(spacing: Space.s3) {
-            CoreWorkingBar()
-            Text("Thinking…").coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+            if working {
+                CoreWorkingBar()
+            } else {
+                Image(systemName: "hand.raised").foregroundStyle(GlassInk.amberInk).frame(width: Space.s8)
+            }
+            Text(words).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
             TimelineView(.periodic(from: since, by: 1)) { ctx in
                 Text(coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(since))))", "s"))
                     .coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2).monospacedDigit()
@@ -227,7 +240,7 @@ struct Thinking: View {
         }
         .padding(.vertical, Space.s1)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("The AI session is thinking")
+        .accessibilityLabel(working ? "The AI session is thinking" : words)
     }
 }
 
@@ -321,7 +334,8 @@ struct EntryRow: View, Equatable {
         case .toolTodos(_, let items): TodoCard(items: items)
         case .subAgent(let id, let type, let task, let prompt, let result, let ok, let ms):
             SubAgentLine(
-                info: SubAgentInfo(id: id, type: type, task: task, prompt: prompt, result: result, ok: ok, ms: ms))
+                info: SubAgentInfo(id: id, type: type, task: task, prompt: prompt, result: result, ok: ok, ms: ms),
+                since: entry.at)
         case .plan(_, let text): PlanCard(text: text)
         case .turnEnded(let cost, let tokens):
             // The quietest line in the column (Ahmed, 2026-11-15): the time and the exact numbers wait in the tooltip.

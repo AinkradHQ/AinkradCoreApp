@@ -20,6 +20,12 @@ struct SubAgentInfo: Identifiable, Equatable {
         }
     }
 
+    /// Its kind as words: "general-purpose" reads "General purpose".
+    static func kind(_ type: String) -> String {
+        let s = type.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
+        return s.prefix(1).uppercased() + s.dropFirst()
+    }
+
     /// The session's sub-agents, in the order they started.
     static func all(_ entries: [TranscriptEntry]) -> [SubAgentInfo] {
         entries.compactMap {
@@ -35,6 +41,8 @@ struct SubAgentInfo: Identifiable, Equatable {
 /// at the end. The report is in the side panel's Sub-agents section.
 struct SubAgentLine: View {
     let info: SubAgentInfo
+    /// When it started: a working one counts up ("Working · 1:12").
+    var since = Date()
     @Environment(\.corePalette) private var palette
 
     var body: some View {
@@ -43,9 +51,13 @@ struct SubAgentLine: View {
                 .frame(width: Space.s4)
             Text("Sub-agent").coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
             Text(info.task).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text).lineLimit(1)
-            Text(info.type).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
+            Text(SubAgentInfo.kind(info.type)).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
             if info.ok == nil {
                 CoreWorkingBar(width: Space.s8)
+                TimelineView(.periodic(from: since, by: 1)) { ctx in
+                    Text("Working · " + AgentWords.clock(max(0, ctx.date.timeIntervalSince(since))))
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
+                }
             } else {
                 Label(info.state.word, systemImage: info.ok == true ? "checkmark" : "xmark")
                     .coreFont(size: MacTextSize.meta, weight: .semibold)
@@ -77,7 +89,8 @@ struct SubAgentsList: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(a.task).coreFont(size: MacTextSize.body).lineLimit(1).truncationMode(.tail)
                             Text(
-                                [a.type, a.ms.map { "\(coreDecimal(Double($0) / 1000, 1)) s" }].compactMap { $0 }
+                                [SubAgentInfo.kind(a.type), a.ms.map { "\(coreDecimal(Double($0) / 1000, 1)) s" }]
+                                    .compactMap { $0 }
                                     .joined(separator: " · ")
                             )
                             .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)

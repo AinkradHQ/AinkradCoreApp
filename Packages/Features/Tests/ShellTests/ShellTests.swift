@@ -54,7 +54,7 @@ struct ShellModelTests {
                 EmptyView()
             })
         shell.dismissPane("p")
-        #expect(shell.toast?.message == "Closed Fix the login. It keeps running.")
+        #expect(shell.toast?.message == "Closed “Fix the login”. It keeps running.")
         #expect(shell.toast?.help == "Claude on runner-1 · as_6w0r")
     }
 

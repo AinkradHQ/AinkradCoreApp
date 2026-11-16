@@ -366,7 +366,7 @@ public final class ShellModel {
         if closedPanes.count > 10 { closedPanes.removeFirst() }
         // Words name the pane the way its tab does; the title (which can carry an id) is hover help only.
         toast = ToastItem(
-            "Closed \(tabName(spec)). It keeps running.", kind: .info, help: spec.title
+            "Closed “\(tabName(spec))”. It keeps running.", kind: .info, help: spec.title
         ) { [weak self] in self?.reopenClosedPane() }
     }
 
