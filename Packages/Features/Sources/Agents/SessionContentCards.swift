@@ -2,69 +2,6 @@ import AppKit
 import CoreUI
 import SwiftUI
 
-/// A sub-agent the session started (Task / Agent tool): its kind and job, working or done, the brief it was given and its
-/// report, both folded until opened. Gallery parts only: a card, an icon tile, a state badge.
-struct SubAgentCard: View {
-    let type: String
-    let task: String
-    let prompt: String
-    let result: String?
-    let ok: Bool?
-    let durationMs: Int?
-    @State private var open = false
-
-    private var state: (String, Tone, String) {
-        switch ok {
-        case nil: ("Working", .run, "ellipsis")
-        case true?: ("Done", .done, "checkmark")
-        case false?: ("Failed", .fail, "xmark")
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Button {
-                withAnimation(Motion.out(Motion.ui)) { open.toggle() }
-            } label: {
-                HStack(spacing: Space.s3) {
-                    IconTile("person.2", hue: GlassInk.blue, size: MacSize.controlLg)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(task).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(2)
-                        Text(
-                            "Sub-agent · \(type)"
-                                + (durationMs.map { " · \(coreDecimal(Double($0) / 1000, 1)) s" } ?? "")
-                        )
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    }
-                    Spacer(minLength: Space.s2)
-                    StateBadge(state.0, tone: state.1, symbol: state.2)
-                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(GlassInk.secondary).rotationEffect(.degrees(open ? 90 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Sub-agent: \(task), \(state.0)")
-            if open {
-                if !prompt.isEmpty {
-                    Text("Brief").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
-                        GlassInk.secondary)
-                    MarkdownText(prompt).padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(GlassInk.well, in: coreShape(Radius.control))
-                }
-                if let result, !result.isEmpty {
-                    Text("Report").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
-                        GlassInk.secondary)
-                    MarkdownText(result).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .sessionSurface(radius: Radius.cardMac)
-        .agentCopyMenu(result ?? prompt)
-    }
-}
-
 /// What a plan card can do in the open session (set by SessionView): go ahead with the plan, or start a change to it.
 struct PlanActions {
     var goAhead: () -> Void

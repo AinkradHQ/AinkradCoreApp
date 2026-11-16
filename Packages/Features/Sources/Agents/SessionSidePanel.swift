@@ -56,6 +56,10 @@ struct SessionSidePanel: View {
                         }
                     }
                 }
+                let subs = SubAgentInfo.all(model.transcripts[session.id]?.entries ?? [])
+                if !subs.isEmpty {
+                    section("Sub-agents", symbol: "person.2", count: subs.count) { SubAgentsList(list: subs) }
+                }
                 section(
                     "Usage", symbol: "gauge.with.dots.needle.50percent",
                     action: model.canWrite(session) ? ("/compact", { model.drafts[session.id] = "/compact " }) : nil
@@ -85,7 +89,7 @@ struct SessionSidePanel: View {
             .padding(Space.s4)
         }
         .scrollIndicators(.never)
-        .background(SessionInk.chrome, in: coreShape(12))
+        .coreWell(radius: 12)  // follows the Appearance setting (Look)
         .task(id: session.id) { await model.followRoute(session.id) }
     }
 

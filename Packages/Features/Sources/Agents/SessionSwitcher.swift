@@ -66,7 +66,7 @@ struct SessionSwitcher: View {
         }
         .padding(Space.s2)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(SessionInk.chrome, in: coreShape(12))
+        .coreWell(radius: 12)  // follows the Appearance setting (Look)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Other AI sessions")
     }

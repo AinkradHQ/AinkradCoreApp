@@ -141,8 +141,6 @@ struct SessionView: View {
                 ui.focusField()
                 composing = true
             }
-            // A solid page, never the wallpaper (direction A): warm paper by day, warm charcoal by night.
-            .background(SessionInk.page)
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)

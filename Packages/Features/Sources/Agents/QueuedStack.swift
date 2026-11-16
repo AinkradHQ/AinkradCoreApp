@@ -1,8 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// The session screen's colours (direction A, approved 2026-11-16, `Designs/core/session-v2/a.css`): a solid warm paper
-/// page by day and a warm charcoal by night, never the wallpaper; fills only, no lines.
+/// The session screen's colours (direction A, approved 2026-11-16, `Designs/core/session-v2/a.css`). The page itself follows
+/// the Appearance setting (Look: transparency and blur, Ahmed 2026-11-16); the fills on it are tints, no lines.
 enum SessionInk {
     private static func hex(_ v: UInt32, _ a: Double = 1) -> Color {
         Color(
@@ -23,9 +23,10 @@ enum SessionInk {
     static let fieldOn = GlassInk.adaptive(light(0.09), day: ink(0.07))
     static let row = GlassInk.adaptive(light(0.06), day: ink(0.05))
     static let rowHover = hover
-    static let bubble = GlassInk.adaptive(hex(0x363531), day: hex(0xEEECE5))
-    static let card = GlassInk.adaptive(hex(0x2E2E2B), day: hex(0xF3F1EB))
-    static let code = GlassInk.adaptive(hex(0x1F1F1D), day: hex(0xF3F1EB))
+    // Tints, not solid colours, so they sit on whatever the Appearance setting (Look) shows behind them.
+    static let bubble = GlassInk.adaptive(light(0.09), day: ink(0.07))
+    static let card = GlassInk.adaptive(light(0.05), day: ink(0.04))
+    static let code = GlassInk.adaptive(.black.opacity(0.22), day: ink(0.045))
     /// The floating stack at the bottom (approval and composer).
     static let float = GlassInk.adaptive(hex(0x32322F, 0.92), day: light(0.9))
     static let floatShadow = GlassInk.adaptive(.black.opacity(0.35), day: hex(0x3C321E, 0.10))

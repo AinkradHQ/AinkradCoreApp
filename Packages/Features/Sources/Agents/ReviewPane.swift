@@ -69,7 +69,7 @@ struct ReviewPane: View {
             }
             .foregroundStyle(palette.text)
             .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
-            .background(SessionInk.chrome, in: coreShape(12))
+            .coreWell(radius: 12)  // follows the Appearance setting (Look)
         }
         .scrollIndicators(.never)
         .focusable().focusEffectDisabled().focused($focused)

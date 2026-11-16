@@ -319,8 +319,9 @@ struct EntryRow: View, Equatable {
         case .toolEdit(_, let name, let path, let old, let new, let ok, let ms):
             EditCard(name: name, path: path, old: old, new: new, ok: ok, ms: ms, expanded: $expanded)
         case .toolTodos(_, let items): TodoCard(items: items)
-        case .subAgent(_, let type, let task, let prompt, let result, let ok, let ms):
-            SubAgentCard(type: type, task: task, prompt: prompt, result: result, ok: ok, durationMs: ms)
+        case .subAgent(let id, let type, let task, let prompt, let result, let ok, let ms):
+            SubAgentLine(
+                info: SubAgentInfo(id: id, type: type, task: task, prompt: prompt, result: result, ok: ok, ms: ms))
         case .plan(_, let text): PlanCard(text: text)
         case .turnEnded(let cost, let tokens):
             // The quietest line in the column (Ahmed, 2026-11-15): the time and the exact numbers wait in the tooltip.
