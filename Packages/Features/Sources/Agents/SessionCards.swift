@@ -133,6 +133,8 @@ struct ChangesCard: View {
 /// and report, with Copy Report and Show in Transcript.
 struct SubAgentsCard: View {
     let list: [SubAgentInfo]
+    /// Puts a failed one's brief in the message field to run it again; nil when the session takes no messages.
+    var again: ((SubAgentInfo) -> Void)?
     @State private var open: String?
     @Environment(\.sessionUI) private var ui
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -225,6 +227,11 @@ struct SubAgentsCard: View {
                     }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
+                if a.ok == false, let again {
+                    Button("Run Again") { again(a) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Put its brief in the message field, to send it again")
+                }
                 Button("Show in Transcript") { ui?.jumpTo = a.seq }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small))
             }
@@ -285,74 +292,6 @@ struct TasksCard: View {
     static func latest(_ entries: [TranscriptEntry]) -> [TodoItem]? {
         for e in entries.reversed() { if case .toolTodos(_, let items) = e.kind, !items.isEmpty { return items } }
         return nil
-    }
-}
-
-// MARK: Activity
-
-/// What the tools did: calls, failures and tool time, then calls by kind with failures in red, and the last call.
-struct ActivityCard: View {
-    let entries: [TranscriptEntry]
-
-    var body: some View {
-        let steps = entries.compactMap(ToolStep.init)
-        let failed = steps.filter { $0.ok == false }.count
-        let secs = Double(steps.compactMap(\.ms).reduce(0, +)) / 1000
-        let kinds = ToolStep.Kind.allCases.map { k in (k, steps.filter { $0.kind == k }) }.filter { !$0.1.isEmpty }
-        let top = max(kinds.map(\.1.count).max() ?? 1, 1)
-        SideCard(
-            id: "activity", title: "Activity", foldedAtFirst: true, count: "\(steps.count) tools",
-            summary: "\(failed) failed · \(coreDecimal(secs, 1)) s"
-        ) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                HStack(spacing: Space.s4) {
-                    figure("\(steps.count)", "calls")
-                    figure("\(failed)", "failed")
-                    figure("\(coreDecimal(secs, 1)) s", "tool time")
-                }
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    ForEach(kinds, id: \.0) { k, list in
-                        let bad = list.filter { $0.ok == false }.count
-                        HStack(spacing: Space.s2) {
-                            Text(Self.name(k)).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
-                                .frame(width: 64, alignment: .leading)
-                            GeometryReader { g in
-                                HStack(spacing: 1) {
-                                    coreShape(2).fill(SessionInk.ink.opacity(0.7))
-                                        .frame(width: g.size.width * CGFloat(list.count - bad) / CGFloat(top))
-                                    if bad > 0 {
-                                        coreShape(2).fill(SessionInk.bad)
-                                            .frame(width: g.size.width * CGFloat(bad) / CGFloat(top))
-                                    }
-                                }
-                            }
-                            .frame(height: 6)
-                            Text("\(list.count)").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
-                                .monospacedDigit().frame(width: 20, alignment: .trailing)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func figure(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(value).coreFont(size: MacTextSize.title, weight: .semibold).foregroundStyle(SessionInk.text)
-                .monospacedDigit()
-            Text(label).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
-        }
-    }
-
-    static func name(_ k: ToolStep.Kind) -> String {
-        switch k {
-        case .read: "Read"
-        case .search: "Search"
-        case .edit: "Edit"
-        case .command: "Commands"
-        case .web: "Web"
-        case .other: "Other"
-        }
     }
 }
 
