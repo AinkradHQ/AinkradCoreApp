@@ -146,8 +146,8 @@ struct ShortcutSheet: View {
     @Environment(\.corePalette) private var palette
 
     private static let more: [(String, String)] = [
-        ("⌘⌫", "Deny a waiting request"), ("↩", "Send the message (⇧↩ a new line)"),
-        ("↑", "Edit your last message (empty field)"),
+        ("⌘⌫", "Deny a waiting request"), ("↩", "Send, or queue it while a turn runs (⇧↩ a new line)"),
+        ("↑", "Edit queued messages, or your last one (empty field)"),
         ("esc", "Stop the turn, or leave the field"), ("/", "Commands"), ("⌥↑ ⌥↓", "Your previous or next message"),
         ("↓", "Jump to the newest message"), ("R", "Resume or start again"), ("W", "Wake a finished session"),
     ]

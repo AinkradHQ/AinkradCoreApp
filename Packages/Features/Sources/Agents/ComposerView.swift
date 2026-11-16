@@ -245,6 +245,12 @@ struct ComposerView: View {
                     pick = max(0, pick - 1)
                     return true
                 }
+                // ↑ on an empty field, as in the Claude CLI: the queued messages come back to the field to edit first;
+                // with none queued, your last message does.
+                if text.isEmpty, model.queued[session.id]?.isEmpty == false {
+                    model.editAllQueued(session.id)
+                    return true
+                }
                 guard text.isEmpty, let last = model.lastUserMessage(session.id) else { return false }
                 draft.wrappedValue = last
                 return true

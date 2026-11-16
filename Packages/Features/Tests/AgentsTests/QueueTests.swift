@@ -40,6 +40,17 @@ struct QueueTests {
         #expect(m.drafts[running] == "first\n\nsecond")
     }
 
+    @Test func upOnAnEmptyFieldTakesEveryQueuedMessageBackToEdit() async {
+        let (m, _) = await make()
+        for t in ["one", "two"] {
+            m.drafts[running] = t
+            m.enqueue(running)
+        }
+        m.editAllQueued(running)
+        #expect(m.queued[running]?.isEmpty == true)
+        #expect(m.drafts[running] == "one\n\ntwo")
+    }
+
     @Test func queuedMessagesGoOutTogetherWhenTheTurnEnds() async {
         let (m, api) = await make()
         m.drafts[running] = "one"

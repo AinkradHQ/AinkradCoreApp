@@ -35,6 +35,14 @@ extension AgentsModel {
         drafts[id] = typed.isEmpty ? m.text : m.text + "\n\n" + typed
     }
 
+    /// ↑ on an empty field (the Claude CLI's key): every queued message back into the field, in order, to edit.
+    public func editAllQueued(_ id: String) {
+        guard let list = queued[id], !list.isEmpty else { return }
+        queued[id] = []
+        let typed = drafts[id] ?? ""
+        drafts[id] = Self.joined(list) + (typed.isEmpty ? "" : "\n\n" + typed)
+    }
+
     /// Hands one queued message to the tool now, while the turn runs (it reads it at its next step).
     public func sendQueuedNow(_ id: String, _ message: QueuedMessage.ID) {
         guard let m = queued[id]?.first(where: { $0.id == message }) else { return }

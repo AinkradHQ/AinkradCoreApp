@@ -51,8 +51,8 @@ struct QueuedStack: View {
             if !list.isEmpty {
                 Label(
                     list.count == 1
-                        ? "Queued · goes out when this turn ends"
-                        : "\(list.count) queued · go out together when this turn ends",
+                        ? "Queued · goes out when this turn ends · ↑ to edit"
+                        : "\(list.count) queued · go out together when this turn ends · ↑ to edit",
                     systemImage: "clock"
                 )
                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
