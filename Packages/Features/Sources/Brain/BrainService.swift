@@ -81,6 +81,9 @@ public protocol BrainService: Sendable {
     func roomAccess(room: String) async throws -> RoomAccess
     /// Replaces one list. The caller has already asked for Touch ID.
     func setRoomAccess(room: String, kind: AccessKind, values: [String]) async throws -> RoomAccess
+
+    /// The room Overview tab, or nil when this service cannot write overviews.
+    var overviewService: (any RoomOverviewService)? { get }
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -110,6 +113,7 @@ extension BrainService {
         throw BrainFailure("Rules come later.", code: "not_served")
     }
     public var servesCandidates: Bool { false }
+    public var overviewService: (any RoomOverviewService)? { nil }
     public func candidates() async throws -> CandidateInbox { CandidateInbox() }
     public func decide(_ id: String, room: String, _ decision: CandidateDecision) async throws {
         throw BrainFailure("The Inbox comes later.", code: "not_served")

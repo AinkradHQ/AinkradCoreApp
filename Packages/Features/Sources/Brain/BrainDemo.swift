@@ -24,6 +24,10 @@ public final class BrainDemo {
         "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
         "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
         "import-review-unchecked", "room-ai-access",
+        // The room Overview, in the order of brain-overview/index.html (layout B).
+        "room-overview", "room-overview-sources", "room-overview-approved", "room-overview-edit",
+        "room-overview-writing", "room-overview-not-written", "room-overview-failed", "room-overview-needs-account",
+        "room-overview-cloud-off",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -90,6 +94,19 @@ public final class BrainDemo {
         default: break
         }
         if scene == "room-ai-access" { s.m3 = true }
+        if scene.hasPrefix("room-overview") {
+            s.m3 = true
+            s.overview =
+                switch scene {
+                case "room-overview-writing": .writing
+                case "room-overview-not-written": .notWritten
+                case "room-overview-failed": .failed
+                case "room-overview-needs-account": .needsAccount
+                case "room-overview-cloud-off": .cloudOff
+                default: .written
+                }
+            s.overviewApproved = scene == "room-overview-approved" || scene == "room-overview-sources"
+        }
         if scene.hasPrefix("m3-") {
             s.m3 = true
             s.noLocalModel = scene == "m3-queued" || scene == "m3-room-queued"
@@ -189,6 +206,18 @@ public final class BrainDemo {
             if scene == "import-review-ai-changes", let r = model.importer?.review {
                 await r.watching?.value
                 await r.openChanges()
+            }
+        case let s where s.hasPrefix("room-overview"):
+            model.show(.rooms)
+            model.view("acme-shop")
+            await model.inspect("acme-shop")
+            await model.candidates?.loadPolicy("acme-shop")
+            model.candidates?.paneMode = .overview
+            let o = model.roomOverview!
+            await o.load("acme-shop")
+            if s == "room-overview-edit" { o.startEdit() }
+            if s == "room-overview-sources" {
+                o.openRule = "Workflow/" + (o.current?.overview?.rules.workflow[0].id ?? "")
             }
         case "room-ai-access":
             model.show(.rooms)
