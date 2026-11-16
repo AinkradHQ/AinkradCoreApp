@@ -204,10 +204,10 @@ struct SessionIndex {
             matches(r, filters) && (inScope(r, scope) || (searching && scope == .active && r.state == nil))
                 && (scope == .archive || searching || r.when != .archive)
         }
-        let pinned = rows.filter { inputs.pinned.contains($0.s.id) && $0.when != .archive }
+        // Pinned is a marker on the row, sorted first in its own group, not a group of its own: a pinned session that
+        // needs you stays in Needs you, so every count agrees (review 2026-11-16).
         var out: [SessionGroup] = []
-        if !pinned.isEmpty && scope != .pinned { out.append(SessionGroup(section: .pinned, rows: sorted(pinned))) }
-        let rest = rows.filter { !(inputs.pinned.contains($0.s.id) && $0.when != .archive && scope != .pinned) }
+        let rest = rows
         switch scope {
         case .active:
             for sec in [SessionSection.needsYou, .running] {
@@ -254,7 +254,10 @@ struct SessionIndex {
     private func sorted(_ r: [(s: AgentSessionInfo, state: SessionSection?, when: SessionSection)])
         -> [AgentSessionInfo]
     {
-        r.sorted { $0.s.updatedAt > $1.s.updatedAt }.map(\.s)
+        r.sorted {
+            let (a, b) = (inputs.pinned.contains($0.s.id), inputs.pinned.contains($1.s.id))
+            return a != b ? a : $0.s.updatedAt > $1.s.updatedAt
+        }.map(\.s)
     }
 
     /// The rows in the order they show, for the keyboard.

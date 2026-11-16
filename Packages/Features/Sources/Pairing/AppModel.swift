@@ -120,6 +120,7 @@ public final class AppModel {
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
         brain = BrainModel(host: AdminHostAdapter(app: self))
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
+        shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
         shell.elevate = { [weak self] in
             guard let self else { return }

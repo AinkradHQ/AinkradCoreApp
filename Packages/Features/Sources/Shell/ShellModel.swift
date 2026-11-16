@@ -220,6 +220,9 @@ public final class ShellModel {
     /// The one "waiting on you" number: approvals nobody answered, supplied by Agents (`AgentsModel.waitingOnYou`). Alerts and Brain
     /// inbox items are not in it; the bell counts them on their own. Until Agents is up, the bell's approval items stand in.
     public var waitingSource: (@MainActor () -> Int)?
+    /// The AI session counts the status chip shows, from the same index as the AI Sessions list and its sidebar (review
+    /// 2026-11-16: the chip, the sidebar and the groups disagreed). Nil until Agents is up: the home feed stands in.
+    public var sessionCounts: (@MainActor () -> (running: Int, needYou: Int))?
     public var waitingOnYou: Int {
         guard let source = waitingSource else { return bell.items.filter { $0.kind == .approval }.count }
         return source() + joinRequests

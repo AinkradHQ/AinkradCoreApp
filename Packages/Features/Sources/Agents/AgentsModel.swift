@@ -384,6 +384,13 @@ public final class AgentsModel {
     /// owners. The list header, the filter, the footer and the shell's status bar and bell all read this one number.
     public var waitingOnYou: Int { pending.count }
 
+    /// Running and needing-you AI sessions, counted by the list's own index, so the status chip, the list's sidebar and
+    /// its groups always agree.
+    public var sessionCounts: (running: Int, needYou: Int) {
+        let c = makeIndex().counts
+        return (c[.running] ?? 0, c[.needsYou] ?? 0)
+    }
+
     public func waiting(_ id: String) -> Bool { pending.contains { $0.session == id } }
 
     public func shown() -> [AgentSessionInfo] {

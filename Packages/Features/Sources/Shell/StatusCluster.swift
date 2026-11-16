@@ -46,8 +46,10 @@ struct StatusCluster: View {
 
     /// "2 running · 1 waiting" (Settings → Activity can hide it). A click opens the bell, where the waiting items are.
     @ViewBuilder private var activity: some View {
-        let running = shell.home.runningAgents
-        let waiting = shell.waitingOnYou
+        // Sessions, as the AI Sessions list counts them: running, and needing you (an approval or your next message).
+        let counts = shell.sessionCounts?() ?? (running: shell.home.runningAgents, needYou: shell.waitingOnYou)
+        let running = counts.running
+        let waiting = counts.needYou
         if shell.showActivityChip && (running > 0 || waiting > 0) {
             Button {
                 shell.toggleBell()
@@ -56,7 +58,7 @@ struct StatusCluster: View {
                     StatusDot(color: palette.tone(waiting > 0 ? .warn : .run).ink)
                     Text("\(running) running").monospacedDigit().contentTransition(.numericText())
                     if waiting > 0 {
-                        Text("· \(waiting) waiting").monospacedDigit().fontWeight(.semibold)
+                        Text("· \(waiting) need\(waiting == 1 ? "s" : "") you").monospacedDigit().fontWeight(.semibold)
                             .contentTransition(.numericText())
                     }
                 }
@@ -67,8 +69,12 @@ struct StatusCluster: View {
             .buttonStyle(StatusBarStyle())
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: running)
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: waiting)
-            .help(waiting > 0 ? "\(waiting) waiting on you. Open notifications" : "Nothing waiting on you")
-            .accessibilityLabel("\(running) running, \(waiting) waiting. Open notifications")
+            .help(
+                waiting > 0
+                    ? "\(waiting) AI session\(waiting == 1 ? "" : "s") need\(waiting == 1 ? "s" : "") you. Open notifications"
+                    : "Nothing needs you"
+            )
+            .accessibilityLabel("\(running) running, \(waiting) need you. Open notifications")
         }
     }
 }

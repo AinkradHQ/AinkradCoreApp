@@ -6,6 +6,7 @@ import SwiftUI
 struct AgentsListView: View {
     @Bindable var model: AgentsModel
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @FocusState private var listFocus: Bool
     @FocusState private var searchFocus: Bool
     @State private var collapsed: Set<SessionSection> = [.earlier]
@@ -37,10 +38,12 @@ struct AgentsListView: View {
                     if !compact { SessionSidebar(model: model, index: index).frame(width: 210) }
                     content(groups, rows, compact: compact, waiting: index.needsYou)
                 }
-                .padding(.horizontal, Space.s3)
+                .padding(.horizontal, Space.s5)
             }
         }
         .foregroundStyle(palette.text)
+        // The same light backing by day as the conversation screen, over the Look.
+        .background(SessionInk.backing)
         .paneLook(AgentPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
@@ -55,8 +58,8 @@ struct AgentsListView: View {
     private func header(_ index: SessionIndex) -> some View {
         let active = index.counts[.active] ?? 0
         return HStack(spacing: Space.s3) {
-            Text("AI Sessions").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
-            CountBadge(model.sessions.items.count, tone: .quiet, label: "AI sessions")
+            // The same title line as the conversation screen: body size, semibold (review 2026-11-16).
+            Text("AI Sessions").coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(.isHeader)
             Text(
                 [
                     "\(active) active", AgentWords.cost(model.sessions.totalCostMicros).map { "\($0) in total" },
@@ -64,18 +67,20 @@ struct AgentsListView: View {
             )
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
-            Button(action: { model.openNewSession() }) { Label("New AI session", systemImage: "plus") }
-                .buttonStyle(.coreProminent).environment(\.coreKeycap, "⌘N")
+            // Graphite, the one filled button colour of the AI session screens.
+            Button(action: { model.openNewSession() }) { Label("New AI Session", systemImage: "plus") }
+                .buttonStyle(GraphiteButtonStyle()).keyHint("⌘N")
                 .help("Open a new AI session with the defaults (⌘N)")
         }
-        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+        .padding(.horizontal, Space.s5).padding(.vertical, Space.s3)
     }
 
     private func filterBar(_ index: SessionIndex, compact: Bool) -> some View {
         HStack(spacing: Space.s2) {
             HStack(spacing: Space.s2) {
                 Image(systemName: "magnifyingglass").foregroundStyle(palette.text2).accessibilityHidden(true)
-                TextField("Search title, first message, folder or project", text: $model.filters.search)
+                TextField("Search sessions", text: $model.filters.search)
+                    .help("Searches the title, the first message, the folder and the project")
                     .textFieldStyle(.plain).focused($searchFocus)
                     .onKeyPress(.escape) {
                         model.filters.search = ""
@@ -106,7 +111,7 @@ struct AgentsListView: View {
                     index.projects.map { CoreSelectOption(Optional($0.name), $0.name) })
             }
         }
-        .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
+        .padding(.horizontal, Space.s5).padding(.bottom, Space.s2)
     }
 
     /// One filter: a quiet chevron select (CoreSelect) whose first choice clears it.
@@ -171,7 +176,7 @@ struct AgentsListView: View {
 
     private func columnHeads(compact: Bool, showActivity: Bool) -> some View {
         HStack(spacing: Space.s3) {
-            Text("Title and project").frame(maxWidth: .infinity, alignment: .leading)
+            Text("Title").frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, MacSize.controlSm + Space.s3)
             if !compact { Text("Runner").frame(width: SessionColumns.runner, alignment: .leading) }
             Text("State").frame(width: SessionColumns.state, alignment: .leading)
@@ -190,7 +195,8 @@ struct AgentsListView: View {
     ) -> some View {
         let now = Date()
         // The column only earns its place when the visible rows differ in last activity.
-        let showActivity = Set(rows.map { AgentWords.ago($0.updatedAt, now: now) }).count > 1
+        // Always shown, so the columns never jump (review 2026-11-16).
+        let showActivity = true
         return VStack(alignment: .leading, spacing: 0) {
             columnHeads(compact: compact, showActivity: showActivity)
             ScrollViewReader { proxy in
@@ -220,13 +226,28 @@ struct AgentsListView: View {
                                     model.selected == s.id ? [.isSelected, .isButton] : .isButton
                                 )
                                 .accessibilityAction { model.openSession(s.id) }
+                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -4)))
                                 .onAppear { model.loadTitle(s.id) }
+                                // Every row a person can act on has the same actions on right-click (HIG).
+                                .contextMenu {
+                                    Button("Open") { model.openSession(s.id) }
+                                    Button(model.pinned.contains(s.id) ? "Unpin" : "Pin") { model.togglePin(s.id) }
+                                    if s.live { Button("End Session…") { model.confirmEnd(s.id) } }
+                                    Button("Archive") { model.toggleArchive(s.id) }
+                                    Button("Copy Title") {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(model.title(s), forType: .string)
+                                    }
+                                }
                             } else {
                                 SectionHeader(group: item.group, collapsed: collapsed.contains(item.group.section)) {
-                                    if collapsed.contains(item.group.section) {
-                                        collapsed.remove(item.group.section)
-                                    } else {
-                                        collapsed.insert(item.group.section)
+                                    // The rows fade (and rise 4 pt) as a section opens or closes.
+                                    withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
+                                        if collapsed.contains(item.group.section) {
+                                            collapsed.remove(item.group.section)
+                                        } else {
+                                            collapsed.insert(item.group.section)
+                                        }
                                     }
                                 }
                             }
@@ -239,6 +260,8 @@ struct AgentsListView: View {
                         }
                     }
                     .padding(.bottom, Space.s2)
+                    // A session that changes group (Running → Needs you) glides to its new place (review 2026-11-16).
+                    .animation(Motion.calm(Motion.out(0.28), reduce), value: rows.map(\.id))
                 }
                 .scrollIndicators(.never)
                 .focusable()

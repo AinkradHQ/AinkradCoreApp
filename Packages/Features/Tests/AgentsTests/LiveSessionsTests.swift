@@ -33,15 +33,19 @@ struct LiveSessionsTests {
     }
 
     /// "Needs you" holds both a pending approval and a session waiting for your next message (2026-11-15: one entry).
-    @Test func activeHasPinnedOnTopThenNeedsYouThenRunning() {
+    /// Pinned is a marker, not a group (review 2026-11-16): a pinned session stays in its state's group, sorted first, so
+    /// the group and every count agree.
+    @Test func activeIsNeedsYouThenRunningWithPinnedFirstInItsGroup() {
         let items = [
             session("run", .running), session("wait", .waiting), session("need", .running), session("pin", .waiting),
             session("old", .ended, ageDays: 1),
         ]
-        let g = index(items, needs: ["need"], pinned: ["pin"]).groups(scope: .active, filters: .init())
-        #expect(g.map(\.section) == [.pinned, .needsYou, .running])
-        #expect(g[0].rows.map(\.id) == ["pin"])
-        #expect(Set(g[1].rows.map(\.id)) == ["need", "wait"])
+        let ix = index(items, needs: ["need"], pinned: ["pin"])
+        let g = ix.groups(scope: .active, filters: .init())
+        #expect(g.map(\.section) == [.needsYou, .running])
+        #expect(g[0].rows.first?.id == "pin")
+        #expect(Set(g[0].rows.map(\.id)) == ["pin", "need", "wait"])
+        #expect(ix.counts[.needsYou] == g[0].rows.count)
     }
 
     @Test func endedSessionsArchiveAfterFourteenDaysAndEarlierIsEightToFourteen() {

@@ -10,7 +10,7 @@ struct SessionSidebar: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s1) {
-                heading("Needs attention")
+                heading("Sessions")
                 item("Active", .active, hot: false)
                 item("Needs you", .needsYou, hot: true)
                 item("Running", .running)
@@ -118,19 +118,24 @@ struct SessionRow: View {
                 if pinned {
                     Image(systemName: "pin.fill").coreFont(size: MacTextSize.floor).foregroundStyle(palette.text2)
                 }
-                Text(title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1).truncationMode(.tail)
-                    .help(title)
+                Text(title).coreFont(size: MacTextSize.body, weight: selected ? .semibold : .regular).lineLimit(1)
+                    .truncationMode(.tail).help(title)
                 if let p = session.project {
                     Text(p).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if hover || selected {
-                HStack(spacing: Space.s1) {
-                    mini(pinned ? "Unpin" : "Pin", "P", onPin)
-                    if session.live { mini("End", "E", onEnd) }
+            // Over the end of the title cell on hover, never inserted into the row: nothing shifts (HIG).
+            .overlay(alignment: .trailing) {
+                if hover {
+                    HStack(spacing: Space.s1) {
+                        mini(pinned ? "Unpin" : "Pin", "P", onPin)
+                        if session.live { mini("End…", "E", onEnd) }
+                    }
+                    .padding(.leading, Space.s2)
+                    .background(selected ? SessionInk.selected : SessionInk.hover, in: coreShape(Radius.control))
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
             }
             if !compact {
                 Text(runner).lineLimit(1).truncationMode(.tail)
@@ -150,9 +155,9 @@ struct SessionRow: View {
         .padding(.horizontal, Space.s3).frame(height: Space.s8 + Space.s1)
         .background {
             if selected {
-                coreShape(Radius.control).fill(palette.navActive)
+                coreShape(Radius.control).fill(SessionInk.selected)
             } else if hover {
-                coreShape(Radius.control).fill(palette.uDim)
+                coreShape(Radius.control).fill(SessionInk.hover)
             }
         }
         .contentShape(Rectangle())
@@ -185,8 +190,9 @@ struct SectionHeader: View {
                     .foregroundStyle(group.section == .needsYou ? GlassInk.amberInk : palette.text)
                 CountBadge(group.rows.count, tone: .quiet)
                 Spacer()
-                if let c = AgentWords.cost(group.costMicros), group.costMicros > 0 {
-                    Text("\(c) in total").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                // A group's total only when there is something to add up (2+ rows); one row shows its own cost.
+                if group.rows.count > 1, let c = AgentWords.cost(group.costMicros), group.costMicros > 0 {
+                    Text("\(c) in total").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                 }
             }
             .foregroundStyle(palette.text2)

@@ -417,6 +417,13 @@ struct SessionView: View {
 struct PinnedApprovals: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    private var pendingIDs: [String] {
+        (model.transcripts[session.id]?.approvalList ?? []).filter {
+            $0.status(now: Date(), sessionOver: session.over) == .pending
+        }.map(\.id)
+    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -427,9 +434,17 @@ struct PinnedApprovals: View {
                     ForEach(pending) { r in ApprovalEntryCard(model: model, request: r, floating: true) }
                 }
                 .padding(.bottom, Space.s2)
-                .transition(.opacity)
+                // It rises out of the message field (8 pt, from 98%), and fades away once answered.
+                .transition(
+                    .asymmetric(
+                        insertion: reduce
+                            ? .opacity
+                            : .opacity.combined(with: .offset(y: 8)).combined(
+                                with: .scale(scale: 0.98, anchor: .bottom)),
+                        removal: .opacity))
             }
         }
+        .animation(Motion.calm(Motion.out(0.24), reduce), value: pendingIDs)
     }
 }
 

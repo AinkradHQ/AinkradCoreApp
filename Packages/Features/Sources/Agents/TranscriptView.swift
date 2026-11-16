@@ -410,7 +410,8 @@ struct ToolCard: View {
                     Text(PathWords.short(summary.isEmpty ? name : summary))
                         .coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
                         .lineLimit(1).truncationMode(.middle)
-                    trailing
+                    // The working bar gives way to ✓ or ✗ with a short crossfade when the step finishes.
+                    trailing.animation(Motion.out(0.2), value: statusKey)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, Space.s2).frame(minHeight: 28)
@@ -439,6 +440,14 @@ struct ToolCard: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
+    }
+
+    private var statusKey: Int {
+        switch status {
+        case .running: 0
+        case .ok: 1
+        case .failed: 2
+        }
     }
 
     @ViewBuilder private var trailing: some View {
