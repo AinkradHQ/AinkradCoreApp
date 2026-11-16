@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 /// Interaction states a component can be shown in. Real input drives them; the gallery forces them.
 public enum CoreInteraction: Sendable, Hashable { case hover, pressed, focused }
 
@@ -161,6 +165,20 @@ extension View {
     /// Reduce Motion: no lift. One implementation, so every control that calls it answers focus the same way.
     public func coreFocusRing(_ show: Bool, radius: CGFloat, palette: Palette) -> some View {
         modifier(CoreFocusLook(show: show, radius: radius))
+    }
+}
+
+/// Whether a button-styled control holds the keyboard itself. In a ButtonStyle, `isFocused` reports the nearest focusable
+/// *ancestor*: with macOS Keyboard navigation off a button is never focusable, so it read the pane's or the window's
+/// focus and a click made every button in the pane look focused at once (Ahmed, 2026-11-16). With Keyboard navigation on,
+/// the button is its own nearest focusable view and the value is its own.
+public enum CoreKeyboardFocus {
+    @MainActor public static func own(_ isFocused: Bool) -> Bool {
+        #if os(macOS)
+        isFocused && NSApplication.shared.isFullKeyboardAccessEnabled
+        #else
+        isFocused
+        #endif
     }
 }
 

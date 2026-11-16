@@ -87,7 +87,9 @@ private struct CoreButtonBody: View {
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
         .modifier(ButtonSurface(kind: kind, radius: size.radius, fill: fill, hover: hover, darken: pressed && reduce))
         // Keyboard focus: the hover fill step, a brighter edge and a 1 pt lift (D6), no ring.
-        .coreFocusRing(isFocused || forced == .focused, radius: size.radius, palette: palette)
+        .coreFocusRing(
+            CoreKeyboardFocus.own(isFocused) || forced == .focused, radius: size.radius, palette: palette
+        )
         .coreDimWhenDisabled(enabled)
         .scaleEffect(pressed && !reduce ? 0.97 : 1)
         .coreAnimation(Motion.press(Motion.press), value: pressed)
