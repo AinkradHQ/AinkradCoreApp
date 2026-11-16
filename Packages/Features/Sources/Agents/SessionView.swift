@@ -30,6 +30,7 @@ struct SessionView: View {
     @State private var clickMonitor: Any?
     /// The conversation fades in and rises 8 pt when a session opens or the sidebar switches to it.
     @State private var shown = false
+    @State private var bottomStack: CGFloat = 0
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -92,7 +93,11 @@ struct SessionView: View {
                     return e
                 }
             }
+            .onChange(of: model.shell.activePane) { _, _ in keepToastsClear() }
             .onDisappear {
+                if model.shell.activePane == AgentsModel.paneID(sessionID) || model.shell.activePane == nil {
+                    model.shell.toastInset = 0
+                }
                 for m in [keyMonitor, clickMonitor].compactMap({ $0 }) { NSEvent.removeMonitor(m) }
                 keyMonitor = nil
                 clickMonitor = nil
@@ -191,9 +196,18 @@ struct SessionView: View {
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump, focus: focusSeq)
                 .frame(maxWidth: .infinity)
-            PinnedApprovals(model: model, session: s).readingColumn().padding(.horizontal, Space.s4)
-            ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
-                .frame(maxWidth: .infinity)
+            // The bottom stack (approval, field): toasts float above it, never on it.
+            VStack(spacing: 0) {
+                PinnedApprovals(model: model, session: s).readingColumn().padding(.horizontal, Space.s4)
+                ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
+                    .frame(maxWidth: .infinity)
+            }
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.height
+            } action: { h in
+                bottomStack = h
+                keepToastsClear()
+            }
         }
         .opacity(shown ? 1 : 0)
         .offset(y: shown || reduce ? 0 : 8)
@@ -204,6 +218,12 @@ struct SessionView: View {
         // The conversation's own text size and typeface (Settings, AI Sessions, Text).
         .environment(\.coreTextScale, AgentPrefs.shared.textScale)
         .environment(\.coreFontDesign, AgentPrefs.shared.fontDesign)
+    }
+
+    /// While this pane is in front, toasts rise above its approval and message field.
+    private func keepToastsClear() {
+        guard model.shell.activePane == AgentsModel.paneID(sessionID) else { return }
+        model.shell.toastInset = bottomStack + Space.s3
     }
 
     /// Runs a session shortcut; false when it does not apply now, so the key goes on (to the text field, say).

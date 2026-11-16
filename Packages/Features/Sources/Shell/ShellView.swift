@@ -21,7 +21,7 @@ public struct ShellView: View {
         .animation(Motion.calm(Motion.out(Motion.move), reduce), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
-        .coreToast($shell.toast)
+        .coreToast($shell.toast, inset: shell.toastInset)
         .environment(\.coreLook, look.look)
         // The window opens calm: focus rests on the root, so no control shows a ring until the keyboard moves it.
         .focusable()

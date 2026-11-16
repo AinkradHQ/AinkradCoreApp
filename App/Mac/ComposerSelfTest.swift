@@ -278,6 +278,11 @@ enum ShowcaseShots {
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
         try? await Task.sleep(for: .seconds(2.5))
         _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
+        // A toast floats above the approval and the message field, never on them.
+        app.shell.showToast("Closed AI Sessions. It keeps running.")
+        try? await Task.sleep(for: .seconds(1))
+        _ = SnapshotCapture.png(window, to: "\(dir)/toast-\(theme).png")
+        app.shell.toast = nil
         // Typing during a turn turns the composer's one button from Stop into Queue.
         a.drafts["as_01JC4X7Q3MZ8N5V2K9R001"] = "Also add a test for the 429 path."
         try? await Task.sleep(for: .seconds(1))
