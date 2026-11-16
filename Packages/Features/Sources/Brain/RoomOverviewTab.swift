@@ -16,7 +16,7 @@ struct RoomOverviewTab: View {
             }
             content
         }
-        .task(id: room.id) { await o.load(room.id) }
+        .task(id: "\(room.id)#\(o.epoch)") { await o.load(room.id) }
         .task(id: o.current?.state) { if o.current?.state == .writing { await o.watch(room.id) } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-overview")

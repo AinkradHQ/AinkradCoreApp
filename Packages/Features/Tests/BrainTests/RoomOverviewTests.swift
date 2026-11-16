@@ -108,6 +108,21 @@ struct RoomOverviewTests {
         #expect(titles["s0"] == "Release checklist" && titles["s3"] == "Sprint 14 retro")
     }
 
+    /// Opening a room clears the room view (inspect) while the tab's first load may be in flight; that load's answer is
+    /// then dropped. Every outside clear bumps `epoch`, the tab's task id, so the tab loads again instead of staying on
+    /// its skeleton. A load that switches rooms itself does not bump it (no reload loop).
+    @Test func anOutsideClearAsksTheTabToLoadAgain() async {
+        let model = await make(.written)
+        let o = model.roomOverview!
+        let before = o.epoch
+        await o.load("acme-shop")
+        #expect(o.epoch == before, "a load never bumps the epoch")
+        await model.inspect("acme-shop")
+        #expect(o.epoch == before + 1 && o.current == nil && o.phase == .idle)
+        await o.load("acme-shop")
+        #expect(o.phase == .ready && o.current?.state == .written)
+    }
+
     @Test func leavingARoomClearsItsOverview() async {
         let model = await make(.written)
         let o = model.roomOverview!
