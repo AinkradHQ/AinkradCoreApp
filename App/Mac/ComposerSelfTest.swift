@@ -292,6 +292,9 @@ enum ShowcaseShots {
         }
         chord("s", 1, [.command, .control])
         chord("i", 34, [.command, .option])
+        // Mid-way: the sidebar and the panel are still sliding out (the toggles animate, with Reduce Motion too).
+        try? await Task.sleep(for: .milliseconds(110))
+        _ = SnapshotCapture.png(window, to: "\(dir)/sliding-\(theme).png")
         try? await Task.sleep(for: .seconds(1))
         _ = SnapshotCapture.png(window, to: "\(dir)/hidden-\(theme).png")
         chord("s", 1, [.command, .control])

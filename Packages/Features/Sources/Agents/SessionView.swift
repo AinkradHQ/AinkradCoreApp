@@ -22,6 +22,13 @@ struct SessionView: View {
     @State private var ui = SessionUI()
     @AppStorage("agents.detailsStrip") private var showDetails = true
     @AppStorage(SessionView.sidebarKey) private var showSidebar = true
+    /// What the screen shows, kept in its own state so a toggle always animates (a settings write can skip the
+    /// animation); the choice is still saved to `showSidebar` / `showPanel`.
+    @State private var sidebarOn = UserDefaults.standard.object(forKey: SessionView.sidebarKey) as? Bool ?? true
+    @State private var panelOn = UserDefaults.standard.object(forKey: "agents.sessionPanel") as? Bool ?? true
+    /// The toggles slide the sidebar and the panel from their edge while the conversation glides over (Ahmed,
+    /// 2026-11-16: "add transition motion to the toggle"), with Reduce Motion too: he asked for this movement.
+    static let toggleMotion = Motion.out(0.28)
     /// The session panel at the right, shown or hidden with its toggle at the end of the title line (⌥⌘I).
     @AppStorage("agents.sessionPanel") private var showPanel = true
     /// The pane has room for the panel beside the conversation; under it, ⌥⌘I shows the details strip instead.
@@ -44,14 +51,14 @@ struct SessionView: View {
         if let s = model.sessions.session(sessionID) {
             GeometryReader { geo in
                 let room = geo.size.width >= Self.sidebarRoom
-                let side = showSidebar && room
+                let side = sidebarOn && room
                 let rest = geo.size.width - (side ? Self.sidebarWidth + Space.s3 : 0)
-                let wide = rest >= Self.panelWidth && showPanel
+                let wide = rest >= Self.panelWidth && panelOn
                 HStack(alignment: .top, spacing: 0) {
                     if side {
                         SessionSwitcher(model: model, current: sessionID).frame(width: Self.sidebarWidth)
                             .padding(.leading, Space.s3).padding(.vertical, Space.s2)
-                            .transition(reduce ? .opacity : .move(edge: .leading).combined(with: .opacity))
+                            .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                     conversation(s, wide: wide, compact: rest < Self.compact, panelRoom: rest >= Self.panelWidth)
                         // The fixed sidebar toggle keeps its corner while the sidebar is hidden: the column clears it.
@@ -61,7 +68,7 @@ struct SessionView: View {
                             .trailing, Space.s3
                         )
                         .padding(.top, Space.s2)
-                        .transition(reduce ? .opacity : .move(edge: .trailing).combined(with: .opacity))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
                 // The sidebar toggle, as in the mockup: a plain icon fixed at the top-left corner, beside "AI Sessions"
@@ -69,7 +76,7 @@ struct SessionView: View {
                 .overlay(alignment: .topLeading) {
                     if room {
                         CoreIconButton(symbol: "sidebar.left", label: "Your other sessions") { toggleSidebar() }
-                            .help(showSidebar ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
+                            .help(sidebarOn ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
                             .keyHint(.sidebar)
                             .padding(.leading, Space.s3 + Space.s2).padding(.top, Space.s2 + Space.s2)
                     }
@@ -228,11 +235,13 @@ struct SessionView: View {
     }
 
     private func toggleSidebar() {
-        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showSidebar.toggle() }
+        withAnimation(Self.toggleMotion) { sidebarOn.toggle() }
+        showSidebar = sidebarOn
     }
 
     private func togglePanel() {
-        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showPanel.toggle() }
+        withAnimation(Self.toggleMotion) { panelOn.toggle() }
+        showPanel = panelOn
     }
 
     /// Runs a session shortcut; false when it does not apply now, so the key goes on (to the text field, say).
