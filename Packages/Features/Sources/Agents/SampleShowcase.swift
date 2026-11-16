@@ -11,7 +11,8 @@ extension FakeAgentsAPI {
         let s = AgentSessionInfo(
             id: "as_01JC4X7Q3MZ8N5V2K9R020", runner: "d_mac", harness: "claude", state: .running, outcome: nil,
             createdAt: now.addingTimeInterval(-900), updatedAt: now.addingTimeInterval(-20), endedAt: nil, lastSeq: 0,
-            usage: AgentUsageInfo(input: 74_000, output: 14_400, costMicros: 1_480_000), index: 20)
+            usage: AgentUsageInfo(input: 74_000, output: 14_400, costMicros: 1_480_000), index: 20, policy: "ask",
+            plan: true)
         let report = """
             # Runner fleet status
             Three of four runners are online. **build-box** has been offline since Friday; the others are healthy.

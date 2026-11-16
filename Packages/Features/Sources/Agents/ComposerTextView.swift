@@ -11,6 +11,8 @@ struct ComposerKeys {
     var escape: () -> Bool
     /// A session shortcut (⌘F, ⌘↩, ⇧⌘R…, `SessionShortcut`): true when the session took it.
     var command: (NSEvent) -> Bool = { _ in false }
+    /// ⇧⇥: the session's next mode (as in Claude Code).
+    var backtab: () -> Bool = { false }
 }
 
 /// The composer's text field (Ahmed, 2026-11-15: Enter sometimes did not send, and the command list ignored the arrows).
@@ -176,6 +178,7 @@ final class KeyTextView: NSTextView {
             case #selector(moveUp(_:)): keys?.up() ?? false
             case #selector(moveDown(_:)): keys?.down() ?? false
             case #selector(insertTab(_:)): keys?.tab() ?? false
+            case #selector(insertBacktab(_:)): keys?.backtab() ?? false
             case #selector(cancelOperation(_:)): keys?.escape() ?? false
             default: false
             }
@@ -194,6 +197,10 @@ final class KeyTextView: NSTextView {
     private var keyFlags: NSEvent.ModifierFlags = []
 
     override func keyDown(with event: NSEvent) {
+        // ⇧⇥ switches the session's mode (as in Claude Code). Caught here: the text view treats it as "focus the previous
+        // control" before it reaches doCommand (the live UI test found it, 2026-11-16).
+        let mods = event.modifierFlags.intersection([.shift, .command, .option, .control])
+        if event.keyCode == 48, mods == .shift, !hasMarkedText(), keys?.backtab() == true { return }
         keyFlags = event.modifierFlags
         defer { keyFlags = [] }
         super.keyDown(with: event)

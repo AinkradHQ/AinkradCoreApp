@@ -393,6 +393,10 @@ struct SessionView: View {
                     } else {
                         await model.say(s.id, "The plan is approved. Go ahead and build it.")
                     }
+                    // Approving the plan leaves Plan mode: the next turn builds (the Core keeps `plan` until told).
+                    if model.sessions.session(s.id)?.plan == true {
+                        await model.setMode(s.id, policy: nil, plan: false)
+                    }
                 }
             },
             change: {

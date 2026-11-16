@@ -44,6 +44,10 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var keepsOpen: Bool?
     /// While waiting: since when.
     public var idleSince: Date?
+    /// Its permission mode (`ask`, `accept_edits`, `sandboxed`) as the Core enforces it; nil from a Core too old to say.
+    public var policy: String?
+    /// In Plan mode: it reads and plans, edits nothing, and ends with a plan to approve (Claude Code only).
+    public var plan = false
     /// Its row, for paging the list with `before`.
     public var index: Int64?
     /// Its chain, account, run and attempts (admins only; nil for any other device).
@@ -55,8 +59,10 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
         endedAt: Date? = nil, lastSeq: Int64 = 0, usage: AgentUsageInfo? = nil, resumes: Int? = nil,
         index: Int64? = nil,
         route: SessionRoute? = nil, title: String? = nil, project: String? = nil, branch: String? = nil,
-        keepsOpen: Bool? = nil, idleSince: Date? = nil
+        keepsOpen: Bool? = nil, idleSince: Date? = nil, policy: String? = nil, plan: Bool = false
     ) {
+        self.policy = policy
+        self.plan = plan
         self.keepsOpen = keepsOpen
         self.idleSince = idleSince
         self.title = title
@@ -159,6 +165,8 @@ public struct NewAgentSession: Equatable, Sendable {
     public var base: String?
     /// `ask`, `accept_edits` or `sandboxed`.
     public var mode: String
+    /// Start in Plan mode (Claude Code only).
+    public var plan = false
     public var secrets: [String]
     /// A fallback chain's id, or an agent id whose bound (else default) chain serves the session. Both need `admin`, and
     /// with either the harness and model are left out: the account the Core picks sets them.

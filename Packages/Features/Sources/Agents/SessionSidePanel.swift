@@ -156,6 +156,7 @@ struct SessionCard: View {
                     .help(w.input)
                 }
                 FlowRow(spacing: Space.s1) {
+                    if let mode = SessionMode.of(session) { tag(mode.symbol, mode.title).help(mode.help) }
                     tag(
                         "terminal",
                         AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model"))

@@ -159,6 +159,7 @@ struct ShortcutSheet: View {
             [
                 ("↩", "Send, or queue it while a turn runs"), ("⇧↩", "A new line"),
                 ("↑", "Edit queued messages, or your last one (empty field)"), ("/", "Commands"),
+                ("⇧⇥", "Switch the mode: Asks first, Accepts edits, Plan"),
                 ("esc", "Stop the turn, or leave the field"),
             ] + keys([.stopTurn, .attach, .model, .compact])
         ),

@@ -190,6 +190,23 @@ enum ComposerSelfTest {
             else { return }
             _ = window.performKeyEquivalent(with: e)
         }
+        // ⇧⇥ in the field switches the session's mode, as in Claude Code (Asks first → Accepts edits).
+        let modeBefore = a.sessions.session(s.id).flatMap { SessionMode.of($0) }
+        window.makeFirstResponder(tv)
+        // A real ⇧⇥ key event, through keyDown and the key bindings, as a person presses it.
+        if let e = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil, characters: "\u{19}", charactersIgnoringModifiers: "\t",
+            isARepeat: false, keyCode: 48)
+        {
+            window.sendEvent(e)
+        }
+        try? await Task.sleep(for: .milliseconds(600))
+        let modeAfter = a.sessions.session(s.id).flatMap { SessionMode.of($0) }
+        check(
+            "⇧⇥ in the field switches the mode",
+            modeBefore != nil && modeAfter == modeBefore?.next(harness: s.harness),
+            "\(modeBefore?.title ?? "none") → \(modeAfter?.title ?? "none")")
         a.drafts[s.id] = ""
         chord("k", 40, [.command, .shift])
         try? await Task.sleep(for: .milliseconds(300))
