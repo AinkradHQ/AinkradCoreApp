@@ -22,7 +22,6 @@ public final class RoomOverviewModel {
     /// The rule whose "from N items" popover is open.
     public var openRule: String?
     @ObservationIgnored var pollEvery: Duration = .seconds(2)
-    @ObservationIgnored private var titles: [String: OverviewSource] = [:]
 
     init(brain: BrainModel) { self.brain = brain }
 
@@ -37,7 +36,6 @@ public final class RoomOverviewModel {
         editing = false
         draft = ""
         openRule = nil
-        titles = [:]
     }
 
     public func load(_ room: String, quiet: Bool = false) async {
@@ -125,16 +123,5 @@ public final class RoomOverviewModel {
         }
         await load(room, quiet: true)
         return true
-    }
-
-    // MARK: sources
-
-    /// The titles for some item ids, in their order. Cached while the room is open.
-    public func sources(_ ids: [String], room: String) async -> [OverviewSource] {
-        let missing = ids.filter { titles[$0] == nil }
-        if !missing.isEmpty, let service, let found = try? await service.overviewSources(room: room, ids: missing) {
-            for s in found { titles[s.id] = s }
-        }
-        return ids.compactMap { titles[$0] }
     }
 }

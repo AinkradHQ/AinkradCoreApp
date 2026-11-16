@@ -97,17 +97,15 @@ struct RoomOverviewTests {
         #expect(!o.editing && o.current?.instructionsText == before)
     }
 
-    @Test func sourcesCarryTitlesForTheFirstIdsOnly() async throws {
+    @Test func everyCitedItemHasATitle() async throws {
         let model = await make(.written)
         let o = model.roomOverview!
         await o.load("acme-shop")
         let rule = try #require(o.current?.overview?.rules.workflow.first)
         #expect(rule.sources.count == 14)
-        let titles = await o.sources(Array(rule.sources.prefix(4)), room: "acme-shop")
-        #expect(
-            titles.map(\.title) == [
-                "Release checklist", "Review thread on checkout PR", "Deploy runbook", "Sprint 14 retro",
-            ])
+        let titles = try #require(o.current?.sourceTitles)
+        #expect(rule.sources.allSatisfy { titles[$0] != nil })
+        #expect(titles["s0"] == "Release checklist" && titles["s3"] == "Sprint 14 retro")
     }
 
     @Test func leavingARoomClearsItsOverview() async {
@@ -126,7 +124,7 @@ struct RoomOverviewTests {
             "room": "acme", "state": "written", "detail": "", "written_at": "2026-11-16T08:00:00Z",
             "model": "claude:work", "instructions": "Edited.", "instructions_approved_at": NSNull(),
             "progress": ["total": 1, "done": 1, "failed": 0, "room": NSNull()],
-            "overview": ["summary": "One."],
+            "overview": ["summary": "One."], "source_titles": ["a": "Deploy runbook"],
         ]
     }
 
@@ -134,7 +132,9 @@ struct RoomOverviewTests {
         let t = FakeBrainTransport()
         t.routes["GET \(base)"] = { _ in Self.view() }
         let o = try await CoreBrainService(transport: t).overviewService!.roomOverview(room: "acme")
-        #expect(o.writer == "Claude, work" && o.progress == OverviewProgress(done: 1, total: 1))
+        #expect(
+            o.sourceTitles == ["a": "Deploy runbook"] && o.writer == "Claude, work"
+                && o.progress == OverviewProgress(done: 1, total: 1))
         #expect(o.instructionsText == "Edited." && !o.instructionsApproved)
     }
 

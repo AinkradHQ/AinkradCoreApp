@@ -36,10 +36,6 @@ extension SampleBrainService: RoomOverviewService {
         o.instructionsApprovedAt = approved ? SampleOverview.iso(-60) : nil
         roomOverviews[room] = o
     }
-
-    public func overviewSources(room: String, ids: [String]) async throws -> [OverviewSource] {
-        ids.compactMap(SampleOverview.item)
-    }
 }
 
 enum SampleOverview {
@@ -55,10 +51,8 @@ enum SampleOverview {
     ]
 
     /// Item `s7` is the eighth title again after the list runs out: enough variety for a made-up room.
-    static func item(_ id: String) -> OverviewSource? {
-        guard let n = Int(id.dropFirst()) else { return nil }
-        let t = items[n % items.count]
-        return OverviewSource(id: id, title: t.0, type: t.1)
+    static func title(_ id: String) -> String? {
+        Int(id.dropFirst()).map { items[$0 % items.count].0 }
     }
 
     static func rule(_ text: String, _ n: Int) -> OverviewRule { OverviewRule(text, sources: (0..<n).map { "s\($0)" }) }
@@ -70,13 +64,17 @@ enum SampleOverview {
                 state: state, detail: state == .writing ? "running on build-box" : "", writtenAt: iso(-120),
                 model: "claude:personal",
                 progress: state == .writing ? OverviewProgress(done: 12, total: 35) : nil, overview: body,
-                instructions: body.instructions, instructionsApprovedAt: approved ? iso(-60) : nil)
+                instructions: body.instructions, instructionsApprovedAt: approved ? iso(-60) : nil,
+                sourceTitles: titles)
         default:
             RoomOverview(
                 state: state,
                 detail: state == .failed ? "the model answered with something that is not an overview" : "")
         }
     }
+
+    static let titles: [String: String] = Dictionary(
+        uniqueKeysWithValues: (0..<14).compactMap { id in title("s\(id)").map { ("s\(id)", $0) } })
 
     static let body = OverviewBody(
         summary: """

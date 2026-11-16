@@ -140,11 +140,13 @@ public struct RoomOverview: Codable, Sendable, Equatable {
     /// The editable instructions, the ones AI sessions read once approved.
     public var instructions: String?
     public var instructionsApprovedAt: String?
+    /// Item id to title, for every item a rule cites.
+    public var sourceTitles: [String: String]
 
     public init(
         state: OverviewState, detail: String = "", writtenAt: String? = nil, model: String? = nil,
         progress: OverviewProgress? = nil, overview: OverviewBody? = nil, instructions: String? = nil,
-        instructionsApprovedAt: String? = nil
+        instructionsApprovedAt: String? = nil, sourceTitles: [String: String] = [:]
     ) {
         self.state = state
         self.detail = detail
@@ -154,6 +156,7 @@ public struct RoomOverview: Codable, Sendable, Equatable {
         self.overview = overview
         self.instructions = instructions
         self.instructionsApprovedAt = instructionsApprovedAt
+        self.sourceTitles = sourceTitles
     }
 
     public init(from decoder: any Decoder) throws {
@@ -166,12 +169,14 @@ public struct RoomOverview: Codable, Sendable, Equatable {
         overview = try c.decodeIfPresent(OverviewBody.self, forKey: .overview)
         instructions = try c.decodeIfPresent(String.self, forKey: .instructions)
         instructionsApprovedAt = try c.decodeIfPresent(String.self, forKey: .instructionsApprovedAt)
+        sourceTitles = try c.decodeIfPresent([String: String].self, forKey: .sourceTitles) ?? [:]
     }
 
     enum CodingKeys: String, CodingKey {
         case state, detail, model, progress, overview, instructions
         case writtenAt = "written_at"
         case instructionsApprovedAt = "instructions_approved_at"
+        case sourceTitles = "source_titles"
     }
 
     var instructionsApproved: Bool { instructionsApprovedAt != nil }
@@ -186,19 +191,6 @@ public struct RoomOverview: Codable, Sendable, Equatable {
     }
 }
 
-/// The title and kind of one item a rule was read from, for the "from N items" popover.
-public struct OverviewSource: Sendable, Equatable, Identifiable {
-    public let id: String
-    public let title: String
-    /// "note", "chat", "doc"…
-    public let type: String
-    public init(id: String, title: String, type: String) {
-        self.id = id
-        self.title = title
-        self.type = type
-    }
-}
-
 /// What the room Overview asks of a service. Small on purpose: the sample implements it today, the Core client when its
 /// routes are merged (`GET /rooms/{room}/overview`, `POST …/overview/write`, `PATCH …/overview/instructions`).
 public protocol RoomOverviewService: Sendable {
@@ -207,6 +199,4 @@ public protocol RoomOverviewService: Sendable {
     func writeOverview(room: String) async throws
     /// Edits the instructions (`text` nil keeps them) and approves or withdraws them.
     func setInstructions(room: String, text: String?, approved: Bool) async throws
-    /// Titles for some of a rule's item ids; an id the Core no longer has is left out.
-    func overviewSources(room: String, ids: [String]) async throws -> [OverviewSource]
 }

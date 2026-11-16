@@ -42,9 +42,6 @@ struct CoreRoomOverview: RoomOverviewService {
         _ = try await wrap { try await routes.setInstructions(room: room, text: text, approved: approved) }
     }
 
-    /// The Core has no route that names an item by id for the Mac yet (`/ai/…/records/{id}` answers AI sessions only).
-    func overviewSources(room: String, ids: [String]) async throws -> [OverviewSource] { [] }
-
     private func wrap<T>(_ op: () async throws -> T) async throws -> T {
         do { return try await op() } catch let e as BrainHTTPError { throw Self.failure(e) }
     }

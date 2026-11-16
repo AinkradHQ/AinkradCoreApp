@@ -220,7 +220,7 @@ private struct RuleLine: View {
                     isPresented: Binding(
                         get: { o.openRule == key }, set: { if !$0, o.openRule == key { o.openRule = nil } }),
                     arrowEdge: .bottom
-                ) { SourcesList(o: o, room: room, rule: rule) }
+                ) { SourcesList(titles: o.current?.sourceTitles ?? [:], rule: rule) }
             }
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 * 1.5)
@@ -230,38 +230,28 @@ private struct RuleLine: View {
     }
 }
 
-/// The items behind one rule: up to four titles and how many more there are.
+/// The items behind one rule: up to four titles and how many more there are. The Core names every item the rules cite.
 private struct SourcesList: View {
-    let o: RoomOverviewModel
-    let room: String
+    let titles: [String: String]
     let rule: OverviewRule
-    @State private var items: [OverviewSource]?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Text("Sources · \(BrainWords.plural(rule.sources.count, "item", "items"))")
                 .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
-            if let items {
-                if items.isEmpty {
+            ForEach(rule.sources.prefix(4), id: \.self) { id in
+                if let t = titles[id] {
+                    Text(t).lineLimit(1)
+                } else {
                     Text("Item titles are not available.").foregroundStyle(GlassInk.secondary)
                 }
-                ForEach(items.prefix(4)) { s in
-                    HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-                        Text(s.title).lineLimit(1)
-                        Spacer(minLength: Space.s3)
-                        Text(s.type).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    }
-                }
-                if rule.sources.count > 4 {
-                    Text("and \(rule.sources.count - 4) more").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
-                }
-            } else {
-                ForEach(0..<3, id: \.self) { _ in CoreSkeleton().frame(height: Space.s4) }
+            }
+            if rule.sources.count > 4 {
+                Text("and \(rule.sources.count - 4) more").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary)
             }
         }
         .coreFont(size: MacTextSize.body)
-        .padding(Space.s3).frame(width: Space.s8 * 10)
-        .task { items = await o.sources(Array(rule.sources.prefix(4)), room: room) }
+        .padding(Space.s3).frame(width: Space.s8 * 10, alignment: .leading)
     }
 }
