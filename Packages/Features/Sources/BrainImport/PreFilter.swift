@@ -24,6 +24,11 @@ public enum PreFilter {
         return parts.dropLast().contains(where: restrictedDirs.contains)
     }
 
+    /// A Claude Code sub-agent transcript, `<session>/subagents/<id>.jsonl`: a prompt an agent received, not human work.
+    public static func isSubagent(_ path: String) -> Bool {
+        path.split(whereSeparator: { $0 == "/" || $0 == "\\" }).dropLast().contains("subagents")
+    }
+
     /// The deprecated project a path or working directory names, if any. Claude Code names a
     /// project folder by its path with `/` turned into `-`, so a dash-separated token counts too.
     public static func deprecatedProject(in path: String) -> String? {
@@ -34,6 +39,7 @@ public enum PreFilter {
     /// Why a file must not be opened, or nil.
     public static func skipReason(path: String) -> String? {
         if isRestricted(path) { return "restricted" }
+        if isSubagent(path) { return "subagent" }
         if let p = deprecatedProject(in: path) { return "deprecated:\(p)" }
         return nil
     }
