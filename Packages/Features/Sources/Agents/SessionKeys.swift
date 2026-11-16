@@ -67,7 +67,7 @@ enum SessionShortcut: CaseIterable {
         case .copyAnswer: "Copy the last answer"
         case .expandSteps: "Open all tool steps"
         case .collapseSteps: "Fold all tool steps"
-        case .details: "Show or hide the details"
+        case .details: "Show or hide the session panel"
         case .sidebar: "Show or hide your other sessions"
         case .shortcuts: "Keyboard shortcuts"
         }

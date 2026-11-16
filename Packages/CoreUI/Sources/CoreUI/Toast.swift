@@ -92,8 +92,6 @@ public struct CoreToast: View {
 private struct ToastHost: ViewModifier {
     @Binding var item: ToastItem?
     let lifetime: TimeInterval?
-    /// Height kept clear at the bottom (a screen's own controls there, like a message field); 0 keeps the usual 52 pt.
-    var inset: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduce
     /// The pointer on a toast holds it open; it counts down again when the pointer leaves.
     @State private var hovering = false
@@ -111,7 +109,8 @@ private struct ToastHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .bottom) {
+            // At the top of the window (Ahmed, 2026-11-16): never over a screen's own controls at the bottom.
+            .overlay(alignment: .top) {
                 if let item {
                     CoreToast(
                         item.message, kind: item.kind, actionTitle: item.actionTitle, help: item.help,
@@ -124,11 +123,12 @@ private struct ToastHost: ViewModifier {
                     )
                     .onHover { hovering = $0 }
                     .accessibilityFocused($toastFocused)
-                    // 52 pt up: clears the widget bar on Home (prototype)
-                    .padding(.horizontal, Space.s4).padding(.bottom, max(Space.s8 + Space.s5, inset))
+                    // In the top bar's empty middle (it is 52 pt tall), so it covers no screen's title or controls; it
+                    // slides down into place, or only fades under Reduce Motion.
+                    .padding(.horizontal, Space.s4).padding(.top, Space.s2)
                     .transition(
                         .asymmetric(
-                            insertion: .opacity.combined(with: .offset(y: coreMove(reduce, Space.s4))),
+                            insertion: .opacity.combined(with: .offset(y: coreMove(reduce, -Space.s4))),
                             removal: .opacity)
                     )
                     .task(id: item.id) { AccessibilityNotification.Announcement(item.message).post() }
@@ -161,7 +161,7 @@ private struct ToastHost: ViewModifier {
 
 extension View {
     /// Shows a toast at the bottom; it leaves on its own after `lifetime` (default: the item's own, longer with an Undo).
-    public func coreToast(_ item: Binding<ToastItem?>, lifetime: TimeInterval? = nil, inset: CGFloat = 0) -> some View {
-        modifier(ToastHost(item: item, lifetime: lifetime, inset: inset))
+    public func coreToast(_ item: Binding<ToastItem?>, lifetime: TimeInterval? = nil) -> some View {
+        modifier(ToastHost(item: item, lifetime: lifetime))
     }
 }

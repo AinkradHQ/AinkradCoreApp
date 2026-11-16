@@ -278,7 +278,26 @@ enum ShowcaseShots {
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
         try? await Task.sleep(for: .seconds(2.5))
         _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
-        // A toast floats above the approval and the message field, never on them.
+        // ⌃⌘S and ⌥⌘I hide the sidebar and the panel; the toggles stay where the mockup has them. Then both come back.
+        func chord(_ c: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags) {
+            guard let tv = composer(window.contentView) else { return }
+            window.makeFirstResponder(tv)
+            if let e = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: flags,
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                characters: c, charactersIgnoringModifiers: c, isARepeat: false, keyCode: code)
+            {
+                _ = window.performKeyEquivalent(with: e)
+            }
+        }
+        chord("s", 1, [.command, .control])
+        chord("i", 34, [.command, .option])
+        try? await Task.sleep(for: .seconds(1))
+        _ = SnapshotCapture.png(window, to: "\(dir)/hidden-\(theme).png")
+        chord("s", 1, [.command, .control])
+        chord("i", 34, [.command, .option])
+        try? await Task.sleep(for: .seconds(1))
+        // A toast shows at the top of the window, never over the controls at the bottom.
         app.shell.showToast("Closed AI Sessions. It keeps running.")
         try? await Task.sleep(for: .seconds(1))
         _ = SnapshotCapture.png(window, to: "\(dir)/toast-\(theme).png")

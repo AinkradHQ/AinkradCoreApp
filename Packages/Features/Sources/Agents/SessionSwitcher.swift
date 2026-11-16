@@ -34,7 +34,8 @@ struct SessionSwitcher: View {
                 CoreIconButton(symbol: "plus", label: "New AI session") { model.openNewSession() }
                     .help("Start a new AI session")
             }
-            .padding(.horizontal, Space.s2)
+            // Room at the left for the fixed sidebar toggle (SessionView), as in the mockup.
+            .padding(.leading, Space.s8).padding(.trailing, Space.s2)
             filterField
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.s1) {

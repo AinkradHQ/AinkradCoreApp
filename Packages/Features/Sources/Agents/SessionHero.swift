@@ -11,12 +11,12 @@ struct SessionHero: View {
     var panel = false
     /// A narrow pane: the actions show as icons (their names in the tooltips), so they never squeeze the title.
     var compact = false
-    /// The pane has room for the other sessions at the left: the sidebar button shows.
-    var sidebarRoom = true
+    /// The pane has room for the session panel: the title line ends with its toggle (⌥⌘I).
+    var panelRoom = false
     /// Opens the find bar (⌘F).
     var find: (() -> Void)?
+    var togglePanel: () -> Void = {}
     @AppStorage("agents.detailsStrip") private var showDetails = true
-    @AppStorage(SessionView.sidebarKey) private var showSidebar = true
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -24,13 +24,6 @@ struct SessionHero: View {
         let st = AgentWords.status(session, waiting: model.waiting(session.id))
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
-                if sidebarRoom {
-                    CoreIconButton(symbol: "sidebar.left", label: "Your other sessions", selected: showSidebar) {
-                        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showSidebar.toggle() }
-                    }
-                    .help(showSidebar ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
-                    .keyHint(.sidebar)
-                }
                 titleLine
                 Spacer(minLength: Space.s3)
                 if empty {
@@ -40,10 +33,16 @@ struct SessionHero: View {
                 }
                 if !panel {
                     Group {
-                        detailsButton
+                        if !panelRoom { detailsButton }
                         SessionActions(model: model, session: session, find: find, compact: compact)
                     }
                     .fixedSize()
+                }
+                // The panel toggle, as in the mockup: a plain icon at the end of the title line.
+                if panelRoom {
+                    CoreIconButton(symbol: "sidebar.right", label: "Session panel") { togglePanel() }
+                        .help(panel ? "Hide the session panel (⌥⌘I)" : "Show the session panel (⌥⌘I)")
+                        .keyHint(.details)
                 }
             }
             .frame(minHeight: MacSize.controlLg)

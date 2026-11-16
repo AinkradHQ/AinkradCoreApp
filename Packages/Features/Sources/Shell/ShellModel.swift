@@ -142,12 +142,7 @@ public final class ShellModel {
     /// Focus mode shows this one pane full size.
     public var focusedPane: String?
     /// The pane the keyboard acts on (⌃⌥← / →, ⌘W).
-    public var activePane: String? {
-        // A new front pane starts with toasts at their usual height; a session pane then raises them over its field.
-        didSet { if oldValue != activePane { toastInset = 0 } }
-    }
-    /// Height the front screen keeps clear at the window's bottom for toasts (a message field there); 0 for none.
-    public var toastInset: CGFloat = 0
+    public var activePane: String?
     public var launcherOpen = false
     /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
     public var actionsOpen = false

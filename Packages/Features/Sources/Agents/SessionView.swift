@@ -22,6 +22,10 @@ struct SessionView: View {
     @State private var ui = SessionUI()
     @AppStorage("agents.detailsStrip") private var showDetails = true
     @AppStorage(SessionView.sidebarKey) private var showSidebar = true
+    /// The session panel at the right, shown or hidden with its toggle at the end of the title line (⌥⌘I).
+    @AppStorage("agents.sessionPanel") private var showPanel = true
+    /// The pane has room for the panel beside the conversation; under it, ⌥⌘I shows the details strip instead.
+    @State private var panelRoom = false
     static let sidebarKey = "agents.sessionSidebar"
     /// The other sessions show at the left only when the pane has room for them beside a readable conversation.
     static let sidebarRoom: CGFloat = 900
@@ -30,7 +34,6 @@ struct SessionView: View {
     @State private var clickMonitor: Any?
     /// The conversation fades in and rises 8 pt when a session opens or the sidebar switches to it.
     @State private var shown = false
-    @State private var bottomStack: CGFloat = 0
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -40,23 +43,38 @@ struct SessionView: View {
     var body: some View {
         if let s = model.sessions.session(sessionID) {
             GeometryReader { geo in
-                let side = showSidebar && geo.size.width >= Self.sidebarRoom
+                let room = geo.size.width >= Self.sidebarRoom
+                let side = showSidebar && room
                 let rest = geo.size.width - (side ? Self.sidebarWidth + Space.s3 : 0)
-                let wide = rest >= Self.panelWidth
+                let wide = rest >= Self.panelWidth && showPanel
                 HStack(alignment: .top, spacing: 0) {
                     if side {
                         SessionSwitcher(model: model, current: sessionID).frame(width: Self.sidebarWidth)
                             .padding(.leading, Space.s3).padding(.vertical, Space.s2)
                             .transition(reduce ? .opacity : .move(edge: .leading).combined(with: .opacity))
                     }
-                    conversation(s, wide: wide, compact: rest < Self.compact, room: geo.size.width >= Self.sidebarRoom)
+                    conversation(s, wide: wide, compact: rest < Self.compact, panelRoom: rest >= Self.panelWidth)
+                        // The fixed sidebar toggle keeps its corner while the sidebar is hidden: the column clears it.
+                        .padding(.leading, room && !side ? Space.s8 + Space.s3 : 0)
                     if wide {
                         SessionSidePanel(model: model, session: s, find: openFind).frame(width: 288).padding(
                             .trailing, Space.s3
                         )
-                        .padding(.top, Space.s2).transition(.opacity)
+                        .padding(.top, Space.s2)
+                        .transition(reduce ? .opacity : .move(edge: .trailing).combined(with: .opacity))
                     }
                 }
+                // The sidebar toggle, as in the mockup: a plain icon fixed at the top-left corner, beside "AI Sessions"
+                // when the sidebar shows, in the same place when it does not.
+                .overlay(alignment: .topLeading) {
+                    if room {
+                        CoreIconButton(symbol: "sidebar.left", label: "Your other sessions") { toggleSidebar() }
+                            .help(showSidebar ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
+                            .keyHint(.sidebar)
+                            .padding(.leading, Space.s3 + Space.s2).padding(.top, Space.s2 + Space.s2)
+                    }
+                }
+                .onChange(of: rest >= Self.panelWidth, initial: true) { _, now in panelRoom = now }
             }
             // The pane holds focus when you are not writing. A live session opens with the cursor in the composer.
             .focusable()
@@ -93,11 +111,7 @@ struct SessionView: View {
                     return e
                 }
             }
-            .onChange(of: model.shell.activePane) { _, _ in keepToastsClear() }
             .onDisappear {
-                if model.shell.activePane == AgentsModel.paneID(sessionID) || model.shell.activePane == nil {
-                    model.shell.toastInset = 0
-                }
                 for m in [keyMonitor, clickMonitor].compactMap({ $0 }) { NSEvent.removeMonitor(m) }
                 keyMonitor = nil
                 clickMonitor = nil
@@ -154,9 +168,11 @@ struct SessionView: View {
         }
     }
 
-    private func conversation(_ s: AgentSessionInfo, wide: Bool, compact: Bool, room: Bool) -> some View {
+    private func conversation(_ s: AgentSessionInfo, wide: Bool, compact: Bool, panelRoom: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            SessionHero(model: model, session: s, panel: wide, compact: compact, sidebarRoom: room, find: openFind)
+            SessionHero(
+                model: model, session: s, panel: wide, compact: compact, panelRoom: panelRoom, find: openFind,
+                togglePanel: togglePanel)
             if finding {
                 ConversationFindBar(
                     query: $findQuery, count: hits.count, index: min(findIndex, max(hits.count - 1, 0)),
@@ -196,18 +212,9 @@ struct SessionView: View {
             .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
             TranscriptView(model: model, store: model.transcripts[sessionID], session: s, jump: jump, focus: focusSeq)
                 .frame(maxWidth: .infinity)
-            // The bottom stack (approval, field): toasts float above it, never on it.
-            VStack(spacing: 0) {
-                PinnedApprovals(model: model, session: s).readingColumn().padding(.horizontal, Space.s4)
-                ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
-                    .frame(maxWidth: .infinity)
-            }
-            .onGeometryChange(for: CGFloat.self) {
-                $0.size.height
-            } action: { h in
-                bottomStack = h
-                keepToastsClear()
-            }
+            PinnedApprovals(model: model, session: s).readingColumn().padding(.horizontal, Space.s4)
+            ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
+                .frame(maxWidth: .infinity)
         }
         .opacity(shown ? 1 : 0)
         .offset(y: shown || reduce ? 0 : 8)
@@ -220,10 +227,12 @@ struct SessionView: View {
         .environment(\.coreFontDesign, AgentPrefs.shared.fontDesign)
     }
 
-    /// While this pane is in front, toasts rise above its approval and message field.
-    private func keepToastsClear() {
-        guard model.shell.activePane == AgentsModel.paneID(sessionID) else { return }
-        model.shell.toastInset = bottomStack + Space.s3
+    private func toggleSidebar() {
+        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showSidebar.toggle() }
+    }
+
+    private func togglePanel() {
+        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showPanel.toggle() }
     }
 
     /// Runs a session shortcut; false when it does not apply now, so the key goes on (to the text field, say).
@@ -272,9 +281,14 @@ struct SessionView: View {
             model.shell.showToast("Copied the last answer", actionTitle: "")
         case .expandSteps, .collapseSteps:
             ui.steps = (ui.steps.gen + 1, key == .expandSteps)
-        case .details: withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showDetails.toggle() }
+        case .details:
+            if panelRoom {
+                togglePanel()
+            } else {
+                withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showDetails.toggle() }
+            }
         // A narrow pane keeps the sidebar hidden whatever this says.
-        case .sidebar: withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showSidebar.toggle() }
+        case .sidebar: toggleSidebar()
         case .shortcuts: ui.shortcuts.toggle()
         }
         return true
