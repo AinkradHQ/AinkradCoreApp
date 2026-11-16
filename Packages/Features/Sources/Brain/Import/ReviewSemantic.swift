@@ -14,11 +14,17 @@ extension ReviewModel {
         semanticState == "pending" ? semantic?.progress.flatMap { $0.total > 0 ? $0 : nil } : nil
     }
 
-    /// What the Core tidied, once the step is done. Nil while it works, when it changed nothing, and after Undo.
+    /// What the Core tidied, once the step is done. Nil while it works, when it changed nothing, after Undo, and when
+    /// it declined.
     public var tidy: TidySummary? {
-        guard semanticState == "ready", let t = semantic?.aiTidy, t.state != "undone" else { return nil }
+        guard semanticState == "ready", let t = semantic?.aiTidy, t.state != "undone", t.state != "declined" else {
+            return nil
+        }
         return t.summary
     }
+
+    /// The AI was not sure (API minor 72): it changed nothing, so there is nothing to undo or list.
+    public var tidyDeclined: Bool { semanticState == "ready" && semantic?.aiTidy?.state == "declined" }
 
     /// The person undid the tidy; Re-sort runs it again.
     public var tidyUndone: Bool { semanticState == "ready" && semantic?.aiTidy?.state == "undone" }

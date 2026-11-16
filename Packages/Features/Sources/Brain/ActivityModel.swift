@@ -117,6 +117,7 @@ public final class ActivityModel {
             events = page.events
             hasMore = page.hasMore
             phase = .ready
+        } catch is CancellationError {
         } catch {
             phase = .failed(BrainWords.failure(error), code: (error as? BrainFailure)?.code ?? "audit_unavailable")
         }

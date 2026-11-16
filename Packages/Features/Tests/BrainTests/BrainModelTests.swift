@@ -224,7 +224,8 @@ struct SampleImportTests {
         m.start()
         for _ in 0..<500 where m.step != .review { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(m.step == .review && m.review.visible.last?.isUnsorted == true)
-        await m.review.accept("ainkrad")
+        m.review.keepsInCommit = true
+        for c in m.review.open where c.id != "ainkrad" { m.review.setChecked(c.id, false) }
         await m.commit()
         #expect(m.step == .done && m.result?.rooms.map(\.room) == ["ainkrad"])
     }
@@ -232,7 +233,7 @@ struct SampleImportTests {
     @Test func sampleRulesNameRoomsAndLatestIsNewestFirst() async throws {
         let svc = SampleBrainService()
         #expect(try await svc.rules().contains { $0.room == "ainkrad" })
-        let days = try await svc.latest(room: "ainkrad").map(\.startedAt)
+        let days = try await svc.latest(room: "ainkrad").items.map(\.startedAt)
         #expect(!days.isEmpty && days == days.sorted(by: >))
     }
 }

@@ -129,6 +129,9 @@ public final class CoreBrainService: BrainService, @unchecked Sendable {
     public func search(room: String, query: String) async throws -> [SearchHit] {
         try await wrap { try await routes.search(room: room, query: query) }
     }
+    public func latest(room: String) async throws -> RoomLatest {
+        try await wrap { try await routes.latest(room: room) }
+    }
     public func rules() async throws -> [RuleWire] { try await wrap { try await routes.rules() } }
     public func setRule(_ id: Int, enabled: Bool) async throws -> RuleWire {
         try await wrap { try await routes.setRule(id, enabled: enabled) }
@@ -149,6 +152,16 @@ public final class CoreBrainService: BrainService, @unchecked Sendable {
             case "batch_too_large": "That was too much to send at once."
             case "room_unavailable": "The room could not be opened."
             case "room_closed": "Open this room first, then search it."
+            case "rate_limited": "The Core is busy. Try again in a moment."
+            case "conflict" where e.message.contains("not in review"):
+                "This import is not in review any more. The list shows where it is now."
+            case "conflict" where e.message.contains("merged"):
+                "That room was joined into another one. The list is up to date now."
+            case "bad_request" where e.message.lowercased().contains("unsorted"):
+                "Unsorted is not a room. Move its items to one."
+            case "bad_request":
+                "The Core could not take this: \(e.message.trimmingCharacters(in: CharacterSet(charactersIn: ". ")))."
+            case "bad_answer": "The Core's answer could not be read: \(e.message)."
             default:
                 e.status == 409
                     ? "That cannot be done right now. \(e.message)".trimmingCharacters(in: .whitespaces)

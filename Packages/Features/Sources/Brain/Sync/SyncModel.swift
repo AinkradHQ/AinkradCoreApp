@@ -55,6 +55,7 @@ public final class SyncModel {
             async let src = service.sources()
             async let r = service.rules()
             (status, sources, rules) = try await (st, src, r)
+        } catch is CancellationError {
         } catch { notice = BrainWords.failure(error) }
     }
 
@@ -220,8 +221,10 @@ public final class SyncModel {
         }
     }
 
-    /// The room's newest items; none when the Core cannot say (the room still has its search).
-    public func latest(room: String) async -> [LatestItem] {
-        (try? await service.latest(room: room)) ?? []
+    /// The room's newest items, or the failure in words (the room still has its search). Nil when the view left first.
+    public func latest(room: String) async -> Result<RoomLatest, BrainFailure>? {
+        do { return .success(try await service.latest(room: room)) } catch is CancellationError { return nil } catch {
+            return .failure(BrainFailure(BrainWords.failure(error), code: "latest"))
+        }
     }
 }

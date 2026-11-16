@@ -244,6 +244,7 @@ public final class AppModel {
             if let api = service.agentsAPI { agents.attach(api) }
             about.use { try await service.about() }
             let me = await about.reload()
+            brain.apiMinor = me?.apiMinor
             var admin = me?.isAdmin
             if admin == nil { admin = (try? await service.myScopes())?.contains("admin") }
             let isAdmin = admin ?? false

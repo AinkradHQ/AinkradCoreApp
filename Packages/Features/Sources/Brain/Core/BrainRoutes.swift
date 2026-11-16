@@ -1,5 +1,6 @@
 import BrainImport
 import Foundation
+import os
 
 /// A signed request to the Core. The app's `CoreConnection` is the real one; tests use a fake.
 public protocol BrainTransport: Sendable {
@@ -31,12 +32,46 @@ public struct BrainRoutes: Sendable {
     ) async throws -> T {
         let data = try await raw(method, path, body)
         do { return try JSONDecoder().decode(T.self, from: data) } catch {
-            throw BrainHTTPError(status: 200, code: "bad_answer", message: "The Core's answer was not the Brain's.")
+            let why = Self.describe(error)
+            Self.log.error(
+                "\(method, privacy: .public) \(Self.logged(path), privacy: .public) 200 not read: \(why, privacy: .public)"
+            )
+            throw BrainHTTPError(status: 200, code: "bad_answer", message: why)
         }
     }
 
     func raw(_ method: String, _ path: String, _ body: (any Encodable)? = nil) async throws -> Data {
-        try await transport.send(method, Self.base + path, body: body.map { try JSONEncoder().encode($0) })
+        do {
+            return try await transport.send(method, Self.base + path, body: body.map { try JSONEncoder().encode($0) })
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            Self.log.error(
+                "\(method, privacy: .public) \(Self.logged(path), privacy: .public) failed: \(String(describing: error), privacy: .public)"
+            )
+            throw error
+        }
+    }
+
+    /// Every failed Brain call: method, path (never the query, which can hold search words), status or decode error.
+    static let log = Logger(subsystem: "com.ainkrad.core", category: "brain")
+    static func logged(_ path: String) -> String { base + (path.split(separator: "?").first.map(String.init) ?? path) }
+
+    /// A decode error as its field path and what was wrong: `items.3.started_at is missing`.
+    static func describe(_ error: Error) -> String {
+        guard let d = error as? DecodingError else { return String(describing: error) }
+        func at(_ c: DecodingError.Context) -> String {
+            let p = c.codingPath.map { $0.intValue.map(String.init) ?? $0.stringValue }.joined(separator: ".")
+            return p.isEmpty ? "the answer" : p
+        }
+        switch d {
+        case .keyNotFound(let k, let c):
+            return "\(c.codingPath.isEmpty ? "" : at(c) + ".")\(k.stringValue) is missing"
+        case .typeMismatch(let t, let c): return "\(at(c)) is not \(t)"
+        case .valueNotFound(let t, let c): return "\(at(c)) is null, not \(t)"
+        case .dataCorrupted(let c): return "\(at(c)) is not JSON: \(c.debugDescription)"
+        @unknown default: return String(describing: d)
+        }
     }
 
     // MARK: status and rooms
@@ -91,6 +126,18 @@ public struct BrainRoutes: Sendable {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/merge", MergeBody(into: into))
     }
+    /// `p` is the same project as `into` (API minor 72): a merge the Core also remembers, so later imports file `p`'s
+    /// items as `into`'s project. Answers the card of `into`.
+    public func sameProject(run: String, proposal: String, into: String) async throws -> ProposalCard {
+        try await call(
+            "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/same-project", MergeBody(into: into))
+    }
+    /// The remembered "same project" names (API minor 72).
+    public func aliases() async throws -> [RoomAlias] { try await call("GET", "/aliases") }
+    /// Forgets one; answers the ones left. The next Re-sort keeps the two rooms apart again.
+    public func removeAlias(_ from: String) async throws -> [RoomAlias] {
+        try await call("DELETE", "/aliases/\(Self.seg(from))")
+    }
     public func split(run: String, proposal: String, itemIDs: [String], name: String?) async throws -> ProposalCard {
         try await call(
             "POST", "/imports/\(Self.seg(run))/proposals/\(Self.seg(proposal))/split",
@@ -107,9 +154,11 @@ public struct BrainRoutes: Sendable {
     public func moveItems(run: String, ids: [String], to proposal: String) async throws {
         _ = try await raw("PATCH", "/imports/\(Self.seg(run))/items", ItemsPatchBody(ids: ids, proposal: proposal))
     }
-    /// Step-up route: the caller asks for Touch ID around it.
-    public func commit(run: String) async throws -> CommitResult {
-        try await call("POST", "/imports/\(Self.seg(run))/commit")
+    /// Step-up route: the caller asks for Touch ID around it. With `keep` (API minor 73) the Core imports those rooms and
+    /// refuses every other open one in the same call; without it, it imports the accepted rooms.
+    public func commit(run: String, keep: [String]? = nil, keepUnsorted: Bool = true) async throws -> CommitResult {
+        try await call(
+            "POST", "/imports/\(Self.seg(run))/commit", keep.map { KeepBody(keep: $0, keepUnsorted: keepUnsorted) })
     }
 
     /// One path segment, escaped so an id can never add a slash or a query.

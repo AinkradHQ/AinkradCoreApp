@@ -126,6 +126,7 @@ public enum ImportWords {
         if reason.hasPrefix("rule:") { return "a rule" }
         switch reason {
         case "restricted": return "restricted files"
+        case "subagent": return "sub-agent transcripts"
         case "empty": return "empty"
         case "unreadable": return "unreadable"
         case "unknown-format": return "a format this version does not know"

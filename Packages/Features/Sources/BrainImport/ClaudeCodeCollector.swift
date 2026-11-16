@@ -149,6 +149,11 @@ public struct ClaudeCodeCollector: FileCollector {
             defaultTitle: "Claude Code session", accepts: { $0.pathExtension == "jsonl" },
             decode: { obj, _ in
                 var r = SessionStream.Read(cwd: obj["cwd"] as? String, timestamp: obj["timestamp"] as? String)
+                // A sidechain is a sub-agent's conversation: every record says so, so the file is skipped at once.
+                if obj["isSidechain"] as? Bool == true {
+                    r.skip = "subagent"
+                    return r
+                }
                 if let type = obj["type"] as? String, type == "user" || type == "assistant",
                     let message = obj["message"] as? [String: Any]
                 {

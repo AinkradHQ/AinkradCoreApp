@@ -6,9 +6,11 @@ import Foundation
 /// nothing on disk, and every room and count is made up.
 actor SampleImportTransport: BrainTransport {
     static let run = "sample-run"
-    /// The local AI's step for this run: `pending`, `ready` or `off`.
+    /// The local AI's step for this run: `pending`, `ready`, `declined` (ready, but it changed nothing) or `off`.
     private let semantic: String
-    private var state: String { semantic }
+    private var state: String { semantic == "declined" ? "ready" : semantic }
+    /// Made-up "same project" names the Core remembers.
+    private var aliases = [RoomAlias(from: "shopapi", to: "Acme Shop")]
     private var settings: [String: Int] = [
         "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
     ]
@@ -81,7 +83,7 @@ actor SampleImportTransport: BrainTransport {
             if let to = b["proposal"] as? String { _ = try? update(to) { $0.itemCount += ids.count } }
             return Data("{}".utf8)
         case ("GET", 3, "proposals"):
-            let tidied = state == "ready" && !undone
+            let tidied = semantic == "ready" && !undone
             let merged: Set<String> = ["acme-shop-api", "pricing-experiment"]
             let tagged = cards.filter { !tidied || !merged.contains($0.id) }.map { c -> ProposalCard in
                 var c = c
@@ -92,10 +94,24 @@ actor SampleImportTransport: BrainTransport {
             return try e.encode(tagged)
         case ("GET", 3, "semantic"): return try e.encode(semanticView())
         case ("GET", 4, "changes"):
-            return try e.encode(TidyChanges(changes: undone || state != "ready" ? [] : Self.sampleChanges))
+            return try e.encode(TidyChanges(changes: undone || semantic != "ready" ? [] : Self.sampleChanges))
         case ("POST", 4, "undo"):
             undone = true
             return try e.encode(semanticView())
+        case ("GET", 1, "aliases"): return try e.encode(aliases)
+        case ("DELETE", 2, _):
+            aliases.removeAll { $0.from == p[1] }
+            return try e.encode(aliases)
+        case ("POST", 5, "same-project"):
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let into = b["into"] as? String ?? ""
+            let from = cards.first { $0.id == p[3] }
+            cards.removeAll { $0.id == p[3] }
+            let to = try update(into) { $0.itemCount += from?.itemCount ?? 0 }
+            let key = (from?.name ?? p[3]).lowercased().filter { $0.isLetter || $0.isNumber }
+            aliases.removeAll { $0.from == key }
+            aliases.append(RoomAlias(from: key, to: to.name))
+            return try e.encode(to)
         case ("GET", 1, "settings"):
             return try e.encode(
                 settings.sorted { $0.key < $1.key }.map {
@@ -147,7 +163,9 @@ actor SampleImportTransport: BrainTransport {
             return try e.encode(update(into) { $0.itemCount += moved })
         case ("POST", 5, "refuse"): return try e.encode(update(p[3]) { $0.state = "refused" })
         case ("POST", 3, "commit"):
-            let made = cards.filter(\.isAccepted).map {
+            let b = (body.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let keep = b["keep"] as? [String]
+            let made = cards.filter { keep?.contains($0.id) ?? $0.isAccepted }.map {
                 RoomMade(proposal: $0.id, room: $0.id, name: $0.name, kind: $0.kind, sources: 1, created: true)
             }
             return try e.encode(CommitResult(rooms: made, held: [], rulesEnabled: 0, state: "committed"))
@@ -159,7 +177,8 @@ actor SampleImportTransport: BrainTransport {
     private func semanticView() -> SemanticView {
         var v = SemanticView(state: state)
         if state == "pending" { v.progress = SemanticProgress(done: 1240, total: 2980) }
-        if state == "ready" { v.aiTidy = AiTidy(state: undone ? "undone" : "applied", summary: Self.sampleTidy) }
+        if semantic == "declined" { v.aiTidy = AiTidy(state: "declined", summary: Self.sampleTidy) }
+        if semantic == "ready" { v.aiTidy = AiTidy(state: undone ? "undone" : "applied", summary: Self.sampleTidy) }
         return v
     }
 

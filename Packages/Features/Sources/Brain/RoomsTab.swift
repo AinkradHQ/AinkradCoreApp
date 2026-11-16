@@ -202,7 +202,7 @@ private struct RoomSearch: View {
     let room: RoomSummary
     @State private var query = ""
     @State private var hits: [SearchHit] = []
-    @State private var latest: [LatestItem] = []
+    @State private var latest: Result<RoomLatest, BrainFailure>?
     @State private var asked = ""
     @FocusState private var focused: Bool
     @Environment(\.corePalette) private var palette
@@ -210,7 +210,12 @@ private struct RoomSearch: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             field
-            if asked.isEmpty, !latest.isEmpty {
+            if asked.isEmpty, case .failure(let f) = latest {
+                Text(f.sentence).foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3)
+            } else if asked.isEmpty, case .success(let l) = latest, l.items.isEmpty {
+                Text("Nothing is in \(room.name) yet.").foregroundStyle(GlassInk.secondary)
+                    .padding(.horizontal, Space.s3)
+            } else if asked.isEmpty, case .success(let l) = latest {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     HStack {
                         Text("Latest").coreFont(size: MacTextSize.headline, weight: .semibold)
@@ -219,8 +224,11 @@ private struct RoomSearch: View {
                         Text("Newest first").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     }
                     .padding(.horizontal, 2)
+                    if l.records == 0 {
+                        Text(BrainWords.importedOnly).foregroundStyle(GlassInk.secondary).padding(.horizontal, 2)
+                    }
                     VStack(alignment: .leading, spacing: 2) {
-                        ForEach(latest) { LatestRow(item: $0, room: room.name) }
+                        ForEach(l.items) { LatestRow(item: $0, room: room.name) }
                     }
                 }
                 .transition(.opacity)
@@ -235,7 +243,7 @@ private struct RoomSearch: View {
                 }
             }
         }
-        .task { latest = await sync.latest(room: room.id) }
+        .task(id: room.id) { latest = await sync.latest(room: room.id) }
         .task(id: query) {
             let q = query.trimmingCharacters(in: .whitespaces)
             guard !q.isEmpty else {
@@ -288,7 +296,7 @@ private struct LatestRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-            Text(MemoryType(rawValue: item.type)?.label ?? item.type)
+            Text(MemoryType(rawValue: item.type)?.label ?? SyncWords.title(item.sourceKind, ImportSources.standard()))
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .frame(width: Space.s8 * 2.5, alignment: .leading).lineLimit(1)
             VStack(alignment: .leading, spacing: 2) {
