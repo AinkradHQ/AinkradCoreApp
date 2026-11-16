@@ -42,6 +42,11 @@ struct DiffBlock: View {
     var body: some View {
         let shown = all ? lines : Array(lines.prefix(Self.fold))
         VStack(alignment: .leading, spacing: 0) {
+            if lines.isEmpty {
+                // An edit the tool reported without its lines (a plain Edit/Write step).
+                Text("The tool did not send the changed lines for this edit.")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).padding(Space.s2)
+            }
             ForEach(shown) { l in
                 HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                     Text(l.number.map(String.init) ?? "").frame(width: Space.s6, alignment: .trailing)

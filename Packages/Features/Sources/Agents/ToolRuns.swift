@@ -142,9 +142,9 @@ struct ToolRunHeader: View {
         Button(action: toggle) {
             HStack(spacing: Space.s2) {
                 Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(palette.text2).rotationEffect(.degrees(open ? 90 : 0))
+                    .foregroundStyle(SessionInk.text2).rotationEffect(.degrees(open ? 90 : 0))
                     .frame(width: Space.s3)
-                Text(ToolStep.summary(steps)).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                Text(ToolStep.summary(steps)).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: Space.s2)
                 trailing
@@ -167,7 +167,7 @@ struct ToolRunHeader: View {
             } else {
                 if secs > 0 {
                     Text("\(coreDecimal(Double(secs) / 1000, 1)) s").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(palette.text2).monospacedDigit()
+                        .foregroundStyle(SessionInk.text2).monospacedDigit()
                 }
                 if failed > 0 {
                     Label("\(failed) failed", systemImage: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)

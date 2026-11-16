@@ -55,12 +55,12 @@ struct ApprovalEntryCard: View {
                     button(approve: false, busy: busy)
                     if busy {
                         Text("Waiting for your Core…").coreFont(size: MacTextSize.meta)
-                            .foregroundStyle(palette.text2)
+                            .foregroundStyle(SessionInk.text2)
                     }
                     Spacer(minLength: 0)
                     if case .waiting(let left?) = state {
                         Text("Asks again in \(AgentWords.clock(left))").coreFont(size: MacTextSize.meta)
-                            .foregroundStyle(palette.text2).monospacedDigit()
+                            .foregroundStyle(SessionInk.text2).monospacedDigit()
                             .contentTransition(.numericText(countsDown: true))
                     }
                 }

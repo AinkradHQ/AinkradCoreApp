@@ -12,7 +12,7 @@ struct FoldedOutput: View {
         let more = lines.count - Self.fold
         VStack(alignment: .leading, spacing: Space.s1) {
             Text(all || more <= 0 ? text : lines.prefix(Self.fold).joined(separator: "\n"))
-                .coreFont(size: MacTextSize.meta + 1, design: .monospaced).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta + 1, design: .monospaced).foregroundStyle(SessionInk.text2)
             if more > 0 {
                 Button(all ? "Show less" : "Show \(more) more lines") { all.toggle() }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small))
@@ -52,7 +52,7 @@ struct EditCard: View {
                     Text("+\(add)").foregroundStyle(palette.tone(.run).ink).monospacedDigit()
                     Text("−\(del)").foregroundStyle(palette.tone(.fail).ink).monospacedDigit()
                     if let ms {
-                        Text(coreUnit(coreDecimal(Double(ms) / 1000, 1), "s")).foregroundStyle(palette.text2)
+                        Text(coreUnit(coreDecimal(Double(ms) / 1000, 1), "s")).foregroundStyle(SessionInk.text2)
                             .monospacedDigit()
                     }
                     switch ok {
@@ -90,17 +90,17 @@ struct TodoCard: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
                 Text("Tasks").coreFont(size: MacTextSize.body, weight: .semibold)
-                Text("\(done) of \(items.count)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                Text("\(done) of \(items.count)").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                     .monospacedDigit()
             }
             ForEach(Array(items.enumerated()), id: \.offset) { _, t in
                 HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                     Image(systemName: symbol(t.status)).foregroundStyle(
-                        t.status == .pending ? GlassInk.secondary : GlassInk.blue
+                        t.status == .pending ? SessionInk.text2 : GlassInk.blue
                     )
                     .frame(width: 16)
                     Text(t.text).strikethrough(t.status == .completed).foregroundStyle(
-                        t.status == .completed ? GlassInk.secondary : GlassInk.primary)
+                        t.status == .completed ? SessionInk.text2 : GlassInk.primary)
                 }
                 .coreFont(size: MacTextSize.body)
             }

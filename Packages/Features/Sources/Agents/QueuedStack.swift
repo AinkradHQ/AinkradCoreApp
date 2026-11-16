@@ -34,7 +34,10 @@ enum SessionInk {
     static let ink = GlassInk.adaptive(hex(0xECEAE3), day: hex(0x2A2925))
     static let onInk = GlassInk.adaptive(hex(0x1F1E1B), day: hex(0xFAF9F5))
     static let bad = GlassInk.adaptive(hex(0xF08379), day: hex(0xB33A31))
-    /// Kept for the old call sites: no lift, the page is solid.
+    /// Behind the conversation by day: a little paper over the Look, so words never sit on bare wallpaper (review
+    /// 2026-11-16: secondary text read at about 2:1); none by night, where the dark Look already carries it.
+    static let backing = GlassInk.adaptive(.clear, day: hex(0xFAF9F5, 0.55))
+    /// Kept for the old call sites: no lift.
     static let lift = Color.clear
 }
 
@@ -71,7 +74,7 @@ struct QueuedStack: View {
                         : "\(list.count) queued · go out together when this turn ends · ↑ to edit",
                     systemImage: "clock"
                 )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                 .padding(.leading, Space.s1)
                 .transition(.opacity)
             }
@@ -135,6 +138,34 @@ struct GraphiteButtonStyle: ButtonStyle {
                 .scaleEffect(configuration.isPressed && !reduce ? 0.97 : 1)
                 .animation(Motion.out(Motion.hover), value: hover)
                 .animation(Motion.press(Motion.press), value: configuration.isPressed)
+                .onHover { hover = $0 }
+                .contentShape(coreShape(Radius.control))
+        }
+    }
+}
+
+/// End Session…: neutral ink at rest, red words and a red tint on hover (review 2026-11-16).
+struct EndButtonStyle: ButtonStyle {
+    var iconOnly = false
+    func makeBody(configuration: Configuration) -> some View { Face(configuration: configuration, iconOnly: iconOnly) }
+
+    private struct Face: View {
+        let configuration: ButtonStyleConfiguration
+        let iconOnly: Bool
+        @Environment(\.isEnabled) private var enabled
+        @Environment(\.accessibilityReduceMotion) private var reduce
+        @State private var hover = false
+
+        var body: some View {
+            configuration.label
+                .coreFont(size: iconOnly ? MacTextSize.meta : MacTextSize.body, weight: .semibold)
+                .foregroundStyle(hover ? SessionInk.bad : SessionInk.text2)
+                .padding(.horizontal, iconOnly ? Space.s2 : Space.s3)
+                .frame(minHeight: iconOnly ? MacSize.controlSm : MacSize.controlMd)
+                .background(hover ? SessionInk.bad.opacity(0.12) : .clear, in: coreShape(Radius.control))
+                .opacity(enabled ? 1 : 0.4)
+                .scaleEffect(configuration.isPressed && !reduce ? 0.97 : 1)
+                .animation(Motion.out(Motion.hover), value: hover)
                 .onHover { hover = $0 }
                 .contentShape(coreShape(Radius.control))
         }

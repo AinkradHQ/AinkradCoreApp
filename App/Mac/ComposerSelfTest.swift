@@ -249,6 +249,9 @@ enum ShowcaseShots {
     static func run(_ app: AppModel, dir: String, env: [String: String]) async {
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
+        // Every run starts with the sidebar and the panel shown (a toggle step must not leak into the next run).
+        UserDefaults.standard.set(true, forKey: "agents.sessionSidebar")
+        UserDefaults.standard.set(true, forKey: "agents.sessionPanel")
         defer { NSApp.terminate(nil) }
         try? await Task.sleep(for: .seconds(3))
         guard let window = await SnapshotCapture.mainWindow() else { return }
@@ -346,6 +349,11 @@ enum ShowcaseShots {
         _ = SnapshotCapture.png(window, to: "\(dir)/keys-\(theme).png")
         CGEvent(keyboardEventSource: nil, virtualKey: 0x37, keyDown: false).map { $0.postToPid(getpid()) }
         try? await Task.sleep(for: .milliseconds(500))
+        // The AI Sessions list on its own.
+        app.shell.closeAllPanes()
+        a.openList()
+        try? await Task.sleep(for: .seconds(2))
+        _ = SnapshotCapture.png(window, to: "\(dir)/list-\(theme).png")
         // Two sessions side by side: each pane is narrow, so the header shows its compact form.
         app.shell.closeAllPanes()
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")

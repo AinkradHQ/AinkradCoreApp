@@ -31,13 +31,13 @@ struct ConnCue: View {
         let refused = ok == false
         HStack(spacing: Space.s2) {
             Image(systemName: refused ? "exclamationmark.triangle" : ok == nil ? "link" : "checkmark.circle")
-                .foregroundStyle(refused ? GlassInk.amberInk : GlassInk.secondary)
+                .foregroundStyle(refused ? GlassInk.amberInk : SessionInk.text2)
             Text(
                 refused
                     ? "Couldn't \(Self.line(tool, summary).lowercased())\(why.isEmpty ? "" : ": \(why)")"
                     : Self.line(tool, summary)
             )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(refused ? GlassInk.primary : GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(refused ? GlassInk.primary : SessionInk.text2)
             .lineLimit(2)
             if refused, let openConnections {
                 Button("Allow in Connections", action: openConnections).buttonStyle(.plain)

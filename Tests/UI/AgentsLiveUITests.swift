@@ -116,9 +116,9 @@ final class AgentsLiveUITests: XCTestCase {
         shot("session-find")
         find.typeKey(.escape, modifierFlags: [])
         // End session asks first, then ends it.
-        app.buttons["End session"].firstMatch.click()
+        app.buttons["End Session…"].firstMatch.click()
         XCTAssertTrue(containing("End this AI session?").waitForExistence(timeout: 10), "End session asks first")
-        let ends = app.buttons.matching(NSPredicate(format: "label == 'End session'"))
+        let ends = app.buttons.matching(NSPredicate(format: "label == 'End Session'"))
         ends.element(boundBy: ends.count - 1).click()  // the sheet's button, drawn last
         // An ended session closes its composer (the sidebar's "Ended" would match any label check).
         XCTAssertTrue(composer.waitForNonExistence(timeout: 90), "the session ends and its composer closes")

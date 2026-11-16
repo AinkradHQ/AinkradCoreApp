@@ -4,7 +4,7 @@ import Foundation
 import Shell
 
 /// Live AI sessions: one long conversation per session, like typing in `claude` in a terminal. The composer stays open while the
-/// session is live, a turn can be stopped without ending the session, and only "End session" closes it.
+/// session is live, a turn can be stopped without ending the session, and only "End Session…" closes it.
 extension AgentsModel {
     // MARK: list state
 
@@ -86,7 +86,7 @@ extension AgentsModel {
                 "\(AgentWords.toolName(s.harness)) exits and the composer closes. The transcript stays, and you can start a new AI session from it.",
             actions: [
                 ShellSheetAction("Keep it open"),
-                ShellSheetAction("End session", primary: true, destructive: true) { [weak self] in self?.end(id) },
+                ShellSheetAction("End Session", primary: true, destructive: true) { [weak self] in self?.end(id) },
             ])
     }
 
@@ -145,18 +145,40 @@ extension AgentsModel {
     func filesTouched(_ id: String) -> [FileTouch] {
         var order: [String] = []
         var by: [String: FileTouch] = [:]
-        for e in transcripts[id]?.entries ?? [] {
-            guard case .toolEdit(_, let name, let path, let old, let new, let ok, _) = e.kind, ok != false else {
-                continue
-            }
-            let d = DiffLines.make(old: old, new: new)
+        func add(_ path: String, _ name: String, _ added: Int, _ removed: Int) {
+            guard !path.isEmpty else { return }
             var t = by[path] ?? FileTouch(path: path, added: 0, removed: 0, created: name.lowercased() == "write")
-            t.added += d.filter { $0.kind == .added }.count
-            t.removed += d.filter { $0.kind == .removed }.count
+            t.added += added
+            t.removed += removed
             if by[path] == nil { order.append(path) }
             by[path] = t
         }
+        // Every edit the conversation shows counts: a diff (toolEdit), or a plain Edit/Write step whose summary is the
+        // path and whose output may say "+40 -6" (the review found the panel saying "Nothing changed yet" beside them).
+        for e in transcripts[id]?.entries ?? [] {
+            switch e.kind {
+            case .toolEdit(_, let name, let path, let old, let new, let ok, _) where ok != false:
+                let d = DiffLines.make(old: old, new: new)
+                add(path, name, d.filter { $0.kind == .added }.count, d.filter { $0.kind == .removed }.count)
+            case .toolDone(_, let name, let summary, true, _, let output, _) where Self.isEdit(name):
+                let n = Self.lineCounts(output)
+                add(summary, name, n.added, n.removed)
+            default: break
+            }
+        }
         return order.compactMap { by[$0] }
+    }
+
+    static func isEdit(_ tool: String) -> Bool {
+        ["edit", "write", "multiedit", "notebookedit"].contains(tool.lowercased())
+    }
+
+    /// "+40 -6" (or "+40 −6") in a tool's output: the lines it added and removed; zeros when it does not say.
+    static func lineCounts(_ output: String) -> (added: Int, removed: Int) {
+        let words = output.replacingOccurrences(of: "−", with: "-").split(whereSeparator: \.isWhitespace)
+        let added = words.first { $0.hasPrefix("+") }.flatMap { Int($0.dropFirst()) } ?? 0
+        let removed = words.first { $0.hasPrefix("-") }.flatMap { Int($0.dropFirst()) } ?? 0
+        return (added, removed)
     }
 
     /// Cost of each turn with its number, from the turn separators. A turn without a cost keeps its number, so the

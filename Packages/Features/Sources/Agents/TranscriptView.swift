@@ -219,10 +219,10 @@ struct Thinking: View {
     var body: some View {
         HStack(spacing: Space.s3) {
             CoreWorkingBar()
-            Text("Thinking…").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+            Text("Thinking…").coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
             TimelineView(.periodic(from: since, by: 1)) { ctx in
                 Text(coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(since))))", "s"))
-                    .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2).monospacedDigit()
+                    .coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2).monospacedDigit()
             }
         }
         .padding(.vertical, Space.s1)
@@ -326,7 +326,6 @@ struct EntryRow: View, Equatable {
         case .turnEnded(let cost, let tokens):
             // The quietest line in the column (Ahmed, 2026-11-15): the time and the exact numbers wait in the tooltip.
             line(ConversationWords.turn(turn, cost: cost), time: false)
-                .opacity(0.7)
                 .help(
                     [
                         entry.at.formatted(date: .omitted, time: .shortened),
@@ -350,7 +349,7 @@ struct EntryRow: View, Equatable {
     /// An event as one quiet centred line (N42): "Turn 1 done · 1.9K tokens · $0.04 · 10:38". No rules, no dashes.
     private func line(_ parts: [String], time: Bool = true) -> some View {
         Text((parts + (time ? [entry.at.formatted(date: .omitted, time: .shortened)] : [])).joined(separator: " · "))
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+            .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
             .lineLimit(1).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s1)
             .accessibilityElement(children: .combine)
@@ -446,13 +445,13 @@ struct ToolCard: View {
         switch status {
         case .running:
             HStack(spacing: Space.s2) {
-                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                 CoreWorkingBar(width: Space.s8)
             }
         case .ok(let facts):
             HStack(spacing: Space.s2) {
                 if !facts.isEmpty {
-                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
                 }
                 Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(palette.primary).accessibilityLabel("Done")
@@ -460,7 +459,7 @@ struct ToolCard: View {
         case .failed(let facts):
             HStack(spacing: Space.s2) {
                 if !facts.isEmpty {
-                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
                 }
                 Label("Failed", systemImage: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(SessionInk.bad)

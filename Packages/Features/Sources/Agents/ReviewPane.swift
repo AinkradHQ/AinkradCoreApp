@@ -104,6 +104,8 @@ struct ReviewPane: View {
                 Button("Close") { close() }.buttonStyle(CoreButtonStyle(.plain, size: .small)).fixedSize()
                     .help("Close the review (Esc or ⇧⌘R)").keyHint(.review)
             }
+            // Room at the right for the fixed panel toggle (SessionView), as the Session header leaves.
+            .padding(.trailing, Space.s6)
             if files.count > 1 {
                 HStack(spacing: Space.s2) {
                     Button("Accept all") { for f in files { store.set(session.id, f.path, .accepted) } }

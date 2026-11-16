@@ -29,6 +29,13 @@ struct SessionView: View {
     /// The toggles slide the sidebar and the panel from their edge while the conversation glides over (Ahmed,
     /// 2026-11-16: "add transition motion to the toggle"), with Reduce Motion too: he asked for this movement.
     static let toggleMotion = Motion.out(0.28)
+    /// The title line's layout (panel shown, compact) switches when a slide has finished, not at its first frame: the
+    /// review found the old and new title overlapping mid-slide (2026-11-16).
+    @State private var heroLayout: HeroLayout?
+    struct HeroLayout: Equatable {
+        var panel: Bool
+        var compact: Bool
+    }
     /// The session panel at the right, shown or hidden with its toggle at the end of the title line (⌥⌘I).
     @AppStorage("agents.sessionPanel") private var showPanel = true
     /// The pane has room for the panel beside the conversation; under it, ⌥⌘I shows the details strip instead.
@@ -60,7 +67,20 @@ struct SessionView: View {
                             .padding(.leading, Space.s3).padding(.vertical, Space.s2)
                             .transition(.move(edge: .leading).combined(with: .opacity))
                     }
-                    conversation(s, wide: wide, compact: rest < Self.compact, panelRoom: rest >= Self.panelWidth)
+                    let target = HeroLayout(panel: wide, compact: rest < Self.compact)
+                    conversation(s, hero: heroLayout ?? target, panelRoom: rest >= Self.panelWidth)
+                        .onChange(of: target, initial: true) { old, new in
+                            guard heroLayout != nil, old != new else {
+                                heroLayout = new
+                                return
+                            }
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(290))
+                                var t = Transaction()
+                                t.disablesAnimations = true
+                                withTransaction(t) { heroLayout = new }
+                            }
+                        }
                         // The fixed toggles keep their corners while their side is hidden: the column clears them.
                         .padding(.leading, room && !side ? Space.s8 + Space.s3 : 0)
                         .padding(.trailing, rest >= Self.panelWidth && !wide ? Space.s8 + Space.s3 : 0)
@@ -186,10 +206,11 @@ struct SessionView: View {
         }
     }
 
-    private func conversation(_ s: AgentSessionInfo, wide: Bool, compact: Bool, panelRoom: Bool) -> some View {
+    private func conversation(_ s: AgentSessionInfo, hero: HeroLayout, panelRoom: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             SessionHero(
-                model: model, session: s, panel: wide, compact: compact, panelRoom: panelRoom, find: openFind,
+                model: model, session: s, panel: hero.panel, compact: hero.compact, panelRoom: panelRoom,
+                find: openFind,
                 togglePanel: togglePanel)
             if finding {
                 ConversationFindBar(
@@ -234,6 +255,7 @@ struct SessionView: View {
             ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
                 .frame(maxWidth: .infinity)
         }
+        .background(SessionInk.backing)
         .opacity(shown ? 1 : 0)
         .offset(y: shown || reduce ? 0 : 8)
         .onAppear { withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { shown = true } }

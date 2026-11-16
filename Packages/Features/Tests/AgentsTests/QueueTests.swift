@@ -73,3 +73,14 @@ struct QueueTests {
         #expect(await until { api.calls.contains("send") && m.queued[running]?.isEmpty == true })
     }
 }
+
+/// The side panel's Files touched counts every edit the conversation shows (review 2026-11-16).
+@MainActor
+struct FilesTouchedTests {
+    @Test func plainEditStepsCountWithTheirLineCounts() {
+        #expect(AgentsModel.lineCounts("+40 -6") == (40, 6))
+        #expect(AgentsModel.lineCounts("+2 −1 lines") == (2, 1))
+        #expect(AgentsModel.lineCounts("done") == (0, 0))
+        #expect(AgentsModel.isEdit("MultiEdit") && !AgentsModel.isEdit("Read"))
+    }
+}

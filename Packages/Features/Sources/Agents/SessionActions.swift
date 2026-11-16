@@ -22,8 +22,8 @@ struct SessionActions: View {
     /// and Start again (blue). A lost one has Resume in the notice above the transcript, so nothing here.
     var body: some View {
         if stacked {
-            // The side panel's first card (Ahmed, 2026-11-15: organised): its title with one action at the right (End
-            // session, as Files touched has Review), where it runs as label/value rows, then the tools as an even grid.
+            // The side panel's Session section is information only (review 2026-11-16: one home per action); the
+            // actions live in the title line, with the same names everywhere.
             VStack(alignment: .leading, spacing: Space.s3) {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "slider.horizontal.3").coreFont(size: MacTextSize.body)
@@ -31,7 +31,6 @@ struct SessionActions: View {
                     Text("Session").coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(
                         .isHeader)
                     Spacer(minLength: 0)
-                    if session.live { state }
                 }
                 // Room at the right for the fixed panel toggle (SessionView), as the sidebar leaves room at the left.
                 .padding(.trailing, Space.s6)
@@ -40,22 +39,6 @@ struct SessionActions: View {
                         ForEach(Array(facts.enumerated()), id: \.offset) { _, f in PanelRow(label: f.0, value: f.1) }
                     }
                 }
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible(), spacing: Space.s2)],
-                    spacing: Space.s2
-                ) {
-                    if session.live || session.state != .lost { folderTools }
-                    gridButton("Find", symbol: "magnifyingglass", key: .find, help: "Find in this conversation (⌘F)") {
-                        find?()
-                    }
-                    gridButton(
-                        "Shortcuts", symbol: "keyboard", key: .shortcuts,
-                        help: "Every keyboard shortcut of this screen (⌘/)"
-                    ) {
-                        ui?.shortcuts.toggle()
-                    }
-                }
-                if !session.live && session.state != .lost { HStack(spacing: Space.s2) { state } }
             }
         } else {
             HStack(spacing: Space.s2) {
@@ -72,18 +55,6 @@ struct SessionActions: View {
             CoreIconButton(symbol: "magnifyingglass", label: "Find in this conversation", action: find)
                 .help("Find in this conversation (⌘F)").keyHint(.find)
         }
-    }
-
-    /// One tile of the panel's tool grid: icon and name, the full column wide.
-    private func gridButton(
-        _ title: String, symbol: String, key: SessionShortcut, help: String, _ run: @escaping () -> Void
-    ) -> some View {
-        Button(action: run) {
-            Label(title, systemImage: symbol).lineLimit(1).frame(maxWidth: .infinity)
-        }
-        .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
-        .help(help)
-        .keyHint(key)
     }
 
     /// ⌘/: the list of this screen's keys.
@@ -105,12 +76,13 @@ struct SessionActions: View {
         if session.live {
             Button(action: { model.confirmEnd(session.id) }) {
                 if compact {
-                    Image(systemName: "stop").accessibilityLabel("End session")
+                    Image(systemName: "stop").accessibilityLabel("End Session…")
                 } else {
-                    Label("End session", systemImage: "stop").lineLimit(1)
+                    Label("End Session…", systemImage: "stop").lineLimit(1)
                 }
             }
-            .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
+            // Neutral at rest, red only on hover: occasional and destructive, never the loudest thing on screen.
+            .buttonStyle(EndButtonStyle(iconOnly: compact))
             .disabled(model.stopping[session.id] != nil)
             .help("End the session: the CLI exits and the transcript stays (⇧⌘E). Esc stops only the current turn.")
             .keyHint(.endSession)
@@ -143,9 +115,9 @@ struct SessionActions: View {
             model.host?.openTerminal(on: session.runner)
         } label: {
             if compact {
-                Image(systemName: "terminal").accessibilityLabel("Terminal here")
+                Image(systemName: "terminal").accessibilityLabel("Terminal")
             } else {
-                Label("Terminal here", systemImage: "terminal").lineLimit(1)
+                Label("Terminal", systemImage: "terminal").lineLimit(1)
                     .frame(maxWidth: stacked ? .infinity : nil)
             }
         }
@@ -173,9 +145,9 @@ struct SessionActions: View {
         ) {
             Group {
                 if compact {
-                    Image(systemName: "folder").accessibilityLabel("Open in…")
+                    Image(systemName: "folder").accessibilityLabel("Open In…")
                 } else {
-                    Label("Open in…", systemImage: "folder").lineLimit(1)
+                    Label("Open In…", systemImage: "folder").lineLimit(1)
                 }
             }
             .coreFont(size: small ? MacTextSize.meta : MacTextSize.body, weight: .semibold)

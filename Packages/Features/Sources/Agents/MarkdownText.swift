@@ -151,11 +151,13 @@ struct MarkdownText: View {
                     Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                 case .heading(let t):
                     // A report's headings read as headings: one step up from the body.
+                    // 16 pt above a heading (8 from the stack + 8), so a section starts clearly (review 2026-11-16).
                     Text(MarkdownBlock.inline(t)).coreFont(size: MacTextSize.title, weight: .semibold)
-                        .padding(.top, Space.s1).textSelection(.enabled)
+                        .padding(.top, Space.s2).textSelection(.enabled)
                 case .item(let marker, let t):
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                        Text(marker).foregroundStyle(GlassInk.secondary).frame(minWidth: 16, alignment: .trailing)
+                        // One 20 pt marker column for bullets and numbers alike, numbers right-aligned in it.
+                        Text(marker).foregroundStyle(SessionInk.text2).frame(width: 20, alignment: .trailing)
                         Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                     }
                 case .code(let lang, let t):
@@ -163,12 +165,14 @@ struct MarkdownText: View {
                 case .table(let header, let rows):
                     MarkdownTable(header: header, rows: rows)
                 case .quote(let t):
-                    HStack(spacing: Space.s2) {
-                        coreShape(1.5).fill(GlassInk.blue.opacity(0.7)).frame(width: 3)
-                        Text(MarkdownBlock.inline(t)).foregroundStyle(GlassInk.secondary).textSelection(.enabled)
-                    }
+                    // A quote is a quiet well, not a coloured bar (no lines on this screen).
+                    Text(MarkdownBlock.inline(t)).foregroundStyle(SessionInk.text2).textSelection(.enabled)
+                        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(SessionInk.card, in: coreShape(Radius.control))
                 case .rule:
-                    coreShape(0.5).fill(GlassInk.track).frame(height: 1)
+                    // A rule is space, not a line.
+                    Color.clear.frame(height: Space.s4)
                 case .image(let alt, let src):
                     MarkdownImage(alt: alt, src: src)
                 }
@@ -196,7 +200,7 @@ private struct CodeBlock: View {
                     .padding(.trailing, Space.s6)
             }
             if !language.isEmpty {
-                Text(language).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                Text(language).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                     .padding(.horizontal, Space.s3).padding(.top, Space.s2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
@@ -206,7 +210,7 @@ private struct CodeBlock: View {
                 copied = true
             }
             .buttonStyle(.plain).coreFont(size: MacTextSize.meta, weight: .semibold)
-            .foregroundStyle(GlassInk.secondary).padding(Space.s2)
+            .foregroundStyle(SessionInk.text2).padding(Space.s2)
         }
         .background(SessionInk.code, in: coreShape(Radius.row))
     }

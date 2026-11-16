@@ -99,7 +99,7 @@ enum SnapshotRunner {
         shell.toast = nil
         shell.presentSheet(
             title: "End this session?", message: "It stops now. What it already wrote stays.",
-            actions: [ShellSheetAction("Cancel"), ShellSheetAction("End session", destructive: true)])
+            actions: [ShellSheetAction("Cancel"), ShellSheetAction("End Session", destructive: true)])
         await shot("02e-sheet")
         shell.sheet = nil
         shell.elevatedUntil = nil

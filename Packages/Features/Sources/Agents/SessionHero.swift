@@ -31,13 +31,12 @@ struct SessionHero: View {
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .help("Choose the tool, runner, folder or repo, model and account order")
                 }
-                if !panel {
-                    Group {
-                        if !panelRoom { detailsButton }
-                        SessionActions(model: model, session: session, find: find, compact: compact)
-                    }
-                    .fixedSize()
+                // The session's actions always live here (one home, one name each); the panel holds information.
+                Group {
+                    if !panel && !panelRoom { detailsButton }
+                    SessionActions(model: model, session: session, find: find, compact: compact)
                 }
+                .fixedSize()
             }
             .frame(minHeight: MacSize.controlLg)
             if showDetails && !panel {
