@@ -325,7 +325,7 @@ public struct LiveAgentsAPI: AgentsAPI {
             }, resumes: s.resumes.map(Int.init), index: s.index, route: route(s, outcome), title: s.title,
             project: (s.workspace?.value["repo"] as? String).map(projectName),
             branch: s.workspace?.value["branch"] as? String, keepsOpen: s.live, idleSince: s.idleSince,
-            policy: s.policy, plan: s.plan ?? false)
+            policy: s.policy, plan: s.plan ?? false, folder: s.folder)
     }
 
     /// Everything the scheduler adds to a session; nil when the Core gave none of it (not an admin, or no chain).

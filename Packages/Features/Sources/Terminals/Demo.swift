@@ -51,7 +51,9 @@ public final class TerminalsDemo {
             return t
         }
         func runners() async throws -> [RunnerItem] { runnerList }
-        func create(runner: String, program: String?, rows: Int, cols: Int) async throws -> TerminalItem {
+        func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws
+            -> TerminalItem
+        {
             if let refusal { throw refusal }
             return item("t_new", runner: runner, attached: 0)
         }

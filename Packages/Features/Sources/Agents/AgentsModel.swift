@@ -24,13 +24,13 @@ public protocol AgentsHost: AnyObject {
     func elevate(reason: String, force: Bool) async -> InlineNotice?
     /// The runner built into this Mac, once it is registered; nil otherwise.
     var thisMacRunnerID: String? { get }
-    /// Opens a new terminal on a runner (the Terminals module owns it). The Core's terminal API has no folder yet.
-    func openTerminal(on runner: String)
+    /// Opens a new terminal on a runner (the Terminals module owns it), in `session`'s folder when the Core can.
+    func openTerminal(on runner: String, session: String?)
 }
 
 extension AgentsHost {
     public var thisMacRunnerID: String? { nil }
-    public func openTerminal(on runner: String) {}
+    public func openTerminal(on runner: String, session: String?) {}
 }
 
 struct ElevationDeclined: Error { let notice: InlineNotice }

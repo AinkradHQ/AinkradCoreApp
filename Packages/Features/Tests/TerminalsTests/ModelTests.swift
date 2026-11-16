@@ -86,6 +86,23 @@ import Testing
         #expect(host.reasons.contains { $0.contains("This approval covers this terminal only.") })
     }
 
+    @Test func aSessionsTerminalNamesTheSessionAndFallsBackToHomeWhenItsFolderIsUnknown() async {
+        let (m, svc, _) = make()
+        await m.reload()
+        svc.createResult = .success(item("t_new"))
+        svc.terminalList = [item("t_new")]
+        svc.attachResults = [.success(FakeLink()), .success(FakeLink())]
+        let form = NewTerminalModel(model: m, runner: "r1")
+        form.session = "as_1"
+        await form.submit()
+        #expect(svc.created.map(\.session) == ["as_1"] && form.error == nil)
+        svc.sessionResult = .failure(.http(status: 409, code: "session_folder_unknown", message: "m"))
+        let again = NewTerminalModel(model: m, runner: "r1")
+        again.session = "as_1"
+        await again.submit()
+        #expect(svc.created.suffix(2).map(\.session) == ["as_1", nil] && again.error == nil)
+    }
+
     @Test func aRunnerWithoutPtyCannotBeOpened() async {
         let (m, svc, _) = make()
         svc.runnerList = [runner(pty: false)]
@@ -118,7 +135,7 @@ struct FailingService: TerminalService {
     func terminals() async throws -> [TerminalItem] { throw CoreError.offline("down") }
     func terminal(_ id: String) async throws -> TerminalItem { throw CoreError.offline("down") }
     func runners() async throws -> [RunnerItem] { throw CoreError.offline("down") }
-    func create(runner: String, program: String?, rows: Int, cols: Int) async throws -> TerminalItem {
+    func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem {
         throw CoreError.offline("down")
     }
     func close(_ id: String) async throws -> TerminalItem { throw CoreError.offline("down") }

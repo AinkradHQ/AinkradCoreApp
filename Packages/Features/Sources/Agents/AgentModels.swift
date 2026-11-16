@@ -48,6 +48,8 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var policy: String?
     /// In Plan mode: it reads and plans, edits nothing, and ends with a plan to approve (Claude Code only).
     public var plan = false
+    /// The folder it works in, on its runner (Core API minor 76); nil until the runner reports it.
+    public var folder: String?
     /// Its row, for paging the list with `before`.
     public var index: Int64?
     /// Its chain, account, run and attempts (admins only; nil for any other device).
@@ -59,8 +61,10 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
         endedAt: Date? = nil, lastSeq: Int64 = 0, usage: AgentUsageInfo? = nil, resumes: Int? = nil,
         index: Int64? = nil,
         route: SessionRoute? = nil, title: String? = nil, project: String? = nil, branch: String? = nil,
-        keepsOpen: Bool? = nil, idleSince: Date? = nil, policy: String? = nil, plan: Bool = false
+        keepsOpen: Bool? = nil, idleSince: Date? = nil, policy: String? = nil, plan: Bool = false,
+        folder: String? = nil
     ) {
+        self.folder = folder
         self.policy = policy
         self.plan = plan
         self.keepsOpen = keepsOpen

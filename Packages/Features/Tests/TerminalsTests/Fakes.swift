@@ -58,11 +58,13 @@ final class FakeService: TerminalService, @unchecked Sendable {
     var runnerList: [RunnerItem] = []
     var attachResults: [Result<FakeLink, CoreError>] = []
     var createResult: Result<TerminalItem, CoreError> = .failure(.offline("x"))
+    /// When set, what a create with a session answers.
+    var sessionResult: Result<TerminalItem, CoreError>?
     private(set) var attachAfters: [UInt64] = []
     private(set) var attachRunners: [String?] = []
     private(set) var signals: [String] = []
     private(set) var closed: [String] = []
-    private(set) var created: [(runner: String, program: String?)] = []
+    private(set) var created: [(runner: String, program: String?, session: String?)] = []
     var policyResult: Result<(policy: RunnerPolicy, restarting: Bool), CoreError>?
     private(set) var policies: [RunnerPolicy] = []
     private(set) var installed: [String] = []
@@ -75,9 +77,12 @@ final class FakeService: TerminalService, @unchecked Sendable {
         return t
     }
     func runners() async throws -> [RunnerItem] { lock.withLock { runnerList } }
-    func create(runner: String, program: String?, rows: Int, cols: Int) async throws -> TerminalItem {
-        lock.withLock { created.append((runner, program)) }
-        return try lock.withLock { createResult }.get()
+    func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem {
+        lock.withLock { created.append((runner, program, session)) }
+        return try lock.withLock {
+            if session != nil, let r = sessionResult { return r }
+            return createResult
+        }.get()
     }
     func close(_ id: String) async throws -> TerminalItem {
         lock.withLock { closed.append(id) }
