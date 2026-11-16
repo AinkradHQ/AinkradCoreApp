@@ -38,12 +38,6 @@ struct SessionHero: View {
                     }
                     .fixedSize()
                 }
-                // The panel toggle, as in the mockup: a plain icon at the end of the title line.
-                if panelRoom {
-                    CoreIconButton(symbol: "sidebar.right", label: "Session panel") { togglePanel() }
-                        .help(panel ? "Hide the session panel (⌥⌘I)" : "Show the session panel (⌥⌘I)")
-                        .keyHint(.details)
-                }
             }
             .frame(minHeight: MacSize.controlLg)
             if showDetails && !panel {

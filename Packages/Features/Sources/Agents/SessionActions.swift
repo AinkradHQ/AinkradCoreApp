@@ -33,6 +33,8 @@ struct SessionActions: View {
                     Spacer(minLength: 0)
                     if session.live { state }
                 }
+                // Room at the right for the fixed panel toggle (SessionView), as the sidebar leaves room at the left.
+                .padding(.trailing, Space.s6)
                 if !facts.isEmpty {
                     VStack(spacing: Space.s1) {
                         ForEach(Array(facts.enumerated()), id: \.offset) { _, f in PanelRow(label: f.0, value: f.1) }

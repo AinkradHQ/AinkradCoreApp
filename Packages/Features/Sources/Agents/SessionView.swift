@@ -61,8 +61,9 @@ struct SessionView: View {
                             .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                     conversation(s, wide: wide, compact: rest < Self.compact, panelRoom: rest >= Self.panelWidth)
-                        // The fixed sidebar toggle keeps its corner while the sidebar is hidden: the column clears it.
+                        // The fixed toggles keep their corners while their side is hidden: the column clears them.
                         .padding(.leading, room && !side ? Space.s8 + Space.s3 : 0)
+                        .padding(.trailing, rest >= Self.panelWidth && !wide ? Space.s8 + Space.s3 : 0)
                     if wide {
                         SessionSidePanel(model: model, session: s, find: openFind).frame(width: 288).padding(
                             .trailing, Space.s3
@@ -79,6 +80,16 @@ struct SessionView: View {
                             .help(sidebarOn ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
                             .keyHint(.sidebar)
                             .padding(.leading, Space.s3 + Space.s2).padding(.top, Space.s2 + Space.s2)
+                    }
+                }
+                // The panel toggle, the left one's mirror: fixed at the top-right corner, beside "Session" when the
+                // panel shows, in the same place when it does not (⌥⌘I).
+                .overlay(alignment: .topTrailing) {
+                    if rest >= Self.panelWidth {
+                        CoreIconButton(symbol: "sidebar.right", label: "Session panel") { togglePanel() }
+                            .help(panelOn ? "Hide the session panel (⌥⌘I)" : "Show the session panel (⌥⌘I)")
+                            .keyHint(.details)
+                            .padding(.trailing, Space.s3 + Space.s2).padding(.top, Space.s2 + Space.s2)
                     }
                 }
                 .onChange(of: rest >= Self.panelWidth, initial: true) { _, now in panelRoom = now }

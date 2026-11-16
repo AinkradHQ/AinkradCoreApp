@@ -86,7 +86,8 @@ struct SessionSidePanel: View {
                 }
             }
             .foregroundStyle(palette.text)
-            .padding(Space.s4)
+            // The header row sits level with the fixed toggles at the top corners.
+            .padding(.horizontal, Space.s4).padding(.top, Space.s3).padding(.bottom, Space.s4)
         }
         .scrollIndicators(.never)
         .coreWell(radius: 12)  // follows the Appearance setting (Look)
