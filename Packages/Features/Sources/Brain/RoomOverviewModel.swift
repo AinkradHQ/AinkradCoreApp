@@ -22,12 +22,20 @@ public final class RoomOverviewModel {
     /// The rule whose "from N items" popover is open.
     public var openRule: String?
     @ObservationIgnored var pollEvery: Duration = .seconds(2)
+    /// Bumped by every `clear()` from outside (a room switch, inspect, a screen lock), so the tab's load task runs
+    /// again: a load whose answer arrives after a clear is dropped, and without this the tab stayed on its skeleton.
+    public private(set) var epoch = 0
 
     init(brain: BrainModel) { self.brain = brain }
 
     var service: (any RoomOverviewService)? { brain?.service?.overviewService }
 
     public func clear() {
+        reset()
+        epoch += 1
+    }
+
+    private func reset() {
         phase = .idle
         current = nil
         roomID = nil
@@ -41,7 +49,7 @@ public final class RoomOverviewModel {
     public func load(_ room: String, quiet: Bool = false) async {
         guard let service else { return }
         if roomID != room {
-            clear()
+            reset()
             roomID = room
         }
         if !quiet, current == nil { phase = .loading }
