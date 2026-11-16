@@ -198,6 +198,9 @@ struct SessionView: View {
                 ui.focusField()
                 composing = true
             }
+            // The day backing fills the whole pane, under the sidebar, the corner toggles and the panel: never a strip
+            // of bare wallpaper beside the conversation (Ahmed, 2026-11-16).
+            .background(SessionInk.backing)
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
@@ -255,7 +258,6 @@ struct SessionView: View {
             ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
                 .frame(maxWidth: .infinity)
         }
-        .background(SessionInk.backing)
         .opacity(shown ? 1 : 0)
         .offset(y: shown || reduce ? 0 : 8)
         .onAppear { withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { shown = true } }
