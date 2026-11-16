@@ -205,6 +205,33 @@ enum ComposerSelfTest {
         let copied = NSPasteboard.general.string(forType: .string)
         check("⇧⌘C copies the last answer", last != nil && copied == last, "copied \(copied?.count ?? 0) characters")
         a.shell.toast = nil
+        // A click on empty space in the conversation hands the cursor back to the message field. The click goes to this
+        // process only.
+        window.makeFirstResponder(nil)
+        let local = NSPoint(x: 60, y: window.frame.height / 2)
+        let screen = window.convertPoint(toScreen: local)
+        let top = (NSScreen.screens.first?.frame.height ?? 0) - screen.y
+        for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+            CGEvent(
+                mouseEventSource: nil, mouseType: type, mouseCursorPosition: CGPoint(x: screen.x, y: top),
+                mouseButton: .left)?.postToPid(getpid())
+            try? await Task.sleep(for: .milliseconds(80))
+        }
+        try? await Task.sleep(for: .milliseconds(500))
+        note("clicks seen \(ComposerFocus.clicks), acted on \(ComposerFocus.handled)")
+        check(
+            "a click in the conversation puts the cursor back in the field", window.firstResponder === tv,
+            "first responder = \(window.firstResponder.map { String(describing: type(of: $0)) } ?? "none")")
+        // The sidebar switches the pane to another session in place: no new tab.
+        if let other = a.sessions.items.first(where: { $0.id != s.id }) {
+            let before = app.shell.panes.count
+            a.switchSession(from: s.id, to: other.id)
+            try? await Task.sleep(for: .milliseconds(500))
+            check(
+                "the sidebar switches sessions in the same pane",
+                app.shell.panes.count == before && app.shell.activePane == "agents.s-\(other.id)",
+                "panes \(before) → \(app.shell.panes.count), active = \(app.shell.activePane ?? "none")")
+        }
     }
 
     private static func find(_ v: NSView?) -> NSTextView? {
@@ -250,6 +277,11 @@ enum ShowcaseShots {
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R001")
         try? await Task.sleep(for: .seconds(2.5))
         _ = SnapshotCapture.png(window, to: "\(dir)/pinned-approval-\(theme).png")
+        // Typing during a turn turns the composer's one button from Stop into Queue.
+        a.drafts["as_01JC4X7Q3MZ8N5V2K9R001"] = "Also add a test for the 429 path."
+        try? await Task.sleep(for: .seconds(1))
+        _ = SnapshotCapture.png(window, to: "\(dir)/typed-\(theme).png")
+        a.drafts["as_01JC4X7Q3MZ8N5V2K9R001"] = ""
         // ⇧⌘R from the message field: the Review pane with its diffs (the status report session has files touched).
         app.shell.closeAllPanes()
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")

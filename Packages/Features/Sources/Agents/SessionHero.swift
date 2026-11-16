@@ -11,9 +11,12 @@ struct SessionHero: View {
     var panel = false
     /// A narrow pane: the actions show as icons (their names in the tooltips), so they never squeeze the title.
     var compact = false
+    /// The pane has room for the other sessions at the left: the sidebar button shows.
+    var sidebarRoom = true
     /// Opens the find bar (⌘F).
     var find: (() -> Void)?
     @AppStorage("agents.detailsStrip") private var showDetails = true
+    @AppStorage(SessionView.sidebarKey) private var showSidebar = true
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -21,6 +24,13 @@ struct SessionHero: View {
         let st = AgentWords.status(session, waiting: model.waiting(session.id))
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
+                if sidebarRoom {
+                    CoreIconButton(symbol: "sidebar.left", label: "Your other sessions", selected: showSidebar) {
+                        withAnimation(reduce ? nil : Motion.out(Motion.ui)) { showSidebar.toggle() }
+                    }
+                    .help(showSidebar ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
+                    .keyHint(.sidebar)
+                }
                 titleLine
                 Spacer(minLength: Space.s3)
                 if empty {

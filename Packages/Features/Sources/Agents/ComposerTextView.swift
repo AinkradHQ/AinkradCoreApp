@@ -64,6 +64,7 @@ struct ComposerTextView: NSViewRepresentable {
         guard let tv = scroll.documentView as? KeyTextView else { return }
         // Fresh closures on every update: nothing stale (the old monitor kept the first session's closure).
         tv.keys = keys
+        context.environment.sessionUI?.field = tv
         tv.onFiles = onFiles
         tv.onFocus = { [weak coordinator = context.coordinator] on in coordinator?.focusChanged(on) }
         tv.isEditable = enabled

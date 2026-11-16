@@ -28,6 +28,21 @@ extension AgentsModel {
         shell.openPane(spec)
     }
 
+    /// Shows session `id` in the pane that shows `current` (the session sidebar): the pane switches, no new tab.
+    public func switchSession(from current: String, to id: String) {
+        guard current != id, let s = sessions.session(id) else { return }
+        selected = id
+        _ = transcript(id)
+        loadTitle(id)
+        let head = head(s)
+        shell.replacePane(
+            Self.paneID(current),
+            with: PaneSpec(
+                id: Self.paneID(id), title: head.title, sub: head.sub, symbol: Self.harnessSymbol(s.harness),
+                chip: head.chip, minWidth: 460
+            ) { SessionView(model: self, sessionID: id) })
+    }
+
     public func openSession(_ id: String) {
         selected = id
         _ = transcript(id)

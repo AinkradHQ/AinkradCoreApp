@@ -34,6 +34,14 @@ struct ToolRunsTests {
         #expect(ColumnRow.openByDefault([done(2, "Read"), done(3, "Bash", ok: false)]))
     }
 
+    @Test func composerButtonFollowsWhatIsHappening() {
+        #expect(ComposerAction.of(running: true, hasText: false, canSend: false) == .stop)
+        #expect(ComposerAction.of(running: true, hasText: true, canSend: true) == .queue)
+        #expect(ComposerAction.of(running: false, hasText: true, canSend: true) == .send)
+        #expect(ComposerAction.of(running: false, hasText: false, canSend: false) == .idle)
+        #expect(ComposerAction.of(running: false, hasText: true, canSend: false) == .idle)
+    }
+
     @Test func connectionCuesNeverJoinARun() {
         let items = TranscriptItem.items([done(1, "Read"), done(2, "github.get_issue"), done(3, "Read")])
         #expect(items.count == 3)

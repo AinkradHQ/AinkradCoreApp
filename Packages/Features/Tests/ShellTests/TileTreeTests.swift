@@ -15,6 +15,12 @@ struct TileTreeTests {
             minWidth: { mins[$0] ?? 340 }, container: CGSize(width: width, height: 700), gap: gap, minHeight: 560)
     }
 
+    @Test func renameKeepsTheSlotAndItsSize() {
+        var t = tree("a", "b", "c")
+        t.rename("b", to: "x")
+        #expect(t.leaves == ["a", "x", "c"])
+    }
+
     @Test func openingAppendsEqualColumns() {
         let l = layout(tree("a", "b", "c"))
         #expect(!l.isStrip && l.seams.count == 2)

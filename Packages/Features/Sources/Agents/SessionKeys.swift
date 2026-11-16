@@ -8,7 +8,7 @@ enum SessionShortcut: CaseIterable {
     case find, findNext, findPrevious
     case goAhead, changePlan, stopTurn, endSession
     case terminal, openIn, review, attach, model, compact, copyAnswer
-    case expandSteps, collapseSteps, details, shortcuts
+    case expandSteps, collapseSteps, details, sidebar, shortcuts
 
     /// The key (as AppKit and SwiftUI both spell it: "\r" for Return, the private-use arrows) and its modifiers.
     var chord: (key: Character, mods: EventModifiers) {
@@ -30,6 +30,7 @@ enum SessionShortcut: CaseIterable {
         case .expandSteps: ("\u{F703}", [.command, .option])
         case .collapseSteps: ("\u{F702}", [.command, .option])
         case .details: ("i", [.command, .option])
+        case .sidebar: ("s", [.command, .control])
         case .shortcuts: ("/", .command)
         }
     }
@@ -67,6 +68,7 @@ enum SessionShortcut: CaseIterable {
         case .expandSteps: "Open all tool steps"
         case .collapseSteps: "Fold all tool steps"
         case .details: "Show or hide the details"
+        case .sidebar: "Show or hide your other sessions"
         case .shortcuts: "Keyboard shortcuts"
         }
     }
@@ -117,6 +119,15 @@ final class SessionUI {
             guard !Task.isCancelled else { return }
             self?.showKeys = true
         }
+    }
+
+    /// The message field itself, so the cursor can be handed to it directly (SwiftUI's focus state drifts).
+    @ObservationIgnored weak var field: NSTextView?
+
+    /// Puts the cursor in the message field.
+    func focusField() {
+        guard let f = field, let w = f.window, w.firstResponder !== f else { return }
+        w.makeFirstResponder(f)
     }
 
     /// Bumped to put the cursor in the message field (Edit, Quote).

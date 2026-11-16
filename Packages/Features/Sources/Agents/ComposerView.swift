@@ -112,22 +112,7 @@ struct ComposerView: View {
                             .coreFont(size: MacTextSize.meta).monospacedDigit()
                             .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
                     }
-                    if model.canStopTurn(session) {
-                        Button("Stop turn") { model.stopTurn(session.id) }
-                            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "esc")
-                            .help("Stop the current turn (Esc or ⌘.). The session stays open.").keyHint("esc")
-                    }
-                    if enabled {
-                        Button(action: { Task { await model.send(session.id) } }) {
-                            Label(session.idle || !session.live ? "Send" : "Queue", systemImage: "arrow.up")
-                        }
-                        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).environment(\.coreKeycap, "↩")
-                        .disabled(!model.canSend(session.id))
-                        .keyHint("↩")
-                        .help(
-                            session.idle || !session.live
-                                ? "Send the message (Return)" : "Send it after this turn (Return)")
-                    }
+                    if enabled || model.canStopTurn(session) { actionButton }
                 }
             }
             .padding(Space.s3)
@@ -184,6 +169,28 @@ struct ComposerView: View {
         .padding(Space.s1)
         .coreGlass(radius: Radius.row, interactive: false)
         .accessibilityLabel("Commands")
+    }
+
+    /// One compact button that follows what is happening (Ahmed, 2026-11-16): Stop while a turn runs and the field is empty,
+    /// Queue once you type during a turn, Send when it is idle, dimmed with nothing to send.
+    private var actionButton: some View {
+        let act = ComposerAction.of(
+            running: model.canStopTurn(session),
+            hasText: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !files.isEmpty, canSend: model.canSend(session.id))
+        return Button {
+            if act == .stop { model.stopTurn(session.id) } else { Task { await model.send(session.id) } }
+        } label: {
+            Image(systemName: act == .stop ? "stop.fill" : "arrow.up")
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: MacSize.controlSm - Space.s2)
+        }
+        .buttonStyle(CoreButtonStyle(act == .stop ? .secondary : .prominent, size: .small))
+        .disabled(act == .idle)
+        .keyHint(act == .stop ? "esc" : act == .idle ? "" : "↩")
+        .help(act.help)
+        .accessibilityLabel(act.name)
+        .animation(Motion.out(Motion.ui), value: act)
     }
 
     /// The tool and its model; for Claude Code a menu that switches the model with the tool's own `/model` command. Other
@@ -336,4 +343,32 @@ private struct AttachmentChip: View {
         .help(url.path)
     }
 
+}
+
+/// What the composer's one button does now.
+enum ComposerAction: Equatable {
+    case stop, queue, send, idle
+
+    static func of(running: Bool, hasText: Bool, canSend: Bool) -> Self {
+        if hasText && canSend { return running ? .queue : .send }
+        if running { return .stop }
+        return .idle
+    }
+
+    var name: String {
+        switch self {
+        case .stop: "Stop turn"
+        case .queue: "Queue"
+        case .send, .idle: "Send"
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .stop: "Stop the current turn (Esc or ⌘.). The session stays open."
+        case .queue: "Send it after this turn (Return). Esc stops the turn."
+        case .send: "Send the message (Return)"
+        case .idle: "Type a message to send"
+        }
+    }
 }

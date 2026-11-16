@@ -20,7 +20,13 @@ struct SessionView: View {
     /// What the screen has open (Open in…, the model menu, Review, the shortcut list), shared so a key opens what a click does.
     @State private var ui = SessionUI()
     @AppStorage("agents.detailsStrip") private var showDetails = true
+    @AppStorage(SessionView.sidebarKey) private var showSidebar = true
+    static let sidebarKey = "agents.sessionSidebar"
+    /// The other sessions show at the left only when the pane has room for them beside a readable conversation.
+    static let sidebarRoom: CGFloat = 900
+    static let sidebarWidth: CGFloat = 240
     @State private var keyMonitor: Any?
+    @State private var clickMonitor: Any?
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -30,9 +36,16 @@ struct SessionView: View {
     var body: some View {
         if let s = model.sessions.session(sessionID) {
             GeometryReader { geo in
-                let wide = geo.size.width >= Self.panelWidth
+                let side = showSidebar && geo.size.width >= Self.sidebarRoom
+                let rest = geo.size.width - (side ? Self.sidebarWidth + Space.s3 : 0)
+                let wide = rest >= Self.panelWidth
                 HStack(alignment: .top, spacing: 0) {
-                    conversation(s, wide: wide, compact: geo.size.width < Self.compact)
+                    if side {
+                        SessionSwitcher(model: model, current: sessionID).frame(width: Self.sidebarWidth)
+                            .padding(.leading, Space.s3).padding(.vertical, Space.s2)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                    conversation(s, wide: wide, compact: rest < Self.compact, room: geo.size.width >= Self.sidebarRoom)
                     if wide {
                         SessionSidePanel(model: model, session: s, find: openFind).frame(width: 320).padding(
                             .trailing, Space.s3
@@ -55,10 +68,31 @@ struct SessionView: View {
                     MainActor.assumeIsolated { ui.track(e, active: shell.activePane == pane) }
                     return e
                 }
+                // Wherever you click in the conversation, the cursor goes back to the message field (Ahmed, 2026-11-16):
+                // after the click lands, unless it put the cursor in another text field or selected words to copy.
+                let model = model
+                let id = sessionID
+                clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { e in
+                    MainActor.assumeIsolated {
+                        ComposerFocus.clicks += 1
+                        guard shell.activePane == pane, let s = model.sessions.session(id), model.canWrite(s),
+                            let window = e.window ?? NSApp.keyWindow ?? NSApp.mainWindow
+                        else { return }
+                        ComposerFocus.handled += 1
+                        // After SwiftUI has settled its own focus for the click.
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(40))
+                            guard ComposerFocus.shouldReturn(window.firstResponder) else { return }
+                            ui.focusField()
+                        }
+                    }
+                    return e
+                }
             }
             .onDisappear {
-                if let m = keyMonitor { NSEvent.removeMonitor(m) }
+                for m in [keyMonitor, clickMonitor].compactMap({ $0 }) { NSEvent.removeMonitor(m) }
                 keyMonitor = nil
+                clickMonitor = nil
                 ui.showKeys = false
             }
             .retakeFocus(after: model.shell, pane: AgentsModel.paneID(sessionID)) { focusStart(s) }
@@ -101,9 +135,8 @@ struct SessionView: View {
             .animation(Motion.out(Motion.ui), value: ui.shortcuts)
             .environment(\.sessionUI, ui)
             .onChange(of: ui.focusComposer) { _, _ in
-                // Whatever holds the keyboard lets go, then the field takes it.
-                composing = false
-                Task { @MainActor in composing = true }
+                ui.focusField()
+                composing = true
             }
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
@@ -113,9 +146,9 @@ struct SessionView: View {
         }
     }
 
-    private func conversation(_ s: AgentSessionInfo, wide: Bool, compact: Bool) -> some View {
+    private func conversation(_ s: AgentSessionInfo, wide: Bool, compact: Bool, room: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            SessionHero(model: model, session: s, panel: wide, compact: compact, find: openFind)
+            SessionHero(model: model, session: s, panel: wide, compact: compact, sidebarRoom: room, find: openFind)
             if finding {
                 ConversationFindBar(
                     query: $findQuery, count: hits.count, index: min(findIndex, max(hits.count - 1, 0)),
@@ -214,6 +247,7 @@ struct SessionView: View {
         case .expandSteps, .collapseSteps:
             ui.steps = (ui.steps.gen + 1, key == .expandSteps)
         case .details: withAnimation(Motion.out(Motion.ui)) { showDetails.toggle() }
+        case .sidebar: withAnimation(Motion.out(Motion.ui)) { showSidebar.toggle() }  // a narrow pane keeps it hidden
         case .shortcuts: ui.shortcuts.toggle()
         }
         return true
@@ -313,5 +347,20 @@ struct PinnedApprovals: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// Whether a click should hand the cursor back to the message field: not when the field has it already, not when another
+/// text field took it (find bar, a comment), and not when words are selected to copy.
+public enum ComposerFocus {
+    /// Debug counts for the self-test: clicks seen, and clicks this pane acted on.
+    nonisolated(unsafe) public static var clicks = 0
+    nonisolated(unsafe) public static var handled = 0
+
+    @MainActor static func shouldReturn(_ responder: NSResponder?) -> Bool {
+        guard let tv = responder as? NSTextView else { return true }
+        if tv is KeyTextView { return false }
+        if tv.isEditable || tv.isFieldEditor { return false }
+        return tv.selectedRange().length == 0
     }
 }

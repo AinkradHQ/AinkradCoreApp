@@ -329,6 +329,20 @@ public final class ShellModel {
         }
     }
 
+    /// Shows `spec` in the place of pane `oldID` (switching what a pane shows, as the session sidebar does): same tab position,
+    /// same tile. When `spec` is already open elsewhere it is focused instead, and `oldID` stays.
+    public func replacePane(_ oldID: String, with spec: PaneSpec) {
+        guard let i = panes.firstIndex(where: { $0.id == oldID }), !panes.contains(where: { $0.id == spec.id }) else {
+            openPane(spec)
+            return
+        }
+        panes[i] = spec
+        tree.rename(oldID, to: spec.id)
+        if focusedPane == oldID { focusedPane = spec.id }
+        activePane = spec.id
+        surface = .workspace
+    }
+
     /// Closes a pane without a trace (a feature closing its own pane). People closing a pane use `dismissPane`.
     public func closePane(_ id: String) {
         guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
