@@ -223,10 +223,12 @@ public final class BrainModel {
 
     // MARK: rooms
 
-    /// Drops everything a room view held. Called before any switch, seal or lock, not after.
-    func clearRoomView() {
+    /// Drops everything a room view held. Called before any switch, seal or lock, not after. `overview` false (opening or
+    /// switching rooms) leaves the Overview to its tab: it resets itself when the room on screen changes, and clearing
+    /// it here raced the tab's own first load and left the tab on its skeleton.
+    func clearRoomView(overview: Bool = true) {
         activity?.clear()
-        roomOverview?.clear()
+        if overview { roomOverview?.clear() }
         inboxState.clear()
         inspected = nil
         inspectingID = nil
@@ -235,7 +237,7 @@ public final class BrainModel {
     /// Switches the pane's viewing room. The old room's view is cleared first.
     public func view(_ id: String) {
         guard id != viewingID else { return }
-        clearRoomView()
+        clearRoomView(overview: false)
         viewingID = id
         notice = nil
         host.shell.updatePane("brain", sub: .some(viewing?.name))
@@ -243,7 +245,8 @@ public final class BrainModel {
 
     /// Opens one room's view in the Rooms tab (a mounted room only).
     public func inspect(_ id: String) async {
-        clearRoomView()
+        BrainRoutes.log.notice("inspect \(id, privacy: .public)")
+        clearRoomView(overview: false)
         inspectingID = id
         guard let service, room(id)?.lock == nil else { return }
         do {
