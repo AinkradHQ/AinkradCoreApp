@@ -165,6 +165,22 @@ func session(cwd: String, _ turns: [(String, String)]) -> String {
         #expect(PreFilter.deprecatedProject(in: "/a/GitScopeX/b") == nil)
     }
 
+    @Test func subagentTranscriptsAreSkippedByPathAndBySidechainFlag() {
+        #expect(PreFilter.skipReason(path: "/-p/s1/subagents/agent-a1.jsonl") == "subagent")
+        #expect(PreFilter.skipReason(path: "/-p/subagents.jsonl") == nil)
+        #expect(PreFilter.skipReason(path: "/-p/s1.jsonl") == nil)
+    }
+
+    @Test func sidechainFileGivesNoItem() async throws {
+        let root = try fixtureRoot()
+        let line =
+            #"{"type":"user","isSidechain":true,"timestamp":"2026-11-01T09:00:00Z","message":{"role":"user","content":"made-up prompt"}}"#
+        try write(root, "-p/s1.jsonl", line + "\n")
+        let out = try await gather(root)
+        #expect(out.items.isEmpty)
+        #expect(out.report.skipped["subagent"] == 1)
+    }
+
     @Test func hashMatchesTheCoreForNormalisedText() {
         // sha256("hello\nworld"), the same value the Core's `hash_of("hello\r\nworld  ")` gives.
         #expect(ItemFormat.hash("hello\r\nworld  ") == ItemFormat.hash("hello\nworld"))
