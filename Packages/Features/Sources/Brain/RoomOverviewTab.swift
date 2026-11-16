@@ -8,6 +8,8 @@ struct RoomOverviewTab: View {
     let model: BrainModel
     let room: RoomSummary
     private var o: RoomOverviewModel { model.roomOverview }
+    /// What the model holds, only while it is this room's: never another room's overview.
+    private var shown: RoomOverview? { o.roomID == room.id ? o.current : nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
@@ -16,14 +18,16 @@ struct RoomOverviewTab: View {
             }
             content
         }
-        .task(id: "\(room.id)#\(o.epoch)") { await o.load(room.id) }
-        .task(id: o.current?.state) { if o.current?.state == .writing { await o.watch(room.id) } }
+        .task(id: "\(room.id)#\(o.epoch)") { await o.open(room.id) }
+        .task(id: "\(room.id)#\(shown.map { "\($0.state)" } ?? "-")") {
+            if shown?.state == .writing { await o.watch(room.id) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-overview")
     }
 
     @ViewBuilder private var content: some View {
-        if let cur = o.current {
+        if let cur = shown {
             switch cur.state {
             case .notWritten: notWritten
             case .needsAccount:
@@ -62,7 +66,7 @@ struct RoomOverviewTab: View {
             case .written:
                 if let body = cur.overview { written(cur, body) } else { notWritten }
             }
-        } else if case .failed(let why) = o.phase {
+        } else if o.roomID == room.id, case .failed(let why) = o.phase {
             BrainStateCard(
                 symbol: "exclamationmark.triangle", title: "Unable to load the overview", text: why,
                 primary: CoreAction("Try Again") { Task { await o.load(room.id) } })

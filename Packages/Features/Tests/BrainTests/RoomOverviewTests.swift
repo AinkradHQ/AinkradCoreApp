@@ -53,7 +53,7 @@ struct RoomOverviewTests {
         for state in [OverviewState.notWritten, .writing, .written, .failed, .needsAccount, .cloudOff] {
             let model = await make(state)
             let o = model.roomOverview!
-            await o.load("acme-shop")
+            await o.open("acme-shop")
             #expect(o.current?.state == state && o.phase == .ready)
         }
     }
@@ -61,7 +61,7 @@ struct RoomOverviewTests {
     @Test func writingShowsAtOnceThenWatchesUntilWritten() async {
         let model = await make(.notWritten)
         let o = model.roomOverview!
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         await o.write("acme-shop")
         #expect(o.current?.state == .writing)
         await o.watch("acme-shop")
@@ -72,7 +72,7 @@ struct RoomOverviewTests {
     @Test func approveThenEditKeepsTheTextAndApproves() async {
         let model = await make(.written)
         let o = model.roomOverview!
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         #expect(o.current?.instructionsApproved == false)
         await o.approve("acme-shop")
         #expect(o.current?.instructionsApproved == true)
@@ -89,7 +89,7 @@ struct RoomOverviewTests {
     @Test func cancelLeavesTheInstructionsAlone() async {
         let model = await make(.written)
         let o = model.roomOverview!
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         let before = o.current?.instructionsText
         o.startEdit()
         o.draft = "Something else"
@@ -100,7 +100,7 @@ struct RoomOverviewTests {
     @Test func everyCitedItemHasATitle() async throws {
         let model = await make(.written)
         let o = model.roomOverview!
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         let rule = try #require(o.current?.overview?.rules.workflow.first)
         #expect(rule.sources.count == 14)
         let titles = try #require(o.current?.sourceTitles)
@@ -115,20 +115,62 @@ struct RoomOverviewTests {
         let model = await make(.written)
         let o = model.roomOverview!
         let before = o.epoch
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         #expect(o.epoch == before, "a load never bumps the epoch")
         await model.inspect("acme-shop")
         #expect(o.epoch == before + 1 && o.current == nil && o.phase == .idle)
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         #expect(o.phase == .ready && o.current?.state == .written)
     }
 
     @Test func leavingARoomClearsItsOverview() async {
         let model = await make(.written)
         let o = model.roomOverview!
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         model.view("app")
         #expect(o.current == nil && o.roomID == nil)
+    }
+
+    // MARK: a room left behind never lands in the room on screen
+
+    /// A's write ends with a load of A, and the Retry/Rewrite task runs on after the pane moved to B.
+    @Test func aLateWriteForTheRoomLeftNeverShowsInTheNextRoom() async {
+        let model = await make(.notWritten)
+        let o = model.roomOverview!
+        await o.open("acme-shop")
+        let late = Task { await o.write("acme-shop") }
+        await o.open("umbrella")
+        await late.value
+        #expect(o.roomID == "umbrella" && o.current?.state == .notWritten && o.phase == .ready)
+        #expect(!o.busy && o.notice == nil)
+    }
+
+    /// The poll for A keeps running while B is shown; its loads of A are dropped.
+    @Test func aPollForTheRoomLeftNeverShowsInTheNextRoom() async {
+        let model = await make(.notWritten)
+        let o = model.roomOverview!
+        await o.open("acme-shop")
+        await o.write("acme-shop")
+        #expect(o.current?.state == .writing)
+        let poll = Task { await o.watch("acme-shop") }
+        await o.open("umbrella")
+        await poll.value
+        #expect(o.roomID == "umbrella" && o.current?.state == .notWritten)
+        await o.load("acme-shop")
+        await o.approve("acme-shop")
+        #expect(o.roomID == "umbrella" && o.current?.state == .notWritten)
+    }
+
+    @Test func theNextRoomLoadsNormallyAfterTheSwitch() async {
+        let model = await make(.written)
+        let o = model.roomOverview!
+        await o.open("acme-shop")
+        let late = Task { await o.write("acme-shop") }
+        await o.open("umbrella")
+        await late.value
+        await o.write("umbrella")
+        await o.watch("umbrella")
+        #expect(o.roomID == "umbrella" && o.current?.state == .written && o.phase == .ready)
     }
 
     // MARK: the Core's routes
@@ -225,7 +267,7 @@ struct RoomOverviewTests {
     @Test func anOlderCoreGetsAClockFromThePressOfWrite() async {
         let model = await make(.notWritten)
         let o = model.roomOverview!
-        await o.load("acme-shop")
+        await o.open("acme-shop")
         #expect(o.writingSince == nil)
         await o.write("acme-shop")
         #expect(o.current?.stage == nil)

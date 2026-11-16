@@ -233,7 +233,7 @@ public final class BrainDemo {
             await model.candidates?.loadPolicy("acme-shop")
             model.candidates?.paneMode = .overview
             let o = model.roomOverview!
-            await o.load("acme-shop")
+            await o.open("acme-shop")
             if s == "room-overview-edit" { o.startEdit() }
             if s == "room-overview-sources" {
                 o.openRule = "Workflow/" + (o.current?.overview?.rules.workflow[0].id ?? "")

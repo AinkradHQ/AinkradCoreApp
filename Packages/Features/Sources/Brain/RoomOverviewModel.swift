@@ -50,12 +50,24 @@ public final class RoomOverviewModel {
         writingSince = nil
     }
 
-    public func load(_ room: String, quiet: Bool = false) async {
-        guard let service else { return }
+    /// The tab calls this for the room on screen, and nothing else does: `roomID` is the one room this model shows, and
+    /// every other call (a late write, a poll, an instructions change for a room left behind) may send its request but
+    /// drops the answer.
+    public func show(_ room: String) {
         if roomID != room {
             reset()
             roomID = room
         }
+    }
+
+    /// Shows `room` and reads its overview.
+    public func open(_ room: String) async {
+        show(room)
+        await load(room)
+    }
+
+    public func load(_ room: String, quiet: Bool = false) async {
+        guard let service, roomID == room else { return }
         if !quiet, current == nil { phase = .loading }
         do {
             let o = try await service.roomOverview(room: room)
@@ -72,9 +84,9 @@ public final class RoomOverviewModel {
 
     /// Asks the Core to write (or rewrite) and shows the writing state at once; the Core's answer follows by polling.
     public func write(_ room: String) async {
-        guard let service, !busy else { return }
+        guard let service, !busy, roomID == room else { return }
         busy = true
-        defer { busy = false }
+        defer { if roomID == room { busy = false } }
         notice = nil
         openRule = nil
         editing = false
@@ -85,7 +97,7 @@ public final class RoomOverviewModel {
         do {
             try await service.writeOverview(room: room)
         } catch is CancellationError {
-        } catch { notice = BrainWords.failure(error) }
+        } catch { if roomID == room { notice = BrainWords.failure(error) } }
         await load(room, quiet: true)
     }
 
@@ -124,16 +136,16 @@ public final class RoomOverviewModel {
     }
 
     private func setInstructions(_ room: String, text: String?, approved: Bool) async -> Bool {
-        guard let service, !busy else { return false }
+        guard let service, !busy, roomID == room else { return false }
         busy = true
-        defer { busy = false }
+        defer { if roomID == room { busy = false } }
         notice = nil
         do {
             try await service.setInstructions(room: room, text: text, approved: approved)
         } catch is CancellationError {
             return false
         } catch {
-            notice = BrainWords.failure(error)
+            if roomID == room { notice = BrainWords.failure(error) }
             return false
         }
         await load(room, quiet: true)
