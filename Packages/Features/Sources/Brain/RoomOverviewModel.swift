@@ -19,6 +19,9 @@ public final class RoomOverviewModel {
     public internal(set) var notice: String?
     public internal(set) var editing = false
     public var draft = ""
+    /// When this app first saw the write (the press of Write, or the first read of a write begun elsewhere): the clock of
+    /// an older Core that sends no `stage_since`.
+    public internal(set) var writingSince: Date?
     /// The rule whose "from N items" popover is open.
     public var openRule: String?
     @ObservationIgnored var pollEvery: Duration = .seconds(2)
@@ -44,6 +47,7 @@ public final class RoomOverviewModel {
         editing = false
         draft = ""
         openRule = nil
+        writingSince = nil
     }
 
     public func load(_ room: String, quiet: Bool = false) async {
@@ -58,6 +62,7 @@ public final class RoomOverviewModel {
             guard roomID == room else { return }
             current = o
             phase = .ready
+            writingSince = o.state == .writing ? writingSince ?? Date() : nil
         } catch is CancellationError {
         } catch {
             guard roomID == room else { return }
@@ -74,6 +79,8 @@ public final class RoomOverviewModel {
         openRule = nil
         editing = false
         current?.state = .writing
+        current?.stage = nil
+        writingSince = Date()
         current?.progress = nil
         do {
             try await service.writeOverview(room: room)

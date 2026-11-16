@@ -37,12 +37,19 @@ struct RoomOverviewTab: View {
                     text: "Cloud writing is off for this room.",
                     primary: CoreAction("Open Room Settings") { model.candidates.paneMode = .settings })
             case .writing:
-                StatusLine(cur: cur, busy: true) {}
+                if let steps = OverviewSteps(cur.stage, picked: cur.picked) {
+                    OverviewStepList(
+                        steps: steps, picked: cur.picked, since: SyncWords.date(cur.stageSince) ?? o.writingSince)
+                } else {
+                    StatusLine(cur: cur, busy: true, since: o.writingSince) {}
+                }
+                // The shape of what is coming, quieter than the steps above it.
                 Columns {
                     Placeholder(widths: Self.leftLines)
                 } right: {
                     Placeholder(widths: Self.rightLines)
                 }
+                .opacity(0.45)
             case .failed:
                 CoreNotice(
                     symbol: "exclamationmark.triangle", title: "Writing the overview failed.", text: cur.detail,
@@ -100,6 +107,7 @@ struct RoomOverviewTab: View {
 private struct StatusLine: View {
     let cur: RoomOverview
     let busy: Bool
+    var since: Date?
     let rewrite: () -> Void
 
     var body: some View {
@@ -115,6 +123,11 @@ private struct StatusLine: View {
                 } else {
                     CoreWorkingBar(width: Space.s8 * 5)
                     if !cur.detail.isEmpty { Text(cur.detail) }
+                    if let since {
+                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                            Text(OverviewSteps.clock(ctx.date.timeIntervalSince(since))).monospacedDigit()
+                        }
+                    }
                 }
             } else {
                 Text(line)

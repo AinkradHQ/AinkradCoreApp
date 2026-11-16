@@ -181,6 +181,55 @@ struct RoomOverviewTests {
             #expect(f.sentence.contains("too long"))
         }
     }
+
+    // MARK: writing stages (API minor 75)
+
+    @Test func decodesTheStageFieldsAndWithoutThem() throws {
+        let d = JSONDecoder()
+        let with = try d.decode(
+            RoomOverview.self,
+            from: Data(
+                #"{"state":"writing","stage":"waiting_runner","stage_since":"2026-11-16T08:00:00Z","picked":14}"#.utf8))
+        #expect(with.stage == .waitingRunner && with.picked == 14 && SyncWords.date(with.stageSince) != nil)
+        let old = try d.decode(RoomOverview.self, from: Data(#"{"state":"writing"}"#.utf8))
+        #expect(old.stage == nil && old.stageSince == nil && old.picked == nil)
+        let odd = try d.decode(RoomOverview.self, from: Data(#"{"state":"writing","stage":"warming_up"}"#.utf8))
+        #expect(odd.stage == .other("warming_up"))
+        #expect(OverviewSteps(odd.stage)?.write == .active && OverviewSteps(odd.stage)?.pick == .done)
+    }
+
+    @Test func eachStageMapsToItsSteps() {
+        func m(_ s: OverviewStage?, _ n: Int? = nil) -> [OverviewSteps.Mark]? {
+            OverviewSteps(s, picked: n).map { [$0.pick, $0.write, $0.check] }
+        }
+        #expect(m(nil) == nil)
+        #expect(m(.queued) == [.active, .pending, .pending])
+        #expect(m(.waitingRunner) == [.active, .pending, .pending])
+        #expect(m(.waitingRunner, 9) == [.done, .active, .pending])
+        #expect(m(.picking) == [.active, .pending, .pending])
+        #expect(m(.starting) == [.done, .active, .pending] && m(.writing) == m(.starting))
+        #expect(m(.reading) == [.done, .done, .active])
+        #expect(m(.retrying) == [.done, .active, .pending])
+        #expect(OverviewSteps(.queued)?.wait == "Waiting for its turn (one room at a time)")
+        #expect(OverviewSteps(.waitingRunner)?.wait == "Waiting for a runner with a sandbox to come online")
+        #expect(OverviewSteps(.retrying)?.wait == "The first answer could not be used. Trying once more.")
+        #expect(OverviewSteps(.writing)?.wait == nil)
+        #expect(OverviewSteps(.queued)?.waiting == true && OverviewSteps(.retrying)?.waiting == false)
+    }
+
+    @Test func theClockReadsMinutesAndSeconds() {
+        #expect(OverviewSteps.clock(0) == "0:00" && OverviewSteps.clock(65.9) == "1:05")
+        #expect(OverviewSteps.clock(600) == "10:00" && OverviewSteps.clock(-5) == "0:00")
+    }
+
+    @Test func anOlderCoreGetsAClockFromThePressOfWrite() async {
+        let model = await make(.notWritten)
+        let o = model.roomOverview!
+        await o.load("acme-shop")
+        #expect(o.writingSince == nil)
+        await o.write("acme-shop")
+        #expect(o.current?.stage == nil)
+    }
 }
 
 private final class Box: @unchecked Sendable { var body: [String: Any]? }

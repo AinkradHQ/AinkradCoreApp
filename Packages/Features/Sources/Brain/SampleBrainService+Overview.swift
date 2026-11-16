@@ -8,7 +8,9 @@ extension SampleBrainService: RoomOverviewService {
     public func roomOverview(room: String) async throws -> RoomOverview {
         guard let state = scenario.overview else { throw BrainFailure("No overview here.", code: "not_served") }
         if roomOverviews[room] == nil {
-            roomOverviews[room] = SampleOverview.make(state, approved: scenario.overviewApproved)
+            roomOverviews[room] = SampleOverview.make(
+                state, approved: scenario.overviewApproved, stage: scenario.overviewStage,
+                stageSeconds: scenario.overviewStageSeconds)
         }
         return roomOverviews[room]!
     }
@@ -39,8 +41,8 @@ extension SampleBrainService: RoomOverviewService {
 }
 
 enum SampleOverview {
-    static func iso(_ minutes: Int) -> String {
-        ISO8601DateFormatter().string(from: Date().addingTimeInterval(TimeInterval(minutes * 60)))
+    static func iso(_ minutes: Int, seconds: Int = 0) -> String {
+        ISO8601DateFormatter().string(from: Date().addingTimeInterval(TimeInterval(minutes * 60 + seconds)))
     }
 
     /// Made-up items the rules were read from.
@@ -57,7 +59,9 @@ enum SampleOverview {
 
     static func rule(_ text: String, _ n: Int) -> OverviewRule { OverviewRule(text, sources: (0..<n).map { "s\($0)" }) }
 
-    static func make(_ state: OverviewState, approved: Bool) -> RoomOverview {
+    static func make(
+        _ state: OverviewState, approved: Bool, stage: OverviewStage? = nil, stageSeconds: Int = 0
+    ) -> RoomOverview {
         switch state {
         case .written, .writing:
             RoomOverview(
@@ -65,7 +69,10 @@ enum SampleOverview {
                 model: "claude:personal",
                 progress: state == .writing ? OverviewProgress(done: 12, total: 35) : nil, overview: body,
                 instructions: body.instructions, instructionsApprovedAt: approved ? iso(-60) : nil,
-                sourceTitles: titles)
+                sourceTitles: titles, stage: state == .writing ? stage : nil,
+                stageSince: state == .writing && stage != nil
+                    ? iso(-stageSeconds / 60, seconds: -stageSeconds % 60) : nil,
+                picked: state == .writing && stage != nil && stage != .queued && stage != .picking ? 14 : nil)
         default:
             RoomOverview(
                 state: state,
