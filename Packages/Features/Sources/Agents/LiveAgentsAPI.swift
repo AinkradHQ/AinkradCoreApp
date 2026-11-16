@@ -3,6 +3,7 @@ import CoreKit
 import CoreUI
 import Foundation
 import OpenAPIRuntime
+import UniformTypeIdentifiers
 
 /// The generated client's agent routes, mapped to this module's types. Errors come out as `CoreError`.
 public struct LiveAgentsAPI: AgentsAPI {
@@ -124,6 +125,50 @@ public struct LiveAgentsAPI: AgentsAPI {
             }
         }
     }
+
+    public func send(_ id: String, text: String, files: [URL]) async throws -> AgentSessionInfo {
+        guard !files.isEmpty, await connection.serverSupports(minor: 81) else {
+            return try await send(id, text: AgentsModel.outgoing(words: text, files: files))
+        }
+        var ids: [String] = []
+        for url in files { ids.append(try await upload(id, url)) }
+        return try await run {
+            switch try await client.sendAgentMessage(
+                path: .init(id: id), body: .json(.init(attachments: ids, text: text)))
+            {
+            case .ok(let o): return Self.session(try o.body.json)
+            case .badRequest(let r): throw Self.fail(r)
+            case .notFound(let r): throw Self.fail(r)
+            case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    /// One file to the Core, kept with the session until it is sent; returns its `at_…`.
+    private func upload(_ id: String, _ url: URL) async throws -> String {
+        let data = try Data(contentsOf: url)
+        guard data.count <= Self.attachmentLimit else {
+            throw CoreError.http(
+                status: 413, code: "attachment_too_large",
+                message: "\(url.lastPathComponent) is over 10 MB, the most one attached file can be.")
+        }
+        let type = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+        return try await run {
+            switch try await client.addAgentAttachment(
+                path: .init(id: id),
+                body: .json(.init(contentType: type, data: data.base64EncodedString(), name: url.lastPathComponent)))
+            {
+            case .ok(let o): return try o.body.json.id
+            case .badRequest(let r): throw Self.fail(r)
+            case .notFound(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+    static let attachmentLimit = 10 << 20
 
     public func send(_ id: String, text: String) async throws -> AgentSessionInfo {
         try await run {

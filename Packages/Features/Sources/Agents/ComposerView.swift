@@ -320,24 +320,10 @@ struct ComposerView: View {
                 }
             }
             .scrollIndicators(.never)
-            // ponytail: "this Mac" is guessed from the runner's name; the Core does not say which runner is local yet.
-            if !Self.onThisMac(model.runnerName(session.runner)) {
-                Label(
-                    "Files are read from this Mac; \(model.runnerName(session.runner)) can't open them yet.",
-                    systemImage: "exclamationmark.triangle"
-                )
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
-            }
         }
     }
 
     private func remove(_ url: URL) { model.attachments[session.id] = files.filter { $0 != url } }
-
-    static func onThisMac(_ runner: String) -> Bool {
-        let here = (Host.current().localizedName ?? "").lowercased()
-        let r = runner.lowercased()
-        return r.contains("this mac") || (!here.isEmpty && (r == here || r.hasPrefix(here) || here.hasPrefix(r)))
-    }
 }
 
 /// One attached file: an image's thumbnail or a document glyph, its name, and ✕ to remove it.

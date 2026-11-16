@@ -29,6 +29,17 @@ struct QueueTests {
         #expect(api.calls.filter { $0 == "send" }.count == sends)
     }
 
+    @Test func attachedFilesQueueWithTheirMessageAndComeBackToEdit() async {
+        let (m, _) = await make()
+        let f = URL(fileURLWithPath: "/tmp/shot.png")
+        m.attachments[running] = [f]
+        m.enqueue(running)  // files alone are a message
+        #expect(m.queued[running]?.first?.files == [f] && m.queued[running]?.first?.text == "")
+        #expect(m.attachments[running] == nil)
+        m.editAllQueued(running)
+        #expect(m.attachments[running] == [f] && m.queued[running]?.isEmpty == true)
+    }
+
     @Test func editTakesItBackToTheFieldBeforeWhatWasTyped() async {
         let (m, _) = await make()
         m.drafts[running] = "first"
