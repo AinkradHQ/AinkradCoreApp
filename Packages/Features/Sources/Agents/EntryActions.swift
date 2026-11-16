@@ -97,7 +97,7 @@ private struct MessageActions: ViewModifier {
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .animation(reduce ? nil : Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.hover), value: hovering)
         .contextMenu {
             ForEach(shown) { act in Button(act.id, action: act.run) }
         }

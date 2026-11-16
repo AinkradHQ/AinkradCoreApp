@@ -69,7 +69,7 @@ struct ReviewPane: View {
             }
             .foregroundStyle(palette.text)
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .coreWell()
+            .sessionSurface(radius: Radius.cardMac)
             .padding(.vertical, Space.s2)
         }
         .scrollIndicators(.never)

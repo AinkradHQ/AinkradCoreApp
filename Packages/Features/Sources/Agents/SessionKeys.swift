@@ -210,7 +210,7 @@ private struct KeyHint: ViewModifier {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(GlassInk.adaptive(Color(white: 0.16), day: Color(white: 0.96)), in: coreShape(Radius.chip))
                 .opacity(on ? 1 : 0)
-                .animation(reduce ? nil : Motion.out(Motion.hover), value: on)
+                .animation(Motion.out(Motion.hover), value: on)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }

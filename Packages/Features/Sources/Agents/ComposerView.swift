@@ -82,6 +82,7 @@ struct ComposerView: View {
     private var composer: some View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
+            QueuedStack(model: model, session: session)
             if !commands.isEmpty { palette(commands) }
             // What went wrong with the last send (or resume, wake...), right where you typed it.
             if let n = model.notices[session.id] {
@@ -117,7 +118,9 @@ struct ComposerView: View {
             }
             .padding(Space.s3)
             // A plain field, no outline (Ahmed, 2026-11-15); a slightly stronger well while writing.
-            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
+            .background(on ? SessionInk.fieldOn : SessionInk.field, in: coreShape(Radius.cardMac))
+            .shadow(color: SessionInk.lift, radius: 6, y: 2)
+            .animation(Motion.out(Motion.hover), value: on)
             .contentShape(coreShape(Radius.cardMac))
             .onTapGesture { if enabled { focused.wrappedValue = true } }
             // Files dropped anywhere on the composer attach, like a chat app.
@@ -179,7 +182,7 @@ struct ComposerView: View {
             hasText: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || !files.isEmpty, canSend: model.canSend(session.id))
         return Button {
-            if act == .stop { model.stopTurn(session.id) } else { Task { await model.send(session.id) } }
+            if act == .stop { model.stopTurn(session.id) } else { submit() }
         } label: {
             Image(systemName: act == .stop ? "stop.fill" : "arrow.up")
                 .contentTransition(.symbolEffect(.replace))
@@ -233,7 +236,7 @@ struct ComposerView: View {
                 switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
                 case .newline: return false
                 case .fill(let name): draft.wrappedValue = name + " "
-                case .send: Task { await model.send(session.id) }
+                case .send: submit()
                 }
                 return true
             },
@@ -268,6 +271,11 @@ struct ComposerView: View {
                 return true
             },
             command: { e in SessionShortcut.match(e).map(command) ?? false })
+    }
+
+    /// Return or the button: while a turn runs the message waits in the queue; otherwise it goes now.
+    private func submit() {
+        if model.canStopTurn(session) { model.enqueue(session.id) } else { Task { await model.send(session.id) } }
     }
 
     /// The 📎 button: pick files to attach.
@@ -366,7 +374,7 @@ enum ComposerAction: Equatable {
     var help: String {
         switch self {
         case .stop: "Stop the current turn (Esc or ⌘.). The session stays open."
-        case .queue: "Send it after this turn (Return). Esc stops the turn."
+        case .queue: "Queue it: it goes out when this turn ends (Return). Esc stops the turn."
         case .send: "Send the message (Return)"
         case .idle: "Type a message to send"
         }

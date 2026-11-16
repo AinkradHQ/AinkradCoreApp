@@ -9,6 +9,7 @@ struct SessionView: View {
     @Bindable var model: AgentsModel
     let sessionID: String
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @FocusState private var paneFocus: Bool
     @FocusState private var composing: Bool
     @State private var jump = 0
@@ -43,7 +44,7 @@ struct SessionView: View {
                     if side {
                         SessionSwitcher(model: model, current: sessionID).frame(width: Self.sidebarWidth)
                             .padding(.leading, Space.s3).padding(.vertical, Space.s2)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .transition(reduce ? .opacity : .move(edge: .leading).combined(with: .opacity))
                     }
                     conversation(s, wide: wide, compact: rest < Self.compact, room: geo.size.width >= Self.sidebarRoom)
                     if wide {
@@ -76,7 +77,7 @@ struct SessionView: View {
                     MainActor.assumeIsolated {
                         ComposerFocus.clicks += 1
                         guard shell.activePane == pane, let s = model.sessions.session(id), model.canWrite(s),
-                            let window = e.window ?? NSApp.keyWindow ?? NSApp.mainWindow
+                            let window = e.window ?? ui.field?.window
                         else { return }
                         ComposerFocus.handled += 1
                         // After SwiftUI has settled its own focus for the click.
@@ -246,8 +247,9 @@ struct SessionView: View {
             model.shell.showToast("Copied the last answer", actionTitle: "")
         case .expandSteps, .collapseSteps:
             ui.steps = (ui.steps.gen + 1, key == .expandSteps)
-        case .details: withAnimation(Motion.out(Motion.ui)) { showDetails.toggle() }
-        case .sidebar: withAnimation(Motion.out(Motion.ui)) { showSidebar.toggle() }  // a narrow pane keeps it hidden
+        case .details: withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showDetails.toggle() }
+        // A narrow pane keeps the sidebar hidden whatever this says.
+        case .sidebar: withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showSidebar.toggle() }
         case .shortcuts: ui.shortcuts.toggle()
         }
         return true

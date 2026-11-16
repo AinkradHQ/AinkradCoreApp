@@ -26,7 +26,7 @@ struct SessionHero: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 if sidebarRoom {
                     CoreIconButton(symbol: "sidebar.left", label: "Your other sessions", selected: showSidebar) {
-                        withAnimation(reduce ? nil : Motion.out(Motion.ui)) { showSidebar.toggle() }
+                        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showSidebar.toggle() }
                     }
                     .help(showSidebar ? "Hide your other sessions (⌃⌘S)" : "Show your other sessions (⌃⌘S)")
                     .keyHint(.sidebar)
@@ -105,7 +105,7 @@ struct SessionHero: View {
     }
 
     private func toggleDetails() {
-        withAnimation(reduce ? nil : Motion.out(Motion.ui)) { showDetails.toggle() }
+        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { showDetails.toggle() }
     }
 
     private var fullDetailsButton: some View {

@@ -27,7 +27,7 @@ struct SessionSidePanel: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 SessionActions(model: model, session: session, find: find, stacked: true, facts: facts)
                     .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                    .coreWell()
+                    .sessionSurface(radius: Radius.cardMac)
                 section(
                     "Files touched", symbol: "doc", count: files.count,
                     review: files.isEmpty ? nil : { ui?.reviewing = true }
@@ -135,6 +135,6 @@ struct SessionSidePanel: View {
             c()
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
+        .sessionSurface(radius: Radius.cardMac)
     }
 }

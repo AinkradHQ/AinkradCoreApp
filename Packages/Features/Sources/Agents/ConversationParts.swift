@@ -77,7 +77,7 @@ struct EditCard: View {
         }
         .foregroundStyle(palette.text)
         .clipShape(coreShape(Radius.control))
-        .coreWell(radius: Radius.control)
+        .sessionSurface()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Edited \(path), \(add) added, \(del) removed")
     }
@@ -108,7 +108,7 @@ struct TodoCard: View {
             }
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
+        .sessionSurface(radius: Radius.cardMac)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tasks, \(done) of \(items.count) done")
     }

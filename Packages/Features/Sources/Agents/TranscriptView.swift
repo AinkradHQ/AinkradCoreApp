@@ -42,7 +42,7 @@ struct TranscriptView: View {
                                         .padding(.leading, inRun ? Space.s4 : 0)
                                 case .run(let es, let open):
                                     ToolRunHeader(entries: es, open: open) {
-                                        withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+                                        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
                                             runOpen[es[0].seq] = !open
                                         }
                                     }
@@ -94,7 +94,7 @@ struct TranscriptView: View {
                 .onChange(of: jump) { _, _ in toEnd(proxy) }
                 .onChange(of: ui?.steps.gen) { _, _ in
                     guard let ui else { return }
-                    withAnimation(reduce ? nil : Motion.out(Motion.ui)) {
+                    withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
                         runOpen = [:]
                         runsAll = ui.steps.open
                     }
@@ -383,7 +383,7 @@ struct ToolCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(reduce ? nil : Motion.out(Motion.ui)) { expanded.toggle() }
+                withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { expanded.toggle() }
             } label: {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
@@ -420,7 +420,7 @@ struct ToolCard: View {
         .foregroundStyle(palette.text)
         .frame(maxWidth: .infinity)
         .clipShape(coreShape(Radius.control))
-        .coreWell(radius: Radius.control)
+        .sessionSurface()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
     }

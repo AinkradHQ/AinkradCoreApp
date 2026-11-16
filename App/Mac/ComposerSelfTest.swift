@@ -208,7 +208,8 @@ enum ComposerSelfTest {
         // A click on empty space in the conversation hands the cursor back to the message field. The click goes to this
         // process only.
         window.makeFirstResponder(nil)
-        let local = NSPoint(x: 60, y: window.frame.height / 2)
+        // Empty space between the reading column and the side panel (the sidebar fills the left edge).
+        let local = NSPoint(x: window.frame.width * 0.75, y: window.frame.height / 2)
         let screen = window.convertPoint(toScreen: local)
         let top = (NSScreen.screens.first?.frame.height ?? 0) - screen.y
         for type in [CGEventType.leftMouseDown, .leftMouseUp] {
@@ -282,6 +283,14 @@ enum ShowcaseShots {
         try? await Task.sleep(for: .seconds(1))
         _ = SnapshotCapture.png(window, to: "\(dir)/typed-\(theme).png")
         a.drafts["as_01JC4X7Q3MZ8N5V2K9R001"] = ""
+        // Two messages typed during the turn wait above the field.
+        for t in ["Also add a test for the 429 path.", "And mention the limit in the PR description."] {
+            a.drafts["as_01JC4X7Q3MZ8N5V2K9R001"] = t
+            a.enqueue("as_01JC4X7Q3MZ8N5V2K9R001")
+        }
+        try? await Task.sleep(for: .seconds(1))
+        _ = SnapshotCapture.png(window, to: "\(dir)/queued-\(theme).png")
+        a.queued["as_01JC4X7Q3MZ8N5V2K9R001"] = []
         // ⇧⌘R from the message field: the Review pane with its diffs (the status report session has files touched).
         app.shell.closeAllPanes()
         a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")

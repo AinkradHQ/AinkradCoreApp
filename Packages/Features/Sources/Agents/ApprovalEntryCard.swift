@@ -67,7 +67,7 @@ struct ApprovalEntryCard: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Needs-you is shown by the amber tile and the badge, not by a tinted card.
-        .coreWell()
+        .sessionSurface(radius: Radius.cardMac)
         .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 

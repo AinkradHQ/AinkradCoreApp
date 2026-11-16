@@ -87,8 +87,12 @@ extension AgentsModel {
 
     /// Sends `text` to the session as you, leaving your draft as it is: the actions that speak to the agent for you (revert
     /// a file, a review comment, retry, approve a plan). Same Touch ID step-up and errors as a typed message.
-    public func say(_ id: String, _ text: String) async {
-        guard let api, let s = sessions.session(id), canReply(s), !text.isEmpty, !sending.contains(id) else { return }
+    /// True when the tool took it.
+    @discardableResult
+    public func say(_ id: String, _ text: String) async -> Bool {
+        guard let api, let s = sessions.session(id), canReply(s), !text.isEmpty, !sending.contains(id) else {
+            return false
+        }
         sending.insert(id)
         note(id, nil)
         defer { sending.remove(id) }
@@ -98,8 +102,10 @@ extension AgentsModel {
             }
             sessions.upsert(s)
             if let t = transcripts[id] { await t.refresh(api, knownLast: s.lastSeq) }
+            return true
         } catch {
             note(id, Self.notice(error, doing: "Sending"))
+            return false
         }
     }
 

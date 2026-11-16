@@ -245,6 +245,7 @@ extension AgentsModel {
 
     /// After anything changed: panes' heads, launcher entries, the bell, macOS notifications for new approvals.
     func syncDerived() {
+        flushQueues()
         refreshHeads()
         syncLauncher()
         let now = Date()

@@ -60,7 +60,7 @@ struct SubAgentCard: View {
             }
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
+        .sessionSurface(radius: Radius.cardMac)
         .agentCopyMenu(result ?? prompt)
     }
 }
@@ -101,7 +101,7 @@ struct PlanCard: View {
             }
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
+        .sessionSurface(radius: Radius.cardMac)
         .agentCopyMenu(text)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Plan")

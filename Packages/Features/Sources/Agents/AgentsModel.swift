@@ -60,6 +60,8 @@ public final class AgentsModel {
     public var filter: AgentFilter = .all
     /// What is typed in each session's composer.
     public var drafts: [String: String] = [:]
+    /// Messages typed during a turn, held here and sent when the turn ends (`AgentsModel+Queue`).
+    public var queued: [String: [QueuedMessage]] = [:]
     /// Files attached to each session's message, sent as `@path` after its words (pasted, dropped or picked).
     public var attachments: [String: [URL]] = [:]
     /// The quick popup's prompt, carried into the advanced sheet.
