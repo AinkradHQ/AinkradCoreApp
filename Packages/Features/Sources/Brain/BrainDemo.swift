@@ -28,6 +28,10 @@ public final class BrainDemo {
         "room-overview", "room-overview-sources", "room-overview-approved", "room-overview-edit",
         "room-overview-writing", "room-overview-not-written", "room-overview-failed", "room-overview-needs-account",
         "room-overview-cloud-off",
+        // The writing stages (API minor 75), each with the clock of its own.
+        "room-overview-stage-queued", "room-overview-stage-waiting-runner", "room-overview-stage-picking",
+        "room-overview-stage-writing", "room-overview-stage-reading", "room-overview-stage-retrying",
+        "room-overview-stage-none",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -99,12 +103,27 @@ public final class BrainDemo {
             s.overview =
                 switch scene {
                 case "room-overview-writing": .writing
+                case let n where n.hasPrefix("room-overview-stage-"): .writing
                 case "room-overview-not-written": .notWritten
                 case "room-overview-failed": .failed
                 case "room-overview-needs-account": .needsAccount
                 case "room-overview-cloud-off": .cloudOff
                 default: .written
                 }
+            if scene.hasPrefix("room-overview-stage-") {
+                let (stage, seconds): (OverviewStage?, Int) =
+                    switch scene.dropFirst("room-overview-stage-".count) {
+                    case "queued": (.queued, 0)
+                    case "waiting-runner": (.waitingRunner, 0)
+                    case "picking": (.picking, 6)
+                    case "writing": (.writing, 107)
+                    case "reading": (.reading, 9)
+                    case "retrying": (.retrying, 24)
+                    default: (nil, 0)
+                    }
+                s.overviewStage = stage
+                s.overviewStageSeconds = seconds
+            }
             s.overviewApproved = scene == "room-overview-approved" || scene == "room-overview-sources"
         }
         if scene.hasPrefix("m3-") {
@@ -214,7 +233,7 @@ public final class BrainDemo {
             await model.candidates?.loadPolicy("acme-shop")
             model.candidates?.paneMode = .overview
             let o = model.roomOverview!
-            await o.load("acme-shop")
+            await o.open("acme-shop")
             if s == "room-overview-edit" { o.startEdit() }
             if s == "room-overview-sources" {
                 o.openRule = "Workflow/" + (o.current?.overview?.rules.workflow[0].id ?? "")

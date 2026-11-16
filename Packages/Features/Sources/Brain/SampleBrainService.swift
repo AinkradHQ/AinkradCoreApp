@@ -37,6 +37,9 @@ public actor SampleBrainService: BrainService {
         public var overview: OverviewState?
         /// The sample overview's instructions are approved already.
         public var overviewApproved = false
+        /// The stage a writing overview reports (nil: an older Core that sends none), and how long ago it began.
+        public var overviewStage: OverviewStage?
+        public var overviewStageSeconds = 0
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,

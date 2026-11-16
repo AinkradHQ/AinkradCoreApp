@@ -12,6 +12,26 @@ public enum OverviewState: String, Codable, Sendable, Equatable {
     case cloudOff = "cloud_off"
 }
 
+/// Which step of a write the Core is in (`stage`, API minor 75). A value this app does not know decodes as `.other`
+/// and reads as plain writing; an older Core sends none.
+public enum OverviewStage: Codable, Sendable, Equatable {
+    case queued, waitingRunner, picking, starting, writing, reading, retrying
+    case other(String)
+
+    static let names: [String: OverviewStage] = [
+        "queued": .queued, "waiting_runner": .waitingRunner, "picking": .picking, "starting": .starting,
+        "writing": .writing, "reading": .reading, "retrying": .retrying,
+    ]
+    public init(from decoder: any Decoder) throws {
+        let s = try decoder.singleValueContainer().decode(String.self)
+        self = Self.names[s] ?? .other(s)
+    }
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(Self.names.first { $0.value == self }?.key ?? { if case .other(let s) = self { s } else { "" } }())
+    }
+}
+
 /// How far the current write is: `total` rooms in it (one for a single room), how many are finished or failed.
 public struct OverviewProgress: Codable, Sendable, Equatable {
     public var total: Int
@@ -137,6 +157,10 @@ public struct RoomOverview: Codable, Sendable, Equatable {
     public var model: String?
     public var progress: OverviewProgress?
     public var overview: OverviewBody?
+    /// Where the write is, when it began (RFC 3339) and how many items were chosen; nil from an older Core.
+    public var stage: OverviewStage?
+    public var stageSince: String?
+    public var picked: Int?
     /// The editable instructions, the ones AI sessions read once approved.
     public var instructions: String?
     public var instructionsApprovedAt: String?
@@ -146,8 +170,12 @@ public struct RoomOverview: Codable, Sendable, Equatable {
     public init(
         state: OverviewState, detail: String = "", writtenAt: String? = nil, model: String? = nil,
         progress: OverviewProgress? = nil, overview: OverviewBody? = nil, instructions: String? = nil,
-        instructionsApprovedAt: String? = nil, sourceTitles: [String: String] = [:]
+        instructionsApprovedAt: String? = nil, sourceTitles: [String: String] = [:],
+        stage: OverviewStage? = nil, stageSince: String? = nil, picked: Int? = nil
     ) {
+        self.stage = stage
+        self.stageSince = stageSince
+        self.picked = picked
         self.state = state
         self.detail = detail
         self.writtenAt = writtenAt
@@ -167,13 +195,17 @@ public struct RoomOverview: Codable, Sendable, Equatable {
         model = try c.decodeIfPresent(String.self, forKey: .model)
         progress = try c.decodeIfPresent(OverviewProgress.self, forKey: .progress)
         overview = try c.decodeIfPresent(OverviewBody.self, forKey: .overview)
+        stage = try c.decodeIfPresent(OverviewStage.self, forKey: .stage)
+        stageSince = try c.decodeIfPresent(String.self, forKey: .stageSince)
+        picked = try c.decodeIfPresent(Int.self, forKey: .picked)
         instructions = try c.decodeIfPresent(String.self, forKey: .instructions)
         instructionsApprovedAt = try c.decodeIfPresent(String.self, forKey: .instructionsApprovedAt)
         sourceTitles = try c.decodeIfPresent([String: String].self, forKey: .sourceTitles) ?? [:]
     }
 
     enum CodingKeys: String, CodingKey {
-        case state, detail, model, progress, overview, instructions
+        case state, detail, model, progress, overview, instructions, stage, picked
+        case stageSince = "stage_since"
         case writtenAt = "written_at"
         case instructionsApprovedAt = "instructions_approved_at"
         case sourceTitles = "source_titles"

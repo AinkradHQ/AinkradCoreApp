@@ -256,7 +256,10 @@ private struct RoomSearch: View {
                 }
             }
         }
-        .task(id: room.id) { latest = await sync.latest(room: room.id) }
+        .task(id: room.id) {
+            let l = await sync.latest(room: room.id)
+            if !Task.isCancelled { latest = l }
+        }
         .task(id: query) {
             let q = query.trimmingCharacters(in: .whitespaces)
             guard !q.isEmpty else {

@@ -8,6 +8,8 @@ struct RoomOverviewTab: View {
     let model: BrainModel
     let room: RoomSummary
     private var o: RoomOverviewModel { model.roomOverview }
+    /// What the model holds, only while it is this room's: never another room's overview.
+    private var shown: RoomOverview? { o.roomID == room.id ? o.current : nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
@@ -16,14 +18,16 @@ struct RoomOverviewTab: View {
             }
             content
         }
-        .task(id: "\(room.id)#\(o.epoch)") { await o.load(room.id) }
-        .task(id: o.current?.state) { if o.current?.state == .writing { await o.watch(room.id) } }
+        .task(id: "\(room.id)#\(o.epoch)") { await o.open(room.id) }
+        .task(id: "\(room.id)#\(shown.map { "\($0.state)" } ?? "-")") {
+            if shown?.state == .writing { await o.watch(room.id) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("room-overview")
     }
 
     @ViewBuilder private var content: some View {
-        if let cur = o.current {
+        if let cur = shown {
             switch cur.state {
             case .notWritten: notWritten
             case .needsAccount:
@@ -37,12 +41,19 @@ struct RoomOverviewTab: View {
                     text: "Cloud writing is off for this room.",
                     primary: CoreAction("Open Room Settings") { model.candidates.paneMode = .settings })
             case .writing:
-                StatusLine(cur: cur, busy: true) {}
+                if let steps = OverviewSteps(cur.stage, picked: cur.picked) {
+                    OverviewStepList(
+                        steps: steps, picked: cur.picked, since: SyncWords.date(cur.stageSince) ?? o.writingSince)
+                } else {
+                    StatusLine(cur: cur, busy: true, since: o.writingSince) {}
+                }
+                // The shape of what is coming, quieter than the steps above it.
                 Columns {
                     Placeholder(widths: Self.leftLines)
                 } right: {
                     Placeholder(widths: Self.rightLines)
                 }
+                .opacity(0.45)
             case .failed:
                 CoreNotice(
                     symbol: "exclamationmark.triangle", title: "Writing the overview failed.", text: cur.detail,
@@ -55,7 +66,7 @@ struct RoomOverviewTab: View {
             case .written:
                 if let body = cur.overview { written(cur, body) } else { notWritten }
             }
-        } else if case .failed(let why) = o.phase {
+        } else if o.roomID == room.id, case .failed(let why) = o.phase {
             BrainStateCard(
                 symbol: "exclamationmark.triangle", title: "Unable to load the overview", text: why,
                 primary: CoreAction("Try Again") { Task { await o.load(room.id) } })
@@ -100,6 +111,7 @@ struct RoomOverviewTab: View {
 private struct StatusLine: View {
     let cur: RoomOverview
     let busy: Bool
+    var since: Date?
     let rewrite: () -> Void
 
     var body: some View {
@@ -115,6 +127,11 @@ private struct StatusLine: View {
                 } else {
                     CoreWorkingBar(width: Space.s8 * 5)
                     if !cur.detail.isEmpty { Text(cur.detail) }
+                    if let since {
+                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                            Text(OverviewSteps.clock(ctx.date.timeIntervalSince(since))).monospacedDigit()
+                        }
+                    }
                 }
             } else {
                 Text(line)

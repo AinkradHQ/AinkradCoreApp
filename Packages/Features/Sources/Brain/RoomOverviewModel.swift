@@ -19,6 +19,9 @@ public final class RoomOverviewModel {
     public internal(set) var notice: String?
     public internal(set) var editing = false
     public var draft = ""
+    /// When this app first saw the write (the press of Write, or the first read of a write begun elsewhere): the clock of
+    /// an older Core that sends no `stage_since`.
+    public internal(set) var writingSince: Date?
     /// The rule whose "from N items" popover is open.
     public var openRule: String?
     @ObservationIgnored var pollEvery: Duration = .seconds(2)
@@ -44,20 +47,34 @@ public final class RoomOverviewModel {
         editing = false
         draft = ""
         openRule = nil
+        writingSince = nil
     }
 
-    public func load(_ room: String, quiet: Bool = false) async {
-        guard let service else { return }
+    /// The tab calls this for the room on screen, and nothing else does: `roomID` is the one room this model shows, and
+    /// every other call (a late write, a poll, an instructions change for a room left behind) may send its request but
+    /// drops the answer.
+    public func show(_ room: String) {
         if roomID != room {
             reset()
             roomID = room
         }
+    }
+
+    /// Shows `room` and reads its overview.
+    public func open(_ room: String) async {
+        show(room)
+        await load(room)
+    }
+
+    public func load(_ room: String, quiet: Bool = false) async {
+        guard let service, roomID == room else { return }
         if !quiet, current == nil { phase = .loading }
         do {
             let o = try await service.roomOverview(room: room)
             guard roomID == room else { return }
             current = o
             phase = .ready
+            writingSince = o.state == .writing ? writingSince ?? Date() : nil
         } catch is CancellationError {
         } catch {
             guard roomID == room else { return }
@@ -67,18 +84,20 @@ public final class RoomOverviewModel {
 
     /// Asks the Core to write (or rewrite) and shows the writing state at once; the Core's answer follows by polling.
     public func write(_ room: String) async {
-        guard let service, !busy else { return }
+        guard let service, !busy, roomID == room else { return }
         busy = true
-        defer { busy = false }
+        defer { if roomID == room { busy = false } }
         notice = nil
         openRule = nil
         editing = false
         current?.state = .writing
+        current?.stage = nil
+        writingSince = Date()
         current?.progress = nil
         do {
             try await service.writeOverview(room: room)
         } catch is CancellationError {
-        } catch { notice = BrainWords.failure(error) }
+        } catch { if roomID == room { notice = BrainWords.failure(error) } }
         await load(room, quiet: true)
     }
 
@@ -117,16 +136,16 @@ public final class RoomOverviewModel {
     }
 
     private func setInstructions(_ room: String, text: String?, approved: Bool) async -> Bool {
-        guard let service, !busy else { return false }
+        guard let service, !busy, roomID == room else { return false }
         busy = true
-        defer { busy = false }
+        defer { if roomID == room { busy = false } }
         notice = nil
         do {
             try await service.setInstructions(room: room, text: text, approved: approved)
         } catch is CancellationError {
             return false
         } catch {
-            notice = BrainWords.failure(error)
+            if roomID == room { notice = BrainWords.failure(error) }
             return false
         }
         await load(room, quiet: true)
