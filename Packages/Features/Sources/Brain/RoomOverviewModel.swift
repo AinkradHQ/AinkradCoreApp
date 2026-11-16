@@ -34,6 +34,7 @@ public final class RoomOverviewModel {
     var service: (any RoomOverviewService)? { brain?.service?.overviewService }
 
     public func clear() {
+        BrainRoutes.log.notice("overview clear (was \(self.roomID ?? "-", privacy: .public))")
         reset()
         epoch += 1
     }
@@ -67,15 +68,24 @@ public final class RoomOverviewModel {
     }
 
     public func load(_ room: String, quiet: Bool = false) async {
-        guard let service, roomID == room else { return }
+        guard let service, roomID == room else {
+            BrainRoutes.log.notice(
+                "overview load \(room, privacy: .public) skipped (shown \(self.roomID ?? "-", privacy: .public))")
+            return
+        }
         if !quiet, current == nil { phase = .loading }
         do {
             let o = try await service.roomOverview(room: room)
-            guard roomID == room else { return }
+            guard roomID == room else {
+                BrainRoutes.log.notice(
+                    "overview load \(room, privacy: .public) dropped (shown \(self.roomID ?? "-", privacy: .public))")
+                return
+            }
             current = o
             phase = .ready
             writingSince = o.state == .writing ? writingSince ?? Date() : nil
         } catch is CancellationError {
+            BrainRoutes.log.notice("overview load \(room, privacy: .public) cancelled")
         } catch {
             guard roomID == room else { return }
             if current == nil { phase = .failed(BrainWords.failure(error)) } else { notice = BrainWords.failure(error) }

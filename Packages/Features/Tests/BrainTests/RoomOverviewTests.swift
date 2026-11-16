@@ -108,27 +108,29 @@ struct RoomOverviewTests {
         #expect(titles["s0"] == "Release checklist" && titles["s3"] == "Sprint 14 retro")
     }
 
-    /// Opening a room clears the room view (inspect) while the tab's first load may be in flight; that load's answer is
-    /// then dropped. Every outside clear bumps `epoch`, the tab's task id, so the tab loads again instead of staying on
-    /// its skeleton. A load that switches rooms itself does not bump it (no reload loop).
-    @Test func anOutsideClearAsksTheTabToLoadAgain() async {
+    /// Opening a room (inspect) leaves the Overview to its tab: clearing it there raced the tab's first load and left the
+    /// tab on its skeleton (live, 2026-11-16). A screen lock still clears it and bumps `epoch`, so the tab loads again.
+    @Test func openingARoomNeverClearsItsOverviewAndALockMakesTheTabLoadAgain() async {
         let model = await make(.written)
         let o = model.roomOverview!
         let before = o.epoch
         await o.open("acme-shop")
-        #expect(o.epoch == before, "a load never bumps the epoch")
         await model.inspect("acme-shop")
+        #expect(o.epoch == before && o.current?.state == .written, "inspect leaves the overview")
+        o.clear()
         #expect(o.epoch == before + 1 && o.current == nil && o.phase == .idle)
         await o.open("acme-shop")
         #expect(o.phase == .ready && o.current?.state == .written)
     }
 
-    @Test func leavingARoomClearsItsOverview() async {
+    /// Switching rooms never shows the old room's overview: the tab's `show` resets when the room differs.
+    @Test func leavingARoomNeverShowsItsOverviewInTheNext() async {
         let model = await make(.written)
         let o = model.roomOverview!
         await o.open("acme-shop")
         model.view("app")
-        #expect(o.current == nil && o.roomID == nil)
+        o.show("app")
+        #expect(o.current == nil && o.roomID == "app")
     }
 
     // MARK: a room left behind never lands in the room on screen

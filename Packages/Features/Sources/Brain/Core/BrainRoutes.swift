@@ -41,9 +41,15 @@ public struct BrainRoutes: Sendable {
     }
 
     func raw(_ method: String, _ path: String, _ body: (any Encodable)? = nil) async throws -> Data {
+        let start = ContinuousClock.now
         do {
-            return try await transport.send(method, Self.base + path, body: body.map { try JSONEncoder().encode($0) })
+            let d = try await transport.send(method, Self.base + path, body: body.map { try JSONEncoder().encode($0) })
+            Self.log.notice(
+                "\(method, privacy: .public) \(Self.logged(path), privacy: .public) ok \(d.count) B in \((ContinuousClock.now - start).formatted(.units(allowed: [.milliseconds])), privacy: .public)"
+            )
+            return d
         } catch is CancellationError {
+            Self.log.notice("\(method, privacy: .public) \(Self.logged(path), privacy: .public) cancelled")
             throw CancellationError()
         } catch {
             Self.log.error(
