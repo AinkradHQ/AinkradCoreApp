@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Observation
 import SwiftUI
@@ -18,6 +19,10 @@ final class AgentPrefs {
     var mode: String { didSet { save() } }
     var runner: String { didSet { save() } }  // "" = the best ready runner
     var model: String { didSet { save() } }  // "" = the harness default
+    /// The conversation's own text size, on top of the app's Text size (Ahmed, 2026-11-15): 0.9 to 1.5.
+    var textScale: Double { didSet { save() } }
+    /// The conversation's typeface: system, rounded, serif or mono. Code stays monospaced whatever is chosen.
+    var font: String { didSet { save() } }
 
     private let d = UserDefaults.standard
     private init() {
@@ -30,6 +35,8 @@ final class AgentPrefs {
         mode = d.string(forKey: "agents.mode") ?? "ask"
         runner = d.string(forKey: "agents.runner") ?? ""
         model = d.string(forKey: "agents.model") ?? ""
+        textScale = d.object(forKey: "agents.textScale") as? Double ?? 1
+        font = d.string(forKey: "agents.font") ?? "system"
     }
 
     /// A saved tool the app no longer offers (agy) falls back to Claude Code, so ⌘N never starts it.
@@ -46,10 +53,39 @@ final class AgentPrefs {
         d.set(mode, forKey: "agents.mode")
         d.set(runner, forKey: "agents.runner")
         d.set(model, forKey: "agents.model")
+        d.set(textScale, forKey: "agents.textScale")
+        d.set(font, forKey: "agents.font")
     }
 }
 
 extension AgentPrefs {
+    static let textScales: [Double] = [0.9, 1, 1.1, 1.25, 1.5]
+    static let fonts: [(id: String, title: String)] = [
+        ("system", "System"), ("rounded", "Rounded"), ("serif", "Serif"), ("mono", "Mono"),
+    ]
+    /// The typeface as a SwiftUI design.
+    var fontDesign: Font.Design {
+        switch font {
+        case "rounded": .rounded
+        case "serif": .serif
+        case "mono": .monospaced
+        default: .default
+        }
+    }
+    /// The same typeface for the composer's AppKit text view, at `size` points.
+    func nsFont(size: CGFloat) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size)
+        let design: NSFontDescriptor.SystemDesign? =
+            switch font {
+            case "rounded": .rounded
+            case "serif": .serif
+            case "mono": .monospaced
+            default: nil
+            }
+        guard let design, let d = base.fontDescriptor.withDesign(design) else { return base }
+        return NSFont(descriptor: d, size: size) ?? base
+    }
+
     /// The app's own Look, or nil to follow Settings, Appearance.
     var look: CoreLook? { followLook ? nil : CoreLook(mode: modeChoice, opacity: opacity) }
     var modeChoice: SurfaceMode {
@@ -83,8 +119,32 @@ struct AgentSettingsView: View {
                 }
             }
             GlassSection(
+                "Text", sub: "The conversation and the message field. Code stays monospaced.", symbol: "textformat",
+                hue: GlassInk.blue, index: 1
+            ) {
+                SettingRow("Size", symbol: "textformat.size") {
+                    CoreSegmented(
+                        "Text size",
+                        segments: AgentPrefs.textScales.map {
+                            CoreSegment($0, $0.formatted(.percent.precision(.fractionLength(0))))
+                        }, selection: $prefs.textScale, fill: true)
+                }
+                SettingRow("Typeface", symbol: "textformat") {
+                    CoreSegmented(
+                        "Typeface", segments: AgentPrefs.fonts.map { CoreSegment($0.id, $0.title) },
+                        selection: $prefs.font, fill: true)
+                }
+                // What the conversation will look like.
+                Text("Two handlers still return 500 instead of 409 on a conflict. Fixing them.")
+                    .coreFont(size: MacTextSize.body)
+                    .environment(\.coreTextScale, prefs.textScale)
+                    .environment(\.coreFontDesign, prefs.fontDesign)
+                    .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(GlassInk.well, in: coreShape(Radius.control))
+            }
+            GlassSection(
                 "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.blue,
-                index: 1
+                index: 2
             ) {
                 SettingRow("Harness", symbol: "cpu") {
                     CoreSegmented(
@@ -136,7 +196,7 @@ private struct ModelField: View {
                     text = ""
                 } label: {
                     Image(systemName: "xmark").coreFont(size: 10, weight: .bold).frame(width: 22, height: 22)
-                        .background(GlassInk.well, in: coreShape(6))
+                        .background(GlassInk.well, in: coreShape(Radius.chip))
                 }
                 .buttonStyle(.plain).help("Use the harness default").transition(.scale.combined(with: .opacity))
             }

@@ -24,13 +24,16 @@ struct BrainChip: View {
     }
     var body: some View {
         let c = palette.tone(tone)
-        Text(text).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1)
-            .foregroundStyle(c.ink)
-            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
-            .background(c.fill, in: coreShape(Radius.chip))
-            // A tag keeps its whole word: its neighbours shrink first (same rule as StateBadge and CoreChip).
-            .fixedSize().layoutPriority(2)
-            .help(help ?? text)
+        // A small square in the tone's colour and the word (Ahmed, 2026-11-15: no tinted fill).
+        HStack(spacing: Space.s1 + 2) {
+            coreShape(2).fill(c.ink).frame(width: 7, height: 7).accessibilityHidden(true)
+            Text(text).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1)
+                .foregroundStyle(GlassInk.secondary)
+        }
+        .frame(minHeight: MacSize.chip)
+        // A tag keeps its whole word: its neighbours shrink first (same rule as StateBadge and CoreChip).
+        .fixedSize().layoutPriority(2)
+        .help(help ?? text)
     }
 }
 

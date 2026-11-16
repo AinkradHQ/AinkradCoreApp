@@ -12,13 +12,19 @@ public enum GlassInk {
     public static let primary = adaptive(.white, day: dayInk)
     public static let secondary = adaptive(.white.opacity(0.72), day: dayInk.opacity(0.68))
     public static let track = adaptive(.white.opacity(0.24), day: dayInk.opacity(0.14))
-    public static let well = adaptive(.white.opacity(0.08), day: .white.opacity(0.55))
-    public static let wellHover = adaptive(.white.opacity(0.13), day: .white.opacity(0.75))
+    // Day wells are a faint ink tint, darker than the pane: white on a near-white pane could not be seen (Ahmed,
+    // 2026-11-15). Night keeps its light wells.
+    public static let well = adaptive(.white.opacity(0.08), day: dayInk.opacity(0.045))
+    public static let wellHover = adaptive(.white.opacity(0.13), day: dayInk.opacity(0.075))
     /// Neutral edge: white 0.30 at night, the least that reads 3:1 over the glass (measured 2026-11-09); white 0.7 by day.
-    public static let wellEdge = adaptive(.white.opacity(0.3), day: .white.opacity(0.7))
+    /// A card on a pane: one step lighter than the pane in both themes, raised by a soft shadow (Ahmed, 2026-11-15:
+    /// cards must be seen without glass). Fields, rows and buttons inside it use `well`.
+    public static let card = adaptive(Color(red: 1, green: 1, blue: 1, opacity: 0.06), day: .white.opacity(0.94))
+    public static let cardHover = adaptive(Color(red: 1, green: 1, blue: 1, opacity: 0.09), day: .white)
+    public static let wellEdge = adaptive(.white.opacity(0.3), day: dayInk.opacity(0.12))
     public static let slate = Color(red: 0.55, green: 0.6, blue: 0.7)
-    public static let blue = adaptive(
-        Color(red: 0.25, green: 0.6, blue: 1), day: Color(red: 0.122, green: 0.42, blue: 0.878))
+    /// The accent (Settings, Appearance; graphite by default). Named blue from when blue was the only accent.
+    public static var blue: Color { AccentPrefs.shared.accent.fill }
     /// Needs you: the one warm hue. Attention, approval waiting, a warning. Never decoration.
     public static let amber = Color(red: 1, green: 0.62, blue: 0.1)
     /// Status only: ok. Muted use, on a state badge, meter or dot. Darker by day so it reads as text on light glass.
@@ -29,8 +35,7 @@ public enum GlassInk {
         Color(red: 1, green: 0.38, blue: 0.4), day: Color(red: 0.9, green: 0.2, blue: 0.165))
     // The same hues as TEXT: lighter at night, darker by day, so red, amber and the blue link read 4.5:1 or better on
     // the glass. Fills, tiles and bars keep the hues above.
-    public static let blueInk = adaptive(
-        Color(red: 0.52, green: 0.76, blue: 1), day: Color(red: 0.102, green: 0.361, blue: 0.776))
+    public static var blueInk: Color { AccentPrefs.shared.accent.ink }
     public static let amberInk = adaptive(
         Color(red: 1, green: 0.70, blue: 0.30), day: Color(red: 0.64, green: 0.345, blue: 0))
     public static let redInk = adaptive(
@@ -44,7 +49,7 @@ public enum GlassInk {
     /// A lift on the glass (selection, hover, keycaps, counts): white `o` at night; by day the stronger white that reads
     /// over pale glass (the mockups' wells are 0.55 to 0.75); zero stays zero.
     public static func lift(_ o: Double) -> Color {
-        adaptive(.white.opacity(o), day: .white.opacity(min(0.95, o * 5)))
+        adaptive(.white.opacity(o), day: dayInk.opacity(min(0.12, o * 0.6)))
     }
     /// A light edge: white `o` at night; by day the bright rim the mockups draw (0.7 to 0.9).
     public static func rim(_ o: Double) -> Color {
@@ -54,7 +59,7 @@ public enum GlassInk {
     public static func sunk(_ o: Double) -> Color { adaptive(.black.opacity(o), day: dayInk.opacity(0.05)) }
     /// A drop shadow: black `o` at night; by day a soft blue shade at half the weight (`ds.css` --shade).
     public static func shade(_ o: Double) -> Color {
-        adaptive(.black.opacity(o), day: Color(red: 40 / 255, green: 80 / 255, blue: 140 / 255).opacity(o * 0.5))
+        adaptive(.black.opacity(o), day: .black.opacity(o * 0.5))
     }
 
     /// One colour for night and one for day, picked by the appearance the view is drawn in (NSApp holds Day/Night).
@@ -78,7 +83,7 @@ public enum GlassInk {
     }
 }
 
-/// A white glyph on a gradient tile in a subject's hue. It bounces when `bounce` changes.
+/// A glyph in a subject's hue on a flat well. It bounces when `bounce` changes.
 public struct IconTile<Trigger: Equatable>: View {
     let symbol: String
     let hue: Color
@@ -91,17 +96,11 @@ public struct IconTile<Trigger: Equatable>: View {
         self.bounce = bounce
     }
     public var body: some View {
-        Image(systemName: symbol).coreFont(size: size * 0.46, weight: .semibold).foregroundStyle(.white)
+        // Flat (Ahmed, 2026-11-15: less colour, less glow): the glyph in its hue on a quiet well, no gradient, no edge.
+        Image(systemName: symbol).coreFont(size: size * 0.46, weight: .semibold).foregroundStyle(GlassInk.ink(hue))
             .coreBounce(bounce)
             .frame(width: size, height: size)
-            .background(
-                LinearGradient(colors: [hue, hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                in: coreShape(size > 40 ? Radius.control + 4 : Radius.control)
-            )
-            .overlay {
-                coreShape(size > 40 ? Radius.control + 4 : Radius.control).strokeBorder(
-                    .white.opacity(0.25), lineWidth: 1)
-            }
+            .background(GlassInk.well, in: coreShape(size > 40 ? Radius.cardMac : Radius.control))
             .accessibilityHidden(true)
     }
 }
@@ -244,7 +243,7 @@ public struct ScopeTile: View {
         self.on = on
     }
     public var body: some View {
-        HStack(alignment: .top, spacing: Space.s3) {
+        HStack(alignment: .center, spacing: Space.s3) {
             IconTile(symbol, hue: on ? hue : GlassInk.slate.opacity(0.5), bounce: on)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name.capitalized).coreFont(size: MacTextSize.body, weight: .semibold)
@@ -265,10 +264,7 @@ public struct ScopeTile: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Selection is blue; the subject colour stays on the icon tile.
-        .background(on ? GlassInk.blue.opacity(0.16) : GlassInk.well, in: coreShape(Radius.row))
-        .overlay {
-            coreShape(Radius.row).strokeBorder(on ? GlassInk.blue.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
-        }
+        .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.row))
         .opacity(on ? 1 : 0.75)
         .animation(Motion.out(Motion.ui), value: on)
         .accessibilityElement(children: .combine)

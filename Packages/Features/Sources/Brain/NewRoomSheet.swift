@@ -87,6 +87,7 @@ private struct ChoiceTile: View {
     let on: Bool
     let pick: () -> Void
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
     var body: some View {
         Button(action: pick) {
             VStack(alignment: .leading, spacing: 2) {
@@ -96,10 +97,9 @@ private struct ChoiceTile: View {
             }
             .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 2, alignment: .topLeading)
             .background(
-                on ? GlassInk.blue.opacity(0.32) : hovering ? GlassInk.wellHover : GlassInk.well,
+                on ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )
-            .overlay { if on { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.7), lineWidth: 1) } }
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain).focusEffectDisabled()

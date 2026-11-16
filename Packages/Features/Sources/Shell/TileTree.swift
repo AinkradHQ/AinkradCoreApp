@@ -78,6 +78,17 @@ struct TileTree: Equatable, Sendable {
 
     mutating func remove(_ id: String) { root = root.flatMap { Self.removing(id, from: $0) } }
 
+    /// A pane takes another's place: same slot, same size.
+    mutating func rename(_ old: String, to new: String) {
+        func walk(_ n: TileNode) -> TileNode {
+            switch n {
+            case .leaf(let id): .leaf(id == old ? new : id)
+            case .split(let axis, let fractions, let kids): .split(axis, fractions: fractions, children: kids.map(walk))
+            }
+        }
+        root = root.map(walk)
+    }
+
     private static func removing(_ id: String, from node: TileNode) -> TileNode? {
         switch node {
         case .leaf(let l): return l == id ? nil : node

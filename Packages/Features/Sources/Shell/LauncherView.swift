@@ -86,7 +86,7 @@ struct LauncherView: View {
         .frame(maxHeight: Space.s8 * 18)
         .fixedSize(horizontal: false, vertical: true)
         // The one frame: a glass rim around the Look's background (Settings, Appearance).
-        .coreFrame(radius: Radius.panel + Space.s1, part: .launcher)
+        .coreFrame(radius: Radius.pane + Space.s1, part: .launcher)
         .background { numberShortcuts(rows) }
         // The root holds focus while the window is calm; the field takes it as it appears, so the first typed key lands.
         .defaultFocus($focused, true)
@@ -240,16 +240,7 @@ private struct LauncherItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s3) {
-                Image(systemName: row.entry.symbol).coreFont(size: MacTextSize.body + 1, weight: .semibold)
-                    .foregroundStyle(.white)
-                    .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                    .background(
-                        LinearGradient(
-                            colors: [hue.opacity(0.95), hue.opacity(0.6)], startPoint: .top, endPoint: .bottom),
-                        in: coreShape(Radius.control)
-                    )
-                    .overlay { coreShape(Radius.control).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                    .accessibilityHidden(true)
+                IconTile(row.entry.symbol, hue: hue, size: MacSize.controlLg)
                 title
                 Spacer(minLength: Space.s2)
                 if let sub = row.entry.sub {
@@ -263,8 +254,8 @@ private struct LauncherItem: View {
             // One highlight that glides between rows (`shell-fx.css` .l-glide), not a background swapped per row.
             .background {
                 if selected {
-                    coreShape(Radius.row).fill(GlassInk.lift(0.18))
-                        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.rim(0.3), lineWidth: 1) }
+                    // The app's one selection: a quiet fill, no outline (Ahmed, 2026-11-15).
+                    coreShape(Radius.row).fill(palette.navActive)
                         .matchedGeometryEffect(id: "selection", in: glide)
                 }
             }
@@ -296,8 +287,8 @@ private struct LauncherItem: View {
 
     /// Each group has its colour, so the list reads at a glance; slate entries stay quiet.
     private var hue: Color {
-        if row.entry.tile == .slate { return .white.opacity(0.35) }
-        if row.entry.tile == .danger { return Color(red: 1, green: 0.38, blue: 0.4) }
+        if row.entry.tile == .slate { return GlassInk.slate }
+        if row.entry.tile == .danger { return GlassInk.red }
         if row.entry.tile == .view { return GlassInk.blue }
         switch row.group {
         case .recent, .topHit: return GlassInk.blue

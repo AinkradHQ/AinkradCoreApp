@@ -18,7 +18,7 @@ struct KeyFact: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
-        .background(GlassInk.well, in: coreShape(Radius.row))
+        .coreWell()
         .accessibilityElement(children: .combine)
     }
 }

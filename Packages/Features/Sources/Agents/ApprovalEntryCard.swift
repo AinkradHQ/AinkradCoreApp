@@ -6,6 +6,8 @@ import SwiftUI
 struct ApprovalEntryCard: View {
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
+    /// Pinned above the composer: it floats with it; in the transcript it is a plain card.
+    var floating = false
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -29,7 +31,7 @@ struct ApprovalEntryCard: View {
         let busy = model.deciding.contains(request.id)
         return VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                Image(systemName: ask.symbol).foregroundStyle(waiting ? GlassInk.amberInk : palette.text2)
+                IconTile(ask.symbol, hue: waiting ? GlassInk.amber : GlassInk.slate, size: MacSize.controlMd)
                     .accessibilityHidden(true)
                 Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.body, weight: .semibold)
                 Spacer(minLength: Space.s2)
@@ -43,7 +45,7 @@ struct ApprovalEntryCard: View {
                     .truncationMode(.tail).textSelection(.enabled)
                     .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GlassInk.sunk(0.25), in: coreShape(Radius.control))
+                    .background(GlassInk.well, in: coreShape(Radius.control))
                     .help(request.input).agentCopyMenu(request.input)
             }
             if waiting {
@@ -53,12 +55,12 @@ struct ApprovalEntryCard: View {
                     button(approve: false, busy: busy)
                     if busy {
                         Text("Waiting for your Core…").coreFont(size: MacTextSize.meta)
-                            .foregroundStyle(palette.text2)
+                            .foregroundStyle(SessionInk.text2)
                     }
                     Spacer(minLength: 0)
                     if case .waiting(let left?) = state {
                         Text("Asks again in \(AgentWords.clock(left))").coreFont(size: MacTextSize.meta)
-                            .foregroundStyle(palette.text2).monospacedDigit()
+                            .foregroundStyle(SessionInk.text2).monospacedDigit()
                             .contentTransition(.numericText(countsDown: true))
                     }
                 }
@@ -66,11 +68,10 @@ struct ApprovalEntryCard: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // The one amber state: an approval that needs you. Decided, it is a plain well like the tool rows.
-        .background(waiting ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                waiting ? GlassInk.amber.opacity(0.6) : GlassInk.wellEdge, lineWidth: waiting ? 1.5 : 1)
+        // Needs-you is shown by the amber tile and the badge, not by a tinted card.
+        .background {
+            coreShape(12).fill(floating ? SessionInk.float : SessionInk.card)
+                .shadow(color: floating ? SessionInk.floatShadow : .clear, radius: 16, y: 12)
         }
         .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
@@ -88,14 +89,21 @@ struct ApprovalEntryCard: View {
         let first = model.cards(for: request.session).first?.id == request.id
         let live =
             first && model.shell.activePane == AgentsModel.paneID(request.session) && !model.shell.coverOpen
-        let tile = Button(action: { Task { await model.decide(request, approved: approve) } }) {
+        let base = Button(action: { Task { await model.decide(request, approved: approve) } }) {
             if approve {
                 Label(elevated ? "Approve" : "Approve with Touch ID", systemImage: elevated ? "checkmark" : "touchid")
             } else {
                 Text("Deny")
             }
         }
-        .buttonStyle(CoreButtonStyle(approve ? .prominent : .secondary, size: .small))
+        // Approve is the graphite button; Deny the quiet one beside it.
+        let tile = Group {
+            if approve {
+                base.buttonStyle(GraphiteButtonStyle())
+            } else {
+                base.buttonStyle(CoreButtonStyle(.secondary, size: .medium))
+            }
+        }
         .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
         .disabled(busy)
         .help(
@@ -104,6 +112,7 @@ struct ApprovalEntryCard: View {
                 : "Tell \(who) no (⌘Delete). It carries on without it."
         )
         .accessibilityLabel(approve ? "Approve \(request.tool)" : "Deny \(request.tool)")
+        .keyHint(live ? (approve ? "⌘↩" : "⌘⌫") : "")
         return Group {
             if live {
                 if approve {

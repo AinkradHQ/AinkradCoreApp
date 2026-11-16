@@ -42,8 +42,7 @@ struct AccessSheet: View {
                         .frame(width: Space.s8 * 4)
                     }
                     .padding(Space.s3)
-                    .background(GlassInk.well, in: coreShape(Radius.cardMac))
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                    .coreWell()
                 }
                 if writes {
                     Label(

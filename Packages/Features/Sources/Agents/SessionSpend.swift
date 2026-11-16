@@ -117,8 +117,7 @@ struct SessionSpendStrip: View {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3).fill(hue.gradient).frame(width: g.size.width * min(1, share))
-                            .shadow(color: hue.opacity(0.5), radius: 4)
+                        coreShape(3).fill(hue).frame(width: g.size.width * min(1, share))
                     }
                 }
                 .frame(width: 140, height: 6)

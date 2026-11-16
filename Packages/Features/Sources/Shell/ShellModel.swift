@@ -220,6 +220,9 @@ public final class ShellModel {
     /// The one "waiting on you" number: approvals nobody answered, supplied by Agents (`AgentsModel.waitingOnYou`). Alerts and Brain
     /// inbox items are not in it; the bell counts them on their own. Until Agents is up, the bell's approval items stand in.
     public var waitingSource: (@MainActor () -> Int)?
+    /// The AI session counts the status chip shows, from the same index as the AI Sessions list and its sidebar (review
+    /// 2026-11-16: the chip, the sidebar and the groups disagreed). Nil until Agents is up: the home feed stands in.
+    public var sessionCounts: (@MainActor () -> (running: Int, needYou: Int))?
     public var waitingOnYou: Int {
         guard let source = waitingSource else { return bell.items.filter { $0.kind == .approval }.count }
         return source() + joinRequests
@@ -329,6 +332,20 @@ public final class ShellModel {
         }
     }
 
+    /// Shows `spec` in the place of pane `oldID` (switching what a pane shows, as the session sidebar does): same tab position,
+    /// same tile. When `spec` is already open elsewhere it is focused instead, and `oldID` stays.
+    public func replacePane(_ oldID: String, with spec: PaneSpec) {
+        guard let i = panes.firstIndex(where: { $0.id == oldID }), !panes.contains(where: { $0.id == spec.id }) else {
+            openPane(spec)
+            return
+        }
+        panes[i] = spec
+        tree.rename(oldID, to: spec.id)
+        if focusedPane == oldID { focusedPane = spec.id }
+        activePane = spec.id
+        surface = .workspace
+    }
+
     /// Closes a pane without a trace (a feature closing its own pane). People closing a pane use `dismissPane`.
     public func closePane(_ id: String) {
         guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
@@ -349,7 +366,7 @@ public final class ShellModel {
         if closedPanes.count > 10 { closedPanes.removeFirst() }
         // Words name the pane the way its tab does; the title (which can carry an id) is hover help only.
         toast = ToastItem(
-            "Closed \(tabName(spec)). It keeps running.", kind: .info, help: spec.title
+            "Closed “\(tabName(spec))”. It keeps running.", kind: .info, help: spec.title
         ) { [weak self] in self?.reopenClosedPane() }
     }
 

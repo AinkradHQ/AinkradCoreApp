@@ -17,14 +17,13 @@ public struct StateBadge: View {
 
     public var body: some View {
         let colours = palette.tone(tone)
-        HStack(spacing: Space.s1) {
-            Image(systemName: symbol).coreFont(size: MacTextSize.meta - 1).accessibilityHidden(true)
-            Text(label).coreFont(size: MacTextSize.meta, weight: .medium)
+        // A small square in the state's colour and the word (Ahmed, 2026-11-15: no tinted fill). `symbol` stays for
+        // callers and the gallery; the square carries the colour, the word carries the meaning.
+        HStack(spacing: Space.s1 + 2) {
+            coreShape(2).fill(colours.ink).frame(width: 7, height: 7).accessibilityHidden(true)
+            Text(label).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.secondary)
         }
-        .foregroundStyle(colours.ink)
-        .padding(.horizontal, Space.s2)
         .frame(minHeight: MacSize.chip)
-        .background(colours.fill, in: coreShape(Radius.chip))
         .fixedSize()
         .layoutPriority(2)  // titles shrink before badges
         .accessibilityElement(children: .ignore)

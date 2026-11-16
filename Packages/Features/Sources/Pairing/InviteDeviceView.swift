@@ -84,7 +84,7 @@ struct InviteDeviceView: View {
             } else if let invite = model.invite {
                 QRImage(text: invite.link.text)
             } else {
-                coreShape(Radius.cardMac).fill(palette.glassCard)
+                Color.clear.coreWell()
                     .overlay { if model.busy { CoreBusyBar().padding(Space.s4) } }
             }
         }
@@ -100,7 +100,7 @@ struct InviteDeviceView: View {
             Text(words).coreFont(size: MacTextSize.body, weight: .semibold).multilineTextAlignment(.center)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .coreWell()
         .accessibilityElement(children: .combine)
     }
 
@@ -138,6 +138,6 @@ struct InviteDeviceView: View {
                 .accessibilityHint("Copies the link and its one-time secret; cleared after a minute.")
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.glassCard, in: coreShape(Radius.row))
+        .background(GlassInk.well, in: coreShape(Radius.control))
     }
 }

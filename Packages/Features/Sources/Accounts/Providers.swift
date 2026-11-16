@@ -212,7 +212,7 @@ struct ProviderDialog: View {
                     .buttonStyle(.plain).foregroundStyle(GlassInk.secondary).help("Remove \(m.id)")
                 }
                 .padding(.horizontal, Space.s2).frame(minHeight: 36)
-                .background(GlassInk.well, in: coreShape(Radius.control + 2))
+                .background(GlassInk.well, in: coreShape(Radius.control))
                 .transition(.opacity)
             }
             HStack(alignment: .top, spacing: Space.s2) {

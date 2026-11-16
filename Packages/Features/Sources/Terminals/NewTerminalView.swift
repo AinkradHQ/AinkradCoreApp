@@ -101,7 +101,6 @@ struct NewTerminalView: View {
         }
         .padding(Space.s3)
         .background(GlassInk.sunk(0.35), in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "Opens the Ainkrad shell on \(form.chosen?.name ?? "no runner")")
@@ -115,6 +114,7 @@ private struct RunnerTile: View {
     let runner: RunnerItem
     let lens: Namespace.ID
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let st = RunnerStatus(runner)
@@ -152,8 +152,7 @@ private struct RunnerTile: View {
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 if on {
-                    coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.16))
-                        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.5), lineWidth: 1) }
+                    coreShape(Radius.cardMac).fill(palette.navActive)
                         .matchedGeometryEffect(id: "runner", in: lens)
                 } else {
                     coreShape(Radius.cardMac).fill(hovering ? GlassInk.wellHover : GlassInk.well)

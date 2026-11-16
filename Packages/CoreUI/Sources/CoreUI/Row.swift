@@ -103,10 +103,9 @@ private struct RowChrome: View {
                     ? palette.navActive : pressed ? palette.uDimHover : hover ? palette.rowHover : palette.glassCard,
                 in: coreShape(Radius.row)
             )
-            .overlay {
-                if selected { coreShape(Radius.row).strokeBorder(palette.navActiveEdge, lineWidth: 1) }
-            }
-            .coreFocusRing(isFocused || forced == .focused, radius: Radius.row, palette: palette)
+            .coreFocusRing(
+                CoreKeyboardFocus.own(isFocused) || forced == .focused, radius: Radius.row, palette: palette
+            )
             .animation(Motion.out(Motion.hover), value: hover)
             .animation(Motion.out(Motion.press), value: pressed)
             .onHover { hovering = $0 }

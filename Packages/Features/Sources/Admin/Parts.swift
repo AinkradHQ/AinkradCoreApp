@@ -27,12 +27,11 @@ struct AdminSection<Content: View>: View {
 struct AdminPanel<Content: View>: View {
     var spacing: CGFloat = Space.s3
     @ViewBuilder let content: Content
-    @Environment(\.corePalette) private var palette
     var body: some View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.glassCard, in: coreShape(Radius.cardMac))
+            .coreWell()
     }
 }
 
@@ -118,10 +117,11 @@ struct StateCard<Actions: View>: View {
 
     var body: some View {
         let c = palette.tone(tone)
+        let hue: Color =
+            tone == .fail
+            ? GlassInk.red : tone == .warn ? GlassInk.amber : tone == .done ? GlassInk.green : GlassInk.blue
         VStack(spacing: Space.s2) {
-            Image(systemName: symbol).coreFont(size: MacTextSize.large).foregroundStyle(c.ink)
-                .frame(width: MacSize.controlLg + Space.s3, height: MacSize.controlLg + Space.s3)
-                .background(c.fill, in: coreShape(Radius.cardMac)).accessibilityHidden(true)
+            IconTile(symbol, hue: hue, size: MacSize.controlLg + Space.s3)
             Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
             Text(text).foregroundStyle(palette.text2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
@@ -140,7 +140,7 @@ struct StateCard<Actions: View>: View {
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .background(palette.glassCard, in: coreShape(Radius.cardMac))
+        .coreWell()
         .overlay { if tone == .fail { coreShape(Radius.cardMac).strokeBorder(c.ink.opacity(0.5), lineWidth: 1) } }
         .accessibilityElement(children: .contain)
     }
@@ -161,7 +161,7 @@ struct SectionSkeleton: View {
             CoreBusyBar().frame(maxWidth: Space.s8 * 5)
             Text("Loading…").foregroundStyle(palette.text2)
             ForEach(0..<5, id: \.self) { i in
-                coreShape(Radius.cardMac).fill(palette.glassCard).frame(height: i == 0 ? Space.s8 : Space.s8 + Space.s5)
+                coreShape(Radius.cardMac).fill(GlassInk.well).frame(height: i == 0 ? Space.s8 : Space.s8 + Space.s5)
             }
         }
         .accessibilityElement(children: .ignore)

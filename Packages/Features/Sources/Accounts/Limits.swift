@@ -183,8 +183,7 @@ struct AccountLimitsSection: View {
         }
         .padding(Space.s4)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .task(id: account.id) { await model.reloadLimits() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-usage-limits")

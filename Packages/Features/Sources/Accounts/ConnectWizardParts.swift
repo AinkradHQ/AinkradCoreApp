@@ -78,7 +78,6 @@ struct ProviderChoiceRow<Trailing: View>: View {
         .background(
             selected || (pressed && !dim) ? palette.uDimHover : hovering && !dim ? palette.uDim : .clear, in: shape
         )
-        .overlay { if selected { shape.strokeBorder(palette.primary, lineWidth: 1.5) } }
         .scaleEffect(pressed && !dim && !reduce ? 0.99 : 1)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.press), value: pressed)

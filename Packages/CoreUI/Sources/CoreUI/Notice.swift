@@ -34,7 +34,7 @@ public struct CoreNotice<Action: View>: View {
 
     public var body: some View {
         let c = palette.tone(tone)
-        HStack(alignment: .top, spacing: Space.s3) {
+        HStack(alignment: .center, spacing: Space.s3) {
             ToneGlyph(symbol: symbol, ink: c.ink, size: 26)
             VStack(alignment: .leading, spacing: Space.s1 / 2) {
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
@@ -50,13 +50,10 @@ public struct CoreNotice<Action: View>: View {
         .padding(Space.s3)
         // Day: a neutral notice is a glass well (the mockups' .notice); a toned one takes its light chip tint.
         .background(
-            !palette.isDay ? c.ink.opacity(0.14) : tone == .queue ? GlassInk.well : c.fill,
+            // A plain well in both themes; the tone is on the glyph (Ahmed, 2026-11-15: same in night and day, less colour).
+            GlassInk.well,
             in: coreShape(Radius.cardMac)
         )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                palette.isDay && tone == .queue ? GlassInk.wellEdge : c.ink.opacity(0.35), lineWidth: 1)
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(text.isEmpty ? title : "\(title). \(text)")
     }
@@ -89,7 +86,7 @@ public struct CoreDialogPanel<Content: View>: View {
         }
         .foregroundStyle(palette.text)
         .coreFont(size: MacTextSize.body)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .corePanel(radius: Radius.pane, padding: Space.s6)
         .frame(width: width)
         .shadow(color: GlassInk.shade(0.3), radius: 34, y: 14)
         .coreModalEntrance()

@@ -41,7 +41,7 @@ struct AinkradCoreApp: App {
         // always starts on its main window (a restored gallery used to open instead of it).
         if #available(macOS 15, *) {
             Window("CoreUI Gallery", id: "gallery") {
-                CoreUIGallery().frame(minWidth: 720, minHeight: 600)
+                CoreUIGallery().frame(minWidth: 1100, minHeight: 700)
             }
             .defaultLaunchBehavior(.suppressed)
             .restorationBehavior(.disabled)
@@ -59,6 +59,7 @@ struct AinkradCoreApp: App {
             keyStore: env["CORE_KEYSTORE"] == "memory" ? makeDebugKeyStore() : makeKeychainKeyStore(),
             demo: env["CORE_DEMO"] == "1", sasFile: env["CORE_IT_SAS_FILE"])
         if env["CORE_DEMO"] == "1" { SampleWorld.install(into: app.shell) }
+        if env["CORE_KEYSTORE"] == "memory" { app.debugSkipLocalTouchID() }
         return app
         #else
         return AppModel()

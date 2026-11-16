@@ -81,7 +81,9 @@ public final class TranscriptStore {
             let e = perTurn(e)
             if foldResult(e) { continue }
             switch e.kind {
-            case .toolUse(let id, _, _), .toolEdit(let id, _, _, _, _, _, _), .toolTodos(let id, _): toolSeq[id] = e.seq
+            case .toolUse(let id, _, _), .toolEdit(let id, _, _, _, _, _, _), .toolTodos(let id, _),
+                .subAgent(let id, _, _, _, _, _, _), .plan(let id, _):
+                toolSeq[id] = e.seq
             default: break
             }
             if e.visible, !repeatsDecision(e) { entries.append(e) }
@@ -134,9 +136,16 @@ public final class TranscriptStore {
                 kind: .toolEdit(id: tid, name: n, path: path, old: old, new: new, ok: ok, durationMs: ms))
             toolSeq[id] = nil
             return true
-        case .toolTodos:
+        case .toolTodos, .plan:
             toolSeq[id] = nil
-            return true  // the CLI's own answer to a todo update says nothing
+            return true  // the CLI's own answer to a todo update or a plan says nothing
+        case .subAgent(let tid, let type, let task, let prompt, _, _, _):
+            // The sub-agent's report joins its card.
+            entries[i] = TranscriptEntry(
+                seq: seq, at: entries[i].at,
+                kind: .subAgent(id: tid, type: type, task: task, prompt: prompt, result: out, ok: ok, durationMs: ms))
+            toolSeq[id] = nil
+            return true
         default: break
         }
         guard case .toolUse(_, let n, let summary) = entries[i].kind else { return false }

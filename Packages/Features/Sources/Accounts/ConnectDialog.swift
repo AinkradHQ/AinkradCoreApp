@@ -143,20 +143,13 @@ struct ConnectDialog: View {
     }
 
     private var gateCard: some View {
-        HStack(spacing: Space.s3) {
-            IconTile("key.fill", hue: GlassInk.blue, size: 36, bounce: false)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Turn on keys for accounts").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("Your Core is set to keep no provider keys. This turns that on.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s3)
+        CoreNotice(
+            symbol: "key.fill", title: "Turn on keys for accounts",
+            text: "Your Core is set to keep no provider keys. This turns that on."
+        ) {
             Button(flow.enabling ? "Turning on…" : "Turn on") { Task { await flow.enableKeys(model) } }
                 .buttonStyle(CoreButtonStyle(.prominent)).disabled(flow.enabling)
         }
-        .padding(Space.s3)
-        .background(GlassInk.blue.opacity(0.12), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.4), lineWidth: 1) }
         .accessibilityIdentifier("key-gate")
     }
 
@@ -228,10 +221,8 @@ struct ConnectDialog: View {
                     .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(on ? GlassInk.blueInk : GlassInk.slate)
                 if !last {
-                    coreShape(1).fill(
-                        LinearGradient(colors: [GlassInk.blue, GlassInk.track], startPoint: .top, endPoint: .bottom)
-                    )
-                    .frame(width: 2).frame(minHeight: 24).padding(.vertical, 4)
+                    coreShape(1).fill(GlassInk.track)
+                        .frame(width: 2).frame(minHeight: 24).padding(.vertical, 4)
                 }
             }
             .frame(width: 30)
@@ -257,6 +248,7 @@ private struct ProviderChoice: View {
     let lens: Namespace.ID
     let pick: () -> Void
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
@@ -270,15 +262,11 @@ private struct ProviderChoice: View {
             .frame(maxWidth: .infinity).padding(.vertical, Space.s3)
             .background {
                 if on {
-                    coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.22))
+                    coreShape(Radius.cardMac).fill(palette.navActive)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 } else {
                     coreShape(Radius.cardMac).fill(hovering ? GlassInk.wellHover : GlassInk.well)
                 }
-            }
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    on ? GlassInk.blue.opacity(0.75) : GlassInk.wellEdge, lineWidth: on ? 1.5 : 1)
             }
             .contentShape(coreShape(Radius.cardMac))
         }

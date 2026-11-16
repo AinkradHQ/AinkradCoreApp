@@ -75,6 +75,8 @@ echo "== core: init + serve on $URL (state in $HOME_DIR, not the real state dir)
 PLAIN=; { [ "$MODE" = terminals ] || [ "$MODE" = manual ] || [[ $MODE == agents* ]]; } && PLAIN=--allow-plain-runner  # a loopback runner pairs over plain http
 # manual: loopback is a trusted proxy, so `l` can make wrong claims from a test address (X-Forwarded-For) and lock that one out.
 [ "$MODE" = manual ] && PLAIN="$PLAIN --trusted-proxy 127.0.0.1"
+# A busy Mac (other builds, the UI test itself) must not make the Core turn the test runner's sessions away as under load.
+[ -n "$PLAIN" ] && PLAIN="$PLAIN --max-host-load 100"
 "$SRV" serve --config "$HOME_DIR/config.toml" --listen "loopback:$PORT" $PLAIN 2>"$W/serve.log" >/dev/null &
 PIDS+=($!)
 wait_for 30 test -S "$SOCK" && wait_for 30 curl -fsS "$URL/healthz" || { echo "the Core did not start"; tail -n5 "$W/serve.log"; exit 1; }
@@ -152,19 +154,28 @@ prep_runner() {
 $| = 1;
 exit 0 if $ENV{AINKRAD_EXEC_PROBE};
 if (grep { $_ eq "--version" } @ARGV) { print "2.1.400 (Claude Code)\n"; exit 0 }
-<STDIN>; <STDIN>;
-print qq({"type":"system","subtype":"init","session_id":"S1"}\n);
-print qq({"type":"assistant","message":{"id":"m1","content":[{"type":"text","text":"Reading the repo before I change anything."}],"usage":{"input_tokens":120,"output_tokens":30}}}\n);
-print qq({"type":"assistant","message":{"id":"m2","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"cargo test -p citadel"}}],"usage":{"input_tokens":150,"output_tokens":60}}}\n);
-select(undef, undef, undef, 0.6);
-print qq({"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"test result: ok. 12 passed"}]}}\n);
-print qq({"type":"control_request","request_id":"req1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"git push -u origin feat/agents"}}}\n);
-my $ok = 0;
-while (my $l = <STDIN>) { if ($l =~ /control_response/) { $ok = ($l =~ /"allow"/) ? 1 : 0; last } }
-my $say = $ok ? "Pushed the branch." : "Not allowed to push, stopping.";
-print qq({"type":"assistant","message":{"id":"m3","content":[{"type":"text","text":"$say"}],"usage":{"input_tokens":300,"output_tokens":100}}}\n);
-print qq({"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":300,"output_tokens":100}}\n);
-select(undef, undef, undef, 0.4);
+# A live session (Core 11-12): it stays open and reads one JSON line per message until stdin closes.
+my $sid = 'S1';
+for my $i (0..$#ARGV) { $sid = $ARGV[$i + 1] if $ARGV[$i] eq '--session-id' || $ARGV[$i] eq '--resume'; }
+print qq({"type":"system","subtype":"init","session_id":"$sid"}\n);
+my ($n, $asking) = (0, 0);
+sub say { $n++; print qq({"type":"assistant","message":{"id":"m$$-$n","content":[{"type":"text","text":"$_[0]"}],"usage":{"input_tokens":300,"output_tokens":100}}}\n); }
+sub done { print qq({"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":300,"output_tokens":100}}\n); }
+while (my $l = <STDIN>) {
+  if ($l =~ /"subtype":"interrupt"/) {
+    $asking = 0; print qq({"type":"result","subtype":"error_during_execution","is_error":true,"usage":{}}\n);
+  } elsif ($l =~ /"type":"control_response"/) {
+    next unless $asking; $asking = 0;
+    say($l =~ /"allow"/ ? "Pushed the branch." : "Not allowed to push, stopping."); done();
+  } elsif ($l =~ /"type":"user"/ && !$asking) {
+    say("Reading the repo before I change anything.");
+    $n++; print qq({"type":"assistant","message":{"id":"m$$-$n","content":[{"type":"tool_use","id":"t$n","name":"Bash","input":{"command":"cargo test -p citadel"}}],"usage":{"input_tokens":150,"output_tokens":60}}}\n);
+    select(undef, undef, undef, 0.6);
+    print qq({"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t$n","content":"test result: ok. 12 passed"}]}}\n);
+    $asking = 1;
+    print qq({"type":"control_request","request_id":"req$n","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"git push -u origin feat/agents"}}}\n);
+  }
+}
 exit 0;
 PERL
   chmod 755 "$W/bin/claude"
@@ -175,6 +186,9 @@ PERL
   RSAS=$(grep -Eo "[A-Z0-9]{4}(-[A-Z0-9]{4}){3}" "$W/rpair.out" | head -n1)
   a device approve "$(field "$W/radd.out" pairing_id)" "$RSAS" >"$W/rapprove.out" 2>&1 || { echo "runner approve failed"; cat "$W/rapprove.out"; return 1; }
   wait_for 30 test -s "$W/runner/enrolment.json" || { echo "the runner was not enrolled"; cat "$W/rpair.out"; return 1; }
+  # The Core starts a session only with an account or the runner's own login (409 no_account): the stand-in gets an empty
+  # login file where the runner looks for Claude's, so it counts as signed in. No token: the stand-in never reads it.
+  mkdir -p "$W/runner/agents-config/claude" && echo '{}' >"$W/runner/agents-config/claude/.credentials.json"
   RFLAGS=(--enable-agents); [ "$MODE" = manual ] && RFLAGS+=(--enable-pty) && mkdir -p "$W/tmp"
   PATH="$W/bin:$PATH" TMPDIR="$W/tmp" AINKRAD_PTYHOST="$PTYH" "$RUN" connect --state "$W/runner" "${RFLAGS[@]}" >"$W/runner.log" 2>&1 </dev/null &
   PIDS+=($!)
@@ -242,9 +256,15 @@ if [ "$MODE" = agents ]; then
   fi
   echo "== xcodebuild test (CORE_IT=1): the agents screens against the Core and the runner"
   cd "$HERE"
+  # APP_IT_XCTESTRUN=<file>: run tests built elsewhere (`build-for-testing` on a Mac with the new Xcode), for a test
+  # Mac whose Xcode cannot build this project (the Air).
+  if [ -n "${APP_IT_XCTESTRUN:-}" ]; then
+    XCB=(xcodebuild test-without-building -xctestrun "$APP_IT_XCTESTRUN" -destination "platform=macOS")
+  else
+    XCB=(xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build test)
+  fi
   TEST_RUNNER_CORE_IT=1 TEST_RUNNER_CORE_IT_URL="$URL" TEST_RUNNER_CORE_IT_CODE="$CODE_BARE" TEST_RUNNER_CORE_IT_SAS_FILE="$SAS_FILE" \
-    nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -configuration Debug -derivedDataPath build \
-    -resultBundlePath "$W/agents.xcresult" -only-testing:AinkradCoreMacUITests/AgentsLiveUITests test 2>&1 \
+    nice -n 19 "${XCB[@]}" -resultBundlePath "$W/agents.xcresult" -only-testing:AinkradCoreMacUITests/AgentsLiveUITests 2>&1 \
     | grep -E "Test Case|error:|TEST |\*\* TEST|XCTAssert"
   STATUS=${PIPESTATUS[0]}
   # The window shots the test kept, out of the result bundle (OUT=<dir> to keep them).

@@ -62,8 +62,7 @@ struct SpendingPage: View {
             DayBars(costs: model.costs, now: model.now())
         }
         .padding(Space.s4)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .accessibilityElement(children: .contain)
     }
 
@@ -106,8 +105,7 @@ struct SpendingPage: View {
             }
         }
         .padding(Space.s4)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
     }
 
     // MARK: activity
@@ -152,8 +150,7 @@ struct SpendingPage: View {
             }
         }
         .padding(Space.s4)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
     }
 
     // MARK: prices
@@ -170,8 +167,7 @@ struct SpendingPage: View {
             AccLink(title: "Advanced", symbol: "tag") { withAnimation(.smooth(duration: 0.3)) { model.page = .prices } }
         }
         .padding(Space.s3)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
     }
 }
 

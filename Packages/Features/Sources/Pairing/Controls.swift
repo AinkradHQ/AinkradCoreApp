@@ -16,7 +16,7 @@ struct DialogCard<Content: View>: View {
             content
         }
         .foregroundStyle(palette.text)
-        .corePanel(radius: Radius.panel, padding: Space.s6)
+        .corePanel(radius: Radius.pane, padding: Space.s6)
         .frame(width: width)
         .shadow(color: GlassInk.shade(0.3), radius: 34, y: 14)
         .coreModalEntrance()
@@ -38,11 +38,7 @@ struct SASView: View {
                 Text(String(group))
                     .coreFont(size: MacTextSize.large * 1.6, weight: .semibold, design: .monospaced)
                     .frame(maxWidth: .infinity, minHeight: MacSize.controlLg * 2)
-                    .background(palette.glassCard, in: coreShape(Radius.cardMac))
-                    .overlay {
-                        coreShape(Radius.cardMac).strokeBorder(
-                            ring(i) ? palette.primary : palette.glassCardEdge, lineWidth: ring(i) ? 2 : 1)
-                    }
+                    .coreWell(active: ring(i))
                     .overlay(alignment: .topTrailing) {
                         if let matched, i < matched {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.tone(.done).ink)
@@ -93,7 +89,7 @@ struct FactCard<Content: View>: View {
         VStack(alignment: .leading, spacing: Space.s2) { content }
             .padding(Space.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.glassCard, in: coreShape(Radius.cardMac))
+            .coreWell()
     }
 }
 
@@ -207,23 +203,6 @@ enum DeviceWords {
         guard let d else { return "Never" }
         if Date().timeIntervalSince(d) < 90 { return "Just now" }
         return d.formatted(.relative(presentation: .named))
-    }
-}
-
-/// A destructive-leaning secondary button: the fail tone on a quiet fill. Used for "It doesn't match" and revoke.
-struct DangerButtonStyle: ButtonStyle {
-    @Environment(\.corePalette) private var palette
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        let t = palette.tone(.fail)
-        configuration.label
-            .coreFont(size: MacTextSize.body, weight: .medium)
-            .foregroundStyle(t.ink)
-            .frame(minHeight: MacSize.controlMd)
-            .padding(.horizontal, Space.s3)
-            .background(configuration.isPressed ? t.fill.opacity(2) : t.fill, in: coreShape(Radius.control))
-            .overlay { coreShape(Radius.control).strokeBorder(t.ink.opacity(0.5), lineWidth: 1) }
-            .coreDimWhenDisabled(enabled)
     }
 }
 

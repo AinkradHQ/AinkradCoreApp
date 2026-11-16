@@ -71,7 +71,7 @@ public struct ConfirmCard: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s6)
         .frame(width: Space.s8 * 14)
-        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .corePanel(radius: Radius.pane + Space.s1, padding: 0)
         .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         .scaleEffect(shown || reduce ? 1 : 0.97)
         .opacity(shown ? 1 : 0)
@@ -137,21 +137,18 @@ public struct ChoiceTile: View {
                 if let keys {
                     Text(keys).coreFont(size: MacTextSize.meta, weight: .medium, design: .rounded)
                         .padding(.horizontal, 6).frame(minHeight: 20)
-                        .background(on ? .white.opacity(0.14) : GlassInk.lift(0.14), in: coreShape(5))
+                        .background(on ? .white.opacity(0.14) : GlassInk.lift(0.14), in: coreShape(Radius.chip))
                 }
             }
             .foregroundStyle(on ? .white : GlassInk.primary)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 // By day the white label needs a strong fill: 0.6 blue over white is a washed 2.6:1.
-                on ? hue.opacity(choice.destructive || palette.isDay ? 0.92 : 0.6) : GlassInk.well,
-                in: coreShape(Radius.control + 2)
+                on ? hue : GlassInk.well,
+                in: coreShape(Radius.control)
             )
             .animation(Motion.out(Motion.hover), value: on)
-            .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? GlassInk.rim(0.4) : GlassInk.wellEdge, lineWidth: 1)
-            }
-            .contentShape(coreShape(Radius.control + 2))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(CoreTilePress())
         .accessibilityLabel(choice.label)
@@ -218,7 +215,7 @@ public struct ModalCard: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s5)
         .frame(maxWidth: Space.s8 * 13)
-        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .corePanel(radius: Radius.pane + Space.s1, padding: 0)
         .scaleEffect(shown || reduce ? 1 : 0.97)
         .opacity(shown ? 1 : 0)
         .animation(Motion.modal(shown, reduce), value: shown)

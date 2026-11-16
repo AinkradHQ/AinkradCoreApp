@@ -21,8 +21,7 @@ struct FirstRunView: View {
     var body: some View {
         ZStack {
             Color.clear.overlay {
-                Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
-                    .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
+                WallpaperView()
             }
             .clipped().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Space.s4) {
@@ -52,7 +51,7 @@ struct FirstRunView: View {
             .foregroundStyle(palette.text)
             .coreFont(size: MacTextSize.body)
             .padding(Space.s6)
-            .coreFrame(radius: Radius.panel, part: .dialogs)
+            .coreFrame(radius: Radius.pane, part: .dialogs)
             .frame(width: Space.s8 * 17)
             .accessibilityElement(children: .contain)
             cluster
@@ -275,7 +274,7 @@ struct FirstRunView: View {
                 }.coreGlassButton()
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.glassCard, in: coreShape(Radius.row))
+            .background(GlassInk.well, in: coreShape(Radius.control))
             VStack(alignment: .leading, spacing: Space.s2) {
                 note("1. Enter the address, then the code it printed.")
                 note("2. Compare the check code on this Mac with the one the host prints, and type y there.")
@@ -398,10 +397,7 @@ struct FirstRunView: View {
     private var approved: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(spacing: Space.s3) {
-                Image(systemName: "checkmark").coreFont(size: MacTextSize.large)
-                    .foregroundStyle(palette.tone(.run).ink)
-                    .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                    .background(palette.tone(.run).fill, in: coreShape(Radius.control)).accessibilityHidden(true)
+                IconTile("checkmark", hue: GlassInk.green, size: MacSize.controlLg).accessibilityHidden(true)
                 Text("This Mac is paired").coreFont(size: MacTextSize.large, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
             }

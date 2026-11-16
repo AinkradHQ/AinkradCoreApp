@@ -20,10 +20,15 @@ public struct AppSurfaceFill: View {
     /// The one tint every app's surface uses (Ahmed, 2026-11-05: the same settings must look the same in every app).
     /// The Terminals app's Deep Blue.
     /// The Terminals app's Deep Blue at night; white by day (light glass).
-    public static let tint = GlassInk.adaptive(Color(red: 3 / 255, green: 8 / 255, blue: 16 / 255), day: .white)
+    /// Neutral since 2026-11-15 (Ahmed: calm, the landing page's tones): near-black at night, light grey by day, so a white
+    /// card stands out on a pane.
+    public static let tint = GlassInk.adaptive(
+        Color(red: 14 / 255, green: 15 / 255, blue: 17 / 255),
+        day: Color(red: 238 / 255, green: 239 / 255, blue: 242 / 255))
     /// The Solid look's colour.
     public static let solid = GlassInk.adaptive(
-        Color(red: 0.05, green: 0.06, blue: 0.09), day: Color(red: 0.96, green: 0.972, blue: 0.988))
+        Color(red: 14 / 255, green: 15 / 255, blue: 17 / 255),
+        day: Color(red: 238 / 255, green: 239 / 255, blue: 242 / 255))
     public init(
         style: AppSurfaceStyle, opacity: Double, tint: Color = AppSurfaceFill.tint, blur: Bool = true,
         radius: CGFloat = Radius.cardMac
@@ -84,29 +89,20 @@ public struct AppFilterTile: View {
                 if count >= 0 {  // a negative count hides the badge (a page with nothing to count)
                     Text("\(count)").coreFont(size: MacTextSize.meta, weight: .semibold).monospacedDigit()
                         .padding(.horizontal, 6).frame(minHeight: 18)
-                        .background(GlassInk.lift(on ? 0.22 : 0.1), in: coreShape(5))
+                        .background(GlassInk.lift(on ? 0.22 : 0.1), in: coreShape(Radius.chip))
                         .contentTransition(.numericText())
                 }
-                // Always laid out, shown by opacity: hover never changes the tile's width.
-                Text(key).coreFont(size: 10, weight: .medium, design: .rounded).foregroundStyle(
-                    GlassInk.secondary
-                )
-                .opacity(hovering || on ? 1 : 0)
-                .accessibilityHidden(true)
             }
             .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
             .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
             .background(
                 on ? GlassInk.lift(0.16) : hovering ? GlassInk.lift(0.07) : .clear, in: coreShape(Radius.control)
             )
-            .overlay {
-                if on || hovering {
-                    coreShape(Radius.control).strokeBorder(GlassInk.rim(on ? 0.4 : 0.3), lineWidth: 1)
-                }
-            }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(CoreTilePress())
+        // The key shows in the tooltip, not on the tab (Ahmed, 2026-11-15).
+        .help(key.isEmpty ? title : "\(title)  \(key)")
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: on)
         .animation(Motion.out(Motion.hover), value: hovering)
@@ -145,25 +141,18 @@ public struct AppActionTile: View {
                     .coreEnterBounce(hovering)
                     .symbolEffect(.pulse, options: .repeating, isActive: pulse && !reduce)
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                if !key.isEmpty {
-                    Text(key).coreFont(size: 10, weight: .medium, design: .rounded)
-                        .padding(.horizontal, 5).frame(minHeight: 16)
-                        .background(prominent || pulse ? .white.opacity(0.16) : GlassInk.lift(0.16), in: coreShape(4))
-                }
             }
             .foregroundStyle(prominent || pulse ? .white : GlassInk.primary)
             .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
             .background(
-                prominent || pulse ? hue.opacity(hovering ? 0.95 : 0.8) : hovering ? hue.opacity(0.28) : GlassInk.well,
+                prominent || pulse ? hue.opacity(hovering ? 0.9 : 1) : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.control)
             )
-            .overlay {
-                coreShape(Radius.control).strokeBorder(
-                    GlassInk.rim(prominent || hovering ? 0.45 : 0.3), lineWidth: 1)
-            }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(CoreTilePress())
+        // The key runs it; it shows in the tooltip, not on the tile (Ahmed, 2026-11-15).
+        .help(key.isEmpty ? title : "\(title)  \(key)")
         .fixedSize()
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
@@ -257,8 +246,7 @@ public struct GlassSlider: View {
                     coreShape(3).fill(GlassInk.adaptive(.white.opacity(0.14), day: GlassInk.dayInk.opacity(0.12)))
                         .frame(height: 6)
                     coreShape(3).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
-                    coreShape(6).fill(.white).frame(width: 18, height: 18)
-                        .shadow(color: GlassInk.shade(0.35), radius: 3, y: 1)
+                    CoreGlassKnob(width: 18, height: 18, radius: 6, active: dragging)
                         .offset(x: direction == .rightToLeft ? 9 - x : x - 9)
                 }
                 .frame(maxHeight: .infinity)
@@ -369,7 +357,7 @@ public struct StepTrack: View {
                 .coreFont(size: MacTextSize.meta, weight: i == at ? .semibold : .regular)
                 .foregroundStyle(i == at ? .white : GlassInk.secondary)
                 .padding(.horizontal, 8).frame(height: 24)
-                .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(6))
+                .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.chip))
             }
         }
         .fixedSize()

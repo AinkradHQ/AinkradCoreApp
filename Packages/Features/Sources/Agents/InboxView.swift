@@ -66,7 +66,6 @@ struct InboxView: View {
         }
         .padding(Space.s4)
         .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
         .animation(.smooth(duration: 0.4), value: n)
     }
 
@@ -226,7 +225,6 @@ struct NotificationsSection: View {
         }
         .padding(Space.s4)
         .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
         .animation(.smooth(duration: 0.35), value: p)
         .accessibilityElement(children: .contain)
     }
@@ -247,7 +245,6 @@ private struct BannerPreview: View {
         }
         .padding(Space.s3).frame(maxWidth: Space.s8 * 12, alignment: .leading)
         .background(GlassInk.sunk(0.25), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
         .help("What an approval banner looks like")
         .accessibilityElement(children: .combine).accessibilityLabel("Preview: claude is waiting on you")
     }

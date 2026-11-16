@@ -50,34 +50,11 @@ private struct GlassModifier: ViewModifier {
     let tinted: Bool
     let frosted: Bool
     @Environment(\.coreSolidOnly) private var solid
+    @Environment(\.coreLook) private var look
     /// Night glass is always dark; day glass is light.
     private var scheme: ColorScheme { palette.isDay ? .light : .dark }
     func body(content: Content) -> some View {
-        let shape = coreShape(radius)
-        if solid {
-            // Reduce Transparency: a solid panel fill instead of Liquid Glass (glass is not documented to honour the setting).
-            content.environment(\.colorScheme, scheme).background(palette.panelStrong, in: shape)
-        } else if #available(macOS 26, iOS 26, *) {
-            if tinted {
-                // The one glass for cards, tiles and dialogs (the launcher's): a dark layer on Apple's frosted glass at
-                // night; by day a white layer on light glass (Ahmed, 2026-11-12: day is light Liquid Glass).
-                let glass = Glass.regular
-                content.environment(\.colorScheme, scheme)
-                    .background(palette.isDay ? Color.white.opacity(0.42) : Color.black.opacity(0.32), in: shape)
-                    .glassEffect(interactive ? glass.interactive() : glass, in: shape)
-            } else {
-                let base = frosted ? Glass.regular : Glass.clear
-                // Untinted is the widgets' glass: clear, so the sky shows through sharp; darkened a touch at night.
-                let glass =
-                    palette.isDay
-                    ? base.tint(.white.opacity(0.3))
-                    : base.tint(.black.opacity(0.32))
-                content.environment(\.colorScheme, scheme)
-                    .glassEffect(interactive ? glass.interactive() : glass, in: shape)
-            }
-        } else {
-            content.background(shape.fill(.regularMaterial).environment(\.colorScheme, scheme))
-                .background(palette.glassTint, in: shape)
-        }
+        // No Liquid Glass (Ahmed, 2026-11-15): the content background, which goes solid under Reduce Transparency.
+        content.environment(\.colorScheme, scheme).background(AppSurfaceFill(look, radius: radius))
     }
 }

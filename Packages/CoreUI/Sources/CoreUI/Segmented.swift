@@ -98,27 +98,23 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .background {
                 coreShape(Radius.control).fill(
                     hovering
-                        ? GlassInk.adaptive(GlassInk.slate.opacity(0.28), day: .white.opacity(0.85))
-                        : selected && palette.isDay ? .clear : GlassInk.well)
+                        ? GlassInk.adaptive(GlassInk.slate.opacity(0.28), day: GlassInk.wellHover)
+                        : selected ? .clear : GlassInk.well)
             }
             .background {
                 // The parent's animation glides the highlight between segments. Reduce Motion: it jumps and its colour fades.
                 if reduce {
-                    coreShape(Radius.control).fill(GlassInk.blue.opacity(selected ? 0.8 : 0))
+                    coreShape(Radius.control).fill(GlassInk.blue.opacity(selected ? 1 : 0))
                 } else if selected {
-                    coreShape(Radius.control).fill(GlassInk.blue.opacity(0.8))
+                    coreShape(Radius.control).fill(GlassInk.blue)
                         .matchedGeometryEffect(id: "lens", in: lens)
                 }
-            }
-            .overlay {
-                coreShape(Radius.control).strokeBorder(
-                    GlassInk.rim(selected || hovering ? 0.45 : 0.3), lineWidth: 1)
             }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(CoreTilePress())
         .focusable(false)
-        .coreFocusRing(focused, radius: Radius.control, palette: palette)
+        .coreFocusRing(focused && CoreInputMode.shared.navigating, radius: Radius.control, palette: palette)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -134,6 +130,7 @@ public struct GlassToggleTile: View {
     let onSymbol: String
     let fill: Bool
     @Binding var isOn: Bool
+    @State private var flipping = false
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -178,15 +175,13 @@ public struct GlassToggleTile: View {
                 coreShape(Radius.control)
                     .fill(hovering ? GlassInk.wellHover : GlassInk.well)  // neutral well: the switch carries "on"
             }
-            .overlay {
-                coreShape(Radius.control).strokeBorder(GlassInk.rim(hovering ? 0.45 : 0.3), lineWidth: 1)
-            }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(CoreTilePress())
         .focusable(false)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
+        .onChange(of: isOn) { flipping = CoreGlassKnob.flash { flipping = false } }
         .animation(Motion.out(Motion.ui), value: isOn)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? "On" : "Off")
@@ -195,13 +190,12 @@ public struct GlassToggleTile: View {
 
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
-        coreShape(5).fill(
+        coreShape(Radius.chip).fill(
             isOn ? GlassInk.blue : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
         )
         .frame(width: 30, height: 18)
         .overlay(alignment: isOn ? .trailing : .leading) {
-            coreShape(4).fill(.white).frame(width: 14, height: 14).padding(2)
-                .shadow(color: GlassInk.shade(0.25), radius: 2, y: 1)
+            CoreGlassKnob(width: 14, height: 14, radius: 4, active: flipping).padding(2)
         }
         .accessibilityHidden(true)
     }

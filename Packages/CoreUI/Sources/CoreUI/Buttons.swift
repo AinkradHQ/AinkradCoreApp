@@ -78,22 +78,18 @@ private struct CoreButtonBody: View {
                 configuration.label.opacity(busy ? 0 : 1)
                 if busy { ProgressView().controlSize(.small).tint(ink) }
             }
-            // The key that runs this button, shown on it (Ahmed, 2026-11-05: every action keyboard driven).
-            if let keycap {
-                // fixedSize: a keycap never gives way to its label ("Deny ⌘⌫" drew as "⌘…" on a small button).
-                Text(keycap).coreFont(size: 10, weight: .medium, design: .rounded).fixedSize()
-                    .padding(.horizontal, 5).frame(minHeight: 16)
-                    .background(solid ? .white.opacity(0.16) : GlassInk.lift(0.16), in: coreShape(5))
-                    .accessibilityHidden(true)
-            }
         }
+        // The key still runs the button; it shows in the hover tooltip, not on the button (Ahmed, 2026-11-15: calmer).
+        .help(keycap ?? "")
         .coreFont(size: size.text, weight: .semibold)
         .foregroundStyle(ink)
         .frame(minHeight: size.height)
         .padding(.horizontal, size == .small ? Space.s2 : Space.s3)
         .modifier(ButtonSurface(kind: kind, radius: size.radius, fill: fill, hover: hover, darken: pressed && reduce))
         // Keyboard focus: the hover fill step, a brighter edge and a 1 pt lift (D6), no ring.
-        .coreFocusRing(isFocused || forced == .focused, radius: size.radius, palette: palette)
+        .coreFocusRing(
+            CoreKeyboardFocus.own(isFocused) || forced == .focused, radius: size.radius, palette: palette
+        )
         .coreDimWhenDisabled(enabled)
         .scaleEffect(pressed && !reduce ? 0.97 : 1)
         .coreAnimation(Motion.press(Motion.press), value: pressed)
@@ -136,21 +132,14 @@ private struct ButtonSurface: ViewModifier {
         content
             .background {
                 switch kind {
-                case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.95 : 0.8))
-                case .secondary:
-                    shape.fill(hover ? GlassInk.adaptive(hue.opacity(0.28), day: .white.opacity(0.85)) : GlassInk.well)
+                case .prominent, .danger: shape.fill(hue.opacity(hover ? 0.9 : 1))
+                case .secondary: shape.fill(hover ? GlassInk.wellHover : GlassInk.well)
                 case .plain: shape.fill(hover ? GlassInk.wellHover : .clear)
-                case .quietDanger: shape.fill(GlassInk.red.opacity(hover ? 0.22 : 0.1))
+                // Quiet danger: red words, a tint only on hover.
+                case .quietDanger: shape.fill(GlassInk.red.opacity(hover ? 0.14 : 0))
                 }
             }
-            .overlay {
-                if kind == .quietDanger {
-                    shape.strokeBorder(GlassInk.red.opacity(hover ? 0.85 : 0.55), lineWidth: 1)
-                } else if kind != .plain {
-                    shape.strokeBorder(
-                        GlassInk.rim(0.3 + (hover ? 0.15 : 0)), lineWidth: 1)
-                }
-            }
+            // No outlines (Ahmed, 2026-11-15): a fill step is the only hover.
             .overlay { shape.fill(.black.opacity(darken ? 0.18 : 0)).allowsHitTesting(false) }
             .animation(Motion.out(Motion.hover), value: darken)
     }

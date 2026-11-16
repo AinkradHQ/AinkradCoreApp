@@ -8,9 +8,15 @@ struct TranscriptView: View {
     let store: TranscriptStore?
     let session: AgentSessionInfo
     var jump = 0
+    /// An entry to bring into view and mark: the find bar's current match or a turn jump.
+    var focus: Int64?
     @State private var atEnd = true
     /// A scroll to the end is queued for the next frame: a burst of entries asks once, not once each.
     @State private var scrollQueued = false
+    /// Runs of tool steps the person opened or folded (by first seq); ⌥⌘→ / ⌥⌘← set them all.
+    @State private var runOpen: [Int64: Bool] = [:]
+    @State private var runsAll: Bool?
+    @Environment(\.sessionUI) private var ui
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -25,31 +31,58 @@ struct TranscriptView: View {
         ScrollViewReader { proxy in
             ZStack(alignment: .bottom) {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: Space.s3) {
+                    LazyVStack(alignment: .leading, spacing: Space.s4) {
                         header(store)
+                        // Everything the rows need, worked out once per pass (the scroll stuttered when each row
+                        // rescanned the transcript: n × n work on every redraw, Ahmed 2026-11-16).
                         let turns = ConversationWords.turns(store.entries)
-                        ForEach(Self.visible(store.entries)) { e in
-                            row(e, store, turn: turns[e.seq])
-                                .id(e.seq)
-                                // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
-                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
+                        let latest = Self.latest(store.entries)
+                        ForEach(columnRows(store)) { c in
+                            Group {
+                                switch c.kind {
+                                case .entry(let e, let inRun):
+                                    marked(e) { row(e, store, turn: turns[e.seq], latest: latest.contains(e.seq)) }
+                                        .padding(.leading, inRun ? Space.s4 : 0)
+                                case .run(let es, let open):
+                                    ToolRunHeader(entries: es, open: open) {
+                                        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
+                                            runOpen[es[0].seq] = !open
+                                        }
+                                    }
+                                }
+                            }
+                            .id(c.id)
+                            // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
+                            .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
                         // The Core's own holds are not transcript entries: they stand after the last one, newest last.
-                        ForEach(store.heldList) { r in
+                        ForEach(store.heldList.filter { $0.status(now: Date(), sessionOver: session.over) != .pending })
+                        {
+                            r in
                             ApprovalEntryCard(model: model, request: r)
                                 .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                         }
                         if session.live && !session.idle && store.load == .ready && !model.waiting(session.id) {
                             Thinking(since: session.updatedAt)
                         }
+                        // While an approval waits, say so where the work would show (the turn is not running).
+                        if session.live, store.load == .ready,
+                            let asked = model.pending.first(where: { $0.session == session.id })?.requestedAt
+                        {
+                            Thinking(since: asked, words: "Waiting for your approval", working: false)
+                        }
                         Color.clear.frame(height: 1).id("end")
                             .onAppear { atEnd = true }
                             .onDisappear { atEnd = false }
                     }
+                    .readingColumn()
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
                 }
-                .defaultScrollAnchor(.bottom)
+                .shortStartsAtTop()
                 .scrollIndicators(.never)
+                // Soft edges by the system (drawn on the GPU while scrolling), not a mask: a mask made the whole
+                // scrolling layer render offscreen on every frame.
+                .softScrollEdges()
                 .animation(Motion.out(Motion.ui), value: store.entries.count)
                 .onChange(of: store.lastSeq) { _, _ in
                     guard atEnd, !scrollQueued else { return }
@@ -61,16 +94,63 @@ struct TranscriptView: View {
                     }
                 }
                 .onChange(of: jump) { _, _ in toEnd(proxy) }
+                .onChange(of: ui?.steps.gen) { _, _ in
+                    guard let ui else { return }
+                    withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
+                        runOpen = [:]
+                        runsAll = ui.steps.open
+                    }
+                }
+                .onChange(of: focus) { _, f in
+                    guard let f else { return }
+                    // A match inside a folded run opens it (columnRows), so the entry itself is in the column.
+                    let target = f
+                    withAnimation(Motion.calm(Motion.out(Motion.move), reduce)) {
+                        proxy.scrollTo(target, anchor: .center)
+                    }
+                }
                 .onChange(of: store.heldList.count) { _, _ in if atEnd { toEnd(proxy) } }
                 if !atEnd {
                     // A quiet glass control centred over the composer, not an action tile.
                     Button(action: { toEnd(proxy) }) { Label("Latest", systemImage: "chevron.down") }
                         .buttonStyle(CoreButtonStyle(.plain, size: .small)).environment(\.coreKeycap, "↓")
                         .coreGlass(radius: Radius.chip)
-                        .help("Jump to the newest message (↓)")
+                        .help("Jump to the newest message (↓)").keyHint("↓")
                         .padding(.bottom, Space.s2)
                         .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
                 }
+            }
+        }
+    }
+
+    private func columnRows(_ store: TranscriptStore) -> [ColumnRow] {
+        ColumnRow.rows(TranscriptItem.items(Self.visible(store.entries))) { seq, es in
+            // A run holding the find bar's match opens, so the mark can show.
+            if let focus, es.contains(where: { $0.seq == focus }) { return true }
+            return runOpen[seq] ?? runsAll ?? ColumnRow.openByDefault(es)
+        }
+    }
+
+    /// Your latest message and the latest answer: the two rows that carry the action row. One backward pass.
+    static func latest(_ entries: [TranscriptEntry]) -> Set<Int64> {
+        var user: Int64?
+        var answer: Int64?
+        for e in entries.reversed() {
+            switch e.kind {
+            case .user where user == nil: user = e.seq
+            case .assistant where answer == nil: answer = e.seq
+            default: break
+            }
+            if user != nil && answer != nil { break }
+        }
+        return Set([user, answer].compactMap { $0 })
+    }
+
+    /// The find bar's or a turn jump's mark behind an entry.
+    private func marked(_ e: TranscriptEntry, @ViewBuilder _ c: () -> some View) -> some View {
+        c().background {
+            if e.seq == focus {
+                coreShape(Radius.control).fill(GlassInk.blue.opacity(0.16)).padding(-Space.s1)
             }
         }
     }
@@ -87,16 +167,22 @@ struct TranscriptView: View {
         }
     }
 
-    @ViewBuilder private func row(_ e: TranscriptEntry, _ store: TranscriptStore, turn: ConversationWords.Turn?)
-        -> some View
-    {
+    @ViewBuilder private func row(
+        _ e: TranscriptEntry, _ store: TranscriptStore, turn: ConversationWords.Turn?, latest: Bool
+    ) -> some View {
         if case .approvalRequest(let id, _, _, _) = e.kind, let r = store.approvals[id] {
-            ApprovalEntryCard(model: model, request: r)
-                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
-        } else {
-            EntryRow(entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn) {
-                model.shell.launcher.entry("connections")?.run()
+            // A pending one is pinned above the composer (PinnedApprovals); answered or expired, it stays here as history.
+            if r.status(now: Date(), sessionOver: session.over) != .pending {
+                ApprovalEntryCard(model: model, request: r)
+                    .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
             }
+        } else {
+            EntryRow(
+                entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
+                latest: latest,
+                openConnections: { model.shell.launcher.entry("connections")?.run() },
+                actions: EntryActions.make(model, session, ui: ui)
+            )
             .equatable()
             // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
             .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
@@ -138,19 +224,26 @@ extension View {
 /// The AI session working: a blue bar that slides, "Thinking…" and how long. The bar rests under Reduce Motion.
 struct Thinking: View {
     let since: Date
+    var words = "Thinking…"
+    /// False while it waits on you: the bar rests.
+    var working = true
     @Environment(\.corePalette) private var palette
     var body: some View {
         HStack(spacing: Space.s3) {
-            CoreWorkingBar()
-            Text("Thinking…").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+            if working {
+                CoreWorkingBar()
+            } else {
+                Image(systemName: "hand.raised").foregroundStyle(GlassInk.amberInk).frame(width: Space.s8)
+            }
+            Text(words).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
             TimelineView(.periodic(from: since, by: 1)) { ctx in
                 Text(coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(since))))", "s"))
-                    .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2).monospacedDigit()
+                    .coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2).monospacedDigit()
             }
         }
         .padding(.vertical, Space.s1)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("The AI session is thinking")
+        .accessibilityLabel(working ? "The AI session is thinking" : words)
     }
 }
 
@@ -162,33 +255,55 @@ struct EntryRow: View, Equatable {
     var harness = "claude"
     var runner = ""
     var turn: ConversationWords.Turn?
+    /// Your latest message or the latest answer: it carries the action row.
+    var latest = false
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
+    /// Copy, Edit, Resend, Retry, Quote. Only `canSend` is compared.
+    var actions: EntryActions?
     @State private var expanded = EntryRow.openAtStart
 
     /// Debug screenshots only: rows start open.
     nonisolated(unsafe) static var openAtStart = false
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool {
-        a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn
+        a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn && a.latest == b.latest
+            && a.actions?.canSend == b.actions?.canSend
     }
     @Environment(\.corePalette) private var palette
+    @Environment(\.sessionUI) private var ui
 
     var body: some View {
+        content.onChange(of: ui?.steps.gen) { _, _ in if let ui { expanded = ui.steps.open } }
+    }
+
+    @ViewBuilder private var content: some View {
         switch entry.kind {
         case .user(let text):
-            HStack {
-                Spacer(minLength: Space.s8)
-                Text(text).coreFont(size: MacTextSize.body).foregroundStyle(palette.btnInk)
-                    .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-                    .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
-                    .textSelection(.enabled)
-                    .agentCopyMenu(text)
+            // The words in the bubble; attached images and files under it.
+            let parts = MessageFiles.split(text)
+            VStack(alignment: .trailing, spacing: Space.s2) {
+                if !parts.words.isEmpty {
+                    HStack {
+                        Spacer(minLength: Space.s8 * 5)  // a bubble stays within about 80% of the column
+                        // A neutral bubble, not a coloured one (direction A): your words, on the right.
+                        Text(parts.words).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text).lineSpacing(
+                            4
+                        )
+                        .padding(.horizontal, Space.s4).padding(.vertical, 10)
+                        .background(SessionInk.bubble, in: coreShape(12))
+                        .textSelection(.enabled)
+                        .messageActions(text: parts.words, user: true, latest: latest, actions)
+                    }
+                }
+                if !parts.files.isEmpty { MessageFilesView(paths: parts.files) }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
             .accessibilityLabel("You: \(text)")
         case .assistant(let text):
             // Printed on the glass, no bubble.
-            MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading).agentCopyMenu(text)
+            MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
+                .messageActions(text: text, user: false, latest: latest, actions)
         case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
             CodeModeCard(
                 tool: CodeModeTool.of(name)!, summary: summary, status: .running, output: "", durationMs: nil,
@@ -220,11 +335,19 @@ struct EntryRow: View, Equatable {
         case .toolEdit(_, let name, let path, let old, let new, let ok, let ms):
             EditCard(name: name, path: path, old: old, new: new, ok: ok, ms: ms, expanded: $expanded)
         case .toolTodos(_, let items): TodoCard(items: items)
+        case .subAgent(let id, let type, let task, let prompt, let result, let ok, let ms):
+            SubAgentLine(
+                info: SubAgentInfo(id: id, type: type, task: task, prompt: prompt, result: result, ok: ok, ms: ms),
+                since: entry.at)
+        case .plan(_, let text): PlanCard(text: text)
         case .turnEnded(let cost, let tokens):
-            line(ConversationWords.turn(turn, cost: cost))
+            // The quietest line in the column (Ahmed, 2026-11-15): the time and the exact numbers wait in the tooltip.
+            line(ConversationWords.turn(turn, cost: cost), time: false)
                 .help(
-                    [tokens.map { "\(AgentWords.tokens($0)) tokens" }, AgentWords.exactCost(cost)].compactMap { $0 }
-                        .joined(separator: " · "))
+                    [
+                        entry.at.formatted(date: .omitted, time: .shortened),
+                        tokens.map { "\(AgentWords.tokens($0)) tokens" }, AgentWords.exactCost(cost),
+                    ].compactMap { $0 }.joined(separator: " · "))
         case .approvalRequest, .approvalDecided: EmptyView()  // drawn as one card by the transcript
         case .ended(let kind, let reason):
             line([ConversationWords.event(entry.kind, runner: runner) ?? ""])
@@ -241,9 +364,9 @@ struct EntryRow: View, Equatable {
     }
 
     /// An event as one quiet centred line (N42): "Turn 1 done · 1.9K tokens · $0.04 · 10:38". No rules, no dashes.
-    private func line(_ parts: [String]) -> some View {
-        Text((parts + [entry.at.formatted(date: .omitted, time: .shortened)]).joined(separator: " · "))
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+    private func line(_ parts: [String], time: Bool = true) -> some View {
+        Text((parts + (time ? [entry.at.formatted(date: .omitted, time: .shortened)] : [])).joined(separator: " · "))
+            .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
             .lineLimit(1).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s1)
             .accessibilityElement(children: .combine)
@@ -266,6 +389,20 @@ struct ToolCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
+    /// What the tool did, as a verb: "Read", "Edited", "Ran".
+    static func verb(_ name: String) -> String {
+        switch name.lowercased() {
+        case "read", "notebookread": "Read"
+        case "glob", "grep", "ls": "Searched"
+        case "edit", "multiedit", "notebookedit": "Edited"
+        case "write": "Wrote"
+        case "bash", "shell": "Ran"
+        case "webfetch": "Fetched"
+        case "websearch": "Searched the web for"
+        default: name
+        }
+    }
+
     private var symbol: String {
         switch name.lowercased() {
         case "bash", "shell": "terminal"
@@ -280,19 +417,21 @@ struct ToolCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(reduce ? nil : Motion.out(Motion.ui)) { expanded.toggle() }
+                withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { expanded.toggle() }
             } label: {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).rotationEffect(.degrees(expanded ? 90 : 0))
-                        .frame(width: Space.s3)
-                    Image(systemName: symbol).foregroundStyle(palette.primary).frame(width: Space.s4)
+                // One quiet line, no box (direction A): icon, the verb, what it acted on, then the time and its mark.
+                HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                    Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+                        .frame(width: Space.s4)
+                    Text(Self.verb(name)).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
                     Text(PathWords.short(summary.isEmpty ? name : summary))
-                        .coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: Space.s2)
-                    trailing
+                        .coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
+                        .lineLimit(1).truncationMode(.middle)
+                    // The working bar gives way to ✓ or ✗ with a short crossfade when the step finishes.
+                    trailing.animation(Motion.out(0.2), value: statusKey)
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
+                .padding(.horizontal, Space.s2).frame(minHeight: 28)
                 .contentShape(Rectangle())
             }
             .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
@@ -316,23 +455,29 @@ struct ToolCard: View {
         }
         .foregroundStyle(palette.text)
         .frame(maxWidth: .infinity)
-        .clipShape(coreShape(Radius.control))
-        .coreWell(radius: Radius.control)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
+    }
+
+    private var statusKey: Int {
+        switch status {
+        case .running: 0
+        case .ok: 1
+        case .failed: 2
+        }
     }
 
     @ViewBuilder private var trailing: some View {
         switch status {
         case .running:
             HStack(spacing: Space.s2) {
-                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                 CoreWorkingBar(width: Space.s8)
             }
         case .ok(let facts):
             HStack(spacing: Space.s2) {
                 if !facts.isEmpty {
-                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
                 }
                 Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(palette.primary).accessibilityLabel("Done")
@@ -340,11 +485,39 @@ struct ToolCard: View {
         case .failed(let facts):
             HStack(spacing: Space.s2) {
                 if !facts.isEmpty {
-                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                    Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
                 }
-                Image(systemName: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(palette.tone(.fail).ink).accessibilityLabel("Failed")
+                Label("Failed", systemImage: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(SessionInk.bad)
             }
+        }
+    }
+}
+
+extension View {
+    /// A short conversation starts at the top (no empty band above it); a long one still opens at its latest message.
+    @ViewBuilder fileprivate func shortStartsAtTop() -> some View {
+        if ScrollBench.off.contains("anchor") {
+            self
+        } else if #available(macOS 15, *) {
+            defaultScrollAnchor(.top, for: .alignment).defaultScrollAnchor(.bottom, for: .initialOffset)
+                .defaultScrollAnchor(.bottom, for: .sizeChanges)
+        } else {
+            defaultScrollAnchor(.bottom)
+        }
+    }
+}
+
+extension View {
+    /// The system's soft scroll edge where it exists (macOS 26), drawn on the GPU; earlier systems keep a hard edge rather
+    /// than a mask that renders the scroll view offscreen every frame.
+    @ViewBuilder func softScrollEdges() -> some View {
+        if ScrollBench.off.contains("softedge") {
+            self
+        } else if #available(macOS 26, *) {
+            scrollEdgeEffectStyle(.soft, for: .vertical)
+        } else {
+            self
         }
     }
 }

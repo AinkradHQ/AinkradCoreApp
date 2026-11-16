@@ -1,11 +1,12 @@
 import CoreUI
 import SwiftUI
 
-/// The AI Sessions list, variant B (N42): a sidebar of what needs you, when, projects and runners, and a flat dense list. Built
+/// The AI Sessions list, variant B (N42): a sidebar of what needs you, when and projects, and a flat dense list. Built
 /// for hundreds of sessions: lazy rows, pages loaded from the Core as you scroll, ended ones archived after 14 days.
 struct AgentsListView: View {
     @Bindable var model: AgentsModel
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @FocusState private var listFocus: Bool
     @FocusState private var searchFocus: Bool
     @State private var collapsed: Set<SessionSection> = [.earlier]
@@ -35,13 +36,14 @@ struct AgentsListView: View {
                 filterBar(index, compact: compact)
                 HStack(alignment: .top, spacing: Space.s2) {
                     if !compact { SessionSidebar(model: model, index: index).frame(width: 210) }
-                    content(groups, rows, compact: compact)
+                    content(groups, rows, compact: compact, waiting: index.needsYou)
                 }
-                .padding(.horizontal, Space.s3)
-                keyHints
+                .padding(.horizontal, Space.s5)
             }
         }
         .foregroundStyle(palette.text)
+        // The same light backing by day as the conversation screen, over the Look.
+        .background(SessionInk.backing)
         .paneLook(AgentPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
@@ -56,8 +58,8 @@ struct AgentsListView: View {
     private func header(_ index: SessionIndex) -> some View {
         let active = index.counts[.active] ?? 0
         return HStack(spacing: Space.s3) {
-            Text("AI Sessions").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
-            CountBadge(model.sessions.items.count, tone: .quiet, label: "AI sessions")
+            // The same title line as the conversation screen: body size, semibold (review 2026-11-16).
+            Text("AI Sessions").coreFont(size: MacTextSize.body, weight: .semibold).accessibilityAddTraits(.isHeader)
             Text(
                 [
                     "\(active) active", AgentWords.cost(model.sessions.totalCostMicros).map { "\($0) in total" },
@@ -65,18 +67,20 @@ struct AgentsListView: View {
             )
             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
-            Button(action: { model.openNewSession() }) { Label("New AI session", systemImage: "plus") }
-                .buttonStyle(.coreProminent).environment(\.coreKeycap, "⌘N")
+            // Graphite, the one filled button colour of the AI session screens.
+            Button(action: { model.openNewSession() }) { Label("New AI Session", systemImage: "plus") }
+                .buttonStyle(GraphiteButtonStyle()).keyHint("⌘N")
                 .help("Open a new AI session with the defaults (⌘N)")
         }
-        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+        .padding(.horizontal, Space.s5).padding(.vertical, Space.s3)
     }
 
     private func filterBar(_ index: SessionIndex, compact: Bool) -> some View {
         HStack(spacing: Space.s2) {
             HStack(spacing: Space.s2) {
                 Image(systemName: "magnifyingglass").foregroundStyle(palette.text2).accessibilityHidden(true)
-                TextField("Search title, first message, folder or project", text: $model.filters.search)
+                TextField("Search sessions", text: $model.filters.search)
+                    .help("Searches the title, the first message, the folder and the project")
                     .textFieldStyle(.plain).focused($searchFocus)
                     .onKeyPress(.escape) {
                         model.filters.search = ""
@@ -106,20 +110,8 @@ struct AgentsListView: View {
                     $model.filters.project, all: "Any project",
                     index.projects.map { CoreSelectOption(Optional($0.name), $0.name) })
             }
-            filter(
-                $model.filters.state, all: "Any state",
-                SessionFilters.Facet.allCases.map { CoreSelectOption(Optional($0), Self.facetWords($0)) })
         }
-        .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
-    }
-
-    private static func facetWords(_ f: SessionFilters.Facet) -> String {
-        switch f {
-        case .needsYou: "Needs you"
-        case .running: "Running"
-        case .waiting: "Waiting for you"
-        case .ended: "Ended"
-        }
+        .padding(.horizontal, Space.s5).padding(.bottom, Space.s2)
     }
 
     /// One filter: a quiet chevron select (CoreSelect) whose first choice clears it.
@@ -132,25 +124,20 @@ struct AgentsListView: View {
     /// Narrow panes drop the sidebar: its entries become one select.
     private var scopeMenu: some View {
         let all: [(String, SessionScope)] = [
-            ("Active", .active), ("Needs you", .needsYou), ("Running", .running), ("Waiting for you", .waiting),
-            ("Pinned", .pinned), ("Today", .today), ("Yesterday", .yesterday), ("This week", .thisWeek),
+            ("Active", .active), ("Needs you", .needsYou), ("Running", .running), ("Pinned", .pinned),
+            ("Ended", .ended), ("Today", .today), ("Yesterday", .yesterday), ("This week", .thisWeek),
             ("Earlier", .earlier), ("Archive", .archive),
         ]
         return CoreSelect(nil, selection: $model.scope, options: all.map { CoreSelectOption($0.1, $0.0) })
             .frame(width: Space.s8 * 5)
     }
 
-    private var keyHints: some View {
-        // A vertical list: up and down, which never flip on a right-to-left line.
-        Text("↑ ↓ move · ↩ open · ⌘N new AI session · ⌘F search · P pin · E end · A archive")
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, Space.s2)
-    }
-
     // MARK: rows
 
     @ViewBuilder
-    private func content(_ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool) -> some View {
+    private func content(
+        _ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool, waiting waitingIDs: Set<String>
+    ) -> some View {
         switch model.sessions.load {
         case .idle, .loading:
             VStack(spacing: Space.s2) {
@@ -182,18 +169,20 @@ struct AgentsListView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                list(groups, rows, compact: compact)
+                list(groups, rows, compact: compact, waiting: waitingIDs)
             }
         }
     }
 
-    private func columnHeads(compact: Bool) -> some View {
+    private func columnHeads(compact: Bool, showActivity: Bool) -> some View {
         HStack(spacing: Space.s3) {
-            Text("Title and project").frame(maxWidth: .infinity, alignment: .leading)
+            Text("Title").frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, MacSize.controlSm + Space.s3)
             if !compact { Text("Runner").frame(width: SessionColumns.runner, alignment: .leading) }
             Text("State").frame(width: SessionColumns.state, alignment: .leading)
-            if !compact { Text("Last activity").frame(width: SessionColumns.activity, alignment: .leading) }
+            if !compact && showActivity {
+                Text("Last activity").frame(width: SessionColumns.activity, alignment: .leading)
+            }
             Text("Cost").frame(width: SessionColumns.cost, alignment: .trailing)
         }
         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).padding(.horizontal, Space.s3)
@@ -201,41 +190,65 @@ struct AgentsListView: View {
     }
 
     /// Keyboard: the list holds focus, ↑↓ move the cursor, ↩ opens, P pins, E ends, A archives.
-    private func list(_ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool) -> some View {
-        let waitingIDs = Set(model.pending.map(\.session))
+    private func list(
+        _ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool, waiting waitingIDs: Set<String>
+    ) -> some View {
         let now = Date()
+        // The column only earns its place when the visible rows differ in last activity.
+        // Always shown, so the columns never jump (review 2026-11-16).
+        let showActivity = true
         return VStack(alignment: .leading, spacing: 0) {
-            columnHeads(compact: compact)
+            columnHeads(compact: compact, showActivity: showActivity)
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2, pinnedViews: []) {
-                        ForEach(groups) { g in
-                            SectionHeader(group: g, collapsed: collapsed.contains(g.section)) {
-                                if collapsed.contains(g.section) {
-                                    collapsed.remove(g.section)
-                                } else {
-                                    collapsed.insert(g.section)
+                        // One flat list of headers and rows: rows nested in a ForEach per group did not redraw in the lazy
+                        // stack when a session changed state or group (a live run showed Running under Needs you). A row's id
+                        // is its session's, which scrolling uses.
+                        ForEach(
+                            ListItem.flatten(groups, open: { !collapsed.contains($0) || !model.filters.search.isEmpty })
+                        ) {
+                            item in
+                            if let s = item.row {
+                                SessionRow(
+                                    session: s, title: model.title(s), runner: model.runnerName(s.runner),
+                                    waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
+                                    selected: model.selected == s.id, compact: compact, showActivity: showActivity,
+                                    now: now,
+                                    onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
+                                )
+                                .onTapGesture(count: 2) { model.openSession(s.id) }
+                                .onTapGesture {
+                                    model.selected = s.id
+                                    listFocus = true
                                 }
-                            }
-                            if !collapsed.contains(g.section) || !model.filters.search.isEmpty {
-                                ForEach(g.rows) { s in
-                                    SessionRow(
-                                        session: s, title: model.title(s), runner: model.runnerName(s.runner),
-                                        waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
-                                        selected: model.selected == s.id, compact: compact, now: now,
-                                        onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
-                                    )
-                                    .id(s.id)
-                                    .onTapGesture(count: 2) { model.openSession(s.id) }
-                                    .onTapGesture {
-                                        model.selected = s.id
-                                        listFocus = true
+                                .accessibilityAddTraits(
+                                    model.selected == s.id ? [.isSelected, .isButton] : .isButton
+                                )
+                                .accessibilityAction { model.openSession(s.id) }
+                                .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -4)))
+                                .onAppear { model.loadTitle(s.id) }
+                                // Every row a person can act on has the same actions on right-click (HIG).
+                                .contextMenu {
+                                    Button("Open") { model.openSession(s.id) }
+                                    Button(model.pinned.contains(s.id) ? "Unpin" : "Pin") { model.togglePin(s.id) }
+                                    if s.live { Button("End Session…") { model.confirmEnd(s.id) } }
+                                    Button("Archive") { model.toggleArchive(s.id) }
+                                    Button("Copy Title") {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(model.title(s), forType: .string)
                                     }
-                                    .accessibilityAddTraits(
-                                        model.selected == s.id ? [.isSelected, .isButton] : .isButton
-                                    )
-                                    .accessibilityAction { model.openSession(s.id) }
-                                    .onAppear { model.loadTitle(s.id) }
+                                }
+                            } else {
+                                SectionHeader(group: item.group, collapsed: collapsed.contains(item.group.section)) {
+                                    // The rows fade (and rise 4 pt) as a section opens or closes.
+                                    withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
+                                        if collapsed.contains(item.group.section) {
+                                            collapsed.remove(item.group.section)
+                                        } else {
+                                            collapsed.insert(item.group.section)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -247,6 +260,8 @@ struct AgentsListView: View {
                         }
                     }
                     .padding(.bottom, Space.s2)
+                    // A session that changes group (Running → Needs you) glides to its new place (review 2026-11-16).
+                    .animation(Motion.calm(Motion.out(0.28), reduce), value: rows.map(\.id))
                 }
                 .scrollIndicators(.never)
                 .focusable()
@@ -316,8 +331,20 @@ struct NotificationAsk: View {
             }
         }
         .padding(Space.s3)
-        .background(palette.glassCard, in: coreShape(Radius.row))
-        .overlay { coreShape(Radius.row).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+        .coreWell(radius: Radius.row)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// A header or a row of the session list, in one flat sequence for the lazy stack.
+struct ListItem: Identifiable {
+    let group: SessionGroup
+    let row: AgentSessionInfo?
+    var id: String { row?.id ?? "section:\(group.section)" }
+
+    static func flatten(_ groups: [SessionGroup], open: (SessionSection) -> Bool) -> [ListItem] {
+        groups.flatMap { g in
+            [ListItem(group: g, row: nil)] + (open(g.section) ? g.rows.map { ListItem(group: g, row: $0) } : [])
+        }
     }
 }

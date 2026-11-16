@@ -248,6 +248,7 @@ enum AuditWords {
 
 /// Filters as tiles: the area at the top, then who, then a search for a name.
 private struct AuditFilters: View {
+    @Environment(\.corePalette) private var palette
     @Bindable var model: AuditModel
 
     var body: some View {
@@ -285,8 +286,7 @@ private struct AuditFilters: View {
                     }
                 }
                 .padding(.horizontal, Space.s3).frame(height: 34)
-                .background(GlassInk.well, in: coreShape(Radius.control + 2))
-                .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .background(GlassInk.well, in: coreShape(Radius.control))
                 .focusEffectDisabled()
                 CoreSegmented(
                     "Who",
@@ -317,13 +317,9 @@ private struct AuditFilters: View {
     {
         Button(action: run) {
             Label(title, systemImage: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
-                .foregroundStyle(on ? .white : GlassInk.secondary)
+                .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary)
                 .padding(.horizontal, Space.s3).frame(height: 30)
-                .background(on ? hue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.control))
-                .overlay {
-                    coreShape(Radius.control).strokeBorder(on ? .white.opacity(0.25) : GlassInk.wellEdge, lineWidth: 1)
-                }
-                .shadow(color: hue.opacity(on ? 0.45 : 0), radius: 8)
+                .background(on ? palette.navActive : GlassInk.well, in: coreShape(Radius.control))
                 .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
@@ -334,6 +330,7 @@ private struct AuditList: View {
     let admin: AdminModel
     @Bindable var model: AuditModel
     @FocusState private var focused: Bool
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
@@ -355,8 +352,7 @@ private struct AuditList: View {
                 }
             }
             .padding(Space.s2)
-            .background(GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .coreWell()
             .focusable().focused($focused).focusEffectDisabled()
             .onKeyPress(phases: .down) { press in
                 switch press.key {
@@ -419,8 +415,7 @@ private struct AuditList: View {
                 .foregroundStyle(GlassInk.secondary)
         }
         .padding(.horizontal, Space.s2).frame(height: 40)
-        .background(on ? area.hue.opacity(0.16) : .clear, in: coreShape(Radius.control))
-        .overlay { if on { coreShape(Radius.control).strokeBorder(area.hue.opacity(0.55), lineWidth: 1) } }
+        .background(on ? palette.navActive : .clear, in: coreShape(Radius.control))
         .contentShape(coreShape(Radius.control))
         .onTapGesture {
             model.selected = a.seq
@@ -431,120 +426,5 @@ private struct AuditList: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction { model.selected = a.seq }
-    }
-}
-
-/// Everything about one row: the sentence, then who, what, when and the details as plain pairs.
-private struct AuditDetail: View {
-    let admin: AdminModel
-    let item: AuditItem?
-    @State private var technical = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            if let a = item {
-                let area = AuditWords.area(a.action)
-                let s = AuditWords.sentence(a, deviceName: { admin.deviceNames[$0] }) {
-                    admin.registry.item($0).map(SettingWords.title)
-                }
-                IconTile(area.symbol, hue: area.hue, size: 44, bounce: a.seq).shadow(
-                    color: area.hue.opacity(0.45), radius: 12)
-                (Text(s.who).bold() + Text(" \(s.verb) ") + Text(s.what).bold())
-                    .coreFont(size: MacTextSize.headline).fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    fact("clock.fill", AdminWords.whenExact(a.at))
-                    fact(a.actor == .system ? "server.rack" : "person.fill", a.actor.label)
-                    fact(area.symbol, area.title)
-                    fact(
-                        AuditWords.origin(a.origin).symbol,
-                        "Started by: " + AuditWords.originSentence(a.origin, deviceName: { admin.deviceNames[$0] }))
-                }
-                let rows = AuditWords.detailRows(a, deviceName: { admin.deviceNames[$0] })
-                let pairs = rows.plain
-                if !pairs.isEmpty {
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        ForEach(pairs, id: \.0) { k, v in
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(k.replacingOccurrences(of: "_", with: " ").capitalized).foregroundStyle(
-                                    GlassInk.secondary)
-                                Spacer(minLength: Space.s2)
-                                Text(v).coreFont(size: MacTextSize.body, design: .monospaced).textSelection(
-                                    .enabled
-                                )
-                                .multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                    .padding(Space.s3)
-                    .background(GlassInk.sunk(0.2), in: coreShape(Radius.control + 2))
-                }
-                DisclosureGroup("Technical details", isExpanded: $technical) {
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        ForEach(Array(rows.technical.enumerated()), id: \.offset) { _, kv in
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(kv.0.capitalized).foregroundStyle(GlassInk.secondary)
-                                Spacer(minLength: Space.s2)
-                                Text(kv.1).coreFont(size: MacTextSize.meta, design: .monospaced)
-                                    .textSelection(.enabled).multilineTextAlignment(.trailing)
-                            }
-                        }
-                    }
-                    .padding(.top, Space.s1)
-                }
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                .help("The ids, entry number and action code behind this row.")
-            } else {
-                Text("Pick a row to see everything about it.").foregroundStyle(GlassInk.secondary)
-            }
-        }
-        .padding(Space.s4).frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
-        .animation(.smooth(duration: 0.25), value: item?.seq)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Row details")
-    }
-
-    private func fact(_ symbol: String, _ text: String) -> some View {
-        Label(text, systemImage: symbol).foregroundStyle(GlassInk.primary)
-    }
-}
-
-/// When things happened across the rows loaded: glowing bars, the busiest slice tallest.
-private struct Activity: View {
-    let cells: [Double]
-    let from: Date
-    let to: Date
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            HStack(alignment: .bottom, spacing: 3) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, v in
-                    coreShape(2)
-                        .fill(
-                            v <= 0
-                                ? AnyShapeStyle(GlassInk.track.opacity(0.5))
-                                : AnyShapeStyle(
-                                    LinearGradient(
-                                        colors: [GlassInk.blue.opacity(0.5), GlassInk.blue], startPoint: .bottom,
-                                        endPoint: .top))
-                        )
-                        .frame(maxWidth: .infinity).frame(height: 4 + CGFloat(v) * 28)
-                        .shadow(color: GlassInk.blue.opacity(v > 0.6 ? 0.5 : 0), radius: 5)
-                }
-            }
-            .frame(height: 32, alignment: .bottom)
-            .accessibilityHidden(true)
-            HStack {
-                Text(from.formatted(date: .abbreviated, time: .shortened))
-                Spacer()
-                Text("When things happened").fontWeight(.semibold)
-                Spacer()
-                Text(to.formatted(date: .abbreviated, time: .shortened))
-            }
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Rows over time, \(AdminWords.when(from)) to \(AdminWords.when(to))")
     }
 }

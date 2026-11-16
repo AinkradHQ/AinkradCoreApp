@@ -24,6 +24,9 @@ enum SnapshotRunner {
         if env["CORE_OPEN_GALLERY"] == "1" { return await GallerySnapshot.open(env: env) }
         if let dir = env["CORE_GALLERY_SNAPSHOT"] { return await GallerySnapshot.run(dir: dir, env: env) }
         if let dir = env["CORE_AGENTS_SNAPSHOT"] { return await AgentsSnapshots.run(app, dir: dir, env: env) }
+        if let log = env["CORE_COMPOSER_TEST"] { return await ComposerSelfTest.run(app, log: log) }
+        if let dir = env["CORE_SHOWCASE_SHOTS"] { return await ShowcaseShots.run(app, dir: dir, env: env) }
+        if let log = env["CORE_SCROLL_BENCH"] { return await ScrollBenchRun.run(app, log: log, env: env) }
         if let dir = env["CORE_ESC_CHECK"] { return await EscapeCheck.run(app, dir: dir) }
         if let dir = env["CORE_A11Y_AUDIT"] { return await A11yAudit.run(app, dir: dir, env: env) }
         if let dir = env["CORE_HOME_SNAPSHOT"] { return await HomeSnapshots.run(app, dir: dir, env: env) }
@@ -97,7 +100,7 @@ enum SnapshotRunner {
         shell.toast = nil
         shell.presentSheet(
             title: "End this session?", message: "It stops now. What it already wrote stays.",
-            actions: [ShellSheetAction("Cancel"), ShellSheetAction("End session", destructive: true)])
+            actions: [ShellSheetAction("Cancel"), ShellSheetAction("End Session", destructive: true)])
         await shot("02e-sheet")
         shell.sheet = nil
         shell.elevatedUntil = nil

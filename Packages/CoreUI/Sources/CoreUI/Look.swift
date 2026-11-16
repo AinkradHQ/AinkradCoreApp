@@ -135,15 +135,19 @@ struct FrameModifier: ViewModifier {
     @Environment(\.coreLook) private var inForce
     func body(content: Content) -> some View {
         let prefs = LookPrefs.shared
-        let look = part.flatMap { prefs.custom[$0] } ?? inForce
-        content
+        var look = part.flatMap { prefs.custom[$0] } ?? inForce
+        // Floating surfaces sit over other content, so they stay more solid than the panes (Ahmed, 2026-11-15).
+        if let part, Self.floating.contains(part), prefs.custom[part] == nil { look.opacity = max(look.opacity, 0.88) }
+        // No glass (Ahmed, 2026-11-15): the content background with plain rounded corners; depth from a soft shadow.
+        return
+            content
             .foregroundStyle(GlassInk.primary)
-            .background { if fill { AppSurfaceFill(look, radius: max(radius - rim, Radius.chip)) } }
-            .clipShape(coreShape(max(radius - rim, Radius.chip)))
-            .padding(rim)
-            .coreGlass(radius: radius, interactive: false, tinted: false)
-            .overlay { coreShape(radius).strokeBorder(GlassInk.rim(active ? max(0.3, edge) : edge), lineWidth: 1) }
+            .background { if fill { AppSurfaceFill(look, radius: radius) } }
+            .clipShape(coreShape(radius))
+            .shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
     }
+
+    private static let floating: Set<LookPart> = [.launcher, .dialogs, .popups, .dropdowns]
 }
 
 /// What a pane's content asks of the pane's background: Appearance's Look, its app's own, or nothing because it draws its
@@ -210,11 +214,32 @@ public struct AppLookTabs: View {
 
 extension View {
     /// A card or component inside content (Ahmed, 2026-11-06: the glass frame is only for panes, dialogs, pop-ups and
-    /// menus, never for what sits inside them): a plain well with a hairline edge, lit when active.
+    /// menus, never for what sits inside them): a raised card, one step lighter than the pane with a soft shadow, lit when active.
     public func coreWell(radius: CGFloat = Radius.cardMac, active: Bool = false) -> some View {
-        background(active ? GlassInk.wellHover : GlassInk.well, in: coreShape(radius))
-            .overlay {
-                coreShape(radius).strokeBorder(active ? GlassInk.rim(0.28) : GlassInk.wellEdge, lineWidth: 1)
-            }
+        // The shadow comes from the card's shape, not from the whole card: shadowing the content too made the system
+        // shade every glyph and redraw it on each scroll frame (Ahmed, 2026-11-16: "all scrolls feel glitchy").
+        background {
+            CardFill(radius: radius, active: active).shadow(color: GlassInk.shade(0.14), radius: 6, y: 2)
+        }
+    }
+}
+
+/// A card's fill (Ahmed, 2026-11-15): it follows the Content background one step weaker than the pane, so a card never
+/// glows solid white on a see-through pane. Its opacity scales with the Look's; Reduce Transparency makes it solid.
+struct CardFill: View {
+    let radius: CGFloat
+    let active: Bool
+    @Environment(\.coreLook) private var look
+    @Environment(\.coreSolidOnly) private var solid
+
+    var body: some View {
+        let shape = coreShape(radius)
+        // Night: a light lift over the dark pane. Day: white, as see-through as the Look allows.
+        let day = solid ? 0.95 : min(0.92, 0.2 + look.opacity * 0.55) + (active ? 0.08 : 0)
+        let night = (solid ? 0.08 : 0.06) + (active ? 0.03 : 0)
+        // No blur of its own (Ahmed, 2026-11-16: scrolling stuttered): the pane under it is already blurred by the Look,
+        // and a material per card was recomputed for every card on every scroll frame (measured: the session's seven cards
+        // alone doubled the dropped frames). The tint still follows the Look's opacity.
+        shape.fill(GlassInk.adaptive(.white.opacity(night), day: .white.opacity(day)))
     }
 }

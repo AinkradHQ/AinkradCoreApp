@@ -109,7 +109,8 @@ private struct ToastHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .bottom) {
+            // At the top of the window (Ahmed, 2026-11-16): never over a screen's own controls at the bottom.
+            .overlay(alignment: .top) {
                 if let item {
                     CoreToast(
                         item.message, kind: item.kind, actionTitle: item.actionTitle, help: item.help,
@@ -122,11 +123,12 @@ private struct ToastHost: ViewModifier {
                     )
                     .onHover { hovering = $0 }
                     .accessibilityFocused($toastFocused)
-                    // 52 pt up: clears the widget bar on Home (prototype)
-                    .padding(.horizontal, Space.s4).padding(.bottom, Space.s8 + Space.s5)
+                    // In the top bar's empty middle (it is 52 pt tall), so it covers no screen's title or controls; it
+                    // slides down into place, or only fades under Reduce Motion.
+                    .padding(.horizontal, Space.s4).padding(.top, Space.s2)
                     .transition(
                         .asymmetric(
-                            insertion: .opacity.combined(with: .offset(y: coreMove(reduce, Space.s4))),
+                            insertion: .opacity.combined(with: .offset(y: coreMove(reduce, -Space.s4))),
                             removal: .opacity)
                     )
                     .task(id: item.id) { AccessibilityNotification.Announcement(item.message).post() }

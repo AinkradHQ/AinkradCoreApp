@@ -28,6 +28,9 @@ public struct CountBadge: View {
             Text(count > 99 ? "99+" : "\(count)")
                 .coreFont(size: MacTextSize.meta, weight: .semibold)
                 .monospacedDigit()
+                // A changing count rolls to its new number instead of jumping (a plain fade under Reduce Motion).
+                .contentTransition(.numericText())
+                .coreAnimation(Motion.out(Motion.ui), value: count)
                 .foregroundStyle(ink)
                 .padding(.horizontal, Space.s1 + 2)
                 .frame(minWidth: MacSize.chip, minHeight: MacSize.chip)

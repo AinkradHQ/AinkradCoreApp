@@ -22,6 +22,15 @@ public struct InlineNotice: Equatable, Sendable {
 @MainActor
 public protocol AgentsHost: AnyObject {
     func elevate(reason: String, force: Bool) async -> InlineNotice?
+    /// The runner built into this Mac, once it is registered; nil otherwise.
+    var thisMacRunnerID: String? { get }
+    /// Opens a new terminal on a runner (the Terminals module owns it). The Core's terminal API has no folder yet.
+    func openTerminal(on runner: String)
+}
+
+extension AgentsHost {
+    public var thisMacRunnerID: String? { nil }
+    public func openTerminal(on runner: String) {}
 }
 
 struct ElevationDeclined: Error { let notice: InlineNotice }
@@ -51,6 +60,10 @@ public final class AgentsModel {
     public var filter: AgentFilter = .all
     /// What is typed in each session's composer.
     public var drafts: [String: String] = [:]
+    /// Messages typed during a turn, held here and sent when the turn ends (`AgentsModel+Queue`).
+    public var queued: [String: [QueuedMessage]] = [:]
+    /// Files attached to each session's message, sent as `@path` after its words (pasted, dropped or picked).
+    public var attachments: [String: [URL]] = [:]
     /// The quick popup's prompt, carried into the advanced sheet.
     public var draftPrompt = ""
     /// The chain picked on the quick sheet's chip, carried into the advanced sheet.
@@ -370,6 +383,13 @@ public final class AgentsModel {
     /// "Waiting on you": approvals nobody has answered, and nothing else. Alerts and Brain-inbox items are counted by their own
     /// owners. The list header, the filter, the footer and the shell's status bar and bell all read this one number.
     public var waitingOnYou: Int { pending.count }
+
+    /// Running and needing-you AI sessions, counted by the list's own index, so the status chip, the list's sidebar and
+    /// its groups always agree.
+    public var sessionCounts: (running: Int, needYou: Int) {
+        let c = makeIndex().counts
+        return (c[.running] ?? 0, c[.needsYou] ?? 0)
+    }
 
     public func waiting(_ id: String) -> Bool { pending.contains { $0.session == id } }
 

@@ -13,7 +13,7 @@ struct FailureDiagram: View {
         let tone = palette.tone(failure.tone)
         // Top-aligned with the link as tall as a tile, so the line runs through the middle of the icons.
         HStack(alignment: .top, spacing: Space.s3) {
-            node("laptopcomputer", "This Mac", ink: palette.text, fill: palette.glassCard)
+            node("laptopcomputer", "This Mac", ink: palette.text, fill: GlassInk.well)
             TimelineView(.animation(paused: reduceMotion)) { context in
                 link(t: context.date.timeIntervalSinceReferenceDate, ink: tone.ink)
             }

@@ -34,8 +34,7 @@ public struct RootView: View {
 
     private var sky: some View {
         Color.clear.overlay {
-            Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
-                .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
+            WallpaperView()
         }
         .clipped().ignoresSafeArea().accessibilityHidden(true)
     }
@@ -63,13 +62,11 @@ private struct BlockedView: View {
         .foregroundStyle(palette.text)
         .coreFont(size: MacTextSize.body)
         .padding(Space.s6)
-        .coreFrame(radius: Radius.panel, part: .dialogs)
+        .coreFrame(radius: Radius.pane, part: .dialogs)
         .frame(width: Space.s8 * 17)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .background {
-            Image(scheme == .dark ? "HomeSky" : "HomeSkyDay", bundle: .main).resizable().scaledToFill()
-                .overlay(scheme == .dark ? .clear : GlassInk.daySkyVeil)
-                .clipped().accessibilityHidden(true)
+            WallpaperView()
         }
         .ignoresSafeArea()
     }

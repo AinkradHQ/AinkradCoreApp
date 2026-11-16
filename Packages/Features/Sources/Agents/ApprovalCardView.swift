@@ -42,7 +42,6 @@ struct ApprovalCardView: View {
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
                 IconTile(ask.symbol, hue: GlassInk.amber, size: 44, bounce: request.id)
-                    .shadow(color: GlassInk.amber.opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.title, weight: .bold)
                     Text(
@@ -52,8 +51,9 @@ struct ApprovalCardView: View {
                     .help("Session \(request.session) · tool \(request.tool) · request \(request.id)")
                 }
                 Spacer(minLength: Space.s3)
-                if let left {
-                    VStack(alignment: .trailing, spacing: 0) {
+                VStack(alignment: .trailing, spacing: Space.s1) {
+                    StateBadge("Needs you", tone: .warn, symbol: "hand.raised")
+                    if let left {
                         Text(AgentWords.clock(left))
                             .coreFont(size: MacTextSize.large + 2, weight: .bold, design: .rounded).monospacedDigit()
                             .foregroundStyle(GlassInk.ink(hue)).contentTransition(.numericText(countsDown: true))
@@ -71,20 +71,14 @@ struct ApprovalCardView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(Space.s3)
-                .background(GlassInk.sunk(0.25), in: coreShape(Radius.control + 2))
-                .overlay { coreShape(Radius.control + 2).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+                .background(GlassInk.well, in: coreShape(Radius.control))
             }
             if request.timeoutSecs != nil {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3)
-                            .fill(
-                                LinearGradient(
-                                    colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                            )
+                        coreShape(3).fill(hue)
                             .frame(width: g.size.width * min(1, max(0, ratio)))
-                            .shadow(color: hue.opacity(0.5), radius: 5)
                     }
                 }
                 .frame(height: 6)
@@ -103,20 +97,20 @@ struct ApprovalCardView: View {
         }
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s4)
-        .background(GlassInk.amber.opacity(0.08), in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                GlassInk.amber.opacity(keys ? 0.6 : 0.35), lineWidth: keys ? 1.5 : 1)
-        }
+        .coreWell()
         .transition(.opacity.combined(with: .offset(y: coreMove(reduce, Space.s2))))
     }
 
     private func answer(approve: Bool, busy: Bool) -> some View {
-        let tile = AppActionTile(
-            title: approve ? (elevated ? "Approve" : "Approve with Touch ID") : "Deny",
-            symbol: approve ? (elevated ? "checkmark" : "touchid") : "xmark", key: approve ? "⌘↩" : "⌘⌫",
-            hue: approve ? GlassInk.blue : GlassInk.slate, prominent: approve  // blue primary: green is for status only
-        ) { Task { await model.decide(request, approved: approve) } }
+        let tile = Button(action: { Task { await model.decide(request, approved: approve) } }) {
+            if approve {
+                Label(elevated ? "Approve" : "Approve with Touch ID", systemImage: elevated ? "checkmark" : "touchid")
+            } else {
+                Label("Deny", systemImage: "xmark")
+            }
+        }
+        .buttonStyle(CoreButtonStyle(approve ? .prominent : .secondary, size: .small))
+        .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
         .disabled(busy)
         .help(
             approve
@@ -150,7 +144,7 @@ struct ApprovalCardView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.s3).frame(minHeight: 40)
-        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .background(GlassInk.well, in: coreShape(Radius.control))
         .accessibilityElement(children: .combine)
     }
 

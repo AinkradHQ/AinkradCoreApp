@@ -192,7 +192,7 @@ private struct PriceRow: View {
             .frame(width: 170, alignment: .trailing)
         }
         .padding(.horizontal, Space.s3).frame(minHeight: 48)
-        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2))
+        .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
         .onHover { hovering = $0 }
         .animation(.smooth(duration: 0.25), value: hovering)
         .accessibilityElement(children: .combine)

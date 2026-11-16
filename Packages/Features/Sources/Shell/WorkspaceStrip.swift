@@ -115,7 +115,6 @@ struct StackBehind: View {
         ZStack(alignment: .top) {
             ForEach(0..<min(count, 2), id: \.self) { i in
                 coreShape(Radius.pane).fill(GlassInk.lift(0.06 - Double(i) * 0.02))
-                    .overlay { coreShape(Radius.pane).strokeBorder(GlassInk.rim(0.14), lineWidth: 1) }
                     .padding(.horizontal, CGFloat(i + 1) * 10)
                     .offset(y: -CGFloat(i + 1) * 5)
             }
@@ -141,8 +140,7 @@ struct StackBadge: View {
         .coreFont(size: MacTextSize.meta, weight: .semibold)
         .foregroundStyle(.white)
         .padding(.horizontal, Space.s2).frame(height: 22)
-        .background(.black.opacity(0.45), in: coreShape(6))
-        .overlay { coreShape(6).strokeBorder(.white.opacity(0.2), lineWidth: 1) }
+        .background(.black.opacity(0.45), in: coreShape(Radius.chip))
         .padding(Space.s2)
         .frame(width: slot.width, height: slot.height, alignment: .bottomTrailing)
         .offset(x: slot.minX, y: slot.minY)

@@ -275,20 +275,13 @@ struct ConnectWizard: View {
     }
 
     private var gateCard: some View {
-        HStack(spacing: Space.s3) {
-            IconTile("key.fill", hue: GlassInk.blue, size: 36, bounce: false)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Turn on keys for accounts").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("Your Core is set to keep no provider keys. This turns that on.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: Space.s3)
+        CoreNotice(
+            symbol: "key.fill", title: "Turn on keys for accounts",
+            text: "Your Core is set to keep no provider keys. This turns that on."
+        ) {
             Button(w.flow.enabling ? "Turning on…" : "Turn on") { Task { await w.flow.enableKeys(model) } }
                 .buttonStyle(CoreButtonStyle(.prominent)).disabled(w.flow.enabling)
         }
-        .padding(Space.s3)
-        .background(GlassInk.blue.opacity(0.12), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.4), lineWidth: 1) }
         .accessibilityIdentifier("key-gate")
     }
 

@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 /// Interaction states a component can be shown in. Real input drives them; the gallery forces them.
 public enum CoreInteraction: Sendable, Hashable { case hover, pressed, focused }
 
@@ -24,23 +28,22 @@ public struct Palette: Sendable {
         copy.increased = level == .increased
         return copy
     }
-    public var primary: Color { theme["primary"] }
+    /// The accent as text (Settings, Appearance).
+    public var primary: Color { GlassInk.blueInk }
     public var disabled: Color { theme["disabled"] }
-    public var btnPrimary: Color { theme["btnPrimary"] }
-    public var btnPrimaryHover: Color { theme["btnPrimaryHover"] }
-    public var btnPrimaryPress: Color { theme["btnPrimaryPress"] }
+    public var btnPrimary: Color { GlassInk.blue }
+    public var btnPrimaryHover: Color { GlassInk.blue.opacity(0.9) }
+    public var btnPrimaryPress: Color { GlassInk.blue.opacity(0.8) }
     public var btnInk: Color { theme["btnInk"] }
     /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
     /// Day: the mockups' lit white row with dark ink.
-    public var navActive: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.18) }
-    public var navActiveEdge: Color { isDay ? .white.opacity(0.9) : .white.opacity(0.3) }
+    public var navActive: Color { isDay ? GlassInk.dayInk.opacity(0.08) : .white.opacity(0.18) }
+    public var navActiveEdge: Color { isDay ? GlassInk.dayInk.opacity(0.1) : .white.opacity(0.3) }
     public var navActiveInk: Color { isDay ? theme["text"] : .white }
-    public var rowHover: Color { isDay ? .white.opacity(0.5) : .white.opacity(0.1) }
+    public var rowHover: Color { isDay ? GlassInk.dayInk.opacity(0.05) : .white.opacity(0.1) }
     /// Neutral edges: white 0.30 or more at night; Increase Contrast goes to 0.55 (day: a dark hairline instead).
     public var edge: Color {
-        isDay
-            ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7))
-            : increased ? .white.opacity(0.55) : theme["edge"]
+        GlassInk.primary.opacity(increased ? 0.45 : 0.15)
     }
     public var track: Color { theme["track"] }
     public var success: Color { theme["success"] }
@@ -55,21 +58,26 @@ public struct Palette: Sendable {
     /// Neutral glass card tint (rows, banners, toasts): never a blue fill on a large surface.
     /// Cards sit on Liquid Glass everywhere now (Ahmed, 2026-11-05: "everything shall be liquid glass"), so a card is a
     /// soft white well with a light edge, not a dark slab, in both themes.
-    public var glassCard: Color { isDay ? .white.opacity(0.55) : .white.opacity(0.08) }
+    public var glassCard: Color { isDay ? GlassInk.dayInk.opacity(0.04) : .white.opacity(0.08) }
     public var glassCardEdge: Color {
-        isDay
-            ? (increased ? GlassInk.dayInk.opacity(0.35) : .white.opacity(0.7)) : .white.opacity(increased ? 0.55 : 0.3)
+        GlassInk.primary.opacity(increased ? 0.45 : 0.25)
     }
     public var panelStrong: Color { pick("panelGlassStrong", fallback: theme["mRead"]) }
     /// Deep-blue glass tint (day: panelGlass; night: the pane glass).
     public var glassTint: Color { pick("panelGlass", fallback: theme["mGlass"]) }
-    public var uDim: Color { isDay ? .white.opacity(0.6) : .white.opacity(0.1) }
-    public var uDimHover: Color { isDay ? .white.opacity(0.8) : .white.opacity(0.16) }
+    public var uDim: Color { isDay ? GlassInk.dayInk.opacity(0.05) : .white.opacity(0.1) }
+    public var uDimHover: Color { isDay ? GlassInk.dayInk.opacity(0.08) : .white.opacity(0.16) }
 
-    public func tone(_ tone: Tone) -> (ink: Color, fill: Color) {
+    /// A state's ink and its chip fill. The fill is the same neutral well for every tone (Ahmed, 2026-11-15: no tinted
+    /// fills); the colour stays on the word.
+    public func tone(_ tone: Tone) -> (ink: Color, fill: Color) { (toneInk(tone), GlassInk.well) }
+
+    private func toneInk(_ tone: Tone) -> Color { toneColours(tone).ink }
+
+    private func toneColours(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {
         case .run: (theme["chipRun"], theme["chipRunBg"])
-        case .done: (theme["chipDone"], theme["chipDoneBg"])
+        case .done: (GlassInk.blueInk, GlassInk.blueInk.opacity(0.14))
         case .fail: (theme["chipFail"], theme["chipFailBg"])
         case .queue: (theme["chipQueue"], theme["chipQueueBg"])
         case .warn:
@@ -122,6 +130,9 @@ private struct CoreThemeModifier: ViewModifier {
     func body(content: Content) -> some View {
         let palette = (scheme == .dark ? Palette.night : Palette.day).contrast(effectiveContrast)
         content
+            // Every open dropdown is drawn here, above all content (Ahmed, 2026-11-15). First, so the theme below (palette,
+            // ink, tint, font) reaches the menus too: attached last, they were drawn in the night palette by day.
+            .coreMenuLayer()
             .environment(\.corePalette, palette)
             .environment(\.coreSolidOnly, solidOnly)
             #if DEBUG
@@ -157,11 +168,50 @@ extension View {
     }
 }
 
+/// Whether a button-styled control should look focused. In a ButtonStyle, `isFocused` reports the nearest focusable
+/// *ancestor*, so a click that focused a card or pane lit every button inside it (Ahmed, 2026-11-16, twice). The focus
+/// look shows only while the keyboard is navigating: Tab or an arrow turns it on, any click turns it off at once.
+public enum CoreKeyboardFocus {
+    @MainActor public static func own(_ isFocused: Bool) -> Bool {
+        isFocused && CoreInputMode.shared.navigating
+    }
+}
+
+/// How the person is moving around right now: with the keyboard (Tab, arrows) or the pointer. Observed, so focus looks
+/// redraw the moment it changes.
+@MainActor @Observable
+public final class CoreInputMode {
+    public static let shared: CoreInputMode = {
+        let m = CoreInputMode()
+        m.start()
+        return m
+    }()
+    public private(set) var navigating = false
+    @ObservationIgnored private var monitor: Any?
+
+    private func start() {
+        #if os(macOS)
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { e in
+            MainActor.assumeIsolated {
+                let keyboard = e.type == .keyDown && Self.navigationKeys.contains(e.keyCode)
+                let pointer = e.type != .keyDown
+                let now = keyboard ? true : pointer ? false : CoreInputMode.shared.navigating
+                if now != CoreInputMode.shared.navigating { CoreInputMode.shared.navigating = now }
+            }
+            return e
+        }
+        #endif
+    }
+
+    /// Tab, Space and the four arrows: the keys that move or use keyboard focus.
+    static let navigationKeys: Set<UInt16> = [48, 49, 123, 124, 125, 126]
+}
+
 /// Disabled dims the control, not its helper text. Day dims less (0.6) so the label stays legible over the glass.
 private struct DimWhenDisabled: ViewModifier {
     let enabled: Bool
     @Environment(\.corePalette) private var palette
-    func body(content: Content) -> some View { content.opacity(enabled ? 1 : palette.isDay ? 0.6 : 0.45) }
+    func body(content: Content) -> some View { content.opacity(enabled ? 1 : 0.5) }
 }
 
 private struct CoreFocusLook: ViewModifier {

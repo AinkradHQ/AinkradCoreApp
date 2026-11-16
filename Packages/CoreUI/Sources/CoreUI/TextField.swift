@@ -64,7 +64,7 @@ public struct CoreTextField: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             CoreFieldLabel(label)
-            TextField(palette.isDay ? "" : placeholder, text: $text)
+            TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .font(fieldFont)
                 .multilineTextAlignment(big ? .center : .leading)
@@ -113,41 +113,27 @@ private struct FieldSurface: ViewModifier {
         let lit = hovering || forced == .hover
         content
             .background { fill(lit: lit) }
-            .overlay { coreShape(radius).strokeBorder(edge, lineWidth: 1) }
-            .shadow(
-                color: palette.isDay
-                    ? Color(red: 40 / 255, green: 80 / 255, blue: 140 / 255).opacity(focused ? 0.16 : 0.1)
-                    : .clear,
-                radius: focused ? 6 : 2, y: focused ? 3 : 1
-            )
+            // The edge only where it says something: an error, focus, or Increase Contrast (Ahmed, 2026-11-15: no outlines).
+            .overlay {
+                if error || focused || palette.increased { coreShape(radius).strokeBorder(edge, lineWidth: 1) }
+            }
             .onHover { hovering = $0 }
             .coreAnimation(Motion.out(Motion.hover), value: lit)
             .coreAnimation(Motion.out(Motion.hover), value: focused)
     }
 
-    @ViewBuilder private func fill(lit: Bool) -> some View {
-        if palette.isDay {
-            // Day: fields are glass (night = wells, day = glass): the mockups' white field (`tf.css` --field 0.7) under
-            // dark ink, brighter when hovered or focused.
-            coreShape(radius).fill(.white.opacity(focused ? 0.9 : lit ? 0.8 : 0.7))
-        } else {
-            coreShape(radius).fill(focused || lit ? GlassInk.wellHover : GlassInk.well)
-        }
+    /// One structure in both themes (Ahmed, 2026-11-15): the well, a stronger well on hover or focus. Only the ink differs.
+    private func fill(lit: Bool) -> some View {
+        coreShape(radius).fill(focused || lit ? GlassInk.wellHover : GlassInk.well)
     }
 
-    private var edge: AnyShapeStyle {
-        if error { return AnyShapeStyle(palette.tone(.fail).ink) }
-        if palette.isDay {
-            if palette.increased { return AnyShapeStyle(GlassInk.dayInk.opacity(focused ? 0.5 : 0.35)) }
-            return AnyShapeStyle(Color.white.opacity(focused || hovering || forced == .hover ? 1 : 0.9))
-        }
-        // Night keeps its first well and edge.
-        return AnyShapeStyle(focused ? Color.white.opacity(0.3) : Color.white.opacity(palette.increased ? 0.4 : 0.14))
+    private var edge: Color {
+        if error { return palette.tone(.fail).ink }
+        return GlassInk.primary.opacity(palette.increased ? 0.45 : 0.3)
     }
 }
 
-/// The placeholder of a day field, drawn by us in the secondary ink (the system one is a pale grey on the dark day well).
-/// Night keeps the system placeholder.
+/// A field's placeholder, drawn by us in the secondary ink in both themes, so night and day match (Ahmed, 2026-11-15).
 private struct DayPlaceholder: ViewModifier {
     let text: String
     let empty: Bool
@@ -156,7 +142,7 @@ private struct DayPlaceholder: ViewModifier {
     @Environment(\.corePalette) private var palette
     func body(content: Content) -> some View {
         content.overlay(alignment: alignment) {
-            if palette.isDay && empty {
+            if empty {
                 Text(text).font(font).foregroundStyle(palette.text2).lineLimit(1).allowsHitTesting(false)
                     .accessibilityHidden(true)
             }

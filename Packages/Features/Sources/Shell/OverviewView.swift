@@ -35,7 +35,7 @@ struct OverviewView: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s6)
         .frame(maxWidth: Space.s8 * 34)
-        .corePanel(radius: Radius.panel + Space.s1, padding: 0, part: .popups)
+        .corePanel(radius: Radius.pane + Space.s1, padding: 0, part: .popups)
         .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         .coreScaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
         .animation(Motion.out(Motion.ui), value: shown)
@@ -62,7 +62,7 @@ struct OverviewView: View {
                 Spacer()
                 if index < 9 {
                     Text("\(index + 1)").coreFont(size: MacTextSize.meta, weight: .bold, design: .rounded)
-                        .frame(width: 22, height: 22).background(GlassInk.lift(0.14), in: coreShape(6))
+                        .frame(width: 22, height: 22).background(GlassInk.lift(0.14), in: coreShape(Radius.chip))
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -79,12 +79,9 @@ struct OverviewView: View {
         .background {
             if on {
                 coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.22))
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.6), lineWidth: 1.5) }
-                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 16)
                     .matchedGeometryEffect(id: "pick", in: lens)
             } else {
                 coreShape(Radius.cardMac).fill(GlassInk.well)
-                    .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
             }
         }
         .coreScaleEffect(on ? 1.03 : 1)

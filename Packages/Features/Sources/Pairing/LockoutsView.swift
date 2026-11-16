@@ -53,7 +53,6 @@ struct LockoutsSection: View {
         let hue = n == 0 ? GlassInk.green : GlassInk.amber
         return HStack(spacing: Space.s4) {
             IconTile(n == 0 ? "lock.open.fill" : "lock.fill", hue: hue, size: 56, bounce: n)
-                .shadow(color: hue.opacity(0.5), radius: 14)
             VStack(alignment: .leading, spacing: 3) {
                 Text(n == 0 ? "Nothing is locked" : n == 1 ? "1 lock right now" : "\(n) locks right now")
                     .coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
@@ -71,8 +70,7 @@ struct LockoutsSection: View {
             }
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .coreWell()
         .animation(.smooth(duration: 0.4), value: n)
     }
 
@@ -103,6 +101,7 @@ private struct LockCard: View {
     let selected: Bool
     let pick: () -> Void
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -129,20 +128,7 @@ private struct LockCard: View {
                     .opacity(left == 0 ? 0.4 : 1)
                     .help("End this lock now. Asks for Touch ID.")
                 }
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        coreShape(3).fill(GlassInk.track.opacity(0.6))
-                        coreShape(3)
-                            .fill(
-                                LinearGradient(
-                                    colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .frame(width: g.size.width * Double(left) / LockMeter.total(left))
-                            .shadow(color: hue.opacity(0.6), radius: 6)
-                    }
-                }
-                .frame(height: 6)
-                .animation(.linear(duration: 1), value: left)
+                CoreMeter(Double(left) / LockMeter.total(left), low: soon, height: 6, label: "Time left on this lock")
                 HStack(spacing: Space.s2) {
                     HStack(spacing: 3) {
                         ForEach(0..<4, id: \.self) { i in
@@ -158,14 +144,9 @@ private struct LockCard: View {
             }
             .padding(Space.s3)
             .background(
-                selected ? hue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well,
+                selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    selected ? hue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-            }
-            .shadow(color: hue.opacity(selected ? 0.3 : 0), radius: 12)
             .contentShape(coreShape(Radius.cardMac))
             .onTapGesture(perform: pick)
             .onHover { hovering = $0 }

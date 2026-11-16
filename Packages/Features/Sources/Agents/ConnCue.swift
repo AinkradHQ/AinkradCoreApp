@@ -20,24 +20,40 @@ struct ConnCue: View {
     }
 
     /// `github.get_issue` + `#142` → `Get issue #142 with GitHub`.
-    nonisolated static func line(_ tool: String, _ summary: String) -> String {
+    nonisolated static func line(_ tool: String, _ summary: String, done: Bool = false) -> String {
         let op =
             tool.split(separator: ".", maxSplits: 1).last.map { $0.replacingOccurrences(of: "_", with: " ") } ?? tool
-        let verb = op.prefix(1).uppercased() + op.dropFirst()
-        return "\(verb)\(summary.isEmpty ? "" : " \(summary)") with \(kind(tool) ?? "a connection")"
+        var words = op.split(separator: " ").map(String.init)
+        // Done reads in the past: "Got issue #142 from GitHub" (review 2026-11-16).
+        if done, let v = words.first { words[0] = past(v) }
+        let phrase = words.joined(separator: " ")
+        let verb = phrase.prefix(1).uppercased() + phrase.dropFirst()
+        let with = done && op.hasPrefix("get") ? "from" : "with"
+        return "\(verb)\(summary.isEmpty ? "" : " \(summary)") \(with) \(kind(tool) ?? "a connection")"
+    }
+
+    /// Only the first letter: a provider's name keeps its capitals ("with GitHub", never "with github").
+    nonisolated static func lowerFirst(_ s: String) -> String { s.prefix(1).lowercased() + s.dropFirst() }
+
+    /// The past tense of a connection verb: irregular ones by name, the rest with -ed.
+    nonisolated static func past(_ verb: String) -> String {
+        let irregular = ["get": "got", "read": "read", "send": "sent", "find": "found", "make": "made", "run": "ran"]
+        if let p = irregular[verb.lowercased()] { return p }
+        if verb.hasSuffix("e") { return verb + "d" }
+        return verb + "ed"
     }
 
     var body: some View {
         let refused = ok == false
         HStack(spacing: Space.s2) {
             Image(systemName: refused ? "exclamationmark.triangle" : ok == nil ? "link" : "checkmark.circle")
-                .foregroundStyle(refused ? GlassInk.amberInk : GlassInk.secondary)
+                .foregroundStyle(refused ? GlassInk.amberInk : SessionInk.text2)
             Text(
                 refused
-                    ? "Couldn't \(Self.line(tool, summary).lowercased())\(why.isEmpty ? "" : ": \(why)")"
-                    : Self.line(tool, summary)
+                    ? "Couldn't \(Self.lowerFirst(Self.line(tool, summary)))\(why.isEmpty ? "" : ": \(why)")"
+                    : Self.line(tool, summary, done: ok == true)
             )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(refused ? GlassInk.primary : GlassInk.secondary)
+            .coreFont(size: MacTextSize.meta).foregroundStyle(refused ? GlassInk.primary : SessionInk.text2)
             .lineLimit(2)
             if refused, let openConnections {
                 Button("Allow in Connections", action: openConnections).buttonStyle(.plain)
@@ -46,10 +62,6 @@ struct ConnCue: View {
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)
         .background(refused ? GlassInk.amber.opacity(0.12) : GlassInk.well, in: coreShape(Radius.control))
-        .overlay {
-            coreShape(Radius.control).strokeBorder(
-                refused ? GlassInk.amber.opacity(0.35) : GlassInk.wellEdge, lineWidth: 1)
-        }
         .accessibilityElement(children: .combine)
     }
 }

@@ -303,8 +303,7 @@ private struct SecretRow: View {
             .overlay(alignment: .trailing) {
                 if selected {
                     actions.padding(Space.s1)
-                        .background(palette.panelStrong, in: coreShape(Radius.chip + Space.s1))
-                        .overlay { coreShape(Radius.chip + Space.s1).strokeBorder(palette.edge, lineWidth: 1) }
+                        .background(palette.panelStrong, in: coreShape(Radius.control))
                         .transition(.opacity)
                 }
             }
@@ -315,7 +314,6 @@ private struct SecretRow: View {
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .frame(minHeight: Space.s8 + Space.s4)
         .background(selected ? palette.uDimHover : hovering ? palette.rowHover : .clear, in: shape)
-        .overlay { if selected { shape.strokeBorder(palette.navActiveEdge, lineWidth: 1) } }
         .contentShape(shape)
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }

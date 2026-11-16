@@ -89,6 +89,7 @@ struct ActivityRowView: View {
     let pick: () -> Void
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         Button(action: pick) {
@@ -113,13 +114,10 @@ struct ActivityRowView: View {
             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
             .background(
                 fresh && !reduce
-                    ? GlassInk.blue.opacity(0.2) : selected || hovering ? GlassInk.wellHover : GlassInk.well,
+                    ? GlassInk.blue.opacity(0.2)
+                    : selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )
-            .overlay {
-                coreShape(Radius.cardMac).strokeBorder(
-                    selected ? GlassInk.blue : GlassInk.wellEdge, lineWidth: 1)
-            }
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain).focusEffectDisabled()

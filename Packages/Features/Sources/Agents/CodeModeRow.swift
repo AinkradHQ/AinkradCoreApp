@@ -103,7 +103,7 @@ struct CodeModeCard: View {
             } label: {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).rotationEffect(.degrees(expanded ? 90 : 0))
+                        .foregroundStyle(SessionInk.text2).rotationEffect(.degrees(expanded ? 90 : 0))
                         .frame(width: Space.s3)
                     Image(systemName: tool == .run ? "curlybraces" : "magnifyingglass").foregroundStyle(palette.primary)
                         .frame(width: Space.s4)
@@ -111,7 +111,7 @@ struct CodeModeCard: View {
                         .layoutPriority(1)
                     if status != .running {
                         Text(tool == .search ? "“\(summary)”" : result.summary)
-                            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                             .lineLimit(1).truncationMode(.tail)
                     }
                     Spacer(minLength: Space.s2)
@@ -126,8 +126,6 @@ struct CodeModeCard: View {
         }
         .foregroundStyle(palette.text)
         .frame(maxWidth: .infinity)
-        .clipShape(coreShape(Radius.control))
-        .coreWell(radius: Radius.control)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(status == .running ? "" : result.summary)")
     }
@@ -158,7 +156,7 @@ struct CodeModeCard: View {
 
     private func block(_ label: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            Text(label).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
+            Text(label).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(SessionInk.text2)
             FoldedOutput(text: text)
         }
     }
@@ -167,11 +165,11 @@ struct CodeModeCard: View {
         HStack(spacing: Space.s2) {
             switch status {
             case .running:
-                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                Text("running").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                 CoreWorkingBar(width: Space.s8)
             case .done, .failed:
                 if let f = result.footer ?? durationMs.map({ "\(coreDecimal(Double($0) / 1000, 1)) s" }) {
-                    Text(f).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(palette.text2)
+                    Text(f).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(SessionInk.text2)
                         .monospacedDigit().lineLimit(1).fixedSize()
                 }
                 Image(systemName: status == .done ? "checkmark" : "xmark")

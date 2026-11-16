@@ -187,6 +187,7 @@ private struct AssignSheet: View {
     let ids: [String]
     @State private var target = ""
     @State private var mode: MoveMode = .move
+    @Environment(\.corePalette) private var palette
     @State private var busy = false
 
     private var rooms: [RoomSummary] { model.mountedRooms.filter { $0.lock == nil } }
@@ -273,10 +274,7 @@ private struct AssignSheet: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background(mode == m ? GlassInk.blue.opacity(0.32) : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay {
-                if mode == m { coreShape(Radius.cardMac).strokeBorder(GlassInk.blue.opacity(0.7), lineWidth: 1) }
-            }
+            .background(mode == m ? palette.navActive : GlassInk.well, in: coreShape(Radius.cardMac))
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain).focusEffectDisabled()

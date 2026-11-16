@@ -16,7 +16,8 @@ private struct DialogButtons: View {
             Button("Cancel") { app.shell.closeDialog() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
             Spacer(minLength: 0)
             if destructive {
-                Button(confirm, action: run).buttonStyle(DangerButtonStyle()).disabled(!enabled || busy)
+                Button(confirm, action: run).buttonStyle(CoreButtonStyle(.danger, busy: busy)).disabled(
+                    !enabled || busy)
             } else {
                 Button(confirm, action: run).buttonStyle(CoreButtonStyle(.prominent, busy: busy))
                     .coreShortcut(.primary).disabled(!enabled)

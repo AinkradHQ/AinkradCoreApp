@@ -50,7 +50,7 @@ public struct ConnectionBanner: View {
 
     public var body: some View {
         let colours = palette.tone(state.tone)
-        HStack(alignment: .top, spacing: Space.s3) {
+        HStack(alignment: .center, spacing: Space.s3) {
             Group {
                 if state == .loading || state == .reconnecting {
                     ProgressView().controlSize(.small).frame(width: 32, height: 32).accessibilityHidden(true)

@@ -154,6 +154,6 @@ extension AddWizardView {
             Spacer(minLength: 0)
             trailing()
         }
-        .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.cardMac))
+        .padding(Space.s3).coreWell()
     }
 }

@@ -14,10 +14,7 @@ struct NewSessionHero: View {
     var body: some View {
         let places = ConversationWords.recentPlaces(model.sessions.items)
         VStack(spacing: Space.s3) {
-            Image(systemName: "bubble.left").coreFont(size: MacTextSize.large, weight: .semibold)
-                .foregroundStyle(palette.btnInk)
-                .frame(width: Space.s8 + Space.s5, height: Space.s8 + Space.s5)
-                .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
+            IconTile("bubble.left", hue: GlassInk.blue, size: Space.s8 + Space.s5)
                 .accessibilityHidden(true)
             Text("New AI session").coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(
                 .isHeader)

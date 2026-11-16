@@ -285,8 +285,7 @@ private struct CodeCells: View {
                     Text(String(ch))
                         .coreFont(size: MacTextSize.large, weight: .semibold, design: .monospaced)
                         .frame(width: MacSize.controlLg, height: MacSize.controlLg + Space.s3)
-                        .background(palette.glassCard, in: coreShape(Radius.control))
-                        .overlay { coreShape(Radius.control).strokeBorder(palette.glassCardEdge, lineWidth: 1) }
+                        .background(GlassInk.well, in: coreShape(Radius.control))
                         .opacity(settled || reduce ? 1 : 0)
                         .offset(y: settled || reduce ? 0 : 6)
                         .animation(Motion.out(Motion.ui).delay(Double(i) * 0.05), value: settled)

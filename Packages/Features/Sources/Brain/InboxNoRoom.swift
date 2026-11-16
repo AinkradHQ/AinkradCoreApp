@@ -61,7 +61,6 @@ private struct MoreMenu: View {
                 .foregroundStyle(GlassInk.primary)
                 .frame(width: MacSize.controlMd, height: MacSize.controlMd)
                 .background(open ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
-                .overlay { coreShape(Radius.control).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
                 .contentShape(coreShape(Radius.control))
         }
         .help("More: \(items.map { $0.title.replacingOccurrences(of: "…", with: "") }.joined(separator: ", "))")

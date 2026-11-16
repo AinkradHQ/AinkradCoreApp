@@ -120,6 +120,7 @@ public final class AppModel {
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
         brain = BrainModel(host: AdminHostAdapter(app: self))
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
+        shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
         shell.elevate = { [weak self] in
             guard let self else { return }
@@ -187,7 +188,11 @@ public final class AppModel {
             phase = .desktop
             shell.coreLink = .live
             #if DEBUG
-            agents.attach(FakeAgentsAPI.prototypeWorld())
+            let world = FakeAgentsAPI.prototypeWorld()
+            FakeAgentsAPI.addShowcase(to: world)  // one session with every kind of content
+            agents.attach(world)
+            // No Core to approve against: a demo send skips Touch ID instead of always failing.
+            agents.debugDropHost()
             brain.use(SampleBrainService())
             #endif
             return
@@ -732,6 +737,10 @@ public final class AppModel {
 }
 
 extension AppModel: AgentsHost {
+    public var thisMacRunnerID: String? { macRunner.runnerID }
+
+    public func openTerminal(on runner: String) { terminals?.open(on: runner) }
+
     /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
     public func elevate(reason: String, force: Bool) async -> InlineNotice? {
         if isElevated && !force { return nil }

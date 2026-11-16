@@ -111,7 +111,6 @@ enum OpsWords {
 private struct Verdict: View {
     let admin: AdminModel
     @Bindable var model: OpsModel
-    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         let raised = model.alarms.filter(\.raised)
@@ -119,17 +118,8 @@ private struct Verdict: View {
         let hue = ok ? GlassInk.green : GlassInk.amber
         let names = raised.map { OpsWords.warning[$0.name]?.title ?? $0.name }
         HStack(spacing: Space.s4) {
-            Image(systemName: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 28, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 60, height: 60)
-                .background(
-                    LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(14)
-                )
-                .overlay { coreShape(14).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
-                .shadow(color: hue.opacity(0.55), radius: 14)
+            IconTile(ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill", hue: hue, size: 60)
                 .contentTransition(.symbolEffect(.replace))
-                .symbolEffect(.pulse, options: .repeating, isActive: !ok && !reduce)
             VStack(alignment: .leading, spacing: 3) {
                 Text(ok ? "Your Core is doing well" : "\(names.joined(separator: " and ")) needs a look")
                     .coreFont(size: MacTextSize.large, weight: .bold).foregroundStyle(GlassInk.ink(hue))
@@ -147,8 +137,7 @@ private struct Verdict: View {
             .keyboardShortcut("r", modifiers: [])
         }
         .padding(Space.s4)
-        .background(hue.opacity(0.1), in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+        .coreWell()
         .animation(.smooth(duration: 0.4), value: ok)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ops-health")
@@ -196,17 +185,12 @@ private struct WarningCard: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(a.raised ? GlassInk.amber.opacity(0.1) : GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                a.raised ? GlassInk.amber.opacity(0.5) : GlassInk.wellEdge, lineWidth: 1)
-        }
-        .shadow(color: GlassInk.amber.opacity(a.raised ? 0.25 : 0), radius: 12)
+        .coreWell()
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A reading against the point where it warns: a glowing fill and a tick at the limit.
+/// A reading against the point where it warns: a flat fill and a tick at the limit.
 private struct Meter: View {
     let reading: Double
     let limit: Double
@@ -216,12 +200,9 @@ private struct Meter: View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
                 coreShape(3).fill(GlassInk.track.opacity(0.6)).frame(height: 6)
-                coreShape(3).fill(
-                    LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                )
-                .frame(width: max(g.size.width * reading / top, 6), height: 6)
-                .shadow(color: hue.opacity(0.6), radius: 6)
-                coreShape(1).fill(.white).frame(width: 2, height: 14)
+                coreShape(3).fill(hue)
+                    .frame(width: max(g.size.width * reading / top, 6), height: 6)
+                coreShape(1).fill(GlassInk.primary).frame(width: 2, height: 14)
                     .offset(x: g.size.width * limit / top - 1)  // grid: ok tick
             }
             .frame(height: 14)
@@ -252,8 +233,7 @@ private struct FigureTile: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+        .coreWell()
         .help(tile.help.isEmpty ? tile.name : tile.help)
         .accessibilityElement(children: .combine)
     }
@@ -297,7 +277,7 @@ private struct RawMetrics: View {
                         .textSelection(.enabled).padding(Space.s3)
                 }
                 .frame(maxHeight: Space.s8 * 10)
-                .background(GlassInk.well, in: coreShape(Radius.control + 2))
+                .background(GlassInk.well, in: coreShape(Radius.control))
                 .transition(.opacity)
             }
         }

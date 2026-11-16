@@ -2,8 +2,8 @@ import CoreUI
 import SwiftUI
 
 /// The content of each widget at each macOS size (N9): small, medium, large and extra large each have their own layout with
-/// more data, not the same layout with more room. A header with a blue symbol, one large figure, bars and Swift Charts; no
-/// rings. What the Core does not report is said as "Not reported yet".
+/// more data, not the same layout with more room. A header, one large figure, and a bar or chart only where it shows real
+/// progress or data. What the Core does not report is left out, never shown as filler (Ahmed, 2026-11-15).
 struct WidgetBody: View {
     let kind: WidgetKind
     let size: WidgetSize
@@ -35,7 +35,7 @@ extension HomeSnapshot {
     var totalSlots: Int { machines.reduce(0) { $0 + $1.slots } }
 }
 
-/// One running agent: its name, how long, and a bar for the time (full at an hour).
+/// One running agent: its name and how long (no bar: time is not progress toward anything).
 struct WRunRow: View {
     let run: HomeSnapshot.Run
     var showTool = false
@@ -49,7 +49,6 @@ struct WRunRow: View {
                     .contentTransition(.numericText())
             }
             .foregroundStyle(GlassInk.primary)
-            CoreMeter(min(Double(run.minutes) / 60, 1), label: "\(run.minutes) minutes")
         }
         .accessibilityElement(children: .combine)
     }
@@ -62,9 +61,6 @@ struct RunningBody: View {
 
     var body: some View {
         let runs = shell.home.running
-        let waiting = shell.waitingOnYou
-        let needs: StateBadge? =
-            waiting > 0 ? StateBadge("\(waiting) needs you", tone: .warn, symbol: "hand.raised") : nil
         VStack(alignment: .leading, spacing: Space.s2) {
             if runs.isEmpty {
                 WHead("text.cursor", "AI sessions")
@@ -74,40 +70,22 @@ struct RunningBody: View {
                 case .s:
                     WHead("text.cursor", "AI sessions")
                     WFigure(value: Double(runs.count), caption: "running")
-                    Spacer(minLength: 0)
-                    HStack(spacing: Space.s1) {
-                        ForEach(runs.prefix(4)) { r in
-                            CoreMeter(min(Double(r.minutes) / 60, 1), label: r.name).frame(maxWidth: .infinity)
-                        }
-                    }
                 case .m:
-                    WHead("text.cursor", "Running AI sessions") { needs }
+                    WHead("text.cursor", "Running AI sessions")
                     HStack(alignment: .top, spacing: Space.s4) {
                         WFigure(value: Double(runs.count), caption: "running now").frame(width: 100)
                         list(runs.prefix(2), tool: false)
                     }
                 case .l, .t:
-                    WHead("text.cursor", "Running AI sessions") { needs }
+                    WHead("text.cursor", "Running AI sessions")
                     WFigure(value: Double(runs.count), caption: "running")
                     list(runs.prefix(5), tool: true)
                     Spacer(minLength: 0)
                 case .x:
                     WHead("text.cursor", "Running AI sessions")
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        VStack(alignment: .leading, spacing: Space.s3) {
-                            HStack {
-                                WFigure(value: Double(runs.count), caption: "running")
-                                Spacer(minLength: 0)
-                                needs
-                            }
-                            list(runs.prefix(5), tool: true)
-                            Spacer(minLength: 0)
-                        }
-                        WSub {
-                            WCaption("Work in the last 12 hours")
-                            WGap(label: "Finished")
-                            WGap(label: "Tokens")
-                        }
+                    HStack(alignment: .top, spacing: Space.s6) {
+                        WFigure(value: Double(runs.count), caption: "running").frame(width: 100, alignment: .leading)
+                        list(runs.prefix(5), tool: true)
                     }
                 }
             }
@@ -136,6 +114,8 @@ struct SpendBody: View {
             return String(d.formatted(.dateTime.weekday(.narrow)))
         }
     }
+    /// A chart only when there is something to draw: an empty box says nothing (Ahmed, 2026-11-15).
+    private var hasWeek: Bool { week.contains { $0 > 0 } }
     private var tightest: String { "\(Int((home.monthTokensUsed * 100).rounded()))% of the tightest limit" }
 
     var body: some View {
@@ -159,7 +139,7 @@ struct SpendBody: View {
                             CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                         }
                         .frame(width: 130)
-                        WColumns(values: week, labels: weekLabels)
+                        if hasWeek { WColumns(values: week, labels: weekLabels) }
                     }
                 case .l, .t:
                     WHead("dollarsign", "AI spend")
@@ -169,11 +149,12 @@ struct SpendBody: View {
                     }
                     CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                     WCaption(tightest)
-                    WSub {
-                        WCaption("Last 7 days")
-                        WColumns(values: week, labels: weekLabels)
+                    if hasWeek {
+                        WSub {
+                            WCaption("Last 7 days")
+                            WColumns(values: week, labels: weekLabels)
+                        }
                     }
-                    WGap(label: "Spend by account")
                 case .x:
                     WHead("dollarsign", "AI spend")
                     HStack(alignment: .top, spacing: Space.s4) {
@@ -182,13 +163,14 @@ struct SpendBody: View {
                             CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                             WCaption(tightest)
                             WBarRow(label: "Today", value: money(home.spendToday), fill: today)
-                            WGap(label: "Spend by account")
                             Spacer(minLength: 0)
                         }
-                        WSub {
-                            WCaption("Last 30 days")
-                            WColumns(values: home.spendByDay)
-                            if let (i, v) = busiest { WCaption("Busiest day: \(day(i)) · \(money(v))") }
+                        if busiest != nil {
+                            WSub {
+                                WCaption("Last 30 days")
+                                WColumns(values: home.spendByDay)
+                                if let (i, v) = busiest { WCaption("Busiest day: \(day(i)) · \(money(v))") }
+                            }
                         }
                     }
                 }
@@ -213,14 +195,14 @@ struct SpendBody: View {
     }
 }
 
-/// One runner: its name, state, agents in use, a bar for the slots and its load line.
+/// One runner: its name, state and AI sessions in use, in words.
 struct WMachineRow: View {
     let machine: HomeSnapshot.Machine
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s2) {
                 Image(systemName: machine.os.hasPrefix("macOS") ? "laptopcomputer" : "server.rack")
-                    .foregroundStyle(GlassInk.blue).accessibilityHidden(true)
+                    .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
                 Text(machine.id).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 WRunnerBadge(machine: machine)
                 Spacer(minLength: Space.s2)
@@ -228,14 +210,6 @@ struct WMachineRow: View {
                     .foregroundStyle(GlassInk.secondary).monospacedDigit().lineLimit(1)
             }
             .foregroundStyle(GlassInk.primary)
-            HStack(spacing: Space.s3) {
-                CoreMeter(
-                    machine.slots > 0 ? Double(machine.used) / Double(machine.slots) : 0,
-                    low: machine.used >= machine.slots && machine.slots > 0, label: "AI session slots in use")
-                if machine.load.count > 1 {
-                    WLine(values: machine.load).frame(width: 80, height: 22)
-                }
-            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -270,23 +244,14 @@ struct MachinesBody: View {
                     }
                 case .m:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
-                    rows(ms.prefix(2))
+                    rows(ms.prefix(3))
                 case .l, .t:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
                     rows(ms.prefix(4))
                     Spacer(minLength: 0)
                 case .x:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        rows(ms.prefix(4))
-                        WSub {
-                            WCaption("Load, last hour")
-                            ForEach(ms.filter { $0.load.count > 1 }.prefix(2)) { m in
-                                WCaption(m.id)
-                                WLine(values: m.load, tint: m.online ? GlassInk.blue : GlassInk.secondary)
-                            }
-                        }
-                    }
+                    rows(ms.prefix(6))
                 }
             }
         }

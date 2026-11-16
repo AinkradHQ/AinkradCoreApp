@@ -11,6 +11,7 @@ struct TerminalTile: View {
     @State private var hovering = false
     @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         let session = model.sessions[item.id]
@@ -65,14 +66,9 @@ struct TerminalTile: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s2)
         .background(
-            selected ? accent.opacity(0.16) : hovering ? GlassInk.wellHover : GlassInk.well,
+            selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
             in: coreShape(Radius.cardMac)
         )
-        .overlay {
-            coreShape(Radius.cardMac).strokeBorder(
-                selected ? accent.opacity(0.7) : hovering ? GlassInk.rim(0.26) : GlassInk.wellEdge,
-                lineWidth: selected ? 1.5 : 1)
-        }
         .opacity(item.isEnded ? 0.7 : 1)
         .contentShape(coreShape(Radius.cardMac))
         .onTapGesture(count: 2) { TileAction.run(.open, item.id, model) }
@@ -113,18 +109,10 @@ struct TerminalTile: View {
 
     private func mini(_ symbol: String, _ key: String, _ hue: Color, run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            VStack(spacing: 1) {
-                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).coreEnterBounce(hovering)
-                Text(key).coreFont(size: 8, weight: .bold, design: .rounded).opacity(0.85)
-            }
-            .foregroundStyle(.white)
-            .frame(width: 30, height: 30)
-            .background(
-                LinearGradient(colors: [hue, hue.opacity(0.65)], startPoint: .top, endPoint: .bottom), in: coreShape(7)
-            )
-            .overlay { coreShape(7).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+            IconTile(symbol, hue: hue, size: 30, bounce: hovering)
         }
         .buttonStyle(.plain)
+        .help("Key \(key)")
     }
 }
 
@@ -143,7 +131,7 @@ private struct TileScreen: View {
         let t = prefs.theme
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 5) {
-                ForEach(0..<3, id: \.self) { _ in Circle().fill(.white.opacity(0.16)).frame(width: 6, height: 6) }
+                ForEach(0..<3, id: \.self) { _ in coreShape(1.5).fill(.white.opacity(0.16)).frame(width: 6, height: 6) }
                 Spacer()
                 HStack(spacing: 5) {
                     coreShape(1.5).fill(state).frame(width: 6, height: 6)
@@ -153,7 +141,7 @@ private struct TileScreen: View {
                 }
                 .foregroundStyle(.white.opacity(0.9))
                 .padding(.horizontal, 7).frame(height: 18)
-                .background(.black.opacity(0.35), in: coreShape(5))
+                .background(.black.opacity(0.35), in: coreShape(Radius.chip))
             }
             Spacer(minLength: Space.s3)
             HStack(spacing: 0) {
@@ -183,6 +171,5 @@ private struct TileScreen: View {
                 coreShape(Radius.row).fill(Color(nsColor: prefs.screenColor))
             }
         }
-        .overlay { coreShape(Radius.row).strokeBorder(.white.opacity(0.12), lineWidth: 1) }
     }
 }

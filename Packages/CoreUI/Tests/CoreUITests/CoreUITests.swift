@@ -8,7 +8,7 @@ struct StatesTests {
     @Test func knownValuesDecode() throws {
         let s = try JSONDecoder().decode(SessionState.self, from: Data(#""interrupted""#.utf8))
         #expect(s == .interrupted)
-        #expect(s.label == "Resuming" && s.tone == .warn && s.symbol == "arrow.clockwise")
+        #expect(s.label == "Resuming" && s.tone == .queue && s.symbol == "arrow.clockwise")
         #expect(RunState(rawValue: "timed_out") == .timedOut)
         #expect(AccountState(rawValue: "over_budget").label == "Budget reached")
     }
@@ -37,7 +37,7 @@ struct TokenTests {
     @Test func radiiAreRoundedRectsNotPills() {
         #expect(Radius.control == 8 && Radius.chip == 6)
         #expect(
-            [Radius.chip, Radius.control, Radius.cardMac, Radius.row, Radius.pane, Radius.panel].allSatisfy {
+            [Radius.chip, Radius.control, Radius.cardMac, Radius.row, Radius.pane, Radius.pane].allSatisfy {
                 $0 > 0 && $0 <= 18
             })
     }
@@ -145,5 +145,15 @@ struct SharedPartsTests {
         #expect(on)
         sw.flip()
         #expect(!on)
+    }
+}
+
+/// A click never makes buttons look focused: the focus look needs keyboard navigation (Ahmed, 2026-11-16).
+@MainActor
+struct KeyboardFocusTests {
+    @Test func focusLooksNeedKeyboardNavigation() {
+        #expect(!CoreKeyboardFocus.own(true), "no navigation key pressed yet: a focused ancestor lights nothing")
+        #expect(!CoreKeyboardFocus.own(false))
+        #expect(CoreInputMode.navigationKeys.contains(48), "Tab navigates")
     }
 }

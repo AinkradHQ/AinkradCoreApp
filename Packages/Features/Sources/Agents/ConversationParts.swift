@@ -12,7 +12,7 @@ struct FoldedOutput: View {
         let more = lines.count - Self.fold
         VStack(alignment: .leading, spacing: Space.s1) {
             Text(all || more <= 0 ? text : lines.prefix(Self.fold).joined(separator: "\n"))
-                .coreFont(size: MacTextSize.meta + 1, design: .monospaced).foregroundStyle(GlassInk.secondary)
+                .coreFont(size: MacTextSize.meta + 1, design: .monospaced).foregroundStyle(SessionInk.text2)
             if more > 0 {
                 Button(all ? "Show less" : "Show \(more) more lines") { all.toggle() }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small))
@@ -39,21 +39,20 @@ struct EditCard: View {
         let del = lines.filter { $0.kind == .removed }.count
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(reduce ? nil : Motion.out(Motion.ui)) { expanded.toggle() }
+                withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { expanded.toggle() }
             } label: {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).rotationEffect(.degrees(expanded ? 90 : 0))
-                        .frame(width: Space.s3)
-                    Image(systemName: "pencil").foregroundStyle(palette.primary).frame(width: Space.s4)
+                // The same quiet line as every tool step: icon, verb, file, +/−, time and its mark.
+                HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                    Image(systemName: "pencil").coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+                        .frame(width: Space.s4)
                     Text(name.lowercased() == "write" ? "Wrote" : "Edited").coreFont(size: MacTextSize.body)
-                    Text(PathWords.short(path)).coreFont(size: MacTextSize.body, design: .monospaced)
+                        .foregroundStyle(SessionInk.text2)
+                    Text(PathWords.short(path)).coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
                         .lineLimit(1).truncationMode(.middle)
                     Text("+\(add)").foregroundStyle(palette.tone(.run).ink).monospacedDigit()
                     Text("−\(del)").foregroundStyle(palette.tone(.fail).ink).monospacedDigit()
-                    Spacer(minLength: Space.s2)
                     if let ms {
-                        Text(coreUnit(coreDecimal(Double(ms) / 1000, 1), "s")).foregroundStyle(palette.text2)
+                        Text(coreUnit(coreDecimal(Double(ms) / 1000, 1), "s")).foregroundStyle(SessionInk.text2)
                             .monospacedDigit()
                     }
                     switch ok {
@@ -65,8 +64,9 @@ struct EditCard: View {
                             .accessibilityLabel("Failed")
                     case nil: CoreWorkingBar(width: Space.s8)
                     }
+                    Spacer(minLength: 0)
                 }
-                .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
+                .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s2).frame(minHeight: 28)
                 .contentShape(Rectangle())
             }
             .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true)).help(path)
@@ -76,8 +76,6 @@ struct EditCard: View {
             }
         }
         .foregroundStyle(palette.text)
-        .clipShape(coreShape(Radius.control))
-        .coreWell(radius: Radius.control)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Edited \(path), \(add) added, \(del) removed")
     }
@@ -91,26 +89,26 @@ struct TodoCard: View {
         let done = items.filter { $0.status == .completed }.count
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                Text("Plan").coreFont(size: MacTextSize.body, weight: .semibold)
-                Text("\(done) of \(items.count)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                Text("Tasks").coreFont(size: MacTextSize.body, weight: .semibold)
+                Text("\(done) of \(items.count)").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                     .monospacedDigit()
             }
             ForEach(Array(items.enumerated()), id: \.offset) { _, t in
                 HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                     Image(systemName: symbol(t.status)).foregroundStyle(
-                        t.status == .pending ? GlassInk.secondary : GlassInk.blue
+                        t.status == .pending ? SessionInk.text2 : GlassInk.blue
                     )
                     .frame(width: 16)
                     Text(t.text).strikethrough(t.status == .completed).foregroundStyle(
-                        t.status == .completed ? GlassInk.secondary : GlassInk.primary)
+                        t.status == .completed ? SessionInk.text2 : GlassInk.primary)
                 }
                 .coreFont(size: MacTextSize.body)
             }
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
+        .sessionSurface(radius: Radius.cardMac)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Plan, \(done) of \(items.count) done")
+        .accessibilityLabel("Tasks, \(done) of \(items.count) done")
     }
 
     private func symbol(_ s: TodoItem.Status) -> String {

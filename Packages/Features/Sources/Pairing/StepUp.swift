@@ -140,22 +140,10 @@ struct StepUpBanner: View {
 
     var body: some View {
         if let n = app.stepUpNotice {
-            let colours = palette.tone(n.tone)
-            HStack(alignment: .top, spacing: Space.s3) {
-                IconTile(n.symbol, hue: colours.ink, size: 32, bounce: n.title)
-                VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    Text(n.title).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    Text(n.detail).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(Space.s3)
-            .background(colours.ink.opacity(0.14), in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(colours.ink.opacity(0.35), lineWidth: 1) }
-            .transition(.opacity.combined(with: .move(edge: .top)))
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("stepup-notice")
+            CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.tone)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("stepup-notice")
         }
     }
 }
@@ -166,7 +154,6 @@ struct StepUpSheet: View {
     @Bindable var model: StepUpModel
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var ripple = false
-    @State private var sweep = false
     @State private var drawn: CGFloat = 0
     /// Esc and Return are caught here first: the window's own Esc handler leaves this sheet alone (it is not dismissible).
     @State private var keys: Any?
@@ -179,7 +166,7 @@ struct StepUpSheet: View {
                 // Halos rippling out while it waits (rounded rectangles, like every shape in the app).
                 if !done && !missed && !reduce {
                     ForEach(0..<3, id: \.self) { i in
-                        coreShape(Radius.cardMac + 10).stroke(hue.opacity(0.5), lineWidth: 1.5)
+                        coreShape(Radius.pane).stroke(hue.opacity(0.5), lineWidth: 1.5)
                             .frame(width: 112, height: 112)
                             .coreScaleEffect(ripple ? 1.55 : 1)
                             .opacity(ripple ? 0 : 0.8)
@@ -188,25 +175,9 @@ struct StepUpSheet: View {
                                 value: ripple)
                     }
                 }
-                coreShape(Radius.cardMac + 6)
-                    .fill(
-                        LinearGradient(
-                            colors: [hue.opacity(0.55), hue.opacity(0.22)], startPoint: .top, endPoint: .bottom)
-                    )
-                    .overlay { coreShape(Radius.cardMac + 6).strokeBorder(.white.opacity(0.25), lineWidth: 1) }
+                coreShape(Radius.pane)
+                    .fill(hue.opacity(done || missed ? 1 : 0.4))
                     .frame(width: 112, height: 112)
-                    .shadow(color: hue.opacity(0.6), radius: done ? 30 : 18)
-                // A light sweep across the tile while it waits, under the Touch ID view: Apple's view cancels when anything
-                // covers it.
-                if !done && !missed && !reduce {
-                    LinearGradient(colors: [.clear, .white.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(width: 112, height: 26)
-                        .offset(y: sweep ? 46 : -46)
-                        .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: sweep)
-                        .clipShape(coreShape(Radius.cardMac + 6))
-                        .frame(width: 112, height: 112)
-                        .allowsHitTesting(false)
-                }
                 Group {
                     if done {
                         CheckMark().trim(from: 0, to: drawn)
@@ -265,12 +236,11 @@ struct StepUpSheet: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s6)
         .frame(width: Space.s8 * 13)
-        .corePanel(radius: Radius.panel + Space.s1, padding: 0)
+        .corePanel(radius: Radius.pane + Space.s1, padding: 0)
         .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         // No fade or scale on the way in: Apple's Touch ID view cancels while it is see-through or still sizing.
         .onAppear {
             ripple = true
-            sweep = true
             keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
                 switch e.keyCode {
                 case 36,

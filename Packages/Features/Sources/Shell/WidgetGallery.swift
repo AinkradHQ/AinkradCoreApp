@@ -45,7 +45,7 @@ struct WidgetGallery: View {
         .foregroundStyle(GlassInk.primary)
         .padding(Space.s6)
         .frame(width: Space.s8 * 27.5)
-        .coreFrame(radius: Radius.panel)
+        .coreFrame(radius: Radius.pane)
         .coreModalEntrance()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Widgets")
@@ -109,10 +109,6 @@ private struct GalleryCard: View {
         }
         .padding(Space.s3)
         .coreWell(radius: Radius.row, active: hovering)
-        .overlay {
-            coreShape(Radius.row).strokeBorder(GlassInk.blue.opacity(hovering ? 1 : 0), lineWidth: 1.5)
-                .allowsHitTesting(false)
-        }
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .animation(Motion.out(Motion.hover), value: placed?.id)

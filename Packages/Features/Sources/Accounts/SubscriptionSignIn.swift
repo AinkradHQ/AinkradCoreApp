@@ -118,11 +118,8 @@ struct SubscriptionSignIn: View {
                         .accessibilityIdentifier("sign-in-code")
                 }
                 .padding(.horizontal, Space.s3).frame(minHeight: 44)
-                .background(codeFocus ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control + 2))
-                .overlay {
-                    coreShape(Radius.control + 2).strokeBorder(
-                        codeFocus ? hue.opacity(0.7) : GlassInk.wellEdge, lineWidth: codeFocus ? 1.5 : 1)
-                }
+                .background(codeFocus ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+                .overlay { if codeFocus { coreShape(Radius.control).strokeBorder(hue.opacity(0.7), lineWidth: 1.5) } }
                 .focusEffectDisabled()
                 if let e = model.signIn?.codeError { AccIssue(text: e) }
             }
@@ -143,12 +140,7 @@ struct SubscriptionSignIn: View {
 
     private func waiting(_ title: String, _ line: String) -> some View {
         VStack(spacing: Space.s3) {
-            Image(systemName: "person.crop.circle.badge.clock").font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(.white).frame(width: 64, height: 64)
-                .background(
-                    LinearGradient(colors: [hue, hue.opacity(0.55)], startPoint: .top, endPoint: .bottom),
-                    in: coreShape(16)
-                )
+            IconTile("person.crop.circle.badge.clock", hue: hue, size: 64)
             Text(title).coreFont(size: MacTextSize.large, weight: .bold)
             Text(line).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             CoreBusyBar().frame(maxWidth: Space.s8 * 6)

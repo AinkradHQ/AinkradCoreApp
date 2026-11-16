@@ -12,8 +12,7 @@ struct AccPanel<Content: View>: View {
         VStack(alignment: .leading, spacing: spacing) { content }
             .padding(Space.s4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .coreWell(active: hovering)
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.2), value: hovering)
     }
@@ -114,8 +113,8 @@ struct AccStateCard<Actions: View>: View {
         }
         .padding(Space.s6)
         .frame(maxWidth: .infinity)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(tone == .queue ? 0.15 : 0.45), lineWidth: 1) }
+        .coreWell()
+        .overlay { if tone == .fail { coreShape(Radius.cardMac).strokeBorder(GlassInk.red, lineWidth: 1) } }
         .animation(.smooth(duration: 0.45), value: shown)
         .onAppear { shown = true }
         .help(code ?? "")
@@ -155,7 +154,7 @@ struct AccSkeleton: View {
             CoreBusyBar().frame(maxWidth: Space.s8 * 5)
             Text("Loading…").foregroundStyle(palette.text2)
             ForEach(0..<4, id: \.self) { _ in
-                coreShape(Radius.cardMac).fill(palette.glassCard).frame(height: Space.s8 + Space.s6)
+                Color.clear.frame(height: Space.s8 + Space.s6).coreWell()
             }
         }
         .accessibilityElement(children: .ignore)
@@ -202,8 +201,7 @@ struct GateBanner: View {
                 .help("Settings → Core → Feature switches")
             }
             .padding(Space.s3)
-            .background(hue.opacity(0.12), in: coreShape(Radius.cardMac))
-            .overlay { coreShape(Radius.cardMac).strokeBorder(hue.opacity(0.4), lineWidth: 1) }
+            .coreWell()
             .help(g.technical)
             .onAppear { shown = true }
             .accessibilityElement(children: .combine)
@@ -256,8 +254,7 @@ struct AccChip: View {
     var body: some View {
         Text(text).coreFont(size: MacTextSize.meta, weight: .medium, design: mono ? .monospaced : .default)
             .padding(.horizontal, Space.s2).frame(minHeight: 22)
-            .background(GlassInk.well, in: coreShape(6))
-            .overlay { coreShape(6).strokeBorder(GlassInk.wellEdge, lineWidth: 1) }
+            .background(GlassInk.well, in: coreShape(Radius.chip))
     }
 }
 
@@ -286,15 +283,14 @@ struct AccPick: View {
     var enabled = true
     let pick: () -> Void
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
 
     var body: some View {
         Button {
             withAnimation(.smooth(duration: 0.25)) { pick() }
         } label: {
             HStack(spacing: Space.s2) {
-                Image(systemName: on ? "checkmark" : symbol).foregroundStyle(on ? .white : hue)
-                    .frame(width: 26, height: 26).background(on ? hue : hue.opacity(0.15), in: coreShape(7))
-                    .contentTransition(.symbolEffect(.replace))
+                IconTile(on ? "checkmark" : symbol, hue: hue, size: 26)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                     Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
@@ -303,13 +299,10 @@ struct AccPick: View {
             }
             .padding(Space.s2)
             .background(
-                on ? hue.opacity(0.14) : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.control + 2)
+                on ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
+                in: coreShape(Radius.control)
             )
-            .overlay {
-                coreShape(Radius.control + 2).strokeBorder(on ? hue.opacity(0.6) : GlassInk.wellEdge, lineWidth: 1)
-            }
-            .contentShape(coreShape(Radius.control + 2))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain).focusEffectDisabled().disabled(!enabled).opacity(enabled ? 1 : 0.45)
         .onHover { hovering = $0 }

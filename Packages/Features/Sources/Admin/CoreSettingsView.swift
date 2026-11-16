@@ -23,10 +23,9 @@ struct CoreSettingsSection: View {
                         let (group, items) = pair
                         GlassSection(group.title, sub: group.sub, symbol: group.symbol, hue: group.hue, index: i) {
                             let changed = items.filter(\.isOverride).count
-                            SettingsChip(
-                                text: changed == 0 ? "All default" : "\(changed) changed",
-                                symbol: changed == 0 ? "checkmark" : "slider.horizontal.3",
-                                hue: changed == 0 ? GlassInk.slate : group.hue)
+                            CoreChip(
+                                changed == 0 ? "All default" : "\(changed) changed",
+                                symbol: changed == 0 ? "checkmark" : "slider.horizontal.3")
                         } content: {
                             VStack(spacing: Space.s2) {
                                 ForEach(items) { s in
@@ -125,10 +124,10 @@ private struct LimitRow: View {
                     if setting.isOverride || SettingWords.needsRestart(setting) {
                         HStack(spacing: Space.s2) {
                             if setting.isOverride {
-                                SettingsChip(text: "Changed", symbol: "pencil", hue: hue)
+                                CoreChip("Changed", symbol: "pencil")
                             }
                             if SettingWords.needsRestart(setting) {
-                                SettingsChip(text: "After a restart", symbol: "arrow.clockwise", hue: GlassInk.amber)
+                                StateBadge("After a restart", tone: .warn, symbol: "arrow.clockwise")
                                     .help("Your Core reads this only when it starts.")
                             }
                         }.fixedSize()
@@ -154,11 +153,7 @@ private struct LimitRow: View {
             }
         }
         .padding(Space.s3)
-        .background(selected ? hue.opacity(0.12) : hovering ? GlassInk.wellHover : GlassInk.well, in: rowShape)
-        .overlay {
-            rowShape.strokeBorder(selected ? hue.opacity(0.55) : GlassInk.wellEdge, lineWidth: selected ? 1.5 : 1)
-        }
-        .shadow(color: hue.opacity(selected ? 0.3 : 0), radius: 12)
+        .coreWell(active: selected || hovering)
         .contentShape(rowShape)
         .onTapGesture(perform: pick)
         .onHover { hovering = $0 }
@@ -240,7 +235,7 @@ private struct LimitEditor: View {
             if let issue = model.issue { IssueLine(code: nil, text: issue.message) }
         }
         .padding(Space.s3)
-        .background(hue.opacity(0.08), in: coreShape(Radius.control + 2))
+        .background(GlassInk.well, in: coreShape(Radius.control))
         .animation(.smooth(duration: 0.25), value: typed)
         .onKeyPress(.escape) {
             model.cancelEdit()
@@ -266,20 +261,7 @@ private struct LimitEditor: View {
     }
 }
 
-/// A small tinted word with a glyph.
-struct SettingsChip: View {
-    let text: String
-    let symbol: String
-    let hue: Color
-    var body: some View {
-        Label(text, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
-            .foregroundStyle(hue == GlassInk.slate ? GlassInk.secondary : hue)
-            .padding(.horizontal, 8).frame(height: 22)
-            .background(hue.opacity(0.16), in: coreShape(6))
-    }
-}
-
-/// Where the value sits between the limits: a glowing fill up to the value, a tick at the default and, while typing, a
+/// Where the value sits between the limits: a flat fill up to the value, a tick at the default and, while typing, a
 /// ghost marker for the draft (red with the words when it would be refused).
 struct RangeBar: View {
     let setting: SettingItem
@@ -295,17 +277,10 @@ struct RangeBar: View {
                 let dx = w * setting.position(setting.defaultValue)
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.track.opacity(0.6)).frame(height: 6)
-                    coreShape(3)
-                        .fill(
-                            LinearGradient(colors: [hue.opacity(0.5), hue], startPoint: .leading, endPoint: .trailing)
-                        )
-                        .frame(width: max(x, 6), height: 6)
-                        .shadow(color: hue.opacity(0.6), radius: 6)
+                    coreShape(3).fill(hue).frame(width: max(x, 6), height: 6)
                     coreShape(1).fill(GlassInk.secondary).frame(width: 2, height: 12)
                         .offset(x: dx - 1)  // grid: ok tick
-                    coreShape(4).fill(.white).frame(width: 8, height: 18)
-                        .overlay { coreShape(4).strokeBorder(hue, lineWidth: 2) }
-                        .shadow(color: hue.opacity(0.7), radius: 6)
+                    coreShape(4).fill(hue).frame(width: 8, height: 18)
                         .offset(x: min(max(x - 4, 0), w - 8))  // grid: ok marker
                     if let ghost {
                         coreShape(3).fill(refused ? GlassInk.red : GlassInk.primary.opacity(0.8))
@@ -379,15 +354,14 @@ private struct HistoryTimeline: View {
     private func row(when: String, who: String, change: String, current: Bool, last: Bool) -> some View {
         HStack(alignment: .top, spacing: Space.s3) {
             VStack(spacing: 0) {
-                coreShape(3).fill(current ? hue : GlassInk.track).frame(width: 10, height: 10)
-                    .shadow(color: hue.opacity(current ? 0.7 : 0), radius: 5).padding(.top, 5)
+                coreShape(3).fill(current ? hue : GlassInk.track).frame(width: 10, height: 10).padding(.top, 5)
                 if !last { Rectangle().fill(GlassInk.track).frame(width: 2).frame(maxHeight: .infinity) }
             }
             .frame(width: 10)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: Space.s2) {
                     Text(change).coreFont(size: MacTextSize.body, weight: .semibold)
-                    if current { SettingsChip(text: "Now", symbol: "checkmark", hue: GlassInk.green) }
+                    if current { CoreChip("Now", symbol: "checkmark") }
                 }
                 Text(who.isEmpty ? when : "\(when) · \(who)").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)

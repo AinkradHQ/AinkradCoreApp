@@ -61,7 +61,7 @@ struct AddWizardView: View {
     func well<C: View>(@ViewBuilder _ c: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) { c() }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background(palette.uDim, in: coreShape(Radius.cardMac))
+            .coreWell()
     }
 
     func copy(_ text: String) {
@@ -168,7 +168,7 @@ struct AddWizardView: View {
                         .help("The Core does not list it under this name yet. Check Devices in a moment.")
                 }
             }
-            .padding(Space.s3).background(palette.uDim, in: coreShape(Radius.cardMac))
+            .padding(Space.s3).coreWell()
             if model.kind?.isRunner == true, d != nil {
                 HStack(spacing: Space.s3) {
                     Button {
@@ -246,8 +246,7 @@ struct ChoiceCardStyle: ButtonStyle {
             let shape = coreShape(Radius.cardMac)
             configuration.label
                 .foregroundStyle(palette.text)
-                .background(selected || hovering ? palette.uDimHover : palette.uDim, in: shape)
-                .overlay { if selected { shape.strokeBorder(palette.primary, lineWidth: 1.5) } }
+                .background(selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well, in: shape)
                 .contentShape(shape)
                 .scaleEffect(configuration.isPressed && !reduce ? 0.985 : 1)
                 .animation(Motion.out(Motion.press), value: configuration.isPressed)

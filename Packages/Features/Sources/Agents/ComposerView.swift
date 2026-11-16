@@ -1,6 +1,7 @@
 import AppKit
 import CoreUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The commands the CLI takes in its streaming mode; picking one fills the field, and Return sends it like any message.
 enum SlashCommands {
@@ -38,51 +39,20 @@ enum ComposerReturn: Equatable {
     }
 }
 
-/// A TextEditor is an NSTextView, which takes Return itself (`insertNewline`) before SwiftUI's `onKeyPress` hears it, so Return
-/// never sent. While the field is focused, one local key monitor sees Return first; `handle(shift)` says whether it took it.
-private struct ReturnMonitor: ViewModifier {
-    let active: Bool
-    let handle: (Bool) -> Bool
-    @State private var monitor: Any?
-
-    func body(content: Content) -> some View {
-        content
-            .onChange(of: active, initial: true) { _, on in on ? install() : remove() }
-            .onDisappear { remove() }
-    }
-
-    private func install() {
-        guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
-            guard e.keyCode == 36 || e.keyCode == 76,
-                e.modifierFlags.intersection([.command, .option, .control]).isEmpty,
-                // IME composition owns Return until it is done.
-                (e.window?.firstResponder as? NSTextView)?.hasMarkedText() != true
-            else { return e }
-            return MainActor.assumeIsolated { handle(e.modifierFlags.contains(.shift)) } ? nil : e
-        }
-    }
-
-    private func remove() {
-        if let m = monitor { NSEvent.removeMonitor(m) }
-        monitor = nil
-    }
-}
-
-extension View {
-    fileprivate func onReturn(active: Bool, _ handle: @escaping (Bool) -> Bool) -> some View {
-        modifier(ReturnMonitor(active: active, handle: handle))
-    }
-}
-
 /// The message field under a conversation. Always open while the session is live: Return sends (⇧Return a new line), the
-/// message queues while a turn runs, ↑ on an empty field edits the last message, Esc stops the turn, "/" opens the commands.
+/// message queues while a turn runs, ↑ on an empty field edits the last message, Esc stops the turn, "/" opens the commands
+/// (↑ ↓ pick, Return or Tab take one). The keys come from `ComposerTextView`, so they work whatever SwiftUI thinks has focus.
 struct ComposerView: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     var focused: FocusState<Bool>.Binding
+    /// A session shortcut pressed while typing (`SessionShortcut`): true when the session took it.
+    var command: (SessionShortcut) -> Bool = { _ in false }
+    @Environment(\.sessionUI) private var ui
     @Environment(\.corePalette) private var palette
     @State private var pick = 0
+    @State private var dropping = false
+    private var files: [URL] { model.attachments[session.id] ?? [] }
 
     private var draft: Binding<String> {
         Binding(get: { model.drafts[session.id] ?? "" }, set: { model.drafts[session.id] = $0 })
@@ -102,6 +72,7 @@ struct ComposerView: View {
                 .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
                 .coreWell()
+                .readingColumn()
                 .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
         } else {
             composer
@@ -112,88 +83,70 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
+            // What went wrong with the last send (or resume, wake...), right where you typed it.
+            if let n = model.notices[session.id] {
+                CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.tone)
+            }
             VStack(alignment: .leading, spacing: Space.s2) {
+                // Queued messages live inside the composer card, above the field (direction A).
+                QueuedStack(model: model, session: session)
+                if !files.isEmpty { attachmentsRow }
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
                         Text(placeholder).foregroundStyle(palette.text2).padding(.horizontal, Space.s1 + 1)
                             .allowsHitTesting(false)
                     }
-                    TextEditor(text: draft)
-                        .accessibilityIdentifier("agent-composer")
-                        .scrollContentBackground(.hidden).focused(focused).focusEffectDisabled().disabled(!enabled)
-                        .onReturn(active: focused.wrappedValue && enabled) { shift in
-                            switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
-                            case .newline: return false
-                            case .fill(let name):
-                                draft.wrappedValue = name + " "
-                            case .send:
-                                Task { await model.send(session.id) }
-                            }
-                            return true
-                        }
-                        .onKeyPress(.upArrow, phases: .down) { _ in
-                            if !commands.isEmpty {
-                                pick = max(0, pick - 1)
-                                return .handled
-                            }
-                            guard text.isEmpty, let last = model.lastUserMessage(session.id) else { return .ignored }
-                            draft.wrappedValue = last
-                            return .handled
-                        }
-                        .onKeyPress(.downArrow, phases: .down) { _ in
-                            guard !commands.isEmpty else { return .ignored }
-                            pick = min(commands.count - 1, pick + 1)
-                            return .handled
-                        }
-                        .onKeyPress(.escape, phases: .down) { _ in
-                            if !commands.isEmpty {
-                                draft.wrappedValue = ""
-                            } else if model.canStopTurn(session) {
-                                model.stopTurn(session.id)
-                            } else {
-                                focused.wrappedValue = false
-                            }
-                            return .handled
-                        }
+                    ComposerTextView(
+                        text: draft, focused: focused, enabled: enabled,
+                        font: AgentPrefs.shared.nsFont(
+                            size: MacTextSize.scaled(
+                                MacTextSize.body, by: TextSizePrefs.shared.scale * AgentPrefs.shared.textScale)),
+                        minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5, keys: keys, onFiles: add)
                 }
                 .coreFont(size: MacTextSize.body)
-                .frame(minHeight: Space.s8 + Space.s3, maxHeight: Space.s8 * 5).fixedSize(
-                    horizontal: false, vertical: true)
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
-                        .disabled(!enabled).help("Attach a file: adds its path to the message")
-                    CoreChip(AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model"))
-                    stateChip
+                        .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)").keyHint(.attach)
+                    modelPicker
                     Spacer(minLength: Space.s2)
                     if bytes > AgentsModel.messageLimit / 2 {
                         Text("\(coreDecimal(Double(bytes) / 1024, 1)) / 16 KiB")
                             .coreFont(size: MacTextSize.meta).monospacedDigit()
                             .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
                     }
-                    if model.canStopTurn(session) {
-                        Button("Stop turn") { model.stopTurn(session.id) }
-                            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, "esc")
-                            .help("Stop the current turn (Esc). The session stays open.")
-                    }
-                    if enabled {
-                        Button(action: { Task { await model.send(session.id) } }) {
-                            Label(session.idle || !session.live ? "Send" : "Queue", systemImage: "arrow.up")
-                        }
-                        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).environment(\.coreKeycap, "↩")
-                        .disabled(!model.canSend(session.id))
-                        .help(
-                            session.idle || !session.live
-                                ? "Send the message (Return)" : "Send it after this turn (Return)")
-                    }
+                    if enabled || model.canStopTurn(session) { actionButton }
                 }
             }
             .padding(Space.s3)
-            .coreFieldSurface(focused: on, radius: Radius.cardMac)
+            // A plain field, no outline (Ahmed, 2026-11-15); a slightly stronger well while writing.
+            // A card floating over the page, as chat apps' composers do; one step stronger while you write.
+            .sessionFloat()
+            .animation(Motion.out(Motion.hover), value: on)
+            .contentShape(coreShape(Radius.cardMac))
+            .onTapGesture { if enabled { focused.wrappedValue = true } }
+            // Files dropped anywhere on the composer attach, like a chat app.
+            .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
+                guard enabled else { return false }
+                for p in providers {
+                    _ = p.loadObject(ofClass: URL.self) { url, _ in
+                        guard let url else { return }
+                        Task { @MainActor in add([url]) }
+                    }
+                }
+                return true
+            }
+            .overlay {
+                if dropping {
+                    coreShape(Radius.cardMac).strokeBorder(GlassInk.blue, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                        .allowsHitTesting(false)
+                }
+            }
             .coreDimWhenDisabled(enabled || session.over)
-            hints
         }
+        .readingColumn()
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
         .onChange(of: text) { _, _ in pick = 0 }
+        .onChange(of: ui?.attach) { _, _ in if enabled { attach() } }
     }
 
     private func palette(_ list: [(name: String, help: String)]) -> some View {
@@ -222,34 +175,215 @@ struct ComposerView: View {
         .accessibilityLabel("Commands")
     }
 
-    /// What the session is doing, beside the tool: blue while it works, amber while an approval waits. Nothing when idle.
-    @ViewBuilder private var stateChip: some View {
-        if model.waiting(session.id) {
-            StateBadge("Waiting for your answer", tone: .warn, symbol: "hand.raised")
-        } else if model.canStopTurn(session) {
-            TimelineView(.periodic(from: session.updatedAt, by: 1)) { ctx in
-                StateBadge(
-                    "Thinking · " + coreUnit("\(max(0, Int(ctx.date.timeIntervalSince(session.updatedAt))))", "s"),
-                    tone: .done, symbol: "ellipsis")
+    /// One compact button that follows what is happening (Ahmed, 2026-11-16): Stop while a turn runs and the field is empty,
+    /// Queue once you type during a turn, Send when it is idle, dimmed with nothing to send.
+    private var actionButton: some View {
+        let act = ComposerAction.of(
+            running: model.canStopTurn(session),
+            hasText: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !files.isEmpty, canSend: model.canSend(session.id))
+        return Button {
+            if act == .stop { model.stopTurn(session.id) } else { submit() }
+        } label: {
+            Image(systemName: act == .stop ? "stop.fill" : "arrow.up")
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: MacSize.controlSm - Space.s2)
+        }
+        .buttonStyle(GraphiteButtonStyle(iconOnly: true))
+        .disabled(act == .idle)
+        .keyHint(act == .stop ? "esc" : act == .idle ? "" : "↩")
+        .help(act.help)
+        .accessibilityLabel(act.name)
+        .animation(Motion.out(Motion.ui), value: act)
+    }
+
+    /// The tool and its model; for Claude Code a menu that switches the model with the tool's own `/model` command. Other
+    /// tools show their model as a label (they have no in-session switch the app can send).
+    @ViewBuilder private var modelPicker: some View {
+        let label = AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model")
+        if session.harness == "claude", enabled {
+            CoreDropdown(
+                items: Self.claudeModels.map { m in
+                    CoreDropdownItem(
+                        m.title, checked: (session.model ?? "").lowercased().contains(m.id), note: m.note
+                    ) { Task { await model.say(session.id, "/model \(m.id)") } }
+                },
+                isPresented: Binding(get: { ui?.modelMenu ?? false }, set: { ui?.modelMenu = $0 })
+            ) {
+                HStack(spacing: Space.s1) {
+                    Text(label)
+                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                }
+                .coreFont(size: MacTextSize.meta, weight: .medium)
+                .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+                .background(GlassInk.well, in: coreShape(Radius.chip))
             }
+            .help("Switch the model for the rest of this session (⇧⌘M)").keyHint(.model)
+        } else {
+            CoreChip(label)
         }
     }
 
-    /// The keys, as quiet words under the composer.
-    private var hints: some View {
-        Text("⇧↩ new line · ↑ edit last message · esc stop turn · / commands")
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .center)
+    static let claudeModels: [(id: String, title: String, note: String?)] = [
+        ("default", "Default", "the account's choice"), ("opus", "Opus", "most capable"),
+        ("sonnet", "Sonnet", "balanced"),
+        ("haiku", "Haiku", "fastest"),
+    ]
+
+    /// Every key the field hands over (one place, read fresh on each update).
+    private var keys: ComposerKeys {
+        ComposerKeys(
+            submit: { shift in
+                switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
+                case .newline: return false
+                case .fill(let name): draft.wrappedValue = name + " "
+                case .send: submit()
+                }
+                return true
+            },
+            up: {
+                if !commands.isEmpty {
+                    pick = max(0, pick - 1)
+                    return true
+                }
+                // ↑ on an empty field, as in the Claude CLI: the queued messages come back to the field to edit first;
+                // with none queued, your last message does.
+                if text.isEmpty, model.queued[session.id]?.isEmpty == false {
+                    model.editAllQueued(session.id)
+                    return true
+                }
+                guard text.isEmpty, let last = model.lastUserMessage(session.id) else { return false }
+                draft.wrappedValue = last
+                return true
+            },
+            down: {
+                guard !commands.isEmpty else { return false }
+                pick = min(commands.count - 1, pick + 1)
+                return true
+            },
+            tab: {
+                // Tab takes the highlighted command; otherwise the field moves focus on (KeyTextView).
+                guard !commands.isEmpty else { return false }
+                draft.wrappedValue = commands[min(pick, commands.count - 1)].name + " "
+                return true
+            },
+            escape: {
+                if !commands.isEmpty {
+                    draft.wrappedValue = ""
+                } else if model.canStopTurn(session) {
+                    model.stopTurn(session.id)
+                } else {
+                    focused.wrappedValue = false
+                }
+                return true
+            },
+            command: { e in SessionShortcut.match(e).map(command) ?? false })
     }
 
+    /// Return or the button: while a turn runs the message waits in the queue; otherwise it goes now.
+    private func submit() {
+        if model.canStopTurn(session) { model.enqueue(session.id) } else { Task { await model.send(session.id) } }
+    }
+
+    /// The 📎 button: pick files to attach.
     private func attach() {
         let p = NSOpenPanel()
         p.canChooseFiles = true
         p.canChooseDirectories = false
         p.allowsMultipleSelection = true
         guard p.runModal() == .OK else { return }
-        let refs = p.urls.map { "@" + $0.path }.joined(separator: " ")
-        draft.wrappedValue += (text.isEmpty || text.hasSuffix(" ") ? "" : " ") + refs + " "
+        add(p.urls)
         focused.wrappedValue = true
+    }
+
+    /// Attach files, once each.
+    private func add(_ urls: [URL]) {
+        var list = files
+        for u in urls where !list.contains(u) { list.append(u) }
+        model.attachments[session.id] = list
+    }
+
+    /// The attached files above the field: a thumbnail for an image, a document glyph otherwise, and a way to remove each.
+    private var attachmentsRow: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            ScrollView(.horizontal) {
+                HStack(spacing: Space.s2) {
+                    ForEach(files, id: \.self) { url in AttachmentChip(url: url) { remove(url) } }
+                }
+            }
+            .scrollIndicators(.never)
+            // ponytail: "this Mac" is guessed from the runner's name; the Core does not say which runner is local yet.
+            if !Self.onThisMac(model.runnerName(session.runner)) {
+                Label(
+                    "Files are read from this Mac; \(model.runnerName(session.runner)) can't open them yet.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+            }
+        }
+    }
+
+    private func remove(_ url: URL) { model.attachments[session.id] = files.filter { $0 != url } }
+
+    static func onThisMac(_ runner: String) -> Bool {
+        let here = (Host.current().localizedName ?? "").lowercased()
+        let r = runner.lowercased()
+        return r.contains("this mac") || (!here.isEmpty && (r == here || r.hasPrefix(here) || here.hasPrefix(r)))
+    }
+}
+
+/// One attached file: an image's thumbnail or a document glyph, its name, and ✕ to remove it.
+private struct AttachmentChip: View {
+    let url: URL
+    let remove: () -> Void
+    private var isImage: Bool {
+        ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff"].contains(url.pathExtension.lowercased())
+    }
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            if isImage, let img = NSImage(contentsOf: url) {
+                Image(nsImage: img).resizable().scaledToFill().frame(width: 28, height: 28)
+                    .clipShape(coreShape(Radius.chip))
+            } else {
+                Image(systemName: "doc").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                    .frame(width: 28, height: 28).background(GlassInk.well, in: coreShape(Radius.chip))
+            }
+            Text(url.lastPathComponent).coreFont(size: MacTextSize.meta).lineLimit(1).truncationMode(.middle)
+                .frame(maxWidth: Space.s8 * 5, alignment: .leading)
+            CoreIconButton(symbol: "xmark", label: "Remove \(url.lastPathComponent)", action: remove)
+        }
+        .padding(.leading, Space.s1).padding(.trailing, Space.s1).padding(.vertical, Space.s1)
+        .background(GlassInk.wellHover, in: coreShape(Radius.control))
+        .help(url.path)
+    }
+
+}
+
+/// What the composer's one button does now.
+enum ComposerAction: Equatable {
+    case stop, queue, send, idle
+
+    static func of(running: Bool, hasText: Bool, canSend: Bool) -> Self {
+        if hasText && canSend { return running ? .queue : .send }
+        if running { return .stop }
+        return .idle
+    }
+
+    var name: String {
+        switch self {
+        case .stop: "Stop turn"
+        case .queue: "Queue"
+        case .send, .idle: "Send"
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .stop: "Stop the current turn (Esc or ⌘.). The session stays open."
+        case .queue: "Queue it: it goes out when this turn ends (Return). Esc stops the turn."
+        case .send: "Send the message (Return)"
+        case .idle: "Type a message to send"
+        }
     }
 }
