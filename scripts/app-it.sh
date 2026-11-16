@@ -193,7 +193,8 @@ PERL
   # The Core starts a session only with an account or the runner's own login (409 no_account): the stand-in gets an empty
   # login file where the runner looks for Claude's, so it counts as signed in. No token: the stand-in never reads it.
   mkdir -p "$W/runner/agents-config/claude" && echo '{}' >"$W/runner/agents-config/claude/.credentials.json"
-  RFLAGS=(--enable-agents); [ "$MODE" = manual ] && RFLAGS+=(--enable-pty) && mkdir -p "$W/tmp"
+  # pty too: the agents test opens a terminal in the session's folder (⇧⌘T, Core #264).
+  RFLAGS=(--enable-agents --enable-pty); mkdir -p "$W/tmp"
   PATH="$W/bin:$PATH" TMPDIR="$W/tmp" AINKRAD_PTYHOST="$PTYH" "$RUN" connect --state "$W/runner" "${RFLAGS[@]}" >"$W/runner.log" 2>&1 </dev/null &
   PIDS+=($!)
   wait_for 40 bash -c "'$CTL' --url '$URL' --host '${URL#http://}' --keystore '$KS_A' --stepup-passphrase-file '$PASS_A' runner ls </dev/null | grep -q online" \

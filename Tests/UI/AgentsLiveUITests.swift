@@ -129,6 +129,27 @@ final class AgentsLiveUITests: XCTestCase {
         XCTAssertTrue(containing("1 of").waitForExistence(timeout: 5), "the find bar counts the match")
         shot("session-find")
         find.typeKey(.escape, modifierFlags: [])
+        // ⇧⌘T opens a terminal on the session's runner, already in the session's folder (Core #264): a session without a
+        // repo works in `<work root>/session-<id>`, so `pwd` prints that.
+        composer.click()
+        app.typeKey("t", modifierFlags: [.command, .shift])
+        let screen = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == 'Terminal screen' OR identifier == 'Terminal screen'")
+        ).firstMatch
+        XCTAssertTrue(screen.waitForExistence(timeout: 30), "⇧⌘T opens a terminal pane")
+        let text = { (screen.value as? String) ?? "" }
+        let prompt = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in text().count > 20 }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [prompt], timeout: 30), .completed, "the shell drew its prompt")
+        screen.click()
+        screen.typeText("pwd\n")
+        let inFolder = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in  // the screen wraps a long path: join its rows first
+                text().replacingOccurrences(of: "\n", with: "").contains("/session-as_")
+            }, object: nil)
+        let ok = XCTWaiter().wait(for: [inFolder], timeout: 20) == .completed
+        shot("session-terminal")
+        XCTAssertTrue(ok, "the terminal starts in the session's folder. Screen: \(text().suffix(300))")
+        XCTAssertTrue(composer.exists, "the terminal opens beside the session, which stays")
         // End session asks first, then ends it.
         app.buttons["End Session…"].firstMatch.click()
         XCTAssertTrue(containing("End this AI session?").waitForExistence(timeout: 10), "End session asks first")
