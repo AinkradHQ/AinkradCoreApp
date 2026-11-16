@@ -105,7 +105,6 @@ enum SnapshotCapture {
         }
     }
 }
-#endif
 
 extension SnapshotCapture {
     /// `base` with the window's visible popovers drawn over it (their frames are relative to the window's).
@@ -134,3 +133,4 @@ extension SnapshotCapture {
         return ctx.makeImage() ?? base
     }
 }
+#endif
