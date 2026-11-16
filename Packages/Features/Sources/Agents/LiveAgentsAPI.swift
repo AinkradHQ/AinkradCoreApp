@@ -110,7 +110,8 @@ public struct LiveAgentsAPI: AgentsAPI {
             let plain = new.chain == nil && new.agent == nil
             let body = Components.Schemas.NewAgentSession(
                 agent: new.agent, chain: new.chain, harness: plain ? new.harness : nil, model: plain ? new.model : nil,
-                policy: policy, prompt: new.prompt.isEmpty ? nil : new.prompt, runner: new.runner,
+                plan: new.plan ? true : nil, policy: policy, prompt: new.prompt.isEmpty ? nil : new.prompt,
+                runner: new.runner,
                 secrets: new.secrets.isEmpty ? nil : new.secrets.map { .init(name: $0, _var: $0) },
                 workspace: try Self.workspace(new))
             switch try await client.createAgentSession(body: .json(body)) {
@@ -141,6 +142,20 @@ public struct LiveAgentsAPI: AgentsAPI {
         try await run {
             switch try await client.interruptAgentSession(path: .init(id: id)) {
             case .ok(let o): return Self.session(try o.body.json)
+            case .notFound(let r): throw Self.fail(r)
+            case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    public func setMode(_ id: String, policy: String?, plan: Bool?) async throws -> AgentSessionInfo {
+        try await run {
+            let body = Components.Schemas.AgentModeChange(plan: plan, policy: policy)
+            switch try await client.setAgentSessionMode(path: .init(id: id), body: .json(body)) {
+            case .ok(let o): return Self.session(try o.body.json)
+            case .badRequest(let r): throw Self.fail(r)
             case .notFound(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
             case .undocumented(let status, let p): throw await Self.status(status, p)
@@ -309,7 +324,8 @@ public struct LiveAgentsAPI: AgentsAPI {
                     costMicros: $0.costUsdMicros)
             }, resumes: s.resumes.map(Int.init), index: s.index, route: route(s, outcome), title: s.title,
             project: (s.workspace?.value["repo"] as? String).map(projectName),
-            branch: s.workspace?.value["branch"] as? String, keepsOpen: s.live, idleSince: s.idleSince)
+            branch: s.workspace?.value["branch"] as? String, keepsOpen: s.live, idleSince: s.idleSince,
+            policy: s.policy, plan: s.plan ?? false)
     }
 
     /// Everything the scheduler adds to a session; nil when the Core gave none of it (not an admin, or no chain).

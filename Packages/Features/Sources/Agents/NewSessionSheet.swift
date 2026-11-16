@@ -256,22 +256,3 @@ enum SessionSource: String, CaseIterable, Sendable {
         }
     }
 }
-
-/// Policy modes in plain words.
-enum SessionMode {
-    static let all = ["ask", "accept_edits", "sandboxed"]
-    static func words(_ mode: String) -> String {
-        switch mode {
-        case "ask": "Asks first"
-        case "sandboxed": "Sandboxed"
-        default: "Accepts edits"
-        }
-    }
-    static func help(_ mode: String) -> String {
-        switch mode {
-        case "ask": "Asks you before each tool call that changes something."
-        case "sandboxed": "Runs in a sandbox and asks for nothing. Needs the admin scope."
-        default: "Edits files without asking; still asks before running commands."
-        }
-    }
-}

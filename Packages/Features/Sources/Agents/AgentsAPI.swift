@@ -72,6 +72,8 @@ public protocol AgentsAPI: Sendable {
     func end(_ id: String) async throws -> AgentSessionInfo
     /// Names a session (`PATCH title`).
     func rename(_ id: String, title: String) async throws -> AgentSessionInfo
+    /// Switches a session's permission mode and/or Plan mode (`setAgentSessionMode`); nil leaves either as it is.
+    func setMode(_ id: String, policy: String?, plan: Bool?) async throws -> AgentSessionInfo
 }
 
 extension AgentsAPI {
@@ -140,6 +142,10 @@ enum EntryParser {
             let tokens = n("input") + n("output")
             let cost = (b["cost_usd"] as? NSNumber).map { Int64(($0.doubleValue * 1_000_000).rounded()) }
             return .turnEnded(costMicros: cost, tokens: tokens > 0 ? tokens : nil)
+        // The mode was switched (`setAgentSessionMode`): one quiet line, "Switched to Plan".
+        case "mode_changed":
+            let plan = b["plan"] as? Bool ?? false
+            return .note(type: "mode_changed", detail: SessionMode.words(policy: str("mode") ?? "ask", plan: plan))
         case "session_started", "usage_so_far", "turn_ended", "waiting", "exited", "approval_requested": return .hidden
         default: return .note(type: type.isEmpty ? "unknown" : type, detail: str("reason") ?? str("text") ?? "")
         }

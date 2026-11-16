@@ -132,7 +132,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         let s = AgentSessionInfo(
             id: id, runner: new.runner, harness: new.chain == nil && new.agent == nil ? new.harness : "claude",
             state: new.prompt.isEmpty ? .waiting : .starting, createdAt: Date(), updatedAt: Date(),
-            index: Int64(counter), project: new.project, branch: new.branch)
+            index: Int64(counter), project: new.project, branch: new.branch, policy: new.mode, plan: new.plan)
         add(
             s,
             entries: [.started(harness: new.harness, resumed: false)] + (new.prompt.isEmpty ? [] : [.user(new.prompt)]))
@@ -185,6 +185,25 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
 
     public func end(_ id: String) async throws -> AgentSessionInfo {
         try await finish(id, "end", .succeeded, "succeeded")
+    }
+
+    private func sessionsByID(_ id: String) -> AgentSessionInfo? { lock.withLock { sessionsByID[id] } }
+
+    public func setMode(_ id: String, policy: String?, plan: Bool?) async throws -> AgentSessionInfo {
+        try record("setMode")
+        update(id) { s in
+            if let policy { s.policy = policy }
+            if let plan { s.plan = plan }
+        }
+        let now = sessionsByID(id)
+        append(
+            id,
+            [
+                .note(
+                    type: "mode_changed",
+                    detail: SessionMode.words(policy: now?.policy ?? "ask", plan: now?.plan ?? false))
+            ])
+        return try await session(id)
     }
 
     public func rename(_ id: String, title: String) async throws -> AgentSessionInfo {
@@ -256,7 +275,7 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
                 id: "as_01JC4X7Q3MZ8N5V2K9R\(String(format: "%03d", n))", runner: r, harness: h, state: st, outcome: o,
                 createdAt: ago(age), updatedAt: ago(30), endedAt: st == .ended || st == .lost ? ago(30) : nil,
                 lastSeq: 0,
-                usage: AgentUsageInfo(input: tin, output: tout, costMicros: cost), index: Int64(n))
+                usage: AgentUsageInfo(input: tin, output: tout, costMicros: cost), index: Int64(n), policy: "ask")
         }
         let files = [
             "crates/citadel/src/routes.rs", "crates/citadel/src/store.rs", "migrations/0024_citadel.sql", "Cargo.toml",

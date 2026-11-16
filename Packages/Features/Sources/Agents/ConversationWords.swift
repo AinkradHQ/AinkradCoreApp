@@ -18,6 +18,7 @@ enum ConversationWords {
                 let why = budget ? nil : reason.flatMap { $0.isEmpty ? nil : AgentWords.reasonWords($0) }
                 return AgentWords.endedWords(budget ? "budget" : kind) + (why.map { " · \($0)" } ?? "")
             }()
+        case .note("mode_changed", let detail): detail.isEmpty ? "Mode changed" : "Switched to \(detail)"
         case .note(let type, let detail): detail.isEmpty ? words(type) : "\(words(type)): \(detail)"
         default: nil
         }

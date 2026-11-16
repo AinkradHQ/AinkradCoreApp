@@ -61,7 +61,9 @@ struct DiffBlock: View {
                 .coreFont(size: 12, design: .monospaced)
                 .padding(.horizontal, Space.s2).padding(.vertical, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(l.kind == .context ? .clear : tint(l.kind).opacity(0.12))
+                // A plain, square band flush with its neighbours: one block, rounded only at its outer corners
+                // (Ahmed, 2026-11-16: "each line is corner rounded on its own").
+                .background { Rectangle().fill(l.kind == .context ? .clear : tint(l.kind).opacity(0.12)) }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(
                     (l.kind == .added ? "Added: " : l.kind == .removed ? "Removed: " : "") + l.text)

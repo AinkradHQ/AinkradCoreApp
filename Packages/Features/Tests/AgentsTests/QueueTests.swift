@@ -84,3 +84,43 @@ struct FilesTouchedTests {
         #expect(AgentsModel.isEdit("MultiEdit") && !AgentsModel.isEdit("Read"))
     }
 }
+
+/// Permission and Plan modes (Ahmed, 2026-11-16): shown from the session, cycled with ⇧⇥ as in Claude Code, switched
+/// through the Core.
+@MainActor
+struct SessionModeTests {
+    private func info(policy: String?, plan: Bool = false, harness: String = "claude") -> AgentSessionInfo {
+        AgentSessionInfo(
+            id: "s", runner: "r", harness: harness, state: .running, createdAt: .now, updatedAt: .now, policy: policy,
+            plan: plan)
+    }
+
+    @Test func theModeComesFromTheSession() {
+        #expect(SessionMode.of(info(policy: nil)) == nil, "an older Core does not say: no chip")
+        #expect(SessionMode.of(info(policy: "ask")) == .ask)
+        #expect(SessionMode.of(info(policy: "accept_edits")) == .acceptEdits)
+        #expect(SessionMode.of(info(policy: "ask", plan: true)) == .plan)
+    }
+
+    @Test func shiftTabCyclesAsClaudeCodeDoes() {
+        #expect(SessionMode.ask.next(harness: "claude") == .acceptEdits)
+        #expect(SessionMode.acceptEdits.next(harness: "claude") == .plan)
+        #expect(SessionMode.plan.next(harness: "claude") == .ask)
+        #expect(SessionMode.acceptEdits.next(harness: "codex") == .ask, "no Plan where the tool has none")
+        #expect(SessionMode.sandboxed.next(harness: "claude") == nil, "sandboxed is chosen at start")
+    }
+
+    @Test func switchingGoesThroughTheCore() async {
+        let api = FakeAgentsAPI.prototypeWorld()
+        let m = AgentsModel(
+            shell: ShellModel(), notifier: FakeNotifier(), defaults: UserDefaults(suiteName: "mode-\(UUID())")!,
+            host: FakeHost())
+        m.attach(api)
+        await m.firstLoad?.value
+        await m.reloadAll()
+        let id = "as_01JC4X7Q3MZ8N5V2K9R002"
+        await m.setMode(id, to: .plan)
+        #expect(api.calls.contains("setMode"))
+        #expect(m.sessions.session(id).map { SessionMode.of($0) } == .plan)
+    }
+}

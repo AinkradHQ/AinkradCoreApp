@@ -11,6 +11,8 @@ struct ComposerKeys {
     var escape: () -> Bool
     /// A session shortcut (⌘F, ⌘↩, ⇧⌘R…, `SessionShortcut`): true when the session took it.
     var command: (NSEvent) -> Bool = { _ in false }
+    /// ⇧⇥: the session's next mode (as in Claude Code).
+    var backtab: () -> Bool = { false }
 }
 
 /// The composer's text field (Ahmed, 2026-11-15: Enter sometimes did not send, and the command list ignored the arrows).
@@ -176,6 +178,7 @@ final class KeyTextView: NSTextView {
             case #selector(moveUp(_:)): keys?.up() ?? false
             case #selector(moveDown(_:)): keys?.down() ?? false
             case #selector(insertTab(_:)): keys?.tab() ?? false
+            case #selector(insertBacktab(_:)): keys?.backtab() ?? false
             case #selector(cancelOperation(_:)): keys?.escape() ?? false
             default: false
             }

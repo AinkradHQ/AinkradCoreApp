@@ -108,6 +108,7 @@ struct ComposerView: View {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
                         .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)").keyHint(.attach)
                     modelPicker
+                    ModeChip(model: model, session: session)
                     Spacer(minLength: Space.s2)
                     if bytes > AgentsModel.messageLimit / 2 {
                         Text("\(coreDecimal(Double(bytes) / 1024, 1)) / 16 KiB")
@@ -277,7 +278,14 @@ struct ComposerView: View {
                 }
                 return true
             },
-            command: { e in SessionShortcut.match(e).map(command) ?? false })
+            command: { e in SessionShortcut.match(e).map(command) ?? false },
+            backtab: {
+                guard let mode = SessionMode.of(session), let next = mode.next(harness: session.harness) else {
+                    return false
+                }
+                Task { await model.setMode(session.id, to: next) }
+                return true
+            })
     }
 
     /// Return or the button: while a turn runs the message waits in the queue; otherwise it goes now.
