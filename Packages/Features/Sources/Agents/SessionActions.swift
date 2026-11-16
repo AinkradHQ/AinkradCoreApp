@@ -84,7 +84,7 @@ struct SessionActions: View {
             // Neutral at rest, red only on hover: occasional and destructive, never the loudest thing on screen.
             .buttonStyle(EndButtonStyle(iconOnly: compact))
             .disabled(model.stopping[session.id] != nil)
-            .help("End the session: the CLI exits and the transcript stays (⇧⌘E). Esc stops only the current turn.")
+            .help("End Session… (⇧⌘E): the CLI exits and the transcript stays. Esc stops only the current turn.")
             .keyHint(.endSession)
         } else if session.state != .lost {
             if session.stoppedByBudget {
@@ -110,23 +110,22 @@ struct SessionActions: View {
 
     // MARK: Terminal here, Open in…
 
-    private var terminalHere: some View {
-        Button {
-            model.host?.openTerminal(on: session.runner)
-        } label: {
-            if compact {
-                Image(systemName: "terminal").accessibilityLabel("Terminal")
-            } else {
-                Label("Terminal", systemImage: "terminal").lineLimit(1)
-                    .frame(maxWidth: stacked ? .infinity : nil)
+    @ViewBuilder private var terminalHere: some View {
+        let help =
+            "Terminal (⇧⌘T): open a new terminal on \(model.runnerName(session.runner)). The Core cannot start it in the session's folder yet."
+        if compact {
+            // Icons only in the title line, like Find and the shortcuts (Ahmed, 2026-11-16); the name is in the tooltip.
+            CoreIconButton(symbol: "terminal", label: "Terminal") { model.host?.openTerminal(on: session.runner) }
+                .help(help).keyHint(.terminal).accessibilityIdentifier("session-terminal-here")
+        } else {
+            Button {
+                model.host?.openTerminal(on: session.runner)
+            } label: {
+                Label("Terminal", systemImage: "terminal").lineLimit(1).frame(maxWidth: stacked ? .infinity : nil)
             }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
+            .help(help).keyHint(.terminal).accessibilityIdentifier("session-terminal-here")
         }
-        .buttonStyle(CoreButtonStyle(.secondary, size: compact ? .small : .medium))
-        .help(
-            "Open a new terminal on \(model.runnerName(session.runner)) (⇧⌘T). The Core cannot start it in the session's folder yet."
-        )
-        .keyHint(.terminal)
-        .accessibilityIdentifier("session-terminal-here")
     }
 
     /// The session's folder on this Mac. The Core sends only the folder's name (`project`), never its path, so this is nil until
@@ -150,14 +149,15 @@ struct SessionActions: View {
                     Label("Open In…", systemImage: "folder").lineLimit(1)
                 }
             }
-            .coreFont(size: small ? MacTextSize.meta : MacTextSize.body, weight: .semibold)
-            .foregroundStyle(GlassInk.primary)
+            .coreFont(size: compact ? MacTextSize.body : MacTextSize.body, weight: compact ? .regular : .semibold)
+            .foregroundStyle(compact ? SessionInk.text2 : GlassInk.primary)
             .padding(.horizontal, small ? Space.s2 : Space.s3)
             .frame(maxWidth: stacked ? .infinity : nil, minHeight: small ? MacSize.controlSm : MacSize.controlMd)
-            .background(GlassInk.well, in: coreShape(small ? Radius.chip : Radius.control))
+            .frame(minWidth: compact ? MacSize.controlSm : nil)
+            .background(compact ? .clear : GlassInk.well, in: coreShape(small ? Radius.chip : Radius.control))
             .contentShape(coreShape(small ? Radius.chip : Radius.control))
         }
-        .help("Reveal the folder in Finder, open it in an editor, or copy it (⇧⌘O)")
+        .help("Open In… (⇧⌘O): reveal the folder in Finder, open it in an editor, or copy it")
         .keyHint(.openIn)
         .accessibilityIdentifier("session-open-in")
     }

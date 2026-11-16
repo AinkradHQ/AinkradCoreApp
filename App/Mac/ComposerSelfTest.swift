@@ -270,6 +270,11 @@ enum ShowcaseShots {
         var last = -1.0
         while n <= 8 {
             _ = SnapshotCapture.png(window, to: "\(dir)/showcase-\(n)-\(theme).png")
+            // Two frames 0.6 s apart on the first page: the working sub-agent's highlight has moved between them.
+            if n == 1 {
+                try? await Task.sleep(for: .milliseconds(600))
+                _ = SnapshotCapture.png(window, to: "\(dir)/showcase-1b-\(theme).png")
+            }
             let y = scroll?.contentView.bounds.origin.y ?? 0
             if y == last { break }
             last = y

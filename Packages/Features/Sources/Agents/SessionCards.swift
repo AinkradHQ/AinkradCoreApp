@@ -171,6 +171,9 @@ struct SubAgentsCard: View {
                     Spacer(minLength: Space.s2)
                     Text(a.ok == nil ? AgentWords.clock(seconds) : "\(coreDecimal(seconds, 1)) s")
                         .coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2).monospacedDigit()
+                        // A working agent's timer rolls to each new second.
+                        .contentTransition(.numericText(countsDown: false))
+                        .animation(Motion.out(0.3), value: Int(seconds))
                 }
                 HStack(spacing: Space.s2) {
                     GeometryReader { g in
@@ -178,13 +181,21 @@ struct SubAgentsCard: View {
                             coreShape(2).fill(SessionInk.selected)
                             coreShape(2).fill(a.ok == false ? SessionInk.bad : SessionInk.ink.opacity(0.7))
                                 .frame(width: g.size.width * CGFloat(min(seconds / scale, 1)))
+                                .animation(Motion.out(0.9), value: seconds)
+                            // Working: a soft highlight sweeps along the whole bar, so it reads as busy, not stuck.
+                            if a.ok == nil { WorkingSheen() }
                         }
                     }
                     .frame(height: 4)
                     .padding(.leading, Space.s4 + Space.s2)
-                    Label(
-                        a.state.word, systemImage: a.ok == nil ? "circle.dotted" : a.ok == true ? "checkmark" : "xmark"
-                    )
+                    HStack(spacing: Space.s1) {
+                        if a.ok == nil {
+                            TurningIcon(symbol: "circle.dotted")
+                        } else {
+                            Image(systemName: a.ok == true ? "checkmark" : "xmark")
+                        }
+                        Text(a.state.word)
+                    }
                     .coreFont(size: MacTextSize.meta)
                     .foregroundStyle(a.ok == false ? SessionInk.bad : SessionInk.text2)
                     .frame(width: 72, alignment: .trailing)
@@ -510,5 +521,43 @@ struct UsageCard: View {
             PanelRow(label: "This session", value: AgentWords.cost(session.usage?.costMicros) ?? "—")
         }
         .transition(.opacity)
+    }
+}
+
+/// A soft light band sweeping along a bar every 1.6 s: the working sub-agent's bar (Ahmed, 2026-11-16: "add some
+/// animation to the working agents"). It runs under Reduce Motion too, as he asked for this movement; it is the only
+/// thing moving in the card, never a pulse.
+struct WorkingSheen: View {
+    var period = 1.6
+
+    var body: some View {
+        GeometryReader { g in
+            TimelineView(.animation) { ctx in
+                let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+                let band = max(g.size.width * 0.3, 24)
+                LinearGradient(
+                    colors: [.clear, SessionInk.text.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: band)
+                .offset(x: -band + (g.size.width + band) * CGFloat(t))
+            }
+        }
+        .clipShape(coreShape(2))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A symbol turning slowly (one turn in 2.4 s), for "working".
+struct TurningIcon: View {
+    let symbol: String
+    var period = 2.4
+
+    var body: some View {
+        TimelineView(.animation) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+            Image(systemName: symbol).rotationEffect(.degrees(360 * t))
+        }
+        .accessibilityHidden(true)
     }
 }

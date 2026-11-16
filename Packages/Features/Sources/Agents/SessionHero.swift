@@ -34,7 +34,8 @@ struct SessionHero: View {
                 // The session's actions always live here (one home, one name each); the panel holds information.
                 Group {
                     if !panel && !panelRoom { detailsButton }
-                    SessionActions(model: model, session: session, find: find, compact: compact)
+                    // Icons only; names and keys are in the tooltips (Ahmed, 2026-11-16).
+                    SessionActions(model: model, session: session, find: find, compact: true)
                 }
                 .fixedSize()
             }

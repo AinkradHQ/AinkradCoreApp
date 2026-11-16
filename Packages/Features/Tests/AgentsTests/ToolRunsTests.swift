@@ -84,7 +84,9 @@ struct TurnStripTests {
 @MainActor
 struct LatestRowsTests {
     @Test func latestUserAndAnswerInOnePass() {
-        let kinds: [EntryKind] = [.user("a"), .assistant("b"), .user("c"), .note(type: "x", detail: ""), .assistant("d")]
+        let kinds: [EntryKind] = [
+            .user("a"), .assistant("b"), .user("c"), .note(type: "x", detail: ""), .assistant("d"),
+        ]
         let es = kinds.enumerated().map { TranscriptEntry(seq: Int64($0 + 1), at: .now, kind: $1) }
         #expect(TranscriptView.latest(es) == [3, 5])
         #expect(TranscriptView.latest([]).isEmpty)
