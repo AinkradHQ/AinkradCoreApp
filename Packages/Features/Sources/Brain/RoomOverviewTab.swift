@@ -118,9 +118,11 @@ private struct StatusLine: View {
                 }
             } else {
                 Text(line)
-                Button("Rewrite", action: rewrite)
-                    .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(busy)
-                    .help("Write this overview again from the room's items")
+                Button(action: rewrite) {
+                    Text("Rewrite").padding(.horizontal, Space.s1).frame(minHeight: MacSize.chip)
+                }
+                .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 1, hoverFill: true)).disabled(busy)
+                .help("Write this overview again from the room's items")
             }
         }
         .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

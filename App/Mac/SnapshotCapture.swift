@@ -17,18 +17,11 @@ enum SnapshotCapture {
         // again before falling back to the offscreen render, which has no blur and no dialog (delete-pool, night).
         var shot: CGImage?
         for attempt in 1...4 {
-            // A popover is a child window of its parent: composite those with the window, nothing else on screen.
-            let kids = (window.childWindows ?? []).filter(\.isVisible)
-            if kids.isEmpty {
-                shot = CGWindowListCreateImage(
-                    .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
-                    [.boundsIgnoreFraming, .nominalResolution])
-            } else {
-                let ids = ([window] + kids).map { NSNumber(value: $0.windowNumber) } as CFArray
-                shot = CGImage(
-                    windowListFromArrayScreenBounds: .null, windowArray: ids,
-                    imageOption: [.boundsIgnoreFraming, .nominalResolution])
-            }
+            shot = CGWindowListCreateImage(
+                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
+                [.boundsIgnoreFraming, .nominalResolution])
+            // A popover is its own window: draw each one over the picture where it sits on the window.
+            if let base = shot { shot = withPopovers(base, of: window) }
             if let s = shot, !isBlank(s) { break }
             log("  attempt \(attempt): window server image not ready")
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
@@ -113,3 +106,31 @@ enum SnapshotCapture {
     }
 }
 #endif
+
+extension SnapshotCapture {
+    /// `base` with the window's visible popovers drawn over it (their frames are relative to the window's).
+    fileprivate static func withPopovers(_ base: CGImage, of window: NSWindow) -> CGImage {
+        let pops = (window.childWindows ?? []).filter {
+            $0.isVisible && String(describing: type(of: $0)).contains("Popover")
+        }
+        guard !pops.isEmpty,
+            let ctx = CGContext(
+                data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return base }
+        let scale = CGFloat(base.width) / window.frame.width
+        ctx.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
+        for p in pops {
+            guard
+                let img = CGWindowListCreateImage(
+                    .null, .optionIncludingWindow, CGWindowID(p.windowNumber),
+                    [.boundsIgnoreFraming, .nominalResolution])
+            else { continue }
+            let r = CGRect(
+                x: (p.frame.minX - window.frame.minX) * scale, y: (p.frame.minY - window.frame.minY) * scale,
+                width: p.frame.width * scale, height: p.frame.height * scale)
+            ctx.draw(img, in: r)
+        }
+        return ctx.makeImage() ?? base
+    }
+}

@@ -200,7 +200,7 @@ private struct RuleLine: View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
             if never {
                 coreShape(Space.s1 / 2).fill(GlassInk.red).frame(width: Space.s1 * 1.5, height: Space.s1 * 1.5)
-                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
+                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] + Space.s1 / 2 }
                     .accessibilityHidden(true)
             }
             Text(rule.text).coreFont(size: MacTextSize.body).fixedSize(horizontal: false, vertical: true)
@@ -211,7 +211,7 @@ private struct RuleLine: View {
                 } label: {
                     Text("from \(BrainWords.plural(rule.sources.count, "item", "items"))")
                         .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                        .padding(.horizontal, Space.s1).frame(minHeight: MacSize.controlSm)
+                        .padding(.horizontal, Space.s1).frame(minHeight: MacSize.chip)
                 }
                 .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 1, hoverFill: true))
                 .fixedSize()
