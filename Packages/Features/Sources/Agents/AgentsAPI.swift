@@ -109,7 +109,11 @@ enum EntryParser {
         case "assistant_text": return .assistant(str("text") ?? "")
         case "tool_use":
             let name = str("name") ?? "tool"
-            if let e = edit(id: str("id") ?? "", name: name, input: b["input"]) { return e }
+            if let e = coreEdit(id: str("id") ?? "", name: name, b["edit"])
+                ?? edit(id: str("id") ?? "", name: name, input: b["input"])
+            {
+                return e
+            }
             if name.lowercased() == "todowrite", let t = todos(id: str("id") ?? "", input: b["input"]) { return t }
             if let k = rich(id: str("id") ?? "", name: name, input: b["input"]) { return k }
             return .toolUse(id: str("id") ?? "", name: name, summary: summary(b["input"]))
@@ -151,7 +155,20 @@ enum EntryParser {
         }
     }
 
-    /// Edit, MultiEdit and Write as a diff: what was cut out and what went in.
+    /// The Core's own shape for every harness's file edits (API minor 79): `edit.changes[{path, old, new}]`, `truncated` when
+    /// the text was cut at 64 KiB. Several files in one step read as one change, like MultiEdit.
+    /// ponytail: one entry per step, so a multi-file Codex change shows its paths joined; split it when that is common.
+    static func coreEdit(id: String, name: String, _ edit: Any?) -> EntryKind? {
+        guard let e = edit as? [String: Any], let cs = e["changes"] as? [[String: Any]], !cs.isEmpty else { return nil }
+        func all(_ k: String) -> String { cs.compactMap { $0[k] as? String }.joined(separator: "\n") }
+        var new = all("new")
+        if e["truncated"] as? Bool == true { new += "\n… the rest was too long to send" }
+        return .toolEdit(
+            id: id, name: name, path: cs.compactMap { $0["path"] as? String }.joined(separator: ", "), old: all("old"),
+            new: new, ok: nil, durationMs: nil)
+    }
+
+    /// Edit, MultiEdit and Write as a diff: what was cut out and what went in (a Core before minor 79, Claude only).
     static func edit(id: String, name: String, input: Any?) -> EntryKind? {
         guard let o = input as? [String: Any], let path = (o["file_path"] ?? o["path"]) as? String else { return nil }
         switch name.lowercased() {

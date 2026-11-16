@@ -125,6 +125,28 @@ struct LiveSessionsTests {
         #expect(w.map(\.kind) == [.added, .added])
     }
 
+    @Test func theCoresEditShapeWinsForAnyToolAndSaysWhenItWasCut() {
+        // Codex's `fileChange` has no Claude-shaped input: the Core's `edit` (minor 79) carries its lines.
+        let codex = EntryParser.kind([
+            "type": "tool_use", "id": "c1", "name": "fileChange", "input": ["changes": [:]],
+            "edit": ["changes": [["path": "/w/a.rs", "old": "a", "new": "b"]], "truncated": false],
+        ])
+        #expect(
+            codex
+                == .toolEdit(
+                    id: "c1", name: "fileChange", path: "/w/a.rs", old: "a", new: "b", ok: nil, durationMs: nil))
+        let cut = EntryParser.kind([
+            "type": "tool_use", "id": "w1", "name": "Write", "input": ["file_path": "/w/big.txt"],
+            "edit": ["changes": [["path": "/w/big.txt", "old": "", "new": "x"]], "truncated": true],
+        ])
+        #expect(
+            cut
+                == .toolEdit(
+                    id: "w1", name: "Write", path: "/w/big.txt", old: "", new: "x\n… the rest was too long to send",
+                    ok: nil,
+                    durationMs: nil))
+    }
+
     @Test func entryParserKeepsEditsAndTodosAndTurnEnds() {
         let edit = EntryParser.kind([
             "type": "tool_use", "id": "t1", "name": "Edit",
