@@ -143,7 +143,9 @@ final class AgentsLiveUITests: XCTestCase {
         screen.click()
         screen.typeText("pwd\n")
         let inFolder = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in text().contains("/session-as_") }, object: nil)
+            predicate: NSPredicate { _, _ in  // the screen wraps a long path: join its rows first
+                text().replacingOccurrences(of: "\n", with: "").contains("/session-as_")
+            }, object: nil)
         let ok = XCTWaiter().wait(for: [inFolder], timeout: 20) == .completed
         shot("session-terminal")
         XCTAssertTrue(ok, "the terminal starts in the session's folder. Screen: \(text().suffix(300))")
