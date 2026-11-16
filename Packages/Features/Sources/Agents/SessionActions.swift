@@ -112,14 +112,18 @@ struct SessionActions: View {
 
     @ViewBuilder private var terminalHere: some View {
         let help =
-            "Terminal (⇧⌘T): open a new terminal on \(model.runnerName(session.runner)). The Core cannot start it in the session's folder yet."
+            session.folder == nil
+            ? "Terminal (⇧⌘T): open a new terminal on \(model.runnerName(session.runner))"
+            : "Terminal (⇧⌘T): open a new terminal in this session's folder on \(model.runnerName(session.runner))"
         if compact {
             // Icons only in the title line, like Find and the shortcuts (Ahmed, 2026-11-16); the name is in the tooltip.
-            CoreIconButton(symbol: "terminal", label: "Terminal") { model.host?.openTerminal(on: session.runner) }
-                .help(help).keyHint(.terminal).accessibilityIdentifier("session-terminal-here")
+            CoreIconButton(symbol: "terminal", label: "Terminal") {
+                model.host?.openTerminal(on: session.runner, session: session.id)
+            }
+            .help(help).keyHint(.terminal).accessibilityIdentifier("session-terminal-here")
         } else {
             Button {
-                model.host?.openTerminal(on: session.runner)
+                model.host?.openTerminal(on: session.runner, session: session.id)
             } label: {
                 Label("Terminal", systemImage: "terminal").lineLimit(1).frame(maxWidth: stacked ? .infinity : nil)
             }
@@ -128,9 +132,11 @@ struct SessionActions: View {
         }
     }
 
-    /// The session's folder on this Mac. The Core sends only the folder's name (`project`), never its path, so this is nil until
-    /// the Core adds one; the menu below already uses it when it exists. Needs Core support.
-    private var localFolder: URL? { nil }
+    /// The session's folder, when it is on this Mac and still there (an ended session's worktree is moved away).
+    private var localFolder: URL? {
+        guard onThisMac, let path = session.folder, FileManager.default.fileExists(atPath: path) else { return nil }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
 
     /// Small tiles in a narrow header and in the panel's grid; body size beside the title on a medium window.
     private var small: Bool { compact }

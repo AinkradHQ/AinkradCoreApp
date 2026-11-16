@@ -308,7 +308,7 @@ struct SessionView: View {
             model.confirmEnd(s.id)
         case .terminal:
             guard s.live || s.state != .lost else { return false }
-            model.host?.openTerminal(on: s.runner)
+            model.host?.openTerminal(on: s.runner, session: s.id)
         case .openIn:
             guard s.live || s.state != .lost else { return false }
             ui.openIn.toggle()

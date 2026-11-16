@@ -418,11 +418,13 @@ public final class TerminalsModel {
         }
     }
 
-    /// Opens a terminal on `runner` at once; the New terminal sheet shows only if that fails.
-    public func open(on runner: String) {
+    /// Opens a terminal on `runner` at once, in AI session `session`'s folder when given; the New terminal sheet shows only
+    /// if that fails. A session whose folder is unknown or gone falls back to the home folder.
+    public func open(on runner: String, session: String? = nil) {
         Task {
             if runners.isEmpty { await reload() }
             let m = NewTerminalModel(model: self, runner: runner)
+            m.session = session
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }
@@ -554,6 +556,8 @@ enum RunnerStatus: Equatable {
 final class NewTerminalModel {
     var runner: String?
     var program = ""
+    /// Start in this AI session's folder (the Core resolves the path).
+    var session: String?
     private(set) var busy = false
     private(set) var error: Refusal?
     private unowned let model: TerminalsModel
@@ -604,12 +608,19 @@ final class NewTerminalModel {
                 keepsEdit: true
             ) {
                 try await self.model.service.create(
-                    runner: r.id, program: program.isEmpty ? nil : program, rows: 30, cols: 100)
+                    runner: r.id, program: program.isEmpty ? nil : program, session: self.session, rows: 30, cols: 100)
             }
             await model.created(t)
         } catch is ElevationDeclined {
         } catch {
-            self.error = Self.refusal(CoreError.unwrapping(error), runner: r.name)
+            let e = CoreError.unwrapping(error)
+            // The session's folder is unknown, gone or on another runner: open in the home folder instead.
+            if session != nil, case .http(_, let code, _)? = e, code.hasPrefix("session_") {
+                session = nil
+                busy = false
+                return await submit()
+            }
+            self.error = Self.refusal(e, runner: r.name)
         }
     }
 

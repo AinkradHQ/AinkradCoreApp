@@ -121,7 +121,7 @@ protocol TerminalService: Sendable {
     func terminals() async throws -> [TerminalItem]
     func terminal(_ id: String) async throws -> TerminalItem
     func runners() async throws -> [RunnerItem]
-    func create(runner: String, program: String?, rows: Int, cols: Int) async throws -> TerminalItem
+    func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem
     func close(_ id: String) async throws -> TerminalItem
     func signal(_ id: String, _ name: String) async throws
     /// Milliseconds the runner took to answer an empty round trip.
@@ -170,10 +170,13 @@ struct LiveTerminalService: TerminalService {
         try await run { try await client.listRunners().ok.body.json.map(Self.runner) }
     }
 
-    func create(runner: String, program: String?, rows: Int, cols: Int) async throws -> TerminalItem {
-        try await run {
+    func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem {
+        // A Core before minor 77 ignores `session` and opens in the home folder; say nothing it cannot read.
+        let supported = await connection.serverSupports(minor: 77)
+        let session = supported ? session : nil
+        return try await run {
             let body = Components.Schemas.NewTerminal(
-                program: program, runner: runner, size: .init(cols: Int32(cols), rows: Int32(rows)))
+                program: program, runner: runner, session: session, size: .init(cols: Int32(cols), rows: Int32(rows)))
             switch try await client.createTerminal(body: .json(body)) {
             case .created(let o): return Self.item(try o.body.json)
             case .badRequest(let r): throw Self.fail(400, try? r.body.json)
