@@ -62,3 +62,31 @@ struct ToolRunsTests {
         #expect(SessionShortcut.review.label == "⇧⌘R")
     }
 }
+
+/// The Session card's turn strip copes with very long sessions (Ahmed, 2026-11-16: "over 100 turns").
+@MainActor
+struct TurnStripTests {
+    private func turn(_ n: Int) -> TurnStrip.Turn {
+        TurnStrip.Turn(number: n, start: Int64(n), seconds: n, cost: nil, interrupted: false, running: false)
+    }
+
+    @Test func manyTurnsShareBarsAndKeepTheirOrder() {
+        let turns = (1...250).map(turn)
+        let g = TurnStrip.groups(turns, slots: 100)
+        #expect(g.count <= 100)
+        #expect(g.flatMap { $0 }.map(\.number) == Array(1...250))
+        #expect(TurnStrip.groups(Array(turns.prefix(40)), slots: 100).count == 40)
+        #expect(TurnStrip.help(g[0]).hasPrefix("Turns 1–3"))
+    }
+}
+
+/// The transcript finds the latest message and answer in one backward pass (the scroll fix, 2026-11-16).
+@MainActor
+struct LatestRowsTests {
+    @Test func latestUserAndAnswerInOnePass() {
+        let kinds: [EntryKind] = [.user("a"), .assistant("b"), .user("c"), .note(type: "x", detail: ""), .assistant("d")]
+        let es = kinds.enumerated().map { TranscriptEntry(seq: Int64($0 + 1), at: .now, kind: $1) }
+        #expect(TranscriptView.latest(es) == [3, 5])
+        #expect(TranscriptView.latest([]).isEmpty)
+    }
+}

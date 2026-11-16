@@ -11,6 +11,9 @@ struct SubAgentInfo: Identifiable, Equatable {
     let result: String?
     let ok: Bool?
     let ms: Int?
+    /// Where it starts in the transcript, and when.
+    var seq: Int64 = 0
+    var at = Date()
 
     var state: (word: String, tone: Tone) {
         switch ok {
@@ -32,7 +35,8 @@ struct SubAgentInfo: Identifiable, Equatable {
             guard case .subAgent(let id, let type, let task, let prompt, let result, let ok, let ms) = $0.kind else {
                 return nil
             }
-            return SubAgentInfo(id: id, type: type, task: task, prompt: prompt, result: result, ok: ok, ms: ms)
+            return SubAgentInfo(
+                id: id, type: type, task: task, prompt: prompt, result: result, ok: ok, ms: ms, seq: $0.seq, at: $0.at)
         }
     }
 }

@@ -44,6 +44,8 @@ struct ReviewPane: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     let diff: (String) -> [DiffLine]
+    /// Inside the Changes card: no frame or scroller of its own (the card and the column have them).
+    var embedded = false
     let close: () -> Void
 
     @State private var selected: String?
@@ -55,23 +57,29 @@ struct ReviewPane: View {
     var body: some View {
         let files = model.filesTouched(session.id)
         let current = files.first { $0.path == selected } ?? files.first
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                header(files)
-                if files.isEmpty {
-                    Text("Nothing changed yet.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                } else {
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        ForEach(files) { f in fileRow(f, selected: f.path == current?.path) }
-                    }
-                    if let f = current { detail(f) }
+        let content = VStack(alignment: .leading, spacing: Space.s3) {
+            header(files)
+            if files.isEmpty {
+                Text("Nothing changed yet.").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            } else {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    ForEach(files) { f in fileRow(f, selected: f.path == current?.path) }
                 }
+                if let f = current { detail(f) }
             }
-            .foregroundStyle(palette.text)
-            .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
-            .coreWell(radius: 12)  // follows the Appearance setting (Look)
         }
-        .scrollIndicators(.never)
+        .foregroundStyle(palette.text)
+        return Group {
+            if embedded {
+                content.frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView {
+                    content.padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
+                        .coreWell(radius: 12)  // follows the Appearance setting (Look)
+                }
+                .scrollIndicators(.never)
+            }
+        }
         .focusable().focusEffectDisabled().focused($focused)
         .onAppear { focused = true }
         .onKeyPress(.upArrow) { move(-1, files, current?.path) }
@@ -94,36 +102,43 @@ struct ReviewPane: View {
     /// nothing wraps in the panel's width.
     private func header(_ files: [FileTouch]) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            HStack(spacing: Space.s2) {
-                Image(systemName: "checklist").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
-                    .frame(width: Space.s4).accessibilityHidden(true)
-                Text("Review").coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1).fixedSize()
-                    .accessibilityAddTraits(.isHeader)
-                if !files.isEmpty { CountBadge(files.count, tone: .quiet) }
-                Spacer(minLength: 0)
-                Button("Close") { close() }.buttonStyle(CoreButtonStyle(.plain, size: .small)).fixedSize()
-                    .help("Close the review (Esc or ⇧⌘R)").keyHint(.review)
-            }
-            // Room at the right for the fixed panel toggle (SessionView), as the Session header leaves.
-            .padding(.trailing, Space.s6)
-            if files.count > 1 {
-                HStack(spacing: Space.s2) {
-                    Button("Accept all") { for f in files { store.set(session.id, f.path, .accepted) } }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).fixedSize()
-                        .help("Accept every changed file")
-                    Button("Revert all") {
-                        for f in files { store.set(session.id, f.path, .revertAsked) }
-                        let list = files.map { "`\($0.path)`" }.joined(separator: ", ")
-                        let id = session.id
-                        Task {
-                            await model.say(id, "Please revert your changes to \(list) and tell me when it is done.")
-                        }
-                    }
-                    .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).fixedSize()
-                    .disabled(!model.canWrite(session))
-                    .help("Ask for every change to be reverted")
+            // Inside the Changes card the card's own header carries the title and Done.
+            if !embedded { titleRow(files) }
+            if files.count > 1 { bulk(files) }
+        }
+    }
+
+    private func titleRow(_ files: [FileTouch]) -> some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: "checklist").coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                .frame(width: Space.s4).accessibilityHidden(true)
+            Text("Review").coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1).fixedSize()
+                .accessibilityAddTraits(.isHeader)
+            if !files.isEmpty { CountBadge(files.count, tone: .quiet) }
+            Spacer(minLength: 0)
+            Button("Close") { close() }.buttonStyle(CoreButtonStyle(.plain, size: .small)).fixedSize()
+                .help("Close the review (Esc or ⇧⌘R)").keyHint(.review)
+        }
+        // Room at the right for the fixed panel toggle (SessionView), as the Session header leaves.
+        .padding(.trailing, Space.s6)
+    }
+
+    private func bulk(_ files: [FileTouch]) -> some View {
+        HStack(spacing: Space.s2) {
+            Button("Accept all") { for f in files { store.set(session.id, f.path, .accepted) } }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).fixedSize()
+                .help("Accept every changed file")
+            Button("Revert all") {
+                for f in files { store.set(session.id, f.path, .revertAsked) }
+                let list = files.map { "`\($0.path)`" }.joined(separator: ", ")
+                let id = session.id
+                Task {
+                    await model.say(id, "Please revert your changes to \(list) and tell me when it is done.")
                 }
             }
+            .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).fixedSize()
+            .disabled(!model.canWrite(session))
+            .help("Ask for every change to be reverted")
         }
     }
 

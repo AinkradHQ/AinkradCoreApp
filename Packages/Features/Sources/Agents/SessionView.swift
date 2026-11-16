@@ -85,11 +85,12 @@ struct SessionView: View {
                         .padding(.leading, room && !side ? Space.s8 + Space.s3 : 0)
                         .padding(.trailing, rest >= Self.panelWidth && !wide ? Space.s8 + Space.s3 : 0)
                     if wide {
-                        SessionSidePanel(model: model, session: s, find: openFind).frame(width: 288).padding(
-                            .trailing, Space.s3
-                        )
-                        .padding(.top, Space.s2)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        SessionSidePanel(model: model, session: s, find: openFind).frame(width: SessionSidePanel.width)
+                            .padding(
+                                .trailing, Space.s3
+                            )
+                            .padding(.top, Space.s2)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
                 // The sidebar toggle, as in the mockup: a plain icon fixed at the top-left corner, beside "AI Sessions"
@@ -194,6 +195,7 @@ struct SessionView: View {
             }
             .animation(Motion.out(Motion.ui), value: ui.shortcuts)
             .environment(\.sessionUI, ui)
+            .onChange(of: ui.jumpTo) { _, seq in if let seq { focusSeq = seq } }
             .onChange(of: ui.focusComposer) { _, _ in
                 ui.focusField()
                 composing = true

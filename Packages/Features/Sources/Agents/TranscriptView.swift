@@ -33,12 +33,15 @@ struct TranscriptView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Space.s4) {
                         header(store)
+                        // Everything the rows need, worked out once per pass (the scroll stuttered when each row
+                        // rescanned the transcript: n × n work on every redraw, Ahmed 2026-11-16).
                         let turns = ConversationWords.turns(store.entries)
+                        let latest = Self.latest(store.entries)
                         ForEach(columnRows(store)) { c in
                             Group {
                                 switch c.kind {
                                 case .entry(let e, let inRun):
-                                    marked(e) { row(e, store, turn: turns[e.seq]) }
+                                    marked(e) { row(e, store, turn: turns[e.seq], latest: latest.contains(e.seq)) }
                                         .padding(.leading, inRun ? Space.s4 : 0)
                                 case .run(let es, let open):
                                     ToolRunHeader(entries: es, open: open) {
@@ -77,16 +80,9 @@ struct TranscriptView: View {
                 }
                 .shortStartsAtTop()
                 .scrollIndicators(.never)
-                // Soft edges (Ahmed, 2026-11-15: content was cut hard under the header and above the composer).
-                .mask {
-                    VStack(spacing: 0) {
-                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                            .frame(height: Space.s4)
-                        Color.black
-                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
-                            .frame(height: Space.s4)
-                    }
-                }
+                // Soft edges by the system (drawn on the GPU while scrolling), not a mask: a mask made the whole
+                // scrolling layer render offscreen on every frame.
+                .softScrollEdges()
                 .animation(Motion.out(Motion.ui), value: store.entries.count)
                 .onChange(of: store.lastSeq) { _, _ in
                     guard atEnd, !scrollQueued else { return }
@@ -135,12 +131,19 @@ struct TranscriptView: View {
         }
     }
 
-    private func latestUser(_ store: TranscriptStore) -> Int64? {
-        store.entries.last { if case .user = $0.kind { true } else { false } }?.seq
-    }
-
-    private func latestAnswer(_ store: TranscriptStore) -> Int64? {
-        store.entries.last { if case .assistant = $0.kind { true } else { false } }?.seq
+    /// Your latest message and the latest answer: the two rows that carry the action row. One backward pass.
+    static func latest(_ entries: [TranscriptEntry]) -> Set<Int64> {
+        var user: Int64?
+        var answer: Int64?
+        for e in entries.reversed() {
+            switch e.kind {
+            case .user where user == nil: user = e.seq
+            case .assistant where answer == nil: answer = e.seq
+            default: break
+            }
+            if user != nil && answer != nil { break }
+        }
+        return Set([user, answer].compactMap { $0 })
     }
 
     /// The find bar's or a turn jump's mark behind an entry.
@@ -164,9 +167,9 @@ struct TranscriptView: View {
         }
     }
 
-    @ViewBuilder private func row(_ e: TranscriptEntry, _ store: TranscriptStore, turn: ConversationWords.Turn?)
-        -> some View
-    {
+    @ViewBuilder private func row(
+        _ e: TranscriptEntry, _ store: TranscriptStore, turn: ConversationWords.Turn?, latest: Bool
+    ) -> some View {
         if case .approvalRequest(let id, _, _, _) = e.kind, let r = store.approvals[id] {
             // A pending one is pinned above the composer (PinnedApprovals); answered or expired, it stays here as history.
             if r.status(now: Date(), sessionOver: session.over) != .pending {
@@ -176,7 +179,7 @@ struct TranscriptView: View {
         } else {
             EntryRow(
                 entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
-                latest: e.seq == latestUser(store) || e.seq == latestAnswer(store),
+                latest: latest,
                 openConnections: { model.shell.launcher.entry("connections")?.run() },
                 actions: EntryActions.make(model, session, ui: ui)
             )
@@ -499,6 +502,18 @@ extension View {
                 .defaultScrollAnchor(.bottom, for: .sizeChanges)
         } else {
             defaultScrollAnchor(.bottom)
+        }
+    }
+}
+
+extension View {
+    /// The system's soft scroll edge where it exists (macOS 26), drawn on the GPU; earlier systems keep a hard edge rather
+    /// than a mask that renders the scroll view offscreen every frame.
+    @ViewBuilder func softScrollEdges() -> some View {
+        if #available(macOS 26, *) {
+            scrollEdgeEffectStyle(.soft, for: .vertical)
+        } else {
+            self
         }
     }
 }

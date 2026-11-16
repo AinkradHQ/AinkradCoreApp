@@ -134,6 +134,8 @@ final class SessionUI {
     var focusComposer = 0
     /// Open or fold every tool step: bumped with the wanted state.
     var steps = (gen: 0, open: false)
+    /// An entry the side column asks the conversation to bring into view (a turn, a sub-agent).
+    var jumpTo: Int64?
 }
 
 extension EnvironmentValues {
