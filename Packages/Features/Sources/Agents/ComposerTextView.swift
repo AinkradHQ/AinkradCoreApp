@@ -197,6 +197,10 @@ final class KeyTextView: NSTextView {
     private var keyFlags: NSEvent.ModifierFlags = []
 
     override func keyDown(with event: NSEvent) {
+        // ⇧⇥ switches the session's mode (as in Claude Code). Caught here: the text view treats it as "focus the previous
+        // control" before it reaches doCommand (the live UI test found it, 2026-11-16).
+        let mods = event.modifierFlags.intersection([.shift, .command, .option, .control])
+        if event.keyCode == 48, mods == .shift, !hasMarkedText(), keys?.backtab() == true { return }
         keyFlags = event.modifierFlags
         defer { keyFlags = [] }
         super.keyDown(with: event)

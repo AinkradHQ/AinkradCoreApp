@@ -107,6 +107,20 @@ final class AgentsLiveUITests: XCTestCase {
             XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: cleared, object: composer)], timeout: 30),
             .completed, "a sent message leaves the composer")
         XCTAssertTrue(containing("wants to").waitForExistence(timeout: 30), "the second turn asks again")
+        // ⇧⇥ in the message field switches the mode through the Core (Core #261), as in Claude Code: the chip changes and
+        // the transcript says so. A Core that does not report modes shows no chip; the step is skipped then.
+        if containing("Mode: Asks first").waitForExistence(timeout: 5) {
+            composer.click()
+            composer.typeKey(.tab, modifierFlags: .shift)
+            XCTAssertTrue(
+                containing("Mode: Accepts edits").waitForExistence(timeout: 20),
+                "⇧⇥ switches the mode to Accepts edits")
+            XCTAssertTrue(
+                containing("Switched to Accepts edits").waitForExistence(timeout: 20), "the transcript says so")
+            shot("session-mode")
+        } else {
+            XCTFail("no mode chip: this Core does not report the session's mode")
+        }
         // The session's actions (header, or the side panel's first card on a wide pane): Find opens the find bar.
         app.buttons["Find in this conversation"].firstMatch.click()
         let find = app.textFields["Find in this conversation"]

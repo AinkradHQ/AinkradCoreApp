@@ -162,7 +162,11 @@ my ($n, $asking) = (0, 0);
 sub say { $n++; print qq({"type":"assistant","message":{"id":"m$$-$n","content":[{"type":"text","text":"$_[0]"}],"usage":{"input_tokens":300,"output_tokens":100}}}\n); }
 sub done { print qq({"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":300,"output_tokens":100}}\n); }
 while (my $l = <STDIN>) {
-  if ($l =~ /"subtype":"interrupt"/) {
+  if ($l =~ /"subtype":"set_permission_mode"/) {
+    # A mode switch (Core #261): acknowledged as Claude Code does, the turn goes on.
+    my ($rid) = $l =~ /"request_id":"([^"]*)"/;
+    print qq({"type":"control_response","response":{"subtype":"success","request_id":"$rid"}}\n);
+  } elsif ($l =~ /"subtype":"interrupt"/) {
     $asking = 0; print qq({"type":"result","subtype":"error_during_execution","is_error":true,"usage":{}}\n);
   } elsif ($l =~ /"type":"control_response"/) {
     next unless $asking; $asking = 0;
