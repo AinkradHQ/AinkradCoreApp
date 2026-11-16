@@ -4,9 +4,12 @@ import Foundation
 public struct QueuedMessage: Identifiable, Equatable, Sendable {
     public let id: UUID
     public var text: String
-    public init(id: UUID = UUID(), text: String) {
+    /// Files attached with it; they go with the message.
+    public var files: [URL]
+    public init(id: UUID = UUID(), text: String, files: [URL] = []) {
         self.id = id
         self.text = text
+        self.files = files
     }
 }
 
@@ -15,9 +18,10 @@ public struct QueuedMessage: Identifiable, Equatable, Sendable {
 extension AgentsModel {
     /// Takes the field's words (and attachments) into the queue.
     public func enqueue(_ id: String) {
-        let text = outgoing(id).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text.utf8.count <= Self.messageLimit else { return }
-        queued[id, default: []].append(QueuedMessage(text: text))
+        let text = (drafts[id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let files = attachments[id] ?? []
+        guard !text.isEmpty || !files.isEmpty, text.utf8.count <= Self.messageLimit else { return }
+        queued[id, default: []].append(QueuedMessage(text: text, files: files))
         drafts[id] = ""
         attachments[id] = nil
         flushQueues()
@@ -33,6 +37,7 @@ extension AgentsModel {
         removeQueued(id, message)
         let typed = drafts[id] ?? ""
         drafts[id] = typed.isEmpty ? m.text : m.text + "\n\n" + typed
+        attachments[id] = m.files + (attachments[id] ?? [])
     }
 
     /// ↑ on an empty field (the Claude CLI's key): every queued message back into the field, in order, to edit.
@@ -41,6 +46,7 @@ extension AgentsModel {
         queued[id] = []
         let typed = drafts[id] ?? ""
         drafts[id] = Self.joined(list) + (typed.isEmpty ? "" : "\n\n" + typed)
+        attachments[id] = list.flatMap(\.files) + (attachments[id] ?? [])
     }
 
     /// Hands one queued message to the tool now, while the turn runs (it reads it at its next step).
@@ -48,7 +54,7 @@ extension AgentsModel {
         guard let m = queued[id]?.first(where: { $0.id == message }) else { return }
         removeQueued(id, message)
         Task { [weak self] in
-            if await self?.say(id, m.text) == false { self?.queued[id, default: []].insert(m, at: 0) }
+            if await self?.say(id, m.text, files: m.files) == false { self?.queued[id, default: []].insert(m, at: 0) }
         }
     }
 
@@ -59,11 +65,16 @@ extension AgentsModel {
             else { continue }
             queued[id] = []
             let text = Self.joined(list)
+            let files = list.flatMap(\.files)
             Task { [weak self] in
-                if await self?.say(id, text) == false { self?.queued[id] = list + (self?.queued[id] ?? []) }
+                if await self?.say(id, text, files: files) == false {
+                    self?.queued[id] = list + (self?.queued[id] ?? [])
+                }
             }
         }
     }
 
-    static func joined(_ list: [QueuedMessage]) -> String { list.map(\.text).joined(separator: "\n\n") }
+    static func joined(_ list: [QueuedMessage]) -> String {
+        list.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
 }

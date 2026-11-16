@@ -41,6 +41,9 @@ public protocol AgentsAPI: Sendable {
     func transcript(_ id: String, after: Int64, limit: Int) async throws -> TranscriptPage
     func create(_ new: NewAgentSession) async throws -> AgentSessionInfo
     func send(_ id: String, text: String) async throws -> AgentSessionInfo
+    /// The words and the attached files. The Core (API minor 80) stores each file with the session and puts it in the
+    /// session's folder on its runner, wherever that is; by default they go as `@path` text, read only on this Mac.
+    func send(_ id: String, text: String, files: [URL]) async throws -> AgentSessionInfo
     func cancel(_ id: String) async throws -> AgentSessionInfo
     func kill(_ id: String) async throws -> AgentSessionInfo
     func resume(_ id: String) async throws -> AgentSessionInfo
@@ -77,6 +80,10 @@ public protocol AgentsAPI: Sendable {
 }
 
 extension AgentsAPI {
+    public func send(_ id: String, text: String, files: [URL]) async throws -> AgentSessionInfo {
+        try await send(id, text: AgentsModel.outgoing(words: text, files: files))
+    }
+
     public func chains() async throws -> [ChainOption] { [] }
     public func agents() async throws -> [String] { [] }
     public func bindings() async throws -> [AgentBinding] { [] }

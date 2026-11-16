@@ -44,9 +44,8 @@ extension AgentsModel {
     /// A live session takes a message at any time (it queues while a turn runs). Wake and Resume are recovery only.
     public func canReply(_ s: AgentSessionInfo) -> Bool { canWrite(s) }
 
-    /// The message as sent: the words, then each attached file as an `@path` the tool reads.
-    // ponytail: paths reach the tool as text, so they work for sessions on this Mac only; an upload API in the Core is the
-    // upgrade path for remote runners.
+    /// The message as an older Core gets it: the words, then each attached file as an `@path` the tool reads on this Mac.
+    /// A Core with attachments (API minor 80) takes the files themselves (`AgentsAPI.send(_:text:files:)`).
     public static func outgoing(words: String, files: [URL]) -> String {
         let refs = files.map { "@" + $0.path }.joined(separator: " ")
         if refs.isEmpty { return words }
@@ -65,7 +64,8 @@ extension AgentsModel {
 
     public func send(_ id: String) async {
         guard let api, canSend(id) else { return }
-        let text = outgoing(id)
+        let text = drafts[id] ?? ""
+        let files = attachments[id] ?? []
         sending.insert(id)
         note(id, nil)
         defer { sending.remove(id) }
@@ -73,7 +73,7 @@ extension AgentsModel {
             let s = try await elevated(
                 "Send a message to \(AgentWords.toolName(sessions.session(id)?.harness ?? "the AI"))."
             ) {
-                try await api.send(id, text: text)
+                try await api.send(id, text: text, files: files)
             }
             drafts[id] = ""
             attachments[id] = nil
@@ -89,8 +89,9 @@ extension AgentsModel {
     /// a file, a review comment, retry, approve a plan). Same Touch ID step-up and errors as a typed message.
     /// True when the tool took it.
     @discardableResult
-    public func say(_ id: String, _ text: String) async -> Bool {
-        guard let api, let s = sessions.session(id), canReply(s), !text.isEmpty, !sending.contains(id) else {
+    public func say(_ id: String, _ text: String, files: [URL] = []) async -> Bool {
+        guard let api, let s = sessions.session(id), canReply(s), !text.isEmpty || !files.isEmpty, !sending.contains(id)
+        else {
             return false
         }
         sending.insert(id)
@@ -98,7 +99,7 @@ extension AgentsModel {
         defer { sending.remove(id) }
         do {
             let s = try await elevated("Send a message to \(AgentWords.toolName(s.harness)).") {
-                try await api.send(id, text: text)
+                try await api.send(id, text: text, files: files)
             }
             sessions.upsert(s)
             if let t = transcripts[id] { await t.refresh(api, knownLast: s.lastSeq) }

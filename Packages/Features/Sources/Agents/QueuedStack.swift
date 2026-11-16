@@ -97,7 +97,9 @@ struct QueuedStack: View {
 
     private func row(_ m: QueuedMessage) -> some View {
         HStack(alignment: .center, spacing: Space.s2) {
-            Text(m.text).coreFont(size: MacTextSize.body).foregroundStyle(palette.text).lineLimit(2)
+            Text(m.text.isEmpty ? m.files.map(\.lastPathComponent).joined(separator: ", ") : m.text).coreFont(
+                size: MacTextSize.body
+            ).foregroundStyle(palette.text).lineLimit(2)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .help(m.text)
