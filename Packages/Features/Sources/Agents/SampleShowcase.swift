@@ -11,7 +11,7 @@ extension FakeAgentsAPI {
         let s = AgentSessionInfo(
             id: "as_01JC4X7Q3MZ8N5V2K9R020", runner: "d_mac", harness: "claude", state: .running, outcome: nil,
             createdAt: now.addingTimeInterval(-900), updatedAt: now.addingTimeInterval(-20), endedAt: nil, lastSeq: 0,
-            usage: AgentUsageInfo(input: 48_000, output: 9_200, costMicros: 640_000), index: 20)
+            usage: AgentUsageInfo(input: 74_000, output: 14_400, costMicros: 1_480_000), index: 20)
         let report = """
             # Runner fleet status
             Three of four runners are online. **build-box** has been offline since Friday; the others are healthy.
@@ -109,7 +109,130 @@ extension FakeAgentsAPI {
                 .assistant(report),
                 .plan(id: "p1", text: plan),
                 .turnEnded(costMicros: 640_000, tokens: 57_200),
-            ], endsAt: nil)
+            ] + turnTwo + turnThree, endsAt: nil)
+    }
+
+    /// Turn 2 (Ahmed, 2026-11-16: "a session that has all possible features"): searches, a fetch, code edits across
+    /// several files (real diffs for Review), Code Mode, a failed sub-agent, connection cues that worked and one refused,
+    /// and approvals allowed, denied and expired.
+    private static var turnTwo: [EntryKind] {
+        let schedOld = """
+            pub fn admit(&self, s: &Session) -> Admit {
+                if self.load() >= self.capacity { return Admit::Queue; }
+                Admit::Now
+            }
+            """
+        let schedNew = """
+            pub fn admit(&self, s: &Session) -> Admit {
+                // One account may hold at most half the runner's slots.
+                let mine = self.sessions.iter().filter(|x| x.account == s.account).count();
+                if mine * 2 >= self.capacity { return Admit::Queue(Reason::AccountShare); }
+                if self.load() >= self.capacity { return Admit::Queue(Reason::Full); }
+                Admit::Now
+            }
+            """
+        let queueNew = """
+            /// Sessions waiting for a slot, oldest first, at most one turn per account at the front.
+            pub struct FairQueue { waiting: VecDeque<SessionId> }
+
+            impl FairQueue {
+                pub fn push(&mut self, id: SessionId) { self.waiting.push_back(id); }
+                pub fn next(&mut self) -> Option<SessionId> { self.waiting.pop_front() }
+            }
+            """
+        return [
+            .user("Good. Now put the account share into the scheduler, add a test, and push a branch."),
+            .toolUse(id: "s1", name: "Grep", summary: "fn admit("),
+            .toolResult(
+                id: "s1", name: "Grep", ok: true, exitCode: nil, output: "3 matches in 2 files", durationMs: 60),
+            .toolUse(id: "s2", name: "Glob", summary: "crates/core/src/**/*.rs"),
+            .toolResult(id: "s2", name: "Glob", ok: true, exitCode: nil, output: "42 files", durationMs: 30),
+            .toolUse(
+                id: "w2", name: "WebFetch", summary: "https://docs.rs/tokio/latest/tokio/sync/struct.Semaphore.html"),
+            .toolResult(id: "w2", name: "WebFetch", ok: true, exitCode: nil, output: "Fetched 18 KB", durationMs: 820),
+            .assistant(
+                "The limit is checked only in `admit()`. I'll add the **account share** there and a small `FairQueue` so a waiting session from another account can go first."
+            ),
+            .toolEdit(
+                id: "e3", name: "MultiEdit", path: "crates/core/src/sched.rs", old: schedOld, new: schedNew, ok: true,
+                durationMs: 110),
+            .toolEdit(
+                id: "e4", name: "Write", path: "crates/core/src/queue.rs", old: "", new: queueNew, ok: true,
+                durationMs: 50),
+            .toolEdit(
+                id: "e5", name: "Edit", path: ".github/workflows/ci.yml", old: "timeout-minutes: 20",
+                new: "timeout-minutes: 30", ok: false, durationMs: 20),
+            .toolUse(id: "c1", name: "ainkrad_search", summary: "queue fairness"),
+            .toolResult(
+                id: "c1", name: "ainkrad_search", ok: true, exitCode: nil,
+                output: "runners.load(), sessions.waiting(), accounts.share()\n[1 call, 40 ms]", durationMs: 40),
+            .toolUse(id: "c2", name: "ainkrad_run", summary: "await runners.load()"),
+            .toolResult(
+                id: "c2", name: "ainkrad_run", ok: true, exitCode: nil,
+                output: "{ \"mac-studio\": 0.48, \"linux-01\": 0.91 }\n[3 calls, 120 ms]", durationMs: 120),
+            .toolUse(id: "t2", name: "Bash", summary: "cargo test -p ainkrad-core sched"),
+            .toolResult(
+                id: "t2", name: "Bash", ok: true, exitCode: 0,
+                output:
+                    "running 14 tests\ntest sched::account_share_queues_the_third ... ok\ntest sched::fair_queue_orders_oldest_first ... ok\ntest result: ok. 14 passed; 0 failed",
+                durationMs: 14_300),
+            .subAgent(
+                id: "sa3", type: "code-reviewer", task: "Review the scheduler change",
+                prompt: "Review crates/core/src/sched.rs and queue.rs for races and missing tests.", result: nil,
+                ok: nil, durationMs: nil),
+            .toolResult(
+                id: "sa3", name: "Task", ok: false, exitCode: nil,
+                output: "Could not finish: the review timed out after 5 minutes.", durationMs: 300_000),
+            .toolUse(id: "g2", name: "github.get_issue", summary: "#188"),
+            .toolResult(id: "g2", name: "github.get_issue", ok: true, exitCode: nil, output: "", durationMs: 280),
+            .toolUse(id: "j1", name: "jira.create_issue", summary: "Queue fairness"),
+            .toolResult(
+                id: "j1", name: "jira.create_issue", ok: false, exitCode: nil,
+                output: "Jira is not connected for this runner.", durationMs: 150),
+            .approvalRequest(
+                id: "ap1", tool: "Bash", input: "git push -u origin feat/queue-fairness", timeoutSecs: 300),
+            .approvalDecided(id: "ap1", approved: true),
+            .approvalRequest(
+                id: "ap2", tool: "Edit", input: "Change .github/workflows/ci.yml (timeout 20 → 30 min)",
+                timeoutSecs: 300
+            ),
+            .approvalDecided(id: "ap2", approved: false),
+            .approvalRequest(id: "ap3", tool: "WebFetch", input: "https://intranet.example.com/oncall", timeoutSecs: 1),
+            .assistant(
+                """
+                Pushed **feat/queue-fairness**. The CI change was denied, so the timeout stays at 20 minutes.
+
+                - `admit()` now queues a third session from the same account (`Reason::AccountShare`).
+                - `FairQueue` hands the next free slot to the oldest waiting session.
+                - 14 tests pass, 2 of them new.
+
+                The reviewer timed out; I can run it again with a smaller scope.
+                """),
+            .turnEnded(costMicros: 1_480_000, tokens: 88_400),
+        ]
+    }
+
+    /// Turn 3: the runner restarted mid-session and it resumed; the last step waits on your approval.
+    private static var turnThree: [EntryKind] {
+        [
+            .interrupted(reason: "mac-studio restarted"),
+            .started(harness: "claude", resumed: true),
+            .user("Continue: open the PR against development and tell me what is left."),
+            .toolTodos(
+                id: "td2",
+                items: [
+                    TodoItem(text: "Read the runner list", status: .completed),
+                    TodoItem(text: "Check backups and the certificate", status: .completed),
+                    TodoItem(text: "Write the report", status: .completed),
+                    TodoItem(text: "Plan the next sprint", status: .completed),
+                    TodoItem(text: "Open the pull request", status: .inProgress),
+                ]),
+            .assistant("Everything is pushed. Opening the pull request needs your approval."),
+            .approvalRequest(
+                id: "ap4", tool: "Bash",
+                input: "gh pr create --base development --title \"Queue fairness: account share and FairQueue\"",
+                timeoutSecs: 600),
+        ]
     }
 
     /// A small picture saved in the caches, so the demo's attachments and inline images have a real file to show.
