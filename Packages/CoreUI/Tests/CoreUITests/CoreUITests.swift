@@ -147,3 +147,13 @@ struct SharedPartsTests {
         #expect(!on)
     }
 }
+
+/// A click never makes buttons look focused: the focus look needs keyboard navigation (Ahmed, 2026-11-16).
+@MainActor
+struct KeyboardFocusTests {
+    @Test func focusLooksNeedKeyboardNavigation() {
+        #expect(!CoreKeyboardFocus.own(true), "no navigation key pressed yet: a focused ancestor lights nothing")
+        #expect(!CoreKeyboardFocus.own(false))
+        #expect(CoreInputMode.navigationKeys.contains(48), "Tab navigates")
+    }
+}

@@ -168,18 +168,43 @@ extension View {
     }
 }
 
-/// Whether a button-styled control holds the keyboard itself. In a ButtonStyle, `isFocused` reports the nearest focusable
-/// *ancestor*: with macOS Keyboard navigation off a button is never focusable, so it read the pane's or the window's
-/// focus and a click made every button in the pane look focused at once (Ahmed, 2026-11-16). With Keyboard navigation on,
-/// the button is its own nearest focusable view and the value is its own.
+/// Whether a button-styled control should look focused. In a ButtonStyle, `isFocused` reports the nearest focusable
+/// *ancestor*, so a click that focused a card or pane lit every button inside it (Ahmed, 2026-11-16, twice). The focus
+/// look shows only while the keyboard is navigating: Tab or an arrow turns it on, any click turns it off at once.
 public enum CoreKeyboardFocus {
     @MainActor public static func own(_ isFocused: Bool) -> Bool {
+        isFocused && CoreInputMode.shared.navigating
+    }
+}
+
+/// How the person is moving around right now: with the keyboard (Tab, arrows) or the pointer. Observed, so focus looks
+/// redraw the moment it changes.
+@MainActor @Observable
+public final class CoreInputMode {
+    public static let shared: CoreInputMode = {
+        let m = CoreInputMode()
+        m.start()
+        return m
+    }()
+    public private(set) var navigating = false
+    @ObservationIgnored private var monitor: Any?
+
+    private func start() {
         #if os(macOS)
-        isFocused && NSApplication.shared.isFullKeyboardAccessEnabled
-        #else
-        isFocused
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { e in
+            MainActor.assumeIsolated {
+                let keyboard = e.type == .keyDown && Self.navigationKeys.contains(e.keyCode)
+                let pointer = e.type != .keyDown
+                let now = keyboard ? true : pointer ? false : CoreInputMode.shared.navigating
+                if now != CoreInputMode.shared.navigating { CoreInputMode.shared.navigating = now }
+            }
+            return e
+        }
         #endif
     }
+
+    /// Tab, Space and the four arrows: the keys that move or use keyboard focus.
+    static let navigationKeys: Set<UInt16> = [48, 49, 123, 124, 125, 126]
 }
 
 /// Disabled dims the control, not its helper text. Day dims less (0.6) so the label stays legible over the glass.

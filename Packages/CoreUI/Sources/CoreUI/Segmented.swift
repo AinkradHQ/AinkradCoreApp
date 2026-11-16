@@ -114,7 +114,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
         }
         .buttonStyle(CoreTilePress())
         .focusable(false)
-        .coreFocusRing(focused, radius: Radius.control, palette: palette)
+        .coreFocusRing(focused && CoreInputMode.shared.navigating, radius: Radius.control, palette: palette)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .accessibilityAddTraits(selected ? .isSelected : [])

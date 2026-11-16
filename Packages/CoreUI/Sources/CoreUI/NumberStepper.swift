@@ -58,7 +58,9 @@ public struct CoreNumberStepper: View {
         }
         .buttonStyle(CoreButtonStyle(.plain, size: .small))
         .coreWell(radius: Radius.control)
-        .coreFocusRing(focused || forced == .focused, radius: Radius.control, palette: palette)
+        .coreFocusRing(
+            (focused && CoreInputMode.shared.navigating) || forced == .focused, radius: Radius.control, palette: palette
+        )
         .coreDimWhenDisabled(enabled)
         .fixedSize()
         .focusable(enabled).focused($focused).focusEffectDisabled()

@@ -91,7 +91,7 @@ public struct CoreIconButton: View {
         .buttonStyle(CoreTilePress())
         .focused($focused)
         .focusEffectDisabled()
-        .coreFocusRing(focused, radius: Radius.control, palette: palette)
+        .coreFocusRing(focused && CoreInputMode.shared.navigating, radius: Radius.control, palette: palette)
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .help(label)
