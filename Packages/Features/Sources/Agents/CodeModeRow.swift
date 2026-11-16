@@ -126,8 +126,6 @@ struct CodeModeCard: View {
         }
         .foregroundStyle(palette.text)
         .frame(maxWidth: .infinity)
-        .clipShape(coreShape(Radius.control))
-        .sessionSurface()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(status == .running ? "" : result.summary)")
     }

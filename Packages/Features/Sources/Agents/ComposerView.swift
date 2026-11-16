@@ -82,13 +82,14 @@ struct ComposerView: View {
     private var composer: some View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
-            QueuedStack(model: model, session: session)
             if !commands.isEmpty { palette(commands) }
             // What went wrong with the last send (or resume, wake...), right where you typed it.
             if let n = model.notices[session.id] {
                 CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.tone)
             }
             VStack(alignment: .leading, spacing: Space.s2) {
+                // Queued messages live inside the composer card, above the field (direction A).
+                QueuedStack(model: model, session: session)
                 if !files.isEmpty { attachmentsRow }
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
@@ -118,8 +119,8 @@ struct ComposerView: View {
             }
             .padding(Space.s3)
             // A plain field, no outline (Ahmed, 2026-11-15); a slightly stronger well while writing.
-            .background(on ? SessionInk.fieldOn : SessionInk.field, in: coreShape(Radius.cardMac))
-            .shadow(color: SessionInk.lift, radius: 6, y: 2)
+            // A card floating over the page, as chat apps' composers do; one step stronger while you write.
+            .sessionFloat()
             .animation(Motion.out(Motion.hover), value: on)
             .contentShape(coreShape(Radius.cardMac))
             .onTapGesture { if enabled { focused.wrappedValue = true } }
@@ -188,7 +189,7 @@ struct ComposerView: View {
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: MacSize.controlSm - Space.s2)
         }
-        .buttonStyle(CoreButtonStyle(act == .stop ? .secondary : .prominent, size: .small))
+        .buttonStyle(GraphiteButtonStyle(iconOnly: true))
         .disabled(act == .idle)
         .keyHint(act == .stop ? "esc" : act == .idle ? "" : "↩")
         .help(act.help)

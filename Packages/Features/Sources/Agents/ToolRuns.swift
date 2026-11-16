@@ -184,6 +184,6 @@ struct ToolRunHeader: View {
 extension View {
     /// The conversation's reading column (Ahmed, 2026-11-15): prose stays a readable line long on a wide window, centred.
     func readingColumn() -> some View {
-        frame(maxWidth: 760).frame(maxWidth: .infinity)
+        frame(maxWidth: 920).frame(maxWidth: .infinity)
     }
 }

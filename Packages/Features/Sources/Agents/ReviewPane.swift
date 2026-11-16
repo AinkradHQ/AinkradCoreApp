@@ -68,9 +68,8 @@ struct ReviewPane: View {
                 }
             }
             .foregroundStyle(palette.text)
-            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .sessionSurface(radius: Radius.cardMac)
-            .padding(.vertical, Space.s2)
+            .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
+            .background(SessionInk.chrome, in: coreShape(12))
         }
         .scrollIndicators(.never)
         .focusable().focusEffectDisabled().focused($focused)

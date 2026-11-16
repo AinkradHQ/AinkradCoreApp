@@ -1,38 +1,53 @@
 import CoreUI
 import SwiftUI
 
-/// The session screen's surfaces (Ahmed, 2026-11-16: "Day theme is very bad"). By night they are the glass wells. By day a
-/// darker tint over a warm, blurred wallpaper read as muddy beige on beige; Mac light mode lifts content instead: lighter
-/// than the pane, with a soft shadow.
+/// The session screen's colours (direction A, approved 2026-11-16, `Designs/core/session-v2/a.css`): a solid warm paper
+/// page by day and a warm charcoal by night, never the wallpaper; fills only, no lines.
 enum SessionInk {
-    static let field = GlassInk.adaptive(.white.opacity(0.08), day: .white.opacity(0.74))
-    static let fieldOn = GlassInk.adaptive(.white.opacity(0.13), day: .white.opacity(0.92))
-    static let row = GlassInk.adaptive(.white.opacity(0.08), day: .white.opacity(0.58))
-    static let rowHover = GlassInk.adaptive(.white.opacity(0.13), day: .white.opacity(0.8))
-    static let selected = GlassInk.adaptive(.white.opacity(0.13), day: .white.opacity(0.85))
-    /// The lift under a day surface; none by night, where the wells sit in the glass.
-    static let lift = GlassInk.adaptive(.clear, day: .black.opacity(0.08))
+    private static func hex(_ v: UInt32, _ a: Double = 1) -> Color {
+        Color(
+            red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255,
+            opacity: a)
+    }
+    private static func ink(_ a: Double) -> Color { hex(0x1F1E1B, a) }
+    private static func light(_ a: Double) -> Color { .white.opacity(a) }
+
+    static let page = GlassInk.adaptive(hex(0x262624), day: hex(0xFAF9F5))
+    /// The sidebar and the side panel, floating over the page.
+    static let chrome = GlassInk.adaptive(hex(0x1F1F1D, 0.86), day: hex(0xF1EFE8, 0.82))
+    static let text = GlassInk.adaptive(hex(0xECEAE3), day: hex(0x1F1E1B))
+    static let text2 = GlassInk.adaptive(hex(0xA9A59C), day: hex(0x66625A))
+    static let hover = GlassInk.adaptive(light(0.06), day: ink(0.05))
+    static let selected = GlassInk.adaptive(light(0.09), day: ink(0.08))
+    static let field = GlassInk.adaptive(light(0.06), day: ink(0.05))
+    static let fieldOn = GlassInk.adaptive(light(0.09), day: ink(0.07))
+    static let row = GlassInk.adaptive(light(0.06), day: ink(0.05))
+    static let rowHover = hover
+    static let bubble = GlassInk.adaptive(hex(0x363531), day: hex(0xEEECE5))
+    static let card = GlassInk.adaptive(hex(0x2E2E2B), day: hex(0xF3F1EB))
+    static let code = GlassInk.adaptive(hex(0x1F1F1D), day: hex(0xF3F1EB))
+    /// The floating stack at the bottom (approval and composer).
+    static let float = GlassInk.adaptive(hex(0x32322F, 0.92), day: light(0.9))
+    static let floatShadow = GlassInk.adaptive(.black.opacity(0.35), day: hex(0x3C321E, 0.10))
+    /// Graphite: the one filled button colour (send, stop, approve).
+    static let ink = GlassInk.adaptive(hex(0xECEAE3), day: hex(0x2A2925))
+    static let onInk = GlassInk.adaptive(hex(0x1F1E1B), day: hex(0xFAF9F5))
+    static let bad = GlassInk.adaptive(hex(0xF08379), day: hex(0xB33A31))
+    /// Kept for the old call sites: no lift, the page is solid.
+    static let lift = Color.clear
 }
 
 extension View {
-    /// A content surface of the session screen. By night the card well it always was; by day lighter than the pane, with a
-    /// soft lift.
-    func sessionSurface(_ fill: Color = SessionInk.row, radius: CGFloat = Radius.control) -> some View {
-        modifier(SessionSurface(fill: fill, radius: radius))
+    /// A content card of the session screen (tasks, plans, approvals, code): a fill, no line, no shadow.
+    func sessionSurface(_ fill: Color = SessionInk.card, radius: CGFloat = Radius.cardMac) -> some View {
+        background(fill, in: coreShape(radius))
     }
-}
 
-private struct SessionSurface: ViewModifier {
-    let fill: Color
-    let radius: CGFloat
-    @Environment(\.colorScheme) private var scheme
-
-    func body(content: Content) -> some View {
-        if scheme == .dark {
-            content.coreWell(radius: radius)
-        } else {
-            content.background(fill, in: coreShape(radius)).shadow(color: SessionInk.lift, radius: 6, y: 2)
-        }
+    /// The floating bottom stack (approval, composer): above the page, with a soft two-layer shadow.
+    func sessionFloat(radius: CGFloat = 12) -> some View {
+        background(SessionInk.float, in: coreShape(radius))
+            .shadow(color: SessionInk.floatShadow.opacity(0.5), radius: 1, y: 1)
+            .shadow(color: SessionInk.floatShadow, radius: 16, y: 12)
     }
 }
 
@@ -85,9 +100,42 @@ struct QueuedStack: View {
             CoreIconButton(symbol: "xmark", label: "Remove") { model.removeQueued(session.id, m.id) }
                 .help("Remove it from the queue")
         }
-        .padding(.leading, Space.s3).padding(.trailing, Space.s1).padding(.vertical, Space.s1)
-        .sessionSurface(SessionInk.row, radius: Radius.control)
+        .padding(.leading, Space.s3).padding(.trailing, Space.s1).frame(minHeight: 32)
+        .background(SessionInk.row, in: coreShape(Radius.control))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Queued: \(m.text)")
+    }
+}
+
+/// Graphite: the screen's one filled button (send, stop, approve), dark ink by day and light ink by night; presses to 0.97,
+/// Reduce Motion darkens instead.
+struct GraphiteButtonStyle: ButtonStyle {
+    var iconOnly = false
+    func makeBody(configuration: Configuration) -> some View { Face(configuration: configuration, iconOnly: iconOnly) }
+
+    private struct Face: View {
+        let configuration: ButtonStyleConfiguration
+        let iconOnly: Bool
+        @Environment(\.isEnabled) private var enabled
+        @Environment(\.accessibilityReduceMotion) private var reduce
+        @State private var hover = false
+
+        var body: some View {
+            configuration.label
+                .coreFont(size: MacTextSize.body, weight: .semibold)
+                .foregroundStyle(SessionInk.onInk)
+                .padding(.horizontal, iconOnly ? 0 : Space.s3)
+                .frame(minWidth: iconOnly ? 28 : nil, minHeight: 28)
+                .background(SessionInk.ink.opacity(hover ? 0.88 : 1), in: coreShape(Radius.control))
+                .overlay {
+                    coreShape(Radius.control).fill(.black.opacity(configuration.isPressed && reduce ? 0.18 : 0))
+                }
+                .opacity(enabled ? 1 : 0.3)
+                .scaleEffect(configuration.isPressed && !reduce ? 0.97 : 1)
+                .animation(Motion.out(Motion.hover), value: hover)
+                .animation(Motion.press(Motion.press), value: configuration.isPressed)
+                .onHover { hover = $0 }
+                .contentShape(coreShape(Radius.control))
+        }
     }
 }

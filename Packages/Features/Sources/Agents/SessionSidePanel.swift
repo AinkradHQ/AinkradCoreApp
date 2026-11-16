@@ -24,10 +24,10 @@ struct SessionSidePanel: View {
 
     private func cards(_ files: [FileTouch]) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.s3) {
+            // Sections on one floating panel, no cards inside it (direction A); space separates them.
+            VStack(alignment: .leading, spacing: Space.s6) {
                 SessionActions(model: model, session: session, find: find, stacked: true, facts: facts)
-                    .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                    .sessionSurface(radius: Radius.cardMac)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 section(
                     "Files touched", symbol: "doc", count: files.count,
                     review: files.isEmpty ? nil : { ui?.reviewing = true }
@@ -82,9 +82,10 @@ struct SessionSidePanel: View {
                 }
             }
             .foregroundStyle(palette.text)
-            .padding(.vertical, Space.s2)
+            .padding(Space.s4)
         }
         .scrollIndicators(.never)
+        .background(SessionInk.chrome, in: coreShape(12))
         .task(id: session.id) { await model.followRoute(session.id) }
     }
 
@@ -134,7 +135,6 @@ struct SessionSidePanel: View {
             }
             c()
         }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .sessionSurface(radius: Radius.cardMac)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

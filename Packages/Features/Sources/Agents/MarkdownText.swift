@@ -148,7 +148,7 @@ struct MarkdownText: View {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .paragraph(let t):
-                    Text(MarkdownBlock.inline(t)).lineSpacing(3).textSelection(.enabled)
+                    Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                 case .heading(let t):
                     // A report's headings read as headings: one step up from the body.
                     Text(MarkdownBlock.inline(t)).coreFont(size: MacTextSize.title, weight: .semibold)
@@ -156,7 +156,7 @@ struct MarkdownText: View {
                 case .item(let marker, let t):
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                         Text(marker).foregroundStyle(GlassInk.secondary).frame(minWidth: 16, alignment: .trailing)
-                        Text(MarkdownBlock.inline(t)).lineSpacing(3).textSelection(.enabled)
+                        Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                     }
                 case .code(let lang, let t):
                     CodeBlock(text: t, language: lang)
@@ -174,6 +174,7 @@ struct MarkdownText: View {
                 }
             }
         }
+        // Conversation prose: body size, which the app's text scale shows at about 15 pt, with chat-app line spacing.
         .coreFont(size: MacTextSize.body)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -207,7 +208,7 @@ private struct CodeBlock: View {
             .buttonStyle(.plain).coreFont(size: MacTextSize.meta, weight: .semibold)
             .foregroundStyle(GlassInk.secondary).padding(Space.s2)
         }
-        .background(GlassInk.wellHover, in: coreShape(Radius.row))
+        .background(SessionInk.code, in: coreShape(Radius.row))
     }
 }
 
@@ -232,7 +233,7 @@ private struct MarkdownTable: View {
             }
             .textSelection(.enabled).padding(Space.s3)
         }
-        .background(GlassInk.well, in: coreShape(Radius.row))
+        .background(SessionInk.code, in: coreShape(Radius.row))
     }
 }
 

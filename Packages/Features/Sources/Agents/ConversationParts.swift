@@ -39,19 +39,18 @@ struct EditCard: View {
         let del = lines.filter { $0.kind == .removed }.count
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(reduce ? nil : Motion.out(Motion.ui)) { expanded.toggle() }
+                withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { expanded.toggle() }
             } label: {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).rotationEffect(.degrees(expanded ? 90 : 0))
-                        .frame(width: Space.s3)
-                    Image(systemName: "pencil").foregroundStyle(palette.primary).frame(width: Space.s4)
+                // The same quiet line as every tool step: icon, verb, file, +/−, time and its mark.
+                HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                    Image(systemName: "pencil").coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+                        .frame(width: Space.s4)
                     Text(name.lowercased() == "write" ? "Wrote" : "Edited").coreFont(size: MacTextSize.body)
-                    Text(PathWords.short(path)).coreFont(size: MacTextSize.body, design: .monospaced)
+                        .foregroundStyle(SessionInk.text2)
+                    Text(PathWords.short(path)).coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
                         .lineLimit(1).truncationMode(.middle)
                     Text("+\(add)").foregroundStyle(palette.tone(.run).ink).monospacedDigit()
                     Text("−\(del)").foregroundStyle(palette.tone(.fail).ink).monospacedDigit()
-                    Spacer(minLength: Space.s2)
                     if let ms {
                         Text(coreUnit(coreDecimal(Double(ms) / 1000, 1), "s")).foregroundStyle(palette.text2)
                             .monospacedDigit()
@@ -65,8 +64,9 @@ struct EditCard: View {
                             .accessibilityLabel("Failed")
                     case nil: CoreWorkingBar(width: Space.s8)
                     }
+                    Spacer(minLength: 0)
                 }
-                .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
+                .coreFont(size: MacTextSize.meta).padding(.horizontal, Space.s2).frame(minHeight: 28)
                 .contentShape(Rectangle())
             }
             .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true)).help(path)
@@ -76,8 +76,6 @@ struct EditCard: View {
             }
         }
         .foregroundStyle(palette.text)
-        .clipShape(coreShape(Radius.control))
-        .sessionSurface()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Edited \(path), \(add) added, \(del) removed")
     }

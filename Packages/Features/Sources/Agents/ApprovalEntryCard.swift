@@ -6,6 +6,8 @@ import SwiftUI
 struct ApprovalEntryCard: View {
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
+    /// Pinned above the composer: it floats with it; in the transcript it is a plain card.
+    var floating = false
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -67,7 +69,8 @@ struct ApprovalEntryCard: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Needs-you is shown by the amber tile and the badge, not by a tinted card.
-        .sessionSurface(radius: Radius.cardMac)
+        .background(floating ? SessionInk.float : SessionInk.card, in: coreShape(12))
+        .shadow(color: floating ? SessionInk.floatShadow : .clear, radius: 16, y: 12)
         .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 
@@ -84,14 +87,21 @@ struct ApprovalEntryCard: View {
         let first = model.cards(for: request.session).first?.id == request.id
         let live =
             first && model.shell.activePane == AgentsModel.paneID(request.session) && !model.shell.coverOpen
-        let tile = Button(action: { Task { await model.decide(request, approved: approve) } }) {
+        let base = Button(action: { Task { await model.decide(request, approved: approve) } }) {
             if approve {
                 Label(elevated ? "Approve" : "Approve with Touch ID", systemImage: elevated ? "checkmark" : "touchid")
             } else {
                 Text("Deny")
             }
         }
-        .buttonStyle(CoreButtonStyle(approve ? .prominent : .secondary, size: .small))
+        // Approve is the graphite button; Deny the quiet one beside it.
+        let tile = Group {
+            if approve {
+                base.buttonStyle(GraphiteButtonStyle())
+            } else {
+                base.buttonStyle(CoreButtonStyle(.secondary, size: .medium))
+            }
+        }
         .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
         .disabled(busy)
         .help(

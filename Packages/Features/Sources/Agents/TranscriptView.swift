@@ -31,7 +31,7 @@ struct TranscriptView: View {
         ScrollViewReader { proxy in
             ZStack(alignment: .bottom) {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: Space.s3) {
+                    LazyVStack(alignment: .leading, spacing: Space.s4) {
                         header(store)
                         let turns = ConversationWords.turns(store.entries)
                         ForEach(columnRows(store)) { c in
@@ -269,12 +269,15 @@ struct EntryRow: View, Equatable {
             VStack(alignment: .trailing, spacing: Space.s2) {
                 if !parts.words.isEmpty {
                     HStack {
-                        Spacer(minLength: Space.s8)
-                        Text(parts.words).coreFont(size: MacTextSize.body).foregroundStyle(palette.btnInk)
-                            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-                            .background(palette.btnPrimary, in: coreShape(Radius.cardMac))
-                            .textSelection(.enabled)
-                            .messageActions(text: parts.words, user: true, latest: latest, actions)
+                        Spacer(minLength: Space.s8 * 5)  // a bubble stays within about 80% of the column
+                        // A neutral bubble, not a coloured one (direction A): your words, on the right.
+                        Text(parts.words).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text).lineSpacing(
+                            4
+                        )
+                        .padding(.horizontal, Space.s4).padding(.vertical, 10)
+                        .background(SessionInk.bubble, in: coreShape(12))
+                        .textSelection(.enabled)
+                        .messageActions(text: parts.words, user: true, latest: latest, actions)
                     }
                 }
                 if !parts.files.isEmpty { MessageFilesView(paths: parts.files) }
@@ -369,6 +372,20 @@ struct ToolCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
+    /// What the tool did, as a verb: "Read", "Edited", "Ran".
+    static func verb(_ name: String) -> String {
+        switch name.lowercased() {
+        case "read", "notebookread": "Read"
+        case "glob", "grep", "ls": "Searched"
+        case "edit", "multiedit", "notebookedit": "Edited"
+        case "write": "Wrote"
+        case "bash", "shell": "Ran"
+        case "webfetch": "Fetched"
+        case "websearch": "Searched the web for"
+        default: name
+        }
+    }
+
     private var symbol: String {
         switch name.lowercased() {
         case "bash", "shell": "terminal"
@@ -385,17 +402,18 @@ struct ToolCard: View {
             Button {
                 withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { expanded.toggle() }
             } label: {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).rotationEffect(.degrees(expanded ? 90 : 0))
-                        .frame(width: Space.s3)
-                    Image(systemName: symbol).foregroundStyle(palette.primary).frame(width: Space.s4)
+                // One quiet line, no box (direction A): icon, the verb, what it acted on, then the time and its mark.
+                HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                    Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+                        .frame(width: Space.s4)
+                    Text(Self.verb(name)).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
                     Text(PathWords.short(summary.isEmpty ? name : summary))
-                        .coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: Space.s2)
+                        .coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
+                        .lineLimit(1).truncationMode(.middle)
                     trailing
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlLg)
+                .padding(.horizontal, Space.s2).frame(minHeight: 28)
                 .contentShape(Rectangle())
             }
             .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.99, hoverFill: true))
@@ -419,8 +437,6 @@ struct ToolCard: View {
         }
         .foregroundStyle(palette.text)
         .frame(maxWidth: .infinity)
-        .clipShape(coreShape(Radius.control))
-        .sessionSurface()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Tool \(name): \(summary)")
     }
@@ -445,8 +461,8 @@ struct ToolCard: View {
                 if !facts.isEmpty {
                     Text(facts).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
                 }
-                Image(systemName: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(palette.tone(.fail).ink).accessibilityLabel("Failed")
+                Label("Failed", systemImage: "xmark").coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(SessionInk.bad)
             }
         }
     }

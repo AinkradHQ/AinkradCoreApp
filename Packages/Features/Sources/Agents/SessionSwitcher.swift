@@ -66,7 +66,7 @@ struct SessionSwitcher: View {
         }
         .padding(Space.s2)
         .frame(maxHeight: .infinity, alignment: .top)
-        .sessionSurface(radius: Radius.cardMac)
+        .background(SessionInk.chrome, in: coreShape(12))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Other AI sessions")
     }

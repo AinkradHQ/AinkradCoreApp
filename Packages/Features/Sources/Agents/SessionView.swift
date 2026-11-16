@@ -28,6 +28,8 @@ struct SessionView: View {
     static let sidebarWidth: CGFloat = 240
     @State private var keyMonitor: Any?
     @State private var clickMonitor: Any?
+    /// The conversation fades in and rises 8 pt when a session opens or the sidebar switches to it.
+    @State private var shown = false
 
     static let panelWidth: CGFloat = 1300
     static let narrow: CGFloat = 720
@@ -48,7 +50,7 @@ struct SessionView: View {
                     }
                     conversation(s, wide: wide, compact: rest < Self.compact, room: geo.size.width >= Self.sidebarRoom)
                     if wide {
-                        SessionSidePanel(model: model, session: s, find: openFind).frame(width: 320).padding(
+                        SessionSidePanel(model: model, session: s, find: openFind).frame(width: 288).padding(
                             .trailing, Space.s3
                         )
                         .padding(.top, Space.s2).transition(.opacity)
@@ -139,6 +141,8 @@ struct SessionView: View {
                 ui.focusField()
                 composing = true
             }
+            // A solid page, never the wallpaper (direction A): warm paper by day, warm charcoal by night.
+            .background(SessionInk.page)
             .paneLook(AgentPrefs.shared.look)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
@@ -193,6 +197,9 @@ struct SessionView: View {
             ComposerView(model: model, session: s, focused: $composing) { run($0, s) }
                 .frame(maxWidth: .infinity)
         }
+        .opacity(shown ? 1 : 0)
+        .offset(y: shown || reduce ? 0 : 8)
+        .onAppear { withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { shown = true } }
         // A plan card's Go ahead approves the tool's pending plan request, or tells the agent to build; Change it starts a
         // message.
         .environment(\.planActions, model.canReply(s) ? planActions(s) : nil)
@@ -343,7 +350,7 @@ struct PinnedApprovals: View {
                 .filter { $0.status(now: ctx.date, sessionOver: session.over) == .pending }
             if !pending.isEmpty {
                 VStack(spacing: Space.s2) {
-                    ForEach(pending) { r in ApprovalEntryCard(model: model, request: r) }
+                    ForEach(pending) { r in ApprovalEntryCard(model: model, request: r, floating: true) }
                 }
                 .padding(.bottom, Space.s2)
                 .transition(.opacity)
