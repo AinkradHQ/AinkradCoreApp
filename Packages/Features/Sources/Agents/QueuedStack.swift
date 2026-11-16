@@ -49,9 +49,12 @@ extension View {
 
     /// The floating bottom stack (approval, composer): above the page, with a soft two-layer shadow.
     func sessionFloat(radius: CGFloat = 12) -> some View {
-        background(SessionInk.float, in: coreShape(radius))
-            .shadow(color: SessionInk.floatShadow.opacity(0.5), radius: 1, y: 1)
-            .shadow(color: SessionInk.floatShadow, radius: 16, y: 12)
+        // The shadow from the shape only, never from the text inside (a content shadow redraws every glyph).
+        background {
+            coreShape(radius).fill(SessionInk.float)
+                .shadow(color: SessionInk.floatShadow.opacity(0.5), radius: 1, y: 1)
+                .shadow(color: SessionInk.floatShadow, radius: 16, y: 12)
+        }
     }
 }
 

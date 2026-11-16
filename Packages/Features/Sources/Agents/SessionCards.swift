@@ -531,6 +531,10 @@ struct WorkingSheen: View {
     var period = 1.6
 
     var body: some View {
+        if ScrollBench.off.contains("anims") { Color.clear } else { sheen }
+    }
+
+    private var sheen: some View {
         GeometryReader { g in
             TimelineView(.animation) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
@@ -554,7 +558,7 @@ struct TurningIcon: View {
     var period = 2.4
 
     var body: some View {
-        TimelineView(.animation) { ctx in
+        TimelineView(.animation(paused: ScrollBench.off.contains("anims"))) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
             Image(systemName: symbol).rotationEffect(.degrees(360 * t))
         }

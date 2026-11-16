@@ -69,8 +69,10 @@ struct ApprovalEntryCard: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Needs-you is shown by the amber tile and the badge, not by a tinted card.
-        .background(floating ? SessionInk.float : SessionInk.card, in: coreShape(12))
-        .shadow(color: floating ? SessionInk.floatShadow : .clear, radius: 16, y: 12)
+        .background {
+            coreShape(12).fill(floating ? SessionInk.float : SessionInk.card)
+                .shadow(color: floating ? SessionInk.floatShadow : .clear, radius: 16, y: 12)
+        }
         .animation(reduce ? nil : Motion.out(Motion.ui), value: state)
     }
 

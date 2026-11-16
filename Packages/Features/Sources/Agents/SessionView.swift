@@ -58,7 +58,7 @@ struct SessionView: View {
         if let s = model.sessions.session(sessionID) {
             GeometryReader { geo in
                 let room = geo.size.width >= Self.sidebarRoom
-                let side = sidebarOn && room
+                let side = sidebarOn && room && !ScrollBench.off.contains("sidebar")
                 let rest = geo.size.width - (side ? Self.sidebarWidth + Space.s3 : 0)
                 let wide = rest >= Self.panelWidth && panelOn
                 HStack(alignment: .top, spacing: 0) {
@@ -84,7 +84,7 @@ struct SessionView: View {
                         // The fixed toggles keep their corners while their side is hidden: the column clears them.
                         .padding(.leading, room && !side ? Space.s8 + Space.s3 : 0)
                         .padding(.trailing, rest >= Self.panelWidth && !wide ? Space.s8 + Space.s3 : 0)
-                    if wide {
+                    if wide && !ScrollBench.off.contains("panel") {
                         SessionSidePanel(model: model, session: s, find: openFind).frame(width: SessionSidePanel.width)
                             .padding(
                                 .trailing, Space.s3

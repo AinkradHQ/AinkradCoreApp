@@ -497,7 +497,9 @@ struct ToolCard: View {
 extension View {
     /// A short conversation starts at the top (no empty band above it); a long one still opens at its latest message.
     @ViewBuilder fileprivate func shortStartsAtTop() -> some View {
-        if #available(macOS 15, *) {
+        if ScrollBench.off.contains("anchor") {
+            self
+        } else if #available(macOS 15, *) {
             defaultScrollAnchor(.top, for: .alignment).defaultScrollAnchor(.bottom, for: .initialOffset)
                 .defaultScrollAnchor(.bottom, for: .sizeChanges)
         } else {
@@ -510,7 +512,9 @@ extension View {
     /// The system's soft scroll edge where it exists (macOS 26), drawn on the GPU; earlier systems keep a hard edge rather
     /// than a mask that renders the scroll view offscreen every frame.
     @ViewBuilder func softScrollEdges() -> some View {
-        if #available(macOS 26, *) {
+        if ScrollBench.off.contains("softedge") {
+            self
+        } else if #available(macOS 26, *) {
             scrollEdgeEffectStyle(.soft, for: .vertical)
         } else {
             self

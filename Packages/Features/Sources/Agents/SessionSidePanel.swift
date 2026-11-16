@@ -114,7 +114,7 @@ struct SideCard<Content: View>: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell(radius: 12)  // follows the Appearance setting (Look)
+        .modifier(CardSurface())
         .animation(Motion.calm(Motion.out(0.22), reduce), value: folded)
     }
 }
@@ -373,6 +373,17 @@ struct FlowRow: Layout {
             )
             x += d.width + spacing
             line = max(line, d.height)
+        }
+    }
+}
+
+/// A card's surface: the Look's card fill (bench switch "cardblur" swaps in a plain tint to measure its cost).
+private struct CardSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        if ScrollBench.off.contains("cardblur") {
+            content.background(SessionInk.card, in: coreShape(12))
+        } else {
+            content.coreWell(radius: 12)  // follows the Appearance setting (Look)
         }
     }
 }

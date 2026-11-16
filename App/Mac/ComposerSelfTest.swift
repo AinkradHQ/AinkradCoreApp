@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import QuartzCore
 import Agents
 import Pairing
 import SwiftUI
@@ -242,6 +243,56 @@ enum ComposerSelfTest {
         return nil
     }
 }
+/// Debug only. `CORE_SCROLL_BENCH=<log> [CORE_BENCH_OFF=anims,panel,sidebar,anchor]`: opens the long demo session and
+/// scrolls its transcript with wheel events for 4 s, down then up, while a 240 Hz timer measures how late the main thread
+/// runs (a late tick is a frame the scroll could not draw). Appends one line to the log, then quits.
+@MainActor
+enum ScrollBenchRun {
+    static func run(_ app: AppModel, log: String, env: [String: String]) async {
+        ScrollBench.off = Set((env["CORE_BENCH_OFF"] ?? "").split(separator: ",").map(String.init))
+        defer { NSApp.terminate(nil) }
+        try? await Task.sleep(for: .seconds(3))
+        guard let window = await SnapshotCapture.mainWindow() else { return }
+        let a = app.agents
+        for _ in 0..<100 where a.sessions.items.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+        app.shell.closeAllPanes()
+        a.openSession("as_01JC4X7Q3MZ8N5V2K9R020")
+        try? await Task.sleep(for: .seconds(3))
+        guard let scroll = ShowcaseShots.transcriptScrollView(window.contentView) else { return }
+        for _ in 0..<60 { ShowcaseShots.wheelStep(scroll, dy: 4000) }  // to the top
+        try? await Task.sleep(for: .seconds(1))
+        var gaps: [Double] = []
+        var last = CACurrentMediaTime()
+        let start = last
+        let timer = Timer(timeInterval: 1.0 / 240, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let now = CACurrentMediaTime()
+                gaps.append(now - last)
+                last = now
+                let t = now - start
+                // 2 s down, 2 s up, 30 pt per tick.
+                ShowcaseShots.wheelStep(scroll, dy: t < 2 ? -30 : 30)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        try? await Task.sleep(for: .seconds(4))
+        timer.invalidate()
+        let ms = gaps.map { $0 * 1000 }.sorted()
+        let p95 = ms.isEmpty ? 0 : ms[Int(Double(ms.count - 1) * 0.95)]
+        let stalls = ms.filter { $0 > 25 }.count
+        let line = String(
+            format: "off=%@ ticks=%d stalls>25ms=%d p95=%.1fms max=%.1fms\n",
+            (env["CORE_BENCH_OFF"] ?? "none"), ms.count, stalls, p95, ms.last ?? 0)
+        if let h = FileHandle(forWritingAtPath: log) {
+            h.seekToEndOfFile()
+            h.write(Data(line.utf8))
+            try? h.close()
+        } else {
+            try? line.write(toFile: log, atomically: true, encoding: .utf8)
+        }
+    }
+}
+
 /// Debug only. `CORE_SHOWCASE_SHOTS=<dir> [CORE_THEME=light|dark]` (with `CORE_DEMO=1`): opens the demo session holding every kind
 /// of content, captures its transcript a page at a time from the top, then a waiting session with its pinned approval.
 @MainActor
@@ -389,6 +440,9 @@ enum ShowcaseShots {
         for sub in v.subviews { if let t = composer(sub) { return t } }
         return nil
     }
+
+    static func wheelStep(_ scroll: NSScrollView, dy: Double) { wheel(scroll, dy: dy) }
+    static func transcriptScrollView(_ v: NSView?) -> NSScrollView? { transcriptScroll(v) }
 
     /// One scroll-wheel step of `dy` points (positive scrolls up), handed straight to the scroll view.
     private static func wheel(_ scroll: NSScrollView?, dy: Double) {
