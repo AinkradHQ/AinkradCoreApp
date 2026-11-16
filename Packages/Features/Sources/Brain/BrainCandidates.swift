@@ -3,7 +3,16 @@ import Foundation
 import Observation
 
 /// Which half of a room the Rooms page shows.
-public enum RoomPaneMode: String, Sendable, Hashable { case items, settings }
+public enum RoomPaneMode: String, Sendable, Hashable {
+    case overview, items, settings
+    var title: String {
+        switch self {
+        case .overview: "Overview"
+        case .items: "Items"
+        case .settings: "Settings"
+        }
+    }
+}
 
 /// A candidate being edited: the kind and text you are changing, held until you save or cancel.
 public struct CandidateDraft: Sendable, Equatable {
@@ -33,7 +42,8 @@ public final class BrainCandidates {
     public internal(set) var policies: [String: RoomPolicy] = [:]
     /// Each room's extra AI allows. A room is absent until the Core answers (a Core before access has no answer).
     public internal(set) var access: [String: RoomAccess] = [:]
-    public var paneMode: RoomPaneMode = .items
+    /// A room opens on its Overview where the service writes one (RoomsTab falls back to Items where it does not).
+    public var paneMode: RoomPaneMode = .overview
     public internal(set) var runners: [RunnerHistory] = []
     /// The runner whose history collection the sheet is about to turn on.
     public var runnerSheet: RunnerHistory?

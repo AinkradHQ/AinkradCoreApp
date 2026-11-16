@@ -34,6 +34,10 @@ public final class BrainModel {
     }
     /// Import takes the ticked rooms in one call (Core API minor 73). The sample always has it.
     public var keepsInCommit: Bool { isSample || (apiMinor ?? 0) >= 73 }
+    /// The room Overview needs the Core's overview routes (API minor 74). The sample always has them where it writes one.
+    public var servesOverview: Bool {
+        service?.overviewService != nil && (isSample || (apiMinor ?? 0) >= 74)
+    }
     /// "Same project as…" and its list in Settings (Core API minor 72). The sample always has it.
     public var remembersSameProject: Bool { isSample || (apiMinor ?? 0) >= 72 }
     /// Sync now, sources and rules on the Rooms page; nil until a service attaches.
@@ -60,12 +64,15 @@ public final class BrainModel {
     @ObservationIgnored public private(set) var checks: ChecksModel!
     /// The M3 Inbox, room policy and runner history.
     @ObservationIgnored public private(set) var candidates: BrainCandidates!
+    /// The viewing room's written overview.
+    @ObservationIgnored public private(set) var roomOverview: RoomOverviewModel!
 
     public init(host: any AdminHost) {
         self.host = host
         activity = ActivityModel(brain: self)
         checks = ChecksModel(brain: self)
         candidates = BrainCandidates(brain: self)
+        roomOverview = RoomOverviewModel(brain: self)
     }
 
     // MARK: connection
@@ -219,6 +226,7 @@ public final class BrainModel {
     /// Drops everything a room view held. Called before any switch, seal or lock, not after.
     func clearRoomView() {
         activity?.clear()
+        roomOverview?.clear()
         inboxState.clear()
         inspected = nil
         inspectingID = nil

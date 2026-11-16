@@ -131,7 +131,10 @@ private struct RoomPane: View {
                         }
                         .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(model.busy != nil)
                     }
-                } else if model.candidates.paneMode == .settings {
+                } else if mode == .overview {
+                    notices
+                    RoomOverviewTab(model: model, room: room)
+                } else if mode == .settings {
                     RoomSettings(model: model, room: room)
                 } else {
                     notices
@@ -145,6 +148,17 @@ private struct RoomPane: View {
         }
     }
 
+    /// The halves this Core can show: Overview where it writes one, Settings where it serves the policy routes.
+    private var tabs: [RoomPaneMode] {
+        (model.servesOverview ? [.overview] : []) + [.items]
+            + (model.service?.servesCandidates == true ? [.settings] : [])
+    }
+
+    /// The chosen half, or Items when this Core does not have it.
+    private var mode: RoomPaneMode {
+        tabs.contains(model.candidates.paneMode) ? model.candidates.paneMode : .items
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: Space.s3) {
             IconTile(room.lock == nil ? "folder" : "lock", hue: room.lock == nil ? GlassInk.blue : GlassInk.slate)
@@ -153,11 +167,10 @@ private struct RoomPane: View {
                 Text(line).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
             Spacer(minLength: Space.s3)
-            if room.lock == nil, model.service?.servesCandidates == true {
+            if room.lock == nil, tabs.count > 1 {
                 CoreSegmented(
-                    "Room view",
-                    segments: [CoreSegment(RoomPaneMode.items, "Items"), CoreSegment(.settings, "Settings")],
-                    selection: Bindable(model.candidates).paneMode)
+                    "Room view", segments: tabs.map { CoreSegment($0, $0.title) },
+                    selection: Binding(get: { mode }, set: { model.candidates.paneMode = $0 }))
             } else {
                 VStack(alignment: .trailing, spacing: 2) {
                     if let when = model.lastSyncLabel(room) { Text("Synced \(when.lowercased())") }

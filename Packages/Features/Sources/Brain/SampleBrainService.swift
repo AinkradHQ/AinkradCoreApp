@@ -33,6 +33,10 @@ public actor SampleBrainService: BrainService {
         public var imports = false
         /// The local AI's step in the sample review: `pending`, `ready` or `off`.
         public var semantic = "off"
+        /// A room's Overview opens in this state (nil: the service does not write overviews).
+        public var overview: OverviewState?
+        /// The sample overview's instructions are approved already.
+        public var overviewApproved = false
         public init(
             paused: Bool = false, offline: Bool = false, rebuilding: Bool = false, embeddingDown: Bool = false,
             empty: Bool = false, error: Bool = false, healthy: Bool = false, emptyInbox: Bool = false,
@@ -52,6 +56,7 @@ public actor SampleBrainService: BrainService {
     }
 
     public nonisolated let isSample = true
+    nonisolated let servesOverview: Bool
     public nonisolated let importRoutes: BrainRoutes?
     var scenario: Scenario
     private var list: [RoomSummary]
@@ -68,9 +73,11 @@ public actor SampleBrainService: BrainService {
     var sampleSwitches: [String: Bool] = [:]
     var sampleRuleOn: [Int: Bool] = [:]
     var m3: SampleM3
+    var roomOverviews: [String: RoomOverview] = [:]
 
     public init(_ scenario: Scenario = Scenario(), pace: Duration = .milliseconds(250)) {
         self.scenario = scenario
+        self.servesOverview = scenario.overview != nil
         self.list = scenario.empty ? [] : scenario.m3 ? SampleM3.rooms : Self.world(worst: scenario.worst)
         self.m3 = SampleM3(scenario)
         self.importRoutes =

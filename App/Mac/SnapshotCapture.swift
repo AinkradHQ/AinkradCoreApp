@@ -17,9 +17,18 @@ enum SnapshotCapture {
         // again before falling back to the offscreen render, which has no blur and no dialog (delete-pool, night).
         var shot: CGImage?
         for attempt in 1...4 {
-            shot = CGWindowListCreateImage(
-                .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
-                [.boundsIgnoreFraming, .nominalResolution])
+            // A popover is a child window of its parent: composite those with the window, nothing else on screen.
+            let kids = (window.childWindows ?? []).filter(\.isVisible)
+            if kids.isEmpty {
+                shot = CGWindowListCreateImage(
+                    .null, .optionIncludingWindow, CGWindowID(window.windowNumber),
+                    [.boundsIgnoreFraming, .nominalResolution])
+            } else {
+                let ids = ([window] + kids).map { NSNumber(value: $0.windowNumber) } as CFArray
+                shot = CGImage(
+                    windowListFromArrayScreenBounds: .null, windowArray: ids,
+                    imageOption: [.boundsIgnoreFraming, .nominalResolution])
+            }
             if let s = shot, !isBlank(s) { break }
             log("  attempt \(attempt): window server image not ready")
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
