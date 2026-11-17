@@ -1,5 +1,6 @@
 import Accounts
 import Brain
+import Design
 import Leyline
 import Projects
 import Shell
@@ -15,6 +16,7 @@ enum Registration {
         app.brain.install()
         app.projects.install()
         app.leyline.install()
+        app.design.install()
         shell.settings.section(
             SettingsSection(
                 id: "devices", group: .core, title: "Devices",

@@ -4,6 +4,7 @@ import Admin
 import Brain
 import CoreKit
 import CryptoKit
+import Design
 import Foundation
 import Leyline
 import Projects
@@ -158,6 +159,8 @@ extension AppModel {
     public func debugProjectsDemo() -> ProjectsDemo { ProjectsDemo(model: projects) }
     /// The Leyline states on sample data, for screenshots and clicking through. Needs no Core.
     public func debugLeylineDemo() -> LeylineDemo { LeylineDemo(model: leyline) }
+    /// The Design states on sample data, for screenshots and clicking through. Needs no Core.
+    public func debugDesignDemo() -> DesignDemo { DesignDemo(model: design) }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }
     public var debugPairingCode: String? {
         if case .code(let p)? = addDevice?.stage { return p.code }

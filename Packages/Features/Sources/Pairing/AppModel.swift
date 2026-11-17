@@ -4,6 +4,7 @@ import Agents
 import Brain
 import CoreKit
 import CoreUI
+import Design
 import Foundation
 import Leyline
 import Observation
@@ -55,6 +56,8 @@ public final class AppModel {
     /// Projects: the gallery and the project spaces (P7); its screens say "not connected" until a Core is open.
     public private(set) var projects: ProjectsModel!
     public private(set) var leyline: LeylineModel!
+    /// Design: every design by category, the library, and the Designs island of a project space (V3-03).
+    public private(set) var design: DesignModel!
     /// The Brain (memory rooms and import). A real Core serves it through the signed module routes; Debug demo shows sample data.
     public private(set) var brain: BrainModel!
     private var rateLimitEnd: Task<Void, Never>?
@@ -126,6 +129,7 @@ public final class AppModel {
         brain = BrainModel(host: AdminHostAdapter(app: self))
         projects = ProjectsModel(host: AdminHostAdapter(app: self))
         leyline = LeylineModel(host: AdminHostAdapter(app: self))
+        design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
@@ -230,6 +234,7 @@ public final class AppModel {
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
             leyline.attach(connection: live.connection)
+            design.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
             brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
         }
@@ -372,6 +377,7 @@ public final class AppModel {
             accounts.event(kind: kind)
             projects.event(kind: kind)
             leyline.event(kind: kind)
+            design.event(kind: kind)
             homeFeed?.event(kind: kind)
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
@@ -727,6 +733,7 @@ public final class AppModel {
         brain.detach()
         projects.detach()
         leyline.detach()
+        design.detach()
         shell.linkNotice = nil
         shell.home = .empty
         shell.resetToFresh()
