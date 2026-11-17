@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "Accounts", targets: ["Accounts"]), .library(name: "Agents", targets: ["Agents"]),
         .library(name: "Brain", targets: ["Brain"]), .library(name: "BrainImport", targets: ["BrainImport"]),
         .library(name: "Projects", targets: ["Projects"]), .library(name: "Leyline", targets: ["Leyline"]),
+        .library(name: "LoreEditor", targets: ["LoreEditor"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -88,6 +89,10 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v6)]),
         // The Mac-side collectors of the Brain import (E3): pure Foundation, no UI, no Core client.
         .target(name: "BrainImport", swiftSettings: [.swiftLanguageMode(.v6)]),
+        // The Lore note editor (R6-02): TextKit 2, Markdown as the document, CoreUI only, no Core client.
+        .target(
+            name: "LoreEditor", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Pairing",
             dependencies: [
@@ -121,6 +126,7 @@ let package = Package(
             dependencies: ["Leyline", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "BrainTests", dependencies: ["Brain", "BrainImport", "Shell", "Admin"]),
         .testTarget(name: "BrainImportTests", dependencies: ["BrainImport"]),
+        .testTarget(name: "LoreEditorTests", dependencies: ["LoreEditor"]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
 )

@@ -49,6 +49,9 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             return await app.debugLeylineDemo().showInteractive(scene)
         }
+        if let dir = env["CORE_LORE_SNAPSHOT"] { return await LoreSnapshots.run(dir: dir, env: env) }
+        // `CORE_LORE_DEMO=1`: the Lore editor on the 10,000-word sample note, left open to type in (no Core is reached).
+        if env["CORE_LORE_DEMO"] == "1" { return await LoreSnapshots.run(dir: nil, env: env) }
         if let dir = env["CORE_BRAIN_SNAPSHOT"] { return await BrainSnapshots.run(app, dir: dir, env: env) }
         // `CORE_BRAIN_DEMO=<scene>`: the Brain on sample data, left open to click through (no Core is reached).
         if let scene = env["CORE_BRAIN_DEMO"] {
