@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "Accounts", targets: ["Accounts"]), .library(name: "Agents", targets: ["Agents"]),
         .library(name: "Brain", targets: ["Brain"]), .library(name: "BrainImport", targets: ["BrainImport"]),
         .library(name: "Projects", targets: ["Projects"]), .library(name: "Leyline", targets: ["Leyline"]),
-        .library(name: "LoreEditor", targets: ["LoreEditor"]),
+        .library(name: "LoreEditor", targets: ["LoreEditor"]), .library(name: "Lore", targets: ["Lore"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -93,10 +93,19 @@ let package = Package(
         .target(
             name: "LoreEditor", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
+        // The Lore space (R6-01): today's note, autosave, remote fold-in, local drafts.
+        .target(
+            name: "Lore",
+            dependencies: [
+                "Shell", "Admin", "LoreEditor", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "Projects", "Leyline",
+                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "Projects", "Leyline", "Lore",
                 .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
@@ -127,6 +136,8 @@ let package = Package(
         .testTarget(name: "BrainTests", dependencies: ["Brain", "BrainImport", "Shell", "Admin"]),
         .testTarget(name: "BrainImportTests", dependencies: ["BrainImport"]),
         .testTarget(name: "LoreEditorTests", dependencies: ["LoreEditor"]),
+        .testTarget(
+            name: "LoreTests", dependencies: ["Lore", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),
     ]
 )

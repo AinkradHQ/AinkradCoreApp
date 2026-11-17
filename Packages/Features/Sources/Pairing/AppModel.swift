@@ -6,6 +6,7 @@ import CoreKit
 import CoreUI
 import Foundation
 import Leyline
+import Lore
 import Observation
 import Projects
 import Shell
@@ -55,6 +56,8 @@ public final class AppModel {
     /// Projects: the gallery and the project spaces (P7); its screens say "not connected" until a Core is open.
     public private(set) var projects: ProjectsModel!
     public private(set) var leyline: LeylineModel!
+    /// Lore: today's note and every note on the Core (R6-01); it says "not connected" until a Core is open.
+    public private(set) var lore: LoreModel!
     /// The Brain (memory rooms and import). A real Core serves it through the signed module routes; Debug demo shows sample data.
     public private(set) var brain: BrainModel!
     private var rateLimitEnd: Task<Void, Never>?
@@ -126,6 +129,7 @@ public final class AppModel {
         brain = BrainModel(host: AdminHostAdapter(app: self))
         projects = ProjectsModel(host: AdminHostAdapter(app: self))
         leyline = LeylineModel(host: AdminHostAdapter(app: self))
+        lore = LoreModel(host: AdminHostAdapter(app: self))
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
@@ -230,6 +234,7 @@ public final class AppModel {
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
             leyline.attach(connection: live.connection)
+            lore.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
             brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
         }
@@ -326,6 +331,7 @@ public final class AppModel {
         switch e {
         case .live:
             shell.coreLink = .live
+            lore.linkUp()
             shell.retryAttempt = 0
             shell.nextRetryAt = nil
             if shell.linkNotice == .renewing {
@@ -357,7 +363,9 @@ public final class AppModel {
             shell.coreLink = .none
             phase = .blocked(f)
         case .notice(let kind, let fields):
-            if kind == "brain.inbox" {
+            if kind.hasPrefix("lore.note.") {
+                lore.remote(fields)
+            } else if kind == "brain.inbox" {
                 brain.inboxNotice(
                     unsorted: Int(fields["unsorted"] ?? "") ?? 0, newRooms: Int(fields["new_rooms"] ?? "") ?? 0)
             } else {
@@ -727,6 +735,7 @@ public final class AppModel {
         brain.detach()
         projects.detach()
         leyline.detach()
+        lore.detach()
         shell.linkNotice = nil
         shell.home = .empty
         shell.resetToFresh()
