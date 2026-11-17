@@ -151,7 +151,9 @@ private struct CategoryRail: View {
 
     private func row(_ c: DesignCategory) -> some View {
         let n = model.count(c)
-        return CoreRow(c.title, symbol: c.symbol, selected: model.category == c, action: { model.pick(c) }) {
+        return CoreRow(
+            c.title, symbol: c.symbol, selected: model.project == nil && model.category == c, action: { model.pick(c) }
+        ) {
             CountBadge(n, tone: c == .needsYou && n > 0 ? .needsYou : .quiet, showsZero: true)
         }
         .accessibilityIdentifier("design-rail-\(c.rawValue)")
@@ -207,19 +209,35 @@ private struct Composer: View {
 struct DesignWall: View {
     let model: DesignModel
     @State private var settled = false
+    @State private var width: CGFloat = 0
 
-    static let columns = [
-        GridItem(.adaptive(minimum: Space.s8 * 8, maximum: Space.s8 * 11), spacing: Space.s4, alignment: .top)
-    ]
+    /// The skeletons' grid: as many columns of at least 256 pt as fit.
+    static let columns = [GridItem(.adaptive(minimum: cardMin), spacing: Space.s4, alignment: .top)]
+    static let cardMin = Space.s8 * 8
+
+    /// A section's columns: as many 256 pt columns as fit, but no more than it has cards (and never fewer than two), so a
+    /// short section's cards stretch across the row instead of leaving an empty band.
+    static func columns(for count: Int, width: CGFloat) -> [GridItem] {
+        let fit = max(1, Int((width + Space.s4) / (cardMin + Space.s4)))
+        let n = max(min(count, fit), min(fit, 2))
+        return Array(repeating: GridItem(.flexible(), spacing: Space.s4, alignment: .top), count: n)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s6) {
                 content
             }
+            // The wall takes the whole width, so the adaptive grid's columns stretch to fill each row.
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, Space.s2).padding(.bottom, Space.s8)
         }
         .scrollIndicators(.never)
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.width
+        } action: {
+            width = $0
+        }
         .onAppear { settled = true }
     }
 
@@ -236,6 +254,15 @@ struct DesignWall: View {
             if sections.isEmpty {
                 emptyLibrary
             } else {
+                if let p = model.project {
+                    // A project row is the rail's one selection: its name and count head the wall.
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                        Text(model.projectName(p)).coreFont(size: MacTextSize.title, weight: .semibold)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("· \(model.items(in: .all).count)").foregroundStyle(GlassInk.secondary)
+                    }
+                    .padding(.horizontal, Space.s1)
+                }
                 ForEach(sections, id: \.0) { c, list in section(c.title, sub: nil, list) }
             }
         default:
@@ -271,10 +298,15 @@ struct DesignWall: View {
                 if let sub { Text(sub).foregroundStyle(GlassInk.secondary) }
             }
             .padding(.horizontal, Space.s1)
-            LazyVGrid(columns: Self.columns, spacing: Space.s4) {
-                ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
-                    DesignCard(model: model, item: item, index: i, settled: settled)
+            // Laid out once the width is known, and never animated between column counts (a resize re-flows at once).
+            if width > 0 {
+                LazyVGrid(columns: Self.columns(for: list.count, width: width), spacing: Space.s4) {
+                    ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
+                        DesignCard(model: model, item: item, index: i, settled: settled)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .transaction { $0.animation = nil }
             }
         }
     }

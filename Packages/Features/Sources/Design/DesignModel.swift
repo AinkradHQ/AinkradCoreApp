@@ -105,25 +105,30 @@ public final class DesignModel {
     }
 
     /// The items after the rail's project and the Filter field.
-    var visible: [DesignItem] {
+    var visible: [DesignItem] { visible(in: project) }
+
+    func visible(in project: String?) -> [DesignItem] {
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
         return items.filter { item in
-            (project == nil || item.projects.contains(project!))
+            (project.map { item.projects.contains($0) } ?? true)
                 && (q.isEmpty || item.name.lowercased().contains(q) || item.kindWord.lowercased().contains(q)
                     || item.tags.contains { $0.lowercased().contains(q) })
         }
     }
 
-    func items(in c: DesignCategory) -> [DesignItem] {
+    func items(in c: DesignCategory) -> [DesignItem] { items(in: c, project: project) }
+
+    func items(in c: DesignCategory, project: String?) -> [DesignItem] {
         switch c {
         // TODO(V6-02): designs waiting for review or approval. TODO(V7-02): designs an AI session is drawing.
         case .needsYou, .drawing: []
-        case .all: visible
-        default: visible.filter { $0.category == c }
+        case .all: visible(in: project)
+        default: visible(in: project).filter { $0.category == c }
         }
     }
 
-    func count(_ c: DesignCategory) -> Int { items(in: c).count }
+    /// A category row's count: what picking it shows (a category is never scoped to a project).
+    func count(_ c: DesignCategory) -> Int { items(in: c, project: nil).count }
 
     /// The projects with something related to them, for the rail.
     var railProjects: [(ref: ProjectRef, count: Int)] {
@@ -241,13 +246,16 @@ public final class DesignModel {
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 
+    /// One rail row is selected at a time: a category clears the project, a project shows all of its designs.
     func pick(_ c: DesignCategory) {
         category = c
+        project = nil
         openID = nil
     }
 
     func pickProject(_ id: String) {
         project = project == id ? nil : id
+        category = .all
         openID = nil
     }
 

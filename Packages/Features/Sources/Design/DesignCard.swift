@@ -41,6 +41,7 @@ struct DesignCard: View {
             .help(item.name)
         }
         .padding(Space.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .coreWell(radius: Radius.pane, active: lit)
         .contentShape(coreShape(Radius.pane))
         .onTapGesture { model.openItem(item.id) }

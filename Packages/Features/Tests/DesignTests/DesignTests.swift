@@ -111,6 +111,28 @@ private func ready(_ s: FakeService) async -> DesignModel {
         #expect(m.linked(to: "1").count == 2)
     }
 
+    @Test func theRailSelectsOneRowAtATime() async {
+        let s = FakeService()
+        s.docList = [doc("dd_1", .design, "Checkout", ["1"]), doc("dd_2", .system, "Calm", ["2"])]
+        let m = await ready(s)
+        m.pick(.systems)
+        m.pickProject("1")
+        #expect(m.project == "1" && m.category == .all)
+        #expect(m.items(in: .all).map(\.name) == ["Checkout"])
+        // Category counts say what picking them shows, whatever project is selected.
+        #expect(m.count(.systems) == 1)
+        m.pick(.screens)
+        #expect(m.project == nil)
+    }
+
+    @Test func shortSectionsStretchAcrossTheRow() {
+        // 1,648 pt fits six 256 pt columns.
+        #expect(DesignWall.columns(for: 2, width: 1648).count == 2)
+        #expect(DesignWall.columns(for: 1, width: 1648).count == 2)
+        #expect(DesignWall.columns(for: 9, width: 1648).count == 6)
+        #expect(DesignWall.columns(for: 3, width: 200).count == 1)
+    }
+
     @Test func fontsAndUncheckedFilesAreNeverFetched() async {
         let s = FakeService()
         let font = asset("f1", .font, "Serif", check: .ok, type: "font/ttf")
