@@ -215,12 +215,11 @@ struct DesignWall: View {
     static let columns = [GridItem(.adaptive(minimum: cardMin), spacing: Space.s4, alignment: .top)]
     static let cardMin = Space.s8 * 8
 
-    /// A section's columns: as many 256 pt columns as fit, but no more than it has cards (and never fewer than two), so a
-    /// short section's cards stretch across the row instead of leaving an empty band.
-    static func columns(for count: Int, width: CGFloat) -> [GridItem] {
+    /// The page's columns, as Photos and Finder do: as many 256 pt columns as fit the width, the same count for every
+    /// section so columns line up from section to section. A short section leaves its trailing slots empty.
+    static func columns(width: CGFloat) -> [GridItem] {
         let fit = max(1, Int((width + Space.s4) / (cardMin + Space.s4)))
-        let n = max(min(count, fit), min(fit, 2))
-        return Array(repeating: GridItem(.flexible(), spacing: Space.s4, alignment: .top), count: n)
+        return Array(repeating: GridItem(.flexible(), spacing: Space.s4, alignment: .top), count: fit)
     }
 
     var body: some View {
@@ -300,7 +299,7 @@ struct DesignWall: View {
             .padding(.horizontal, Space.s1)
             // Laid out once the width is known, and never animated between column counts (a resize re-flows at once).
             if width > 0 {
-                LazyVGrid(columns: Self.columns(for: list.count, width: width), spacing: Space.s4) {
+                LazyVGrid(columns: Self.columns(width: width), spacing: Space.s4) {
                     ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
                         DesignCard(model: model, item: item, index: i, settled: settled)
                     }
