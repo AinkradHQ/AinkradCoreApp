@@ -1,0 +1,180 @@
+import AppKit
+import Foundation
+import Testing
+import UniformTypeIdentifiers
+
+@testable import LoreEditor
+
+/// Appends `tail` at the end of the first paragraph containing `marker`, as typing would.
+@MainActor func typeAfter(_ marker: String, _ tail: String, in c: LoreEditorController) {
+    let tv = c.textView
+    let r = (tv.string as NSString).range(of: marker)
+    tv.setSelectedRange(NSRange(location: NSMaxRange(r), length: 0))
+    tv.insertText(tail, replacementRange: tv.selectedRange())
+}
+
+@MainActor func ms(_ body: () -> Void) -> Double {
+    let t = ContinuousClock.now
+    body()
+    let d = ContinuousClock.now - t
+    return Double(d.components.seconds) * 1000 + Double(d.components.attoseconds) / 1e15
+}
+
+/// Security review of #147, finding 1: hostile lines must parse in linear time.
+@MainActor struct HostileInputTests {
+    /// The review's two cases must parse in under 50 ms; the other shapes, just under the plain-text limit, in under 100 ms
+    /// (2,000 inline code spans is real formatting work, not backtracking). Debug build.
+    @Test(arguments: [
+        (String(repeating: "[[", count: 50_000), 50.0),  // 100 KB, over the plain-text limit
+        (String(repeating: "**a ", count: 10_000), 50.0),  // 40 KB
+        (String(repeating: "[[", count: 2_000), 100.0),  // 4 KB, parsed: the bounds do the work
+        (String(repeating: "**a ", count: 1_000), 100.0),
+        (String(repeating: "[a](", count: 1_000), 100.0),
+        (String(repeating: "https://a.....", count: 290), 100.0),
+        (String(repeating: "`a", count: 2_000), 100.0),
+        (String(repeating: "_a ", count: 1_300), 100.0),
+    ])
+    func parsesFast(_ line: String, _ budget: Double) {
+        _ = MarkdownReader.parse("warm up\n")
+        let t = ms { _ = MarkdownReader.parse(line + "\n") }
+        #expect(t < budget, "took \(Int(t)) ms for \(String(line.prefix(6))) x \(line.count)")
+        print("PARSE \(String(line.prefix(6))) x \(line.count): \(String(format: "%.1f", t)) ms")
+    }
+
+    @Test func overTheLimitIsPlainText() {
+        let line = Array(repeating: "**b**", count: 1_000).joined(separator: " ")
+        let (text, _) = MarkdownReader.parse(line + "\n")
+        #expect(text.string == line + "\n")
+        #expect(text.attribute(.loreBold, at: 2, effectiveRange: nil) == nil)
+        #expect(editor(line + "\n").markdown() == line + "\n")
+    }
+}
+
+/// Finding 2: no web previews, no Look Up on links, no Writing Tools, no Open Link from the menu.
+@MainActor struct NoFetchTests {
+    @Test func writingToolsAreOff() throws {
+        let tv = editor("").textView
+        if #available(macOS 15.0, *) { #expect(tv.writingToolsBehavior == .none) }
+    }
+
+    @Test func contextMenuDropsOpenLinkLookUpAndShare() {
+        let m = NSMenu()
+        for (title, sel) in [
+            ("Open Link", "_openLinkFromMenu:"), ("Copy Link", "copyLink:"), ("Look Up “x”", "_lookUpDefiniteRange:"),
+            ("Search With Google", "_searchWithGoogleFromMenu:"), ("Cut", "cut:"), ("Copy", "copy:"),
+            ("Paste", "paste:"), ("Share…", "_share:"), ("Writing Tools", "showWritingTools:"),
+        ] {
+            m.addItem(NSMenuItem(title: title, action: NSSelectorFromString(sel), keyEquivalent: ""))
+            m.addItem(.separator())
+        }
+        let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
+        services.submenu = NSMenu()
+        m.addItem(services)
+        let left = LoreTextView.safeMenu(m).items.filter { !$0.isSeparatorItem }.map(\.title)
+        #expect(left == ["Copy Link", "Cut", "Copy", "Paste"])
+        #expect(m.items.first?.isSeparatorItem == false && m.items.last?.isSeparatorItem == false)
+    }
+}
+
+@MainActor final class SlowUploader: LoreAttachmentUploader {
+    var calls = 0
+    func upload(_ file: LoreUpload) async throws -> URL {
+        calls += 1
+        try await Task.sleep(for: .milliseconds(150))
+        return URL(string: "lore-attachment:" + String(repeating: "b", count: 64))!
+    }
+}
+
+/// Finding 3: an upload that ends after a note switch is dropped.
+@MainActor struct UploadAcrossNotesTests {
+    @Test func lateUploadNeverLandsInTheNextNote() async throws {
+        _ = NSApplication.shared
+        let up = SlowUploader()
+        let c = LoreEditorController(uploader: up)
+        c.load(markdown: "first note\n")
+        c.upload(LoreUpload(name: "a.png", type: .png, data: Data([1, 2, 3])), at: 0)
+        c.load(markdown: "second note\n")
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(up.calls == 1)
+        #expect(c.markdown() == "second note\n")
+    }
+}
+
+/// Finding 4: blocks written fresh keep what they had.
+@MainActor struct RewriteIntegrityTests {
+    nonisolated static let escapes = [
+        "a [b] c", "snake_case_name and _x_", "back\\slash", "star * here", "tick ` mark", "[[not a link]]",
+        "**not bold**", "*not italic*", "[text](https://not.a.link)", "`not code`", "\\*kept escape\\*",
+    ]
+
+    /// Load → edit → reload shows the same text plus the edit, for text full of syntax characters.
+    @Test(arguments: escapes) func escapedTextSurvivesARewrite(_ shown: String) {
+        let c = editor("")
+        c.textView.insertText(shown, replacementRange: NSRange(location: 0, length: 0))
+        let once = editor(c.markdown())
+        #expect(once.textView.string == shown + "\n")
+        typeAfter(shown, " x", in: once)
+        #expect(editor(once.markdown()).textView.string == shown + " x\n")
+    }
+
+    @Test(arguments: [
+        ("* a\n* b\n", "b", "* a\n* b x\n"), ("+ a\n+ b\n", "a", "+ a x\n+ b\n"),
+        ("3. a\n4. b\n", "a", "3. a x\n4. b\n"), ("10) a\n11) b\n", "b", "10) a\n11) b x\n"),
+        ("* [ ] a\n* [x] b\n", "a", "* [ ] a x\n* [x] b\n"),
+    ])
+    func listMarkersAndStartsAreKept(_ md: String, _ at: String, _ want: String) {
+        let c = editor(md)
+        typeAfter(at, " x", in: c)
+        #expect(c.markdown() == want)
+    }
+
+    @Test func numberedListIsDrawnFromItsStart() {
+        let c = editor("3. a\n4. b\n")
+        #expect(c.textView.ts.attribute(.loreOrdinal, at: 0, effectiveRange: nil) as? Int == 3)
+    }
+
+    @Test func hardBreaksAndIndentationAreKept() {
+        let md = "Line one  \n    indented two\\\nthree\n"
+        let c = editor(md)
+        typeAfter("three", " x", in: c)
+        let out = c.markdown()
+        #expect(out == "Line one  \n    indented two\\\nthree x\n", "\(out.debugDescription)")
+    }
+}
+
+/// Finding 5: a file's real type and size are checked before it is read.
+@MainActor struct FileChecksTests {
+    @Test func symlinkedAndWrongFilesAreRefusedUnread() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lore-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let big = dir.appendingPathComponent("big.bin")
+        FileManager.default.createFile(atPath: big.path, contents: Data(count: 11 * 1024 * 1024))
+        let fakePNG = dir.appendingPathComponent("pic.png")
+        try FileManager.default.createSymbolicLink(at: fakePNG, withDestinationURL: big)
+        let script = dir.appendingPathComponent("run.sh")
+        try Data("echo hi".utf8).write(to: script)
+        let png = dir.appendingPathComponent("ok.png")
+        let rep = try #require(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        try #require(rep.representation(using: .png, properties: [:])).write(to: png)
+
+        let up = FakeUploader()
+        _ = NSApplication.shared
+        let c = LoreEditorController(uploader: up)
+        c.load(markdown: "")
+        var notices: [String] = []
+        c.onNotice = { notices.append($0) }
+        let pb = NSPasteboard(name: .init("lore-test-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }
+        pb.clearContents()
+        pb.writeObjects([fakePNG as NSURL, script as NSURL, png as NSURL])
+        #expect(c.textView.readPasteboard(pb))
+        for _ in 0..<200 where up.got.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(up.got.map(\.name) == ["ok.png"])
+        #expect(notices.count == 2)
+    }
+}

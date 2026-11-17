@@ -19,6 +19,8 @@ extension NSAttributedString.Key {
     static let loreCode = NSAttributedString.Key("loreCode")
     /// Note link (wikilink): the value is the note title.
     static let loreChip = NSAttributedString.Key("loreChip")
+    /// A list item's marker as read (`-`, `*`, `+`, `3.`, `10)`), kept when the item is written fresh.
+    static let loreMarker = NSAttributedString.Key("loreMarker")
     /// The index of the source block this paragraph was read from (see `LoreSourceMap`).
     static let loreSeq = NSAttributedString.Key("loreSeq")
 }
@@ -280,7 +282,10 @@ enum LoreInk {
                     kinds[k] = nil
                 }
                 if case .ol = b {
-                    counts[l] = kinds[l] == "ol" ? counts[l] + 1 : 1
+                    // A list that starts at 3 in the Markdown is drawn from 3.
+                    let start = (ts.attribute(.loreMarker, at: r.location, effectiveRange: nil) as? String)
+                        .flatMap { Int($0.dropLast()) }
+                    counts[l] = kinds[l] == "ol" ? counts[l] + 1 : (start ?? 1)
                     if ts.attribute(.loreOrdinal, at: r.location, effectiveRange: nil) as? Int != counts[l] {
                         ts.addAttribute(.loreOrdinal, value: counts[l], range: r)
                     }

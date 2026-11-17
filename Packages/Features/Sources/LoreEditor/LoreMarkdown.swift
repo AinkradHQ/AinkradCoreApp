@@ -25,17 +25,21 @@ struct LoreSourceMap {
     private static let headingRE = re(#"^(#{1,6})\s+(.*)$"#)
     private static let listRE = re(#"^([ \t]*)([-*+]|\d+[.)])\s+(?:\[( |x|X)\]\s+)?(.*)$"#)
     private static let quoteRE = re(#"^\s*>\s?(.*)$"#)
+    /// Every quantifier is bounded, so a hostile line costs at most a few hundred steps per position (imports and AI
+    /// sessions write notes: an unbounded `.+?` made a 40 KB line of `[[` take 98 s).
     private static let inlineRE = re(
         [
             #"\\([\\`*_\[\]#>|+.)!-])"#,  // 1 escape
-            #"`([^`]+)`"#,  // 2 code
-            #"\[\[([^\]\n]+)\]\]"#,  // 3 note link
-            #"\[([^\]\n]+)\]\(([^)\s]+)\)"#,  // 4,5 link
-            #"(https?://[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"])"#,  // 6 bare url
-            #"\*\*(?=\S)(.+?)(?<=\S)\*\*"#,  // 7 bold
-            #"(?<![*\w])\*(?=[^\s*])([^*\n]+?)(?<=\S)\*(?![*\w])"#,  // 8 italic
-            #"(?<![_\w])_(?=[^\s_])([^_\n]+?)(?<=\S)_(?![_\w])"#,  // 9 italic
+            #"`([^`\n]{1,256})`"#,  // 2 code
+            #"\[\[([^\[\]\n]{1,256})\]\]"#,  // 3 note link
+            #"\[([^\[\]\n]{1,256})\]\(([^()\s]{1,2048})\)"#,  // 4,5 link
+            #"(https?://[^\s<>()\[\]]{0,2048}[^\s<>()\[\].,;:!?'"])"#,  // 6 bare url
+            #"\*\*(?=\S)([^*\n]{1,256}?)(?<=\S)\*\*"#,  // 7 bold
+            #"(?<![*\w])\*(?=[^\s*])([^*\n]{1,256}?)(?<=\S)\*(?![*\w])"#,  // 8 italic
+            #"(?<![_\w])_(?=[^\s_])([^_\n]{1,256}?)(?<=\S)_(?![_\w])"#,  // 9 italic
         ].joined(separator: "|"))
+    /// A paragraph longer than this is shown as plain text, with no inline parse at all.
+    static let inlineLimit = 4096
 
     /// Reads a whole note. `trailingNewline: false` drops the last paragraph's newline (pasting into a paragraph).
     static func parse(_ md: String, trailingNewline: Bool = true) -> (NSAttributedString, LoreSourceMap) {
@@ -66,7 +70,11 @@ struct LoreSourceMap {
         }
         func match(_ re: NSRegularExpression, _ s: String) -> [String?]? {
             let ns = s as NSString
-            guard let m = re.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)) else { return nil }
+            // Anchored: every line rule starts at `^`, so a long line costs one attempt, not one per character.
+            guard let m = re.firstMatch(in: s, options: .anchored, range: NSRange(location: 0, length: ns.length))
+            else {
+                return nil
+            }
             return (0..<m.numberOfRanges).map {
                 m.range(at: $0).location == NSNotFound ? nil : ns.substring(with: m.range(at: $0))
             }
@@ -126,16 +134,19 @@ struct LoreSourceMap {
                     if let box = g[3] { .task(level, box != " ") } else if g[2]!.first!.isNumber { .ol(level) } else {
                         .ul(level)
                     }
-                add(inline(g[4] ?? ""), b, i, i + 1)
+                // The item's own marker (`*`, `+`, `-`, `3.`, `10)`) is kept for when it is written fresh.
+                add(inline(g[4] ?? ""), b, i, i + 1, [.loreMarker: g[2]!])
             } else if let g = match(quoteRE, line) {
                 add(inline(g[1] ?? ""), .quote, i, i + 1)
                 indents = []
             } else {
                 let a = i
-                var text = t
+                // Leading space trimmed, trailing kept: two trailing spaces are a hard break.
+                var text = String(line.drop { $0 == " " || $0 == "\t" })
+                // Each source line stays a line (U+2028): hard breaks, trailing spaces and indentation survive a rewrite.
                 while i + 1 < lines.count, !startsBlock(lines[i + 1]) {
                     i += 1
-                    text += " " + lines[i].trimmingCharacters(in: .whitespaces)
+                    text += "\u{2028}" + lines[i]
                 }
                 add(inline(text), .p, a, i + 1)
                 indents = []
@@ -155,6 +166,7 @@ struct LoreSourceMap {
     static func inline(_ text: String, _ base: [NSAttributedString.Key: Any] = [:]) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let ns = text as NSString
+        guard ns.length <= inlineLimit else { return NSAttributedString(string: text, attributes: base) }
         var pos = 0
         func plain(_ s: String, _ extra: [NSAttributedString.Key: Any] = [:]) -> NSAttributedString {
             NSAttributedString(string: s, attributes: base.merging(extra) { $1 })
@@ -239,6 +251,7 @@ struct LoreSourceMap {
         // An empty paragraph ended the last list; the next list then takes the other marker, so it stays a second list.
         var broke = false
         var alt = false
+        var bullets = [String?](repeating: nil, count: 10)
         ns.enumerateSubstrings(
             in: NSRange(location: 0, length: ns.length), options: [.byParagraphs, .substringNotRequired]
         ) { _, r, _, _ in
@@ -255,7 +268,7 @@ struct LoreSourceMap {
             if let p = prev, !(p.isList && b.isList), !(p == .quote && b == .quote) { blank = true }
             var lines: [String]
             switch b {
-            case .p: lines = [escapeLead(body)]
+            case .p: lines = body.components(separatedBy: "\u{2028}").map(escapeLead)
             case .h(let n): lines = [String(repeating: "#", count: n) + " " + body]
             case .quote: lines = ["> " + body]
             case .code:
@@ -269,16 +282,28 @@ struct LoreSourceMap {
                 if !(prev?.isList ?? false) {
                     counts = [Int](repeating: 0, count: 10)
                     kinds = [String?](repeating: nil, count: 10)
+                    bullets = [String?](repeating: nil, count: 10)
                     alt = broke ? !alt : false
                 }
                 for k in (l + 1)..<10 {
                     counts[k] = 0
                     kinds[k] = nil
+                    bullets[k] = nil
                 }
-                var marker = alt ? "*" : "-"
+                // The item's own marker as read, else the one above it in this list, else the default.
+                let own = s.attribute(.loreMarker, at: r.location, effectiveRange: nil) as? String
+                var marker: String
                 if case .ol = b {
-                    counts[l] = kinds[l] == "ol" ? counts[l] + 1 : 1
-                    marker = "\(counts[l])" + (alt ? ")" : ".")
+                    let numbered = own.flatMap { $0.first?.isNumber == true ? $0 : nil }
+                    let start = numbered.flatMap { Int($0.dropLast()) }
+                    counts[l] = kinds[l] == "ol" ? counts[l] + 1 : (start ?? 1)
+                    let delim = numbered.map { String($0.suffix(1)) } ?? (kinds[l] == "ol" ? bullets[l] : nil)
+                    marker = "\(counts[l])" + (delim ?? (alt ? ")" : "."))
+                    bullets[l] = String(marker.suffix(1))
+                } else {
+                    let ownBullet = own.flatMap { ["-", "*", "+"].contains($0) ? $0 : nil }
+                    marker = ownBullet ?? (kinds[l] == "ol" ? nil : bullets[l]) ?? (alt ? "*" : "-")
+                    bullets[l] = marker
                 }
                 if case .task(_, let c) = b { marker += c ? " [x]" : " [ ]" }
                 kinds[l] = b.key
@@ -329,14 +354,34 @@ struct LoreSourceMap {
         }.joined()
     }
 
-    private static func escape(_ t: String) -> String {
-        t.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "*", with: "\\*")
-            .replacingOccurrences(of: "`", with: "\\`").replacingOccurrences(of: "[[", with: "\\[[")
+    /// Every character the reader treats as inline syntax, so text written fresh reads back as the same text. A
+    /// backslash that ends a line (U+2028 next) is a hard break and stays as it is. Works on UTF-8 bytes: the escaped
+    /// characters are all ASCII, and a 100 KB line must stay a few milliseconds even in a Debug build.
+    static func escape(_ t: String) -> String {
+        var t = t
+        return t.withUTF8 { b -> String in
+            var out = [UInt8]()
+            out.reserveCapacity(b.count + b.count / 8)
+            let n = b.count
+            var i = 0
+            while i < n {
+                let c = b[i]
+                switch c {
+                case 0x2A, 0x60, 0x5B, 0x5D, 0x5F: out.append(0x5C)  // * ` [ ] _
+                case 0x5C where !(i + 3 < n && b[i + 1] == 0xE2 && b[i + 2] == 0x80 && b[i + 3] == 0xA8):
+                    out.append(0x5C)
+                default: break
+                }
+                out.append(c)
+                i += 1
+            }
+            return String(decoding: out, as: UTF8.self)
+        }
     }
 
     private static func escapeLead(_ t: String) -> String {
         for p in ["#", "- ", "+ ", "* ", "> ", "|", "```"] where t.hasPrefix(p) { return "\\" + t }
-        if let r = t.range(of: #"^\d+(?=[.)] )"#, options: .regularExpression) {
+        if let r = t.range(of: #"^\d+(?=[.)] )"#, options: [.regularExpression, .anchored]) {
             return String(t[..<r.upperBound]) + "\\" + String(t[r.upperBound...])
         }
         return t

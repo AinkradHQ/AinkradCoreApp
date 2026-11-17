@@ -61,9 +61,10 @@ let corpus: [String] = [
     }
 
     @Test func twoListsStayTwoLists() {
+        // Written fresh, items keep their own marker; the blank line keeps the gap.
         let (text, _) = MarkdownReader.parse("- a\n- b\n\n- c\n")
         let md = MarkdownWriter.markdown(text)
-        #expect(md == "- a\n- b\n\n* c\n")
+        #expect(md == "- a\n- b\n\n- c\n")
         #expect(MarkdownWriter.markdown(MarkdownReader.parse(md).0) == md)
     }
 }

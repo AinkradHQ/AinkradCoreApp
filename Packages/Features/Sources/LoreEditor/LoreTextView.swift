@@ -42,6 +42,8 @@ final class LoreTextView: NSTextView {
         isContinuousSpellCheckingEnabled = false
         isGrammarCheckingEnabled = false
         smartInsertDeleteEnabled = false
+        // Note text never goes to Writing Tools (Apple Intelligence).
+        if #available(macOS 15.0, *) { writingToolsBehavior = .none }
         usesFindBar = true
         isIncrementalSearchingEnabled = true
         textContainer?.lineFragmentPadding = 0
@@ -213,17 +215,19 @@ final class LoreTextView: NSTextView {
         try! NSRegularExpression(pattern: p)
     }
     private static let inlineRules: [(NSRegularExpression, NSAttributedString.Key)] = [
-        (re(#"(?<!`)`([^`\n]+)`$"#), .loreCode),
-        (re(#"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*$"#), .loreBold),
-        (re(#"(?<![*\w])\*(?=[^\s*])([^*\n]+?)(?<=\S)\*$"#), .loreItalic),
-        (re(#"(?<![_\w])_(?=[^\s_])([^_\n]+?)(?<=\S)_$"#), .loreItalic),
+        (re(#"(?<!`)`([^`\n]{1,256})`$"#), .loreCode),
+        (re(#"\*\*(?=\S)([^*\n]{1,256}?)(?<=\S)\*\*$"#), .loreBold),
+        (re(#"(?<![*\w])\*(?=[^\s*])([^*\n]{1,256}?)(?<=\S)\*$"#), .loreItalic),
+        (re(#"(?<![_\w])_(?=[^\s_])([^_\n]{1,256}?)(?<=\S)_$"#), .loreItalic),
     ]
 
     private func inlineTrigger() {
         let pr = paraRange
         let b = currentBlock()
         guard b != .code else { return }
-        let r = NSRange(location: pr.location, length: cursor - pr.location)
+        // Only the last few hundred characters before the caret: the rules match at most 260 of them.
+        let from = max(pr.location, cursor - 300)
+        let r = NSRange(location: from, length: cursor - from)
         let text = ns.substring(with: r)
         for (rx, key) in Self.inlineRules {
             guard let m = rx.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) else {
@@ -394,6 +398,56 @@ final class LoreTextView: NSTextView {
         }
         super.deleteBackward(sender)
         if picker != nil { updatePicker() }
+    }
+
+    // MARK: no previews, no Look Up on links (T9: nothing is fetched)
+
+    /// Force click and a three-finger tap would show a live web preview of a link, which loads the page.
+    override func quickLook(with event: NSEvent) {}
+
+    /// Look Up on a link shows a web preview too; on plain words it stays (the dictionary is local).
+    override func showDefinition(for attrString: NSAttributedString?, at textBaselineOrigin: NSPoint) {
+        if let a = attrString, a.length > 0 {
+            var hasLink = false
+            a.enumerateAttribute(.link, in: NSRange(location: 0, length: a.length)) { v, _, stop in
+                if v != nil {
+                    hasLink = true
+                    stop.pointee = true
+                }
+            }
+            if hasLink { return }
+        }
+        super.showDefinition(for: attrString, at: textBaselineOrigin)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        super.menu(for: event).map(Self.safeMenu)
+    }
+
+    /// The context menu without the items that open, preview or send text out on their own: Open Link (it bypasses the
+    /// link policy), Look Up, Search With, Share, Services, Writing Tools. A link still opens by click, through the policy.
+    static func safeMenu(_ menu: NSMenu) -> NSMenu {
+        let blocked = ["openlink", "lookup", "searchwith", "share", "service", "writingtools", "translat"]
+        for item in menu.items.reversed() {
+            let key =
+                ((item.action.map(NSStringFromSelector) ?? "") + " " + item.title + " "
+                + (item.identifier?.rawValue ?? ""))
+                .lowercased().replacingOccurrences(of: " ", with: "")
+            if blocked.contains(where: key.contains) {
+                menu.removeItem(item)
+            } else if let sub = item.submenu {
+                _ = safeMenu(sub)
+                if sub.items.isEmpty { menu.removeItem(item) }
+            }
+        }
+        // No separator left first, last or doubled.
+        while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
+        while menu.items.last?.isSeparatorItem == true { menu.removeItem(at: menu.items.count - 1) }
+        for i in stride(from: menu.items.count - 1, to: 0, by: -1)
+        where menu.items[i].isSeparatorItem && menu.items[i - 1].isSeparatorItem {
+            menu.removeItem(at: i)
+        }
+        return menu
     }
 
     // MARK: find (⌘F, ⌘G, ⇧⌘G, ⌘E): the native find bar

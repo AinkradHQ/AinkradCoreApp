@@ -6,6 +6,11 @@
 //   `lore-attachment:` links go to the host, never to the system. Every other scheme (file:, javascript:, app schemes)
 //   is never opened: its address is copied and the host is told.
 // - Nothing is fetched. No remote URL is loaded, not for links, not for image refs; an image ref shows as a link.
+//   Force click / Quick Look and Look Up on a link (live web previews) are off, and the context menu has no Open Link,
+//   Look Up, Search With, Share, Services or Writing Tools. Writing Tools are off, so note text never leaves the Mac.
+// - Parsing is linear: every inline rule is bounded, and a paragraph over 4,096 characters is plain text (no ReDoS).
+// - An upload that finishes after the note changed is dropped; a dropped or pasted file's real type and size (symlinks
+//   resolved) are checked before it is read.
 // - Paste and drop take plain text or Markdown only; rich text, RTF and HTML on the pasteboard are ignored. Images and
 //   PDFs (local files or pasteboard data, ≤ 10 MB, allow-listed types) go to the injected upload hook, and only a
 //   `lore-attachment:` ref it returns is inserted.
@@ -76,6 +81,8 @@ public enum LoreLinkPolicy {
     let titles: LoreNoteTitles
     let uploader: LoreAttachmentUploader
     private var map = LoreSourceMap()
+    /// Bumped by every `load`: an upload that finishes after the note changed is dropped, never put in the other note.
+    private(set) var generation = 0
     /// After every edit (debounce and save in the host).
     public var onChange: (() -> Void)?
     /// A `[[Title]]` link was clicked.
@@ -105,6 +112,7 @@ public enum LoreLinkPolicy {
     /// Replaces the page with a note. Clears undo: the loaded text is the new starting point.
     public func load(markdown: String) {
         textView.closePicker()
+        generation += 1
         let (text, map) = MarkdownReader.parse(markdown)
         self.map = map
         textView.ts.setAttributedString(text)
@@ -146,11 +154,12 @@ public enum LoreLinkPolicy {
             onNotice?("\(file.name) is larger than 10 MB.")
             return
         }
+        let note = generation
         Task { @MainActor in
             do {
                 let url = try await uploader.upload(file)
-                guard url.scheme == "lore-attachment" else { return }
-                let name = file.name.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
+                guard url.scheme == "lore-attachment", generation == note else { return }
+                let name = file.name.filter { !"[]()\n\r\u{2028}\u{2029}".contains($0) }
                 // ponytail: inserted where the drop or paste happened; text typed before it meanwhile shifts the spot.
                 textView.insertMarkdown("![\(name)](\(url.absoluteString))", at: NSRange(location: location, length: 0))
             } catch {
@@ -243,9 +252,18 @@ extension LoreTextView {
             pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
         if !files.isEmpty {
             for url in files {
-                let type = UTType(filenameExtension: url.pathExtension) ?? .data
-                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? .max
-                guard size <= LoreLinkPolicy.maxUpload, let data = try? Data(contentsOf: url, options: .mappedIfSafe)
+                // Type and size come from the file itself (a symlink resolved first), before a byte is read.
+                let real = url.resolvingSymlinksInPath()
+                let facts = try? real.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey, .isRegularFileKey])
+                guard facts?.isRegularFile == true, let type = facts?.contentType,
+                    LoreLinkPolicy.uploadTypes.contains(where: { type.conforms(to: $0) })
+                else {
+                    controller?.onNotice?("Only images and PDFs can be added to a note.")
+                    continue
+                }
+                guard let size = facts?.fileSize, size <= LoreLinkPolicy.maxUpload,
+                    let data = try? Data(contentsOf: real, options: .mappedIfSafe),
+                    data.count <= LoreLinkPolicy.maxUpload
                 else {
                     controller?.onNotice?("\(url.lastPathComponent) is larger than 10 MB.")
                     continue
