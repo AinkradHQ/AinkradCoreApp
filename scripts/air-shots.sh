@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Run one snapshot walk of a built Debug app on the MacBook Air (`ssh air`) and pull the PNGs back. Builds nothing.
 #   scripts/air-shots.sh <Ainkrad.app> <walk> [night|day] [outdir]
-# walk: admin|home|agents|terminals|accounts|brain|pairing|shell|gallery   (default theme night, outdir ./air-shots)
+# walk: admin|home|agents|terminals|accounts|brain|pairing|shell|gallery|projects   (default theme night, outdir ./air-shots)
 # Prints the app's stderr (SNAP lines) from the Air; set SCENES=a,b to limit the admin walk.
 set -euo pipefail
 APP=${1:?usage: air-shots.sh <Ainkrad.app> <walk> [night|day] [outdir]}; WALK=${2:?walk}; THEME=${3:-night}; OUT=${4:-./air-shots}
 case $WALK in
   admin) VAR=CORE_ADMIN_SNAPSHOT;; home) VAR=CORE_HOME_SNAPSHOT;; agents) VAR=CORE_AGENTS_SNAPSHOT;;
   terminals) VAR=CORE_TERM_SNAPSHOT;; accounts) VAR=CORE_ACC_SNAPSHOT;; brain) VAR=CORE_BRAIN_SNAPSHOT;;
-  pairing) VAR=CORE_PAIR_SNAPSHOT;; shell) VAR=CORE_SNAPSHOT;; gallery) VAR=CORE_GALLERY_SNAPSHOT;;
+  pairing) VAR=CORE_PAIR_SNAPSHOT;; shell) VAR=CORE_SNAPSHOT;; gallery) VAR=CORE_GALLERY_SNAPSHOT;; projects) VAR=CORE_PROJECTS_SNAPSHOT;;
   *) echo "unknown walk $WALK" >&2; exit 2;;
 esac
 [ "$THEME" = night ] && T=dark || T=light
@@ -28,7 +28,7 @@ ssh air 'V=$(launchctl print gui/501 | grep -o "CORE_[A-Z_]*" | sort -u | tr "\n
 rsync -a --delete "$APP/" air:rig/walk-app/Ainkrad.app/
 ssh air "caffeinate -u -t 3; open -n --stdout $REMOTE/out.log --stderr $REMOTE/err.log \
   --env CORE_DEMO=1 --env CORE_SHOTS=1 --env CORE_ALLOW_CAPTURE=1 --env CORE_KEYSTORE=memory --env $VAR=$REMOTE \
-  --env CORE_THEME=$T --env CORE_ADMIN_SCENES=${SCENES:-} --env CORE_BRAIN_SCENES=${SCENES:-} --env CORE_ACC_SCENES=${SCENES:-} --env CORE_TERM_SCENES=${SCENES:-} ~/rig/walk-app/Ainkrad.app
+  --env CORE_THEME=$T --env CORE_ADMIN_SCENES=${SCENES:-} --env CORE_BRAIN_SCENES=${SCENES:-} --env CORE_ACC_SCENES=${SCENES:-} --env CORE_TERM_SCENES=${SCENES:-} --env CORE_PROJECTS_SCENES=${SCENES:-} --env CORE_REDUCE_MOTION=${REDUCE:-0} ~/rig/walk-app/Ainkrad.app
   for i in \$(seq 90); do pgrep -x Ainkrad >/dev/null || break; sleep 2; done; pkill -x Ainkrad 2>/dev/null; true"
 ssh air "cat /tmp/ainkrad-snap.log" || true
 rsync -a --include='*.png' --exclude='*' air:"$REMOTE/" "$OUT/"
