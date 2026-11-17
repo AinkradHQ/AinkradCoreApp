@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Run one snapshot walk of a built Debug app on the MacBook Air (`ssh air`) and pull the PNGs back. Builds nothing.
 #   scripts/air-shots.sh <Ainkrad.app> <walk> [night|day] [outdir]
-# walk: admin|home|agents|terminals|accounts|brain|pairing|shell|gallery|projects|leyline   (default theme night, outdir ./air-shots)
+# walk: admin|home|agents|terminals|accounts|brain|pairing|shell|gallery|projects|leyline|lore   (default theme night, outdir ./air-shots)
 # Prints the app's stderr (SNAP lines) from the Air; set SCENES=a,b to limit the admin walk.
 set -euo pipefail
 APP=${1:?usage: air-shots.sh <Ainkrad.app> <walk> [night|day] [outdir]}; WALK=${2:?walk}; THEME=${3:-night}; OUT=${4:-./air-shots}
 case $WALK in
   admin) VAR=CORE_ADMIN_SNAPSHOT;; home) VAR=CORE_HOME_SNAPSHOT;; agents) VAR=CORE_AGENTS_SNAPSHOT;;
   terminals) VAR=CORE_TERM_SNAPSHOT;; accounts) VAR=CORE_ACC_SNAPSHOT;; brain) VAR=CORE_BRAIN_SNAPSHOT;;
-  pairing) VAR=CORE_PAIR_SNAPSHOT;; shell) VAR=CORE_SNAPSHOT;; gallery) VAR=CORE_GALLERY_SNAPSHOT;; projects) VAR=CORE_PROJECTS_SNAPSHOT;; leyline) VAR=CORE_LEYLINE_SNAPSHOT;;
+  pairing) VAR=CORE_PAIR_SNAPSHOT;; shell) VAR=CORE_SNAPSHOT;; gallery) VAR=CORE_GALLERY_SNAPSHOT;; projects) VAR=CORE_PROJECTS_SNAPSHOT;; leyline) VAR=CORE_LEYLINE_SNAPSHOT;; lore) VAR=CORE_LORE_SNAPSHOT;;
   *) echo "unknown walk $WALK" >&2; exit 2;;
 esac
 [ "$THEME" = night ] && T=dark || T=light
