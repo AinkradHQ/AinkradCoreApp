@@ -19,6 +19,9 @@ struct Overview: View {
                 VStack(spacing: Space.s2) {
                     sessions.coreRise(settled, 1)
                     brain.coreRise(settled, 2)
+                    if let designs = model.designsIsland {
+                        designs(ProjectRef(id: String(project.id), name: project.name)).coreRise(settled, 3)
+                    }
                 }
                 .frame(width: Space.s8 * 10)
             }

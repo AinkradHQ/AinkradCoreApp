@@ -117,6 +117,9 @@ public final class ProjectsDemo {
     private static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
     private static let webURL = "https://github.com/tidepool-labs/tidepool-web"
 
+    /// The sample projects on the model without opening the pane (other apps' demos name them).
+    public func loadSample() async { await model.useNow(Service(Self.sample())) }
+
     /// For clicking through by hand.
     public func showInteractive(_ scene: String) async { await show(scene) }
 

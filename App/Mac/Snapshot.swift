@@ -49,6 +49,12 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             return await app.debugLeylineDemo().showInteractive(scene)
         }
+        if let dir = env["CORE_DESIGN_SNAPSHOT"] { return await DesignSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_DESIGN_DEMO=<scene>`: Design on the stand-in data, left open to click through (no Core is reached).
+        if let scene = env["CORE_DESIGN_DEMO"] {
+            try? await Task.sleep(for: .seconds(3))
+            return await app.debugDesignDemo().showInteractive(scene)
+        }
         if let dir = env["CORE_LORE_SPACE_SNAPSHOT"] { return await LoreSpaceSnapshots.run(app, dir: dir, env: env) }
         // `CORE_LORE_SPACE_DEMO=<scene>`: the Lore space on made-up notes, left open to click through (no Core is reached).
         if let scene = env["CORE_LORE_SPACE_DEMO"] {

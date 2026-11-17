@@ -239,3 +239,13 @@ final class ProjectColours {
         defaults.set(all, forKey: Self.key)
     }
 }
+
+/// A project as other apps see it: the Core's id as text (the Design module's links use text ids) and its name.
+public struct ProjectRef: Identifiable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+    }
+}

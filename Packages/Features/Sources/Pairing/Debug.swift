@@ -4,6 +4,7 @@ import Admin
 import Brain
 import CoreKit
 import CryptoKit
+import Design
 import Foundation
 import Leyline
 import Lore
@@ -159,6 +160,8 @@ extension AppModel {
     public func debugProjectsDemo() -> ProjectsDemo { ProjectsDemo(model: projects) }
     /// The Leyline states on sample data, for screenshots and clicking through. Needs no Core.
     public func debugLeylineDemo() -> LeylineDemo { LeylineDemo(model: leyline) }
+    /// The Design states on sample data, for screenshots and clicking through. Needs no Core.
+    public func debugDesignDemo() -> DesignDemo { DesignDemo(model: design) }
     /// The Lore space on made-up notes, for screenshots and clicking through. Needs no Core.
     public func debugLoreDemo() -> LoreDemo { LoreDemo(model: lore) }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }

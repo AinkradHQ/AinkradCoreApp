@@ -59,6 +59,8 @@ targets:
       - package: Features
         product: Leyline
       - package: Features
+        product: Design
+      - package: Features
         product: LoreEditor
       - package: Features
         product: Lore
