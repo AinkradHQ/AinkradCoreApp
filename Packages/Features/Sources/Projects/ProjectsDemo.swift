@@ -35,12 +35,21 @@ public final class ProjectsDemo {
         func setExpose(project: Int64, _ on: Bool) async throws {
             lock.withLock { if let i = list.firstIndex(where: { $0.id == project }) { list[i].expose = on } }
         }
+        func setRun(_ project: Int64, _ state: RunSummary.State, progress: Double = 0) {
+            lock.withLock {
+                guard let i = list.firstIndex(where: { $0.id == project }) else { return }
+                list[i].run = RunSummary(
+                    state: state, services: 5, sessions: 2, lastRun: state == .stopped ? "just now" : nil)
+                list[i].live = DemoLive.make(state, progress: progress)
+            }
+        }
     }
 
     public static let scenes = [
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
         "gallery-failed", "new-quick-empty", "new-quick", "new-quick-error", "new-advanced", "space-no-repos",
-        "space-add-repos", "space-copying", "space-setting-up", "space-ready",
+        "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
+        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-brain",
     ]
 
     private let model: ProjectsModel
@@ -65,7 +74,7 @@ public final class ProjectsDemo {
                         remoteURL: "https://github.com/\(slug)-co/\(slug)-\($0)",
                         branch: "main", primary: $0 == 0, fetchedAt: now, fetchError: nil)
                 },
-                updatedAt: now.addingTimeInterval(-hours * 3600), run: run)
+                updatedAt: now.addingTimeInterval(-hours * 3600), run: run, live: DemoLive.make(run.state))
         }
         return [
             p(1, "lanterna", "Lanterna", RunSummary(state: .running, services: 5, sessions: 2), hours: 1),
@@ -107,6 +116,7 @@ public final class ProjectsDemo {
         model.filter = ""
         model.cursor = nil
         model.openID = nil
+        model.section = .overview
         model.debugHover = nil
         model.clearWriteError()
         var list = Self.sample()
@@ -116,6 +126,13 @@ public final class ProjectsDemo {
         case "space-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "space-setting-up": list.insert(Self.tidepool(repos: 2), at: 0)
         case "space-ready": list.insert(Self.tidepool(repos: 2, draft: true), at: 0)
+        case "overview-starting":
+            list[1].run = RunSummary(state: .starting, services: 5)
+            list[1].live = DemoLive.make(.starting, progress: 0.4)
+        // A real Core today: no run state, services, logs, sessions or room.
+        case "overview-real-core":
+            list[3].run = nil
+            list[3].live = nil
         default: break
         }
         await model.useNow(Service(list))
@@ -137,6 +154,16 @@ public final class ProjectsDemo {
         case "new-advanced":
             NewProjectDialogs.openAdvanced(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
         case "space-no-repos", "space-copying", "space-setting-up", "space-ready": model.openID = 7
+        case "overview-running": model.openID = 1
+        case "page-run":
+            model.openID = 1
+            model.section = .run
+        case "page-brain":
+            model.openID = 1
+            model.section = .brain
+        case "overview-starting": model.openID = 2
+        case "overview-failed": model.openID = 3
+        case "overview-stopped", "overview-real-core": model.openID = 4
         case "space-add-repos":
             model.openID = 7
             if let p = model.open { NewProjectDialogs.openAddRepos(model, p, picked: [Self.apiURL]) }
@@ -145,7 +172,80 @@ public final class ProjectsDemo {
     }
 }
 
+/// The stand-in "live" data of a project in each run state. Made-up names and lines; nothing reaches a Core.
+enum DemoLive {
+    static func make(_ state: RunSummary.State, progress: Double = 0) -> ProjectLive {
+        let svc = [("web", "212 MB"), ("api", "148 MB"), ("queue", "96 MB"), ("mysql", "402 MB"), ("redis", "12 MB")]
+        let services = svc.enumerated().map { i, s -> ProjectLive.Service in
+            let st: ProjectLive.Service.State
+            switch state {
+            case .running: st = .up
+            case .stopped: st = .down
+            case .starting: st = Double(i) / 5 < progress ? .up : .down
+            case .failed: st = s.0 == "api" ? .exited : .up
+            }
+            return ProjectLive.Service(name: s.0, memory: s.1, state: st)
+        }
+        let ok: [ProjectLive.LogLine] = [
+            .init(service: "mysql", text: "ready for connections · 8.4.2"),
+            .init(service: "api", text: "Server running on 0.0.0.0:8000"),
+            .init(service: "web", text: "Next.js 15.1 · ready in 2.1 s"),
+            .init(service: "web", text: "GET / 200 in 84 ms"),
+            .init(service: "api", text: "GET /api/products?page=1 200 31 ms"),
+            .init(service: "queue", text: "ResizeImage ........ 212 ms DONE"),
+        ]
+        let bad: [ProjectLive.LogLine] = [
+            .init(service: "mysql", text: "ready for connections · 8.4.2"),
+            .init(service: "web", text: "Next.js 15.1 · ready in 2.1 s"),
+            .init(service: "api", text: "Missing environment variable STRIPE_SECRET"),
+            .init(service: "api", text: "exited with code 1"),
+        ]
+        var live = ProjectLive(
+            services: services, logs: state == .failed ? bad : state == .starting ? [] : ok,
+            sessions: [
+                .init(
+                    title: "Fix coupon rounding for EU orders", state: .needsYou, harness: "Claude Code", when: "2 m"),
+                .init(title: "Move image uploads to object storage", state: .running, harness: "Codex", when: "12 m"),
+                .init(title: "Checkout rewrite: payment step", state: .done, harness: "Claude Code", when: "yesterday"),
+                .init(title: "Tidy the product page empty state", state: .done, harness: "Codex", when: "Mon"),
+            ],
+            room: .init(
+                summary:
+                    "Online shop for handmade lighting. Laravel API with a Next.js storefront; the team ships weekly from development.",
+                instructionsInUse: true, rules: 10, items: 2320))
+        if state == .running { live.idle = "idle 4 min of 30" }
+        if state == .starting {
+            live.progress = progress
+            live.progressLine = "Pulling images · \(min(5, 1 + Int(progress * 5))) of 5 services"
+        }
+        if state == .failed {
+            live.failure = "api stopped 40 s after start."
+            live.failureFix = "STRIPE_SECRET is not set. Set it in Run › Secrets, then start again."
+        }
+        return live
+    }
+}
+
 extension ProjectsModel {
+    /// Debug only: Start, Stop and Restart on the stand-in service; Start walks "starting" up to "running".
+    func demoControl(_ action: RunAction, _ project: ProjectItem) {
+        guard let s = service as? ProjectsDemo.Service else { return }
+        Task { @MainActor in
+            if action == .stop {
+                s.setRun(project.id, .stopped)
+                await reload()
+                return
+            }
+            for step in 0...5 {
+                s.setRun(project.id, .starting, progress: Double(step) / 5)
+                await reload()
+                try? await Task.sleep(for: .milliseconds(450))
+            }
+            s.setRun(project.id, .running)
+            await reload()
+        }
+    }
+
     /// Debug only: attaches a stand-in service and reads it before returning (no background reload to race a scene).
     func useNow(_ s: any ProjectsService) async {
         service = s

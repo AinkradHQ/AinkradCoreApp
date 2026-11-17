@@ -203,4 +203,25 @@ struct ModelTests {
         m.detach()
         #expect(m.projects.isEmpty && m.openID == nil && m.load == .notConnected)
     }
+
+    @Test func railKeysAndStartingState() async {
+        #expect(ProjectSection.allCases.map(\.key) == ["1", "2", "3", "4", "5", "6"])
+        var p = ProjectItem(
+            id: 1, slug: "demo", name: "Demo", description: "", expose: true,
+            repos: [
+                RepoItem(
+                    id: 1, name: "a", remoteURL: "https://x/a", branch: "main", primary: true, fetchedAt: Date(),
+                    fetchError: nil)
+            ], updatedAt: Date())
+        p.run = RunSummary(state: .starting, services: 5)
+        #expect(p.tag == .starting && p.badge.label == "Starting")
+        let (m, _, _) = await make()
+        m.section = .repos
+        m.openProject(1)
+        #expect(m.section == .overview)
+        #expect(!m.canControl(p))
+        p.live = ProjectLive()
+        #expect(m.canControl(p))
+        #expect(ProjectSection.brain.empty(p).title == "Demo room")
+    }
 }
