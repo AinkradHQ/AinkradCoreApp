@@ -3,8 +3,8 @@ import Projects
 import SwiftUI
 
 /// The open item: a top bar (back, name, what it is, its projects), the stage and an About island. For a design the stage is
-/// its preview and the place the canvas goes; the canvas itself is V3-02 (TODO(V3-02): `DesignCanvasView` replaces the
-/// placeholder), a mockup's viewer V3-07 and a system's tokens and rules V3-06.
+/// its canvas (V3-02, `DesignModel.canvas`), or its preview while the doc cannot sync; a mockup's viewer is V3-07 and a
+/// system's tokens and rules V3-06.
 struct DesignDetail: View {
     let model: DesignModel
     let item: DesignItem
@@ -49,7 +49,21 @@ struct DesignDetail: View {
         }
     }
 
-    private var stage: some View {
+    @ViewBuilder private var stage: some View {
+        if case .doc(let d) = item, let canvas = model.canvasView(d) {
+            canvas
+                .clipShape(coreShape(Radius.pane))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .coreWell(radius: Radius.pane)
+                .contextMenu { DesignMenu(model: model, item: item) }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("design-canvas")
+        } else {
+            preview
+        }
+    }
+
+    private var preview: some View {
         VStack(spacing: Space.s4) {
             DesignThumb(model: model, item: item, large: true)
             if let note = stageNote {
@@ -69,7 +83,8 @@ struct DesignDetail: View {
     private var stageNote: String? {
         guard case .doc(let d) = item else { return nil }
         switch d.kind {
-        case .design: return "The canvas arrives with the next update: you will watch AI draw here, note and tweak."
+        case .design:
+            return "The canvas opens here once this Core can sync designs: you will watch AI draw, note and tweak."
         case .mockup: return "Clicking through the mockup arrives with the mockup viewer, in a later update."
         case .system: return "Tokens, components and rules show here once design systems arrive, in a later update."
         }

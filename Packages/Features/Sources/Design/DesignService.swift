@@ -8,7 +8,9 @@ protocol DesignService: Sendable {
     func docs() async throws -> [DesignDoc]
     func assets() async throws -> [DesignAsset]
     func kits() async throws -> [BrandKit]
-    /// The bytes of a checked (`ok`) asset. Never called for a font.
+    /// One asset, library or not (the canvas asks for what a design draws with).
+    func asset(_ sha: String) async throws -> DesignAsset
+    /// The bytes of a checked (`ok`) asset. Fonts are fetched only for the canvas engine, never shown or loaded by the app.
     func data(_ sha: String) async throws -> Data
     /// Relates an item to a project (`on`) or ends that.
     func link(_ item: DesignItem, project: String, _ on: Bool) async throws
@@ -21,6 +23,15 @@ struct DesignFailure: Error, Equatable, Sendable {
     var status = 0
 }
 
+extension DesignService {
+    func asset(_ sha: String) async throws -> DesignAsset {
+        guard let a = try await assets().first(where: { $0.sha == sha }) else {
+            throw DesignFailure(sentence: "The Core does not have that file.", code: "not_found", status: 404)
+        }
+        return a
+    }
+}
+
 struct LiveDesignService: DesignService {
     let connection: CoreConnection
     static let base = "/modules/design/v1"
@@ -31,6 +42,9 @@ struct LiveDesignService: DesignService {
     }
     func kits() async throws -> [BrandKit] {
         try await call("GET", "/collections", as: [CollectionWire].self).filter { $0.kind == "brand_kit" }.map(\.kit)
+    }
+    func asset(_ sha: String) async throws -> DesignAsset {
+        try await call("GET", "/assets/\(Self.seg(sha))", as: AssetWire.self).asset
     }
     func data(_ sha: String) async throws -> Data {
         try await raw("GET", "/assets/\(Self.seg(sha))/data")

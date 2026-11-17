@@ -49,6 +49,7 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             return await app.debugLeylineDemo().showInteractive(scene)
         }
+        if let dir = env["CORE_DESIGN_MEASURE"] { return await DesignMeasure.run(app, dir: dir) }
         if let dir = env["CORE_DESIGN_SNAPSHOT"] { return await DesignSnapshots.run(app, dir: dir, env: env) }
         // `CORE_DESIGN_DEMO=<scene>`: Design on the stand-in data, left open to click through (no Core is reached).
         if let scene = env["CORE_DESIGN_DEMO"] {
