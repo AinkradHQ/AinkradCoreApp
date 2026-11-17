@@ -1,5 +1,6 @@
 import Accounts
 import Brain
+import Design
 import Leyline
 import Lore
 import Projects
@@ -16,6 +17,7 @@ enum Registration {
         app.brain.install()
         app.projects.install()
         app.leyline.install()
+        app.design.install()
         app.lore.install()
         shell.settings.section(
             SettingsSection(

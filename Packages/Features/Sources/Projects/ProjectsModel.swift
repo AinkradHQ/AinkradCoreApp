@@ -42,6 +42,19 @@ public final class ProjectsModel {
     var debugHover: Int64?
     #endif
 
+    /// The Designs island of the Overview, from the Design app (which depends on Projects, not the other way round).
+    @ObservationIgnored public var designsIsland: (@MainActor (ProjectRef) -> AnyView)?
+
+    /// The projects as other apps name them: the Core's id as text and the name.
+    public var refs: [ProjectRef] { projects.map { ProjectRef(id: String($0.id), name: $0.name) } }
+
+    /// Opens a project's space on its Overview (from another app's link).
+    public func openSpace(_ id: String) {
+        guard let pid = Int64(id) else { return }
+        section = .overview
+        show(project: pid)
+    }
+
     public convenience init(host: any AdminHost) { self.init(host: host, defaults: .standard) }
 
     init(host: any AdminHost, defaults: UserDefaults) {
