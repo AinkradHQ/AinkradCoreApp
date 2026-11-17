@@ -20,7 +20,11 @@ struct SessionSidePanel: View {
                 SessionCard(model: model, session: session, entries: entries)
                 ChangesCard(model: model, session: session, entries: entries, diff: diff)
                 let subs = SubAgentInfo.all(entries)
-                if !subs.isEmpty { SubAgentsCard(list: subs) }
+                if !subs.isEmpty {
+                    SubAgentsCard(
+                        list: subs, again: model.canWrite(session) ? { runAgain($0) } : nil,
+                        stop: session.canStopSubagents ? { model.stopSubagent(session.id, $0.id) } : nil)
+                }
                 if let todos = TasksCard.latest(entries) { TasksCard(items: todos) }
                 ActivityCard(entries: entries)
                 ApprovalsCard(model: model, session: session, entries: entries)
@@ -32,6 +36,12 @@ struct SessionSidePanel: View {
         // A soft edge where the column runs past the window (the system's, not a mask: see TranscriptView).
         .softScrollEdges()
         .task(id: session.id) { await model.followRoute(session.id) }
+    }
+
+    /// A failed sub-agent's brief, in the message field: sending it is the user's call.
+    func runAgain(_ a: SubAgentInfo) {
+        model.drafts[session.id] =
+            "Run the \(SubAgentInfo.kind(a.type).lowercased()) sub-agent again, with this brief:\n\n\(a.prompt)"
     }
 
     func diff(_ path: String) -> [DiffLine] {

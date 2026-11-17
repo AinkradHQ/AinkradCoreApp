@@ -195,6 +195,19 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
     }
 
+    public func stopSubagent(_ id: String, _ subagent: String) async throws {
+        try await run {
+            switch try await client.stopAgentSubagent(path: .init(id: id, toolUseId: subagent)) {
+            case .ok: return
+            case .badRequest(let r): throw Self.fail(r)
+            case .notFound(let r): throw Self.fail(r)
+            case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
     public func setMode(_ id: String, policy: String?, plan: Bool?) async throws -> AgentSessionInfo {
         try await run {
             let body = Components.Schemas.AgentModeChange(plan: plan, policy: policy)
@@ -358,7 +371,7 @@ public struct LiveAgentsAPI: AgentsAPI {
     static func session(_ s: Components.Schemas.AgentSession) -> AgentSessionInfo {
         let outcome = s.outcome?.value
         let u = s.usage
-        return AgentSessionInfo(
+        var info = AgentSessionInfo(
             id: s.id, runner: s.runner, harness: s.harness, model: s.model, state: SessionState(rawValue: s.state),
             outcome: (outcome?["kind"] as? String).map { SessionOutcome(rawValue: $0) },
             outcomeReason: outcome?["reason"] as? String, createdAt: s.createdAt, updatedAt: s.updatedAt,
@@ -371,6 +384,10 @@ public struct LiveAgentsAPI: AgentsAPI {
             project: (s.workspace?.value["repo"] as? String).map(projectName),
             branch: s.workspace?.value["branch"] as? String, keepsOpen: s.live, idleSince: s.idleSince,
             policy: s.policy, plan: s.plan ?? false, folder: s.folder)
+        info.turnCostMicros = s.turnCostUsdMicros
+        info.turnCostApproximate = s.turnCostApproximate ?? false
+        info.canStopSubagents = s.canStopSubagents ?? false
+        return info
     }
 
     /// Everything the scheduler adds to a session; nil when the Core gave none of it (not an admin, or no chain).

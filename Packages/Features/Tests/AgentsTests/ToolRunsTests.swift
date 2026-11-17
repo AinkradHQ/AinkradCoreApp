@@ -12,6 +12,16 @@ struct ToolRunsTests {
         e(seq, .toolDone(id: "\(seq)", name: name, summary: "", ok: ok, exitCode: nil, output: "", durationMs: 100))
     }
 
+    @Test func activityCutsTheTranscriptIntoTurnsWithTheRunningOneLast() {
+        let end = { (seq: Int64, t: Int64?) in self.e(seq, .turnEnded(costMicros: nil, tokens: t)) }
+        let all = [done(1, "Read"), done(2, "Bash", ok: false), end(3, 900), e(4, .user("more")), end(5, nil)]
+        let turns = ActivityCard.turns(all + [done(6, "Grep")])
+        #expect(turns.map { $0.map(\.seq) } == [[1, 2, 3], [4, 5], [6]])
+        #expect(ActivityCard.tokens(turns[0]) == 900 && ActivityCard.tokens(turns.last ?? []) == nil)
+        // A tail without tools is not a turn.
+        #expect(ActivityCard.turns(all + [e(6, .assistant("hi"))]).count == 2)
+    }
+
     @Test func twoOrMoreToolStepsFoldIntoOneRunKeepingTheFirstSeq() {
         let items = TranscriptItem.items([
             e(1, .assistant("Reading")), done(2, "Read"), done(3, "Edit"), done(4, "Bash"),

@@ -50,6 +50,12 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var plan = false
     /// The folder it works in, on its runner (Core API minor 76); nil until the runner reports it.
     public var folder: String?
+    /// The running answer's cost so far (Core API minor 82); nil unless a turn runs. `turnCostApproximate` when it was
+    /// worked out from tokens and prices rather than told by the tool.
+    public var turnCostMicros: Int64?
+    public var turnCostApproximate = false
+    /// Whether its tool can stop one sub-agent on its own (Claude Code); Stop is hidden otherwise.
+    public var canStopSubagents = false
     /// Its row, for paging the list with `before`.
     public var index: Int64?
     /// Its chain, account, run and attempts (admins only; nil for any other device).

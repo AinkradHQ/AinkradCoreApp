@@ -77,11 +77,17 @@ public protocol AgentsAPI: Sendable {
     func rename(_ id: String, title: String) async throws -> AgentSessionInfo
     /// Switches a session's permission mode and/or Plan mode (`setAgentSessionMode`); nil leaves either as it is.
     func setMode(_ id: String, policy: String?, plan: Bool?) async throws -> AgentSessionInfo
+    /// Stops one working sub-agent by its tool call id (`stopAgentSubagent`, Core API minor 82).
+    func stopSubagent(_ id: String, _ subagent: String) async throws
 }
 
 extension AgentsAPI {
     public func send(_ id: String, text: String, files: [URL]) async throws -> AgentSessionInfo {
         try await send(id, text: AgentsModel.outgoing(words: text, files: files))
+    }
+
+    public func stopSubagent(_ id: String, _ subagent: String) async throws {
+        throw CoreError.http(status: 409, code: "unsupported_command", message: "This Core can't stop a sub-agent.")
     }
 
     public func chains() async throws -> [ChainOption] { [] }
