@@ -183,6 +183,8 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
         return try await session(id)
     }
 
+    public func stopSubagent(_ id: String, _ subagent: String) async throws { try record("stopSubagent:\(subagent)") }
+
     public func end(_ id: String) async throws -> AgentSessionInfo {
         try await finish(id, "end", .succeeded, "succeeded")
     }

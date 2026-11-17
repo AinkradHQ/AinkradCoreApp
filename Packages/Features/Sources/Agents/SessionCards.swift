@@ -135,6 +135,8 @@ struct SubAgentsCard: View {
     let list: [SubAgentInfo]
     /// Puts a failed one's brief in the message field to run it again; nil when the session takes no messages.
     var again: ((SubAgentInfo) -> Void)?
+    /// Stops a working one; nil when its tool can't stop one sub-agent alone.
+    var stop: ((SubAgentInfo) -> Void)?
     @State private var open: String?
     @Environment(\.sessionUI) private var ui
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -226,6 +228,11 @@ struct SubAgentsCard: View {
                         NSPasteboard.general.setString(r, forType: .string)
                     }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                }
+                if a.ok == nil, let stop {
+                    Button("Stop") { stop(a) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Stop this sub-agent; the rest of the turn goes on")
                 }
                 if a.ok == false, let again {
                     Button("Run Again") { again(a) }
@@ -439,21 +446,32 @@ struct UsageCard: View {
     }
 
     private var costs: some View {
-        let turns = model.turnCosts(session.id)
+        var turns = model.turnCosts(session.id).map { (turn: $0.turn, cost: $0.cost, now: false) }
+        // The running answer, so far (Core API minor 82): the next turn, its bar lighter.
+        if let c = session.turnCostMicros {
+            let ended = (model.transcripts[session.id]?.entries ?? []).filter(ActivityCard.ends).count
+            turns.append((ended + 1, c, true))
+        }
         let top = max(turns.map(\.cost).max() ?? 1, 1)
         return VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .bottom, spacing: Space.s2) {
-                ForEach(turns, id: \.turn) { n, c in
+                ForEach(turns, id: \.turn) { n, c, now in
+                    let about = now && session.turnCostApproximate ? "~" : ""
                     VStack(spacing: Space.s1) {
-                        Text(AgentWords.cost(c) ?? "").coreFont(size: MacTextSize.meta).foregroundStyle(
+                        Text(about + (AgentWords.cost(c) ?? "")).coreFont(size: MacTextSize.meta).foregroundStyle(
                             SessionInk.text2
                         )
-                        .monospacedDigit()
-                        coreShape(3).fill(SessionInk.ink.opacity(0.7))
+                        .monospacedDigit().contentTransition(.numericText())
+                        coreShape(3).fill(SessionInk.ink.opacity(now ? 0.35 : 0.7))
                             .frame(width: 32, height: max(4, 56 * CGFloat(c) / CGFloat(top)))
-                        Text("Turn \(n)").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
+                            .animation(Motion.out(0.3), value: c)
+                        Text(now ? "Now" : "Turn \(n)").coreFont(size: MacTextSize.meta).foregroundStyle(
+                            SessionInk.text2)
                     }
-                    .help(AgentWords.exactCost(c) ?? "")
+                    .help(
+                        now
+                            ? "This turn so far: \(AgentWords.exactCost(c) ?? "")\(about.isEmpty ? "" : ", worked out from tokens")"
+                            : AgentWords.exactCost(c) ?? "")
                 }
                 Spacer(minLength: 0)
             }

@@ -77,6 +77,20 @@ extension AgentsModel {
         }
     }
 
+    /// Stops one working sub-agent; the rest of the turn goes on. Its entry says how it ended when the tool reports it.
+    public func stopSubagent(_ id: String, _ subagent: String) {
+        guard let api, let s = sessions.session(id), s.canStopSubagents, canStopTurn(s) else { return }
+        note(id, nil)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.elevated("Stop a sub-agent of \(AgentWords.toolName(s.harness)).") {
+                    try await api.stopSubagent(id, subagent)
+                }
+            } catch { self.note(id, Self.notice(error, doing: "Stopping the sub-agent")) }
+        }
+    }
+
     /// Ends the session for good, after asking: the live process exits and the composer closes.
     public func confirmEnd(_ id: String) {
         guard let s = sessions.session(id), s.live else { return }

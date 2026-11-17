@@ -29,6 +29,17 @@ struct QueueTests {
         #expect(api.calls.filter { $0 == "send" }.count == sends)
     }
 
+    @Test func aSubAgentIsStoppedOnlyWhenItsToolCanStopOneAlone() async {
+        let (m, api) = await make()
+        m.stopSubagent(running, "toolu_1")
+        var s = m.sessions.session(running)!
+        s.canStopSubagents = true
+        m.sessions.upsert(s)
+        m.stopSubagent(running, "toolu_1")
+        #expect(await until { api.calls.contains("stopSubagent:toolu_1") })
+        #expect(api.calls.filter { $0.hasPrefix("stopSubagent") }.count == 1)
+    }
+
     @Test func attachedFilesQueueWithTheirMessageAndComeBackToEdit() async {
         let (m, _) = await make()
         let f = URL(fileURLWithPath: "/tmp/shot.png")

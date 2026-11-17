@@ -21,7 +21,9 @@ struct SessionSidePanel: View {
                 ChangesCard(model: model, session: session, entries: entries, diff: diff)
                 let subs = SubAgentInfo.all(entries)
                 if !subs.isEmpty {
-                    SubAgentsCard(list: subs, again: model.canWrite(session) ? { runAgain($0) } : nil)
+                    SubAgentsCard(
+                        list: subs, again: model.canWrite(session) ? { runAgain($0) } : nil,
+                        stop: session.canStopSubagents ? { model.stopSubagent(session.id, $0.id) } : nil)
                 }
                 if let todos = TasksCard.latest(entries) { TasksCard(items: todos) }
                 ActivityCard(entries: entries)
