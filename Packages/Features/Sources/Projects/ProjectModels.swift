@@ -16,7 +16,7 @@ struct RepoItem: Identifiable, Equatable, Sendable {
 /// What the Core's run engine says of a project. The engine (P5) does not exist yet, so a live project has none and the
 /// stand-in data (Debug) is the only thing that fills it.
 struct RunSummary: Equatable, Sendable {
-    enum State: Equatable, Sendable { case running, stopped, failed }
+    enum State: Equatable, Sendable { case running, starting, stopped, failed }
     var state: State
     var services = 0
     var sessions = 0
@@ -41,16 +41,19 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var updatedAt: Date
     var run: RunSummary?
     var draft: RunDraft?
+    /// What the Overview shows of a running project: services, logs, AI sessions, the Brain room. Nil on a real Core today.
+    var live: ProjectLive?
 
     var link: String { ProjectRules.host(slug) }
 
     /// The word on the card's tag. Always a word with its colour, never colour alone.
-    enum Tag: Equatable, Sendable { case running, stopped, failed, settingUp, new }
+    enum Tag: Equatable, Sendable { case running, starting, stopped, failed, settingUp, new }
 
     var tag: Tag {
         if let run {
             switch run.state {
             case .running: return .running
+            case .starting: return .starting
             case .failed: return .failed
             case .stopped: break
             }
@@ -64,6 +67,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var badge: (label: String, tone: Tone, symbol: String) {
         switch tag {
         case .running: ("Running", .run, "play.circle")
+        case .starting: ("Starting", .warn, "gearshape")
         case .stopped: ("Stopped", .queue, "stop.circle")
         case .failed: ("Failed", .fail, "exclamationmark.triangle")
         case .settingUp: ("Setting up", .warn, "gearshape")
@@ -79,6 +83,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
                 var parts = ["Running", Self.count(run.services, "service")]
                 if run.sessions > 0 { parts.append(Self.count(run.sessions, "AI session")) }
                 return parts.joined(separator: " · ")
+            case .starting: return "Starting · \(Self.count(run.services, "service"))"
             case .failed: return run.lastRun.map { "Last run failed \($0)" } ?? "Last run failed"
             case .stopped: return run.lastRun.map { "Stopped · last run \($0)" } ?? "Stopped"
             }

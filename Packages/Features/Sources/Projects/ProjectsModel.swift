@@ -15,12 +15,14 @@ public final class ProjectsModel {
     var catalog: any RepoCatalog
     private(set) var catalogState = RepoCatalogState.loading
 
-    private(set) var projects: [ProjectItem] = []
+    internal(set) var projects: [ProjectItem] = []
     var load: ProjectsLoad = .notConnected
     /// The gallery's Filter field.
     var filter = ""
     /// The project whose space is open (nil: the gallery).
     var openID: Int64?
+    /// The page of the open project's space.
+    var section = ProjectSection.overview
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
     /// ⌘N and the New Project button: the quick pop-over under the button.
@@ -255,12 +257,23 @@ public final class ProjectsModel {
     // MARK: navigation
 
     func openProject(_ id: Int64) {
+        section = .overview
         withAnimation(Motion.out(Motion.move)) { openID = id }
     }
 
     func closeProject() {
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
+
+    /// Start, Stop and Restart. TODO(P6-02): the run engine; until then only the Debug demo's stand-in data answers.
+    func control(_ action: RunAction, _ project: ProjectItem) {
+        #if DEBUG
+        demoControl(action, project)
+        #endif
+    }
+
+    /// Whether the Core can run this project yet (a real one cannot).
+    func canControl(_ project: ProjectItem) -> Bool { project.live != nil }
 
     func newProject() {
         guard !readOnly else { return }
