@@ -14,25 +14,14 @@ struct RepoPicker: View {
     let model: ProjectsModel
     @Binding var picked: Set<String>
     @Binding var pasted: [PickRepo]
-    var height: CGFloat = Space.s8 * 6 + Space.s2
+    var height: CGFloat = Space.s8 * 7
     @State private var query = ""
-    @FocusState private var searching: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            CoreFieldLabel(picked.isEmpty ? "Repos from GitHub" : "Repos from GitHub · \(picked.count) selected")
-            HStack(spacing: Space.s2) {
-                Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.body, weight: .medium)
-                    .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-                TextField(
-                    "", text: $query,
-                    prompt: Text("Search your repos or paste a link").foregroundStyle(GlassInk.secondary)
-                )
-                .textFieldStyle(.plain).focused($searching).onSubmit(addTypedLink)
-                .accessibilityLabel("Search your repos or paste a link")
-            }
-            .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg)
-            .coreFieldSurface(focused: searching)
+            CoreTextField(
+                picked.isEmpty ? "Repos from GitHub" : "Repos from GitHub · \(picked.count) selected",
+                placeholder: "Search your repos or paste a link", text: $query, onSubmit: addTypedLink)
             list
         }
         .task { await model.loadCatalog() }
@@ -41,7 +30,7 @@ struct RepoPicker: View {
     private var catalogState: RepoCatalogState { model.catalogState }
     private var now: Date { model.now() }
 
-    /// The repos that match the search, by org then freshest first; pasted links sit in their own group.
+    /// The repos that match the search, by org (the freshest org first) then freshest first; pasted links sit in their own group.
     private var groups: [(org: String, repos: [PickRepo])] {
         var all: [PickRepo] = []
         if case .ready(let r) = catalogState { all = r }
@@ -49,10 +38,12 @@ struct RepoPicker: View {
         let hit: (PickRepo) -> Bool = {
             q.isEmpty || $0.name.lowercased().contains(q) || $0.org.lowercased().contains(q)
         }
-        let byOrg = Dictionary(grouping: all.filter(hit), by: \.org)
-        var out = byOrg.keys.sorted().map { org in
-            (org, byOrg[org]!.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) })
+        let fresh: (PickRepo) -> Date = { $0.updatedAt ?? .distantPast }
+        let byOrg = Dictionary(grouping: all.filter(hit), by: \.org).mapValues { $0.sorted { fresh($0) > fresh($1) } }
+        var out = byOrg.keys.sorted {
+            (byOrg[$0]!.first.map(fresh) ?? .distantPast) > (byOrg[$1]!.first.map(fresh) ?? .distantPast)
         }
+        .map { ($0, byOrg[$0]!) }
         let mine = pasted.filter(hit)
         if !mine.isEmpty { out.append(("Pasted links", mine)) }
         return out
@@ -61,8 +52,7 @@ struct RepoPicker: View {
     /// The search text, when it is a repo link that is not in the list yet.
     private var typedLink: PickRepo? {
         guard let r = ProjectRules.repo(fromLink: query) else { return nil }
-        let known = pasted.contains { $0.url == r.url }
-        if known { return nil }
+        if pasted.contains(where: { $0.url == r.url }) { return nil }
         if case .ready(let all) = catalogState, all.contains(where: { $0.url == r.url }) { return nil }
         return PickRepo(org: "Pasted links", name: r.name, url: r.url)
     }
@@ -71,11 +61,13 @@ struct RepoPicker: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s1) {
                 if let link = typedLink {
-                    row(link, detail: link.url, action: "Add link")
+                    CoreRow("Add link: \(link.name)", subtitle: link.url, symbol: "plus", action: addTypedLink)
                 }
                 switch catalogState {
                 case .loading:
-                    ForEach(0..<3, id: \.self) { _ in CoreSkeleton(coreShape(Radius.control)).frame(height: 40) }
+                    ForEach(0..<3, id: \.self) { _ in
+                        CoreSkeleton(coreShape(Radius.control)).frame(height: MacSize.controlLg + Space.s2)
+                    }
                 case .unavailable where pasted.isEmpty && typedLink == nil:
                     Text("GitHub’s repo list is not available from this Core yet. Paste a repo link above to add one.")
                         .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
@@ -88,46 +80,26 @@ struct RepoPicker: View {
                     Text(g.org).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                         .padding(.horizontal, Space.s2).padding(.top, Space.s2)
                         .accessibilityAddTraits(.isHeader)
-                    ForEach(g.repos) { r in row(r, detail: r.detail(now: now), action: nil) }
+                    ForEach(g.repos) { r in row(r) }
                 }
             }
             .padding(Space.s1)
         }
         .scrollIndicators(.never)
         .frame(height: height)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .coreCard(GlassInk.well, radius: Radius.cardMac)
         .clipShape(coreShape(Radius.cardMac))
     }
 
-    private func row(_ r: PickRepo, detail: String, action: String?) -> some View {
+    /// A checkbox and a row: either one toggles the repo.
+    private func row(_ r: PickRepo) -> some View {
         let on = picked.contains(r.id)
-        return Button {
-            if action != nil { addTypedLink() } else { toggle(r) }
-        } label: {
-            HStack(spacing: Space.s2) {
-                if action != nil {
-                    Image(systemName: "plus").coreFont(size: MacTextSize.body, weight: .semibold)
-                        .frame(width: 18, height: 18).accessibilityHidden(true)
-                } else {
-                    CoreCheckbox("", isOn: .constant(on)).allowsHitTesting(false).accessibilityHidden(true)
-                        .frame(width: 18)
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(action.map { "\($0): \(r.name)" } ?? r.name).lineLimit(1)
-                    Text(detail).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 + 2)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(on ? GlassInk.wellHover : .clear, in: coreShape(Radius.control))
-            .contentShape(coreShape(Radius.control))
+        return ZStack(alignment: .leading) {
+            CoreRow(r.name, subtitle: r.detail(now: now), selected: on) { toggle(r) }
+                .padding(.leading, Space.s8)
+            CoreCheckbox("", isOn: Binding(get: { on }, set: { _ in toggle(r) }))
+                .padding(.leading, Space.s3).accessibilityHidden(true)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(r.name)
-        .accessibilityValue(on ? "selected" : "not selected")
-        .accessibilityHint(detail)
-        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     private func toggle(_ r: PickRepo) {

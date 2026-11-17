@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Screenshots of every Projects state on the stand-in data (ProjectsDemo): the app captures its own window, no Core needed.
 #   OUT=<dir> scripts/projects-shots.sh [night|day|both] [reduce]   (SCENES=a,b limits the walk). Run `make build` first.
-#   With `reduce` the screens behave as if Reduce Motion were on (files get a -reduce suffix).
+#   `reduce` only names the files -reduce: turn Reduce Motion on in System Settings first (the components follow it).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 [ "${UI_LOCK_HELD:-}" = 1 ] || exec "$HERE/scripts/ui-lock.sh" "$0" "$@"

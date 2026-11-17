@@ -115,11 +115,6 @@ struct RulesTests {
         #expect(p.tag == .failed)
         #expect(p.subtitle == "Last run failed 20 min ago")
     }
-
-    @Test @MainActor func reduceMotionMeansNoTravel() {
-        #expect(ProjectsMotion.rise(true) == 0)
-        #expect(ProjectsMotion.rise(false) > 0)
-    }
 }
 
 @MainActor
@@ -127,12 +122,12 @@ struct ModelTests {
     @Test func creatingAddsTheReposBehindOneTouchID() async {
         let (m, s, host) = await make()
         let ok = await m.create(
-            name: "Tidepool", slug: "tidepool", colour: .green, repos: [pick("tidepool-api"), pick("tidepool-web")])
+            name: "Tidepool", slug: "tidepool", colour: .teal, repos: [pick("tidepool-api"), pick("tidepool-web")])
         #expect(ok)
         #expect(host.reasons.count == 1)
         #expect(s.calls == ["create tidepool", "repo tidepool-api primary=true", "repo tidepool-web primary=false"])
         #expect(m.openID == m.projects.first?.id)
-        #expect(m.colour(m.projects[0]) == .green)
+        #expect(m.colour(m.projects[0]) == .teal)
         #expect(m.projects[0].repos.count == 2)
     }
 

@@ -60,6 +60,17 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
         return .stopped
     }
 
+    /// The state as the design system's badge says it.
+    var badge: (label: String, tone: Tone, symbol: String) {
+        switch tag {
+        case .running: ("Running", .run, "play.circle")
+        case .stopped: ("Stopped", .queue, "stop.circle")
+        case .failed: ("Failed", .fail, "exclamationmark.triangle")
+        case .settingUp: ("Setting up", .warn, "gearshape")
+        case .new: ("New", .queue, "sparkle")
+        }
+    }
+
     /// The line under the name: "Running · 5 services · 2 AI sessions".
     var subtitle: String {
         if let run {
@@ -82,36 +93,15 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     static func count(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s")" }
 }
 
-/// The six colours a project can have. The Core has no colour field yet, so the choice lives on this Mac.
-enum ProjectColour: Int, CaseIterable, Sendable {
-    case blue, clay, green, violet, amber, grey
+/// A project's colour is one of the design system's accents (`CoreAccent`): no hues of our own.
+/// TODO(design-system): proposal CoreSwatch, a row of tinted rounded squares to pick one of these.
+typealias ProjectColour = CoreAccent
 
-    var fill: Color {
-        switch self {
-        case .blue: Color(red: 0.29, green: 0.42, blue: 0.58)
-        case .clay: Color(red: 0.54, green: 0.42, blue: 0.29)
-        case .green: Color(red: 0.23, green: 0.48, blue: 0.35)
-        case .violet: Color(red: 0.37, green: 0.35, blue: 0.57)
-        case .amber: Color(red: 0.66, green: 0.44, blue: 0.18)
-        case .grey: Color(red: 0.48, green: 0.48, blue: 0.45)
-        }
-    }
-
-    var name: String {
-        switch self {
-        case .blue: "Blue"
-        case .clay: "Clay"
-        case .green: "Green"
-        case .violet: "Violet"
-        case .amber: "Amber"
-        case .grey: "Grey"
-        }
-    }
-
+extension CoreAccent {
     /// A stable colour for a project that never had one picked.
-    static func standard(for slug: String) -> ProjectColour {
+    static func standard(for slug: String) -> CoreAccent {
         let sum = slug.unicodeScalars.reduce(0) { ($0 &+ Int($1.value)) % 997 }
-        return ProjectColour(rawValue: sum % allCases.count) ?? .blue
+        return allCases[sum % allCases.count]
     }
 }
 
@@ -119,6 +109,8 @@ enum ProjectColour: Int, CaseIterable, Sendable {
 enum ProjectRules {
     static let domain = "ainkrad.io"
     static let idleMinutes = 30
+    /// What the Core gives a new project (its table defaults), shown as "Runs on".
+    static let defaultLimits = "2 CPUs, 2 GB"
     static func host(_ slug: String) -> String { "\(slug).\(domain)" }
 
     /// "Tidepool Labs" -> "tidepool-labs": lowercase letters and digits, one dash between words, at most 40.
@@ -224,36 +216,19 @@ enum ProjectsLoad: Equatable {
     case notConnected
 }
 
-/// Colours chosen on this Mac, by link name.
+/// Colours chosen on this Mac, by link name (the Core has no colour field yet).
 @MainActor
 final class ProjectColours {
     private let defaults: UserDefaults
-    static let key = "ainkrad.core.projects.colours"
+    static let key = "ainkrad.core.projects.accents"
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     func colour(_ slug: String) -> ProjectColour {
-        let all = defaults.dictionary(forKey: Self.key) as? [String: Int] ?? [:]
+        let all = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]
         return all[slug].flatMap(ProjectColour.init(rawValue:)) ?? .standard(for: slug)
     }
     func set(_ colour: ProjectColour, for slug: String) {
-        var all = defaults.dictionary(forKey: Self.key) as? [String: Int] ?? [:]
+        var all = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]
         all[slug] = colour.rawValue
         defaults.set(all, forKey: Self.key)
     }
-}
-
-/// Reduce Motion, from the system or (Debug only) forced for the screenshots.
-@MainActor
-enum ProjectsMotion {
-    #if DEBUG
-    static var forceReduce = false
-    #endif
-    static func reduce(_ system: Bool) -> Bool {
-        #if DEBUG
-        return system || forceReduce
-        #else
-        return system
-        #endif
-    }
-    /// How far a card rises as it appears: nothing when motion is reduced (it only fades).
-    static func rise(_ system: Bool) -> CGFloat { reduce(system) ? 0 : Space.s2 }
 }

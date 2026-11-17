@@ -90,9 +90,6 @@ public final class ProjectsDemo {
     private static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
     private static let webURL = "https://github.com/tidepool-labs/tidepool-web"
 
-    /// The screens behave as if Reduce Motion were on (the system setting cannot be set from inside the app).
-    public static func forceReduceMotion(_ on: Bool) { ProjectsMotion.forceReduce = on }
-
     /// For clicking through by hand.
     public func showInteractive(_ scene: String) async { await show(scene) }
 
@@ -103,6 +100,7 @@ public final class ProjectsDemo {
         shell.launcherOpen = false
         shell.linkNotice = nil
         shell.coreLink = .live
+        shell.home.coreName = "core-oracle"
         model.host.clearElevationNotice()
         model.quickOpen = false
         model.quickName = ""

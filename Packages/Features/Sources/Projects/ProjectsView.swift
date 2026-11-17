@@ -2,8 +2,8 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// The Projects pane: the gallery, or the open project's space. Opening and going back cross-fade (Reduce Motion or not:
-/// the two screens share no element that could travel).
+/// The Projects pane: the gallery, or the open project's space. Opening and going back cross-fade: the two screens share no
+/// element that could travel. The pane draws no background of its own (`own: true`), so the cards sit over the wallpaper.
 struct ProjectsView: View {
     let model: ProjectsModel
     @FocusState private var paneFocus: Bool
@@ -16,7 +16,7 @@ struct ProjectsView: View {
                 GalleryView(model: model).transition(.opacity)
             }
         }
-        .paneLook(nil)
+        .paneLook(nil, own: true)
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)
@@ -34,9 +34,8 @@ struct ProjectsView: View {
             }
             return .ignored
         }
-        .onKeyPress(.leftArrow) { move(-1) }
+        .coreSideKeys { move($0) }
         .onKeyPress(.upArrow) { move(-1) }
-        .onKeyPress(.rightArrow) { move(1) }
         .onKeyPress(.downArrow) { move(1) }
         .onKeyPress(.return) {
             guard model.openID == nil, !model.quickOpen, let id = model.cursor else { return .ignored }
@@ -59,7 +58,7 @@ struct ProjectsView: View {
     }
 }
 
-/// The gallery: a header with Filter and New Project, then the cards over the pane's surface and one card to start another.
+/// The gallery: a header with Filter and New Project, then the cards and one card to start another.
 struct GalleryView: View {
     let model: ProjectsModel
     @State private var settled = false
@@ -71,10 +70,14 @@ struct GalleryView: View {
                     .accessibilityAddTraits(.isHeader)
             } actions: {
                 FilterField(text: Binding(get: { model.filter }, set: { model.filter = $0 }))
-                AppActionTile(title: "New Project", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                Button {
                     model.newProject()
+                } label: {
+                    Label("New Project", systemImage: "plus")
                 }
+                .buttonStyle(CoreButtonStyle(.prominent))
                 .disabled(model.readOnly || model.load == .notConnected)
+                .help("New Project  ⌘N")
                 .accessibilityIdentifier("projects-new")
             }
             content
@@ -138,14 +141,18 @@ struct GalleryView: View {
         }
     }
 
-    static let columns = [GridItem(.adaptive(minimum: 280, maximum: 480), spacing: Space.s4, alignment: .top)]
+    /// Wide cards: three to a row on a full-size pane.
+    static let columns = [
+        GridItem(.adaptive(minimum: Space.s8 * 15, maximum: Space.s8 * 20), spacing: Space.s4, alignment: .top)
+    ]
 
     private func centered<V: View>(_ v: V) -> some View {
         v.frame(maxWidth: .infinity, maxHeight: .infinity).padding(Space.s4)
     }
 }
 
-/// The gallery's Filter: a quiet well with a magnifier, never a pill.
+/// The gallery's Filter, on the design system's field surface.
+/// TODO(design-system): proposal CoreSearchField (a field with a magnifier and a clear button, no label above it).
 private struct FilterField: View {
     @Binding var text: String
     @FocusState private var focused: Bool
@@ -154,18 +161,13 @@ private struct FilterField: View {
             Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.body, weight: .medium)
                 .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
             TextField("", text: $text, prompt: Text("Filter").foregroundStyle(GlassInk.secondary))
-                .textFieldStyle(.plain).focused($focused).frame(width: Space.s8 * 3)
+                .textFieldStyle(.plain).focused($focused).frame(width: Space.s8 * 4)
                 .accessibilityLabel("Filter projects")
             if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark").coreFont(size: 9, weight: .bold).foregroundStyle(GlassInk.secondary)
-                }
-                .buttonStyle(.plain).help("Clear the filter").accessibilityLabel("Clear the filter")
+                CoreIconButton(symbol: "xmark", label: "Clear the filter") { text = "" }
             }
         }
-        .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
+        .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg)
         .coreFieldSurface(focused: focused)
         .onExitCommand { if text.isEmpty { focused = false } else { text = "" } }
     }
