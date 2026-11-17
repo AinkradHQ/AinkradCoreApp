@@ -321,7 +321,12 @@ public final class AgentsModel {
             await refreshSession(id)
             if e.kind != "agent.created", let t = transcripts[id] { await t.refresh(api, knownLast: lastSeq(id)) }
         case "agent.transcript":
-            if let t = transcripts[id] { await t.refresh(api, knownLast: lastSeq(id)) }
+            if let t = transcripts[id] {
+                // The running answer's cost moves with its transcript (Core API minor 82).
+                // ponytail: one session read per entry of an open session; debounce if bursts get heavy.
+                if sessions.session(id)?.turnCostMicros != nil { await refreshSession(id) }
+                await t.refresh(api, knownLast: lastSeq(id))
+            }
         case "agent.approval_requested", "agent.approval_decided":
             await refreshSession(id)
             await store(id).refresh(api, knownLast: lastSeq(id))

@@ -221,31 +221,37 @@ struct SubAgentsCard: View {
                 Text(r).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text).textSelection(.enabled)
                     .lineLimit(14)
             }
-            HStack(spacing: Space.s2) {
-                if let r = a.result {
-                    Button("Copy Report") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(r, forType: .string)
-                    }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                }
-                if a.ok == nil, let stop {
-                    Button("Stop") { stop(a) }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Stop this sub-agent; the rest of the turn goes on")
-                }
-                if a.ok == false, let again {
-                    Button("Run Again") { again(a) }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Put its brief in the message field, to send it again")
-                }
-                Button("Show in Transcript") { ui?.jumpTo = a.seq }
-                    .buttonStyle(CoreButtonStyle(.plain, size: .small))
+            // Side by side when they fit, else one under the other: never a label broken over two lines.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s2) { actions(a) }
+                VStack(alignment: .leading, spacing: Space.s1) { actions(a) }
             }
         }
         .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
         .background(SessionInk.code, in: coreShape(Radius.control))
         .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -Space.s1)))
+    }
+
+    @ViewBuilder private func actions(_ a: SubAgentInfo) -> some View {
+        if let r = a.result {
+            Button("Copy Report") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(r, forType: .string)
+            }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        }
+        if a.ok == nil, let stop {
+            Button("Stop") { stop(a) }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .help("Stop this sub-agent; the rest of the turn goes on")
+        }
+        if a.ok == false, let again {
+            Button("Run Again") { again(a) }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .help("Put its brief in the message field, to send it again")
+        }
+        Button("Show in Transcript") { ui?.jumpTo = a.seq }
+            .buttonStyle(CoreButtonStyle(.plain, size: .small))
     }
 
     static func symbol(_ type: String) -> String {
