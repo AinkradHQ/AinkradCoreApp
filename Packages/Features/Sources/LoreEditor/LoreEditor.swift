@@ -6,9 +6,12 @@
 //   `lore-attachment:` links go to the host, never to the system. Every other scheme (file:, javascript:, app schemes)
 //   is never opened: its address is copied and the host is told.
 // - Nothing is fetched. No remote URL is loaded, not for links, not for image refs; an image ref shows as a link.
-//   Force click / Quick Look and Look Up on a link (live web previews) are off, and the context menu has no Open Link,
-//   Look Up, Search With, Share, Services or Writing Tools. Writing Tools are off, so note text never leaves the Mac.
-// - Parsing is linear: every inline rule is bounded, and a paragraph over 4,096 characters is plain text (no ReDoS).
+//   Force click / Quick Look and Look Up on a link (live web previews) are off, and the context menu (filtered by
+//   action selector, on a copy of the shared menu) has no Open Link, Look Up, Quick Look, Search With, Share, Services
+//   or Writing Tools. Writing Tools are off, so note text never leaves the Mac.
+// - Parsing is bounded: every inline rule has a length cap, a paragraph over 4,096 characters is plain text, and at most
+//   200 spans per paragraph and 10,000 per note are styled (the rest is plain). Text that was not parsed is marked raw
+//   and saved exactly as it was, so a nearby edit never escapes it.
 // - An upload that finishes after the note changed is dropped; a dropped or pasted file's real type and size (symlinks
 //   resolved) are checked before it is read.
 // - Paste and drop take plain text or Markdown only; rich text, RTF and HTML on the pasteboard are ignored. Images and

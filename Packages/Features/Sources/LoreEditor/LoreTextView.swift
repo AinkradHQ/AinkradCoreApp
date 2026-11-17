@@ -147,6 +147,8 @@ final class LoreTextView: NSTextView {
     // MARK: typing triggers
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
+        // Typed text is the person's own: never raw source, so its `*` or `_` is escaped when written.
+        typingAttributes[.loreRaw] = nil
         super.insertText(string, replacementRange: replacementRange)
         guard !busy, selectedRange().length == 0,
             let s = (string as? String) ?? (string as? NSAttributedString)?.string
@@ -420,20 +422,25 @@ final class LoreTextView: NSTextView {
         super.showDefinition(for: attrString, at: textBaselineOrigin)
     }
 
+    /// A copy: `NSTextView.defaultMenu` is shared by every text view in the app and must not lose items.
     override func menu(for event: NSEvent) -> NSMenu? {
-        super.menu(for: event).map(Self.safeMenu)
+        (super.menu(for: event)?.copy() as? NSMenu).map(Self.safeMenu)
+    }
+
+    /// AppKit adds Look Up, Open Link, Share and Services after `menu(for:)`; filter again right before it shows.
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        _ = Self.safeMenu(menu)
     }
 
     /// The context menu without the items that open, preview or send text out on their own: Open Link (it bypasses the
     /// link policy), Look Up, Search With, Share, Services, Writing Tools. A link still opens by click, through the policy.
     static func safeMenu(_ menu: NSMenu) -> NSMenu {
-        let blocked = ["openlink", "lookup", "searchwith", "share", "service", "writingtools", "translat"]
+        // By action selector only, so it works in every language (titles are localised).
+        let blocked = ["openlink", "lookup", "searchwith", "share", "service", "writingtools", "translat", "quicklook"]
         for item in menu.items.reversed() {
-            let key =
-                ((item.action.map(NSStringFromSelector) ?? "") + " " + item.title + " "
-                + (item.identifier?.rawValue ?? ""))
-                .lowercased().replacingOccurrences(of: " ", with: "")
-            if blocked.contains(where: key.contains) {
+            let key = (item.action.map(NSStringFromSelector) ?? "").lowercased()
+            if blocked.contains(where: key.contains) || (item.submenu != nil && item.submenu === NSApp.servicesMenu) {
                 menu.removeItem(item)
             } else if let sub = item.submenu {
                 _ = safeMenu(sub)

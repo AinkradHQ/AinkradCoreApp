@@ -57,22 +57,43 @@ import UniformTypeIdentifiers
         if #available(macOS 15.0, *) { #expect(tv.writingToolsBehavior == .none) }
     }
 
+    /// Matched by selector only: these titles are German, and Look Up's is an unknown private selector name.
     @Test func contextMenuDropsOpenLinkLookUpAndShare() {
         let m = NSMenu()
         for (title, sel) in [
-            ("Open Link", "_openLinkFromMenu:"), ("Copy Link", "copyLink:"), ("Look Up “x”", "_lookUpDefiniteRange:"),
-            ("Search With Google", "_searchWithGoogleFromMenu:"), ("Cut", "cut:"), ("Copy", "copy:"),
-            ("Paste", "paste:"), ("Share…", "_share:"), ("Writing Tools", "showWritingTools:"),
+            ("Link öffnen", "_openLinkFromMenu:"), ("Link kopieren", "copyLink:"),
+            ("„x“ nachschlagen", "_lookUpDefiniteRange:"), ("Mit Google suchen", "_searchWithGoogleFromMenu:"),
+            ("Ausschneiden", "cut:"), ("Kopieren", "copy:"), ("Einsetzen", "paste:"), ("Teilen …", "_share:"),
+            ("Schreibtools", "showWritingTools:"), ("Übersetzen", "_translate:"),
+            ("Übersicht", "toggleQuickLookPreviewPanel:"),
         ] {
             m.addItem(NSMenuItem(title: title, action: NSSelectorFromString(sel), keyEquivalent: ""))
             m.addItem(.separator())
         }
-        let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
+        let services = NSMenuItem(title: "Dienste", action: nil, keyEquivalent: "")
         services.submenu = NSMenu()
         m.addItem(services)
         let left = LoreTextView.safeMenu(m).items.filter { !$0.isSeparatorItem }.map(\.title)
-        #expect(left == ["Copy Link", "Cut", "Copy", "Paste"])
+        #expect(left == ["Link kopieren", "Ausschneiden", "Kopieren", "Einsetzen"])
         #expect(m.items.first?.isSeparatorItem == false && m.items.last?.isSeparatorItem == false)
+    }
+
+    /// `NSTextView.defaultMenu` is shared by every text view in the app: filtering works on a copy.
+    @Test func sharedDefaultMenuIsNotChanged() throws {
+        let c = editor("hello [l](https://x.io)\n")
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered,
+            defer: false)
+        w.contentView = c.scrollView
+        let e = try #require(
+            NSEvent.mouseEvent(
+                with: .rightMouseDown, location: NSPoint(x: 60, y: 280), modifierFlags: [], timestamp: 0,
+                windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        let before = NSTextView.defaultMenu?.items.count
+        let menu = c.textView.menu(for: e)
+        #expect(menu !== NSTextView.defaultMenu)
+        #expect(NSTextView.defaultMenu?.items.count == before)
+        #expect(menu?.items.contains { $0.action == NSSelectorFromString("toggleQuickLookPreviewPanel:") } == false)
     }
 }
 
@@ -176,5 +197,70 @@ import UniformTypeIdentifiers
         for _ in 0..<200 where up.got.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
         #expect(up.got.map(\.name) == ["ok.png"])
         #expect(notices.count == 2)
+    }
+}
+
+/// Round 2, finding 1: text that was not parsed is written back as it was, never escaped.
+@MainActor struct RawTextTests {
+    @Test func editNextToAnOverLimitParagraphKeepsItsSyntax() {
+        let body = String(repeating: "word ", count: 830) + "**bold** [l](https://x.io) snake_case"
+        let c = editor(body + "\n")
+        typeAfter("snake_case", " z", in: c)
+        #expect(c.markdown() == body + " z\n")
+        #expect(editor(c.markdown()).markdown() == body + " z\n")
+    }
+
+    @Test func spanOverItsBoundStaysAsWritten() {
+        let md = "A **" + String(repeating: "x", count: 300) + "** and snake_case.\n"
+        let c = editor(md)
+        typeAfter("snake_case.", " More", in: c)
+        #expect(c.markdown() == md.replacingOccurrences(of: "snake_case.", with: "snake_case. More"))
+    }
+
+    @Test func typedSyntaxNextToRawTextIsEscaped() {
+        let c = editor("plain_text here\n")
+        typeAfter("here", " *not italic*", in: c)
+        #expect(editor(c.markdown()).textView.string == "plain_text here *not italic*\n")
+    }
+}
+
+/// Round 2, finding 2: the whole load is bounded.
+@MainActor struct BoundedLoadTests {
+    @Test func spansPerParagraphAreCapped() {
+        let line = Array(repeating: "`a`", count: 300).joined(separator: " ")
+        let (text, _) = MarkdownReader.parse(line + "\n")
+        var spans = 0
+        text.enumerateAttribute(.loreCode, in: NSRange(location: 0, length: text.length)) { v, _, _ in
+            if v != nil { spans += 1 }
+        }
+        #expect(spans == MarkdownReader.spansPerParagraph)
+        let c = editor(line + "\n")
+        let end = (c.textView.string as NSString).length - 1
+        c.textView.setSelectedRange(NSRange(location: end, length: 0))
+        c.textView.insertText(" z", replacementRange: c.textView.selectedRange())
+        #expect(c.markdown() == line + " z\n")
+    }
+
+    @Test func twoMegabyteHostileNoteLoadsInUnderTwoSeconds() {
+        let para = String(String(repeating: "`a", count: 2_045).prefix(4_090))
+        let note = Array(repeating: para, count: 480).joined(separator: "\n\n") + "\n"
+        #expect(note.utf8.count > 1_960_000)
+        _ = NSApplication.shared
+        let c = LoreEditorController()
+        let t = ms { c.load(markdown: note) }
+        print("LOAD 2 MB hostile note: \(Int(t)) ms")
+        #expect(t < 2_000)
+        #expect(c.markdown() == note)
+    }
+}
+
+/// Round 2, decision 3: soft-wrapped lines flow as one paragraph; hard breaks stay.
+@MainActor struct SoftWrapTests {
+    @Test func softWrapsFlowHardBreaksStay() {
+        let c = editor("one\ntwo\nthree  \n  four\n")
+        #expect(c.textView.string == "one two three  \u{2028}  four\n")
+        #expect(c.markdown() == "one\ntwo\nthree  \n  four\n")
+        typeAfter("four", " x", in: c)
+        #expect(c.markdown() == "one two three  \n  four x\n")
     }
 }

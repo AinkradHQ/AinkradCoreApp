@@ -21,6 +21,9 @@ extension NSAttributedString.Key {
     static let loreChip = NSAttributedString.Key("loreChip")
     /// A list item's marker as read (`-`, `*`, `+`, `3.`, `10)`), kept when the item is written fresh.
     static let loreMarker = NSAttributedString.Key("loreMarker")
+    /// Source text the reader did not parse (plain runs, a paragraph over the limit): written back exactly, unescaped.
+    /// Typed text never carries it, so what the person types is escaped as usual.
+    static let loreRaw = NSAttributedString.Key("loreRaw")
     /// The index of the source block this paragraph was read from (see `LoreSourceMap`).
     static let loreSeq = NSAttributedString.Key("loreSeq")
 }

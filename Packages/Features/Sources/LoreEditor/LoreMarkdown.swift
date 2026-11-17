@@ -40,9 +40,17 @@ struct LoreSourceMap {
         ].joined(separator: "|"))
     /// A paragraph longer than this is shown as plain text, with no inline parse at all.
     static let inlineLimit = 4096
+    /// At most this many inline spans per paragraph, and per note; the rest is plain text. Each span costs styling work
+    /// (a 2 MB note packed with code spans took 27 s to load), so the whole load stays bounded.
+    static let spansPerParagraph = 200
+    static let spansPerNote = 10_000
+    /// Spans left for the note being read.
+    private static var budget = Int.max
 
     /// Reads a whole note. `trailingNewline: false` drops the last paragraph's newline (pasting into a paragraph).
     static func parse(_ md: String, trailingNewline: Bool = true) -> (NSAttributedString, LoreSourceMap) {
+        budget = spansPerNote
+        defer { budget = Int.max }
         let out = NSMutableAttributedString()
         // Raw lines keep a CRLF's "\r" for the source map; the parser sees the line without it.
         let raw = md.components(separatedBy: "\n")
@@ -141,12 +149,20 @@ struct LoreSourceMap {
                 indents = []
             } else {
                 let a = i
-                // Leading space trimmed, trailing kept: two trailing spaces are a hard break.
+                // Soft-wrapped lines flow as one paragraph (Apple Notes). A hard break (two trailing spaces or a trailing
+                // backslash) stays a line break (U+2028), with the next line's indentation. Untouched, the paragraph is
+                // saved as its original bytes anyway; once edited, soft wraps are written as one line.
                 var text = String(line.drop { $0 == " " || $0 == "\t" })
-                // Each source line stays a line (U+2028): hard breaks, trailing spaces and indentation survive a rewrite.
                 while i + 1 < lines.count, !startsBlock(lines[i + 1]) {
+                    let hard = lines[i].hasSuffix("  ") || lines[i].hasSuffix("\\")
                     i += 1
-                    text += "\u{2028}" + lines[i]
+                    if hard {
+                        text += "\u{2028}" + lines[i]
+                    } else {
+                        if !text.hasSuffix(" ") { text += " " }
+                        // Leading space only: trailing spaces may be the next hard break.
+                        text += String(lines[i].drop { $0 == " " || $0 == "\t" })
+                    }
                 }
                 add(inline(text), .p, a, i + 1)
                 indents = []
@@ -166,14 +182,29 @@ struct LoreSourceMap {
     static func inline(_ text: String, _ base: [NSAttributedString.Key: Any] = [:]) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let ns = text as NSString
-        guard ns.length <= inlineLimit else { return NSAttributedString(string: text, attributes: base) }
+        // Source text that was not parsed is marked raw: the writer copies it out as it was, never escaped.
+        var rawBase = base
+        rawBase[.loreRaw] = true
+        guard ns.length <= inlineLimit else { return NSAttributedString(string: text, attributes: rawBase) }
         var pos = 0
         func plain(_ s: String, _ extra: [NSAttributedString.Key: Any] = [:]) -> NSAttributedString {
             NSAttributedString(string: s, attributes: base.merging(extra) { $1 })
         }
-        for m in inlineRE.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+        func raw(_ r: NSRange) -> NSAttributedString {
+            NSAttributedString(string: ns.substring(with: r), attributes: rawBase)
+        }
+        var matches: [NSTextCheckingResult] = []
+        let cap = min(spansPerParagraph, max(0, budget))
+        if cap > 0 {
+            inlineRE.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { m, _, stop in
+                if let m { matches.append(m) }
+                if matches.count >= cap { stop.pointee = true }
+            }
+        }
+        budget -= matches.count
+        for m in matches {
             if m.range.location > pos {
-                out.append(plain(ns.substring(with: NSRange(location: pos, length: m.range.location - pos))))
+                out.append(raw(NSRange(location: pos, length: m.range.location - pos)))
             }
             func g(_ i: Int) -> String? {
                 m.range(at: i).location == NSNotFound ? nil : ns.substring(with: m.range(at: i))
@@ -186,7 +217,7 @@ struct LoreSourceMap {
                 out.append(plain(t, [.loreChip: t]))
             } else if let t = g(4), let u = g(5) {
                 // A link we cannot parse stays text, exactly as written.
-                out.append(URL(string: u).map { plain(t, [.link: $0]) } ?? plain(ns.substring(with: m.range)))
+                out.append(URL(string: u).map { plain(t, [.link: $0]) } ?? raw(m.range))
             } else if let u = g(6) {
                 out.append(plain(u, URL(string: u).map { [.link: $0] } ?? [:]))
             } else if let b = g(7) {
@@ -200,7 +231,7 @@ struct LoreSourceMap {
             }
             pos = NSMaxRange(m.range)
         }
-        if pos < ns.length { out.append(plain(ns.substring(from: pos))) }
+        if pos < ns.length { out.append(raw(NSRange(location: pos, length: ns.length - pos))) }
         return out
     }
 }
@@ -318,7 +349,7 @@ struct LoreSourceMap {
     }
 
     private struct Sig: Equatable {
-        var bold = false, italic = false, code = false
+        var bold = false, italic = false, code = false, raw = false
         var chip: String?, link: String?
     }
 
@@ -333,6 +364,7 @@ struct LoreSourceMap {
             sig.italic = a[.loreItalic] != nil
             sig.code = a[.loreCode] != nil
             sig.chip = a[.loreChip] as? String
+            sig.raw = a[.loreRaw] != nil
             sig.link = (a[.link] as? URL)?.absoluteString ?? a[.link] as? String
             let t = ns.substring(with: rr)
             if let last = segs.last, last.1 == sig { segs[segs.count - 1].0 += t } else { segs.append((t, sig)) }
@@ -340,13 +372,15 @@ struct LoreSourceMap {
         return segs.map { t, sig in
             if sig.code { return "`" + t + "`" }
             if sig.chip != nil { return "[[" + t + "]]" }
+            // Raw source text goes out as it came in.
+            if sig.raw && !sig.bold && !sig.italic && sig.link == nil { return t }
             var core = t.trimmingCharacters(in: .whitespaces)
             guard !core.isEmpty else { return t }
             let lead = String(t.prefix { $0 == " " })
             let trail = String(t.reversed().prefix { $0 == " " })
             if let link = sig.link {
                 core = core == link ? link : "[" + escape(core) + "](" + link + ")"
-            } else {
+            } else if !sig.raw {
                 core = escape(core)
             }
             let open = sig.bold && sig.italic ? "**_" : sig.bold ? "**" : sig.italic ? "*" : ""
