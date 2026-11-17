@@ -153,16 +153,21 @@ struct GalleryView: View {
 
 /// The gallery's Filter, on the design system's field surface.
 /// TODO(design-system): proposal CoreSearchField (a field with a magnifier and a clear button, no label above it).
-private struct FilterField: View {
+public struct FilterField: View {
     @Binding var text: String
+    let label: String
     @FocusState private var focused: Bool
-    var body: some View {
+    public init(text: Binding<String>, label: String = "Filter projects") {
+        _text = text
+        self.label = label
+    }
+    public var body: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.body, weight: .medium)
                 .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
             TextField("", text: $text, prompt: Text("Filter").foregroundStyle(GlassInk.secondary))
                 .textFieldStyle(.plain).focused($focused).frame(width: Space.s8 * 4)
-                .accessibilityLabel("Filter projects")
+                .accessibilityLabel(label)
             if !text.isEmpty {
                 CoreIconButton(symbol: "xmark", label: "Clear the filter") { text = "" }
             }
