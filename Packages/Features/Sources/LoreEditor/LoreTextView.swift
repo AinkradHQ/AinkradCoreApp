@@ -138,7 +138,25 @@ final class LoreTextView: NSTextView {
         if updateTyping { typingAttributes = Style.typing(b) }
     }
 
+    /// The range a change from outside the editor's own code (typing, Find & Replace, the system) writes.
+    private var outsideEdit: NSRange?
+
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        let ok = super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+        let undoing = undoManager?.isUndoing == true || undoManager?.isRedoing == true
+        if ok, !busy, !undoing, let s = replacementString {
+            outsideEdit = NSRange(location: affectedCharRange.location, length: (s as NSString).length)
+        }
+        return ok
+    }
+
     override func didChangeText() {
+        // Replaced text keeps the attributes of what it replaced; new text is never raw source, so it is escaped when
+        // written (Find & Replace put a live link into a raw paragraph). Undo and redo restore the original as it was.
+        if let r = outsideEdit {
+            outsideEdit = nil
+            if r.length > 0, NSMaxRange(r) <= ts.length { ts.removeAttribute(.loreRaw, range: r) }
+        }
         super.didChangeText()
         Style.renumber(ts, around: min(cursor, max(0, ts.length - 1)))
         controller?.onChange?()

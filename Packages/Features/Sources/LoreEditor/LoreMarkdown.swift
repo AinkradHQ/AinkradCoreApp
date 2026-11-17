@@ -414,7 +414,9 @@ struct LoreSourceMap {
     }
 
     private static func escapeLead(_ t: String) -> String {
-        for p in ["#", "- ", "+ ", "* ", "> ", "|", "```"] where t.hasPrefix(p) { return "\\" + t }
+        // `#` only when the line would read as a heading: `#tag` stays a tag (T5 indexes tags).
+        if t.range(of: #"^#{1,6}(\s|$)"#, options: [.regularExpression, .anchored]) != nil { return "\\" + t }
+        for p in ["- ", "+ ", "* ", "> ", "|", "```"] where t.hasPrefix(p) { return "\\" + t }
         if let r = t.range(of: #"^\d+(?=[.)] )"#, options: [.regularExpression, .anchored]) {
             return String(t[..<r.upperBound]) + "\\" + String(t[r.upperBound...])
         }

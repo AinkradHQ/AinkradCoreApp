@@ -264,3 +264,46 @@ import UniformTypeIdentifiers
         #expect(c.markdown() == "one two three  \n  four x\n")
     }
 }
+
+/// Round 3: tags stay tags, and replaced text is never raw.
+@MainActor struct RoundThreeTests {
+    @Test func tagAtLineStartSurvivesAnEditLater() {
+        let md = "#tag first *x and more\n"
+        let c = editor(md)
+        typeAfter("more", " z", in: c)
+        #expect(c.markdown() == "#tag first *x and more z\n")
+    }
+
+    @Test func typedTagAtLineStartIsNotEscaped() {
+        let c = editor("")
+        for ch in "#project notes" { c.textView.insertText(String(ch), replacementRange: c.textView.selectedRange()) }
+        #expect(c.markdown() == "#project notes\n")
+    }
+
+    @Test func headingLikeLineIsStillEscaped() {
+        let c = editor("")
+        c.textView.insertText("# not a heading", replacementRange: NSRange(location: 0, length: 0))
+        #expect(c.markdown() == "\\# not a heading\n")
+    }
+
+    /// Find & Replace goes through shouldChangeText → replaceCharacters → didChangeText, like this.
+    @Test func replacedTextInARawParagraphIsEscaped() throws {
+        let c = editor("plain words here and snake_case\n")
+        let tv = c.textView
+        let r = (tv.string as NSString).range(of: "words")
+        let evil = "[Login](https://evil.io)"
+        #expect(tv.shouldChangeText(in: r, replacementString: evil))
+        tv.ts.replaceCharacters(in: r, with: evil)
+        tv.didChangeText()
+        let md = c.markdown()
+        #expect(md == "plain \\[Login\\](https://evil.io) here and snake_case\n")
+        let again = editor(md).textView
+        // No disguised link: the only link is the bare address itself, shown as text (an autolink).
+        var linked: [String] = []
+        again.ts.enumerateAttribute(.link, in: NSRange(location: 0, length: again.ts.length)) { v, r, _ in
+            if v != nil { linked.append((again.string as NSString).substring(with: r)) }
+        }
+        #expect(linked == ["https://evil.io"])
+        #expect(again.string == "plain \(evil) here and snake_case\n")
+    }
+}
