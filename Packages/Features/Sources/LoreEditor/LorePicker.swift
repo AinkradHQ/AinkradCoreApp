@@ -26,8 +26,11 @@ struct LorePickerView: View {
         .padding(Space.s1)
         .frame(width: Space.s8 * 8, alignment: .leading)
         .coreFrame(radius: Radius.cardMac + Space.s1, rim: Space.s1, part: .popups)
-        .padding(Space.s6)  // room for the frame's shadow inside the panel
         .fixedSize()
+        .padding(Space.s6)  // room for the frame's shadow inside the panel
+        // The panel keeps one size (room for 8 rows); the list hugs its top. Resizing to the list's fitting size read
+        // the size before SwiftUI had laid out the new rows and squeezed them. Transparent parts let clicks through.
+        .frame(width: LorePicker.size.width, height: LorePicker.size.height, alignment: .topLeading)
         .coreTheme()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Link to a note")
@@ -37,6 +40,10 @@ struct LorePickerView: View {
 /// `[[` note-link picker: a non-activating child panel under the caret. The text view keeps focus; typing filters,
 /// ↑/↓ move, Return or Tab pick, Escape closes. Not animated: it opens on every `[[` (keyboard-driven, many times a day).
 @MainActor final class LorePicker {
+    /// 8 rows of `CoreRow` (40 pt and a 4 pt gap) with padding, plus the shadow room on every side.
+    nonisolated static let size = CGSize(
+        width: Space.s8 * 8 + Space.s6 * 2,
+        height: 8 * (MacSize.controlLg + Space.s2 + Space.s1) + Space.s6 * 2 + Space.s4)
     let anchor: Int
     /// Set whole on every change, so the panel is redrawn and sized at once (an observed model in a non-key panel was
     /// drawn a step late).
@@ -99,7 +106,7 @@ struct LorePickerView: View {
     private func place() {
         guard let tv = textView else { return }
         let caret = tv.firstRect(forCharacterRange: NSRange(location: anchor, length: 0), actualRange: nil)
-        let size = host.fittingSize
+        let size = Self.size
         // The list's leading edge sits on the `[[`, its top just under the line.
         panel.setFrame(
             NSRect(

@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import CoreUI
+import QuartzCore
 import LoreEditor
 import SwiftUI
 
@@ -30,11 +31,26 @@ enum LoreSnapshots {
         try? await Task.sleep(for: .seconds(1))
         editor.focus()
         guard let dir else { return }
+        // The walk takes about a minute: keep the display awake, or the window server hands back stale frames.
+        let awake = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Lore snapshot walk")
+        defer { ProcessInfo.processInfo.endActivity(awake) }
         let tv = window.firstResponder as? NSTextView
         var n = 0
         func shot(_ name: String) async {
             n += 1
             try? await Task.sleep(for: .seconds(1))
+            // Typed text reached the window server a few frames late on the Air: draw and commit everything now.
+            for w in [window] + (window.childWindows ?? []) {
+                w.contentView?.needsDisplay = true
+                w.display()
+            }
+            CATransaction.flush()
+            try? await Task.sleep(for: .milliseconds(500))
+            let text = ((window.firstResponder as? NSTextView)?.string ?? "").suffix(24)
+            log(
+                "before \(name): children=\(window.childWindows?.count ?? 0) text=…\(text.replacingOccurrences(of: "\n", with: "⏎"))"
+            )
             let file = "\(dir)/\(String(format: "%02d", n))-\(name)-\(theme)\(reduce ? "-reduce" : "")-lore.png"
             log("shot \(name) \(SnapshotCapture.png(window, to: file) ? "ok" : "FAILED")")
         }
@@ -102,6 +118,7 @@ enum LoreSnapshots {
         editor.focus()
         await key(.find, window)
         await type("harbor", window)
+        try? await Task.sleep(for: .seconds(1))
         await shot("find-bar")
 
         // Typing latency, in the middle of the 10,000-word note (the R0-01 meter: key press → laid out).
