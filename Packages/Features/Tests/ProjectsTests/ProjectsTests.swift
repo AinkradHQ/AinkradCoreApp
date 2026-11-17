@@ -1,4 +1,5 @@
 import Admin
+import Brain
 import Foundation
 import Shell
 import Testing
@@ -223,5 +224,26 @@ struct ModelTests {
         p.live = ProjectLive()
         #expect(m.canControl(p))
         #expect(ProjectSection.brain.empty(p).title == "Demo room")
+    }
+}
+
+@MainActor
+@Suite struct ProjectPagesTests {
+    @Test func roomCountsItsRulesFromTheBrainOverview() {
+        let rules = OverviewRules(workflow: [OverviewRule("a")], never: [OverviewRule("b"), OverviewRule("c")])
+        let overview = RoomOverview(
+            state: .written, overview: OverviewBody(summary: "One.\n\nTwo.", rules: rules),
+            instructionsApprovedAt: "2026-11-16T10:00:00Z")
+        let room = ProjectLive.Room(overview: overview, items: 5, updated: "now")
+        #expect(room.rules == 3)
+        #expect(room.summary == "One.")
+        #expect(room.instructionsInUse)
+    }
+
+    @Test func aRepoKeepsTheHeadOfTheCoresCopy() {
+        #expect(
+            RepoItem(id: 1, name: "a", remoteURL: "", branch: "main", primary: true, fetchedAt: nil, fetchError: nil)
+                .head == nil)
+        #expect(ProjectSection.brain.symbol == "brain")
     }
 }
