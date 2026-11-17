@@ -60,6 +60,10 @@ targets:
         product: Leyline
       - package: Features
         product: Design
+      - package: Features
+        product: LoreEditor
+      - package: Features
+        product: Lore
     # The runner inside the app (N16): ainkrad-runner and ainkrad-ptyhost in Contents/Helpers, the two agent plists in
     # Contents/Library/LaunchAgents. Takes the binaries from AINKRAD_RUNNER_DIR or the release pinned in scripts/runner.pin.
     postBuildScripts:

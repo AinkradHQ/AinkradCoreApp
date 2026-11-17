@@ -110,7 +110,8 @@ extension SnapshotCapture {
     /// `base` with the window's visible popovers drawn over it (their frames are relative to the window's).
     fileprivate static func withPopovers(_ base: CGImage, of window: NSWindow) -> CGImage {
         let pops = (window.childWindows ?? []).filter {
-            $0.isVisible && String(describing: type(of: $0)).contains("Popover")
+            // Child panels too: the Lore `[[` picker is a non-activating panel over the window.
+            $0.isVisible && (String(describing: type(of: $0)).contains("Popover") || $0 is NSPanel)
         }
         guard !pops.isEmpty,
             let ctx = CGContext(
