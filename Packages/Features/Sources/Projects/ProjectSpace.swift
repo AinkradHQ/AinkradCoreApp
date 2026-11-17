@@ -27,6 +27,12 @@ struct ProjectSpaceView: View {
         switch model.section {
         case .overview:
             Overview(model: model, project: project)
+        case .repos:
+            ReposPage(model: model, project: project)
+        case .sessions:
+            SessionsPage(model: model, project: project)
+        case .brain:
+            BrainPage(model: model, project: project)
         default:
             let e = model.section.empty(project)
             Island(e.title) {

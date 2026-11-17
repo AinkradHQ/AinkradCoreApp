@@ -66,7 +66,7 @@ let package = Package(
         .target(
             name: "Projects",
             dependencies: [
-                "Shell", "Admin", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", "Admin", "Brain", .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),

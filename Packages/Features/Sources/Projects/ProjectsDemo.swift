@@ -1,4 +1,5 @@
 #if DEBUG
+import Brain
 import Foundation
 import Shell
 import SwiftUI
@@ -49,7 +50,8 @@ public final class ProjectsDemo {
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
         "gallery-failed", "new-quick-empty", "new-quick", "new-quick-error", "new-advanced", "space-no-repos",
         "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
-        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-brain",
+        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-repos", "page-sessions",
+        "page-brain", "page-brain-empty",
     ]
 
     private let model: ProjectsModel
@@ -76,12 +78,28 @@ public final class ProjectsDemo {
                 },
                 updatedAt: now.addingTimeInterval(-hours * 3600), run: run, live: DemoLive.make(run.state))
         }
+        var lanterna = p(1, "lanterna", "Lanterna", RunSummary(state: .running, services: 5, sessions: 2), hours: 1)
+        lanterna.repos = [
+            Self.lanternaRepo(0, "lanterna-api", branch: "development", head: "4e1c9a2", minutes: 4),
+            Self.lanternaRepo(1, "lanterna-web", branch: "development", head: "a81f03d", minutes: 4),
+            Self.lanternaRepo(2, "lanterna-admin", branch: "main", head: "91aa0c4", minutes: 180, failing: true),
+        ]
         return [
-            p(1, "lanterna", "Lanterna", RunSummary(state: .running, services: 5, sessions: 2), hours: 1),
+            lanterna,
             p(2, "northwind-ledger", "Northwind Ledger", RunSummary(state: .stopped, lastRun: "yesterday"), hours: 2),
             p(3, "quill", "Quill", RunSummary(state: .failed, lastRun: "20 min ago"), hours: 3),
             p(4, "harbor-crm", "Harbor CRM", RunSummary(state: .stopped, lastRun: "Mon"), hours: 80),
         ]
+    }
+
+    private static func lanternaRepo(
+        _ i: Int64, _ name: String, branch: String, head: String, minutes: Double, failing: Bool = false
+    ) -> RepoItem {
+        RepoItem(
+            id: 10 + i, name: name, remoteURL: "https://github.com/lanterna-co/\(name)", branch: branch,
+            primary: i == 0,
+            fetchedAt: Date().addingTimeInterval(-minutes * 60),
+            fetchError: failing ? "The GitHub connection can no longer read this repo." : nil, head: head)
     }
 
     private static func tidepool(repos: Int, fetched: Bool = true, draft: Bool = false) -> ProjectItem {
@@ -130,7 +148,7 @@ public final class ProjectsDemo {
             list[1].run = RunSummary(state: .starting, services: 5)
             list[1].live = DemoLive.make(.starting, progress: 0.4)
         // A real Core today: no run state, services, logs, sessions or room.
-        case "overview-real-core":
+        case "overview-real-core", "page-brain-empty":
             list[3].run = nil
             list[3].live = nil
         default: break
@@ -158,8 +176,14 @@ public final class ProjectsDemo {
         case "page-run":
             model.openID = 1
             model.section = .run
-        case "page-brain":
+        case "page-repos":
             model.openID = 1
+            model.section = .repos
+        case "page-sessions":
+            model.openID = 1
+            model.section = .sessions
+        case "page-brain", "page-brain-empty":
+            model.openID = scene == "page-brain" ? 1 : 4
             model.section = .brain
         case "overview-starting": model.openID = 2
         case "overview-failed": model.openID = 3
@@ -204,15 +228,53 @@ enum DemoLive {
             services: services, logs: state == .failed ? bad : state == .starting ? [] : ok,
             sessions: [
                 .init(
-                    title: "Fix coupon rounding for EU orders", state: .needsYou, harness: "Claude Code", when: "2 m"),
-                .init(title: "Move image uploads to object storage", state: .running, harness: "Codex", when: "12 m"),
-                .init(title: "Checkout rewrite: payment step", state: .done, harness: "Claude Code", when: "yesterday"),
-                .init(title: "Tidy the product page empty state", state: .done, harness: "Codex", when: "Mon"),
+                    title: "Fix coupon rounding for EU orders", state: .needsYou, harness: "Claude Code", when: "14 m",
+                    runner: "core-oracle", branch: "fix/coupon-rounding", cost: "$0.42"),
+                .init(
+                    title: "Move image uploads to object storage", state: .running, harness: "Codex", when: "1 h 2 m",
+                    runner: "core-oracle", branch: "feat/object-storage", cost: "$1.10"),
+                .init(
+                    title: "Checkout rewrite: payment step", state: .done, harness: "Claude Code", when: "38 m",
+                    runner: "this Mac", branch: "feat/checkout-pay", cost: "$0.64"),
+                .init(
+                    title: "Tidy the product page empty state", state: .done, harness: "Codex", when: "12 m",
+                    runner: "core-oracle", branch: "ux/empty-state", cost: "$0.18"),
+            ],
+            repoExtras: [
+                "lanterna-admin": .init(
+                    usedBy: "2 AI sessions · the run (api)", size: "48 MB",
+                    commits: [
+                        .init(
+                            title: "Round coupon totals per line, not per order", by: "Lina M. · 4 m", hash: "4e1c9a2"),
+                        .init(title: "Add EU VAT rates for 2027", by: "AI session · 2 h", hash: "a81f03d"),
+                        .init(title: "Cache product images for 1 day", by: "Omar K. · yesterday", hash: "5c2e7b0"),
+                        .init(title: "Fix stock count after refunds", by: "Lina M. · Mon", hash: "e09d1aa"),
+                        .init(title: "Upgrade Laravel to 11.31", by: "Omar K. · Sun", hash: "77b3c12"),
+                    ])
             ],
             room: .init(
-                summary:
-                    "Online shop for handmade lighting. Laravel API with a Next.js storefront; the team ships weekly from development.",
-                instructionsInUse: true, rules: 10, items: 2320))
+                overview: RoomOverview(
+                    state: .written,
+                    overview: OverviewBody(
+                        summary:
+                            "Lanterna is an online shop for handmade lighting. A Laravel API handles catalogue, orders and payments; a Next.js storefront sells to customers and a small admin manages stock.",
+                        facts: OverviewFacts(stack: "Laravel 11, Next.js 15, MySQL, Redis"),
+                        rules: OverviewRules(
+                            workflow: [
+                                OverviewRule("Branch from development; one PR per change."),
+                                OverviewRule("Run the API tests before pushing."),
+                            ],
+                            code: [
+                                OverviewRule("Money is stored in cents, never floats."),
+                                OverviewRule("Form requests validate; controllers stay thin."),
+                            ],
+                            design: [OverviewRule("Storefront components come from the shared kit.")],
+                            never: [
+                                OverviewRule("Never edit a migration that has shipped."),
+                                OverviewRule("Never log customer addresses."),
+                            ])),
+                    instructionsApprovedAt: "2026-11-16T10:00:00Z"),
+                items: 2320, updated: "2 h ago", approved: "yesterday"))
         if state == .running { live.idle = "idle 4 min of 30" }
         if state == .starting {
             live.progress = progress

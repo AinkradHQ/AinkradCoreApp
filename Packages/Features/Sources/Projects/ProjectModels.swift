@@ -11,6 +11,8 @@ struct RepoItem: Identifiable, Equatable, Sendable {
     let primary: Bool
     let fetchedAt: Date?
     let fetchError: String?
+    /// The commit the Core's copy is at (`mirror.head`).
+    var head: String? = nil
 }
 
 /// What the Core's run engine says of a project. The engine (P5) does not exist yet, so a live project has none and the

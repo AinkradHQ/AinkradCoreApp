@@ -1,3 +1,4 @@
+import Brain
 import Foundation
 
 /// What the Overview shows of a project beyond what the Core serves today: its services, logs, AI sessions and Brain room.
@@ -25,17 +26,45 @@ struct ProjectLive: Equatable, Sendable {
         let state: State
         let harness: String
         let when: String
+        /// The AI Sessions page's other columns; "–" when the Core has not said.
+        var runner = "–"
+        var branch = "–"
+        var cost = "–"
     }
+    /// A recent commit of a repo.
+    struct Commit: Equatable, Sendable {
+        let title: String
+        /// "Lina M. · 4 m".
+        let by: String
+        let hash: String
+    }
+    /// What the Repos page shows of a repo beyond what the Core serves (keyed by repo name).
+    /// TODO(core): used-by, size and recent commits per repo; the page hides these rows until they exist.
+    struct RepoExtra: Equatable, Sendable {
+        var usedBy: String
+        var size: String
+        var commits: [Commit]
+    }
+    /// The project's Brain room as the Brain app's own overview model (`RoomOverview`): the page only reads it.
     struct Room: Equatable, Sendable {
-        let summary: String
-        let instructionsInUse: Bool
-        let rules: Int
+        let overview: RoomOverview
         let items: Int
+        /// "2 h ago".
+        let updated: String
+        /// "yesterday", when the instructions were approved.
+        var approved = ""
+        var summary: String { overview.overview?.summary.components(separatedBy: "\n\n").first ?? "" }
+        var instructionsInUse: Bool { overview.instructionsApprovedAt != nil }
+        var rules: Int {
+            guard let r = overview.overview?.rules else { return 0 }
+            return r.workflow.count + r.code.count + r.design.count + r.never.count
+        }
     }
 
     var services: [Service] = []
     var logs: [LogLine] = []
     var sessions: [Session] = []
+    var repoExtras: [String: RepoExtra] = [:]
     var room: Room?
     /// "idle 4 min of 30", while running.
     var idle: String?
@@ -69,7 +98,8 @@ enum ProjectSection: Int, CaseIterable, Identifiable {
         case .run: "display"
         case .repos: "arrow.triangle.branch"
         case .sessions: "sparkles"
-        case .brain: "brain.head.profile"
+        // SF Symbols 5 (macOS 14): "brain.head.profile" drew a hand on older systems.
+        case .brain: "brain"
         case .settings: "slider.horizontal.3"
         }
     }

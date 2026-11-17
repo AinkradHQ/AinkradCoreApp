@@ -54,7 +54,8 @@ struct LiveProjectsService: ProjectsService {
             repos: p.repos.map {
                 RepoItem(
                     id: $0.id, name: $0.name, remoteURL: $0.remoteUrl, branch: $0.defaultBranch,
-                    primary: $0.isPrimary, fetchedAt: $0.mirror?.fetchedAt, fetchError: $0.mirror?.error)
+                    primary: $0.isPrimary, fetchedAt: $0.mirror?.fetchedAt, fetchError: $0.mirror?.error,
+                    head: $0.mirror?.head)
             }, updatedAt: p.updatedAt)
     }
 }
