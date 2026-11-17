@@ -1,6 +1,7 @@
 import Accounts
 import Brain
 import Leyline
+import Lore
 import Projects
 import Shell
 import SwiftUI
@@ -15,6 +16,7 @@ enum Registration {
         app.brain.install()
         app.projects.install()
         app.leyline.install()
+        app.lore.install()
         shell.settings.section(
             SettingsSection(
                 id: "devices", group: .core, title: "Devices",
