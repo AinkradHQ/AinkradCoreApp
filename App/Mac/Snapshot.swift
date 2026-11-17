@@ -37,6 +37,12 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             return await app.debugAccountsDemo().showInteractive(scene)
         }
+        if let dir = env["CORE_PROJECTS_SNAPSHOT"] { return await ProjectsSnapshots.run(app, dir: dir, env: env) }
+        // `CORE_PROJECTS_DEMO=<scene>`: Projects on the stand-in data, left open to click through (no Core is reached).
+        if let scene = env["CORE_PROJECTS_DEMO"] {
+            try? await Task.sleep(for: .seconds(3))
+            return await app.debugProjectsDemo().showInteractive(scene)
+        }
         if let dir = env["CORE_BRAIN_SNAPSHOT"] { return await BrainSnapshots.run(app, dir: dir, env: env) }
         // `CORE_BRAIN_DEMO=<scene>`: the Brain on sample data, left open to click through (no Core is reached).
         if let scene = env["CORE_BRAIN_DEMO"] {

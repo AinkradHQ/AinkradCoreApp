@@ -5,6 +5,7 @@ import Brain
 import CoreKit
 import CryptoKit
 import Foundation
+import Projects
 import Shell
 
 /// Debug only: puts the app in a named state for the self-snapshot runner (no keys sent, nothing leaves the app).
@@ -152,6 +153,8 @@ extension AppModel {
     public var debugAccountsDetailOpen: Bool { accounts.debugDetailOpen }
     /// The Brain's states on sample data, for screenshots and clicking through. Needs no Core.
     public func debugBrainDemo() -> BrainDemo { BrainDemo(model: brain) }
+    /// The Projects states on sample data, for screenshots and clicking through. Needs no Core.
+    public func debugProjectsDemo() -> ProjectsDemo { ProjectsDemo(model: projects) }
     public var debugLinkIsLive: Bool { shell.coreLink == .live }
     public var debugPairingCode: String? {
         if case .code(let p)? = addDevice?.stage { return p.code }

@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "Terminals", targets: ["Terminals"]), .library(name: "Admin", targets: ["Admin"]),
         .library(name: "Accounts", targets: ["Accounts"]), .library(name: "Agents", targets: ["Agents"]),
         .library(name: "Brain", targets: ["Brain"]), .library(name: "BrainImport", targets: ["BrainImport"]),
+        .library(name: "Projects", targets: ["Projects"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -63,6 +64,16 @@ let package = Package(
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
+            name: "Projects",
+            dependencies: [
+                "Shell", "Admin", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+                .product(name: "AinkradClient", package: "AinkradClient"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
+        .target(
             name: "Brain",
             dependencies: ["Shell", "Admin", "BrainImport", .product(name: "CoreUI", package: "CoreUI")],
             resources: [.process("Resources")],
@@ -72,7 +83,7 @@ let package = Package(
         .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain",
+                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "Projects",
                 .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
@@ -94,6 +105,9 @@ let package = Package(
             ]),
         .testTarget(
             name: "AgentsTests", dependencies: ["Agents", "Shell", .product(name: "CoreKit", package: "CoreKit")]),
+        .testTarget(
+            name: "ProjectsTests",
+            dependencies: ["Projects", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "BrainTests", dependencies: ["Brain", "BrainImport", "Shell", "Admin"]),
         .testTarget(name: "BrainImportTests", dependencies: ["BrainImport"]),
         .testTarget(name: "PairingTests", dependencies: ["Pairing", .product(name: "CoreKit", package: "CoreKit")]),

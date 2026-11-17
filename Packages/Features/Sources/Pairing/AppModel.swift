@@ -6,6 +6,7 @@ import CoreKit
 import CoreUI
 import Foundation
 import Observation
+import Projects
 import Shell
 import SwiftUI
 import Terminals
@@ -50,6 +51,8 @@ public final class AppModel {
     public private(set) var admin: AdminModel!
     /// Provider accounts, pools and chains (E5-08); its screens say "not connected" until a Core is open.
     public private(set) var accounts: AccountsModel!
+    /// Projects: the gallery and the project spaces (P7); its screens say "not connected" until a Core is open.
+    public private(set) var projects: ProjectsModel!
     /// The Brain (memory rooms and import). A real Core serves it through the signed module routes; Debug demo shows sample data.
     public private(set) var brain: BrainModel!
     private var rateLimitEnd: Task<Void, Never>?
@@ -119,6 +122,7 @@ public final class AppModel {
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
         brain = BrainModel(host: AdminHostAdapter(app: self))
+        projects = ProjectsModel(host: AdminHostAdapter(app: self))
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
@@ -221,6 +225,7 @@ public final class AppModel {
             terminals = model
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
+            projects.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
             brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
         }
@@ -361,6 +366,7 @@ public final class AppModel {
             terminals?.event(kind: kind)
             admin.event(kind: kind)
             accounts.event(kind: kind)
+            projects.event(kind: kind)
             homeFeed?.event(kind: kind)
             if kind.hasPrefix("device.") || kind == "pairing.approved" { await devices.reload() }
             if kind.hasPrefix("auth.") { await lockouts.reload() }
@@ -714,6 +720,7 @@ public final class AppModel {
         admin.detach()
         accounts.detach()
         brain.detach()
+        projects.detach()
         shell.linkNotice = nil
         shell.home = .empty
         shell.resetToFresh()
