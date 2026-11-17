@@ -55,6 +55,20 @@ enum SnapshotRunner {
             try? await Task.sleep(for: .seconds(3))
             return await app.debugLoreDemo().show(scene)
         }
+        // `CORE_LORE_CAPTURE_DEMO=quick|advanced|error`: the quick capture panel on made-up text, opened over the next app
+        // brought to the front (it waits until Ainkrad is in the background), and left open.
+        if let scene = env["CORE_LORE_CAPTURE_DEMO"] {
+            SnapshotCapture.log("capture demo \(scene) waiting")
+            try? await Task.sleep(for: .seconds(12))
+            SnapshotCapture.log("capture demo active=\(NSApp.isActive)")
+            if let t = env["CORE_THEME"] { NSApp.appearance = NSAppearance(named: t == "light" ? .aqua : .darkAqua) }
+            app.debugLoreDemo().capture(scene)
+            try? await Task.sleep(for: .seconds(1))
+            for w in NSApp.windows where w is NSPanel {
+                SnapshotCapture.log("capture panel visible=\(w.isVisible) key=\(w.isKeyWindow) frame=\(w.frame)")
+            }
+            return
+        }
         if let dir = env["CORE_LORE_SNAPSHOT"] { return await LoreSnapshots.run(dir: dir, env: env) }
         // `CORE_LORE_DEMO=1`: the Lore editor on the 10,000-word sample note, left open to type in (no Core is reached).
         if env["CORE_LORE_DEMO"] == "1" { return await LoreSnapshots.run(dir: nil, env: env) }

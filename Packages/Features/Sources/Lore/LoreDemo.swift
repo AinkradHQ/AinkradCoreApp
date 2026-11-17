@@ -153,6 +153,18 @@ public final class LoreDemo {
         }
     }
 
+    /// Quick capture over whatever app is in front: `quick`, `advanced` or `error`, with made-up text, left open.
+    public func capture(_ scene: String) {
+        model.use(service)
+        let c = model.capture
+        c.text = "Ask Mira whether the seed swap moves to Saturday"
+        c.advanced = scene == "advanced"
+        c.project = scene == "advanced" ? "7" : ""
+        c.error =
+            scene == "error" ? "Unable to save: The Core did not answer. Your text is still here." : nil
+        c.open()
+    }
+
     // MARK: checks for the walk
 
     /// An AI session appends to the open note on the Core, and the event arrives.
