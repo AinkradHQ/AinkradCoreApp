@@ -238,6 +238,7 @@ public final class AppModel {
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
             leyline.attach(connection: live.connection)
+            leyline.openTerminal = { [weak model] id in await model?.openRemote(id) }
             design.attach(connection: live.connection)
             lore.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
