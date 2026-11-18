@@ -11,6 +11,21 @@ struct ActivityTab: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             header(a)
             PausedBanner(model: model, full: false)
+            if a.view == .memory {
+                ChangesView(model: model)
+            } else {
+                feedOrEgress(a)
+            }
+        }
+        .task { a.enter() }
+        .onChange(of: model.viewingID) { a.enter() }
+        .onDisappear { a.leave() }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("brain-activity")
+    }
+
+    @ViewBuilder private func feedOrEgress(_ a: ActivityModel) -> some View {
+        Group {
             switch a.phase {
             case .loading:
                 BrainSkeleton(shape: .list)
@@ -30,11 +45,6 @@ struct ActivityTab: View {
                 }
             }
         }
-        .task { a.enter() }
-        .onChange(of: model.viewingID) { a.enter() }
-        .onDisappear { a.leave() }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("brain-activity")
     }
 
     private func header(_ a: ActivityModel) -> some View {
@@ -42,8 +52,12 @@ struct ActivityTab: View {
         return HStack(alignment: .top, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: Space.s1) {
                 BrainTitle("Activity")
-                Text("Who touched which room, and what was refused. Never any memory text.")
-                    .foregroundStyle(GlassInk.secondary)
+                Text(
+                    a.view == .memory
+                        ? "What the Brain saved, merged or dropped in this room by itself. Undo puts it back."
+                        : "Who touched which room, and what was refused. Never any memory text."
+                )
+                .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s3)
             if let q = model.overview?.flags.offlineQueued {
@@ -51,17 +65,25 @@ struct ActivityTab: View {
                     "Offline, \(q) queued", GlassInk.slate,
                     help: "The local Core answers; the remote server is unreachable.")
             }
-            HStack(spacing: Space.s1) {
-                coreShape(2).fill(GlassInk.blue).frame(width: 6, height: 6).accessibilityHidden(true)
-                Text("Live").foregroundStyle(GlassInk.secondary)
+            if a.view == .feed {
+                HStack(spacing: Space.s1) {
+                    coreShape(2).fill(GlassInk.blue).frame(width: 6, height: 6).accessibilityHidden(true)
+                    Text("Live").foregroundStyle(GlassInk.secondary)
+                }
+                .help("New rows arrive within seconds.")
             }
-            .help("New rows arrive within seconds.")
-            CoreSegmented(
-                "View",
-                segments: [CoreSegment(ActivityView.feed, "Activity"), CoreSegment(.egress, "Sent out of this Mac")],
-                selection: $a.view
-            )
-            .help("Egress log: everything a model ever received from a room.")
+            if a.views.count > 1 {
+                CoreSegmented("View", segments: a.views.map(Self.segment), selection: $a.view)
+                    .help("Memory changes, the audit feed, and the egress log: everything a model ever received from a room.")
+            }
+        }
+    }
+
+    private static func segment(_ v: ActivityView) -> CoreSegment<ActivityView> {
+        switch v {
+        case .feed: CoreSegment(.feed, "Activity")
+        case .egress: CoreSegment(.egress, "Sent out of this Mac")
+        case .memory: CoreSegment(.memory, "Memory changes")
         }
     }
 

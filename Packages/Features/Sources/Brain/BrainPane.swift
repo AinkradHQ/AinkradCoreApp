@@ -165,7 +165,7 @@ struct BrainPane: View {
                 case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
                 case .inbox: CandidateInboxTab(model: model)
                 case .activity:
-                    if model.isSample { ActivityTab(model: model) } else { BrainComingLater(title: "Activity") }
+                    if model.isSample || model.service?.servesChanges == true { ActivityTab(model: model) } else { BrainComingLater(title: "Activity") }
                 case .checks: if model.isSample { ChecksTab(model: model) } else { BrainComingLater(title: "Checks") }
                 }
             }

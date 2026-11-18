@@ -84,6 +84,17 @@ public protocol BrainService: Sendable {
 
     /// The room Overview tab, or nil when this service cannot write overviews.
     var overviewService: (any RoomOverviewService)? { get }
+
+    // MARK: memory change sets (B10-01)
+
+    /// True when this service has the change-set routes; Activity then shows what the Core saved, with Undo.
+    var servesChanges: Bool { get }
+    /// A mounted room's change sets, newest first. `after` is the last id of the page before.
+    func changes(room: String, after: String?) async throws -> ChangesPage
+    /// The records one change set touched, before and after. `after` is the last row `seq` of the page before.
+    func changeRows(room: String, change: String, after: Int?) async throws -> ChangeRowsPage
+    /// Puts the set's records back at once; records changed since are kept and listed.
+    func undoChange(room: String, change: String) async throws -> ChangeUndo
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -113,6 +124,14 @@ extension BrainService {
         throw BrainFailure("Rules come later.", code: "not_served")
     }
     public var servesCandidates: Bool { false }
+    public var servesChanges: Bool { false }
+    public func changes(room: String, after: String?) async throws -> ChangesPage { ChangesPage() }
+    public func changeRows(room: String, change: String, after: Int?) async throws -> ChangeRowsPage {
+        ChangeRowsPage()
+    }
+    public func undoChange(room: String, change: String) async throws -> ChangeUndo {
+        throw BrainFailure("Undo comes later.", code: "not_served")
+    }
     public var overviewService: (any RoomOverviewService)? { nil }
     public func candidates() async throws -> CandidateInbox { CandidateInbox() }
     public func decide(_ id: String, room: String, _ decision: CandidateDecision) async throws {
