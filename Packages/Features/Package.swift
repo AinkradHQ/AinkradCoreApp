@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "Projects", targets: ["Projects"]), .library(name: "Leyline", targets: ["Leyline"]),
         .library(name: "Design", targets: ["Design"]),
         .library(name: "LoreEditor", targets: ["LoreEditor"]), .library(name: "Lore", targets: ["Lore"]),
+        .library(name: "LoreImport", targets: ["LoreImport"]),
     ],
     dependencies: [
         .package(path: "../CoreUI"), .package(path: "../CoreKit"), .package(path: "../AinkradClient"),
@@ -102,11 +103,19 @@ let package = Package(
         .target(
             name: "LoreEditor", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
+        // Importing notes into Lore (R4-02): from a project's repo copy on the Core, or from Markdown files and zips.
+        .target(
+            name: "LoreImport",
+            dependencies: [
+                "Shell", "Admin", "BrainImport", .product(name: "CoreUI", package: "CoreUI"),
+                .product(name: "CoreKit", package: "CoreKit"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]),
         // The Lore space (R6-01): today's note, autosave, remote fold-in, local drafts.
         .target(
             name: "Lore",
             dependencies: [
-                "Shell", "Admin", "LoreEditor", .product(name: "CoreUI", package: "CoreUI"),
+                "Shell", "Admin", "LoreEditor", "LoreImport", .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
             ],
             resources: [.process("Resources")],
@@ -147,6 +156,9 @@ let package = Package(
             dependencies: ["Design", "Projects", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "BrainTests", dependencies: ["Brain", "BrainImport", "Shell", "Admin"]),
         .testTarget(name: "BrainImportTests", dependencies: ["BrainImport"]),
+        .testTarget(
+            name: "LoreImportTests",
+            dependencies: ["LoreImport", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(name: "LoreEditorTests", dependencies: ["LoreEditor"]),
         .testTarget(
             name: "LoreTests", dependencies: ["Lore", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),

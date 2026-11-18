@@ -6,6 +6,7 @@
 import AppKit
 import CoreKit
 import CoreUI
+import LoreImport
 import Observation
 import Shell
 import SwiftUI
@@ -228,6 +229,14 @@ final class LoreFinder {
     }
 
     func backToOpen() { lore.host.shell.present(ShellDialog(id: "lore-open") { LoreOpenView(finder: self) }) }
+
+    // MARK: import
+
+    /// Import…: the import dialogs (R4-02), for the project in the filter, else the open note's.
+    func importNotes() {
+        let place = project.isEmpty ? (lore.note?.kind == "note" ? lore.note?.project : nil) : project
+        LoreImport.chooser(host: lore.host, service: lore.service, projects: lore.projectNames, project: place)
+    }
 
     // MARK: export
 
