@@ -200,11 +200,13 @@ extension LoreService {
 public struct LiveLoreService: LoreService {
     public typealias Send = @Sendable (_ method: String, _ target: String, _ body: Data) async throws -> Data
     static let base = "/modules/lore/v1"
+    static let bodyMax = 16 << 20
     let send: Send
     let projects: @Sendable () async throws -> [String: String]
 
     public init(connection: CoreConnection) {
-        send = { try await connection.signedRequest(method: $0, target: $1, body: $2) }
+        // A zip import is the one body over 1 MiB (the Core allows 16 MiB on that route only).
+        send = { try await connection.signedRequest(method: $0, target: $1, body: $2, limit: Self.bodyMax) }
         projects = {
             do {
                 let list = try await connection.client.listProjects().ok.body.json
@@ -333,7 +335,7 @@ public struct LiveLoreService: LoreService {
         return try await call("PATCH", "/notes/\(Self.seg(id))", Body(project: project), as: NoteWire.self).note
     }
 
-    private func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
+    func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
         async throws -> T
     {
         let data = try await send(method, Self.base + path, try body.map { try JSONEncoder().encode($0) } ?? Data())

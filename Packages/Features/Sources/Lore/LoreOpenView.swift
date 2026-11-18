@@ -1,5 +1,6 @@
 import CoreKit
 import CoreUI
+import LoreImport
 import SwiftUI
 
 /// The ⌘O sheet: the search field, the filters, the list (recent notes, hits or the trash) and the actions.
@@ -131,6 +132,14 @@ struct LoreOpenView: View {
             .help(
                 finder.project.isEmpty
                     ? "Save every note as a zip of Markdown files" : "Save this project's notes as a zip of Markdown files")
+            Button {
+                finder.importNotes()
+            } label: {
+                Label("Import…", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary))
+            .disabled(!LoreImport.supports(finder.lore.service))
+            .help("Bring in notes from a project's repo or from Markdown files")
             Spacer(minLength: Space.s3)
             Button("Close") { finder.lore.host.shell.closeDialog() }
                 .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
