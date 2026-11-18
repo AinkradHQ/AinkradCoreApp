@@ -36,6 +36,14 @@ public final class ProjectsDemo {
         func setExpose(project: Int64, _ on: Bool) async throws {
             lock.withLock { if let i = list.firstIndex(where: { $0.id == project }) { list[i].expose = on } }
         }
+        func update(project: Int64, name: String, description: String) async throws {
+            lock.withLock {
+                guard let i = list.firstIndex(where: { $0.id == project }) else { return }
+                list[i].name = name
+                list[i].description = description
+            }
+        }
+        func archive(project: Int64) async throws { lock.withLock { list.removeAll { $0.id == project } } }
         func setRun(_ project: Int64, _ state: RunSummary.State, progress: Double = 0) {
             lock.withLock {
                 guard let i = list.firstIndex(where: { $0.id == project }) else { return }
@@ -50,8 +58,9 @@ public final class ProjectsDemo {
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
         "gallery-failed", "new-quick-empty", "new-quick", "new-quick-error", "new-advanced", "space-no-repos",
         "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
-        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-repos", "page-sessions",
-        "page-brain", "page-brain-empty",
+        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
+        "page-settings-stopped", "page-repos", "page-sessions",
+        "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
     ]
 
     private let model: ProjectsModel
@@ -79,6 +88,7 @@ public final class ProjectsDemo {
                 updatedAt: now.addingTimeInterval(-hours * 3600), run: run, live: DemoLive.make(run.state))
         }
         var lanterna = p(1, "lanterna", "Lanterna", RunSummary(state: .running, services: 5, sessions: 2), hours: 1)
+        lanterna.description = "Online shop for handmade lighting"
         lanterna.repos = [
             Self.lanternaRepo(0, "lanterna-api", branch: "development", head: "4e1c9a2", minutes: 4),
             Self.lanternaRepo(1, "lanterna-web", branch: "development", head: "a81f03d", minutes: 4),
@@ -157,6 +167,7 @@ public final class ProjectsDemo {
         default: break
         }
         await model.useNow(Service(list))
+        model.runService = DemoRunService()
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
         switch scene {
@@ -179,6 +190,15 @@ public final class ProjectsDemo {
         case "page-run":
             model.openID = 1
             model.section = .run
+        case "page-run-failed":
+            model.openID = 3
+            model.section = .run
+        case "page-run-draft":
+            model.openID = 2
+            model.section = .run
+        case "page-settings", "page-settings-stopped":
+            model.openID = scene == "page-settings" ? 1 : 4
+            model.section = .settings
         case "page-repos":
             model.openID = 1
             model.section = .repos
@@ -203,6 +223,7 @@ public final class ProjectsDemo {
 enum DemoLive {
     static func make(_ state: RunSummary.State, progress: Double = 0) -> ProjectLive {
         let svc = [("web", "212 MB"), ("api", "148 MB"), ("queue", "96 MB"), ("mysql", "402 MB"), ("redis", "12 MB")]
+        let cpu = [18, 9, 3, 6, 1]
         let services = svc.enumerated().map { i, s -> ProjectLive.Service in
             let st: ProjectLive.Service.State
             switch state {
@@ -211,7 +232,8 @@ enum DemoLive {
             case .starting: st = Double(i) / 5 < progress ? .up : .down
             case .failed: st = s.0 == "api" ? .exited : .up
             }
-            return ProjectLive.Service(name: s.0, memory: s.1, state: st)
+            return ProjectLive.Service(
+                name: s.0, memory: s.1, state: st, cpu: cpu[i], restarts: st == .exited ? 3 : 0)
         }
         let ok: [ProjectLive.LogLine] = [
             .init(service: "mysql", text: "ready for connections · 8.4.2"),
