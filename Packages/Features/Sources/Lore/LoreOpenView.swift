@@ -70,8 +70,9 @@ struct LoreOpenView: View {
             Text("Searching…").foregroundStyle(palette.text2).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .needsWord:
             CoreStateCard(
-                symbol: "number", title: "Add a word", line: "A tag narrows a search. Type a word to search within it.")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                symbol: "number", title: "Add a word", line: "A tag narrows a search. Type a word to search within it."
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let why):
             CoreStateCard(
                 symbol: "exclamationmark.triangle", title: "Unable to search", line: why,
@@ -115,7 +116,8 @@ struct LoreOpenView: View {
                 CoreStateCard(
                     symbol: "calendar", title: "No Daily Notes", line: "Today's note is made when you open Lore.")
             case .trash:
-                CoreStateCard(symbol: "trash", title: "The Trash Is Empty", line: "Deleted notes wait here for 30 days.")
+                CoreStateCard(
+                    symbol: "trash", title: "The Trash Is Empty", line: "Deleted notes wait here for 30 days.")
             }
         }
     }
@@ -131,7 +133,8 @@ struct LoreOpenView: View {
             .disabled(finder.exporting)
             .help(
                 finder.project.isEmpty
-                    ? "Save every note as a zip of Markdown files" : "Save this project's notes as a zip of Markdown files")
+                    ? "Save every note as a zip of Markdown files"
+                    : "Save this project's notes as a zip of Markdown files")
             Button {
                 finder.importNotes()
             } label: {
@@ -165,7 +168,9 @@ private struct LoreFinderRow: View {
         VStack(alignment: .leading, spacing: 0) {
             // A trashed note is not opened (its Restore is the action), so its row is not a button.
             // TODO(design-system): proposal CoreRow rich subtitle — a row whose second line is styled text (the snippet).
-            CoreRow(row.title, subtitle: row.sub, symbol: row.symbol, selected: selected, action: row.trashed ? nil : open) {
+            CoreRow(
+                row.title, subtitle: row.sub, symbol: row.symbol, selected: selected, action: row.trashed ? nil : open
+            ) {
                 if row.trashed {
                     Button("Restore") { restore() }.buttonStyle(CoreButtonStyle(.secondary))
                         .help("Take “\(row.title)” out of the trash")

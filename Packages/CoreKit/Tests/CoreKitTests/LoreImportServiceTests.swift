@@ -57,7 +57,9 @@ struct LoreImportServiceTests {
                 "/modules/lore/v1/imports/li_abcdefghijkl/items", "/modules/lore/v1/imports/li_abcdefghijkl/zip",
                 "/modules/lore/v1/imports/li_abcdefghijkl/finish",
             ])
-        #expect(String(decoding: w.sent[0].2, as: UTF8.self) == ##"{"items":[{"path":"a.md","text":"# A"}]}"##)
+        // JSONEncoder does not fix a key order, so compare the decoded shape.
+        let sent = try JSONSerialization.jsonObject(with: w.sent[0].2) as? [String: [[String: String]]]
+        #expect(sent == ["items": [["path": "a.md", "text": "# A"]]])
         #expect(w.sent[1].2 == Data([0x50, 0x4b, 0x03, 0x04]))
     }
 
