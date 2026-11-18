@@ -109,6 +109,67 @@ final class FakeLore: LoreService, @unchecked Sendable {
         }
     }
     func projectNames() async throws -> [String: String] { ["7": "Garden Club"] }
+
+    /// R6-03: a word search over titles and text, newest first; `semantic` is what the test sets.
+    var semantic = true
+    func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
+        try lock.withLock {
+            calls.append(
+                "search \(query) \(filter.state) \(filter.kind ?? "-") \(filter.project ?? "-") \(filter.tag ?? "-")")
+            if offline { throw CoreError.offline("down") }
+            let hits = notes.values.filter { Self.match($0, filter) && $0.text.localizedCaseInsensitiveContains(query) }
+                .sorted { $0.id < $1.id }
+                .map { LoreHit(note: $0, snippet: LoreSnippet(text: $0.text, matches: [])) }
+            return LoreSearchResult(hits: hits, semantic: semantic)
+        }
+    }
+    func list(filter: LoreFilter) async throws -> [LoreNote] {
+        try lock.withLock {
+            calls.append("list \(filter.state) \(filter.kind ?? "-") \(filter.project ?? "-")")
+            if offline { throw CoreError.offline("down") }
+            return notes.values.filter { Self.match($0, filter) }.sorted { $0.id < $1.id }
+        }
+    }
+    func restore(_ id: String) async throws -> LoreNote {
+        lock.withLock {
+            calls.append("restore \(id)")
+            notes[id]!.trashed = false
+            return notes[id]!
+        }
+    }
+    private static func match(_ n: LoreNote, _ f: LoreFilter) -> Bool {
+        n.trashed == (f.state == "trashed") && (f.kind == nil || n.kind == f.kind)
+            && (f.project == nil || n.project == f.project)
+    }
+
+    var links: [String: [LoreBacklink]] = [:]
+    /// Version id to its text, per note; `restored` counts the auto versions made by restores.
+    var kept: [String: [String: String]] = [:]
+    func backlinks(_ id: String) async throws -> [LoreBacklink] { lock.withLock { links[id] ?? [] } }
+    func versions(_ id: String) async throws -> [LoreVersion] {
+        lock.withLock { (kept[id] ?? [:]).keys.sorted().map { LoreVersion(id: $0) } }
+    }
+    func versionText(_ id: String, version: String) async throws -> String { lock.withLock { kept[id]![version]! } }
+    func restore(_ id: String, version: String) async throws -> LoreSaveResult {
+        lock.withLock {
+            calls.append("restore \(id) \(version)")
+            var n = notes[id]!
+            let undo = "lv_u\(kept[id]!.count)"
+            kept[id]![undo] = n.text
+            n.text = kept[id]![version]!
+            n.rev += 1
+            notes[id] = n
+            history[id, default: [:]][n.rev] = n.text
+            return LoreSaveResult(note: n, outcome: "restored", version: undo)
+        }
+    }
+    func move(_ id: String, project: String?) async throws -> LoreNote {
+        lock.withLock {
+            calls.append("move \(id) \(project ?? "personal")")
+            notes[id]!.project = project
+            return notes[id]!
+        }
+    }
 }
 
 @MainActor
@@ -227,6 +288,42 @@ struct LoreModelTests {
             #expect(host.shell.toast?.message == "That link does not open from a note.", "\(bad)")
         }
         #expect(model.note?.id == "ln_cccccccccccc")
+    }
+
+    @Test func restoreThenUndoRoundTrips() async {
+        core.put(LoreNote(id: "ln_cccccccccccc", title: "A", rev: 2, text: "new\n"))
+        core.kept["ln_cccccccccccc"] = ["lv_a": "old\n"]
+        model.service = core
+        await model.openNote("ln_cccccccccccc")
+        await model.restore("lv_a")
+        #expect(page.text == "old\n" && model.base == 3)
+        #expect(model.notice == "Restored" && model.noticeAction == .undoRestore("lv_u1"))
+        await model.restore("lv_u1", offerUndo: false)
+        #expect(page.text == "new\n" && model.notice == nil && model.base == 4)
+    }
+
+    @Test func backlinksShowOnlyWhenThereAreSome() async {
+        core.put(LoreNote(id: "ln_cccccccccccc", title: "A", rev: 1, text: "x"))
+        core.links["ln_cccccccccccc"] = [LoreBacklink(note: "ln_dddddddddddd", title: "B", context: "see [[A]]")]
+        model.service = core
+        await model.openNote("ln_cccccccccccc")
+        #expect(await until { model.backlinks.count == 1 })
+        await model.openDay(today)
+        #expect(model.backlinks.isEmpty)
+    }
+
+    @Test func movingANoteChangesOnlyItsProject() async {
+        core.put(LoreNote(id: "ln_cccccccccccc", title: "A", rev: 1, text: "x"))
+        model.service = core
+        await model.openNote("ln_cccccccccccc")
+        await model.move(to: "7")
+        #expect(model.note?.project == "7" && model.projectName == "Project")
+        await model.move(to: nil)
+        #expect(model.note?.project == nil)
+        // A daily note never moves.
+        await model.openDay(today)
+        await model.move(to: "7")
+        #expect(model.note?.project == nil)
     }
 }
 

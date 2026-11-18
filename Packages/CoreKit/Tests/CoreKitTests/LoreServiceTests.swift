@@ -59,4 +59,65 @@ struct LoreServiceTests {
         _ = try await service(w).note("../x?y")
         #expect(w.sent[0].1 == "/modules/lore/v1/notes/..%2Fx%3Fy")
     }
+
+    @Test func searchReadsHitsAndSnippets() async throws {
+        let w = Wire()
+        let hit =
+            String(Self.note.dropLast())
+            + #","score":0.1,"via":"both","heading":"Plan","snippet":{"text":"a café plan","matches":[{"start":2,"end":7}]}}"#
+        w.answer = Data(#"{"results":[\#(hit)],"semantic":false}"#.utf8)
+        let r = try await service(w).search(
+            "caf é", filter: LoreFilter(state: "trashed", kind: "daily", project: "7", tag: "x"), limit: 30)
+        #expect(
+            w.sent[0].1
+                == "/modules/lore/v1/search?q=caf%20%C3%A9&limit=30&state=trashed&kind=daily&project=7&tag=x")
+        #expect(!r.semantic && r.hits.count == 1)
+        #expect(r.hits[0].note.id == "ln_abcdefgh2345" && r.hits[0].via == "both" && r.hits[0].heading == "Plan")
+        #expect(r.hits[0].snippet == LoreSnippet(text: "a café plan", matches: [LoreSpan(start: 2, end: 7)]))
+    }
+
+    @Test func listRestoreAndExport() async throws {
+        let w = Wire()
+        w.answer = Data("[\(Self.note)]".utf8)
+        let list = try await service(w).list(filter: LoreFilter(state: "trashed", tag: "ignored"))
+        #expect(w.sent[0].1 == "/modules/lore/v1/notes?state=trashed")
+        #expect(list.count == 1 && list[0].text == "# Hi\n")
+
+        w.answer = Data(Self.note.utf8)
+        _ = try await service(w).restore("ln_abcdefgh2345")
+        #expect(w.sent[1].0 == "PATCH" && w.sent[1].1 == "/modules/lore/v1/notes/ln_abcdefgh2345")
+        #expect(w.sent[1].2.contains(#""trashed":false"#))
+
+        w.answer = Data([0x50, 0x4b, 0x03, 0x04])
+        let zip = try await service(w).export(project: "7")
+        #expect(zip == w.answer && w.sent[2].1 == "/modules/lore/v1/export?project=7")
+    }
+
+    @Test func backlinksVersionsRestoreAndMove() async throws {
+        let w = Wire()
+        w.answer = Data(
+            #"[{"note":"ln_bbbbbbbbbbbb","title":"Plot map","heading":"","context":"see [[Hi]]","project":"7","updated_at":"x"}]"#
+                .utf8)
+        let b = try await service(w).backlinks("ln_abcdefgh2345")
+        #expect(b.first?.note == "ln_bbbbbbbbbbbb" && b.first?.project == "7")
+        #expect(w.sent[0].1 == "/modules/lore/v1/notes/ln_abcdefgh2345/backlinks")
+
+        w.answer = Data(
+            #"[{"id":"lv_1","kind":"named","name":"Draft","rev":2,"origin":"system","created_at":"x"}]"#.utf8)
+        let v = try await service(w).versions("ln_abcdefgh2345")
+        #expect(v.first == LoreVersion(id: "lv_1", kind: "named", name: "Draft", rev: 2, createdAt: "x"))
+
+        w.answer = Data(#"{"id":"lv_1","kind":"auto","rev":2,"origin":"system","created_at":"x","text":"old"}"#.utf8)
+        #expect(try await service(w).versionText("ln_abcdefgh2345", version: "lv_1") == "old")
+        #expect(w.sent[2].1 == "/modules/lore/v1/notes/ln_abcdefgh2345/versions/lv_1")
+
+        w.answer = Data((String(Self.note.dropLast()) + #","outcome":"restored","version":"lv_2"}"#).utf8)
+        let r = try await service(w).restore("ln_abcdefgh2345", version: "lv_1")
+        #expect(r.outcome == "restored" && r.version == "lv_2" && !r.keptVersion)
+        #expect(w.sent[3].0 == "POST" && w.sent[3].2 == #"{"version":"lv_1"}"#)
+
+        w.answer = Data(Self.note.utf8)
+        _ = try await service(w).move("ln_abcdefgh2345", project: nil)
+        #expect(w.sent[4].0 == "PATCH" && w.sent[4].2 == #"{"project":null}"#)
+    }
 }
