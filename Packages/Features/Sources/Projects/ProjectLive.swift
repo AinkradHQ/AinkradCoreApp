@@ -82,9 +82,10 @@ struct ProjectLive: Equatable, Sendable {
     var failureFix: String?
 }
 
-/// The pages of a project's space, in the rail's order. `⌘` + `key` opens one.
+/// The pages of a project's space. `⌘` + `key` opens one. The rail shows them in this order, Project Settings last at the
+/// bottom; `docs` (R6-06) is declared after `settings` so every earlier page keeps its ⌘ key, and the rail puts it after Brain.
 enum ProjectSection: Int, CaseIterable, Identifiable {
-    case overview, run, repos, sessions, brain, settings
+    case overview, run, repos, sessions, brain, settings, docs
     var id: Int { rawValue }
     var key: Character { Character("\(rawValue + 1)") }
     var title: String {
@@ -95,6 +96,7 @@ enum ProjectSection: Int, CaseIterable, Identifiable {
         case .sessions: "AI Sessions"
         case .brain: "Brain"
         case .settings: "Project Settings"
+        case .docs: "Docs"
         }
     }
     var symbol: String {
@@ -106,6 +108,7 @@ enum ProjectSection: Int, CaseIterable, Identifiable {
         // SF Symbols 5 (macOS 14): "brain.head.profile" drew a hand on older systems.
         case .brain: "brain"
         case .settings: "slider.horizontal.3"
+        case .docs: "doc.text"
         }
     }
     /// What an unbuilt page says (P7-03..P7-05 fill them in), from the approved mockup's empty states.
@@ -122,6 +125,7 @@ enum ProjectSection: Int, CaseIterable, Identifiable {
                 "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
             )
         case .settings: ("General", "Name, link and run limits, as in any project.")
+        case .docs: ("Docs", "No docs yet. Import them from the repos, or write the first one.")
         }
     }
 }

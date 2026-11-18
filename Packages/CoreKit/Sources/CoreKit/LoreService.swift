@@ -45,6 +45,109 @@ public struct LoreSaveResult: Equatable, Sendable {
     public var keptVersion: Bool { outcome == "conflict" || outcome == "base_lost" }
 }
 
+/// A matched word inside a snippet: UTF-8 byte offsets into `LoreSnippet.text` (the Core counts bytes).
+public struct LoreSpan: Equatable, Sendable {
+    public var start: Int
+    public var end: Int
+    public init(start: Int, end: Int) {
+        self.start = start
+        self.end = end
+    }
+}
+
+/// A stretch of a note on one line, with the matched words. Note text: untrusted, shown as plain text only.
+public struct LoreSnippet: Equatable, Sendable {
+    public var text: String
+    public var matches: [LoreSpan]
+    public init(text: String, matches: [LoreSpan] = []) {
+        self.text = text
+        self.matches = matches
+    }
+}
+
+/// One search hit (R2-02): the note without its text, which ranking found it, the best section's heading.
+public struct LoreHit: Equatable, Sendable {
+    public var note: LoreNote
+    /// `text`, `meaning` or `both`.
+    public var via: String
+    public var heading: String?
+    public var snippet: LoreSnippet
+    public init(note: LoreNote, via: String = "text", heading: String? = nil, snippet: LoreSnippet) {
+        self.note = note
+        self.via = via
+        self.heading = heading
+        self.snippet = snippet
+    }
+}
+
+public struct LoreSearchResult: Equatable, Sendable {
+    public var hits: [LoreHit]
+    /// false = the Core's model is absent or still loading: these are word matches only.
+    public var semantic: Bool
+    public init(hits: [LoreHit], semantic: Bool) {
+        self.hits = hits
+        self.semantic = semantic
+    }
+}
+
+/// What `GET /search` and `GET /notes` filter on. `tag` filters a search only (the list route has no tag filter).
+public struct LoreFilter: Equatable, Sendable {
+    /// `active` or `trashed`.
+    public var state: String
+    /// `note`, `daily` or nil for both.
+    public var kind: String?
+    /// A project id as text; nil = every note.
+    public var project: String?
+    public var tag: String?
+    public init(state: String = "active", kind: String? = nil, project: String? = nil, tag: String? = nil) {
+        self.state = state
+        self.kind = kind
+        self.project = project
+        self.tag = tag
+    }
+}
+
+/// A note that links to the open one (`GET /notes/{id}/backlinks`). `context` is note text: outside data, shown as plain text.
+public struct LoreBacklink: Equatable, Sendable, Identifiable, Decodable {
+    /// The linking note's id.
+    public var note: String
+    public var title: String
+    public var heading: String
+    public var context: String
+    public var project: String?
+    public var id: String { note + "#" + heading + "#" + context }
+    public init(note: String, title: String, heading: String = "", context: String = "", project: String? = nil) {
+        self.note = note
+        self.title = title
+        self.heading = heading
+        self.context = context
+        self.project = project
+    }
+}
+
+/// One saved text of a note (`GET /notes/{id}/versions`, no text). `kind`: `auto`, `named` or `conflict`.
+public struct LoreVersion: Equatable, Sendable, Identifiable, Decodable {
+    public var id: String
+    public var kind: String
+    public var name: String?
+    public var rev: Int
+    /// `person:d_…`, `session:as_…` or `system`.
+    public var origin: String
+    /// ISO 8601 text as the Core wrote it.
+    public var createdAt: String
+    public init(
+        id: String, kind: String = "auto", name: String? = nil, rev: Int = 1, origin: String = "system",
+        createdAt: String = ""
+    ) {
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.rev = rev
+        self.origin = origin
+        self.createdAt = createdAt
+    }
+}
+
 /// What the Lore space asks of the Core. Errors are `CoreError` (`http(404/501)` = no Lore module on this Core).
 public protocol LoreService: Sendable {
     /// The daily note of `day` (`YYYY-MM-DD`), created empty on first use.
@@ -56,17 +159,54 @@ public protocol LoreService: Sendable {
     func save(_ id: String, baseRev: Int, text: String) async throws -> LoreSaveResult
     /// Project ids (as text) and names, for the project chip.
     func projectNames() async throws -> [String: String]
+    /// Hybrid search, best first (the Core needs at least one word). `GET /search`.
+    func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult
+    /// Notes without their text, newest change first (at most 500). `GET /notes`.
+    func list(filter: LoreFilter) async throws -> [LoreNote]
+    /// Takes a note out of the trash. `PATCH /notes/{id}`.
+    func restore(_ id: String) async throws -> LoreNote
+    /// The R1-06 zip of every note, or of one project's. `GET /export`.
+    func export(project: String?) async throws -> Data
+    /// The live notes linking to this one, newest first (R1-04).
+    func backlinks(_ id: String) async throws -> [LoreBacklink]
+    /// The note's versions, newest first, without text.
+    func versions(_ id: String) async throws -> [LoreVersion]
+    /// One version's text.
+    func versionText(_ id: String, version: String) async throws -> String
+    /// Restore = a normal save at the head; `version` of the result is an auto version of the replaced text, so
+    /// restoring that one undoes this.
+    func restore(_ id: String, version: String) async throws -> LoreSaveResult
+    /// Moves a note to a project (nil = personal).
+    func move(_ id: String, project: String?) async throws -> LoreNote
+}
+
+/// A Core (or a test double) without these routes answers "not implemented", like an old Core does.
+extension LoreService {
+    public func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
+        throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot search notes.")
+    }
+    public func list(filter: LoreFilter) async throws -> [LoreNote] {
+        throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot list notes.")
+    }
+    public func restore(_ id: String) async throws -> LoreNote {
+        throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot restore notes.")
+    }
+    public func export(project: String?) async throws -> Data {
+        throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot export notes.")
+    }
 }
 
 /// The real one: signed requests through the paired connection, the way Leyline and the Brain reach their modules.
 public struct LiveLoreService: LoreService {
     public typealias Send = @Sendable (_ method: String, _ target: String, _ body: Data) async throws -> Data
     static let base = "/modules/lore/v1"
+    static let bodyMax = 16 << 20
     let send: Send
     let projects: @Sendable () async throws -> [String: String]
 
     public init(connection: CoreConnection) {
-        send = { try await connection.signedRequest(method: $0, target: $1, body: $2) }
+        // A zip import is the one body over 1 MiB (the Core allows 16 MiB on that route only).
+        send = { try await connection.signedRequest(method: $0, target: $1, body: $2, limit: Self.bodyMax) }
         projects = {
             do {
                 let list = try await connection.client.listProjects().ok.body.json
@@ -121,7 +261,81 @@ public struct LiveLoreService: LoreService {
 
     public func projectNames() async throws -> [String: String] { try await projects() }
 
-    private func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
+    public func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
+        let w = try await call(
+            "GET", "/search?q=\(Self.query(query))&limit=\(limit)" + Self.filterQuery(filter), as: SearchWire.self)
+        return LoreSearchResult(
+            hits: w.results.map {
+                LoreHit(
+                    note: $0.note.note, via: $0.via, heading: $0.heading,
+                    snippet: LoreSnippet(
+                        text: $0.snippet.text,
+                        matches: $0.snippet.matches.map { LoreSpan(start: $0.start, end: $0.end) }
+                    ))
+            }, semantic: w.semantic)
+    }
+
+    public func list(filter: LoreFilter) async throws -> [LoreNote] {
+        // The list route has no `tag`.
+        var f = filter
+        f.tag = nil
+        return try await call("GET", "/notes?" + String(Self.filterQuery(f).dropFirst()), as: [NoteWire].self).map(
+            \.note)
+    }
+
+    public func restore(_ id: String) async throws -> LoreNote {
+        struct Body: Encodable { let trashed: Bool }
+        return try await call("PATCH", "/notes/\(Self.seg(id))", Body(trashed: false), as: NoteWire.self).note
+    }
+
+    public func export(project: String?) async throws -> Data {
+        // A zip, not JSON: the bytes as they come.
+        let q = project.map { "?project=\(Self.query($0))" } ?? ""
+        return try await send("GET", Self.base + "/export" + q, Data())
+    }
+
+    /// `&state=…&kind=…&project=…&tag=…`, each only when set.
+    static func filterQuery(_ f: LoreFilter) -> String {
+        var s = "&state=\(Self.query(f.state))"
+        if let k = f.kind { s += "&kind=\(Self.query(k))" }
+        if let p = f.project { s += "&project=\(Self.query(p))" }
+        if let t = f.tag, !t.isEmpty { s += "&tag=\(Self.query(t))" }
+        return s
+    }
+
+    public func backlinks(_ id: String) async throws -> [LoreBacklink] {
+        try await call("GET", "/notes/\(Self.seg(id))/backlinks", as: [LoreBacklink].self)
+    }
+
+    public func versions(_ id: String) async throws -> [LoreVersion] {
+        try await call("GET", "/notes/\(Self.seg(id))/versions", as: [LoreVersion].self)
+    }
+
+    public func versionText(_ id: String, version: String) async throws -> String {
+        struct View: Decodable { let text: String }
+        return try await call("GET", "/notes/\(Self.seg(id))/versions/\(Self.seg(version))", as: View.self).text
+    }
+
+    public func restore(_ id: String, version: String) async throws -> LoreSaveResult {
+        struct Body: Encodable { let version: String }
+        let w = try await call("POST", "/notes/\(Self.seg(id))/restore", Body(version: version), as: SaveWire.self)
+        return LoreSaveResult(note: w.note.note, outcome: w.outcome, version: w.version)
+    }
+
+    public func move(_ id: String, project: String?) async throws -> LoreNote {
+        struct Body: Encodable {
+            let project: String?
+            // `null` makes the note personal, so the key is always sent.
+            func encode(to encoder: any Encoder) throws {
+                var c = encoder.container(keyedBy: Keys.self)
+                try c.encode(project, forKey: .project)
+            }
+            enum Keys: String, CodingKey { case project }
+        }
+        return try await call("PATCH", "/notes/\(Self.seg(id))", Body(project: project), as: NoteWire.self).note
+    }
+
+    func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
         async throws -> T
     {
         let data = try await send(method, Self.base + path, try body.map { try JSONEncoder().encode($0) } ?? Data())
@@ -159,6 +373,34 @@ private struct NoteWire: Decodable {
             id: id, kind: kind, day: day, project: project, title: title, rev: rev, text: text ?? "",
             trashed: trashedAt != nil)
     }
+}
+
+/// `SearchOut`: each hit is the note summary flattened, plus `via`, `heading` and the snippet.
+private struct SearchWire: Decodable {
+    struct Span: Decodable {
+        let start: Int
+        let end: Int
+    }
+    struct Snip: Decodable {
+        let text: String
+        let matches: [Span]
+    }
+    struct Hit: Decodable {
+        let note: NoteWire
+        let via: String
+        let heading: String?
+        let snippet: Snip
+        enum Keys: String, CodingKey { case via, heading, snippet }
+        init(from decoder: any Decoder) throws {
+            note = try NoteWire(from: decoder)
+            let c = try decoder.container(keyedBy: Keys.self)
+            via = try c.decode(String.self, forKey: .via)
+            heading = try c.decodeIfPresent(String.self, forKey: .heading)
+            snippet = try c.decode(Snip.self, forKey: .snippet)
+        }
+    }
+    let results: [Hit]
+    let semantic: Bool
 }
 
 /// `SaveOut`: the note flattened, plus the outcome and the kept version.

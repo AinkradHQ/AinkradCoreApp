@@ -1,9 +1,8 @@
 import Foundation
 
-// Change-set routes (B2-02) in `modules/brain/module/src/change_routes.rs` on AinkradCore `epic/brain`. Hand-written until
-// the generated client is regenerated at the epic build.
-// TODO(client-regen): replace these wire types and routes with the generated `brainChangeSets`, `brainChangeSet` and
-// `brainUndoChange` calls at the epic build (CORE_COMMIT), then delete this file.
+// Change-set routes (B2-02) in `modules/brain/module/src/change_routes.rs` on AinkradCore. The generated client is built
+// from the Core contract, which does not carry module routes, so these are called through `BrainRoutes`. Checked at the
+// epic build against `modules/brain/api/openapi.core.json` (`brainChangeSets`, `brainChangeSet`, `brainUndoChange`).
 
 struct ChangeWire: Decodable {
     var id: String

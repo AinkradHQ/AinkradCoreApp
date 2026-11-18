@@ -60,11 +60,15 @@ public actor CoreConnection {
     /// One signed request to a route the generated client does not cover (a module's, under `/modules/...`): the same
     /// signing, session and retry rules as every generated call, no new crypto. `target` is the path and raw query exactly
     /// as sent. Any non-2xx answer is thrown as `CoreError`. A body is JSON and at most 1 MiB (§4).
-    public func signedRequest(method: String, target: String, body: Data = Data()) async throws -> Data {
+    /// `limit`: the most bytes of body; the default is the signed-body cap (§4). A module route that declares a larger body
+    /// (Lore's zip import) passes its own ceiling; the Core still refuses what the route does not allow.
+    public func signedRequest(
+        method: String, target: String, body: Data = Data(), limit: Int? = nil
+    ) async throws -> Data {
         guard target.hasPrefix("/"), !target.hasPrefix("/handshake"), !target.hasPrefix("/pair") else {
             throw CoreError.invalidInput("\(target) is not a signed route")
         }
-        guard body.count <= SigningMiddleware.maxBody else { throw CoreError.bodyTooLarge }
+        guard body.count <= (limit ?? SigningMiddleware.maxBody) else { throw CoreError.bodyTooLarge }
         return try await sessions.perform(method: method, target: target, body: body).body
     }
 

@@ -26,7 +26,7 @@ struct RoomCareTests {
 
     // MARK: the wire
 
-    private static func policyJSON(_ auto: [String]) -> [String: Any] {
+    nonisolated private static func policyJSON(_ auto: [String]) -> [String: Any] {
         [
             "room": "r1", "model": "cloud", "auto_accept": auto, "min_sources": 1, "daily_distils": 12,
             "retention_days": NSNull(),
@@ -119,7 +119,7 @@ struct RoomCareTests {
 
     @Test func autoSaveTurnsOneKindOnOrOffAndAsksForTouchID() async {
         let (m, host) = await make()
-        let c = m.candidates
+        let c: BrainCandidates = m.candidates
         #expect(c.policy("core")?.savedTypes.isEmpty == true)
         await c.toggleSave("core", .preference)
         #expect(c.policy("core")?.savedTypes == ["preference"] && c.policy("core")?.autoAccept == true)
@@ -144,7 +144,7 @@ struct RoomCareTests {
 
     @Test func retentionShowsTheCountFirstAndOnlyThenAsksForTouchID() async {
         let (m, host) = await make()
-        let care = m.care
+        let care: RoomCareModel = m.care
         care.askRetention("core", days: 30)
         #expect(care.retentionAsk?.days == 30 && care.retentionAsk?.preview == nil)
         #expect(await until { care.retentionAsk?.preview != nil })
@@ -185,7 +185,7 @@ struct RoomCareTests {
 
     @Test func theDryRunCountsThenApplyAsksForTouchIDAndUndoRoundTrips() async {
         let (m, host) = await make()
-        let care = m.care
+        let care: RoomCareModel = m.care
         care.check("core")
         if case .checking = care.cleanup {} else { Issue.record("the dry run starts at once") }
         #expect(await until { if case .ready = care.cleanup { true } else { false } })
@@ -194,7 +194,10 @@ struct RoomCareTests {
         care.apply("core")
         #expect(await until { if case .done = care.cleanup { true } else { false } })
         #expect(host.reasons.count == 1)
-        guard case .done(let run) = care.cleanup, let change = run.change else { return Issue.record("no result") }
+        guard case .done(let run) = care.cleanup, let change = run.change else {
+            Issue.record("no result")
+            return
+        }
         #expect(run.summary == "Kept 84 facts, archived 1,203 items" && care.undone(change) == nil)
         care.undo(change)
         #expect(await until { care.undone(change) != nil })

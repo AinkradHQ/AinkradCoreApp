@@ -123,7 +123,9 @@ public final class ChangesModel {
     // MARK: Undo
 
     /// A row Undo left alone because the record changed since.
-    public func kept(_ row: ChangeRow, in change: String) -> Bool { results[change]?.skipped.contains(row.record) == true }
+    public func kept(_ row: ChangeRow, in change: String) -> Bool {
+        results[change]?.skipped.contains(row.record) == true
+    }
 
     public func undo(_ id: String) {
         guard let service = brain?.service, let room, !undoing.contains(id) else { return }
