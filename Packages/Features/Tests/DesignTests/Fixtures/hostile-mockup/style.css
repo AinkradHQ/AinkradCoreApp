@@ -1,0 +1,2 @@
+body { background: url("http://127.0.0.1:__PORT__/css-url"); }
+@font-face { font-family: x; src: url("http://127.0.0.1:__PORT__/font"); }

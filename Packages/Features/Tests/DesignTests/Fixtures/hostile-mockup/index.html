@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hostile</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="http://127.0.0.1:__PORT__/css-link">
+<script src="http://127.0.0.1:__PORT__/script-tag"></script>
+<script src="probe.js"></script></head>
+<body>
+<!-- Every request below is aimed at the canary listener; a single connection to it fails the test. -->
+<img src="http://127.0.0.1:__PORT__/img" alt="">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+<iframe src="http://127.0.0.1:__PORT__/iframe"></iframe>
+<form id="form" action="http://127.0.0.1:__PORT__/form" method="post"></form>
+<a id="in" href="next.html">next</a>
+<a id="out" href="http://127.0.0.1:__PORT__/link">out</a>
+<a id="blank" href="http://127.0.0.1:__PORT__/blank" target="_blank">blank</a>
+<a id="up" href="../secret.html">up</a>
+</body></html>
