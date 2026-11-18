@@ -12,6 +12,8 @@ public final class LoreDemo {
         private var notes: [String: LoreNote] = [:]
         /// Every saved text by note and rev, for the stand-in merge.
         private var history: [String: [Int: String]] = [:]
+        /// Versions by note, newest first, with their texts (the stand-in for `lore_versions`).
+        private var kept: [String: [(LoreVersion, String)]] = [:]
         var conflict = false
         var offline = false
         private let originals: [LoreNote]
@@ -24,6 +26,7 @@ public final class LoreDemo {
             lock.withLock {
                 notes = [:]
                 history = [:]
+                kept = [:]
                 for n in originals {
                     notes[n.id] = n
                     history[n.id] = [n.rev: n.text]
@@ -63,6 +66,7 @@ public final class LoreDemo {
                 if offline { throw CoreError.offline("demo") }
                 guard var n = notes[id] else { throw CoreError.http(status: 404, code: "not_found", message: "") }
                 var outcome = conflict ? "conflict" : "saved"
+                if conflict { keep(id, kind: "conflict", text: n.text, rev: n.rev) }
                 var merged = text
                 // The stand-in merge: text appended at the head since the base is kept after the client's text.
                 if baseRev < n.rev, let base = history[id]?[baseRev], n.text.hasPrefix(base) {
@@ -74,6 +78,66 @@ public final class LoreDemo {
                 notes[id] = n
                 history[id, default: [:]][n.rev] = merged
                 return LoreSaveResult(note: n, outcome: outcome, version: conflict ? "lv_1" : nil)
+            }
+        }
+        /// A version of `text` for the walk; the caller holds the lock.
+        private func keep(_ id: String, kind: String, text: String, rev: Int) {
+            let v = LoreVersion(
+                id: "lv_\(kept.values.reduce(0) { $0 + $1.count } + 1)", kind: kind, rev: rev, origin: "system",
+                createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-600)))
+            kept[id, default: []].insert((v, text), at: 0)
+        }
+        /// Two older texts for the versions sheet.
+        func seedVersions(_ id: String) {
+            lock.withLock {
+                guard let n = notes[id] else { return }
+                keep(id, kind: "auto", text: "# \(n.title)\n\nThe first draft.\n", rev: 1)
+                keep(id, kind: "named", text: n.text + "\n- [ ] One more thing\n", rev: 2)
+            }
+        }
+        func backlinks(_ id: String) async throws -> [LoreBacklink] {
+            lock.withLock {
+                guard id == "ln_demoprojecta" else { return [] }
+                return [
+                    LoreBacklink(
+                        note: "ln_demopastaaaa", title: "A quiet Monday", context: "Tomorrow: see [[Launch checklist]]."
+                    ),
+                    LoreBacklink(
+                        note: "ln_demotodayaaa", title: "Morning pages",
+                        context: "Check the [[Launch checklist]] items."),
+                ]
+            }
+        }
+        func versions(_ id: String) async throws -> [LoreVersion] { lock.withLock { (kept[id] ?? []).map(\.0) } }
+        func versionText(_ id: String, version: String) async throws -> String {
+            try lock.withLock {
+                guard let t = kept[id]?.first(where: { $0.0.id == version })?.1 else {
+                    throw CoreError.http(status: 404, code: "not_found", message: "")
+                }
+                return t
+            }
+        }
+        func restore(_ id: String, version: String) async throws -> LoreSaveResult {
+            try lock.withLock {
+                guard var n = notes[id], let t = kept[id]?.first(where: { $0.0.id == version })?.1 else {
+                    throw CoreError.http(status: 404, code: "not_found", message: "")
+                }
+                guard t != n.text else { return LoreSaveResult(note: n, outcome: "restored") }
+                keep(id, kind: "auto", text: n.text, rev: n.rev)
+                let undo = kept[id]?.first?.0.id
+                n.rev += 1
+                n.text = t
+                notes[id] = n
+                history[id, default: [:]][n.rev] = t
+                return LoreSaveResult(note: n, outcome: "restored", version: undo)
+            }
+        }
+        func move(_ id: String, project: String?) async throws -> LoreNote {
+            try lock.withLock {
+                guard var n = notes[id] else { throw CoreError.http(status: 404, code: "not_found", message: "") }
+                n.project = project
+                notes[id] = n
+                return n
             }
         }
         /// Empties a day's note: the blank page of L1.
@@ -97,6 +161,7 @@ public final class LoreDemo {
 
     public static let scenes = [
         "today-blank", "today", "past-day", "project-note", "conflict", "kept", "not-connected", "open-sheet",
+        "backlinks", "versions", "restored",
     ]
 
     private let model: LoreModel
@@ -146,6 +211,11 @@ public final class LoreDemo {
             service.offline = true
             model.page.show(Self.todayText + "\nA line written while the Core was away.\n", fold: false)
             await model.save()
+        case "backlinks": await model.openNote("ln_demoprojecta")
+        case "versions", "restored":
+            await model.openNote("ln_demoprojecta")
+            service.seedVersions("ln_demoprojecta")
+            if scene == "versions" { model.showVersions() } else { await model.restore("lv_2") }
         case "open-sheet":
             await model.openDay(model.todayKey)
             LoreOpenSheet.open(model)
