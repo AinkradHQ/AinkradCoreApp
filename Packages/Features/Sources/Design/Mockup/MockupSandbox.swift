@@ -1,4 +1,5 @@
 import Foundation
+import ObjectiveC
 import WebKit
 
 // SECURITY MODEL (V3-07, T10; security-flagged, needs an independent review).
@@ -16,17 +17,20 @@ import WebKit
 //     to the package), `frame-src 'none'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`; scripts,
 //     styles, images and fonts only from `mockup:`. Inline script/style stay allowed (the mockups are single files).
 //  4. NO script message handler is ever added, so `window.webkit` is absent: the page cannot call into the app. The one
-//     user script (`hardening`, document start, every frame) only REMOVES things: the WebRTC constructors and the
-//     `preconnect|dns-prefetch|prefetch|preload` link hints. WebRTC is also switched off in the preferences
-//     (private `_peerConnectionEnabled`, set only if this SDK has it) because ICE/TURN opens sockets the content rules
-//     never see.
+//     user script (`hardening`, document start, every frame) is only a SECOND layer: it removes the WebRTC
+//     constructors. The real switches are WebKit preferences, set through guarded private API (`responds(to:)` on
+//     every call): WebRTC (`_setPeerConnectionEnabled:`), `LinkPreconnectEnabled` and `DNSPrefetchingEnabled`
+//     (private setter, or `_features` + `_setEnabled:forFeature:`). They are engine-wide, so they also hold in
+//     about:blank/srcdoc iframes, where a document-start script can lose the race. A `preconnect`/`dns-prefetch`
+//     hint is acted on at parse time, before any script observer could strip it, so the script does NOT try.
+//     If any of the three switches is missing in this SDK the web view is NOT built (fail closed, `.noRules`).
 //  5. Navigation (`MockupNavigation`): only `mockup://package/<html file of the package>` may load; every other
 //     navigation, download and new window is cancelled. Clicking a link to the outside does nothing.
 //  6. Non-persistent data store (no cookies, storage or cache on disk), no popups, no link preview, no inspector.
 //
 // ACCEPTED LIMITS. (a) A page can write to the clipboard on a user click (a normal gesture-gated web API); it cannot
-// read it. (b) The test canary is a loopback TCP listener: it cannot observe DNS lookups or UDP, so the link-hint
-// stripping and the WebRTC removal are belt and braces that the canary alone cannot prove. (c) Camera/microphone
+// read it. (b) The test canary is a loopback TCP listener: it cannot observe DNS lookups or UDP, so the preference
+// switch for DNS prefetch cannot be proven by the canary alone; it does prove preconnect and TURN-over-TCP. (c) Camera/microphone
 // requests are denied by the UI delegate.
 //
 // The Core serves package files as inert attachments from its own origin; this viewer is the only place they render.
@@ -142,7 +146,7 @@ enum MockupSandbox {
         return list
     }
 
-    /// Document-start script for every frame: removes WebRTC and the network-warming link hints.
+    /// Document-start script for every frame: second layer only, removes the WebRTC constructors.
     static let hardening = """
         (() => {
           for (const n of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel"]) {
@@ -151,21 +155,41 @@ enum MockupSandbox {
               try { Object.defineProperty(window, n, { value: undefined, configurable: false }); } catch (e) {}
             }
           }
-          const bad = /^(preconnect|dns-prefetch|prefetch|preload|prerender|modulepreload)$/i;
-          const strip = (l) => {
-            if (!l.localName || l.localName !== "link") return;
-            const was = l.getAttribute("rel") || "";
-            const rel = was.split(/\\s+/).filter((x) => !bad.test(x)).join(" ");
-            if (rel !== was) l.setAttribute("rel", rel || "x-blocked");
-          };
-          new MutationObserver((ms) => {
-            for (const m of ms) {
-              if (m.type === "attributes") strip(m.target);
-              for (const a of m.addedNodes) if (a.querySelectorAll) { strip(a); a.querySelectorAll("link").forEach(strip); }
-            }
-          }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["rel"] });
         })();
         """
+
+    /// Calls a private `-set…:(BOOL)` on `prefs` if it exists. False when this SDK lacks it.
+    @MainActor private static func setFlag(_ prefs: WKPreferences, _ name: String, _ on: Bool) -> Bool {
+        let sel = NSSelectorFromString(name)
+        guard prefs.responds(to: sel), let m = class_getInstanceMethod(WKPreferences.self, sel) else { return false }
+        typealias Fn = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(m), to: Fn.self)(prefs, sel, on)
+        return true
+    }
+
+    /// Turns a WebKit feature off by key via `+_features` and `-_setEnabled:forFeature:`. False when unavailable.
+    @MainActor private static func disableFeature(_ prefs: WKPreferences, key: String) -> Bool {
+        let list = NSSelectorFromString("_features")
+        let set = NSSelectorFromString("_setEnabled:forFeature:")
+        guard (WKPreferences.self as AnyObject).responds(to: list), prefs.responds(to: set),
+            let m = class_getInstanceMethod(WKPreferences.self, set),
+            let all = (WKPreferences.self as AnyObject).perform(list)?.takeUnretainedValue() as? [NSObject],
+            let feature = all.first(where: {
+                $0.responds(to: NSSelectorFromString("key")) && ($0.value(forKey: "key") as? String) == key
+            })
+        else { return false }
+        typealias Fn = @convention(c) (AnyObject, Selector, Bool, AnyObject) -> Void
+        unsafeBitCast(method_getImplementation(m), to: Fn.self)(prefs, set, false, feature)
+        return true
+    }
+
+    /// Switches off WebRTC, link preconnect and DNS prefetch. Throws if any switch is missing (fail closed).
+    @MainActor static func lockDownNetworkPreferences(_ prefs: WKPreferences) throws {
+        guard setFlag(prefs, "_setPeerConnectionEnabled:", false),
+            setFlag(prefs, "_setLinkPreconnectEnabled:", false) || disableFeature(prefs, key: "LinkPreconnectEnabled"),
+            setFlag(prefs, "_setDNSPrefetchingEnabled:", false) || disableFeature(prefs, key: "DNSPrefetchingEnabled")
+        else { throw MockupFailure.noRules }
+    }
 
     /// The sandboxed web view of one package. Fails closed: no rules, no web view.
     @MainActor static func makeWebView(
@@ -176,13 +200,10 @@ enum MockupSandbox {
         config.websiteDataStore = .nonPersistent()
         config.setURLSchemeHandler(handler, forURLScheme: scheme)
         config.userContentController.add(rules)
-        // No `add(_:name:)` anywhere: the page has no way into the app. The user script only removes features.
+        // No `add(_:name:)` anywhere: the page has no way into the app. The user script is a second layer.
         config.userContentController.addUserScript(
             WKUserScript(source: hardening, injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        // Private key: guarded, because KVC on an unknown key raises an NSException.
-        if config.preferences.responds(to: NSSelectorFromString("_setPeerConnectionEnabled:")) {
-            config.preferences.setValue(false, forKey: "_peerConnectionEnabled")
-        }
+        try lockDownNetworkPreferences(config.preferences)
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         config.mediaTypesRequiringUserActionForPlayback = .all
         let web = WKWebView(frame: .zero, configuration: config)

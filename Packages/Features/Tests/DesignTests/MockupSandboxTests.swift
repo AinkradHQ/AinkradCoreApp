@@ -126,22 +126,27 @@ struct MockupSandboxTests {
         #expect(r["beacon"] as? String != "reached")
         #expect(r["webkit"] as? String == "none", "no webkit.messageHandlers")
         #expect(r["handlers"] as? Int == 0)
-        for k in ["rtc", "webkitRtc", "rtcData"] { #expect(r[k] as? String == "undefined", "\(k) must be removed") }
+        for k in ["rtc", "webkitRtc", "rtcData", "frameRtc", "frameWebkitRtc"] {
+            #expect(r[k] as? String == "undefined", "\(k) must be removed")
+        }
         #expect(r["openBlank"] as? String == "none")
         // Is the CSP really on (pass 1) or really off (pass 2)? Without this a header typo would pass silently.
         #expect(r["eval"] as? String == (csp ? "blocked" : "allowed"))
 
         try await Task.sleep(for: .milliseconds(800))
         #expect(canary.connections == 0, "a request reached the network (csp \(csp))")
-        let body = try await web.evaluateJavaScript(
-            "JSON.stringify([document.body.dataset.violations, document.body.dataset.fileImg || '', document.body.dataset.frameRtc || ''])"
-        ) as? String
+        let body =
+            try await web.evaluateJavaScript(
+                "JSON.stringify([document.body.dataset.violations, document.body.dataset.fileImg || ''])"
+            ) as? String
         let extra = try #require(
             try JSONSerialization.jsonObject(with: Data((body ?? "[]").utf8)) as? [String])
-        if csp { #expect((Int(extra[0]) ?? 0) > 0, "securitypolicyviolation events fired") }
-        else { #expect(extra[0] == "0") }
+        if csp {
+            #expect((Int(extra[0]) ?? 0) > 0, "securitypolicyviolation events fired")
+        } else {
+            #expect(extra[0] == "0")
+        }
         #expect(extra[1] != "reached", "file:// image")
-        #expect(extra[2] != "function" && extra[2] != "object", "RTC inside the srcdoc frame")
         #expect(web.url?.host == MockupSandbox.host && web.url?.scheme == MockupSandbox.scheme)
         #expect(web.url?.path == "/index.html", "still on the first page after every navigation attempt")
         #expect(blocked > 0, "the delegate saw and cancelled the attempts")

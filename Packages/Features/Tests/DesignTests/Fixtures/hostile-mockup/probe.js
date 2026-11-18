@@ -56,8 +56,13 @@
   r.rtc = typeof RTCPeerConnection;
   r.webkitRtc = typeof webkitRTCPeerConnection;
   r.rtcData = typeof RTCDataChannel;
-  const Rtc = window.RTCPeerConnection || window.webkitRTCPeerConnection;
-  if (Rtc) {
+  // An about:blank iframe, appended synchronously: the document-start script may not have run there yet.
+  const f = document.createElement("iframe");
+  document.body.append(f);
+  r.frameRtc = typeof f.contentWindow.RTCPeerConnection;
+  r.frameWebkitRtc = typeof f.contentWindow.webkitRTCPeerConnection;
+  for (const Rtc of [window.RTCPeerConnection, window.webkitRTCPeerConnection, f.contentWindow.RTCPeerConnection, f.contentWindow.webkitRTCPeerConnection]) {
+    if (!Rtc) continue;
     try {
       const pc = new Rtc({ iceServers: [{ urls: "turn:127.0.0.1:__PORT__?transport=tcp", username: "a", credential: "b" }] });
       pc.createDataChannel("x");
