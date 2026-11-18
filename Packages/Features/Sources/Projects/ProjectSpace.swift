@@ -35,6 +35,8 @@ struct ProjectSpaceView: View {
             SessionsPage(model: model, project: project)
         case .brain:
             BrainPage(model: model, project: project)
+        case .docs:
+            DocsPage(model: model, project: project)
         case .settings:
             SettingsPage(model: model, project: project)
         default:
@@ -110,11 +112,12 @@ private struct TopBar: View {
     }
 }
 
-/// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘6 from anywhere in the space.
+/// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘7 from anywhere in the space.
 private struct Rail: View {
     let model: ProjectsModel
     var body: some View {
         VStack(spacing: Space.s1) {
+            // Docs (R6-06) is the last case, so it follows Brain; Project Settings stays at the bottom.
             ForEach(ProjectSection.allCases.filter { $0 != .settings }) { tile($0) }
             Spacer(minLength: 0)
             tile(.settings)

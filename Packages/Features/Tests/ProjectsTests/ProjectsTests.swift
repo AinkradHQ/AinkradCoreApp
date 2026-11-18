@@ -231,7 +231,7 @@ struct ModelTests {
     }
 
     @Test func railKeysAndStartingState() async {
-        #expect(ProjectSection.allCases.map(\.key) == ["1", "2", "3", "4", "5", "6"])
+        #expect(ProjectSection.allCases.map(\.key) == ["1", "2", "3", "4", "5", "6", "7"])
         var p = ProjectItem(
             id: 1, slug: "demo", name: "Demo", description: "", expose: true,
             repos: [
@@ -345,5 +345,21 @@ struct SettingsAndRunTests {
             RepoItem(id: 1, name: "a", remoteURL: "", branch: "main", primary: true, fetchedAt: nil, fetchError: nil)
                 .head == nil)
         #expect(ProjectSection.brain.symbol == "brain")
+    }
+}
+
+@Suite struct DocGroupTests {
+    @Test func tagsPickTheGroup() {
+        #expect(DocGroup.of(text: "# Launch\n#plans #q4\n") == .plans)
+        #expect(DocGroup.of(text: "Intro #Spec text") == .specs)
+        #expect(DocGroup.of(text: "#runbooks, deploy") == .runbooks)
+        #expect(DocGroup.of(text: "#specs #plans") == .plans)
+        #expect(DocGroup.of(text: "# Heading\nnothing tagged #planet") == .other)
+        #expect(DocGroup.of(text: "") == .other)
+    }
+
+    @Test func docsIsLastCaseSoOtherKeysStay() {
+        #expect(ProjectSection.settings.key == "6" && ProjectSection.docs.key == "7")
+        #expect(ProjectSection.allCases.filter { $0 != .settings }.map(\.title).suffix(2) == ["Brain", "Docs"])
     }
 }

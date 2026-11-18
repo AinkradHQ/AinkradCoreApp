@@ -48,6 +48,11 @@ public final class ProjectsModel {
     var debugHover: Int64?
     #endif
 
+    /// The notes of the Docs page (R6-06): the Lore routes of the same Core.
+    @ObservationIgnored var lore: (any LoreService)?
+    /// Opens a note in the Lore space (the app wires this to `LoreModel.open(note:)`; Lore depends on Shell, not on Projects).
+    @ObservationIgnored public var openNote: (@MainActor (String) -> Void)?
+
     /// The Designs island of the Overview, from the Design app (which depends on Projects, not the other way round).
     @ObservationIgnored public var designsIsland: (@MainActor (ProjectRef) -> AnyView)?
 
@@ -75,7 +80,10 @@ public final class ProjectsModel {
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveProjectsService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        lore = LiveLoreService(connection: connection)
+        use(LiveProjectsService(connection: connection))
+    }
 
     func use(_ service: any ProjectsService) {
         self.service = service
@@ -85,6 +93,7 @@ public final class ProjectsModel {
 
     public func detach() {
         service = nil
+        lore = nil
         projects = []
         load = .notConnected
         openID = nil
