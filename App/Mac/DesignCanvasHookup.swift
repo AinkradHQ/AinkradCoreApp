@@ -21,6 +21,8 @@ final class CanvasEditing: DesignEditBackend {
     func peers() -> Data? { view?.editorPeers() }
     func setPresence(_ json: String) { view?.editorSetPresence(json) }
     func tokens() -> Data? { view?.editorTokens() }
+    var syncStuck: Bool { view?.editorSyncStuck ?? false }
+    var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
 
     /// Hands the chrome the canvas and has the canvas tell it when the document or selection may have changed.
     static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {

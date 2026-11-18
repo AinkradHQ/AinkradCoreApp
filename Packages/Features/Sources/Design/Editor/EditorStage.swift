@@ -22,7 +22,10 @@ struct EditorStage: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("design-canvas")
                 VStack(spacing: Space.s2) {
-                    if let note = editor.notice {
+                    if editor.syncStuck {
+                        CoreNotice(symbol: "exclamationmark.triangle", title: DesignEditor.stuckSentence, tone: .warn)
+                            .frame(maxWidth: Space.s8 * 14)
+                    } else if let note = editor.notice {
                         CoreNotice(symbol: "exclamationmark.triangle", title: note, tone: .warn) {
                             Button("Dismiss") { editor.notice = nil }.buttonStyle(.corePlain)
                         }

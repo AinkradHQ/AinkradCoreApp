@@ -26,6 +26,7 @@ public final class DesignCanvasNSView: NSView {
     /// release, a key, an undo, an edit from the chrome): the layers panel and inspector read the engine again.
     public var onChange: (() -> Void)?
     private var fitted = false
+    var lastEditTooLarge = false
     var reduceMotion = false {
         didSet {
             let on = reduceMotion
@@ -283,7 +284,8 @@ public final class DesignCanvasNSView: NSView {
     }
 
     func undo(redo: Bool) {
-        _ = redo ? de_redo(engine.h) : de_undo(engine.h)
+        let rc = redo ? de_redo(engine.h) : de_undo(engine.h)
+        if rc == DE_ERR_TOO_LARGE { sync?.probe() }
         loop.wake(input: true)
         sync?.flush()
         onChange?()
@@ -342,6 +344,7 @@ public struct DesignCanvas: NSViewRepresentable {
         v.loop.onMissing = { [weak fetcher] hashes in Task { @MainActor in fetcher?.fetch(hashes) } }
         let s = DesignSync(engine: engine, doc: doc, channel: channel)
         s.onRemote = { [weak v] in v?.contentArrived() }
+        s.onStuck = { [weak v] in v?.onChange?() }
         v.sync = s
         if let system {
             let y = DesignSync(engine: engine, doc: system, target: .system, channel: channel)

@@ -18,10 +18,20 @@ extension DesignCanvasNSView {
     }
     /// A JSON array of ops, applied all or nothing as one undo step; false when the engine refused it.
     @discardableResult public func editorEdit(_ json: String) -> Bool {
-        let ok = engine.edit(json)
-        if ok { changed() }
-        return ok
+        let r = engine.editResult(json)
+        lastEditTooLarge = r == .tooLarge
+        if r == .applied {
+            changed()
+        } else if r == .tooLarge {
+            sync?.probe()
+            onChange?()
+        }
+        return r == .applied
     }
+    /// The last `editorEdit` was refused as too large for one update (or because an unsent update is stuck).
+    public var editorLastEditTooLarge: Bool { lastEditTooLarge }
+    /// An unsent edit can never go out: "This design stopped syncing — reopen it (unsent edits are lost)".
+    public var editorSyncStuck: Bool { sync?.stuck ?? false }
     public func editorUndo() { undo(redo: false) }
     public func editorRedo() { undo(redo: true) }
     public func editorFitSelection() {

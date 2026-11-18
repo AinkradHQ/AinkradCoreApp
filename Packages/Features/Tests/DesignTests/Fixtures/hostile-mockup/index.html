@@ -10,7 +10,7 @@
 <link rel="preload" as="fetch" href="http://127.0.0.1:__PORT__/preload">
 <script type="speculationrules">{"prefetch":[{"source":"list","urls":["http://127.0.0.1:__PORT__/speculation"]}]}</script>
 <meta http-equiv="refresh" content="0;url=http://127.0.0.1:__PORT__/meta-refresh">
-<script src="probe.js"></script></head>
+<script src="probe.js" defer></script></head>
 <body>
 <!-- Every request below is aimed at the canary listener; a single connection to it fails the test. -->
 <img src="http://127.0.0.1:__PORT__/img" alt="">

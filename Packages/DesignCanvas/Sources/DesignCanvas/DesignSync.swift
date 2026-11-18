@@ -30,6 +30,11 @@ public final class DesignSync {
     var onRemote: () -> Void = {}
     private var task: Task<Void, Never>?
     private(set) public var connected = false
+    /// An unsent edit is over what the Core takes (`DE_ERR_TOO_LARGE`): it can never be sent, so nothing more is. The
+    /// design must be reopened and the unsent edits are lost; this never retries.
+    private(set) public var stuck = false
+    /// Called once, when `stuck` turns on.
+    var onStuck: () -> Void = {}
     /// Reconnect backoff in seconds: 0.5, 1, 2 … 10.
     var backoff: (Int) -> Double = { min(10, 0.5 * pow(2, Double($0))) }
 
@@ -51,6 +56,10 @@ public final class DesignSync {
             }
         }
     }
+
+    /// Reads the outbox once, only to learn whether it is stuck (after the engine refused an edit as too large). Needs the
+    /// link up: reading the outbox drains it, and nothing is drained while offline.
+    func probe() { flush() }
 
     public func stop() {
         task?.cancel()
@@ -74,6 +83,13 @@ public final class DesignSync {
                     switch engine.apply(u, to: target) {
                     case .applied: onRemote()
                     case .refused: break
+                    case .busy:
+                        // nothing changed: ask for it again a moment later (the state vector brings back what is missing)
+                        try await Task.sleep(for: .milliseconds(500))
+                        if let sv = engine.stateVector() { try await channel.send(.stateVector(sv), doc: doc) }
+                    case .tooLarge:
+                        // a peer's update the engine will not take: start over from the Core's state
+                        if let sv = engine.stateVector() { try await channel.send(.stateVector(sv), doc: doc) }
                     case .reset:
                         // The engine reset the doc: ask for everything again (unsent local edits are kept).
                         onRemote()
@@ -103,9 +119,18 @@ public final class DesignSync {
     /// Sends local edits (after a gesture, a key, undo), in as many updates as the engine splits them into. Nothing while
     /// offline: the next connect's diff carries them.
     public func flush() {
-        guard target == .doc, connected else { return }
+        guard target == .doc, connected, !stuck else { return }
         var updates: [Data] = []
-        while let u = engine.outbox(), !u.isEmpty { updates.append(u) }
+        drain: while true {
+            switch engine.outbox() {
+            case .update(let u): updates.append(u)
+            case .empty: break drain
+            case .stuck:
+                stuck = true
+                onStuck()
+                break drain
+            }
+        }
         guard !updates.isEmpty else { return }
         let (channel, doc) = (channel, doc)
         Task { for u in updates { try? await channel.send(.update(u), doc: doc) } }

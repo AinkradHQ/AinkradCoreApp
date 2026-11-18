@@ -21,6 +21,9 @@ final class DesignEditor {
     private(set) var tokens: [DesignToken] = []
     /// A sentence when the engine refused the last write; cleared by the next change.
     var notice: String?
+    /// The canvas cannot send an unsent edit to the Core: shown until the design is reopened (never a retry).
+    private(set) var syncStuck = false
+    static let stuckSentence = "This design stopped syncing — reopen it (unsent edits are lost)"
     var expanded: Set<String> = []
     var renaming: String?
     /// The layer being dragged (a drag carries only its id).
@@ -65,6 +68,7 @@ final class DesignEditor {
     }
 
     func reload() {
+        syncStuck = backend?.syncStuck ?? false
         guard let b = backend else {
             layers = LayerTree([])
             selection = []
@@ -109,7 +113,11 @@ final class DesignEditor {
             reload()
             return true
         }
-        notice = "The design refused that change. Nothing was changed."
+        syncStuck = b.syncStuck
+        notice =
+            b.lastEditTooLarge && !syncStuck
+            ? "That change is too large to send at once. Nothing was changed."
+            : "The design refused that change. Nothing was changed."
         return false
     }
 

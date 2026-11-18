@@ -230,6 +230,8 @@ final class FakeBackend: DesignEditBackend {
     var presence: [String] = []
     var refuse = false
     var canSelect = true
+    var syncStuck = false
+    var lastEditTooLarge = false
     var peerJSON: String?
     func tree() -> Data? { treeJSON.data(using: .utf8) }
     func node(_ id: String) -> String? { nodes[id] }
@@ -271,8 +273,9 @@ final class FakeBackend: DesignEditBackend {
     }
 
     @Test func attachingReadsLayersAndTokens() {
-        let (e, _) = make()
+        let (e, b) = make()  // the editor holds its backend weakly: keep `b` alive
         #expect(e.layers.layers.count == 4 && e.attached)
+        withExtendedLifetime(b) {}
         #expect(e.tokens.map(\.name) == ["radius.control"])
         #expect(e.node == nil)
     }
@@ -319,6 +322,28 @@ final class FakeBackend: DesignEditBackend {
         e.set("opacity", .number(0.5))
         let json = b.edits.last ?? ""
         #expect(json.contains(#""id":"t""#) && json.contains(#""id":"u""#) && !json.contains(#""id":"f""#))
+    }
+
+    @Test func aStuckOutboxSaysTheDesignStoppedSyncingAndOffersNoRetry() {
+        let (e, b) = make()
+        b.refuse = true
+        b.syncStuck = true
+        b.lastEditTooLarge = true
+        #expect(!e.apply([EditOps.delete("t")]))
+        #expect(e.syncStuck)
+        #expect(DesignEditor.stuckSentence == "This design stopped syncing — reopen it (unsent edits are lost)")
+        // the sentence stays up when the next reload finds it still stuck, and goes with a reopened (fresh) editor
+        e.reload()
+        #expect(e.syncStuck)
+        #expect(!DesignEditor(doc: "dd_2").syncStuck)
+    }
+
+    @Test func aTooLargeChangeIsNamedButIsNotTheStuckState() {
+        let (e, b) = make()
+        b.refuse = true
+        b.lastEditTooLarge = true
+        #expect(!e.apply([EditOps.delete("t")]))
+        #expect(e.notice?.contains("too large") == true && !e.syncStuck)
     }
 
     @Test func aRefusedWriteSaysSoAndChangesNothing() {
