@@ -3,7 +3,7 @@ import Projects
 import SwiftUI
 
 /// The open item: a top bar (back, name, what it is, its projects), the stage and an About island. For a design the stage is
-/// its canvas (V3-02, `DesignModel.canvas`), or its preview while the doc cannot sync; a mockup's viewer is V3-07 and a
+/// its canvas (V3-02, `DesignModel.canvas`), or its preview while the doc cannot sync; a mockup's viewer is V3-07 (`MockupStage`) and a
 /// system's tokens and rules V3-06.
 struct DesignDetail: View {
     let model: DesignModel
@@ -12,7 +12,11 @@ struct DesignDetail: View {
 
     /// The editor chrome (V3-04) of a design that has a canvas.
     private var editor: DesignEditor? {
-        if case .doc(let d) = item, d.kind == .design, model.canvas != nil, model.service != nil { model.editor(for: d.id) } else { nil }
+        if case .doc(let d) = item, d.kind == .design, model.canvas != nil, model.service != nil {
+            model.editor(for: d.id)
+        } else {
+            nil
+        }
     }
 
     var body: some View {
@@ -68,7 +72,12 @@ struct DesignDetail: View {
     }
 
     @ViewBuilder private var stage: some View {
-        if case .doc(let d) = item, let canvas = model.canvasView(d) {
+        if case .doc(let d) = item, d.kind == .mockup {
+            MockupStage(model: model, doc: d)
+                .padding(Space.s2)
+                .coreWell(radius: Radius.pane)
+                .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .doc(let d) = item, let canvas = model.canvasView(d) {
             canvas
                 .clipShape(coreShape(Radius.pane))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -103,7 +112,7 @@ struct DesignDetail: View {
         switch d.kind {
         case .design:
             return "The canvas opens here once this Core can sync designs: you will watch AI draw, note and tweak."
-        case .mockup: return "Clicking through the mockup arrives with the mockup viewer, in a later update."
+        case .mockup: return nil
         case .system: return "Tokens, components and rules show here once design systems arrive, in a later update."
         }
     }

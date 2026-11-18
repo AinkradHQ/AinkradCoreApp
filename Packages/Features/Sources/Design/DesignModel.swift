@@ -18,6 +18,8 @@ public final class DesignModel {
     let host: any AdminHost
     let projectsModel: ProjectsModel
     var service: (any DesignService)?
+    /// Where the mockup viewer reads packages from (V3-07); nil until a Core is attached.
+    var mockups: (any MockupSource)?
 
     var docs: [DesignDoc] = []
     var assets: [DesignAsset] = []
@@ -58,7 +60,10 @@ public final class DesignModel {
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveDesignService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        mockups = LiveMockupSource(connection: connection)
+        use(LiveDesignService(connection: connection))
+    }
 
     func use(_ service: any DesignService) {
         self.service = service
@@ -68,6 +73,7 @@ public final class DesignModel {
 
     public func detach() {
         service = nil
+        mockups = nil
         docs = []
         assets = []
         kits = []
