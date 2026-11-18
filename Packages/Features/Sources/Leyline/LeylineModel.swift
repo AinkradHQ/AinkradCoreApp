@@ -15,6 +15,11 @@ public final class LeylineModel {
     /// Shows a Core terminal (a host terminal the Core just opened) in the existing terminal pane. The app sets it; nil when
     /// there is no terminal app (the Debug demo), and the host page then says so.
     public var openTerminal: (@MainActor (String) async -> Void)?
+    /// Tells the terminal pane of a host terminal whether the Core is recording it: nil = not recorded, else whether it is
+    /// paused. The app sets it; the terminal app draws the "Recording" notice.
+    public var markRecording: (@MainActor (String, Bool?) -> Void)?
+    /// The paired device with this id (name, platform, key fingerprint), from the app's device list: who claimed a runner invite.
+    public var deviceLookup: (@MainActor (String) -> RunnerClaimer?)?
 
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
@@ -44,6 +49,8 @@ public final class LeylineModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: the Make Runner state a host page opens in.
+    var debugRunner: HostPageState.RunnerInstallState?
     #endif
 
     public init(host: any AdminHost) { self.host = host }
@@ -75,7 +82,47 @@ public final class LeylineModel {
     public func resync() { if service != nil { Task { await reload() } } }
 
     /// An event from the Core that may change what the screens show.
-    public func event(kind: String) { if kind.hasPrefix("leyline.") { resync() } }
+    public func event(kind: String) {
+        guard kind.hasPrefix("leyline.") else { return }
+        resync()
+        if kind == "leyline.session" { Task { await syncRecording() } }
+    }
+
+    // MARK: recording of host terminals
+
+    /// Host terminals this app opened, by terminal id: the host, and the Core session once it is known.
+    private var watched: [String: (host: String, session: String?)] = [:]
+
+    func watchRecording(terminal: String, host: String) {
+        watched[terminal] = (host, nil)
+        Task { await syncRecording() }
+    }
+
+    /// Reads the Core's sessions for the terminals being watched and tells each pane whether it is recorded or paused.
+    func syncRecording() async {
+        guard let service else { return }
+        for (terminal, w) in watched {
+            guard let rows = try? await service.sessions(host: w.host),
+                let row = rows.first(where: { $0.terminal == terminal })
+            else { continue }
+            watched[terminal]?.session = row.id
+            if row.live {
+                markRecording?(terminal, row.recorded ? row.paused : nil)
+            } else {
+                markRecording?(terminal, nil)
+                watched[terminal] = nil
+            }
+        }
+    }
+
+    /// "Pause recording" on a terminal pane. Pausing needs no Touch ID (a person who sees a recording can stop it at once).
+    public func pauseRecording(terminal: String) async {
+        guard let service, let session = watched[terminal]?.session else { return }
+        do { try await service.pauseRecording(session: session) } catch {
+            host.shell.showToast(words(error), kind: .warn)
+        }
+        await syncRecording()
+    }
 
     func reload() async {
         guard let service else { return }

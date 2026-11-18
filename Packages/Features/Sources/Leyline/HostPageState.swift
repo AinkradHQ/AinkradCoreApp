@@ -30,6 +30,9 @@ final class HostPageState {
     init(model: LeylineModel, hostID: String) {
         self.model = model
         self.hostID = hostID
+        #if DEBUG
+        if let r = model.debugRunner { runnerState = r }
+        #endif
     }
 
     var host: HostItem? { model.hostItem(hostID) }
@@ -58,6 +61,7 @@ final class HostPageState {
         do {
             let id = try await service.openTerminal(host: hostID, rows: 24, cols: 80)
             await model.openTerminal?(id)
+            model.watchRecording(terminal: id, host: hostID)
             shell.showToast("Terminal opened on \(host?.name ?? "the host")")
         } catch { shell.showToast(words(error), kind: .warn) }
     }
@@ -287,7 +291,13 @@ final class HostPageState {
                 transfer = "Uploading \(name)…"
                 do {
                     let data = try await Task.detached { try Data(contentsOf: url) }.value
-                    try await service.upload(host: hostID, path: RemotePath.join(path, name), data: data)
+                    // Writing a file on a host needs Touch ID, like a terminal.
+                    try await model.host.elevated(
+                        "Write \(name) to \(host?.name ?? "the host").", done: "written", keepsEdit: false
+                    ) { try await service.upload(host: hostID, path: RemotePath.join(path, name), data: data) }
+                } catch is AdminDeclined {
+                    transfer = nil
+                    return
                 } catch {
                     transfer = nil
                     shell.showToast(words(error), kind: .warn)
@@ -329,8 +339,20 @@ final class HostPageState {
         replaying = e
         position = 0
         recording = .loading
-        recording = await read { try await $0.recording(id) }
-        if case .ready = recording { play() }
+        guard let service else { return }
+        do {
+            // A recording is terminal content: replaying it needs Touch ID.
+            let r = try await model.host.elevated(
+                "Replay this recording of \(host?.name ?? "the host").", done: "shown", keepsEdit: false
+            ) { try await service.recording(id) }
+            recording = .ready(r)
+            play()
+        } catch is AdminDeclined {
+            recording = .idle
+            replaying = nil
+        } catch let e as LeylineFailure where e.isMissing {
+            recording = .missing
+        } catch { recording = .failed(words(error)) }
     }
 
     func play() {
@@ -353,7 +375,63 @@ final class HostPageState {
         player = nil
     }
 
-    func closePage() { stop() }
+    func closePage() {
+        stop()
+        runnerWatch?.cancel()
+    }
+
+    // MARK: make it a runner
+
+    enum RunnerInstallState: Equatable {
+        case idle, starting
+        /// The installer is running in the terminal; the invite ends at the date.
+        case waiting(until: Date?)
+        /// A runner paired: the device that claimed the invite.
+        case paired(device: String)
+        case expired
+    }
+
+    private(set) var runnerState = RunnerInstallState.idle
+    private var runnerWatch: Task<Void, Never>?
+
+    /// One action: Touch ID, then the Core puts a one-time invite on the host, opens a terminal with the installer typed in
+    /// (the person types the sudo password there) and waits for the runner to pair.
+    func makeRunner() async {
+        guard let service, let h = host, model.mayWrite() else { return }
+        switch runnerState {
+        case .starting, .waiting: return
+        default: break
+        }
+        runnerState = .starting
+        do {
+            let install = try await model.host.elevated(
+                "Install the Ainkrad runner on \(h.name).", done: "started", keepsEdit: false
+            ) { try await service.makeRunner(host: h.id, rows: 24, cols: 80) }
+            await model.openTerminal?(install.terminal)
+            runnerState = .waiting(until: install.expiresAt)
+            runnerWatch?.cancel()
+            runnerWatch = Task { [weak self] in await self?.watchRunner(until: install.expiresAt) }
+        } catch is AdminDeclined {
+            runnerState = .idle
+        } catch {
+            runnerState = .idle
+            shell.showToast(words(error), kind: .warn)
+        }
+    }
+
+    /// Reads the host until the runner pairs or the invite (15 minutes, and a minute of grace) is over.
+    private func watchRunner(until: Date?) async {
+        let end = (until ?? Date().addingTimeInterval(900)).addingTimeInterval(60)
+        while Date() < end, !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(3))
+            await model.reload()
+            if let d = host?.runnerDevice {
+                runnerState = .paired(device: d)
+                return
+            }
+        }
+        if !Task.isCancelled { runnerState = .expired }
+    }
 
     // MARK: Mac-direct
 

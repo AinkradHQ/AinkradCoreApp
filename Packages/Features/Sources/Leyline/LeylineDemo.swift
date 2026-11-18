@@ -63,13 +63,50 @@ public final class LeylineDemo {
         func importKey(name: String, privateKey: String, passphrase: String?) async throws -> KeyItem {
             try await generateKey(name: name)
         }
+        func health(host: String) async throws -> HostHealth {
+            let wave = (0..<24).map { 30 + 25 * abs(sin(Double($0) * 0.5)) }
+            return HostHealth(
+                state: .up, checkedAt: Date().addingTimeInterval(-40), load1: 0.9, cpus: 4, memPct: 41, diskPct: 63,
+                failedUnits: 0, cpuSeries: wave, memSeries: wave.map { $0 * 0.8 }, diskSeries: wave.map { 60 + $0 / 20 }
+            )
+        }
+        func files(host: String, path: String) async throws -> [RemoteFile] {
+            func f(_ n: String, _ k: RemoteFile.Kind, _ size: Int64?) -> RemoteFile {
+                RemoteFile(
+                    path: RemotePath.join(path, n), name: n, kind: k, size: size,
+                    modified: Date().addingTimeInterval(-86400 * 3), target: nil)
+            }
+            return [
+                f("releases", .dir, nil), f("shared", .dir, nil), f("current", .link, nil),
+                f("deploy.log", .file, 48_213),
+                f(".env", .file, 612), f("README.md", .file, 2_048),
+            ]
+        }
+        func history(host: String) async throws -> [HostEvent] {
+            let now = Date()
+            return [
+                HostEvent(
+                    id: "ls_1", who: .you, what: "terminal", detail: "relayed · recorded",
+                    at: now.addingTimeInterval(-3600),
+                    recording: "ls_1", minutes: 12),
+                HostEvent(
+                    id: "ls_2", who: .ai, what: "df -h", detail: "read-only · auto", at: now.addingTimeInterval(-7200),
+                    recording: nil, minutes: nil),
+                HostEvent(
+                    id: "ls_3", who: .system, what: "terminal", detail: "relayed", at: now.addingTimeInterval(-90000),
+                    recording: nil, minutes: 3),
+            ]
+        }
+        func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall {
+            RunnerInstall(terminal: "t_demo", expiresAt: Date().addingTimeInterval(840))
+        }
     }
 
     public static let scenes = [
         "hosts", "hosts-hover", "hosts-selected", "hosts-filtered", "hosts-empty", "hosts-loading", "hosts-offline",
         "hosts-absent", "hosts-failed", "add-quick-empty", "add-quick", "add-quick-error", "add-advanced", "keys",
         "keys-empty", "key-generate", "key-import", "host-overview", "host-terminal", "host-access",
-        "host-access-allowed", "host-access-bare",
+        "host-access-allowed", "host-access-bare", "host-files", "host-history", "runner-waiting", "runner-paired",
     ]
 
     private let model: LeylineModel
@@ -157,6 +194,8 @@ public final class LeylineDemo {
         model.page = .hosts
         model.section = .overview
         model.debugHover = nil
+        model.debugRunner = nil
+        model.deviceLookup = nil
         model.clearWriteError()
         var hosts = Self.hosts()
         var keys = Self.keys()
@@ -170,6 +209,13 @@ public final class LeylineDemo {
             hosts[4].group = nil
             hosts[4].tags = []
             hosts[4].jumpChain = []
+        case "runner-paired":
+            hosts[7].runnerDevice = "d_0000000000000001"
+            model.deviceLookup = { _ in
+                RunnerClaimer(
+                    id: "d_0000000000000001", name: "build-box runner", platform: "linux x86_64",
+                    fingerprint: "SHA256:zNJHblwAqgEFH8fTLgmCjvptDXBTFs9gBrASwrmtyiM")
+            }
         default: break
         }
         await model.useNow(Service(hosts: hosts, keys: keys, known: scene == "keys-empty" ? [] : Self.known()))
@@ -210,6 +256,19 @@ public final class LeylineDemo {
             model.section = .access
         case "host-access-bare":
             model.openID = Self.id(5)
+            model.section = .access
+        case "host-files":
+            model.openID = Self.id(1)
+            model.section = .files
+        case "host-history":
+            model.openID = Self.id(1)
+            model.section = .history
+        case "runner-waiting":
+            model.debugRunner = .waiting(until: Date().addingTimeInterval(840))
+            model.openID = Self.id(8)
+            model.section = .access
+        case "runner-paired":
+            model.openID = Self.id(8)
             model.section = .access
         default: break
         }

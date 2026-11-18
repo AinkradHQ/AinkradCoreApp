@@ -1,5 +1,7 @@
+import Admin
 import CoreUI
 import Projects
+import Shell
 import SwiftUI
 
 /// The space of one host: a top bar with how it is reached, a thin rail and the page the rail picks. Overview, Terminal,
@@ -46,7 +48,7 @@ struct HostSpaceView: View {
         case .commands: HostCommandsPage(state: state)
         case .history: HostHistoryPage(state: state)
         case .access:
-            AccessPage(model: model, host: host)
+            AccessPage(model: model, host: host, state: state)
         case .tunnels:
             let e = model.section.empty
             Island(e.title) {
@@ -175,6 +177,7 @@ private struct HostRail: View {
 struct AccessPage: View {
     let model: LeylineModel
     let host: HostItem
+    let state: HostPageState
     @State private var settled = false
 
     var body: some View {
@@ -343,24 +346,86 @@ struct AccessPage: View {
         Island(
             title: "Make it a runner", sub: "run AI sessions and projects here",
             accessory: {
-                // TODO(Y8-01): make a runner from a host: invite, copy over SSH, install, pair.
-                Soon(prominent: true, help: "Making a host a runner arrives with the runner update") {
+                Button {
+                    confirmRunner()
+                } label: {
                     Label("Make Runner…", systemImage: "server.rack")
                 }
+                .buttonStyle(CoreButtonStyle(.prominent, busy: state.runnerState == .starting))
+                .disabled(model.readOnly || host.runnerDevice != nil || busyInstalling)
+                .help(
+                    host.runnerDevice != nil
+                        ? "This host is already a runner" : "Install the Ainkrad runner here (Touch ID)"
+                )
+                .accessibilityIdentifier("runner-make")
             }
         ) {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                ForEach(
-                    Array(
-                        [
-                            "Create a one-time invite", "Copy it to the host over SSH",
-                            "Install the Ainkrad runner (sudo, in a terminal you watch)", "Pair with the Core",
-                        ].enumerated()), id: \.offset
-                ) { i, step in
-                    Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
+            VStack(alignment: .leading, spacing: Space.s3) {
+                runnerStatus
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    ForEach(
+                        Array(
+                            [
+                                "Create a one-time invite", "Copy it to the host over SSH",
+                                "Install the Ainkrad runner (sudo, in a terminal you watch)", "Pair with the Core",
+                            ].enumerated()), id: \.offset
+                    ) { i, step in
+                        Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
+                    }
                 }
             }
         }
         .accessibilityIdentifier("access-runner")
+    }
+
+    private var busyInstalling: Bool {
+        switch state.runnerState {
+        case .starting, .waiting: true
+        default: false
+        }
+    }
+
+    private func confirmRunner() {
+        model.host.shell.presentSheet(
+            title: "Make \(host.name) a runner?",
+            message:
+                "Ainkrad copies a one-time invite to the host and opens a terminal that installs the runner as root. You type the sudo password there; Ainkrad never sees it. The invite ends in 15 minutes.",
+            actions: [
+                ShellSheetAction("Cancel"),
+                ShellSheetAction("Make Runner", primary: true) { Task { await state.makeRunner() } },
+            ], symbol: "server.rack")
+    }
+
+    /// What the install is doing, and, once it paired, which machine claimed the invite: the invite is its own approval, so this
+    /// is the person's one check that it is the machine they meant.
+    @ViewBuilder private var runnerStatus: some View {
+        switch state.runnerState {
+        case .waiting(let until):
+            CoreNotice(
+                symbol: "terminal", title: "Type your sudo password in the terminal",
+                text: until.map {
+                    "Waiting for the runner to pair. The invite ends \($0.formatted(date: .omitted, time: .shortened))."
+                }
+                    ?? "Waiting for the runner to pair.", tone: .queue)
+        case .expired:
+            CoreNotice(
+                symbol: "clock.badge.exclamationmark", title: "The invite ended",
+                text: "Nothing was installed and the invite is gone. Start again when you are at the terminal.",
+                tone: .warn)
+        default:
+            if let device = host.runnerDevice { claimer(device) }
+        }
+    }
+
+    private func claimer(_ device: String) -> some View {
+        let c = model.deviceLookup?(device)
+        let facts = [c?.name, c?.platform, c?.fingerprint.map { "key \($0)" }].compactMap { $0 }
+        return CoreNotice(
+            symbol: "checkmark.seal", title: "This host is a runner",
+            text: facts.isEmpty
+                ? "Paired as device \(device)."
+                : "Paired as \(facts.joined(separator: " · ")). Check it is the machine you meant.", tone: .done
+        )
+        .accessibilityIdentifier("runner-claimer")
     }
 }

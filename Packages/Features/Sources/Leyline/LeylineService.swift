@@ -30,6 +30,12 @@ protocol LeylineService: Sendable {
     func recording(_ id: String) async throws -> Recording
     func startDirect(host: String) async throws -> DirectLease
     func stopDirect(host: String) async throws
+    /// The terminal sessions of the host and whether the Core is recording each (`GET /hosts/{h}/sessions`).
+    func sessions(host: String) async throws -> [HostSession]
+    /// Pauses the recording of a session (`POST /sessions/{s}/recording/pause`); no step-up needed.
+    func pauseRecording(session: String) async throws
+    /// Makes the host a runner (`POST /hosts/{h}/runner`, a step-up route): opens a terminal with the installer typed in.
+    func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall
 }
 
 extension LeylineService {
@@ -47,6 +53,9 @@ extension LeylineService {
     func recording(_ id: String) async throws -> Recording { throw LeylineFailure.notYet }
     func startDirect(host: String) async throws -> DirectLease { throw LeylineFailure.notYet }
     func stopDirect(host: String) async throws { throw LeylineFailure.notYet }
+    func sessions(host: String) async throws -> [HostSession] { throw LeylineFailure.notYet }
+    func pauseRecording(session: String) async throws { throw LeylineFailure.notYet }
+    func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall { throw LeylineFailure.notYet }
 }
 
 /// A new host, as the Add Host sheets fill it. Nothing optional is sent as null: the Core takes its defaults.
@@ -172,18 +181,22 @@ struct LiveLeylineService: LeylineService {
         ).item
     }
 
-    func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
-        async throws -> T
-    {
-        let data: Data
+    /// The answer's bytes, as the Core sent them (a recording is a text file, not JSON).
+    func raw(_ method: String, _ path: String, _ body: (any Encodable)? = nil) async throws -> Data {
         do {
-            data = try await connection.signedRequest(
+            return try await connection.signedRequest(
                 method: method, target: Self.base + path, body: try body.map { try JSONEncoder().encode($0) } ?? Data())
         } catch CoreError.http(let status, let code, let message) {
             throw Self.failure(status: status, code: code, message: message)
         } catch CoreError.badRequest(let message) {
             throw Self.failure(status: 400, code: "bad_request", message: message)
         }
+    }
+
+    func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
+        async throws -> T
+    {
+        let data = try await raw(method, path, body)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         do { return try decoder.decode(T.self, from: data) } catch {
@@ -210,6 +223,21 @@ struct LiveLeylineService: LeylineService {
         case 404, 501: LeylineFailure(sentence: "This Core does not have Leyline yet.", code: code, status: status)
         case 409 where code == "no_runner":
             LeylineFailure(sentence: "No runner can reach this host. Pick one on Access.", code: code, status: status)
+        case 409 where code == "already_runner":
+            LeylineFailure(sentence: "This host is already a runner.", code: code, status: status)
+        case 409 where code == "host_not_trusted":
+            LeylineFailure(
+                sentence: "Trust the host key of every host on the way first (Access).", code: code, status: status)
+        case 409 where code == "runner_cannot_ssh" || code == "runner_cannot_sftp":
+            LeylineFailure(
+                sentence: "The runner that reaches this host is too old for ssh. Update it first.", code: code,
+                status: status)
+        case 409 where code == "out_of_order":
+            LeylineFailure(sentence: "The upload got out of order. Try again.", code: code, status: status)
+        case 413:
+            LeylineFailure(sentence: "That file is larger than 64 MB.", code: code, status: status)
+        case 502 where code == "host_unavailable" || code == "sftp_failed":
+            LeylineFailure(sentence: "The host could not do that. Check it is reachable.", code: code, status: status)
         case 409 where code == "host_needs_key":
             LeylineFailure(sentence: "Give this host an ssh key first (Access).", code: code, status: status)
         case 409 where code.hasPrefix("host_key"):
@@ -237,12 +265,13 @@ struct HostWire: Decodable {
     let aiRule: String
     let os: String?
     let createdAt: String
+    let runnerDevice: String?
 
     var item: HostItem {
         HostItem(
             id: id, name: name, address: address, port: port, username: username, keyID: keyId,
             jumpChain: jumpChain, viaRunner: viaRunner, group: group, tags: tags, aiRule: AIRule(wire: aiRule),
-            os: os, createdAt: Self.date(createdAt))
+            os: os, createdAt: Self.date(createdAt), runnerDevice: runnerDevice)
     }
 
     static func date(_ s: String) -> Date? {

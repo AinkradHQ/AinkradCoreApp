@@ -54,6 +54,9 @@ struct HostItem: Identifiable, Equatable, Sendable {
     var aiRule: AIRule
     var os: String?
     var createdAt: Date?
+    /// The runner device this host was made into (Make Runner): display only, never a route and never proof that the
+    /// runner is this host (the Core says the same).
+    var runnerDevice: String?
 
     /// `user@address`, with the port only when it is not 22.
     var login: String { "\(username)@\(address)" + (port == 22 ? "" : ":\(port)") }

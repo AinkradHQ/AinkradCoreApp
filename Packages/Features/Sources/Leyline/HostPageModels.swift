@@ -288,9 +288,86 @@ struct DirectLease: Equatable, Sendable {
 }
 
 struct DirectWire: Decodable {
-    let command: String
+    /// What to run in a terminal on the Mac: it reaches the host, and only the host.
+    let ready: String
     let expiresAt: String?
-    var item: DirectLease { DirectLease(command: command, expiresAt: expiresAt.flatMap(HostWire.date)) }
+    var item: DirectLease { DirectLease(command: ready, expiresAt: expiresAt.flatMap(HostWire.date)) }
+}
+
+/// One terminal session on a host, as the Core's history lists it (`SessionRow`).
+struct HostSession: Identifiable, Equatable, Sendable {
+    let id: String
+    let terminal: String
+    /// `person:d_…` or `session:…`.
+    let principal: String
+    let startedAt: Date?
+    let endedAt: Date?
+    /// A recording exists to replay.
+    let recorded: Bool
+    /// Recording right now (not ended, not paused).
+    let recording: Bool
+
+    var live: Bool { endedAt == nil }
+    var paused: Bool { live && recorded && !recording }
+}
+
+struct SessionWire: Decodable {
+    let id: String
+    let terminal: String
+    let principal: String
+    let startedAt: String
+    let endedAt: String?
+    let endReason: String?
+    let recorded: Bool
+    let recording: Bool
+
+    var item: HostSession {
+        HostSession(
+            id: id, terminal: terminal, principal: principal, startedAt: HostWire.date(startedAt),
+            endedAt: endedAt.flatMap(HostWire.date), recorded: recorded, recording: recording)
+    }
+
+    /// The history row of a terminal session.
+    var event: HostEvent {
+        let start = HostWire.date(startedAt)
+        let end = endedAt.flatMap(HostWire.date)
+        let who: HostEvent.Who = principal.hasPrefix("session:") ? .ai : principal.hasPrefix("person:") ? .you : .system
+        var detail = "relayed"
+        if recorded { detail += " · recorded" }
+        if let endReason, endReason != "exited" { detail += " · \(endReason.replacingOccurrences(of: "_", with: " "))" }
+        return HostEvent(
+            id: id, who: who, what: "terminal", detail: detail, at: start, recording: recorded ? id : nil,
+            minutes: start.flatMap { s in end.map { max(0, Int($0.timeIntervalSince(s) / 60)) } })
+    }
+}
+
+/// The runner install the Core started: a terminal with the installer typed in (the person types the sudo password there),
+/// and an invite that ends in 15 minutes.
+struct RunnerInstall: Equatable, Sendable {
+    let terminal: String
+    let expiresAt: Date?
+}
+
+struct RunnerInstallWire: Decodable {
+    struct Session: Decodable { let terminal: String }
+    let session: Session
+    let expiresAt: String
+    var item: RunnerInstall { RunnerInstall(terminal: session.terminal, expiresAt: HostWire.date(expiresAt)) }
+}
+
+/// The machine that claimed the invite: the one check the person has that it is the machine they meant, because the invite is
+/// its own approval. Read from the Core's device list (name, platform, key fingerprint).
+public struct RunnerClaimer: Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let platform: String?
+    public let fingerprint: String?
+    public init(id: String, name: String, platform: String?, fingerprint: String?) {
+        self.id = id
+        self.name = name
+        self.platform = platform
+        self.fingerprint = fingerprint
+    }
 }
 
 /// A host terminal the Core opened: the id is the Core terminal the existing pane attaches to.

@@ -57,4 +57,46 @@ struct HostPageTests {
         let h = try d.decode(HealthWire.self, from: Data(json.utf8)).item
         #expect(h.state == .up && h.cpuPct == 50 && h.diskPct == nil && h.cpuSeries == [25])
     }
+
+    private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        return try d.decode(type, from: Data(json.utf8))
+    }
+
+    /// The Core's session row, as the history and the recording indicator read it.
+    @Test func sessionsBecomeHistoryRowsAndTheRecordingState() throws {
+        let live = try decode(
+            SessionWire.self,
+            #"{"id":"ls_1","host_id":"h_1","terminal":"t_1","runner":"d_r","principal":"person:d_me","started_at":"2026-11-18T10:00:00Z","ended_at":null,"end_reason":null,"exit_code":null,"recorded":true,"recording":false,"recording_bytes":10}"#
+        ).item
+        #expect(live.live && live.paused, "recorded, not recording, not ended = paused")
+        let done = try decode(
+            SessionWire.self,
+            #"{"id":"ls_2","host_id":"h_1","terminal":"t_2","runner":"d_r","principal":"session:s1","started_at":"2026-11-18T10:00:00Z","ended_at":"2026-11-18T10:12:00Z","end_reason":"runner_lost","exit_code":null,"recorded":true,"recording":false,"recording_bytes":10}"#
+        )
+        #expect(done.event.who == .ai && done.event.minutes == 12 && done.event.recording == "ls_2")
+        #expect(done.event.detail.contains("runner lost"))
+    }
+
+    @Test func directAndRunnerAnswersDecode() throws {
+        let lease = try decode(
+            DirectWire.self,
+            #"{"id":"ld_1","host_id":"h_1","runner":"d_r","socket":"/x","ready":"ssh -F /x/ssh_config me@h","started_at":"2026-11-18T10:00:00Z","expires_at":"2026-11-18T11:00:00Z"}"#
+        ).item
+        #expect(lease.command.hasPrefix("ssh -F") && lease.expiresAt != nil)
+        let run = try decode(
+            RunnerInstallWire.self,
+            #"{"session":{"id":"ls_1","host_id":"h_1","terminal":"t_9","recording":false},"pairing":"p_1","expires_at":"2026-11-18T10:15:00Z"}"#
+        ).item
+        #expect(run.terminal == "t_9" && run.expiresAt != nil)
+    }
+
+    @Test func aFileListingDecodes() throws {
+        let f = try decode(
+            [RemoteFileWire].self,
+            #"[{"path":"/srv/a","name":"a","kind":"dir","size":null,"modified":"2026-11-18T10:00:00Z","target":null}]"#
+        ).map(\.item)
+        #expect(f.count == 1 && f[0].isFolder && f[0].path == "/srv/a")
+    }
 }

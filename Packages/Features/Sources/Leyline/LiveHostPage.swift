@@ -1,10 +1,8 @@
 import CoreKit
 import Foundation
 
-/// The live host-page calls. Routes that exist in the Core today: terminals (Y3-01), commands and runs (Y4-02). The rest
-/// (health, files, history, Mac-direct) are the routes the plan's stories add (Y5-01, Y2-03, Y3-02, Y6-01); their paths and
-/// shapes are written down here so the epic build has one place to align, and until the Core has them they answer 404 and
-/// the page shows "This Core cannot do that yet".
+/// The live host-page calls: terminals, health, commands and runs, files (SFTP), sessions and recordings, Mac-direct and
+/// Make Runner. An older Core answers 404 and the page shows "This Core cannot do that yet".
 extension LiveLeylineService {
     /// Most a transfer may hold in memory, and the chunk each signed request carries (a body is JSON, at most 1 MiB).
     static let transferCap = 64 << 20
@@ -26,7 +24,6 @@ extension LiveLeylineService {
         ).terminal
     }
 
-    // TODO(Y5-01): `GET /hosts/{h}/health` (the samples the prober stores) is not routed yet.
     func health(host: String) async throws -> HostHealth {
         try await call("GET", "/hosts/\(Self.seg(host))/health", as: HealthWire.self).item
     }
@@ -55,8 +52,8 @@ extension LiveLeylineService {
         try await call("GET", "/runs/\(Self.seg(id))", as: RunWire.self).item(host: host, name: name)
     }
 
-    // TODO(Y2-03): the Core routes for SFTP. Shapes assumed: a listing is `[RemoteFileWire]`; a download is read in chunks
-    // (`offset`, `limit`) answered as `{data: base64, eof}`; an upload is written in chunks `{offset, data: base64, done}`.
+    // SFTP: a listing is `[RemoteFileWire]`; a download is read in chunks (`offset`, `limit`) answered as
+    // `{data: base64, eof}`; an upload is sent in chunks `{offset, data: base64, done}` and written to the host on `done`.
     func files(host: String, path: String) async throws -> [RemoteFile] {
         try await call("GET", "/hosts/\(Self.seg(host))/files?path=\(Self.q(path))", as: [RemoteFileWire].self).map(
             \.item)
@@ -108,17 +105,34 @@ extension LiveLeylineService {
     /// Answers whose body this app ignores.
     private struct Ack: Decodable {}
 
-    // TODO(Y3-02): `GET /hosts/{h}/sessions` (what happened here) and `GET /sessions/{s}/recording` (the cast).
+    func sessions(host: String) async throws -> [HostSession] {
+        try await call("GET", "/hosts/\(Self.seg(host))/sessions", as: [SessionWire].self).map(\.item)
+    }
+
     func history(host: String) async throws -> [HostEvent] {
-        try await call("GET", "/hosts/\(Self.seg(host))/history", as: [HostEventWire].self).map(\.item)
+        try await call("GET", "/hosts/\(Self.seg(host))/sessions", as: [SessionWire].self).map(\.event)
     }
 
+    /// The cast is an asciicast file (`application/x-asciicast`), not JSON; it needs a live step-up.
     func recording(_ id: String) async throws -> Recording {
-        struct Cast: Decodable { let cast: String }
-        return Recording.parse(Data(try await call("GET", "/recordings/\(Self.seg(id))", as: Cast.self).cast.utf8))
+        Recording.parse(try await raw("GET", "/sessions/\(Self.seg(id))/recording"))
     }
 
-    // TODO(Y6-01): `POST /hosts/{h}/direct` answers the ready command; `/direct/revoke` drops the lease.
+    func pauseRecording(session: String) async throws {
+        _ = try await call("POST", "/sessions/\(Self.seg(session))/recording/pause", as: Ack.self)
+    }
+
+    func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall {
+        struct Body: Encodable {
+            let rows: Int
+            let cols: Int
+        }
+        return try await call(
+            "POST", "/hosts/\(Self.seg(host))/runner", Body(rows: rows, cols: cols), as: RunnerInstallWire.self
+        ).item
+    }
+
+    // `POST /hosts/{h}/direct` answers the ready command; `/direct/revoke` drops the lease.
     func startDirect(host: String) async throws -> DirectLease {
         try await call("POST", "/hosts/\(Self.seg(host))/direct", as: DirectWire.self).item
     }
