@@ -4,3 +4,6 @@
 .build/
 .swiftpm/
 xcuserdata/
+
+# DesignEngine.xcframework (scripts/sync-engine.sh, pinned in scripts/engine.pin)
+Packages/DesignCanvas/Vendor/
