@@ -31,10 +31,16 @@ public final class ProjectsModel {
     var quickOpen = false
     var quickName = ""
     /// A refusal from the Core for the write in flight, in words.
-    private(set) var writeError: String?
-    private(set) var busy = false
+    internal(set) var writeError: String?
+    internal(set) var busy = false
     /// A write came back `forbidden_scope`: this device can read but not change.
-    private(set) var readOnly = false
+    internal(set) var readOnly = false
+    /// Projects whose Start, Stop or Restart is in flight (the buttons wait).
+    internal(set) var controlling: Set<Int64> = []
+    /// The newest run of each project, as the Core's run routes last said it.
+    @ObservationIgnored var runStates: [Int64: ProjectRunState] = [:]
+    /// Bumps when a colour is picked, so the views that read `colour(_:)` redraw.
+    private var colourTick = 0
     @ObservationIgnored let colours: ProjectColours
     @ObservationIgnored var now: () -> Date = { Date() }
     /// The Core's name, for "Runs on" (the Core this Mac is paired with).
@@ -102,7 +108,18 @@ public final class ProjectsModel {
     func reload() async {
         guard let service else { return }
         do {
-            projects = try await service.projects().sorted { $0.updatedAt > $1.updatedAt }
+            let list = try await service.projects().sorted { $0.updatedAt > $1.updatedAt }
+            // One read of each run, in parallel: the gallery's tags and the top bar need them.
+            let runs = await withTaskGroup(of: (Int64, ProjectRunState?).self) { group in
+                for p in list where !p.repos.isEmpty {
+                    group.addTask { (p.id, try? await service.run(project: p.id)) }
+                }
+                var out: [Int64: ProjectRunState] = [:]
+                for await (id, r) in group { if let r { out[id] = r } }
+                return out
+            }
+            runStates = runs
+            projects = list.map(applying)
             load = .ready
         } catch {
             // A list already on screen stays; only a first load that failed shows the failure.
@@ -128,13 +145,14 @@ public final class ProjectsModel {
 
     func project(_ id: Int64?) -> ProjectItem? { id.flatMap { id in projects.first { $0.id == id } } }
     var open: ProjectItem? { project(openID) }
-    func colour(_ p: ProjectItem) -> ProjectColour { colours.colour(p.slug) }
+    func colour(_ p: ProjectItem) -> ProjectColour {
+        _ = colourTick
+        return colours.colour(p.slug)
+    }
 
-    /// The gallery's cards after the Filter field.
-    var shown: [ProjectItem] {
-        let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty
-            ? projects : projects.filter { $0.name.lowercased().contains(q) || $0.slug.contains(q) }
+    func setColour(_ c: ProjectColour, for p: ProjectItem) {
+        colours.set(c, for: p.slug)
+        colourTick += 1
     }
 
     // MARK: words
@@ -283,16 +301,6 @@ public final class ProjectsModel {
     func closeProject() {
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
-
-    /// Start, Stop and Restart. TODO(P6-02): the run engine; until then only the Debug demo's stand-in data answers.
-    func control(_ action: RunAction, _ project: ProjectItem) {
-        #if DEBUG
-        demoControl(action, project)
-        #endif
-    }
-
-    /// Whether the Core can run this project yet (a real one cannot).
-    func canControl(_ project: ProjectItem) -> Bool { project.live != nil }
 
     func newProject() {
         guard !readOnly else { return }
