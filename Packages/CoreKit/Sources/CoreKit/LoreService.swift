@@ -107,6 +107,47 @@ public struct LoreFilter: Equatable, Sendable {
     }
 }
 
+/// A note that links to the open one (`GET /notes/{id}/backlinks`). `context` is note text: outside data, shown as plain text.
+public struct LoreBacklink: Equatable, Sendable, Identifiable, Decodable {
+    /// The linking note's id.
+    public var note: String
+    public var title: String
+    public var heading: String
+    public var context: String
+    public var project: String?
+    public var id: String { note + "#" + heading + "#" + context }
+    public init(note: String, title: String, heading: String = "", context: String = "", project: String? = nil) {
+        self.note = note
+        self.title = title
+        self.heading = heading
+        self.context = context
+        self.project = project
+    }
+}
+
+/// One saved text of a note (`GET /notes/{id}/versions`, no text). `kind`: `auto`, `named` or `conflict`.
+public struct LoreVersion: Equatable, Sendable, Identifiable, Decodable {
+    public var id: String
+    public var kind: String
+    public var name: String?
+    public var rev: Int
+    /// `person:d_…`, `session:as_…` or `system`.
+    public var origin: String
+    /// ISO 8601 text as the Core wrote it.
+    public var createdAt: String
+    public init(
+        id: String, kind: String = "auto", name: String? = nil, rev: Int = 1, origin: String = "system",
+        createdAt: String = ""
+    ) {
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.rev = rev
+        self.origin = origin
+        self.createdAt = createdAt
+    }
+}
+
 /// What the Lore space asks of the Core. Errors are `CoreError` (`http(404/501)` = no Lore module on this Core).
 public protocol LoreService: Sendable {
     /// The daily note of `day` (`YYYY-MM-DD`), created empty on first use.
@@ -126,6 +167,17 @@ public protocol LoreService: Sendable {
     func restore(_ id: String) async throws -> LoreNote
     /// The R1-06 zip of every note, or of one project's. `GET /export`.
     func export(project: String?) async throws -> Data
+    /// The live notes linking to this one, newest first (R1-04).
+    func backlinks(_ id: String) async throws -> [LoreBacklink]
+    /// The note's versions, newest first, without text.
+    func versions(_ id: String) async throws -> [LoreVersion]
+    /// One version's text.
+    func versionText(_ id: String, version: String) async throws -> String
+    /// Restore = a normal save at the head; `version` of the result is an auto version of the replaced text, so
+    /// restoring that one undoes this.
+    func restore(_ id: String, version: String) async throws -> LoreSaveResult
+    /// Moves a note to a project (nil = personal).
+    func move(_ id: String, project: String?) async throws -> LoreNote
 }
 
 /// A Core (or a test double) without these routes answers "not implemented", like an old Core does.
@@ -141,6 +193,7 @@ extension LoreService {
     }
     public func export(project: String?) async throws -> Data {
         throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot export notes.")
+    }
     }
 }
 
@@ -247,6 +300,38 @@ public struct LiveLoreService: LoreService {
         if let p = f.project { s += "&project=\(Self.query(p))" }
         if let t = f.tag, !t.isEmpty { s += "&tag=\(Self.query(t))" }
         return s
+    }
+
+    public func backlinks(_ id: String) async throws -> [LoreBacklink] {
+        try await call("GET", "/notes/\(Self.seg(id))/backlinks", as: [LoreBacklink].self)
+    }
+
+    public func versions(_ id: String) async throws -> [LoreVersion] {
+        try await call("GET", "/notes/\(Self.seg(id))/versions", as: [LoreVersion].self)
+    }
+
+    public func versionText(_ id: String, version: String) async throws -> String {
+        struct View: Decodable { let text: String }
+        return try await call("GET", "/notes/\(Self.seg(id))/versions/\(Self.seg(version))", as: View.self).text
+    }
+
+    public func restore(_ id: String, version: String) async throws -> LoreSaveResult {
+        struct Body: Encodable { let version: String }
+        let w = try await call("POST", "/notes/\(Self.seg(id))/restore", Body(version: version), as: SaveWire.self)
+        return LoreSaveResult(note: w.note.note, outcome: w.outcome, version: w.version)
+    }
+
+    public func move(_ id: String, project: String?) async throws -> LoreNote {
+        struct Body: Encodable {
+            let project: String?
+            // `null` makes the note personal, so the key is always sent.
+            func encode(to encoder: any Encoder) throws {
+                var c = encoder.container(keyedBy: Keys.self)
+                try c.encode(project, forKey: .project)
+            }
+            enum Keys: String, CodingKey { case project }
+        }
+        return try await call("PATCH", "/notes/\(Self.seg(id))", Body(project: project), as: NoteWire.self).note
     }
 
     private func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)
