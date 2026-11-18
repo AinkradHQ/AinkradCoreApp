@@ -61,7 +61,7 @@ extension RoomSettings {
 
     func retention(_ p: RoomPolicy) -> some View {
         let care = model.care
-        let ask = care.roomID == room.id ? care.retentionAsk : nil
+        let ask = care?.roomID == room.id ? care?.retentionAsk : nil
         return VStack(alignment: .leading, spacing: Space.s1) {
             head("Retention", "Turning it on asks for Touch ID")
             row(
