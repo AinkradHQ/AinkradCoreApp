@@ -194,7 +194,6 @@ extension LoreService {
     public func export(project: String?) async throws -> Data {
         throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot export notes.")
     }
-    }
 }
 
 /// The real one: signed requests through the paired connection, the way Leyline and the Brain reach their modules.
