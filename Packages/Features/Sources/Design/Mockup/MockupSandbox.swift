@@ -15,11 +15,19 @@ import WebKit
 //  3. CSP (sent as a header on every response): `default-src 'none'`, `connect-src 'none'` (no fetch/XHR/WebSocket even
 //     to the package), `frame-src 'none'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`; scripts,
 //     styles, images and fonts only from `mockup:`. Inline script/style stay allowed (the mockups are single files).
-//  4. NO script message handler is ever added and no user script is injected, so `window.webkit` is absent: the page
-//     cannot call into the app.
+//  4. NO script message handler is ever added, so `window.webkit` is absent: the page cannot call into the app. The one
+//     user script (`hardening`, document start, every frame) only REMOVES things: the WebRTC constructors and the
+//     `preconnect|dns-prefetch|prefetch|preload` link hints. WebRTC is also switched off in the preferences
+//     (private `_peerConnectionEnabled`, set only if this SDK has it) because ICE/TURN opens sockets the content rules
+//     never see.
 //  5. Navigation (`MockupNavigation`): only `mockup://package/<html file of the package>` may load; every other
 //     navigation, download and new window is cancelled. Clicking a link to the outside does nothing.
 //  6. Non-persistent data store (no cookies, storage or cache on disk), no popups, no link preview, no inspector.
+//
+// ACCEPTED LIMITS. (a) A page can write to the clipboard on a user click (a normal gesture-gated web API); it cannot
+// read it. (b) The test canary is a loopback TCP listener: it cannot observe DNS lookups or UDP, so the link-hint
+// stripping and the WebRTC removal are belt and braces that the canary alone cannot prove. (c) Camera/microphone
+// requests are denied by the UI delegate.
 //
 // The Core serves package files as inert attachments from its own origin; this viewer is the only place they render.
 
@@ -134,6 +142,31 @@ enum MockupSandbox {
         return list
     }
 
+    /// Document-start script for every frame: removes WebRTC and the network-warming link hints.
+    static let hardening = """
+        (() => {
+          for (const n of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel"]) {
+            try { delete window[n]; } catch (e) {}
+            if (typeof window[n] !== "undefined") {
+              try { Object.defineProperty(window, n, { value: undefined, configurable: false }); } catch (e) {}
+            }
+          }
+          const bad = /^(preconnect|dns-prefetch|prefetch|preload|prerender|modulepreload)$/i;
+          const strip = (l) => {
+            if (!l.localName || l.localName !== "link") return;
+            const was = l.getAttribute("rel") || "";
+            const rel = was.split(/\\s+/).filter((x) => !bad.test(x)).join(" ");
+            if (rel !== was) l.setAttribute("rel", rel || "x-blocked");
+          };
+          new MutationObserver((ms) => {
+            for (const m of ms) {
+              if (m.type === "attributes") strip(m.target);
+              for (const a of m.addedNodes) if (a.querySelectorAll) { strip(a); a.querySelectorAll("link").forEach(strip); }
+            }
+          }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["rel"] });
+        })();
+        """
+
     /// The sandboxed web view of one package. Fails closed: no rules, no web view.
     @MainActor static func makeWebView(
         handler: MockupSchemeHandler, navigation: MockupNavigation
@@ -143,7 +176,13 @@ enum MockupSandbox {
         config.websiteDataStore = .nonPersistent()
         config.setURLSchemeHandler(handler, forURLScheme: scheme)
         config.userContentController.add(rules)
-        // No `add(_:name:)` and no user script anywhere: the page has no way into the app.
+        // No `add(_:name:)` anywhere: the page has no way into the app. The user script only removes features.
+        config.userContentController.addUserScript(
+            WKUserScript(source: hardening, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        // Private key: guarded, because KVC on an unknown key raises an NSException.
+        if config.preferences.responds(to: NSSelectorFromString("_setPeerConnectionEnabled:")) {
+            config.preferences.setValue(false, forKey: "_peerConnectionEnabled")
+        }
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         config.mediaTypesRequiringUserActionForPlayback = .all
         let web = WKWebView(frame: .zero, configuration: config)
@@ -178,9 +217,12 @@ final class MockupSchemeHandler: NSObject, WKURLSchemeHandler {
     let doc: String
     let index: [String: String]
     let source: any MockupSource
+    /// Test-only: false drops the CSP header so a test can prove the content rules alone hold. Always true in the app.
+    let sendCSP: Bool
     private var running: [ObjectIdentifier: Task<Void, Never>] = [:]
 
-    init(package: MockupPackage, source: any MockupSource) {
+    init(package: MockupPackage, source: any MockupSource, sendCSP: Bool = true) {
+        self.sendCSP = sendCSP
         doc = package.doc
         index = package.index
         self.source = source
@@ -199,11 +241,12 @@ final class MockupSchemeHandler: NSObject, WKURLSchemeHandler {
                 !Task.isCancelled
             else { return fail(task, status: 404, url: url, cancelled: Task.isCancelled) }
             guard !Task.isCancelled else { return }
-            let head: [String: String] = [
+            var head: [String: String] = [
                 "Content-Type": type, "Content-Length": String(data.count),
-                "Content-Security-Policy": MockupSandbox.csp, "X-Content-Type-Options": "nosniff",
-                "Cache-Control": "no-store", "Cross-Origin-Resource-Policy": "same-origin",
+                "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store",
+                "Cross-Origin-Resource-Policy": "same-origin",
             ]
+            if sendCSP { head["Content-Security-Policy"] = MockupSandbox.csp }
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: head)
             task.didReceive(
                 response
@@ -271,5 +314,14 @@ final class MockupNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
     ) -> WKWebView? {
         onBlocked(action.request.url)
         return nil
+    }
+
+    /// Camera and microphone are never available to a mockup.
+    func webView(
+        _ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
+        decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+    ) {
+        decisionHandler(.deny)
     }
 }

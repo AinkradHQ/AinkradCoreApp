@@ -8,7 +8,7 @@ import WebKit
 /// A package served from the `Fixtures/hostile-mockup` folder; `__PORT__` becomes the canary's port.
 struct FixtureSource: MockupSource {
     let port: UInt16
-    static let names = ["index.html", "style.css", "probe.js", "next.html", "local.json"]
+    static let names = ["index.html", "style.css", "probe.js", "next.html", "local.json", "worker.js"]
 
     func package(_ doc: String) async throws -> MockupPackage {
         MockupPackage(doc: doc, screens: [.init(name: "index", path: "index.html", states: [])], files: Self.names)
@@ -100,7 +100,8 @@ struct MockupSandboxTests {
 
     /// Loads the hostile package in the real sandbox. Every probe must fail, the canary must see nothing, the page
     /// must have no bridge and must stay inside the package, while an in-package link still clicks through.
-    @Test func theHostilePackageReachesNothing() async throws {
+    /// Pass 1 has the CSP; pass 2 has NO CSP header, so the content rules and the hardening script must hold alone.
+    @Test(arguments: [true, false]) func theHostilePackageReachesNothing(csp: Bool) async throws {
         let canary = try await Canary()
         defer { canary.stop() }
         let source = FixtureSource(port: canary.port)
@@ -109,22 +110,38 @@ struct MockupSandboxTests {
         var blocked = 0
         nav.onBlocked = { _ in blocked += 1 }
         let web = try await MockupSandbox.makeWebView(
-            handler: MockupSchemeHandler(package: pkg, source: source), navigation: nav)
+            handler: MockupSchemeHandler(package: pkg, source: source, sendCSP: csp), navigation: nav)
         web.frame = CGRect(x: 0, y: 0, width: 800, height: 600)
         web.load(URLRequest(url: MockupSandbox.url("index.html")!))
 
         let json = try await poll(
             web, "document.body && document.body.dataset.done === '1' ? document.body.dataset.result : null")
         let r = try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
-        for k in ["fetch", "fetchNoCors", "fetchPackage", "xhr", "ws", "img"] {
-            #expect(r[k] as? String == "blocked", "\(k)")
+        for k in [
+            "fetch", "fetchNoCors", "xhr", "ws", "img", "eventSource", "worker", "fileFetch", "otherFetch", "dotsFetch",
+        ] {
+            #expect(r[k] as? String == "blocked", "\(k) (csp \(csp))")
         }
+        if csp { #expect(r["fetchPackage"] as? String == "blocked", "CSP connect-src 'none'") }
         #expect(r["beacon"] as? String != "reached")
         #expect(r["webkit"] as? String == "none", "no webkit.messageHandlers")
         #expect(r["handlers"] as? Int == 0)
+        for k in ["rtc", "webkitRtc", "rtcData"] { #expect(r[k] as? String == "undefined", "\(k) must be removed") }
+        #expect(r["openBlank"] as? String == "none")
+        // Is the CSP really on (pass 1) or really off (pass 2)? Without this a header typo would pass silently.
+        #expect(r["eval"] as? String == (csp ? "blocked" : "allowed"))
 
         try await Task.sleep(for: .milliseconds(800))
-        #expect(canary.connections == 0, "a request reached the network")
+        #expect(canary.connections == 0, "a request reached the network (csp \(csp))")
+        let body = try await web.evaluateJavaScript(
+            "JSON.stringify([document.body.dataset.violations, document.body.dataset.fileImg || '', document.body.dataset.frameRtc || ''])"
+        ) as? String
+        let extra = try #require(
+            try JSONSerialization.jsonObject(with: Data((body ?? "[]").utf8)) as? [String])
+        if csp { #expect((Int(extra[0]) ?? 0) > 0, "securitypolicyviolation events fired") }
+        else { #expect(extra[0] == "0") }
+        #expect(extra[1] != "reached", "file:// image")
+        #expect(extra[2] != "function" && extra[2] != "object", "RTC inside the srcdoc frame")
         #expect(web.url?.host == MockupSandbox.host && web.url?.scheme == MockupSandbox.scheme)
         #expect(web.url?.path == "/index.html", "still on the first page after every navigation attempt")
         #expect(blocked > 0, "the delegate saw and cancelled the attempts")
