@@ -62,6 +62,8 @@ public final class BrainModel {
     /// Activity and Checks keep their own state; both read this model for rooms, Paused and the service.
     @ObservationIgnored public private(set) var activity: ActivityModel!
     @ObservationIgnored public private(set) var checks: ChecksModel!
+    /// The Activity tab's memory view: the viewing room's change sets with Undo.
+    @ObservationIgnored public private(set) var changes: ChangesModel!
     /// The M3 Inbox, room policy and runner history.
     @ObservationIgnored public private(set) var candidates: BrainCandidates!
     /// The viewing room's written overview.
@@ -71,6 +73,7 @@ public final class BrainModel {
         self.host = host
         activity = ActivityModel(brain: self)
         checks = ChecksModel(brain: self)
+        changes = ChangesModel(brain: self)
         candidates = BrainCandidates(brain: self)
         roomOverview = RoomOverviewModel(brain: self)
     }
@@ -92,6 +95,7 @@ public final class BrainModel {
         for id in Self.actionIDs { host.shell.launcher.unregister(id) }
         activity.reset()
         checks.reset()
+        changes.reset()
         candidates.clear()
         clearRoomView()
         rooms = []
@@ -113,7 +117,9 @@ public final class BrainModel {
     /// A real Core serves the Inbox, rooms and sources; Overview, Activity and Checks are on the sample only for now.
     public var visibleTabs: [BrainTab] {
         if isSample { return BrainTab.allCases }
-        return service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
+        var tabs: [BrainTab] = service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
+        if service?.servesChanges == true { tabs.append(.activity) }
+        return tabs
     }
     /// The tab on screen: the chosen one, or the first this Core has.
     public var currentTab: BrainTab { visibleTabs.contains(tab) ? tab : visibleTabs[0] }
@@ -228,6 +234,7 @@ public final class BrainModel {
     /// it here raced the tab's own first load and left the tab on its skeleton.
     func clearRoomView(overview: Bool = true) {
         activity?.clear()
+        changes?.clear()
         if overview { roomOverview?.clear() }
         inboxState.clear()
         inspected = nil
