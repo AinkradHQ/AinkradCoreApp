@@ -52,8 +52,6 @@ public final class LoreModel {
     /// One line under the top bar: a conflict kept as a version, a refused save, a link that was not opened.
     var notice: String?
     var projectNames: [String: String] = [:]
-    /// ⌘O: the open sheet (R6-03 builds it).
-    var openSheet = false
 
     @ObservationIgnored let page: any LorePageText
     /// Quick capture ⇧⌘N (R6-05).
@@ -183,12 +181,14 @@ public final class LoreModel {
         await reload()
     }
 
-    /// New ⌘N: a blank note in the open note's project (personal from a daily note), opened at once.
-    func newNote() async {
+    /// New ⌘N: a blank note in the open note's project (personal from a daily note), opened at once. R6-03's advanced
+    /// line passes the chosen project (`nil` = personal) and tags, which go into the text as `#tag` words.
+    func newNote(inProject chosen: String?? = nil, tags: [String] = []) async {
         guard let service, load == .ready else { return }
         await leave()
         do {
-            let n = try await service.create(text: "", project: note?.kind == "note" ? note?.project : nil)
+            let n = try await service.create(
+                text: LoreTags.text(tags), project: chosen ?? (note?.kind == "note" ? note?.project : nil))
             day = nil
             apply(n)
         } catch { say(error) }
@@ -225,7 +225,7 @@ public final class LoreModel {
     }
 
     /// Shows a note (or a day without one), taking a waiting draft over the Core's text: the next save merges it.
-    private func apply(_ n: LoreNote?) {
+    func apply(_ n: LoreNote?) {
         note = n
         if let d = n?.day { day = d }
         base = n?.rev ?? 0
@@ -247,7 +247,7 @@ public final class LoreModel {
     }
 
     /// Before the page changes: send what was typed.
-    private func leave() async {
+    func leave() async {
         timer?.cancel()
         if dirty { await save() }
     }

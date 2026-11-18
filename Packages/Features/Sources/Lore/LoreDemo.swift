@@ -93,6 +93,39 @@ public final class LoreDemo {
             }
         }
         func projectNames() async throws -> [String: String] { ["7": "Garden Club Website"] }
+
+        // R6-03: the stand-in's list, word search (one hit per note, the first match in bold) and Restore.
+        func list(filter: LoreFilter) async throws -> [LoreNote] {
+            lock.withLock {
+                notes.values.filter { Self.match($0, filter) }.sorted { $0.id < $1.id }
+            }
+        }
+        func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
+            lock.withLock {
+                let hits: [LoreHit] = notes.values.filter { Self.match($0, filter) }.sorted { $0.id < $1.id }
+                    .compactMap { n in
+                        let flat = n.text.replacingOccurrences(of: "\n", with: " ")
+                        guard let r = flat.range(of: query, options: .caseInsensitive) else { return nil }
+                        let start = flat.utf8.distance(from: flat.startIndex, to: r.lowerBound)
+                        let end = flat.utf8.distance(from: flat.startIndex, to: r.upperBound)
+                        return LoreHit(
+                            note: n, snippet: LoreSnippet(text: flat, matches: [LoreSpan(start: start, end: end)]))
+                    }
+                return LoreSearchResult(hits: Array(hits.prefix(limit)), semantic: true)
+            }
+        }
+        func restore(_ id: String) async throws -> LoreNote {
+            try lock.withLock {
+                guard var n = notes[id] else { throw CoreError.http(status: 404, code: "not_found", message: "") }
+                n.trashed = false
+                notes[id] = n
+                return n
+            }
+        }
+        private static func match(_ n: LoreNote, _ f: LoreFilter) -> Bool {
+            n.trashed == (f.state == "trashed") && (f.kind == nil || n.kind == f.kind)
+                && (f.project == nil || n.project == f.project)
+        }
     }
 
     public static let scenes = [
@@ -113,6 +146,9 @@ public final class LoreDemo {
             LoreNote(id: "ln_demopastaaaa", kind: "daily", day: yesterday, title: "", rev: 5, text: Self.pastText),
             LoreNote(
                 id: "ln_demoprojecta", project: "7", title: "Launch checklist", rev: 2, text: Self.projectText),
+            LoreNote(
+                id: "ln_demoshedplan", title: "Shed plan", rev: 4, text: "# Shed plan\n\nA lean-to shed by the fence.",
+                trashed: true),
         ])
     }
 
