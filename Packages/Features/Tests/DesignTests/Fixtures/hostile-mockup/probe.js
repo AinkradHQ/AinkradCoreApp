@@ -51,7 +51,9 @@
   });
   r.fileFetch = await blocked(fetch("file:///etc/hosts"));
   r.otherFetch = await blocked(fetch("mockup://other/x.json"));
-  r.dotsFetch = await blocked(fetch("mockup://package/%2e%2e/x"));
+  // Inside the package scheme the rule list lets the request through; the handler answers a dot-segment path with a
+  // 404, which `fetch` resolves. "Blocked" here means nothing was served (not `ok`), not that the request failed.
+  r.dotsFetch = await fetch("mockup://package/%2e%2e/x").then((x) => (x.ok ? "reached" : "blocked"), () => "blocked");
   // WebRTC: the constructors must be gone; if one survived, aim a TURN-over-TCP probe at the canary.
   r.rtc = typeof RTCPeerConnection;
   r.webkitRtc = typeof webkitRTCPeerConnection;

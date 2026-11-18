@@ -190,4 +190,13 @@ public protocol DesignEditBackend: AnyObject {
     func peers() -> Data?
     func setPresence(_ json: String)
     func tokens() -> Data?
+    /// An unsent edit can never go to the Core (it is over what one update takes): the design must be reopened.
+    var syncStuck: Bool { get }
+    /// The last `edit` was refused because the change is too large for one update.
+    var lastEditTooLarge: Bool { get }
+}
+
+extension DesignEditBackend {
+    public var syncStuck: Bool { false }
+    public var lastEditTooLarge: Bool { false }
 }

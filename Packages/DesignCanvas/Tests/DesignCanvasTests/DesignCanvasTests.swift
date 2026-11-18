@@ -157,7 +157,10 @@ struct AssetFetcherTests {
         func route(_ t: String) -> CanvasAssetInfo.Route { CanvasAssetInfo(contentType: t, check: .ok).route }
         #expect(["font/ttf", "font/otf", "font/woff2"].allSatisfy { route($0) == .font })
         #expect(["image/png", "image/jpeg", "image/gif", "image/webp"].allSatisfy { route($0) == .image })
-        let never = ["image/svg+xml", "application/pdf", "application/zip", "", "Font/TTF", "font/ttf; x=1", "font/woff", "text/html"]
+        let never = [
+            "image/svg+xml", "application/pdf", "application/zip", "", "Font/TTF", "font/ttf; x=1", "font/woff",
+            "text/html",
+        ]
         #expect(never.allSatisfy { route($0) == .none })
     }
 
@@ -174,5 +177,27 @@ struct AssetFetcherTests {
         f.fetch([pdf])
         try? await Task.sleep(for: .milliseconds(200))
         #expect(calls.all.isEmpty)
+    }
+}
+
+@Suite struct EditorQueryTests {
+    @Test func treeTokensAndSelectAnswerFromTheEngine() {
+        let e = Engine(doc: "dd_q")!
+        #expect(addPage(e, "n_aaaaaaaaaaaa"))
+        let tree = String(data: e.tree() ?? Data(), encoding: .utf8) ?? ""
+        #expect(tree.contains("n_aaaaaaaaaaaa") && tree.contains("page"))
+        #expect(e.tokens() != nil)
+        #expect(e.select(["n_aaaaaaaaaaaa"]) && e.selection() == ["n_aaaaaaaaaaaa"])
+        #expect(
+            !e.select(["n_zzzzzzzzzzzz"]) && e.selection() == ["n_aaaaaaaaaaaa"], "an unknown id refuses the whole call"
+        )
+        #expect(e.select([]) && e.selection().isEmpty)
+    }
+
+    @Test func aFreshOutboxIsEmptyAfterTheEditsAreDrained() {
+        let e = Engine(doc: "dd_o")!
+        #expect(addPage(e, "n_aaaaaaaaaaaa"))
+        if case .update(let u) = e.outbox() { #expect(!u.isEmpty) } else { Issue.record("expected an update") }
+        #expect(e.outbox() == .empty)
     }
 }
