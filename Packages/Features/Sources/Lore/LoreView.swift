@@ -12,11 +12,9 @@ struct LoreView: View {
         VStack(spacing: Space.s2) {
             LoreTopBar(model: model)
             if let line = model.notice {
-                CoreNotice(symbol: "clock.arrow.circlepath", title: line, tone: .warn) {
-                    Button("Dismiss") { model.notice = nil }.buttonStyle(CoreButtonStyle(.secondary))
-                }
-                .frame(maxWidth: Self.pageWidth)
-                .transition(.opacity)
+                CoreNotice(symbol: "clock.arrow.circlepath", title: line, tone: .warn) { noticeButtons }
+                    .frame(maxWidth: Self.pageWidth)
+                    .transition(.opacity)
             }
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -29,13 +27,32 @@ struct LoreView: View {
         .accessibilityIdentifier("lore-space")
     }
 
+    @ViewBuilder private var noticeButtons: some View {
+        switch model.noticeAction {
+        case .undoRestore(let version)?:
+            // "Restored · Undo": one line, no Dismiss.
+            Button("Undo") { Task { await model.restore(version, offerUndo: false) } }
+                .buttonStyle(CoreButtonStyle(.secondary)).help("Bring back the text before the restore")
+        case .seeChanges(let version)?:
+            Button("See changes") { model.showVersions(selecting: version) }
+                .buttonStyle(CoreButtonStyle(.secondary)).help("Open the version that was kept")
+            Button("Dismiss") { model.notice = nil }.buttonStyle(CoreButtonStyle(.secondary))
+        case nil:
+            Button("Dismiss") { model.notice = nil }.buttonStyle(CoreButtonStyle(.secondary))
+        }
+    }
+
     /// A reading measure: about 80 characters of body text.
     static let pageWidth = Space.s8 * 24
 
     @ViewBuilder private var content: some View {
         switch model.load {
         case .ready, .loading:
-            LorePageIsland(model: model)
+            VStack(spacing: Space.s2) {
+                LorePageIsland(model: model)
+                if !model.backlinks.isEmpty { LoreBacklinksIsland(model: model) }
+            }
+            .animation(Motion.out(Motion.ui), value: model.backlinks.isEmpty)
         case .notConnected:
             CoreStateCard(
                 symbol: "wifi.slash", title: "Not connected",
@@ -76,7 +93,6 @@ private struct LorePageIsland: View {
 /// Long date (or the note's title), ‹ › days, Today, the project chip; the save state, Open… ⌘O and New ⌘N.
 private struct LoreTopBar: View {
     let model: LoreModel
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
         AppHeader {
@@ -91,12 +107,13 @@ private struct LoreTopBar: View {
                 .buttonStyle(CoreButtonStyle(.secondary))
                 .disabled(model.isToday || model.service == nil)
                 .help("Go to today's note")
-            // TODO(R6-04): the chip becomes the project menu (personal / projects).
-            AppStatChip(model.note?.project == nil ? "person" : "folder", model.projectName, palette.text2)
-                .help(model.day == nil ? "This note's project" : "Daily notes are personal")
-                .accessibilityLabel("Project: \(model.projectName)")
+            LoreProjectChip(model: model)
         } actions: {
             Text(model.syncWords).foregroundStyle(GlassInk.secondary).accessibilityIdentifier("lore-sync")
+            CoreIconButton(symbol: "clock.arrow.circlepath", label: "Show earlier versions of this note") {
+                model.showVersions()
+            }
+            .disabled(model.note == nil || model.load != .ready)
             Button {
                 LoreOpenSheet.open(model)
             } label: {
@@ -119,23 +136,5 @@ private struct LoreTopBar: View {
         .frame(maxWidth: .infinity)
         .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
-    }
-}
-
-/// Open… ⌘O. A stand-in until R6-03 builds search, recent notes and filters.
-enum LoreOpenSheet {
-    @MainActor static func open(_ model: LoreModel) {
-        let shell = model.host.shell
-        shell.present(
-            ShellDialog(id: "lore-open") {
-                CoreSheet("Open a Note") {
-                    Text("Search and recent notes arrive with the next update. Today's note and ‹ › days work now.")
-                        .fixedSize(horizontal: false, vertical: true)
-                } footer: {
-                    Button("Close") { shell.closeDialog() }
-                        .buttonStyle(CoreButtonStyle(.secondary))
-                        .keyboardShortcut(.cancelAction)
-                }
-            })
     }
 }
