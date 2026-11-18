@@ -129,6 +129,7 @@ public final class TerminalsDemo {
         "runner-login-shell",
         "runner-degraded", "runner-offline-detail", "runner-busy", "new-terminal", "new-busy", "new-offline",
         "new-stepup", "end-confirm", "launcher", "bell", "instant", "instant-large",
+        "recording",
     ]
 
     func reset() {
@@ -159,6 +160,7 @@ public final class TerminalsDemo {
         ]
         host.elevationNotice = nil
         host.isElevated = true
+        model.recording = [:]
     }
 
     private func id(_ n: Int) -> String { service.terminalList[n].id }
@@ -202,6 +204,9 @@ public final class TerminalsDemo {
             await pane(0, .attached(letterbox: false))
             model.openList()
         case "live": await pane(0, .attached(letterbox: false))
+        case "recording":
+            await pane(0, .attached(letterbox: false))
+            model.recording[id(0)] = PaneRecording()
         case "instant", "instant-large":
             TerminalPrefs.shared.fontSize = scene == "instant" ? 12 : 17
             await pane(0, .attached(letterbox: false))

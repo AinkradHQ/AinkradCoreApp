@@ -1,17 +1,26 @@
+import Admin
 import CoreUI
 import Projects
+import Shell
 import SwiftUI
 
-/// The space of one host: a top bar with how it is reached, a thin rail and the page the rail picks. Y9-02 builds the top bar,
-/// the rail and the Access page; the other pages are stubs with the mockup's empty words until Y9-03 (Overview, Terminal, Files,
-/// Tunnels, Commands, History).
+/// The space of one host: a top bar with how it is reached, a thin rail and the page the rail picks. Overview, Terminal,
+/// Files, Commands, History and Access are live (Y9-02, Y9-03); Tunnels waits for tunnels (deferred out of 0.9).
 struct HostSpaceView: View {
     let model: LeylineModel
     let host: HostItem
+    @State private var state: HostPageState
+
+    init(model: LeylineModel, host: HostItem) {
+        self.model = model
+        self.host = host
+        _state = State(initialValue: HostPageState(model: model, hostID: host.id))
+    }
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            HostTopBar(model: model, host: host)
+            HostTopBar(model: model, host: host, state: state)
+            if let lease = state.direct { DirectBanner(state: state, lease: lease) }
             HStack(alignment: .top, spacing: Space.s2) {
                 HostRail(model: model)
                 page
@@ -20,21 +29,53 @@ struct HostSpaceView: View {
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
+        // What the Overview and History pages both show, read once when the space opens.
+        .task {
+            async let c: Void = state.loadCommands()
+            async let h: Void = state.loadHistory()
+            _ = await (c, h)
+        }
+        .onDisappear { state.closePage() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("host-space")
     }
 
     @ViewBuilder private var page: some View {
         switch model.section {
+        case .overview: HostOverviewPage(state: state)
+        case .terminal: HostTerminalPage(state: state)
+        case .files: HostFilesPage(state: state)
+        case .commands: HostCommandsPage(state: state)
+        case .history: HostHistoryPage(state: state)
         case .access:
-            AccessPage(model: model, host: host)
-        default:
+            AccessPage(model: model, host: host, state: state)
+        case .tunnels:
             let e = model.section.empty
             Island(e.title) {
                 Text(e.line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityIdentifier("host-page-\(model.section.title)")
         }
+    }
+}
+
+/// Shown under the top bar for as long as a Mac-direct lease is open, whatever page the person is on.
+private struct DirectBanner: View {
+    let state: HostPageState
+    let lease: DirectLease
+
+    var body: some View {
+        CoreNotice(
+            symbol: "key", title: "Mac-direct is on",
+            text: lease.expiresAt.map {
+                "This Mac may sign in to \(state.host?.name ?? "the host") until \($0.formatted(date: .omitted, time: .shortened))."
+            }
+                ?? "This Mac may sign in to \(state.host?.name ?? "the host") for a few minutes.", tone: .done
+        ) {
+            Button("Revoke") { Task { await state.stopDirect() } }
+                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(state.directBusy)
+        }
+        .accessibilityIdentifier("direct-banner")
     }
 }
 
@@ -61,7 +102,16 @@ struct RouteChips: View {
 private struct HostTopBar: View {
     let model: LeylineModel
     let host: HostItem
-    @State private var mode = "relayed"
+    let state: HostPageState
+
+    /// Relayed is the default; Mac-direct needs a lease, so choosing it asks Touch ID and choosing Relayed revokes.
+    private var mode: Binding<String> {
+        Binding(
+            get: { state.direct == nil ? "relayed" : "direct" },
+            set: { new in
+                Task { if new == "direct" { await state.startDirect() } else { await state.stopDirect() } }
+            })
+    }
 
     var body: some View {
         AppHeader {
@@ -70,20 +120,27 @@ private struct HostTopBar: View {
             if let g = host.group { CoreChip(g, minWidth: 0) }
         } actions: {
             RouteChips(hops: ["This Mac"] + model.route(host) + [host.name])
-            // TODO(Y6-01): Mac-direct (the Mac's own ssh borrows the key for a few minutes). Relayed is the only way today.
             CoreSegmented(
                 "Route",
                 segments: [CoreSegment("relayed", "Relayed"), CoreSegment("direct", "Mac-direct")],
-                selection: $mode
+                selection: mode
             )
-            .fixedSize().disabled(true)
-            .help("Relayed: the key never leaves the Core. Mac-direct arrives with the next update.")
-            Soon(prominent: true, help: "Connecting arrives with the SSH update") {
+            .fixedSize().disabled(state.directBusy || model.readOnly)
+            .help(
+                "Relayed: the key never leaves the Core. Mac-direct: this Mac’s ssh borrows the key for a few minutes.")
+            Button {
+                Task { await state.connect() }
+            } label: {
                 Label("Connect", systemImage: "terminal")
             }
-            Soon(prominent: false, help: "Running a command arrives with the SSH update") {
+            .buttonStyle(CoreButtonStyle(.prominent, busy: state.opening))
+            .disabled(state.opening || model.readOnly).help("Open a terminal on this host")
+            Button {
+                model.section = .commands
+            } label: {
                 Label("Run…", systemImage: "chevron.right.2")
             }
+            .buttonStyle(CoreButtonStyle(.secondary)).help("Pick a pre-set command to run on this host")
         }
         .frame(maxWidth: .infinity)
         .coreWell(radius: Radius.pane)
@@ -120,6 +177,7 @@ private struct HostRail: View {
 struct AccessPage: View {
     let model: LeylineModel
     let host: HostItem
+    let state: HostPageState
     @State private var settled = false
 
     var body: some View {
@@ -288,24 +346,86 @@ struct AccessPage: View {
         Island(
             title: "Make it a runner", sub: "run AI sessions and projects here",
             accessory: {
-                // TODO(Y8-01): make a runner from a host: invite, copy over SSH, install, pair.
-                Soon(prominent: true, help: "Making a host a runner arrives with the runner update") {
+                Button {
+                    confirmRunner()
+                } label: {
                     Label("Make Runner…", systemImage: "server.rack")
                 }
+                .buttonStyle(CoreButtonStyle(.prominent, busy: state.runnerState == .starting))
+                .disabled(model.readOnly || host.runnerDevice != nil || busyInstalling)
+                .help(
+                    host.runnerDevice != nil
+                        ? "This host is already a runner" : "Install the Ainkrad runner here (Touch ID)"
+                )
+                .accessibilityIdentifier("runner-make")
             }
         ) {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                ForEach(
-                    Array(
-                        [
-                            "Create a one-time invite", "Copy it to the host over SSH",
-                            "Install the Ainkrad runner (sudo, in a terminal you watch)", "Pair with the Core",
-                        ].enumerated()), id: \.offset
-                ) { i, step in
-                    Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
+            VStack(alignment: .leading, spacing: Space.s3) {
+                runnerStatus
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    ForEach(
+                        Array(
+                            [
+                                "Create a one-time invite", "Copy it to the host over SSH",
+                                "Install the Ainkrad runner (sudo, in a terminal you watch)", "Pair with the Core",
+                            ].enumerated()), id: \.offset
+                    ) { i, step in
+                        Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
+                    }
                 }
             }
         }
         .accessibilityIdentifier("access-runner")
+    }
+
+    private var busyInstalling: Bool {
+        switch state.runnerState {
+        case .starting, .waiting: true
+        default: false
+        }
+    }
+
+    private func confirmRunner() {
+        model.host.shell.presentSheet(
+            title: "Make \(host.name) a runner?",
+            message:
+                "Ainkrad copies a one-time invite to the host and opens a terminal that installs the runner as root. You type the sudo password there; Ainkrad never sees it. The invite ends in 15 minutes.",
+            actions: [
+                ShellSheetAction("Cancel"),
+                ShellSheetAction("Make Runner", primary: true) { Task { await state.makeRunner() } },
+            ], symbol: "server.rack")
+    }
+
+    /// What the install is doing, and, once it paired, which machine claimed the invite: the invite is its own approval, so this
+    /// is the person's one check that it is the machine they meant.
+    @ViewBuilder private var runnerStatus: some View {
+        switch state.runnerState {
+        case .waiting(let until):
+            CoreNotice(
+                symbol: "terminal", title: "Type your sudo password in the terminal",
+                text: until.map {
+                    "Waiting for the runner to pair. The invite ends \($0.formatted(date: .omitted, time: .shortened))."
+                }
+                    ?? "Waiting for the runner to pair.", tone: .queue)
+        case .expired:
+            CoreNotice(
+                symbol: "clock.badge.exclamationmark", title: "The invite ended",
+                text: "Nothing was installed and the invite is gone. Start again when you are at the terminal.",
+                tone: .warn)
+        default:
+            if let device = host.runnerDevice { claimer(device) }
+        }
+    }
+
+    private func claimer(_ device: String) -> some View {
+        let c = model.deviceLookup?(device)
+        let facts = [c?.name, c?.platform, c?.fingerprint.map { "key \($0)" }].compactMap { $0 }
+        return CoreNotice(
+            symbol: "checkmark.seal", title: "This host is a runner",
+            text: facts.isEmpty
+                ? "Paired as device \(device)."
+                : "Paired as \(facts.joined(separator: " · ")). Check it is the machine you meant.", tone: .done
+        )
+        .accessibilityIdentifier("runner-claimer")
     }
 }
