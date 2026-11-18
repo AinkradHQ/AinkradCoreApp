@@ -5,8 +5,7 @@ import SwiftUI
 /// The Run page: the services table, the public link, the secrets and the logs, as in the approved mockup
 /// (`Designs/core/projects/index.html`, Run). The setup comes from the project's run spec (Core #306), the secrets from #316,
 /// the run's state from #318. What the run engine does not report yet (health, CPU, memory, restarts, log lines) comes from
-/// `ProjectLive`, which only the Debug demo fills; a real project shows "–" there.
-/// TODO(P5-04): per-service health, CPU, memory, restarts and the log stream, from the run engine.
+/// the Core's `run/services` and `run/logs` (polled while the page is open); the Debug demo fills `ProjectLive` instead.
 struct RunPage: View {
     let model: ProjectsModel
     let project: ProjectItem
@@ -51,6 +50,7 @@ private struct ServicesIsland: View {
         let image: String
         let port: String
         let state: ProjectLive.Service.State?
+        let health: String
         let cpu: Int?
         let memory: String?
         let restarts: Int
@@ -59,19 +59,21 @@ private struct ServicesIsland: View {
 
     /// The spec's services with whatever the run reports of each; without a spec, the run's own list.
     private var rows: [Row] {
-        let live = project.live?.services ?? []
+        let live = run.services.isEmpty ? (project.live?.services ?? []) : run.services
         if let spec = run.spec {
             return spec.services.map { s in
                 let l = live.first { $0.name == s.name }
                 return Row(
                     name: s.name, image: s.image,
                     port: s.port.map { "\($0)\(s.isPublic ? " · public" : "")" } ?? "–", state: l?.state,
+                    health: l?.health ?? "none",
                     cpu: l?.cpu, memory: l?.memory, restarts: l?.restarts ?? 0)
             }
         }
         return live.map {
             Row(
-                name: $0.name, image: "–", port: "–", state: $0.state, cpu: $0.cpu, memory: $0.memory,
+                name: $0.name, image: "–", port: "–", state: $0.state, health: $0.health, cpu: $0.cpu,
+                memory: $0.memory,
                 restarts: $0.restarts)
         }
     }
@@ -153,6 +155,10 @@ private struct ServicesIsland: View {
 
     @ViewBuilder private func health(_ r: Row) -> some View {
         switch r.state {
+        case .up? where r.health == "unhealthy":
+            StateBadge("Unhealthy", tone: .fail, symbol: "exclamationmark.triangle")
+        case .up? where r.health == "starting": StateBadge("Starting", tone: .queue, symbol: "clock")
+        case .up? where r.health == "none": StateBadge("Running", tone: .done, symbol: "checkmark.circle")
         case .up?: StateBadge("Healthy", tone: .done, symbol: "checkmark.circle")
         case .exited?: StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
         case .down?: StateBadge("Stopped", tone: .queue, symbol: "stop.circle")
@@ -326,7 +332,9 @@ private struct LogsIsland: View {
     private var names: [String] { run.spec?.services.map(\.name) ?? project.live?.services.map(\.name) ?? [] }
 
     private var lines: [ProjectLive.LogLine] {
-        (project.live?.logs ?? []).filter { run.logService == nil || $0.service == run.logService }
+        (run.logLines.isEmpty ? (project.live?.logs ?? []) : run.logLines).filter {
+            run.logService == nil || $0.service == run.logService
+        }
     }
 
     var body: some View {

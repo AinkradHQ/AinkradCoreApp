@@ -103,6 +103,13 @@ struct SetupSheet: View {
     let project: ProjectItem
     let close: () -> Void
     @State private var text: String
+    @State private var image = SetupSheet.images[0].value
+
+    /// What a Makefile or script drafted from the repo runs in (all carry `make`): the smallest picker that works.
+    static let images = [
+        CoreSelectOption("node:22", "Node 22"), CoreSelectOption("python:3.13", "Python 3.13"),
+        CoreSelectOption("golang:1.24", "Go 1.24"), CoreSelectOption("buildpack-deps:stable", "Plain Linux"),
+    ]
 
     /// What a project with no setup starts from: one public web service to edit.
     static let starter = """
@@ -136,6 +143,18 @@ struct SetupSheet: View {
                 CoreTextArea(
                     nil, placeholder: "{ \"services\": { … } }", text: $text, error: run.writeError,
                     minHeight: Space.s8 * 8, maxHeight: Space.s8 * 14, autofocus: true, design: .monospaced)
+                HStack(alignment: .bottom, spacing: Space.s3) {
+                    CoreSelect("Image for a Makefile or script", selection: $image, options: Self.images)
+                    Button("Draft from Repo") {
+                        let i = image
+                        Task { if await run.draftFromRepo(image: i, projectName: project.name) { close() } }
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary))
+                    .disabled(run.busy)
+                    .help(
+                        "Read the primary repo's compose file, run.sh, Makefile or package.json and draft the setup. Nothing is run."
+                    )
+                }
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),
                     primary: CoreAction("Save Setup", key: .command, run: save), busy: run.busy, enabled: changed)

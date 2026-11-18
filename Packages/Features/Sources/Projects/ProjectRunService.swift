@@ -80,6 +80,27 @@ protocol ProjectRunService: Sendable {
     func run(project: Int64) async throws -> RunStatus?
     /// Says a viewer is on the Run page, so the idle stop moves back.
     func touch(project: Int64) async throws
+    /// The live run's services (state, health, CPU, memory, restarts); none while the project is not running.
+    func services(project: Int64) async throws -> [ProjectLive.Service]
+    /// Log lines of the live run after `after` (0 for the oldest held), and the `seq` to ask with next.
+    func logs(project: Int64, after: Int) async throws -> RunLogPage
+    /// Drafts the setup from a file in the project's primary repo (compose, run.sh, Makefile or package.json), saved as the
+    /// next version (admin, step-up). `image` is what a Makefile or script runs in; a Makefile cannot be drafted without one.
+    func draft(project: Int64, image: String?) async throws -> SpecVersionItem
+}
+
+/// A page of run log lines.
+struct RunLogPage: Equatable, Sendable {
+    var lines: [ProjectLive.LogLine] = []
+    var next = 0
+}
+
+extension ProjectRunService {
+    func services(project: Int64) async throws -> [ProjectLive.Service] { [] }
+    func logs(project: Int64, after: Int) async throws -> RunLogPage { RunLogPage(next: after) }
+    func draft(project: Int64, image: String?) async throws -> SpecVersionItem {
+        throw RunFailure(sentence: "This Core cannot draft a setup.", code: "unsupported")
+    }
 }
 
 struct LiveProjectRunService: ProjectRunService {
@@ -121,6 +142,28 @@ struct LiveProjectRunService: ProjectRunService {
     }
 
     func touch(project: Int64) async throws { _ = try await call("POST", "\(Self.base(project))/run/activity") }
+
+    func draft(project: Int64, image: String?) async throws -> SpecVersionItem {
+        let body = try JSONSerialization.data(withJSONObject: image.map { ["image": $0] } ?? [:])
+        let data = try await call("POST", "\(Self.base(project))/run/spec/draft", body)
+        guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let v = o["version"] else {
+            throw RunWire.bad
+        }
+        return try RunWire.specVersion(try JSONSerialization.data(withJSONObject: v))
+    }
+
+    func services(project: Int64) async throws -> [ProjectLive.Service] {
+        do {
+            return try RunWire.services(try await call("GET", "\(Self.base(project))/run/services"))
+        } catch let f as RunFailure where f.status == 404 || f.status == 501 { return [] }
+    }
+
+    func logs(project: Int64, after: Int) async throws -> RunLogPage {
+        do {
+            return try RunWire.logs(
+                try await call("GET", "\(Self.base(project))/run/logs?after=\(after)"), after: after)
+        } catch let f as RunFailure where f.status == 404 || f.status == 501 { return RunLogPage(next: after) }
+    }
 
     private static func base(_ id: Int64) -> String { "/api/v1/projects/\(id)" }
 
@@ -221,6 +264,42 @@ enum RunWire {
             state: state, error: o["error"] as? String, idleStopAt: date(o["idle_stop_at"] as? String))
     }
 
+    /// The Core's service rows: Podman's `state` read as up (running), exited (it stopped on its own) or down (anything else),
+    /// `cpu_percent` rounded, `memory_bytes` as a size, `health` and `restarts` as they are.
+    static func services(_ data: Data) throws -> [ProjectLive.Service] {
+        guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = o["services"] as? [[String: Any]]
+        else { throw bad }
+        return try list.map {
+            guard let name = $0["name"] as? String else { throw bad }
+            let bytes = ($0["memory_bytes"] as? NSNumber)?.int64Value ?? 0
+            return ProjectLive.Service(
+                name: name, memory: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory),
+                state: state(($0["state"] as? String) ?? ""),
+                cpu: ($0["cpu_percent"] as? Double).map { Int($0.rounded()) },
+                restarts: ($0["restarts"] as? NSNumber)?.intValue ?? 0, health: ($0["health"] as? String) ?? "none")
+        }
+    }
+
+    static func state(_ podman: String) -> ProjectLive.Service.State {
+        switch podman {
+        case "running": .up
+        case "exited", "dead": .exited
+        default: .down
+        }
+    }
+
+    static func logs(_ data: Data, after: Int) throws -> RunLogPage {
+        guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let lines = o["lines"] as? [[String: Any]]
+        else { throw bad }
+        return RunLogPage(
+            lines: lines.compactMap {
+                guard let s = $0["service"] as? String, let t = $0["text"] as? String else { return nil }
+                return ProjectLive.LogLine(service: s, text: t)
+            }, next: (o["next"] as? NSNumber)?.intValue ?? after)
+    }
+
     static func date(_ s: String?) -> Date? {
         guard let s else { return nil }
         let f = ISO8601DateFormatter()
@@ -248,7 +327,7 @@ enum SecretRules {
 
 /// The lines that differ between two spec versions, for "See Changes": `+` added, `-` removed, in file order.
 enum SpecDiff {
-    struct Line: Equatable, Sendable {
+    struct Line: Hashable, Sendable {
         let added: Bool
         let text: String
     }

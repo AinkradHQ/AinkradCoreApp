@@ -16,6 +16,10 @@ final class RunPageModel {
     private(set) var previous: SpecVersionItem?
     private(set) var secrets: [SecretItem] = []
     private(set) var status: RunStatus?
+    /// What the live run reports of each service, and its newest log lines (the last 500).
+    private(set) var services: [ProjectLive.Service] = []
+    private(set) var logLines: [ProjectLive.LogLine] = []
+    private var logNext = 0
     private(set) var loaded = false
     /// Why the first read failed, in words.
     private(set) var loadError: String?
@@ -61,6 +65,7 @@ final class RunPageModel {
             spec = try await service.spec(project: projectID)
             secrets = try await service.secrets(project: projectID)
             status = try await service.run(project: projectID)
+            await observe(service)
             previous = try await earlier(service)
             loadError = nil
         } catch {
@@ -74,8 +79,8 @@ final class RunPageModel {
         return try await service.specVersion(project: projectID, v - 1)
     }
 
-    /// Every minute while the page is open: a viewer on the Run page keeps a running project from idling out, then the run is
-    /// read again. Ends when the view goes away (the task is cancelled).
+    /// Every minute while the page is open: a viewer on the Run page keeps a running project from idling out, then the run, its
+    /// services and its logs are read again. Ends when the view goes away (the task is cancelled).
     func watch() async {
         await load()
         while !Task.isCancelled {
@@ -83,6 +88,20 @@ final class RunPageModel {
             guard !Task.isCancelled, let service else { continue }
             if status?.state == "running" { try? await service.touch(project: projectID) }
             if let s = try? await service.run(project: projectID) { status = s }
+            await observe(service)
+        }
+    }
+
+    /// Services and log lines of the live run; both empty once it is over.
+    private func observe(_ service: any ProjectRunService) async {
+        guard status?.state == "running" || status?.state == "starting" else {
+            services = []
+            return
+        }
+        if let s = try? await service.services(project: projectID) { services = s }
+        if let page = try? await service.logs(project: projectID, after: logNext) {
+            logNext = page.next
+            logLines = Array((logLines + page.lines).suffix(500))
         }
     }
 
@@ -106,6 +125,17 @@ final class RunPageModel {
         return await saveSpec(
             previous.json, reason: "Go back to the setup of \(projectName) from before the draft.",
             done: "Draft undone")
+    }
+
+    /// Drafts the setup from the primary repo's compose file, run.sh, Makefile or package.json (never run, only read).
+    @discardableResult
+    func draftFromRepo(image: String, projectName: String) async -> Bool {
+        await write("Draft the setup of \(projectName) from its repo.") { service in
+            _ = try await service.draft(project: self.projectID, image: image)
+        } then: {
+            await self.load()
+            self.model.host.shell.showToast("Setup drafted")
+        }
     }
 
     @discardableResult

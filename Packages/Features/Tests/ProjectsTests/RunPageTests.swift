@@ -43,6 +43,23 @@ struct RunWireTests {
         #expect(throws: RunFailure.self) { try RunWire.secrets(Data("{}".utf8)) }
     }
 
+    @Test func servicesReadTheCoresFields() throws {
+        let json = #"""
+            {"run":"r_1","services":[
+              {"name":"web","state":"running","health":"healthy","cpu_percent":12.6,"memory_bytes":134217728,"memory_limit_bytes":0,"restarts":0},
+              {"name":"api","state":"exited","health":"none","cpu_percent":null,"memory_bytes":0,"memory_limit_bytes":0,"restarts":3},
+              {"name":"db","state":"created","health":"starting","cpu_percent":null,"memory_bytes":0,"memory_limit_bytes":0,"restarts":1}]}
+            """#
+        let s = try RunWire.services(Data(json.utf8))
+        #expect(s.map(\.state) == [.up, .exited, .down])
+        #expect(s[0].cpu == 13 && s[0].health == "healthy" && s[0].memory.contains("128"))
+        #expect(s[1].cpu == nil && s[1].restarts == 3 && s[2].health == "starting")
+        let logs = try RunWire.logs(
+            Data(#"{"run":"r_1","lines":[{"seq":4,"service":"web","at":"x","text":"up"}],"next":5,"lost":0}"#.utf8),
+            after: 0)
+        #expect(logs.next == 5 && logs.lines == [ProjectLive.LogLine(service: "web", text: "up")])
+    }
+
     @Test func secretNamesFollowTheCoresRule() {
         #expect(SecretRules.nameProblem("stripe_secret") == nil)
         #expect(SecretRules.nameProblem("a.b-c_1") == nil)
@@ -69,7 +86,7 @@ struct RunWireTests {
         #expect(Set(d) == [.init(added: false, text: "  \"b\": 2"), .init(added: true, text: "  \"b\": 3")])
         #expect(SpecDiff.lines(from: a, to: a).isEmpty)
         // The first version: everything is new.
-        #expect(SpecDiff.lines(from: nil, to: "x\ny").allSatisfy(\.added))
+        #expect(SpecDiff.lines(from: nil, to: "x\ny").allSatisfy { $0.added })
     }
 }
 
@@ -149,7 +166,8 @@ struct RunPageModelTests {
         #expect(svc.calls == ["secret db_password"])
         #expect(host.reasons.count == 1 && host.reasons[0].contains("db_password"))
         #expect(!host.reasons[0].contains("hunter2"))
-        #expect(run.missingSecrets.isEmpty)
+        // The spec also names app_key, which is still missing.
+        #expect(run.missingSecrets == ["app_key"])
         // Nothing the model holds is the value.
         #expect(run.secretRows.allSatisfy { !"\($0)".contains("hunter2") })
     }
