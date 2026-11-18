@@ -60,7 +60,7 @@ public final class ProjectsDemo {
         "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
-        "page-brain", "page-brain-empty",
+        "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
     ]
 
     private let model: ProjectsModel
@@ -167,6 +167,7 @@ public final class ProjectsDemo {
         default: break
         }
         await model.useNow(Service(list))
+        model.runService = DemoRunService()
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
         switch scene {
@@ -188,6 +189,12 @@ public final class ProjectsDemo {
         case "overview-running": model.openID = 1
         case "page-run":
             model.openID = 1
+            model.section = .run
+        case "page-run-failed":
+            model.openID = 3
+            model.section = .run
+        case "page-run-draft":
+            model.openID = 2
             model.section = .run
         case "page-settings", "page-settings-stopped":
             model.openID = scene == "page-settings" ? 1 : 4
@@ -216,6 +223,7 @@ public final class ProjectsDemo {
 enum DemoLive {
     static func make(_ state: RunSummary.State, progress: Double = 0) -> ProjectLive {
         let svc = [("web", "212 MB"), ("api", "148 MB"), ("queue", "96 MB"), ("mysql", "402 MB"), ("redis", "12 MB")]
+        let cpu = [18, 9, 3, 6, 1]
         let services = svc.enumerated().map { i, s -> ProjectLive.Service in
             let st: ProjectLive.Service.State
             switch state {
@@ -224,7 +232,8 @@ enum DemoLive {
             case .starting: st = Double(i) / 5 < progress ? .up : .down
             case .failed: st = s.0 == "api" ? .exited : .up
             }
-            return ProjectLive.Service(name: s.0, memory: s.1, state: st)
+            return ProjectLive.Service(
+                name: s.0, memory: s.1, state: st, cpu: cpu[i], restarts: st == .exited ? 3 : 0)
         }
         let ok: [ProjectLive.LogLine] = [
             .init(service: "mysql", text: "ready for connections · 8.4.2"),

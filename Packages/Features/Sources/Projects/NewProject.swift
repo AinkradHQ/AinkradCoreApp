@@ -26,7 +26,7 @@ enum NewProjectDialogs {
 }
 
 /// A dialog's own header: the title and one plain line under it (no icon tile).
-private struct DialogHead: View {
+struct DialogHead: View {
     let title: String
     let line: String?
     @Environment(\.corePalette) private var palette

@@ -15,6 +15,9 @@ struct ProjectLive: Equatable, Sendable {
         let name: String
         let memory: String
         let state: State
+        /// Percent of one CPU while up; nil when the run engine has not said.
+        var cpu: Int? = nil
+        var restarts = 0
     }
     struct LogLine: Equatable, Sendable {
         let service: String

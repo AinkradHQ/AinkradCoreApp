@@ -13,6 +13,8 @@ public final class ProjectsModel {
     let host: any AdminHost
     var service: (any ProjectsService)?
     var catalog: any RepoCatalog
+    /// The Run page's reads and writes (spec, secrets, run). Set with the connection; the Debug demo brings its own.
+    var runService: (any ProjectRunService)?
     private(set) var catalogState = RepoCatalogState.loading
 
     internal(set) var projects: [ProjectItem] = []
@@ -75,7 +77,10 @@ public final class ProjectsModel {
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveProjectsService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        runService = LiveProjectRunService(connection: connection)
+        use(LiveProjectsService(connection: connection))
+    }
 
     func use(_ service: any ProjectsService) {
         self.service = service
@@ -85,6 +90,7 @@ public final class ProjectsModel {
 
     public func detach() {
         service = nil
+        runService = nil
         projects = []
         load = .notConnected
         openID = nil
