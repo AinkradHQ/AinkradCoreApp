@@ -60,6 +60,7 @@ public actor SampleBrainService: BrainService {
 
     public nonisolated let isSample = true
     public nonisolated let servesChanges = true
+    public nonisolated let servesCare = true
     nonisolated let servesOverview: Bool
     public nonisolated let importRoutes: BrainRoutes?
     var scenario: Scenario
@@ -71,6 +72,8 @@ public actor SampleBrainService: BrainService {
     var liveRows: [ActivityEvent] = []
     /// Change sets the sample's Undo already ran (SampleBrainService+Changes.swift).
     var undoneChanges: Set<String> = []
+    /// The sample's clean-up run (SampleBrainService+Care.swift): it reads six sources each time it is asked.
+    var careRun: RedistilRun?
     var watchers: [AsyncStream<ActivityEvent>.Continuation] = []
     /// How long each of the eight steps of a check takes. Tests use zero.
     let pace: Duration

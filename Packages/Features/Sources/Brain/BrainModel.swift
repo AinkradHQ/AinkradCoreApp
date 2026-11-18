@@ -68,6 +68,8 @@ public final class BrainModel {
     @ObservationIgnored public private(set) var candidates: BrainCandidates!
     /// The viewing room's written overview.
     @ObservationIgnored public private(set) var roomOverview: RoomOverviewModel!
+    /// The viewing room's retention count, clean-up run and card.
+    @ObservationIgnored public private(set) var care: RoomCareModel!
 
     public init(host: any AdminHost) {
         self.host = host
@@ -76,6 +78,7 @@ public final class BrainModel {
         changes = ChangesModel(brain: self)
         candidates = BrainCandidates(brain: self)
         roomOverview = RoomOverviewModel(brain: self)
+        care = RoomCareModel(brain: self)
     }
 
     // MARK: connection
@@ -97,6 +100,7 @@ public final class BrainModel {
         checks.reset()
         changes.reset()
         candidates.clear()
+        care.clear()
         clearRoomView()
         rooms = []
         overview = nil

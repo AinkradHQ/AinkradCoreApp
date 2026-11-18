@@ -63,11 +63,16 @@ struct PolicyWire: Decodable {
     var minSources: Int?
     var accounts: [PolicyAccountWire]?
     var localModels: [String]?
+    /// Not sent until the Core's policy view carries it (Core proposal in the B10-02 PR).
+    var dailyDistils: Int?
+    var retentionDays: Int?
     enum CodingKeys: String, CodingKey {
         case model, accounts
         case autoAccept = "auto_accept"
         case minSources = "min_sources"
         case localModels = "local_models"
+        case dailyDistils = "daily_distils"
+        case retentionDays = "retention_days"
     }
 }
 
@@ -75,10 +80,14 @@ struct PolicyPatchBody: Encodable {
     var model: String?
     var autoAccept: [String]?
     var minSources: Int?
+    var dailyDistils: Int?
+    var retentionDays: Int?
     enum CodingKeys: String, CodingKey {
         case model
         case autoAccept = "auto_accept"
         case minSources = "min_sources"
+        case dailyDistils = "daily_distils"
+        case retentionDays = "retention_days"
     }
 }
 
