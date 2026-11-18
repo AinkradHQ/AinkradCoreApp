@@ -17,6 +17,7 @@ struct RoomOverviewTab: View {
                 CoreNotice(symbol: "exclamationmark.triangle", title: n, tone: .warn)
             }
             content
+            RoomCardSection(model: model, room: room)
         }
         .task(id: "\(room.id)#\(o.epoch)") { await o.open(room.id) }
         .task(id: "\(room.id)#\(shown.map { "\($0.state)" } ?? "-")") {
