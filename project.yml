@@ -89,6 +89,9 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Ainkrad
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_HARDENED_RUNTIME: YES
+        # Import Apple Notes (R4-03): macOS asks the first time the person chooses it, with this sentence.
+        INFOPLIST_KEY_NSAppleEventsUsageDescription: Ainkrad reads your notes in Notes only when you choose Import Apple Notes.
+        CODE_SIGN_ENTITLEMENTS: App/Mac/Ainkrad.entitlements
 
   AinkradCoreMacUITests:
     type: bundle.ui-testing
