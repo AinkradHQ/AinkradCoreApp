@@ -152,6 +152,7 @@ public final class CoreBrainService: BrainService, @unchecked Sendable {
             case "batch_too_large": "That was too much to send at once."
             case "room_unavailable": "The room could not be opened."
             case "room_closed": "Open this room first, then search it."
+            case "not_undoable": "A purge removed these for good. It cannot be undone."
             case "rate_limited": "The Core is busy. Try again in a moment."
             case "conflict" where e.message.contains("not in review"):
                 "This import is not in review any more. The list shows where it is now."

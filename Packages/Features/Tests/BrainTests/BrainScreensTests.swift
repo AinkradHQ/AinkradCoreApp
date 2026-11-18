@@ -145,10 +145,10 @@ struct BrainScreensTests {
         #expect(try JSONDecoder().decode(ProposalCard.self, from: Data(plain.utf8)).suggestMerge == nil)
     }
 
-    @Test func aRealCoreShowsInboxRoomsAndSources() {
+    @Test func aRealCoreShowsInboxRoomsSourcesAndActivity() {
         let m = BrainModel(host: FakeHost())
         m.use(CoreBrainService(transport: FakeBrainTransport()))
-        #expect(m.visibleTabs == [.inbox, .rooms, .sources] && m.currentTab == .inbox)
+        #expect(m.visibleTabs == [.inbox, .rooms, .sources, .activity] && m.currentTab == .inbox)
         m.tab = .sources
         #expect(m.currentTab == .sources)
     }

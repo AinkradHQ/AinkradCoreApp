@@ -208,6 +208,10 @@ public struct RoomPolicy: Sendable, Equatable {
     /// Types set at the Core that have no row here (preference, project state, summary); kept when rules change.
     public var otherAuto: [String] = []
     public var minSources = 1
+    /// Distils a day this room may start by itself. Nil when this Core does not send it yet (the row is then hidden).
+    public var dailyDistils: Int?
+    /// Sources older than this many days lose their text for good. Nil keeps everything (the default).
+    public var retentionDays: Int?
     /// Items waiting because the room is local only and no runner has a local model.
     public var queued = 0
     public init() {}
@@ -220,13 +224,22 @@ public struct PolicyChange: Sendable, Equatable {
     public var autoAccept: Bool?
     public var kinds: Set<CandidateKind>?
     public var minSources: Int?
+    /// The record types saved without a review, replacing the whole list (Auto-save rows).
+    public var types: Set<String>?
+    public var dailyDistils: Int?
+    /// 0 keeps everything; 1 or more turns retention on (Touch ID).
+    public var retentionDays: Int?
     public init(
-        model: ModelPolicy? = nil, autoAccept: Bool? = nil, kinds: Set<CandidateKind>? = nil, minSources: Int? = nil
+        model: ModelPolicy? = nil, autoAccept: Bool? = nil, kinds: Set<CandidateKind>? = nil, minSources: Int? = nil,
+        types: Set<String>? = nil, dailyDistils: Int? = nil, retentionDays: Int? = nil
     ) {
         self.model = model
         self.autoAccept = autoAccept
         self.kinds = kinds
         self.minSources = minSources
+        self.types = types
+        self.dailyDistils = dailyDistils
+        self.retentionDays = retentionDays
     }
 }
 

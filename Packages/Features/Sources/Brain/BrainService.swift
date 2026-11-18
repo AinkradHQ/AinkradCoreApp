@@ -84,6 +84,32 @@ public protocol BrainService: Sendable {
 
     /// The room Overview tab, or nil when this service cannot write overviews.
     var overviewService: (any RoomOverviewService)? { get }
+
+    // MARK: memory change sets (B10-01)
+
+    /// True when this service has the change-set routes; Activity then shows what the Core saved, with Undo.
+    var servesChanges: Bool { get }
+    /// A mounted room's change sets, newest first. `after` is the last id of the page before.
+    func changes(room: String, after: String?) async throws -> ChangesPage
+    /// The records one change set touched, before and after. `after` is the last row `seq` of the page before.
+    func changeRows(room: String, change: String, after: Int?) async throws -> ChangeRowsPage
+    /// Puts the set's records back at once; records changed since are kept and listed.
+    func undoChange(room: String, change: String) async throws -> ChangeUndo
+
+    // MARK: room care (B10-02)
+
+    /// True when this service has the retention and clean-up routes; Room Settings then shows Retention and Clean up memory.
+    var servesCare: Bool { get }
+    /// What turning retention on at `days` would compact now. Reads only.
+    func retentionPreview(room: String, days: Int) async throws -> RetentionPreview
+    /// Starts (or resumes) a clean-up. A dry run counts and writes nothing; the real one needs the caller's Touch ID.
+    func startRedistil(room: String, dryRun: Bool) async throws -> RedistilRun
+    /// The room's newest clean-up run, or nil when it never had one.
+    func redistilStatus(room: String) async throws -> RedistilRun?
+    /// Cancels the room's open run; nothing is archived.
+    func cancelRedistil(room: String) async throws -> RedistilRun
+    /// The room card the Overview shows, or nil when this Core has no card route.
+    func roomCard(room: String) async throws -> RoomCard?
 }
 
 /// Whether the Brain exists on this Core and whether it has anything yet.
@@ -113,6 +139,26 @@ extension BrainService {
         throw BrainFailure("Rules come later.", code: "not_served")
     }
     public var servesCandidates: Bool { false }
+    public var servesChanges: Bool { false }
+    public func changes(room: String, after: String?) async throws -> ChangesPage { ChangesPage() }
+    public func changeRows(room: String, change: String, after: Int?) async throws -> ChangeRowsPage {
+        ChangeRowsPage()
+    }
+    public func undoChange(room: String, change: String) async throws -> ChangeUndo {
+        throw BrainFailure("Undo comes later.", code: "not_served")
+    }
+    public var servesCare: Bool { false }
+    public func retentionPreview(room: String, days: Int) async throws -> RetentionPreview {
+        throw BrainFailure("Retention comes later.", code: "not_served")
+    }
+    public func startRedistil(room: String, dryRun: Bool) async throws -> RedistilRun {
+        throw BrainFailure("Clean up comes later.", code: "not_served")
+    }
+    public func redistilStatus(room: String) async throws -> RedistilRun? { nil }
+    public func cancelRedistil(room: String) async throws -> RedistilRun {
+        throw BrainFailure("Clean up comes later.", code: "not_served")
+    }
+    public func roomCard(room: String) async throws -> RoomCard? { nil }
     public var overviewService: (any RoomOverviewService)? { nil }
     public func candidates() async throws -> CandidateInbox { CandidateInbox() }
     public func decide(_ id: String, room: String, _ decision: CandidateDecision) async throws {
