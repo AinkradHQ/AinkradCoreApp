@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-public enum ActivityView: String, Sendable, Hashable { case feed, egress }
+public enum ActivityView: String, Sendable, Hashable { case feed, egress, memory }
 
 /// The Activity tab's state. It asks the service for events, filters them for display and keeps one selected row. It stores
 /// ids and codes only; the viewing room is the starting filter and "All mounted rooms" is an explicit choice.
@@ -65,8 +65,15 @@ public final class ActivityModel {
 
     // MARK: lifecycle
 
+    /// The segments on offer: a real Core has the memory view alone, the sample has all three.
+    public var views: [ActivityView] {
+        guard brain?.isSample == true else { return [.memory] }
+        return brain?.service?.servesChanges == true ? [.feed, .egress, .memory] : [.feed, .egress]
+    }
+
     /// Called when the tab appears or the viewing room changes. A room view starts on its own room.
     public func enter() {
+        if !started, brain?.isSample == false, brain?.service?.servesChanges == true { view = .memory }
         let viewing = brain?.viewingID
         if seenRoom != viewing {
             seenRoom = viewing
@@ -75,9 +82,10 @@ public final class ActivityModel {
         }
         if !started {
             started = true
-            Task { await load() }
+            // A real Core serves the memory view only; the audit feed and egress log are on the sample.
+            if view != .memory { Task { await load() } }
         }
-        startLive()
+        if view != .memory { startLive() }
     }
 
     public func leave() {

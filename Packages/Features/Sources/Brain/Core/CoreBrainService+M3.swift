@@ -90,6 +90,8 @@ extension CoreBrainService {
         p.kinds = Set(w.autoAccept.compactMap(CandidateKind.init(autoType:)))
         p.otherAuto = w.autoAccept.filter { CandidateKind(autoType: $0) == nil }
         p.minSources = w.minSources ?? 1
+        p.dailyDistils = w.dailyDistils
+        p.retentionDays = w.retentionDays.flatMap { $0 > 0 ? $0 : nil }
         p.provider = w.accounts?.first.map { $0.provider.capitalized } ?? "Anthropic"
         p.accounts = (w.accounts ?? []).map(\.name)
         p.localModels = w.localModels ?? []
@@ -103,11 +105,13 @@ extension CoreBrainService {
             let on = change.autoAccept ?? now.autoAccept
             let kinds = change.kinds ?? now.kinds
             // Auto-accept filters by type: Landmines is every rule and Open threads is every task.
-            let types = Array(Set(kinds.map(\.wireType) + now.otherAuto)).sorted()
-            let touchesAuto = change.autoAccept != nil || change.kinds != nil
+            let types = Array(change.types ?? Set(kinds.map(\.wireType) + now.otherAuto)).sorted()
+            // `types` is the whole list, so an empty one turns saving off for every kind.
+            let touchesAuto = change.autoAccept != nil || change.kinds != nil || change.types != nil
             let body = PolicyPatchBody(
-                model: change.model?.rawValue, autoAccept: touchesAuto ? (on ? types : []) : nil,
-                minSources: change.minSources)
+                model: change.model?.rawValue,
+                autoAccept: touchesAuto ? (on || change.types != nil ? types : []) : nil,
+                minSources: change.minSources, dailyDistils: change.dailyDistils, retentionDays: change.retentionDays)
             return Self.policy(try await routes.patchPolicy(room: room, body), queued: now.queued)
         }
     }

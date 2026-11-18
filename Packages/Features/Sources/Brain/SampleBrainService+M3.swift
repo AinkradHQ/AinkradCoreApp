@@ -144,6 +144,7 @@ struct SampleM3: Sendable {
         p.autoAccept = auto
         p.kinds = auto ? [.fact, .openThread] : []
         p.minSources = 2
+        p.dailyDistils = 12
         return p
     }
 
@@ -209,6 +210,13 @@ extension SampleBrainService {
         if let a = change.autoAccept { p.autoAccept = a }
         if let k = change.kinds { p.kinds = k }
         if let n = change.minSources { p.minSources = n }
+        if let t = change.types {
+            p.kinds = Set(t.compactMap(CandidateKind.init(autoType:)))
+            p.otherAuto = t.filter { CandidateKind(autoType: $0) == nil }.sorted()
+            p.autoAccept = !t.isEmpty
+        }
+        if let n = change.dailyDistils { p.dailyDistils = n }
+        if let d = change.retentionDays { p.retentionDays = d > 0 ? d : nil }
         if p.model == .cloud { p.queued = 0 }
         m3.policies[room] = p
         return p

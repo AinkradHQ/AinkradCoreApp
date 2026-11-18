@@ -1,19 +1,23 @@
 import CoreUI
 import SwiftUI
 
-/// A room's Settings half: which models may read it, and what it files without a review. Every change asks for Touch ID
+/// A room's Settings half: which models may read it, what it saves by itself, how long it keeps sources, and the clean-up. Every change asks for Touch ID
 /// (the model asks); until the Core answers, the controls show what the Core has.
 struct RoomSettings: View {
     let model: BrainModel
     let room: RoomSummary
-    private var c: BrainCandidates { model.candidates }
+    var c: BrainCandidates { model.candidates }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             if let p = c.policy(room.id) {
                 if p.needsLocalModel { queue(p) }
                 policy(p)
-                auto(p)
+                saving(p)
+                if model.service?.servesCare == true {
+                    retention(p)
+                    RoomCleanupCard(model: model, room: room)
+                }
                 RoomAISessions(c: c, room: room)
             } else {
                 BrainSkeleton(shape: .list)
@@ -27,7 +31,7 @@ struct RoomSettings: View {
         .accessibilityIdentifier("room-settings")
     }
 
-    private func head(_ title: String, _ note: String) -> some View {
+    func head(_ title: String, _ note: String) -> some View {
         HStack {
             Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s3)
@@ -36,7 +40,7 @@ struct RoomSettings: View {
         .padding(.horizontal, 2)
     }
 
-    private func hint(_ s: String) -> some View {
+    func hint(_ s: String) -> some View {
         Text(s).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -131,58 +135,11 @@ struct RoomSettings: View {
         .frame(maxWidth: Space.s8 * 11, alignment: .leading)
     }
 
-    // MARK: auto-accept
+    // The Auto-save, daily cap and Retention sections are in RoomSettingsMemory.swift.
 
-    private func auto(_ p: RoomPolicy) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            head("Auto-accept", "Off by default")
-            row(
-                "Accept candidates automatically",
-                p.autoAccept
-                    ? "These kinds go straight into the room."
-                    : "Everything waits in the Inbox until you accept it.",
-                dim: false
-            ) {
-                CoreSwitch(
-                    "",
-                    isOn: Binding(get: { p.autoAccept }, set: { on in Task { await c.setAutoAccept(room.id, on) } }))
-            }
-            ForEach(CandidateKind.autoRows, id: \.self) { k in
-                row(k.plural, Self.autoAbout(k), dim: !p.autoAccept, inline: true) {
-                    CoreCheckbox(
-                        "",
-                        isOn: Binding(
-                            get: { p.kinds.contains(k) }, set: { _ in Task { await c.toggleKind(room.id, k) } }),
-                        spoken: k.plural)
-                }
-                .disabled(!p.autoAccept)
-            }
-            row("Only with at least", nil, dim: !p.autoAccept, inline: true) {
-                CoreSelect(
-                    nil,
-                    selection: Binding(get: { p.minSources }, set: { n in Task { await c.setMinSources(room.id, n) } }),
-                    options: Self.minChoices(p.minSources).map {
-                        CoreSelectOption($0, BrainWords.plural($0, "source", "sources"))
-                    }
-                )
-                .frame(width: Space.s8 * 4)
-                .disabled(!p.autoAccept)
-            }
-        }
-    }
+    static func minChoices(_ current: Int) -> [Int] { Set([1, 2, 3, 5, 10, current]).sorted() }
 
-    /// Auto-accept filters by type, so the two tagged kinds say how wide they are.
-    private static func autoAbout(_ k: CandidateKind) -> String {
-        switch k {
-        case .landmine: "A trap to avoid. Takes every rule"
-        case .openThread: "A question still open. Takes every task"
-        default: k.about
-        }
-    }
-
-    private static func minChoices(_ current: Int) -> [Int] { Set([1, 2, 3, 5, 10, current]).sorted() }
-
-    private func row<T: View>(
+    func row<T: View>(
         _ title: String, _ sub: String?, dim: Bool, inline: Bool = false, @ViewBuilder trailing: () -> T
     )
         -> some View
