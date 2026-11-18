@@ -36,6 +36,14 @@ public final class ProjectsDemo {
         func setExpose(project: Int64, _ on: Bool) async throws {
             lock.withLock { if let i = list.firstIndex(where: { $0.id == project }) { list[i].expose = on } }
         }
+        func update(project: Int64, name: String, description: String) async throws {
+            lock.withLock {
+                guard let i = list.firstIndex(where: { $0.id == project }) else { return }
+                list[i].name = name
+                list[i].description = description
+            }
+        }
+        func archive(project: Int64) async throws { lock.withLock { list.removeAll { $0.id == project } } }
         func setRun(_ project: Int64, _ state: RunSummary.State, progress: Double = 0) {
             lock.withLock {
                 guard let i = list.firstIndex(where: { $0.id == project }) else { return }
@@ -50,7 +58,8 @@ public final class ProjectsDemo {
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
         "gallery-failed", "new-quick-empty", "new-quick", "new-quick-error", "new-advanced", "space-no-repos",
         "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
-        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-repos", "page-sessions",
+        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
+        "page-settings-stopped", "page-repos", "page-sessions",
         "page-brain", "page-brain-empty",
     ]
 
@@ -79,6 +88,7 @@ public final class ProjectsDemo {
                 updatedAt: now.addingTimeInterval(-hours * 3600), run: run, live: DemoLive.make(run.state))
         }
         var lanterna = p(1, "lanterna", "Lanterna", RunSummary(state: .running, services: 5, sessions: 2), hours: 1)
+        lanterna.description = "Online shop for handmade lighting"
         lanterna.repos = [
             Self.lanternaRepo(0, "lanterna-api", branch: "development", head: "4e1c9a2", minutes: 4),
             Self.lanternaRepo(1, "lanterna-web", branch: "development", head: "a81f03d", minutes: 4),
@@ -179,6 +189,9 @@ public final class ProjectsDemo {
         case "page-run":
             model.openID = 1
             model.section = .run
+        case "page-settings", "page-settings-stopped":
+            model.openID = scene == "page-settings" ? 1 : 4
+            model.section = .settings
         case "page-repos":
             model.openID = 1
             model.section = .repos

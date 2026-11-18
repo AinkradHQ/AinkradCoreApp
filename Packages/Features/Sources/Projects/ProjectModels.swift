@@ -26,6 +26,18 @@ struct RunSummary: Equatable, Sendable {
     var lastRun: String?
 }
 
+/// A project's newest run as the Core's run routes (`/projects/{id}/run`, AinkradCore #318) answer it.
+struct ProjectRunState: Equatable, Sendable {
+    var summary: RunSummary
+    var startedAt: Date
+    /// When the idle stop is due, for a running run.
+    var idleStopAt: Date?
+    /// What went wrong, for a failed run (the Core redacts it).
+    var error: String?
+    /// `user`, `idle`, `crash`, `runner_lost`, `replaced` or `start_failed`.
+    var stopReason: String?
+}
+
 /// A drafted run (P4): shown in the "ready to start" state.
 struct RunDraft: Equatable, Sendable {
     let source: String
@@ -45,6 +57,10 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var draft: RunDraft?
     /// What the Overview shows of a running project: services, logs, AI sessions, the Brain room. Nil on a real Core today.
     var live: ProjectLive?
+    /// What a run may use and when it stops by itself (the Core's defaults until it says otherwise).
+    var cpuLimit = 2.0
+    var memLimitMb: Int64 = 2048
+    var idleMinutes = ProjectRules.idleMinutes
 
     var link: String { ProjectRules.host(slug) }
 
@@ -82,10 +98,11 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
         if let run {
             switch run.state {
             case .running:
-                var parts = ["Running", Self.count(run.services, "service")]
+                var parts = ["Running"]
+                if run.services > 0 { parts.append(Self.count(run.services, "service")) }
                 if run.sessions > 0 { parts.append(Self.count(run.sessions, "AI session")) }
                 return parts.joined(separator: " · ")
-            case .starting: return "Starting · \(Self.count(run.services, "service"))"
+            case .starting: return run.services > 0 ? "Starting · \(Self.count(run.services, "service"))" : "Starting"
             case .failed: return run.lastRun.map { "Last run failed \($0)" } ?? "Last run failed"
             case .stopped: return run.lastRun.map { "Stopped · last run \($0)" } ?? "Stopped"
             }

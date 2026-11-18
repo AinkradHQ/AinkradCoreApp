@@ -12,7 +12,7 @@ final class FakeHost: AdminHost {
     var pausedReason: String?
     var elevationNotice: AdminNotice?
     var declines = false
-    private(set) var reasons: [String] = []
+    var reasons: [String] = []
     func clearElevationNotice() { elevationNotice = nil }
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
         reasons.append(reason)
@@ -53,6 +53,31 @@ final class FakeService: ProjectsService, @unchecked Sendable {
         }
     }
     func setExpose(project: Int64, _ on: Bool) async throws { lock.withLock { calls.append("expose \(on)") } }
+    var runState: ProjectRunState?
+    func update(project: Int64, name: String, description: String) async throws {
+        lock.withLock {
+            calls.append("update \(name) | \(description)")
+            if let i = list.firstIndex(where: { $0.id == project }) {
+                list[i].name = name
+                list[i].description = description
+            }
+        }
+    }
+    func archive(project: Int64) async throws {
+        lock.withLock {
+            calls.append("archive")
+            list.removeAll { $0.id == project }
+        }
+    }
+    func run(project: Int64) async throws -> ProjectRunState? { lock.withLock { runState } }
+    func control(project: Int64, _ action: RunAction) async throws -> ProjectRunState {
+        lock.withLock {
+            calls.append("run \(action)")
+            let state: RunSummary.State = action == .stop ? .stopped : .starting
+            runState = ProjectRunState(summary: RunSummary(state: state), startedAt: Date())
+            return runState!
+        }
+    }
 }
 
 private func pick(_ name: String) -> PickRepo {
@@ -220,10 +245,85 @@ struct ModelTests {
         m.section = .repos
         m.openProject(1)
         #expect(m.section == .overview)
-        #expect(!m.canControl(p))
-        p.live = ProjectLive()
         #expect(m.canControl(p))
         #expect(ProjectSection.brain.empty(p).title == "Demo room")
+    }
+}
+
+@MainActor
+struct SettingsAndRunTests {
+    private func projectWithRepo(_ m: ProjectsModel) async -> ProjectItem {
+        _ = await m.create(name: "Tidepool", slug: "tidepool", colour: .blue, repos: [pick("tidepool-api")])
+        return m.projects[0]
+    }
+
+    @Test func startingAsksTouchIDAndShowsTheRunTheCoreAnswered() async {
+        let (m, s, host) = await make()
+        let p = await projectWithRepo(m)
+        host.reasons.removeAll()
+        await m.runControl(.start, p)
+        #expect(s.calls.last == "run start")
+        #expect(host.reasons.count == 1)
+        #expect(m.projects[0].tag == .starting)
+        await m.runControl(.stop, m.projects[0])
+        #expect(m.projects[0].tag == .stopped)
+        #expect(m.controlling.isEmpty)
+    }
+
+    @Test func aDeclinedTouchIDDoesNotStart() async {
+        let host = FakeHost()
+        let (m, s, _) = await make(host)
+        let p = await projectWithRepo(m)
+        host.declines = true
+        await m.runControl(.start, p)
+        #expect(!s.calls.contains("run start"))
+        #expect(m.projects[0].tag == .stopped)
+    }
+
+    @Test func aRunningRunShowsItsIdleTimerAndAFailedOneWhyItFailed() async {
+        let (m, s, _) = await make()
+        let p = await projectWithRepo(m)
+        s.runState = ProjectRunState(
+            summary: RunSummary(state: .running), startedAt: Date().addingTimeInterval(-600),
+            idleStopAt: Date().addingTimeInterval(26 * 60))
+        await m.refreshRun(p.id)
+        #expect(m.projects[0].tag == .running)
+        #expect(m.projects[0].live?.idle == "idle 4 min of 30")
+        s.runState = ProjectRunState(
+            summary: RunSummary(state: .failed), startedAt: Date(), error: "port 3000 is taken",
+            stopReason: "start_failed")
+        await m.refreshRun(p.id)
+        #expect(m.projects[0].live?.failure == "port 3000 is taken")
+        #expect(m.projects[0].live?.idle == nil)
+    }
+
+    @Test func savingGeneralChangesNameAndDescriptionBehindOneTouchID() async {
+        let (m, s, host) = await make()
+        let p = await projectWithRepo(m)
+        host.reasons.removeAll()
+        #expect(await m.saveGeneral(p, name: " Tidepool Labs ", description: "Tides"))
+        #expect(s.calls.last == "update Tidepool Labs | Tides")
+        #expect(host.reasons.count == 1)
+        #expect(m.projects[0].name == "Tidepool Labs")
+        #expect(await m.saveGeneral(p, name: "  ", description: "") == false)
+        #expect(m.writeError == "Give the project a name.")
+    }
+
+    @Test func archivingClosesTheSpace() async {
+        let (m, s, _) = await make()
+        let p = await projectWithRepo(m)
+        m.openProject(p.id)
+        await m.archive(p)
+        #expect(s.calls.last == "archive")
+        #expect(m.projects.isEmpty)
+    }
+
+    @Test func limitsAreSaidInWords() {
+        #expect(SettingsPage.cpus(2) == "2 CPUs")
+        #expect(SettingsPage.cpus(1) == "1 CPU")
+        #expect(SettingsPage.cpus(1.5) == "1.5 CPUs")
+        #expect(SettingsPage.memory(2048) == "2 GB")
+        #expect(SettingsPage.memory(512) == "512 MB")
     }
 }
 
