@@ -20,6 +20,17 @@ struct TerminalPaneView: View {
                 ) { b.action.map(perform) }
                 .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
+            if let r = model.recording[session.id] {
+                TermBanner(
+                    tone: r.paused ? .done : .warn, title: r.paused ? "Recording paused" : "Recording",
+                    detail: r.paused
+                        ? "Nothing is being recorded now. Resume it from the host's History page."
+                        : "The Core records this terminal's output, redacted. What you type is never recorded.",
+                    symbol: "record.circle", actionTitle: r.paused ? nil : "Pause recording"
+                ) { Task { await model.pauseRecording?(session.id) } }
+                .accessibilityIdentifier("terminal-recording")
+                .transition(reduce ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
             ZStack {
                 if v.screenVisible {
                     TerminalScreen(surface: session.surface).opacity(v.dim ? 0.5 : 1)

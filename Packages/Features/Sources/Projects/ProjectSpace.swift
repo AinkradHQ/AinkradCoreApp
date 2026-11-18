@@ -2,8 +2,8 @@ import CoreUI
 import SwiftUI
 
 /// The space of one project: a top bar, a thin rail and the page the rail picks. P7-02 builds the top bar, the rail and the
-/// Overview; the other pages are stubs with the mockup's empty words until P7-03 (Repos, AI Sessions, Brain), P7-04 (Run)
-/// and P7-05 (Project Settings).
+/// Overview, P7-03 the Repos, AI Sessions and Brain pages, P7-04 the Run page; Project Settings is a stub with the mockup's
+/// empty words until P7-05.
 struct ProjectSpaceView: View {
     let model: ProjectsModel
     let project: ProjectItem
@@ -29,6 +29,8 @@ struct ProjectSpaceView: View {
         switch model.section {
         case .overview:
             Overview(model: model, project: project)
+        case .run:
+            RunPage(model: model, project: project).id(project.id)
         case .repos:
             ReposPage(model: model, project: project)
         case .sessions:

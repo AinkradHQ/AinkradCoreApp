@@ -33,6 +33,12 @@ enum NoopOutcome: Equatable {
 
 /// The terminals feature: what the Core lists, the runners, the open panes and their sessions. Views read it; the Core is
 /// reached only through `TerminalService`.
+/// What a pane shows of the Core's recording of its terminal (output only, redacted by the Core).
+public struct PaneRecording: Equatable, Sendable {
+    public var paused: Bool
+    public init(paused: Bool = false) { self.paused = paused }
+}
+
 @MainActor @Observable
 public final class TerminalsModel {
     private(set) var items: [TerminalItem] = []
@@ -51,6 +57,10 @@ public final class TerminalsModel {
     /// only the current value, so the chart is what was sampled while the app watched.
     private(set) var loadSamples: [String: [Double]] = [:]
     var newTerminal: NewTerminalModel?
+    /// Host terminals the Core is recording (Leyline), by terminal id: the pane says so and offers Pause. Leyline sets it.
+    public var recording: [String: PaneRecording] = [:]
+    /// Pauses the Core's recording of a terminal. Leyline owns the Core call, so the app sets this.
+    public var pauseRecording: (@MainActor (String) async -> Void)?
     /// Runner control (N17, N19): the policy being applied, why one was refused, and each runner's tool installs.
     var policyBusy: Set<String> = []
     var policyNote: [String: RunnerNote] = [:]
@@ -269,6 +279,12 @@ public final class TerminalsModel {
                 RunnersView(model: self)
             })
         Task { await reload() }
+    }
+
+    /// Opens the pane of a terminal the Core made elsewhere (a Leyline host terminal): reads the list first so it is known.
+    public func openRemote(_ id: String) async {
+        await reload()
+        openTerminal(id)
     }
 
     /// Opens a terminal's pane. `attach`: connect at once (a terminal this app just made, or one nobody else holds).

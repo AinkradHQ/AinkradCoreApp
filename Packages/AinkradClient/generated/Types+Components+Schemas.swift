@@ -9649,31 +9649,63 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/UpdateProject`.
         public struct UpdateProject: Codable, Hashable, Sendable {
+            /// CPUs a run may use, 0.1 to 16.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProject/cpu_limit`.
+            public var cpuLimit: Swift.Double?
             /// - Remark: Generated from `#/components/schemas/UpdateProject/description`.
             public var description: Swift.String?
             /// - Remark: Generated from `#/components/schemas/UpdateProject/expose`.
             public var expose: Swift.Bool?
+            /// Idle stop, 5 to 1440 minutes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProject/idle_minutes`.
+            public var idleMinutes: Swift.Int64?
+            /// Memory a run may use, 64 to 32768 MB.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProject/mem_limit_mb`.
+            public var memLimitMb: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/UpdateProject/name`.
             public var name: Swift.String?
+            /// The link name (the slug); refused while the project runs or holds secrets.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProject/slug`.
+            public var slug: Swift.String?
             /// Creates a new `UpdateProject`.
             ///
             /// - Parameters:
+            ///   - cpuLimit: CPUs a run may use, 0.1 to 16.
             ///   - description:
             ///   - expose:
+            ///   - idleMinutes: Idle stop, 5 to 1440 minutes.
+            ///   - memLimitMb: Memory a run may use, 64 to 32768 MB.
             ///   - name:
+            ///   - slug: The link name (the slug); refused while the project runs or holds secrets.
             public init(
+                cpuLimit: Swift.Double? = nil,
                 description: Swift.String? = nil,
                 expose: Swift.Bool? = nil,
-                name: Swift.String? = nil
+                idleMinutes: Swift.Int64? = nil,
+                memLimitMb: Swift.Int64? = nil,
+                name: Swift.String? = nil,
+                slug: Swift.String? = nil
             ) {
+                self.cpuLimit = cpuLimit
                 self.description = description
                 self.expose = expose
+                self.idleMinutes = idleMinutes
+                self.memLimitMb = memLimitMb
                 self.name = name
+                self.slug = slug
             }
             public enum CodingKeys: String, CodingKey {
+                case cpuLimit = "cpu_limit"
                 case description
                 case expose
+                case idleMinutes = "idle_minutes"
+                case memLimitMb = "mem_limit_mb"
                 case name
+                case slug
             }
         }
         /// What changes; an omitted field is kept.

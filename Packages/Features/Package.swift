@@ -153,7 +153,9 @@ let package = Package(
             dependencies: ["Leyline", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(
             name: "DesignTests",
-            dependencies: ["Design", "Projects", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")]),
+            dependencies: ["Design", "Projects", "Shell", "Admin", .product(name: "CoreKit", package: "CoreKit")],
+            // The hostile mockup package of V3-07: pages that try to reach the network, the app and the outside.
+            resources: [.copy("Fixtures")]),
         .testTarget(name: "BrainTests", dependencies: ["Brain", "BrainImport", "Shell", "Admin"]),
         .testTarget(name: "BrainImportTests", dependencies: ["BrainImport"]),
         .testTarget(

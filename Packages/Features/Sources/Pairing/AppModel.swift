@@ -239,6 +239,18 @@ public final class AppModel {
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
             leyline.attach(connection: live.connection)
+            leyline.openTerminal = { [weak model] id in await model?.openRemote(id) }
+            // The Core records host terminals when a host asks: the pane shows it and can pause it.
+            leyline.markRecording = { [weak model] terminal, paused in
+                model?.recording[terminal] = paused.map { PaneRecording(paused: $0) }
+            }
+            model.pauseRecording = { [weak self] terminal in await self?.leyline.pauseRecording(terminal: terminal) }
+            // Who claimed a runner invite, from the device list the Admin app keeps.
+            leyline.deviceLookup = { [weak self] id in
+                self?.devices.items.first { $0.id == id }.map {
+                    RunnerClaimer(id: $0.id, name: $0.name, platform: $0.platform, fingerprint: $0.fingerprint)
+                }
+            }
             design.attach(connection: live.connection)
             lore.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".

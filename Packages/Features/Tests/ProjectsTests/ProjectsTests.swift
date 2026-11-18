@@ -277,7 +277,7 @@ struct SettingsAndRunTests {
         host.declines = true
         await m.runControl(.start, p)
         #expect(!s.calls.contains("run start"))
-        #expect(m.projects[0].tag == .stopped)
+        #expect(m.projects[0].tag == p.tag, "a declined start changes nothing")
     }
 
     @Test func aRunningRunShowsItsIdleTimerAndAFailedOneWhyItFailed() async {
