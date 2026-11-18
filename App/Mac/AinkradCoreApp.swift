@@ -60,9 +60,12 @@ struct AinkradCoreApp: App {
             demo: env["CORE_DEMO"] == "1", sasFile: env["CORE_IT_SAS_FILE"])
         if env["CORE_DEMO"] == "1" { SampleWorld.install(into: app.shell) }
         if env["CORE_KEYSTORE"] == "memory" { app.debugSkipLocalTouchID() }
+        DesignCanvasHookup.install(app)
         return app
         #else
-        return AppModel()
+        let app = AppModel()
+        DesignCanvasHookup.install(app)
+        return app
         #endif
     }
 }

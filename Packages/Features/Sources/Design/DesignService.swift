@@ -8,10 +8,18 @@ protocol DesignService: Sendable {
     func docs() async throws -> [DesignDoc]
     func assets() async throws -> [DesignAsset]
     func kits() async throws -> [BrandKit]
-    /// The bytes of a checked (`ok`) asset. Never called for a font.
+    /// One asset, library or not (the canvas asks for what a design draws with).
+    func asset(_ sha: String) async throws -> DesignAsset
+    /// The bytes of a checked (`ok`) asset. Fonts are fetched only for the canvas engine, never shown or loaded by the app.
     func data(_ sha: String) async throws -> Data
     /// Relates an item to a project (`on`) or ends that.
     func link(_ item: DesignItem, project: String, _ on: Bool) async throws
+    /// The design's versions, newest first (V3-04).
+    func versions(doc: String) async throws -> [DesignVersion]
+    /// Keeps the design's current state under a name.
+    func saveVersion(doc: String, name: String) async throws -> DesignVersion
+    /// Rewrites the live design to a version (one Core transaction, so it is an ordinary edit for everyone and Undo works).
+    func restoreVersion(doc: String, id: String) async throws
 }
 
 /// A failure the screens can word. `code` is for hover help only.
@@ -19,6 +27,23 @@ struct DesignFailure: Error, Equatable, Sendable {
     let sentence: String
     let code: String
     var status = 0
+}
+
+extension DesignService {
+    // The Core serves no versions route yet (V1-04), so a service that does not bring its own says so in words.
+    func versions(doc: String) async throws -> [DesignVersion] { throw Self.noVersions }
+    func saveVersion(doc: String, name: String) async throws -> DesignVersion { throw Self.noVersions }
+    func restoreVersion(doc: String, id: String) async throws { throw Self.noVersions }
+    static var noVersions: DesignFailure {
+        DesignFailure(sentence: "This Core does not keep versions yet.", code: "not_found", status: 404)
+    }
+
+    func asset(_ sha: String) async throws -> DesignAsset {
+        guard let a = try await assets().first(where: { $0.sha == sha }) else {
+            throw DesignFailure(sentence: "The Core does not have that file.", code: "not_found", status: 404)
+        }
+        return a
+    }
 }
 
 struct LiveDesignService: DesignService {
@@ -31,6 +56,9 @@ struct LiveDesignService: DesignService {
     }
     func kits() async throws -> [BrandKit] {
         try await call("GET", "/collections", as: [CollectionWire].self).filter { $0.kind == "brand_kit" }.map(\.kit)
+    }
+    func asset(_ sha: String) async throws -> DesignAsset {
+        try await call("GET", "/assets/\(Self.seg(sha))", as: AssetWire.self).asset
     }
     func data(_ sha: String) async throws -> Data {
         try await raw("GET", "/assets/\(Self.seg(sha))/data")
@@ -45,9 +73,23 @@ struct LiveDesignService: DesignService {
         _ = try await raw(on ? "PUT" : "DELETE", "\(path)/projects/\(Self.seg(project))")
     }
 
-    private func raw(_ method: String, _ path: String) async throws -> Data {
+    // TODO(V1-04): the versions routes are the plan's T14 shape, not yet in the Core's contract: GET/POST
+    // `/docs/{d}/versions` (`{id, kind, name, created_by, created_at}`, POST body `{"name"}`) and POST
+    // `/docs/{d}/versions/{id}/restore`. Check them against `openapi.json` when V1-04 lands.
+    func versions(doc: String) async throws -> [DesignVersion] {
+        try await call("GET", "/docs/\(Self.seg(doc))/versions", as: [VersionWire].self).map(\.version)
+    }
+    func saveVersion(doc: String, name: String) async throws -> DesignVersion {
+        let body = try JSONEncoder().encode(["name": name])
+        return try await call("POST", "/docs/\(Self.seg(doc))/versions", body: body, as: VersionWire.self).version
+    }
+    func restoreVersion(doc: String, id: String) async throws {
+        _ = try await raw("POST", "/docs/\(Self.seg(doc))/versions/\(Self.seg(id))/restore")
+    }
+
+    private func raw(_ method: String, _ path: String, body: Data = Data()) async throws -> Data {
         do {
-            return try await connection.signedRequest(method: method, target: Self.base + path)
+            return try await connection.signedRequest(method: method, target: Self.base + path, body: body)
         } catch CoreError.http(let status, let code, let message) {
             throw Self.failure(status: status, code: code, message: message)
         } catch CoreError.badRequest(let message) {
@@ -55,8 +97,9 @@ struct LiveDesignService: DesignService {
         }
     }
 
-    private func call<T: Decodable>(_ method: String, _ path: String, as: T.Type) async throws -> T {
-        let data = try await raw(method, path)
+    private func call<T: Decodable>(_ method: String, _ path: String, body: Data = Data(), as: T.Type) async throws -> T
+    {
+        let data = try await raw(method, path, body: body)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         do { return try decoder.decode(T.self, from: data) } catch {
@@ -95,6 +138,19 @@ struct DocWire: Decodable {
         DesignDoc(
             id: id, kind: DesignDoc.Kind(rawValue: kind) ?? .design, name: name, system: system, projects: projects,
             aiPaused: aiPaused, createdBy: createdBy, updatedAt: Ago.iso(updatedAt))
+    }
+}
+
+struct VersionWire: Decodable {
+    let id: String
+    let kind: String
+    let name: String
+    let createdBy: String
+    let createdAt: String
+    var version: DesignVersion {
+        DesignVersion(
+            id: id, kind: DesignVersion.Kind(rawValue: kind) ?? .auto, name: name, createdBy: createdBy,
+            createdAt: Ago.iso(createdAt))
     }
 }
 
