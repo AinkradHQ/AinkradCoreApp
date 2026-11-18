@@ -124,6 +124,19 @@ public protocol LoreImportService: Sendable {
     /// Calling it again on a run that is undoing resumes it.
     func undoImport(_ run: String) async throws -> LoreImportRun
     func abandonImport(_ run: String) async throws -> LoreImportRun
+    /// An upload-like run whose Markdown the Mac made from Apple Notes (R4-03); project nil = personal.
+    func startAppleNotesImport(project: String?) async throws -> LoreImportRun
+    /// Stores one attachment (png, jpeg, gif, webp, heic or pdf, at most 10 MB) and returns its sha256, for `lore-attachment:<sha>`.
+    func uploadAttachment(_ data: Data) async throws -> String
+}
+
+extension LoreImportService {
+    public func startAppleNotesImport(project: String?) async throws -> LoreImportRun {
+        throw CoreError.protocolViolation("This Core cannot import Apple Notes.")
+    }
+    public func uploadAttachment(_ data: Data) async throws -> String {
+        throw CoreError.protocolViolation("This Core cannot store attachments.")
+    }
 }
 
 extension LiveLoreService: LoreImportService {
@@ -142,6 +155,22 @@ extension LiveLoreService: LoreImportService {
         }
         return try await call(
             "POST", "/imports", Body(source: repo ? "mirror" : "upload", project: project), as: LoreImportRun.self)
+    }
+
+    public func startAppleNotesImport(project: String?) async throws -> LoreImportRun {
+        struct Body: Encodable {
+            let source: String
+            let project: String?
+        }
+        return try await call("POST", "/imports", Body(source: "apple_notes", project: project), as: LoreImportRun.self)
+    }
+
+    public func uploadAttachment(_ data: Data) async throws -> String {
+        struct Stored: Decodable { let sha256: String }
+        let out = try await send("POST", Self.base + "/attachments", data)
+        do { return try JSONDecoder().decode(Stored.self, from: out).sha256 } catch {
+            throw CoreError.protocolViolation("The Core answered something this app does not know.")
+        }
     }
 
     public func addImportFiles(_ run: String, _ files: [LoreImportFile]) async throws -> LoreImportRun {

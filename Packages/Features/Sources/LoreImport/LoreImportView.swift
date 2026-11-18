@@ -22,6 +22,7 @@ struct LoreImportView: View {
             case .undone: undone
             case .failed(let why): failed(why)
             case .history: history
+            case .needsPermission: needsPermission
             }
         }
         .accessibilityIdentifier("lore-import")
@@ -37,6 +38,7 @@ struct LoreImportView: View {
         case .undone: "Import Undone"
         case .failed: "Unable to Import"
         case .history: "Earlier Imports"
+        case .needsPermission: "Apple Notes"
         }
     }
 
@@ -55,6 +57,11 @@ struct LoreImportView: View {
                 action: { model.chooseFiles() }
             )
             .help("Choose .md files or a .zip on this Mac")
+            CoreRow(
+                "Import Apple Notes…", subtitle: "Read your notes on this Mac", symbol: "note.text",
+                action: { model.importAppleNotes() }
+            )
+            .help("Asks macOS to let Ainkrad read Notes the first time. Nothing becomes a note until you review it")
             CoreRow(
                 "Earlier Imports", subtitle: "Continue or undo an import", symbol: "clock.arrow.circlepath",
                 action: { model.openHistory() }
@@ -141,6 +148,15 @@ struct LoreImportView: View {
         }
     }
 
+    private var needsPermission: some View {
+        CoreStateCard(
+            symbol: "lock", title: "Allow Ainkrad to Read Notes",
+            line:
+                "macOS did not let Ainkrad control Notes. Turn on Notes under Ainkrad in System Settings, Privacy & Security, Automation, then try again.",
+            secondary: CoreAction("Close") { model.close() },
+            primary: CoreAction("Open Settings", key: .primary) { model.openAutomationSettings() })
+    }
+
     private func failed(_ why: String) -> some View {
         CoreStateCard(
             symbol: "exclamationmark.triangle", title: "Unable to Import", line: why,
@@ -185,7 +201,8 @@ private struct LoreImportRunRow: View {
         let state = LoreImportWords.state(run.state)
         let help = LoreImportWords.resumeHelp(run.state)
         let sub = [
-            run.source == "mirror" ? "From repo" : "From files", LoreImportWords.age(run.createdAt),
+            run.source == "mirror" ? "From repo" : run.source == "apple_notes" ? "From Apple Notes" : "From files",
+            LoreImportWords.age(run.createdAt),
         ].compactMap { $0 }.joined(separator: " · ")
         let act: (() -> Void)? = help == nil ? nil : { model.resume(run) }
         CoreRow(
@@ -212,7 +229,9 @@ struct LoreImportReview: View {
                         symbol: "doc.questionmark", title: "No Markdown Files Found",
                         text: run.source == "mirror"
                             ? "The repo has no .md files under Docs/ or docs/."
-                            : "None of the chosen files can be imported.",
+                            : run.source == "apple_notes"
+                                ? "No notes could be read from Apple Notes."
+                                : "None of the chosen files can be imported.",
                         tone: .warn)
                 } else {
                     Text(LoreImportWords.summary(run, into: model.place))

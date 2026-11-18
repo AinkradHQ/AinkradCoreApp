@@ -19,6 +19,8 @@ import UniformTypeIdentifiers
 final class LoreImportModel {
     enum Phase: Equatable {
         case chooser, repoSetup, review, done, undone, history
+        /// Notes would not let this app control it: one explanation card.
+        case needsPermission
         /// Words, and how far along (0...1) when the Core can say.
         case working(String, Double?)
         case failed(String)
@@ -73,7 +75,7 @@ final class LoreImportModel {
             ?? error.localizedDescription
     }
 
-    private func fail(_ why: String, retry again: (() -> Void)? = nil) {
+    func fail(_ why: String, retry again: (() -> Void)? = nil) {
         poll?.cancel()
         retry = again
         phase = .failed(why)
@@ -83,7 +85,7 @@ final class LoreImportModel {
     var canTryAgain: Bool { retry != nil }
 
     /// A dropped link is tried again after 2 s and 4 s; any answer from the Core is final.
-    private func retrying<T: Sendable>(_ op: @Sendable () async throws -> T) async throws -> T {
+    func retrying<T: Sendable>(_ op: @Sendable () async throws -> T) async throws -> T {
         var attempt = 0
         while true {
             do { return try await op() } catch {
