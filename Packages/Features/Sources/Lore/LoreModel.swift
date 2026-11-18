@@ -50,7 +50,11 @@ public final class LoreModel {
     private(set) var note: LoreNote?
     private(set) var sync: LoreSync = .saved
     /// One line under the top bar: a conflict kept as a version, a refused save, a link that was not opened.
-    var notice: String?
+    var notice: String? { didSet { noticeAction = nil } }
+    /// The button on the notice line, set right after the line itself.
+    var noticeAction: LoreNoticeAction?
+    /// Notes linking to the open one (R6-04); the island shows only when this is not empty.
+    private(set) var backlinks: [LoreBacklink] = []
     var projectNames: [String: String] = [:]
     /// ⌘O: the open sheet (R6-03 builds it).
     var openSheet = false
@@ -69,6 +73,7 @@ public final class LoreModel {
     @ObservationIgnored private var again = false
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private var opening = 0
+    @ObservationIgnored private var backlinkOwner = ""
     /// The space was opened since the Core was attached.
     @ObservationIgnored private var opened = false
     @ObservationIgnored private let signposter = OSSignposter(subsystem: "com.ainkrad.core", category: "lore")
@@ -108,6 +113,7 @@ public final class LoreModel {
         opened = false
         service = nil
         note = nil
+        backlinks = []
         day = nil
         base = 0
         synced = ""
@@ -148,7 +154,7 @@ public final class LoreModel {
         if load != .ready { Task { await openDay(todayKey) } }
     }
 
-    /// The page is on screen and takes typing (L1: the cursor ready). Ends the open signpost.
+    /// The page is on screen and takes typing (L1). Ends the open signpost.
     func ready() {
         page.focus()
         if let s = openSign {
@@ -231,6 +237,7 @@ public final class LoreModel {
         base = n?.rev ?? 0
         synced = n?.text ?? ""
         notice = n?.trashed == true ? "This note is in the trash." : nil
+        refreshBacklinks()
         let draft = n.flatMap { drafts.read($0.id) } ?? day.flatMap { drafts.read("day-\($0)") }
         let waiting = draft.map { $0.text != synced } ?? false
         if let draft, waiting {
@@ -247,7 +254,7 @@ public final class LoreModel {
     }
 
     /// Before the page changes: send what was typed.
-    private func leave() async {
+    func leave() async {
         timer?.cancel()
         if dirty { await save() }
     }
@@ -309,6 +316,7 @@ public final class LoreModel {
             if r.keptVersion {
                 notice =
                     "Changed elsewhere at the same time. Your lines were kept; the other text is saved as a version."
+                if let v = r.version { noticeAction = .seeChanges(v) }
             }
             if page.markdown() == text {
                 if r.note.text != text { fold(r.note.text) }
@@ -362,6 +370,34 @@ public final class LoreModel {
         page.show(text, fold: true)
     }
 
+    // MARK: history (R6-04: `LoreHistory.swift`)
+    /// A restore made `n` the head: the page shows it (the caret stays near where it was) and the base moves up.
+    func adopt(_ n: LoreNote) {
+        note = n
+        synced = n.text
+        base = n.rev
+        drafts.remove(n.id)
+        page.show(n.text, fold: true)
+        sync = .saved
+        refreshBacklinks()
+    }
+
+    /// The note moved projects: only the project changes, so typed text and the base stay.
+    func moved(_ n: LoreNote) { note?.project = n.project }
+
+    func refreshBacklinks() {
+        guard let service, let id = note?.id, load != .absent else {
+            backlinks = []
+            return
+        }
+        if id != backlinkOwner { backlinks = [] }
+        backlinkOwner = id
+        Task {
+            let list = (try? await service.backlinks(id)) ?? []
+            if note?.id == id { backlinks = list }
+        }
+    }
+
     // MARK: links
 
     func openInternal(_ url: URL) {
@@ -396,7 +432,7 @@ public final class LoreModel {
         }
     }
 
-    private func say(_ error: any Error) { host.shell.showToast(words(error), kind: .warn) }
+    func say(_ error: any Error) { host.shell.showToast(words(error), kind: .warn) }
 
     func words(_ error: any Error) -> String {
         if case .rateLimited(let after)? = CoreError.unwrapping(error) { host.rateLimited(retryAfter: after) }

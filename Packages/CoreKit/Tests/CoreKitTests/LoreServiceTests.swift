@@ -59,4 +59,32 @@ struct LoreServiceTests {
         _ = try await service(w).note("../x?y")
         #expect(w.sent[0].1 == "/modules/lore/v1/notes/..%2Fx%3Fy")
     }
+
+    @Test func backlinksVersionsRestoreAndMove() async throws {
+        let w = Wire()
+        w.answer = Data(
+            #"[{"note":"ln_bbbbbbbbbbbb","title":"Plot map","heading":"","context":"see [[Hi]]","project":"7","updated_at":"x"}]"#
+                .utf8)
+        let b = try await service(w).backlinks("ln_abcdefgh2345")
+        #expect(b.first?.note == "ln_bbbbbbbbbbbb" && b.first?.project == "7")
+        #expect(w.sent[0].1 == "/modules/lore/v1/notes/ln_abcdefgh2345/backlinks")
+
+        w.answer = Data(
+            #"[{"id":"lv_1","kind":"named","name":"Draft","rev":2,"origin":"system","created_at":"x"}]"#.utf8)
+        let v = try await service(w).versions("ln_abcdefgh2345")
+        #expect(v.first == LoreVersion(id: "lv_1", kind: "named", name: "Draft", rev: 2, createdAt: "x"))
+
+        w.answer = Data(#"{"id":"lv_1","kind":"auto","rev":2,"origin":"system","created_at":"x","text":"old"}"#.utf8)
+        #expect(try await service(w).versionText("ln_abcdefgh2345", version: "lv_1") == "old")
+        #expect(w.sent[2].1 == "/modules/lore/v1/notes/ln_abcdefgh2345/versions/lv_1")
+
+        w.answer = Data((String(Self.note.dropLast()) + #","outcome":"restored","version":"lv_2"}"#).utf8)
+        let r = try await service(w).restore("ln_abcdefgh2345", version: "lv_1")
+        #expect(r.outcome == "restored" && r.version == "lv_2" && !r.keptVersion)
+        #expect(w.sent[3].0 == "POST" && w.sent[3].2 == #"{"version":"lv_1"}"#)
+
+        w.answer = Data(Self.note.utf8)
+        _ = try await service(w).move("ln_abcdefgh2345", project: nil)
+        #expect(w.sent[4].0 == "PATCH" && w.sent[4].2 == #"{"project":null}"#)
+    }
 }
