@@ -110,6 +110,38 @@ final class FakeLore: LoreService, @unchecked Sendable {
     }
     func projectNames() async throws -> [String: String] { ["7": "Garden Club"] }
 
+    /// R6-03: a word search over titles and text, newest first; `semantic` is what the test sets.
+    var semantic = true
+    func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
+        try lock.withLock {
+            calls.append(
+                "search \(query) \(filter.state) \(filter.kind ?? "-") \(filter.project ?? "-") \(filter.tag ?? "-")")
+            if offline { throw CoreError.offline("down") }
+            let hits = notes.values.filter { Self.match($0, filter) && $0.text.localizedCaseInsensitiveContains(query) }
+                .sorted { $0.id < $1.id }
+                .map { LoreHit(note: $0, snippet: LoreSnippet(text: $0.text, matches: [])) }
+            return LoreSearchResult(hits: hits, semantic: semantic)
+        }
+    }
+    func list(filter: LoreFilter) async throws -> [LoreNote] {
+        try lock.withLock {
+            calls.append("list \(filter.state) \(filter.kind ?? "-") \(filter.project ?? "-")")
+            if offline { throw CoreError.offline("down") }
+            return notes.values.filter { Self.match($0, filter) }.sorted { $0.id < $1.id }
+        }
+    }
+    func restore(_ id: String) async throws -> LoreNote {
+        lock.withLock {
+            calls.append("restore \(id)")
+            notes[id]!.trashed = false
+            return notes[id]!
+        }
+    }
+    private static func match(_ n: LoreNote, _ f: LoreFilter) -> Bool {
+        n.trashed == (f.state == "trashed") && (f.kind == nil || n.kind == f.kind)
+            && (f.project == nil || n.project == f.project)
+    }
+
     var links: [String: [LoreBacklink]] = [:]
     /// Version id to its text, per note; `restored` counts the auto versions made by restores.
     var kept: [String: [String: String]] = [:]

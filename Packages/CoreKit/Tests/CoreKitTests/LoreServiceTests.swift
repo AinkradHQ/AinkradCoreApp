@@ -60,6 +60,39 @@ struct LoreServiceTests {
         #expect(w.sent[0].1 == "/modules/lore/v1/notes/..%2Fx%3Fy")
     }
 
+    @Test func searchReadsHitsAndSnippets() async throws {
+        let w = Wire()
+        let hit =
+            String(Self.note.dropLast())
+            + #","score":0.1,"via":"both","heading":"Plan","snippet":{"text":"a café plan","matches":[{"start":2,"end":7}]}}"#
+        w.answer = Data(#"{"results":[\#(hit)],"semantic":false}"#.utf8)
+        let r = try await service(w).search(
+            "caf é", filter: LoreFilter(state: "trashed", kind: "daily", project: "7", tag: "x"), limit: 30)
+        #expect(
+            w.sent[0].1
+                == "/modules/lore/v1/search?q=caf%20%C3%A9&limit=30&state=trashed&kind=daily&project=7&tag=x")
+        #expect(!r.semantic && r.hits.count == 1)
+        #expect(r.hits[0].note.id == "ln_abcdefgh2345" && r.hits[0].via == "both" && r.hits[0].heading == "Plan")
+        #expect(r.hits[0].snippet == LoreSnippet(text: "a café plan", matches: [LoreSpan(start: 2, end: 7)]))
+    }
+
+    @Test func listRestoreAndExport() async throws {
+        let w = Wire()
+        w.answer = Data("[\(Self.note)]".utf8)
+        let list = try await service(w).list(filter: LoreFilter(state: "trashed", tag: "ignored"))
+        #expect(w.sent[0].1 == "/modules/lore/v1/notes?state=trashed")
+        #expect(list.count == 1 && list[0].text == "# Hi\n")
+
+        w.answer = Data(Self.note.utf8)
+        _ = try await service(w).restore("ln_abcdefgh2345")
+        #expect(w.sent[1].0 == "PATCH" && w.sent[1].1 == "/modules/lore/v1/notes/ln_abcdefgh2345")
+        #expect(w.sent[1].2.contains(#""trashed":false"#))
+
+        w.answer = Data([0x50, 0x4b, 0x03, 0x04])
+        let zip = try await service(w).export(project: "7")
+        #expect(zip == w.answer && w.sent[2].1 == "/modules/lore/v1/export?project=7")
+    }
+
     @Test func backlinksVersionsRestoreAndMove() async throws {
         let w = Wire()
         w.answer = Data(

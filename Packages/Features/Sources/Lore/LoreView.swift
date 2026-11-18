@@ -138,21 +138,3 @@ private struct LoreTopBar: View {
         .accessibilityElement(children: .contain)
     }
 }
-
-/// Open… ⌘O. A stand-in until R6-03 builds search, recent notes and filters.
-enum LoreOpenSheet {
-    @MainActor static func open(_ model: LoreModel) {
-        let shell = model.host.shell
-        shell.present(
-            ShellDialog(id: "lore-open") {
-                CoreSheet("Open a Note") {
-                    Text("Search and recent notes arrive with the next update. Today's note and ‹ › days work now.")
-                        .fixedSize(horizontal: false, vertical: true)
-                } footer: {
-                    Button("Close") { shell.closeDialog() }
-                        .buttonStyle(CoreButtonStyle(.secondary))
-                        .keyboardShortcut(.cancelAction)
-                }
-            })
-    }
-}
