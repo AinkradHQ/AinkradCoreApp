@@ -3,11 +3,21 @@ import Projects
 import SwiftUI
 
 /// The open item: a top bar (back, name, what it is, its projects), the stage and an About island. For a design the stage is
-/// its preview and the place the canvas goes; the canvas itself is V3-02 (TODO(V3-02): `DesignCanvasView` replaces the
-/// placeholder), a mockup's viewer V3-07 (`MockupStage`) and a system's tokens and rules V3-06.
+/// its canvas (V3-02, `DesignModel.canvas`), or its preview while the doc cannot sync; a mockup's viewer is V3-07 (`MockupStage`) and a
+/// system's tokens and rules V3-06.
 struct DesignDetail: View {
     let model: DesignModel
     let item: DesignItem
+    @State private var aboutOpen = false
+
+    /// The editor chrome (V3-04) of a design that has a canvas.
+    private var editor: DesignEditor? {
+        if case .doc(let d) = item, d.kind == .design, model.canvas != nil, model.service != nil {
+            model.editor(for: d.id)
+        } else {
+            nil
+        }
+    }
 
     var body: some View {
         VStack(spacing: Space.s2) {
@@ -18,6 +28,8 @@ struct DesignDetail: View {
                     .accessibilityAddTraits(.isHeader)
                 Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
             } actions: {
+                if let editor { PresenceStrip(peers: editor.peers) }
+                if let editor { EditorToolbar(editor: editor, aboutOpen: $aboutOpen) }
                 CoreDropdown(
                     items: projectItems,
                     isPresented: Binding(get: { model.projectsMenuOpen }, set: { model.projectsMenuOpen = $0 })
@@ -32,9 +44,19 @@ struct DesignDetail: View {
             .frame(maxWidth: .infinity)
             .coreWell(radius: Radius.pane)
             HStack(alignment: .top, spacing: Space.s2) {
-                stage
-                AboutIsland(model: model, item: item).frame(width: Space.s8 * 10)
+                if let editor, case .doc(let d) = item, let canvas = model.canvasView(d) {
+                    EditorStage(model: model, item: item, editor: editor, canvas: canvas)
+                } else {
+                    stage
+                    AboutIsland(model: model, item: item).frame(width: Space.s8 * 10)
+                }
             }
+        }
+        .popover(isPresented: $aboutOpen, arrowEdge: .bottom) {
+            AboutIsland(model: model, item: item).frame(width: Space.s8 * 10, height: Space.s8 * 14).padding(Space.s2)
+        }
+        .sheet(isPresented: Binding(get: { editor?.versionsOpen ?? false }, set: { editor?.versionsOpen = $0 })) {
+            if let editor { VersionsSheet(editor: editor) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("design-detail")
@@ -55,12 +77,20 @@ struct DesignDetail: View {
                 .padding(Space.s2)
                 .coreWell(radius: Radius.pane)
                 .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .doc(let d) = item, let canvas = model.canvasView(d) {
+            canvas
+                .clipShape(coreShape(Radius.pane))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .coreWell(radius: Radius.pane)
+                .contextMenu { DesignMenu(model: model, item: item) }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("design-canvas")
         } else {
-            previewStage
+            preview
         }
     }
 
-    private var previewStage: some View {
+    private var preview: some View {
         VStack(spacing: Space.s4) {
             DesignThumb(model: model, item: item, large: true)
             if let note = stageNote {
@@ -80,7 +110,8 @@ struct DesignDetail: View {
     private var stageNote: String? {
         guard case .doc(let d) = item else { return nil }
         switch d.kind {
-        case .design: return "The canvas arrives with the next update: you will watch AI draw here, note and tweak."
+        case .design:
+            return "The canvas opens here once this Core can sync designs: you will watch AI draw, note and tweak."
         case .mockup: return nil
         case .system: return "Tokens, components and rules show here once design systems arrive, in a later update."
         }
@@ -100,7 +131,7 @@ private struct StageDrag: ViewModifier {
 }
 
 /// What the item is: its facts as rows, then its projects, then (by kind) tags, colours, fonts or the designs that use it.
-private struct AboutIsland: View {
+struct AboutIsland: View {
     let model: DesignModel
     let item: DesignItem
 
