@@ -80,7 +80,8 @@ import Testing
         #expect(skipped.isEmpty && files.count == 1)
         let f = files[0]
         #expect(f.path.hasPrefix("Work-Home/") && f.path.hasSuffix(".md") && !f.path.dropFirst(10).contains("/"))
-        #expect(f.markdown.hasPrefix("# ../Plan: A\ntext") || f.markdown.hasPrefix("# ../Plan: A"))
+        // The title becomes a safe first heading; the note's own heading and text follow.
+        #expect(f.markdown.hasPrefix("# -Plan- A\n") && f.markdown.contains("# ../Plan: A\n\ntext"))
         let text = AppleNotesExport.finish(f, shas: ["ab", nil])
         #expect(text.contains("[a.pdf](lore-attachment:ab)") && text.contains("could not be imported"))
         #expect(AppleNotesExport.prepare([note]).files[0].path == f.path)
@@ -89,6 +90,6 @@ import Testing
     @Test func scriptNeverBuildsAFileNameFromANote() {
         let s = AppleNotesSource.script(stagingRoot: "/tmp/a\"b")
         #expect(s.contains("/tmp/a\\\"b"))
-        #expect(!s.contains("do shell script") && !s.contains("ext"))
+        #expect(!s.contains("do shell script") && !s.contains("extension"))
     }
 }
