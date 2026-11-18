@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import ObjectiveC
 import Testing
 import WebKit
 
@@ -92,6 +93,26 @@ struct MockupSandboxTests {
         #expect(MockupSandbox.contentType("a") == nil)
         #expect(MockupSandbox.csp.contains("connect-src 'none'"))
         #expect(!MockupSandbox.csp.contains("http"))
+    }
+
+    /// The private switches really read back as off after `lockDownNetworkPreferences`.
+    @MainActor @Test func theNetworkSwitchesReadBackOff() throws {
+        let prefs = WKPreferences()
+        try MockupSandbox.lockDownNetworkPreferences(prefs)
+        if prefs.responds(to: NSSelectorFromString("_peerConnectionEnabled")) {
+            #expect(prefs.value(forKey: "_peerConnectionEnabled") as? Bool == false, "WebRTC switch")
+        }
+        let list = NSSelectorFromString("_features")
+        let get = NSSelectorFromString("_isEnabledForFeature:")
+        if (WKPreferences.self as AnyObject).responds(to: list), prefs.responds(to: get),
+            let m = class_getInstanceMethod(WKPreferences.self, get),
+            let all = (WKPreferences.self as AnyObject).perform(list)?.takeUnretainedValue() as? [NSObject],
+            let feature = all.first(where: { ($0.value(forKey: "key") as? String) == "LinkPreconnect" })
+        {
+            typealias Fn = @convention(c) (AnyObject, Selector, AnyObject) -> Bool
+            let on = unsafeBitCast(method_getImplementation(m), to: Fn.self)(prefs, get, feature)
+            #expect(!on, "LinkPreconnect feature switch")
+        }
     }
 
     @Test func theRuleListCompiles() async throws {

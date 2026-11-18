@@ -56,6 +56,7 @@
   r.rtc = typeof RTCPeerConnection;
   r.webkitRtc = typeof webkitRTCPeerConnection;
   r.rtcData = typeof RTCDataChannel;
+  r.webTransport = typeof WebTransport; // switched off best effort: recorded, not required
   // An about:blank iframe, appended synchronously: the document-start script may not have run there yet.
   const f = document.createElement("iframe");
   document.body.append(f);

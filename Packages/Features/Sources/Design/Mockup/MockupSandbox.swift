@@ -184,11 +184,13 @@ enum MockupSandbox {
     }
 
     /// Switches off WebRTC, link preconnect and DNS prefetch. Throws if any switch is missing (fail closed).
+    /// WebTransport is switched off best effort only (the key is not in every WebKit build, so it cannot fail closed).
     @MainActor static func lockDownNetworkPreferences(_ prefs: WKPreferences) throws {
         guard setFlag(prefs, "_setPeerConnectionEnabled:", false),
             setFlag(prefs, "_setLinkPreconnectEnabled:", false) || disableFeature(prefs, key: "LinkPreconnect"),
-            setFlag(prefs, "_setDNSPrefetchingEnabled:", false) || disableFeature(prefs, key: "DNSPrefetchingEnabled")
+            setFlag(prefs, "_setDNSPrefetchingEnabled:", false)
         else { throw MockupFailure.noRules }
+        _ = disableFeature(prefs, key: "WebTransportEnabled")
     }
 
     /// The sandboxed web view of one package. Fails closed: no rules, no web view.
