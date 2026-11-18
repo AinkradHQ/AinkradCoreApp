@@ -161,7 +161,7 @@ private func ready(_ s: FakeService) async -> DesignModel {
         guard let input = got else { return #expect(Bool(false)) }
         #expect(input.doc == "dd_1" && input.system == "dd_sys")
         let f = await input.info("f1")
-        #expect(f?.isFont == true && f?.check == "ok")
+        #expect(f?.contentType == "font/ttf" && f?.check == "ok")
         #expect(await input.info("p1")?.check == "pending")
         #expect(await input.info("nope") == nil)
     }

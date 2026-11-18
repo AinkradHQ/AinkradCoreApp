@@ -133,10 +133,10 @@ struct AssetFetcherTests {
         let src = CanvasAssetSource(
             info: { sha in
                 switch sha {
-                case ok: CanvasAssetInfo(isFont: false, check: .ok)
-                case pending: CanvasAssetInfo(isFont: false, check: .pending)
-                case refused: CanvasAssetInfo(isFont: false, check: .refused)
-                case font: CanvasAssetInfo(isFont: true, check: .ok)
+                case ok: CanvasAssetInfo(contentType: "image/png", check: .ok)
+                case pending: CanvasAssetInfo(contentType: "image/png", check: .pending)
+                case refused: CanvasAssetInfo(contentType: "image/png", check: .refused)
+                case font: CanvasAssetInfo(contentType: "font/ttf", check: .ok)
                 default: nil
                 }
             },
@@ -149,5 +149,30 @@ struct AssetFetcherTests {
         try? await Task.sleep(for: .milliseconds(300))
         #expect(Set(calls.all) == [ok, font])
         #expect(calls.all.count == 2)
+    }
+
+    /// #304 review: routing follows the Core's content type, never the asset's kind. A font-kind asset that is a PDF, or an
+    /// image-kind asset that is a font, is routed by its type; SVG, PDF, zip and unknown types never reach the engine.
+    @Test func routesStrictlyByContentType() {
+        func route(_ t: String) -> CanvasAssetInfo.Route { CanvasAssetInfo(contentType: t, check: .ok).route }
+        #expect(["font/ttf", "font/otf", "font/woff2"].allSatisfy { route($0) == .font })
+        #expect(["image/png", "image/jpeg", "image/gif", "image/webp"].allSatisfy { route($0) == .image })
+        let never = ["image/svg+xml", "application/pdf", "application/zip", "", "Font/TTF", "font/ttf; x=1", "font/woff", "text/html"]
+        #expect(never.allSatisfy { route($0) == .none })
+    }
+
+    @Test func neverFetchesATypeThatIsNeitherFontNorImage() async {
+        let pdf = String(repeating: "f", count: 64)
+        let calls = Calls()
+        let src = CanvasAssetSource(
+            info: { _ in CanvasAssetInfo(contentType: "application/pdf", check: .ok) },
+            data: { sha in
+                calls.add(sha)
+                return Data()
+            })
+        let f = AssetFetcher(engine: Engine(doc: "dd_test")!, source: src)
+        f.fetch([pdf])
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(calls.all.isEmpty)
     }
 }

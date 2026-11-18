@@ -5,10 +5,35 @@ import Pairing
 import SwiftUI
 import os
 
+/// The editor chrome's way into the engine (V3-04): `Design` sees `DesignEditBackend`, the canvas view does the work.
+@MainActor
+final class CanvasEditing: DesignEditBackend {
+    private weak var view: DesignCanvasNSView?
+    init(_ view: DesignCanvasNSView) { self.view = view }
+    func tree() -> Data? { view?.editorTree() }
+    func node(_ id: String) -> String? { view?.editorNode(id) }
+    func selection() -> [String] { view?.editorSelection() ?? [] }
+    func select(_ ids: [String]) -> Bool { view?.editorSelect(ids) ?? false }
+    func edit(_ json: String) -> Bool { view?.editorEdit(json) ?? false }
+    func undo() { view?.editorUndo() }
+    func redo() { view?.editorRedo() }
+    func fitSelection() { view?.editorFitSelection() }
+    func peers() -> Data? { view?.editorPeers() }
+    func setPresence(_ json: String) { view?.editorSetPresence(json) }
+    func tokens() -> Data? { view?.editorTokens() }
+
+    /// Hands the chrome the canvas and has the canvas tell it when the document or selection may have changed.
+    static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {
+        handle.attach(CanvasEditing(view))
+        view.onChange = { handle.changed() }
+    }
+}
+
 /// Gives Design its canvas (V3-02). The app links the engine; `Features` does not. A design gets a canvas once its doc can
 /// sync with the Core. TODO(V1-03): the Core serves no `docs/{d}/sync` route yet, so there is no live `DesignSyncChannel`
 /// and real designs keep their preview. Then: `DesignCanvas(doc:system:channel:assets:)` with the live channel and a
-/// `CanvasAssetSource` over `input.info` / `input.data`. Debug: `CORE_DESIGN_SCENE=<dir>` (doc.bin, system.bin, <sha>.png from AinkradCore's
+/// `CanvasAssetSource` over `input.info` / `input.data` (its `CanvasAssetInfo(contentType:check:)` from `info`), and
+/// `onReady: { CanvasEditing.connect($0, to: input.editor) }` so the layers panel and inspector work. Debug: `CORE_DESIGN_SCENE=<dir>` (doc.bin, system.bin, <sha>.png from AinkradCore's
 /// synth scene) opens every design on that scene through a local channel, for screenshots and the T5 measurement.
 @MainActor
 enum DesignCanvasHookup {
@@ -20,7 +45,11 @@ enum DesignCanvasHookup {
                 AnyView(
                     DesignCanvas(
                         doc: input.doc, system: SceneChannel.system, channel: SceneChannel(dir: scene),
-                        assets: SceneChannel.assets(scene), onReady: { DesignMeasure.ready($0) }))
+                        assets: SceneChannel.assets(scene),
+                        onReady: {
+                            DesignMeasure.ready($0)
+                            CanvasEditing.connect($0, to: input.editor)
+                        }))
             }
             return
         }
@@ -54,7 +83,7 @@ struct SceneChannel: DesignSyncChannel {
         CanvasAssetSource(
             info: { sha in
                 FileManager.default.fileExists(atPath: dir.appendingPathComponent("\(sha).png").path)
-                    ? CanvasAssetInfo(isFont: false, check: .ok) : nil
+                    ? CanvasAssetInfo(contentType: "image/png", check: .ok) : nil
             },
             data: { sha in try Data(contentsOf: dir.appendingPathComponent("\(sha).png")) })
     }

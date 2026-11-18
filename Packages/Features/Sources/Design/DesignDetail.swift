@@ -8,6 +8,12 @@ import SwiftUI
 struct DesignDetail: View {
     let model: DesignModel
     let item: DesignItem
+    @State private var aboutOpen = false
+
+    /// The editor chrome (V3-04) of a design that has a canvas.
+    private var editor: DesignEditor? {
+        if case .doc(let d) = item, d.kind == .design, model.canvas != nil, model.service != nil { model.editor(for: d.id) } else { nil }
+    }
 
     var body: some View {
         VStack(spacing: Space.s2) {
@@ -18,6 +24,8 @@ struct DesignDetail: View {
                     .accessibilityAddTraits(.isHeader)
                 Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
             } actions: {
+                if let editor { PresenceStrip(peers: editor.peers) }
+                if let editor { EditorToolbar(editor: editor, aboutOpen: $aboutOpen) }
                 CoreDropdown(
                     items: projectItems,
                     isPresented: Binding(get: { model.projectsMenuOpen }, set: { model.projectsMenuOpen = $0 })
@@ -32,9 +40,19 @@ struct DesignDetail: View {
             .frame(maxWidth: .infinity)
             .coreWell(radius: Radius.pane)
             HStack(alignment: .top, spacing: Space.s2) {
-                stage
-                AboutIsland(model: model, item: item).frame(width: Space.s8 * 10)
+                if let editor, case .doc(let d) = item, let canvas = model.canvasView(d) {
+                    EditorStage(model: model, item: item, editor: editor, canvas: canvas)
+                } else {
+                    stage
+                    AboutIsland(model: model, item: item).frame(width: Space.s8 * 10)
+                }
             }
+        }
+        .popover(isPresented: $aboutOpen, arrowEdge: .bottom) {
+            AboutIsland(model: model, item: item).frame(width: Space.s8 * 10, height: Space.s8 * 14).padding(Space.s2)
+        }
+        .sheet(isPresented: Binding(get: { editor?.versionsOpen ?? false }, set: { editor?.versionsOpen = $0 })) {
+            if let editor { VersionsSheet(editor: editor) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("design-detail")
@@ -104,7 +122,7 @@ private struct StageDrag: ViewModifier {
 }
 
 /// What the item is: its facts as rows, then its projects, then (by kind) tags, colours, fonts or the designs that use it.
-private struct AboutIsland: View {
+struct AboutIsland: View {
     let model: DesignModel
     let item: DesignItem
 

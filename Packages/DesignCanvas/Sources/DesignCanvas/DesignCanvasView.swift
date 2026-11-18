@@ -22,6 +22,9 @@ public final class DesignCanvasNSView: NSView {
     var sync: DesignSync?
     var system: DesignSync?
     var fetcher: AssetFetcher?
+    /// Called on the main thread when the document or the selection may have changed (a remote update, a pointer press or
+    /// release, a key, an undo, an edit from the chrome): the layers panel and inspector read the engine again.
+    public var onChange: (() -> Void)?
     private var fitted = false
     var reduceMotion = false {
         didSet {
@@ -104,6 +107,7 @@ public final class DesignCanvasNSView: NSView {
     func contentArrived() {
         if !fitted, bounds.width > 0 { fit() }
         loop.wake()
+        onChange?()
     }
 
     func fit() {
@@ -204,6 +208,7 @@ public final class DesignCanvasNSView: NSView {
         de_pointer(engine.h, UInt32(phase), Float(p.x), Float(p.y), mods)
         updateCursor(p)
         loop.wake(input: true)
+        if phase != DE_POINTER_MOVE { onChange?() }
     }
 
     private func updateCursor(_ p: CGPoint) {
@@ -274,12 +279,14 @@ public final class DesignCanvasNSView: NSView {
         de_key(engine.h, UInt32(key), mods)
         loop.wake(input: true)
         sync?.flush()
+        onChange?()
     }
 
     func undo(redo: Bool) {
         _ = redo ? de_redo(engine.h) : de_undo(engine.h)
         loop.wake(input: true)
         sync?.flush()
+        onChange?()
     }
 }
 

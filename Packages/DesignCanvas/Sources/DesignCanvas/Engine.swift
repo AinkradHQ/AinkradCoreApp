@@ -98,6 +98,25 @@ public final class Engine: Sendable {
         else { return nil }
         return s
     }
+    /// This device's presence JSON (cursor, selection, label), at most 4 KiB.
+    @discardableResult func presenceSet(_ json: String) -> Bool {
+        let b = Array(json.utf8)
+        return de_presence_set(h, b, b.count) == DE_OK
+    }
+    /// Other peers' presence as JSON `{"<client>": {...}}`.
+    func presencePeers() -> Data? { read { de_presence_peers(h, $0, $1, $2) } }
+
+    // The editor chrome's three reads the C ABI does not have yet (V3-04 found them): list the nodes, list the design
+    // system's tokens, select by id. Until AinkradCore adds `de_tree`, `de_tokens` and `de_select` to
+    // `modules/design/ffi` (same out-buffer shape as `de_selection`), they answer "nothing", and the layers panel, the token
+    // pickers and click-to-select in the layers panel stay empty. Each is one place to change when the ABI lands.
+    // TODO(V2-ABI): de_tree(h, out, cap, out_len) -> [{id,type,parent,order,name,hidden}]
+    func tree() -> Data? { nil }
+    // TODO(V2-ABI): de_tokens(h, out, cap, out_len) -> [{name,kind}] of the system doc
+    func tokens() -> Data? { nil }
+    // TODO(V2-ABI): de_select(h, ids_json, len)
+    func select(_ ids: [String]) -> Bool { false }
+
     /// Applies a JSON array of edit ops (one undo step).
     @discardableResult public func edit(_ json: String) -> Bool {
         let b = Array(json.utf8)

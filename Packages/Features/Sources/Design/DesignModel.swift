@@ -37,6 +37,8 @@ public final class DesignModel {
     private(set) var readOnly = false
     /// The open item's Projects menu.
     var projectsMenuOpen = false
+    /// The editor chrome of each design whose canvas was built (V3-04), by doc id.
+    @ObservationIgnored var editors: [String: DesignEditor] = [:]
     /// Builds the canvas for an open design (V3-02). Set by the app, which links the engine; it returns nil while the
     /// Core cannot sync the doc. Nil here (tests) keeps the preview.
     @ObservationIgnored public var canvas: ((DesignCanvasInput) -> AnyView?)?
@@ -73,6 +75,7 @@ public final class DesignModel {
         fetching = []
         load = .notConnected
         openID = nil
+        editors = [:]
         readOnly = false
     }
 
@@ -246,6 +249,7 @@ public final class DesignModel {
     }
 
     func closeItem() {
+        editors = [:]
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 

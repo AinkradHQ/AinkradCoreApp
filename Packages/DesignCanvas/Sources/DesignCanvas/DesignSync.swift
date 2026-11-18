@@ -93,6 +93,13 @@ public final class DesignSync {
         return true
     }
 
+    /// Sends this device's presence (awareness) after `Engine.presenceSet`.
+    public func flushPresence() {
+        guard target == .doc, connected, let a = engine.presenceEncode(), !a.isEmpty else { return }
+        let (channel, doc) = (channel, doc)
+        Task { try? await channel.send(.awareness(a), doc: doc) }
+    }
+
     /// Sends local edits (after a gesture, a key, undo), in as many updates as the engine splits them into. Nothing while
     /// offline: the next connect's diff carries them.
     public func flush() {
