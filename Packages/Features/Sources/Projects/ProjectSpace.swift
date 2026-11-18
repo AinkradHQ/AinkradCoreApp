@@ -21,6 +21,8 @@ struct ProjectSpaceView: View {
         .coreFont(size: MacTextSize.body)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("project-space")
+        // Reads the run again while it starts or runs, and tells the Core a viewer is on the Overview or Run page.
+        .task(id: "\(project.id) \(project.tag)") { await model.watch(project.id) }
     }
 
     @ViewBuilder private var page: some View {
@@ -33,6 +35,10 @@ struct ProjectSpaceView: View {
             SessionsPage(model: model, project: project)
         case .brain:
             BrainPage(model: model, project: project)
+        case .docs:
+            DocsPage(model: model, project: project)
+        case .settings:
+            SettingsPage(model: model, project: project)
         default:
             let e = model.section.empty(project)
             Island(e.title) {
@@ -74,8 +80,7 @@ private struct TopBar: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Restart and Stop while it runs, Stop while it starts, Start otherwise. They answer only where the Core can run the
-    /// project (Debug demo today); a real project shows them off with the reason on hover. TODO(P6-02).
+    /// Restart and Stop while it runs, Stop while it starts, Start otherwise. Each asks the Core's run routes behind Touch ID.
     @ViewBuilder private var runButtons: some View {
         let can = model.canControl(project)
         switch project.tag {
@@ -95,7 +100,7 @@ private struct TopBar: View {
 
     private func run(
         _ title: String, _ symbol: String, _ action: RunAction, enabled: Bool,
-        why: String = "Starting a project arrives with the run engine"
+        why: String = "Not available while this device cannot change projects or the Core is unreachable"
     ) -> some View {
         Button {
             model.control(action, project)
@@ -107,11 +112,12 @@ private struct TopBar: View {
     }
 }
 
-/// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘6 from anywhere in the space.
+/// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘7 from anywhere in the space.
 private struct Rail: View {
     let model: ProjectsModel
     var body: some View {
         VStack(spacing: Space.s1) {
+            // Docs (R6-06) is the last case, so it follows Brain; Project Settings stays at the bottom.
             ForEach(ProjectSection.allCases.filter { $0 != .settings }) { tile($0) }
             Spacer(minLength: 0)
             tile(.settings)

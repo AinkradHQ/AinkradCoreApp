@@ -77,7 +77,10 @@ struct LiveApp: View {
             Label(title, systemImage: "play")
         }
         .buttonStyle(CoreButtonStyle(.prominent)).disabled(!can)
-        .help(can ? "Start \(project.name)" : "Starting a project arrives with the run engine")
+        .help(
+            can
+                ? "Start \(project.name)"
+                : "Not available while this device cannot change projects or the Core is unreachable")
     }
 
     private var noRepos: some View {
