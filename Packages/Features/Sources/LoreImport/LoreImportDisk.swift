@@ -4,6 +4,7 @@
 // calls restricted (`.env*`, keys, tokens), files over 1 MB and text that is not UTF-8 are skipped and counted by reason,
 // never sent. The Core checks every path and size again (R4-01); this only keeps unwanted bytes off the wire.
 import BrainImport
+import CoreKit
 import Foundation
 
 struct LoreImportPick: Sendable, Equatable {
