@@ -56,6 +56,8 @@ public final class LoreModel {
     var openSheet = false
 
     @ObservationIgnored let page: any LorePageText
+    /// Quick capture ⇧⌘N (R6-05).
+    @ObservationIgnored public private(set) lazy var capture = QuickCapture(lore: self)
     @ObservationIgnored let editor: LoreEditorController?
     @ObservationIgnored var drafts: LoreDrafts
     @ObservationIgnored var now: () -> Date = { Date() }
@@ -429,6 +431,17 @@ public final class LoreModel {
                 id: "lore", title: "Lore", sub: "Today's note, and every note on your Core", symbol: "text.book.closed",
                 keywords: ["notes", "note", "today", "daily", "journal", "write", "docs"]
             ) { [weak self] in self?.show() })
+        shell.launcher.register(
+            LauncherEntry(
+                id: "lore-capture", title: "Quick capture", sub: "Add a line to today's note from any app  ⇧⌘N",
+                symbol: "square.and.pencil", keywords: ["note", "capture", "jot", "today", "lore"], isAction: true
+            ) { [weak self] in self?.capture.toggle() })
+        shell.settings.section(
+            SettingsSection(
+                id: "lore", group: .apps, title: "Lore", sub: "The quick capture shortcut", symbol: "text.book.closed",
+                order: 40
+            ) { [capture] in LoreSettingsSection(capture: capture) })
+        capture.start()
     }
 }
 

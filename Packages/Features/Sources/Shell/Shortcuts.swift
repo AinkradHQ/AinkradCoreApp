@@ -9,7 +9,7 @@ enum ShortcutCatalog {
             "File",
             [
                 ("Launcher…", "⌘K"), ("Actions…", "⇧⌘A"), ("Overview", "⇧⌘O"), ("Next / Previous Tab", "⌃Tab / ⌃⇧Tab"),
-                ("Rename Tab…", "⇧⌘R"), ("New AI Session", "⌘N"), ("New Terminal", "⌘T"),
+                ("Rename Tab…", "⇧⌘R"), ("New AI Session", "⌘N"), ("Quick Capture", "⇧⌘N"), ("New Terminal", "⌘T"),
                 ("Close Pane", "⌘W"),
                 ("Reopen Closed Pane", "⇧⌘T"), ("Close All Panes", "⌥⌘W"),
             ]
@@ -17,7 +17,7 @@ enum ShortcutCatalog {
         (
             "View",
             [
-                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘N"),
+                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘B"),
                 ("Reconnect to Core", "⌘R"),
                 ("Switch Day and Night", "⌃⌘D"), ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"),
                 ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
@@ -155,6 +155,9 @@ public struct ShellCommands: Commands {
                 .disabled(paneCount == 0)
             Divider()
             Button("New AI Session") { shell.newItem() }.keyboardShortcut("n")
+            // Lore's quick capture (R6-05): in the app ⇧⌘N always opens it, whatever the global shortcut is.
+            Button("Quick Capture") { shell.launcher.entry("lore-capture")?.run() }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
             Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
                 .keyboardShortcut("t", modifiers: [.command, .option])
@@ -172,7 +175,7 @@ public struct ShellCommands: Commands {
             Button("Workspace") { shell.show(.workspace) }.keyboardShortcut("0", modifiers: [.command, .shift])
             Button(!focusMode ? "Focus Mode" : "Tile Panes") { shell.toggleFocusMode() }
                 .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(paneCount == 0)
-            Button("Notifications") { shell.toggleBell() }.keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("Notifications") { shell.toggleBell() }.keyboardShortcut("b", modifiers: [.command, .shift])
             Divider()
             Button("Switch Day and Night") { shell.switchDayAndNight() }
                 .keyboardShortcut("d", modifiers: [.control, .command])

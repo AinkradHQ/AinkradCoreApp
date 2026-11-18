@@ -458,7 +458,7 @@ final class LoreTextView: NSTextView {
         let blocked = ["openlink", "lookup", "searchwith", "share", "service", "writingtools", "translat", "quicklook"]
         for item in menu.items.reversed() {
             let key = (item.action.map(NSStringFromSelector) ?? "").lowercased()
-            if blocked.contains(where: key.contains) || (item.submenu != nil && item.submenu === NSApp.servicesMenu) {
+            if blocked.contains(where: key.contains) || (item.submenu != nil && item.submenu === NSApp?.servicesMenu) {
                 menu.removeItem(item)
             } else if let sub = item.submenu {
                 _ = safeMenu(sub)
