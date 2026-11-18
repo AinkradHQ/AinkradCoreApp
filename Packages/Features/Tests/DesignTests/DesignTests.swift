@@ -3,6 +3,7 @@ import CoreKit
 import Foundation
 import Projects
 import Shell
+import SwiftUI
 import Testing
 
 @testable import Design
@@ -141,6 +142,28 @@ private func ready(_ s: FakeService) async -> DesignModel {
         for a in [font, pending, refused] { await m.loadImage(a) }
         #expect(s.calls.isEmpty)
         #expect(!font.loadable && !pending.loadable && !refused.loadable)
+    }
+
+    @Test func canvasGetsTheDocAndTheCoresAssetAnswers() async {
+        let s = FakeService()
+        let font = asset("f1", .font, "Serif", check: .ok, type: "font/ttf")
+        s.assetList = [font, asset("p1", .image, "Pic", check: .pending)]
+        let m = await ready(s)
+        let d = doc("dd_1", .design, "Checkout", system: "dd_sys")
+        #expect(m.canvasView(d) == nil)  // no canvas set: the preview stays
+        var got: DesignCanvasInput?
+        m.canvas = { input in
+            got = input
+            return AnyView(EmptyView())
+        }
+        #expect(m.canvasView(doc("dd_2", .mockup, "Flow")) == nil)  // only designs draw on the canvas
+        #expect(m.canvasView(d) != nil)
+        guard let input = got else { return #expect(Bool(false)) }
+        #expect(input.doc == "dd_1" && input.system == "dd_sys")
+        let f = await input.info("f1")
+        #expect(f?.isFont == true && f?.check == "ok")
+        #expect(await input.info("p1")?.check == "pending")
+        #expect(await input.info("nope") == nil)
     }
 
     @Test func linkingWritesAndReloads() async {
