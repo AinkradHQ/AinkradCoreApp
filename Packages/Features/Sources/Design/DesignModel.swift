@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 
 /// The Design app: the home of every design by category (the rail), the library (logos, icons, illustrations, fonts, brand
 /// kits), the open item, and the Designs island in a project's space. It owns the lists, the Core service and the project
-/// links, and registers the pane and the launcher entries. Drawing (the canvas, V3-02), review (V3-05), design systems
+/// links, and registers the pane and the launcher entries. Drawing happens on the canvas (V3-02, set by the app through `canvas`); review (V3-05), design systems
 /// (V3-06), the mockup viewer (V3-07) and AI drawing from a brief (V7-02) come in later stories.
 @MainActor @Observable
 public final class DesignModel {
@@ -37,6 +37,11 @@ public final class DesignModel {
     private(set) var readOnly = false
     /// The open item's Projects menu.
     var projectsMenuOpen = false
+    /// The editor chrome of each design whose canvas was built (V3-04), by doc id.
+    @ObservationIgnored var editors: [String: DesignEditor] = [:]
+    /// Builds the canvas for an open design (V3-02). Set by the app, which links the engine; it returns nil while the
+    /// Core cannot sync the doc. Nil here (tests) keeps the preview.
+    @ObservationIgnored public var canvas: ((DesignCanvasInput) -> AnyView?)?
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
@@ -70,6 +75,7 @@ public final class DesignModel {
         fetching = []
         load = .notConnected
         openID = nil
+        editors = [:]
         readOnly = false
     }
 
@@ -243,6 +249,7 @@ public final class DesignModel {
     }
 
     func closeItem() {
+        editors = [:]
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 
