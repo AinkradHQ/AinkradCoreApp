@@ -52,6 +52,39 @@ public struct LoreImportRun: Equatable, Sendable, Identifiable, Decodable {
         self.committedAt = committedAt
     }
 
+    /// Dictionary keys are camelCased by the decoder on some toolchains and left as sent on others, so both spellings
+    /// are folded to camelCase here (`too_large` -> `tooLarge`).
+    public init(from decoder: Decoder) throws {
+        enum K: String, CodingKey {
+            case id, source, project, repo, state, items, include, refused, ignored, error, flags, results, undone, kept
+            case createdAt, committedAt
+        }
+        let c = try decoder.container(keyedBy: K.self)
+        func counts(_ k: K) throws -> [String: Int] {
+            var out: [String: Int] = [:]
+            for (key, n) in try c.decode([String: Int].self, forKey: k) { out[Self.camel(key), default: 0] += n }
+            return out
+        }
+        self.init(
+            id: try c.decode(String.self, forKey: .id), source: try c.decode(String.self, forKey: .source),
+            project: try c.decodeIfPresent(String.self, forKey: .project),
+            repo: try c.decodeIfPresent(String.self, forKey: .repo),
+            state: try c.decode(String.self, forKey: .state), items: try c.decode(Int.self, forKey: .items),
+            include: try c.decode(Int.self, forKey: .include), refused: try c.decode(Int.self, forKey: .refused),
+            ignored: try c.decode(Int.self, forKey: .ignored),
+            error: try c.decodeIfPresent(String.self, forKey: .error),
+            flags: try counts(.flags), results: try counts(.results), undone: try c.decode(Int.self, forKey: .undone),
+            kept: try c.decode(Int.self, forKey: .kept), createdAt: try c.decode(String.self, forKey: .createdAt),
+            committedAt: try c.decodeIfPresent(String.self, forKey: .committedAt))
+    }
+
+    private static func camel(_ s: String) -> String {
+        let parts = s.split(separator: "_")
+        return parts.first.map(String.init).map {
+            $0 + parts.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+        } ?? s
+    }
+
     /// Items with no flag: notes this run would make.
     public var fresh: Int { max(items - flags.values.reduce(0, +), 0) }
     /// Items commit has dealt with so far (for a progress bar).
