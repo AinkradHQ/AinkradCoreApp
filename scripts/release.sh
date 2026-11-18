@@ -47,7 +47,7 @@ rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"; ln -s /Applications "$STAGE/Applications"
 
 if [ -n "$SIGN" ] && [ -n "$PROFILE" ]; then
-  codesign --force --deep --options runtime --timestamp --sign "$SIGN" "$STAGE/Ainkrad.app"
+  codesign --force --deep --options runtime --timestamp --entitlements App/Mac/Ainkrad.entitlements --sign "$SIGN" "$STAGE/Ainkrad.app"
 fi
 hdiutil create -quiet -volname Ainkrad -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 if [ -n "$SIGN" ] && [ -n "$PROFILE" ]; then
