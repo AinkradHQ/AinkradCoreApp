@@ -36,13 +36,15 @@ enum AppleNotesError: Error, Equatable {
     case unavailable
 }
 
+/// One entry per note: id, title, account, folder, HTML body, then (id, name, saved path) for each attachment. Structured
+/// values, never delimited text: a note body can hold any character, so nothing in it can end a field or start a record.
 protocol ScriptRunner: Sendable {
-    func run(_ source: String) throws -> String
+    func run(_ source: String) throws -> [[String]]
 }
 
 /// Runs AppleScript through `NSAppleScript`. Main actor only (it traps otherwise): `scan` hops there before the call.
 struct OSAScriptRunner: ScriptRunner {
-    func run(_ source: String) throws -> String {
+    func run(_ source: String) throws -> [[String]] {
         try MainActor.assumeIsolated {
             var error: NSDictionary?
             guard let script = NSAppleScript(source: source) else { throw AppleNotesError.unavailable }
@@ -52,7 +54,16 @@ struct OSAScriptRunner: ScriptRunner {
                 if (error[NSAppleScript.errorNumber] as? Int) == -1743 { throw AppleNotesError.permissionDenied }
                 throw AppleNotesError.unavailable
             }
-            return result.stringValue ?? ""
+            return Self.lists(result)
+        }
+    }
+
+    /// A list of lists of text, read item by item (AppleEvent descriptors count from 1).
+    static func lists(_ d: NSAppleEventDescriptor) -> [[String]] {
+        guard d.numberOfItems > 0 else { return [] }
+        return (1...d.numberOfItems).compactMap { i in
+            guard let inner = d.atIndex(i), inner.numberOfItems > 0 else { return nil }
+            return (1...inner.numberOfItems).map { inner.atIndex($0)?.stringValue ?? "" }
         }
     }
 }
@@ -62,8 +73,6 @@ struct AppleNotesSource: Sendable {
     static let excludedFolder = "Recently Deleted"
     /// The Core stages at most 2 000 items a run.
     static let notesMax = 2000
-    static let recordSeparator = "\u{1E}"
-    static let unitSeparator = "\u{1F}"
 
     let runner: any ScriptRunner
     let stagingRoot: URL
@@ -77,9 +86,7 @@ struct AppleNotesSource: Sendable {
         self.stagingRoot = stagingRoot
     }
 
-    /// One record per note: id, title, account, folder, then the HTML body up to a line holding only ASCII 31, then one
-    /// line per attachment (`id US name US saved path`), records ended by a line holding only ASCII 30. Control
-    /// characters, because no printable delimiter is safe inside note HTML.
+    /// Returns a list with one list per note (see `ScriptRunner`), so no delimiter is involved.
     ///
     /// Iterates accounts, folders, notes (asking a note for its container fails with -1700). The staged file name is
     /// `<note>-<attachment>` with NO extension: the name comes from the note, and an extension taken from it could carry
@@ -88,9 +95,7 @@ struct AppleNotesSource: Sendable {
         let stage = stagingRoot.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return """
-            set out to ""
-            set RS to (ASCII character 30)
-            set US to (ASCII character 31)
+            set out to {}
             set stage to "\(stage)"
             set ni to 0
             tell application "Notes"
@@ -102,7 +107,7 @@ struct AppleNotesSource: Sendable {
                     repeat with n in notes of f
                       if ni < \(notesMax) then
                         set ni to ni + 1
-                        set out to out & (id of n) & linefeed & (name of n) & linefeed & acct & linefeed & fname & linefeed & (body of n) & linefeed & US & linefeed
+                        set rec to {(id of n) as text, (name of n) as text, acct as text, fname as text, (body of n) as text}
                         set ai to 0
                         repeat with att in attachments of n
                           set ai to ai + 1
@@ -119,9 +124,9 @@ struct AppleNotesSource: Sendable {
                               set apath to ""
                             end try
                           end if
-                          set out to out & (id of att) & US & aname & US & apath & linefeed
+                          set rec to rec & {(id of att) as text, aname, apath}
                         end repeat
-                        set out to out & RS & linefeed
+                        set end of out to rec
                       end if
                     end repeat
                   end if
@@ -144,21 +149,16 @@ struct AppleNotesSource: Sendable {
 
     func cleanUp() { try? FileManager.default.removeItem(at: stagingRoot) }
 
-    /// A record short of its five fields is DROPPED, never padded: it was cut off, and a guessed title would be worse than
-    /// one note fewer.
-    static func parse(_ output: String, stagingRoot: URL) -> [AppleNote] {
-        output.components(separatedBy: recordSeparator).prefix(notesMax).compactMap { record -> AppleNote? in
-            var lines = record.components(separatedBy: "\n").map { $0.hasSuffix("\r") ? String($0.dropLast()) : $0 }
-            while let first = lines.first, first.trimmingCharacters(in: .whitespaces).isEmpty { lines.removeFirst() }
-            guard lines.count >= 6, let marker = lines[4...].firstIndex(of: unitSeparator) else { return nil }
-            let attachments = lines[lines.index(after: marker)...].compactMap { line -> AppleNoteAttachment? in
-                let f = line.components(separatedBy: unitSeparator)
-                guard f.count >= 3 else { return nil }
-                return AppleNoteAttachment(name: f[1], file: inside(stagingRoot, f[2]))
+    /// A record short of its five fields is DROPPED, never padded: a guessed title would be worse than one note fewer.
+    /// Attachments follow as (id, name, path) triples; a cut-off triple is ignored.
+    static func parse(_ records: [[String]], stagingRoot: URL) -> [AppleNote] {
+        records.prefix(notesMax).compactMap { r -> AppleNote? in
+            guard r.count >= 5 else { return nil }
+            let attachments = stride(from: 5, to: r.count - 2, by: 3).map {
+                AppleNoteAttachment(name: r[$0 + 1], file: inside(stagingRoot, r[$0 + 2]))
             }
             return AppleNote(
-                id: lines[0], title: lines[1], account: lines[2], folder: lines[3],
-                html: lines[4..<marker].joined(separator: "\n"), attachments: attachments)
+                id: r[0], title: r[1], account: r[2], folder: r[3], html: r[4], attachments: attachments)
         }
     }
 

@@ -243,6 +243,10 @@ struct LoreImportReview: View {
                     {
                         Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     }
+                    if run.source == "apple_notes" {
+                        Text("Attachments are uploaded before this review. If you discard the import, they are removed after a day.")
+                            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    }
                     if (run.flags["conflict"] ?? 0) > 0 {
                         CoreNotice(
                             symbol: "exclamationmark.triangle", title: "Some notes were edited here",

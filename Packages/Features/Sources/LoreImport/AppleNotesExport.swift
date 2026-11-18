@@ -58,10 +58,12 @@ enum AppleNotesExport {
         return text
     }
 
-    /// A path part: no `/`, `\`, `:` or control characters, no leading dot, at most `max` characters.
+    /// A path part: no `/`, `\`, `:`, control or format characters (ZWJ, bidi marks), no leading dot, at most `max` characters.
     static func clean(_ s: String, fallback: String, max: Int) -> String {
-        let kept = s.unicodeScalars.map { "/\\:".unicodeScalars.contains($0) || $0.value < 0x20 ? "-" : String($0) }
-            .joined()
+        let kept = s.unicodeScalars.map {
+            "/\\:".unicodeScalars.contains($0) || $0.value < 0x20 || $0.value == 0x7F
+                || $0.properties.generalCategory == .format ? "-" : String($0)
+        }.joined()
         let t = String(kept.prefix(max)).trimmingCharacters(in: .whitespaces)
         let undotted = String(t.drop { $0 == "." })
         return undotted.isEmpty ? fallback : undotted

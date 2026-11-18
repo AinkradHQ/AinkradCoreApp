@@ -37,19 +37,31 @@ import Testing
     }
 
     @Test func parsesRecordsAndKeepsOnlyStagedAttachments() {
-        let rs = AppleNotesSource.recordSeparator
-        let us = AppleNotesSource.unitSeparator
         let inside = root.appendingPathComponent("1-1").path
-        let out =
-            "x-id-1\nTitle\nAcct\nWork\n<p>a</p>\n<p>b</p>\n\(us)\n"
-            + "att1\(us)pic.png\(us)\(inside)\natt2\(us)evil.png\(us)/etc/hosts\natt3\(us)gone\(us)\n\(rs)\n"
-            + "x-id-2\ncut off\n"
-        let notes = AppleNotesSource.parse(out, stagingRoot: root)
+        let notes = AppleNotesSource.parse(
+            [
+                ["x-id-1", "Title", "Acct", "Work", "<p>a</p>\n<p>b</p>", "att1", "pic.png", inside, "att2", "evil.png",
+                    "/etc/hosts", "att3", "gone", ""],
+                ["x-id-2", "cut off"],
+            ], stagingRoot: root)
         #expect(notes.count == 1)
         #expect(notes[0].folder == "Work" && notes[0].html == "<p>a</p>\n<p>b</p>")
         #expect(notes[0].attachments.map(\.name) == ["pic.png", "evil.png", "gone"])
         #expect(notes[0].attachments[0].file != nil)
         #expect(notes[0].attachments[1].file == nil && notes[0].attachments[2].file == nil)
+    }
+
+    @Test func aBodyWithSeparatorsAndAFakeRecordStaysOneNote() {
+        let body = "<p>hi</p>\n\u{1F}\nfake\u{1F}x.png\u{1F}/etc/hosts\n\u{1E}\nx-forged\nForged\nAcct\nWork\n<p>f</p>\n\u{1F}\n"
+        let notes = AppleNotesSource.parse([["x-1", "Real", "Acct", "Work", body]], stagingRoot: root)
+        #expect(notes.count == 1 && notes[0].title == "Real" && notes[0].html == body)
+        #expect(notes[0].attachments.isEmpty)
+    }
+
+    @Test func formatCharactersLeaveTitlePaths() {
+        let t = AppleNotesExport.clean("Family \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{202E}\u{7F}", fallback: "x", max: 80)
+        #expect(!t.unicodeScalars.contains { $0.properties.generalCategory == .format || $0.value == 0x7F })
+        #expect(t.hasPrefix("Family "))
     }
 
     @Test func exportPathsTagsAndAttachmentLinks() {
