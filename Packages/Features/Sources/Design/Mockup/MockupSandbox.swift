@@ -186,7 +186,7 @@ enum MockupSandbox {
     /// Switches off WebRTC, link preconnect and DNS prefetch. Throws if any switch is missing (fail closed).
     @MainActor static func lockDownNetworkPreferences(_ prefs: WKPreferences) throws {
         guard setFlag(prefs, "_setPeerConnectionEnabled:", false),
-            setFlag(prefs, "_setLinkPreconnectEnabled:", false) || disableFeature(prefs, key: "LinkPreconnectEnabled"),
+            setFlag(prefs, "_setLinkPreconnectEnabled:", false) || disableFeature(prefs, key: "LinkPreconnect"),
             setFlag(prefs, "_setDNSPrefetchingEnabled:", false) || disableFeature(prefs, key: "DNSPrefetchingEnabled")
         else { throw MockupFailure.noRules }
     }
