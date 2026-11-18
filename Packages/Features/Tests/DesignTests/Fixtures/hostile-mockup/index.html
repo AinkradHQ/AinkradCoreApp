@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hostile</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="http://127.0.0.1:__PORT__/css-link">
+<script src="http://127.0.0.1:__PORT__/script-tag"></script>
+<!-- Link hints. The canary sees loopback TCP only (no DNS, no UDP), so it can prove a hint CONNECTED, not that it resolved. -->
+<link rel="preconnect" href="http://127.0.0.1:__PORT__/preconnect">
+<link rel="dns-prefetch" href="http://127.0.0.1:__PORT__/dns-prefetch">
+<link rel="prefetch" href="http://127.0.0.1:__PORT__/prefetch">
+<link rel="preload" as="fetch" href="http://127.0.0.1:__PORT__/preload">
+<script type="speculationrules">{"prefetch":[{"source":"list","urls":["http://127.0.0.1:__PORT__/speculation"]}]}</script>
+<meta http-equiv="refresh" content="0;url=http://127.0.0.1:__PORT__/meta-refresh">
+<script src="probe.js" defer></script></head>
+<body>
+<!-- Every request below is aimed at the canary listener; a single connection to it fails the test. -->
+<img src="http://127.0.0.1:__PORT__/img" alt="">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+<iframe src="http://127.0.0.1:__PORT__/iframe"></iframe>
+<form id="form" action="http://127.0.0.1:__PORT__/form" method="post"></form>
+<video src="http://127.0.0.1:__PORT__/video" preload="auto"></video>
+<audio src="http://127.0.0.1:__PORT__/audio" preload="auto"></audio>
+<svg width="1" height="1"><image href="http://127.0.0.1:__PORT__/svg-image"/><use href="http://127.0.0.1:__PORT__/svg-use.svg#a"/></svg>
+<a id="pinger" href="#p" ping="http://127.0.0.1:__PORT__/ping">ping</a>
+<object data="http://127.0.0.1:__PORT__/object"></object>
+<embed src="http://127.0.0.1:__PORT__/embed">
+<iframe srcdoc="<img src='http://127.0.0.1:__PORT__/srcdoc-img'><script>fetch('http://127.0.0.1:__PORT__/srcdoc-fetch').catch(()=>{})</script>"></iframe>
+<img src="file:///etc/hosts" alt="" onerror="document.body.dataset.fileImg='blocked'" onload="document.body.dataset.fileImg='reached'">
+<img src="mockup://other/x.png" alt="">
+<img src="mockup://package/%2e%2e/x.png" alt="">
+<a id="in" href="next.html">next</a>
+<a id="out" href="http://127.0.0.1:__PORT__/link">out</a>
+<a id="blank" href="http://127.0.0.1:__PORT__/blank" target="_blank">blank</a>
+<a id="up" href="../secret.html">up</a>
+</body></html>

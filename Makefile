@@ -7,13 +7,13 @@ endif
 SCHEME := AinkradCoreMac
 PROJECT := AinkradCore.xcodeproj
 APP := build/Build/Products/Debug/Ainkrad.app
-PACKAGES := Packages/AinkradClient Packages/CoreUI Packages/CoreKit Packages/Features
+PACKAGES := Packages/AinkradClient Packages/CoreUI Packages/CoreKit Packages/Features Packages/DesignCanvas
 # Tokens.swift is generated (scripts/sync-tokens.sh) and not swift-format clean
-FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features -name '*.swift' -not -path '*/.build/*'))
+FORMAT_PATHS := App Tests/UI Packages/CoreKit/Sources Packages/CoreKit/Tests $(filter-out %/Tokens.swift,$(shell find Packages/CoreUI Packages/Features Packages/DesignCanvas -name '*.swift' -not -path '*/.build/*'))
 
 .DEFAULT_GOAL := generate
 include scripts/guardrails.mk
-.PHONY: dmg generate open build test uitest run lint format format-check sync-client strings clean
+.PHONY: dmg generate open build test uitest run lint format format-check sync-client sync-engine engine-check strings clean
 
 generate: ## Generate the Xcode project from project.yml
 	xcodegen generate --quiet
@@ -21,10 +21,10 @@ generate: ## Generate the Xcode project from project.yml
 open: generate
 	open $(PROJECT)
 
-build: lint generate ## Debug build into ./build
+build: lint engine-check generate ## Debug build into ./build
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug -derivedDataPath build -quiet build
 
-test: lint ## Package tests (the app target has none yet)
+test: lint engine-check ## Package tests (the app target has none yet)
 	@for p in $(PACKAGES); do echo "swift test: $$p"; (cd $$p && swift test --quiet) || exit 1; done
 
 uitest: generate ## Keyboard-path UI tests (take over the screen: wait for the shared lock and 5 idle minutes, UI_IDLE=0 to skip)
@@ -40,6 +40,12 @@ format:
 
 format-check:
 	swift format lint --strict --recursive --parallel $(FORMAT_PATHS)
+
+engine-check: ## The vendored DesignEngine.xcframework matches scripts/engine.pin
+	scripts/sync-engine.sh check
+
+sync-engine: ## Vendor DesignEngine.xcframework from ../AinkradCore/target/engine (make engine there first)
+	scripts/sync-engine.sh
 
 sync-client: ## Re-vendor the generated client from ../AinkradCore
 	scripts/sync-client.sh
