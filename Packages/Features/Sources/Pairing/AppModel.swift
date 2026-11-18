@@ -134,6 +134,7 @@ public final class AppModel {
         leyline = LeylineModel(host: AdminHostAdapter(app: self))
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
+        projects.openNote = { [weak lore] id in lore?.open(note: id) }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }

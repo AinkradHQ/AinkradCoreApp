@@ -139,7 +139,13 @@ public final class LoreModel {
 
     // MARK: open
 
-    func show() {
+    /// Opens `id` in the Lore space (the Projects Docs page, R6-06). Lore's own pane, then that note, not today's.
+    public func open(note id: String) {
+        show(today: false)
+        Task { await openNote(id) }
+    }
+
+    func show(today: Bool = true) {
         openSign = signposter.beginInterval("open", id: signposter.makeSignpostID())
         opened = true
         let shell = host.shell
@@ -149,7 +155,7 @@ public final class LoreModel {
         spec.tab = "Lore"
         spec.onNew = { [weak self] in Task { await self?.newNote() } }
         shell.openPane(spec)
-        if load != .ready { Task { await openDay(todayKey) } }
+        if today, load != .ready { Task { await openDay(todayKey) } }
     }
 
     /// The page is on screen and takes typing (L1). Ends the open signpost.
