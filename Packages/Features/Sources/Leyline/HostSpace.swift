@@ -2,16 +2,23 @@ import CoreUI
 import Projects
 import SwiftUI
 
-/// The space of one host: a top bar with how it is reached, a thin rail and the page the rail picks. Y9-02 builds the top bar,
-/// the rail and the Access page; the other pages are stubs with the mockup's empty words until Y9-03 (Overview, Terminal, Files,
-/// Tunnels, Commands, History).
+/// The space of one host: a top bar with how it is reached, a thin rail and the page the rail picks. Overview, Terminal,
+/// Files, Commands, History and Access are live (Y9-02, Y9-03); Tunnels waits for tunnels (deferred out of 0.9).
 struct HostSpaceView: View {
     let model: LeylineModel
     let host: HostItem
+    @State private var state: HostPageState
+
+    init(model: LeylineModel, host: HostItem) {
+        self.model = model
+        self.host = host
+        _state = State(initialValue: HostPageState(model: model, hostID: host.id))
+    }
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            HostTopBar(model: model, host: host)
+            HostTopBar(model: model, host: host, state: state)
+            if let lease = state.direct { DirectBanner(state: state, lease: lease) }
             HStack(alignment: .top, spacing: Space.s2) {
                 HostRail(model: model)
                 page
@@ -20,21 +27,53 @@ struct HostSpaceView: View {
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
+        // What the Overview and History pages both show, read once when the space opens.
+        .task {
+            async let c: Void = state.loadCommands()
+            async let h: Void = state.loadHistory()
+            _ = await (c, h)
+        }
+        .onDisappear { state.closePage() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("host-space")
     }
 
     @ViewBuilder private var page: some View {
         switch model.section {
+        case .overview: HostOverviewPage(state: state)
+        case .terminal: HostTerminalPage(state: state)
+        case .files: HostFilesPage(state: state)
+        case .commands: HostCommandsPage(state: state)
+        case .history: HostHistoryPage(state: state)
         case .access:
             AccessPage(model: model, host: host)
-        default:
+        case .tunnels:
             let e = model.section.empty
             Island(e.title) {
                 Text(e.line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityIdentifier("host-page-\(model.section.title)")
         }
+    }
+}
+
+/// Shown under the top bar for as long as a Mac-direct lease is open, whatever page the person is on.
+private struct DirectBanner: View {
+    let state: HostPageState
+    let lease: DirectLease
+
+    var body: some View {
+        CoreNotice(
+            symbol: "key", title: "Mac-direct is on",
+            text: lease.expiresAt.map {
+                "This Mac may sign in to \(state.host?.name ?? "the host") until \($0.formatted(date: .omitted, time: .shortened))."
+            }
+                ?? "This Mac may sign in to \(state.host?.name ?? "the host") for a few minutes.", tone: .done
+        ) {
+            Button("Revoke") { Task { await state.stopDirect() } }
+                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(state.directBusy)
+        }
+        .accessibilityIdentifier("direct-banner")
     }
 }
 
@@ -61,7 +100,16 @@ struct RouteChips: View {
 private struct HostTopBar: View {
     let model: LeylineModel
     let host: HostItem
-    @State private var mode = "relayed"
+    let state: HostPageState
+
+    /// Relayed is the default; Mac-direct needs a lease, so choosing it asks Touch ID and choosing Relayed revokes.
+    private var mode: Binding<String> {
+        Binding(
+            get: { state.direct == nil ? "relayed" : "direct" },
+            set: { new in
+                Task { if new == "direct" { await state.startDirect() } else { await state.stopDirect() } }
+            })
+    }
 
     var body: some View {
         AppHeader {
@@ -70,20 +118,27 @@ private struct HostTopBar: View {
             if let g = host.group { CoreChip(g, minWidth: 0) }
         } actions: {
             RouteChips(hops: ["This Mac"] + model.route(host) + [host.name])
-            // TODO(Y6-01): Mac-direct (the Mac's own ssh borrows the key for a few minutes). Relayed is the only way today.
             CoreSegmented(
                 "Route",
                 segments: [CoreSegment("relayed", "Relayed"), CoreSegment("direct", "Mac-direct")],
-                selection: $mode
+                selection: mode
             )
-            .fixedSize().disabled(true)
-            .help("Relayed: the key never leaves the Core. Mac-direct arrives with the next update.")
-            Soon(prominent: true, help: "Connecting arrives with the SSH update") {
+            .fixedSize().disabled(state.directBusy || model.readOnly)
+            .help(
+                "Relayed: the key never leaves the Core. Mac-direct: this Mac’s ssh borrows the key for a few minutes.")
+            Button {
+                Task { await state.connect() }
+            } label: {
                 Label("Connect", systemImage: "terminal")
             }
-            Soon(prominent: false, help: "Running a command arrives with the SSH update") {
+            .buttonStyle(CoreButtonStyle(.prominent, busy: state.opening))
+            .disabled(state.opening || model.readOnly).help("Open a terminal on this host")
+            Button {
+                model.section = .commands
+            } label: {
                 Label("Run…", systemImage: "chevron.right.2")
             }
+            .buttonStyle(CoreButtonStyle(.secondary)).help("Pick a pre-set command to run on this host")
         }
         .frame(maxWidth: .infinity)
         .coreWell(radius: Radius.pane)

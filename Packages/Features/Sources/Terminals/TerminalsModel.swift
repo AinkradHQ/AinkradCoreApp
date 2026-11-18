@@ -271,6 +271,12 @@ public final class TerminalsModel {
         Task { await reload() }
     }
 
+    /// Opens the pane of a terminal the Core made elsewhere (a Leyline host terminal): reads the list first so it is known.
+    public func openRemote(_ id: String) async {
+        await reload()
+        openTerminal(id)
+    }
+
     /// Opens a terminal's pane. `attach`: connect at once (a terminal this app just made, or one nobody else holds).
     public func openTerminal(_ id: String, attach: Bool = true) {
         guard let item = items.first(where: { $0.id == id }) else { return }

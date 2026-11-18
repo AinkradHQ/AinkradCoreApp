@@ -12,6 +12,9 @@ import SwiftUI
 public final class LeylineModel {
     let host: any AdminHost
     var service: (any LeylineService)?
+    /// Shows a Core terminal (a host terminal the Core just opened) in the existing terminal pane. The app sets it; nil when
+    /// there is no terminal app (the Debug demo), and the host page then says so.
+    public var openTerminal: (@MainActor (String) async -> Void)?
 
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
