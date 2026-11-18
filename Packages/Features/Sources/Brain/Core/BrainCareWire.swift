@@ -1,10 +1,11 @@
 import Foundation
 
-// Room care routes (B6-01 re-distil, B6-02 retention) in `modules/brain/module/src/{redistil_routes,retention}.rs` on
-// AinkradCore `epic/brain`, and the room card. Hand-written until the generated client is regenerated at the epic build.
-// TODO(client-regen): replace these wire types and routes with the generated `brainRetentionPreview`, `brainRedistil`,
-// `brainRedistilDryRun`, `brainRedistilCancel` and `brainRedistils` calls at the epic build (CORE_COMMIT), then delete
-// this file. The card route does not exist yet: see the Core proposal in the B10-02 PR.
+// Room care routes (B6-01 re-distil, B6-02 retention) and the room card, in
+// `modules/brain/module/src/{redistil_routes,retention,card}.rs` on AinkradCore. The generated client (`AinkradClient`)
+// is built from the Core contract `api/openapi.json`, which does not carry module routes, so every Brain route is
+// called through `BrainRoutes` with these wire types. Checked at the epic build against the module contract
+// `modules/brain/api/openapi.core.json` (operations `brainRetentionPreview`, `brainRedistil`, `brainRedistilDryRun`,
+// `brainRedistilCancel`, `brainRedistils`, `brainRoomCard`).
 
 struct RetentionPreviewWire: Decodable {
     var days: Int
@@ -35,7 +36,7 @@ struct RedistilWire: Decodable {
     }
 }
 
-/// `GET /rooms/{room}/card` (proposed): what a session is told about the room, and how many records it holds.
+/// `GET /rooms/{room}/card`: what a session is told about the room, and how many records it holds.
 struct CardWire: Decodable {
     var text: String
     var ids: [String]

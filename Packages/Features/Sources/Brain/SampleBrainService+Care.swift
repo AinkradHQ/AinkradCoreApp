@@ -11,7 +11,9 @@ extension SampleBrainService {
 
     public func startRedistil(room: String, dryRun: Bool) async throws -> RedistilRun {
         if scenario.error { throw BrainFailure("Core did not answer.", code: "sample_unreachable") }
-        if scenario.empty { throw BrainFailure("There is nothing to clean up in this room yet.", code: "nothing_to_redistil") }
+        if scenario.empty {
+            throw BrainFailure("There is nothing to clean up in this room yet.", code: "nothing_to_redistil")
+        }
         let run = RedistilRun(id: "rd-1", dryRun: dryRun, state: .running, total: 12)
         careRun = run
         return run
@@ -25,7 +27,8 @@ extension SampleBrainService {
                 r.state = .done
                 r.kept = 84
                 r.archived = 1_203
-                r.summary = r.dryRun ? "Would keep 84 facts, archive 1,203 items" : "Kept 84 facts, archived 1,203 items"
+                r.summary =
+                    r.dryRun ? "Would keep 84 facts, archive 1,203 items" : "Kept 84 facts, archived 1,203 items"
                 // The sample's newest change set stands in for the clean-up's, so Undo works end to end.
                 r.change = r.dryRun ? nil : "chg-4"
             }

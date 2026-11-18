@@ -46,11 +46,14 @@ private struct ChangeRowView: View {
                     .foregroundStyle(GlassInk.secondary)
                 if kept {
                     BrainChip(
-                        "Kept, changed since", GlassInk.slate, help: "Undo left this alone because it changed after this set.")
+                        "Kept, changed since", GlassInk.slate,
+                        help: "Undo left this alone because it changed after this set.")
                 }
                 Spacer(minLength: Space.s2)
-                Text(row.record).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(GlassInk.secondary)
-                    .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                Text(row.record).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(
+                    GlassInk.secondary
+                )
+                .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
             }
             HStack(alignment: .top, spacing: Space.s2) {
                 side("Before", row.before, empty: "Did not exist")

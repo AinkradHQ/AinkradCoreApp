@@ -15,8 +15,9 @@ struct RoomCardSection: View {
             case .loading, .none:
                 EmptyView()
             case .failed(let why):
-                CoreNotice(symbol: "exclamationmark.triangle", title: "Unable to load the room card", text: why, tone: .warn)
-                {
+                CoreNotice(
+                    symbol: "exclamationmark.triangle", title: "Unable to load the room card", text: why, tone: .warn
+                ) {
                     Button("Try Again") { Task { await care.loadCard(room.id) } }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }

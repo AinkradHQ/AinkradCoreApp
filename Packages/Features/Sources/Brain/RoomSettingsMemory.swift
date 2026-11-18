@@ -32,7 +32,8 @@ extension RoomSettings {
             if let cap = p.dailyDistils {
                 row("Distils a day", "How many times this room may distil by itself", dim: false) {
                     CoreSelect(
-                        nil, selection: Binding(get: { cap }, set: { n in Task { await c.setDailyDistils(room.id, n) } }),
+                        nil,
+                        selection: Binding(get: { cap }, set: { n in Task { await c.setDailyDistils(room.id, n) } }),
                         options: Self.capChoices(cap).map { CoreSelectOption($0, $0 == 0 ? "None" : "\($0) a day") }
                     )
                     .frame(width: Space.s8 * 4)
@@ -98,8 +99,10 @@ extension RoomSettings {
     /// The count comes first; turning it on is a second, deliberate step because compaction cannot be undone.
     @ViewBuilder private func retentionAsk(_ ask: RoomCareModel.RetentionAsk) -> some View {
         if let why = ask.failed {
-            CoreNotice(symbol: "exclamationmark.triangle", title: "Unable to count what it would remove", text: why, tone: .fail)
-            {
+            CoreNotice(
+                symbol: "exclamationmark.triangle", title: "Unable to count what it would remove", text: why,
+                tone: .fail
+            ) {
                 HStack(spacing: Space.s2) {
                     Button("Try Again") { model.care.askRetention(room.id, days: ask.days) }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
@@ -186,9 +189,10 @@ struct RoomCleanupCard: View {
         case .nothing:
             CoreNotice(
                 symbol: "tray", title: "Nothing to clean up",
-                text: "This room has no sources to read again yet.") {
-                    Button("Dismiss") { care.dismiss() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                }
+                text: "This room has no sources to read again yet."
+            ) {
+                Button("Dismiss") { care.dismiss() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            }
         case .failed(let why):
             CoreNotice(symbol: "exclamationmark.triangle", title: "Clean up did not finish", text: why, tone: .fail) {
                 HStack(spacing: Space.s2) {

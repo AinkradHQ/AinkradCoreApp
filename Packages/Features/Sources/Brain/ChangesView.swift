@@ -29,7 +29,8 @@ struct ChangesView: View {
                     if m.changes.isEmpty {
                         BrainStateCard(
                             symbol: "tray", title: "Nothing saved yet",
-                            text: "When the Brain saves, merges or drops memories in this room, each batch shows here with Undo."
+                            text:
+                                "When the Brain saves, merges or drops memories in this room, each batch shows here with Undo."
                         )
                         .accessibilityIdentifier("changes-empty")
                     } else {

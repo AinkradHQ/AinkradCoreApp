@@ -38,10 +38,12 @@ extension SampleBrainService {
         "chg-4": [
             ChangeRow(
                 seq: 1, record: "rec-a1", before: nil,
-                after: MemoryImage(type: "decision", text: "Sample: releases ship from the release branch.", sources: ["src-01"])),
+                after: MemoryImage(
+                    type: "decision", text: "Sample: releases ship from the release branch.", sources: ["src-01"])),
             ChangeRow(
                 seq: 2, record: "rec-a2", before: MemoryImage(type: "fact", text: "Sample: the build takes 4 minutes."),
-                after: MemoryImage(type: "fact", text: "Sample: the build takes 4 minutes.", sources: ["src-02", "src-03"])),
+                after: MemoryImage(
+                    type: "fact", text: "Sample: the build takes 4 minutes.", sources: ["src-02", "src-03"])),
             ChangeRow(
                 seq: 3, record: "rec-a3", before: nil,
                 after: MemoryImage(type: "preference", text: "Sample: short commit subjects.", sources: ["src-04"])),
@@ -57,11 +59,13 @@ extension SampleBrainService {
                 after: MemoryImage(type: "rule", text: "Sample: never deploy on Friday.", sources: ["src-13"])),
             ChangeRow(
                 seq: 3, record: "rec-b3", before: MemoryImage(type: "task", text: "Sample: renew the certificate."),
-                after: MemoryImage(type: "task", text: "Sample: renew the certificate before 1 Dec.", sources: ["src-14"])),
+                after: MemoryImage(
+                    type: "task", text: "Sample: renew the certificate before 1 Dec.", sources: ["src-14"])),
         ],
         "chg-2": [
             ChangeRow(
-                seq: 1, record: "rec-c1", before: MemoryImage(type: "fact", text: "Sample: the team uses two trackers."),
+                seq: 1, record: "rec-c1",
+                before: MemoryImage(type: "fact", text: "Sample: the team uses two trackers."),
                 after: nil),
             ChangeRow(
                 seq: 2, record: "rec-c2", before: MemoryImage(type: "fact", text: "Sample: the team uses one tracker."),

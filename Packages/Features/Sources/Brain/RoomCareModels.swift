@@ -93,5 +93,7 @@ extension RoomPolicy {
 
 extension CandidateKind {
     /// The kinds the Auto-save rows list: the Core's seven record types, a landmine being a rule and an open thread a task.
-    public static let saveRows: [CandidateKind] = [.fact, .decision, .preference, .rule, .task, .projectState, .summary]
+    public static let saveRows: [CandidateKind] = [
+        .fact, .decision, .preference, .rule, .task, .projectState, .summary,
+    ]
 }

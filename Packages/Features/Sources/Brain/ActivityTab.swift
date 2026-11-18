@@ -74,7 +74,9 @@ struct ActivityTab: View {
             }
             if a.views.count > 1 {
                 CoreSegmented("View", segments: a.views.map(Self.segment), selection: $a.view)
-                    .help("Memory changes, the audit feed, and the egress log: everything a model ever received from a room.")
+                    .help(
+                        "Memory changes, the audit feed, and the egress log: everything a model ever received from a room."
+                    )
             }
         }
     }
