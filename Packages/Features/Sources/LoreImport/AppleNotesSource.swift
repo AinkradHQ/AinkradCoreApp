@@ -124,7 +124,11 @@ struct AppleNotesSource: Sendable {
                               set apath to ""
                             end try
                           end if
-                          set rec to rec & {(id of att) as text, aname, apath}
+                          set aid to ""
+                          try
+                            set aid to (id of att) as text
+                          end try
+                          set rec to rec & {aid, aname, apath}
                         end repeat
                         set end of out to rec
                       end if

@@ -40,8 +40,11 @@ import Testing
         let inside = root.appendingPathComponent("1-1").path
         let notes = AppleNotesSource.parse(
             [
-                ["x-id-1", "Title", "Acct", "Work", "<p>a</p>\n<p>b</p>", "att1", "pic.png", inside, "att2", "evil.png",
-                    "/etc/hosts", "att3", "gone", ""],
+                [
+                    "x-id-1", "Title", "Acct", "Work", "<p>a</p>\n<p>b</p>", "att1", "pic.png", inside, "att2",
+                    "evil.png",
+                    "/etc/hosts", "att3", "gone", "",
+                ],
                 ["x-id-2", "cut off"],
             ], stagingRoot: root)
         #expect(notes.count == 1)
@@ -52,14 +55,16 @@ import Testing
     }
 
     @Test func aBodyWithSeparatorsAndAFakeRecordStaysOneNote() {
-        let body = "<p>hi</p>\n\u{1F}\nfake\u{1F}x.png\u{1F}/etc/hosts\n\u{1E}\nx-forged\nForged\nAcct\nWork\n<p>f</p>\n\u{1F}\n"
+        let body =
+            "<p>hi</p>\n\u{1F}\nfake\u{1F}x.png\u{1F}/etc/hosts\n\u{1E}\nx-forged\nForged\nAcct\nWork\n<p>f</p>\n\u{1F}\n"
         let notes = AppleNotesSource.parse([["x-1", "Real", "Acct", "Work", body]], stagingRoot: root)
         #expect(notes.count == 1 && notes[0].title == "Real" && notes[0].html == body)
         #expect(notes[0].attachments.isEmpty)
     }
 
     @Test func formatCharactersLeaveTitlePaths() {
-        let t = AppleNotesExport.clean("Family \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{202E}\u{7F}", fallback: "x", max: 80)
+        let t = AppleNotesExport.clean(
+            "Family \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{202E}\u{7F}", fallback: "x", max: 80)
         #expect(!t.unicodeScalars.contains { $0.properties.generalCategory == .format || $0.value == 0x7F })
         #expect(t.hasPrefix("Family "))
     }
