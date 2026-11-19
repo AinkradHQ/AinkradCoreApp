@@ -119,6 +119,12 @@ public final class BrainModel {
         Task { await reload() }
     }
 
+    /// One sync of the Mac collectors without any screen (the background collector): reads the rooms, then syncs.
+    public func collectNow() async {
+        for _ in 0..<30 where sync == nil || load != .ready { try? await Task.sleep(for: .seconds(1)) }
+        await sync?.syncNow()
+    }
+
     public func detach() {
         service = nil
         updateStatusPolling()
