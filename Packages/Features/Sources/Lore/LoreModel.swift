@@ -71,6 +71,7 @@ public final class LoreModel {
     @ObservationIgnored private var again = false
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private var opening = 0
+    @ObservationIgnored private var registeredNotes: Set<String> = []
     @ObservationIgnored private var backlinkOwner = ""
     /// The space was opened since the Core was attached.
     @ObservationIgnored private var opened = false
@@ -101,6 +102,7 @@ public final class LoreModel {
         load = .loading
         Task {
             projectNames = (try? await service.projectNames()) ?? [:]
+            await syncLauncherNotes()
             // Today's note is made on the first open of the space (T7), not on every connect.
             if opened { await reload() }
         }
@@ -227,6 +229,7 @@ public final class LoreModel {
             }
             guard mine == opening else { return }
             apply(n)
+            Task { await syncLauncherNotes() }
         } catch {
             guard mine == opening else { return }
             switch Self.status(error) {
@@ -484,7 +487,36 @@ public final class LoreModel {
                 id: "lore", group: .apps, title: "Lore", sub: "The quick capture shortcut", symbol: "text.book.closed",
                 order: 40
             ) { [capture] in LoreSettingsSection(capture: capture) })
+        shell.launcher.registerFallback(
+            LauncherFallback(id: "lore-search", symbol: "magnifyingglass", title: { "Search notes for “\($0)”" }) {
+                [weak self] q in if let self { LoreOpenSheet.open(self, query: q) }
+            })
+        shell.launcher.registerFallback(
+            LauncherFallback(id: "lore-new", symbol: "square.and.pencil", title: { _ in "New note" }) { [weak self] _ in
+                guard let self else { return }
+                self.show(today: false)
+                Task { await self.newNote() }
+            })
         capture.start()
+        Task { await syncLauncherNotes() }
+    }
+
+    /// The eight most recent notes as launcher entries (⌘K → Notes).
+    func syncLauncherNotes() async {
+        guard let service, let list = try? await service.list(filter: LoreFilter(state: "active", kind: nil, project: nil, tag: nil))
+        else { return }
+        let shell = host.shell
+        let names = projectNames
+        let recent = list.prefix(8).map { LoreFinder.row($0, names, nil) }
+        let ids = Set(recent.map { "note-\($0.id)" })
+        for gone in registeredNotes.subtracting(ids) { shell.launcher.unregister(gone) }
+        for r in recent {
+            shell.launcher.register(
+                LauncherEntry(id: "note-\(r.id)", title: r.title, sub: r.sub, symbol: r.symbol, keywords: ["note", "lore"]) {
+                    [weak self] in self?.open(note: r.id)
+                })
+        }
+        registeredNotes = ids
     }
 }
 

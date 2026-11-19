@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The launcher's groups. Sessions and terminals come in numbers, so the empty state keeps every group collapsed under its header.
 enum LauncherSection: Int, CaseIterable, Sendable {
-    case apps, sessions, terminals, projects, actions
+    case apps, sessions, terminals, projects, notes, actions
 
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum LauncherSection: Int, CaseIterable, Sendable {
         case .sessions: "Sessions"
         case .terminals: "Terminals"
         case .projects: "Projects"
+        case .notes: "Notes"
         case .actions: "Actions"
         }
     }
@@ -20,6 +21,7 @@ enum LauncherSection: Int, CaseIterable, Sendable {
         case .sessions: "sparkles"
         case .terminals: "terminal"
         case .projects: "folder"
+        case .notes: "doc.text"
         case .actions: "bolt"
         }
     }
@@ -28,6 +30,7 @@ enum LauncherSection: Int, CaseIterable, Sendable {
         if e.id.hasPrefix("agents.s-") { return .sessions }
         if e.id.hasPrefix("terminal-") { return .terminals }
         if e.id.hasPrefix("project-") { return .projects }
+        if e.id.hasPrefix("note-") { return .notes }
         return e.isAction ? .actions : .apps
     }
 }
@@ -73,7 +76,30 @@ enum LauncherLine: Identifiable {
     }
 }
 
+enum LauncherDirection { case up, down, left, right }
+
 enum LauncherLines {
+    /// The 2D move: the suggestions are a two-column grid (←/→ across, ↑/↓ by row); everything after is one column.
+    /// Nil means the key does nothing here (←/→ outside the grid).
+    static func move(_ lines: [LauncherLine], from i: Int, _ d: LauncherDirection) -> Int? {
+        let n = lines.count
+        guard n > 0, lines.indices.contains(i) else { return nil }
+        let p = lines.prefix { if case .pick = $0 { true } else { false } }.count
+        if i < p {
+            switch d {
+            case .left: return i % 2 == 1 ? i - 1 : nil
+            case .right: return i % 2 == 0 && i + 1 < p ? i + 1 : nil
+            case .up: return i >= 2 ? i - 2 : n - 1
+            case .down: return i + 2 < p ? i + 2 : (p < n ? p : 0)
+            }
+        }
+        switch d {
+        case .left, .right: return nil
+        case .up: return i == p && p > 0 ? (p - 1) - ((p - 1) % 2) : (i > 0 ? i - 1 : n - 1)
+        case .down: return i < n - 1 ? i + 1 : 0
+        }
+    }
+
     static let maxResults = 40
 
     /// Empty query: the suggestions, then a collapsed header per group, with the open group's entries under it.

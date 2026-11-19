@@ -13,6 +13,8 @@ struct LauncherView: View {
     @State private var lines: [LauncherLine] = []
     /// The group whose entries are showing under its header.
     @State private var open: LauncherSection?
+    /// Nothing matched the query: the lines are the fallback actions.
+    @State private var noMatch = false
     /// The line whose actions menu (→) is showing.
     @State private var menuFor: String?
     /// The pointer only moves the selection while the keyboard has not moved it just now (a list scrolling under a still pointer is not a hover).
@@ -60,8 +62,23 @@ struct LauncherView: View {
                             if let h = line.heading, i == 0 || lines[i - 1].heading != h { sectionTitle(h) }
                             if i == 0, case .pick = line { sectionTitle(suggestionTitle) }
                             if case .group = line, i == 0 || !lines[i - 1].isGroup, !isNested(i - 1) { sectionTitle("Browse") }
-                            row(i, line)
-                                .id(line.id)
+                            if noMatch, i == 0 { empty }
+                            if case .pick = line {
+                                // Two to a row (07-launcher `.n7-picks`); the second of each pair is drawn with the first.
+                                if i % 2 == 0 {
+                                    HStack(spacing: Space.s1) {
+                                        pickCell(i, line)
+                                        if lines.indices.contains(i + 1), case .pick = lines[i + 1] {
+                                            pickCell(i + 1, lines[i + 1])
+                                        } else {
+                                            Color.clear.frame(maxWidth: .infinity)
+                                        }
+                                    }
+                                    .id(line.id)
+                                }
+                            } else {
+                                row(i, line).id(line.id)
+                            }
                         }
                         if lines.isEmpty { empty }
                     }
@@ -71,7 +88,10 @@ struct LauncherView: View {
                     // The list scrolls on the same curve the highlight glides on, so the two move together.
                     // Only the keyboard scrolls the list; a row under the pointer is already in view.
                     guard lines.indices.contains(new), Date().timeIntervalSince(keyAt) < 0.3 else { return }
-                    withAnimation(reduce ? nil : Motion.out(0.18)) { proxy.scrollTo(lines[new].id) }
+                    var target = lines[new].id
+                    // A suggestion is drawn with its row's first cell.
+                    if case .pick = lines[new], new % 2 == 1 { target = lines[new - 1].id }
+                    withAnimation(reduce ? nil : Motion.out(0.18)) { proxy.scrollTo(target) }
                 }
             }
             footer
@@ -112,10 +132,24 @@ struct LauncherView: View {
         } else if query.isEmpty {
             found = LauncherLines.browse(entries: shell.launcher.entries, picks: shell.launcher.picks, open: open)
         } else {
-            found = LauncherLines.results(
+            var hits = LauncherLines.results(
                 Fuzzy.rank(
                     shell.launcher.entries, query: query, recents: shell.launcher.recents, usage: shell.launcher.bonus))
+            // Nothing matched: what the modules offer to do with the words instead.
+            let none = hits.isEmpty
+            if none {
+                hits = shell.launcher.fallbacks.map { f in
+                    let q = query
+                    let e = LauncherEntry(id: "fallback-\(f.id)", title: f.title(q), symbol: f.symbol, isAction: true) {
+                        f.run(q)
+                    }
+                    return .item(LauncherRow(entry: e, group: .actions, matched: []), heading: nil, nested: false)
+                }
+            }
+            noMatch = none
+            found = hits
         }
+        if actionsOnly || query.isEmpty { noMatch = false }
         lines = found
         selection = min(selection, max(found.count - 1, 0))
     }
@@ -154,6 +188,15 @@ struct LauncherView: View {
         }
     }
 
+    @ViewBuilder private func pickCell(_ i: Int, _ line: LauncherLine) -> some View {
+        if case .pick(let p) = line {
+            LauncherPickCell(
+                entry: p.entry, reason: p.reason, number: i < 6 ? i + 1 : nil, selected: i == selection, glide: glide,
+                hover: { hoverOver(i) }
+            ) { activate(at: i) }
+        }
+    }
+
     private func hoverOver(_ i: Int) {
         if Date().timeIntervalSince(keyAt) > 0.3 { point(i) }
     }
@@ -177,6 +220,8 @@ struct LauncherView: View {
             menuItem("arrow.right", "Open", "↵") { activate(at: i) }
             menuItem("rectangle.split.2x1", "Open beside the current app", "⌘↵") { activate(at: i, beside: true) }
             menuItem("doc.on.doc", "Copy name", "⌥↵") { copyName(entry) }
+            menuItem("folder", "Show in Projects", "⌘⇧P", enabled: isProject(entry)) { activate(at: i) }
+            menuItem("xmark", "Close it", "⌘⌫", enabled: isOpen(entry)) { closeIt(entry) }
         }
         .padding(Space.s1)
         .coreGlass(radius: Radius.cardMac, interactive: false)
@@ -184,7 +229,20 @@ struct LauncherView: View {
         .transition(.opacity)
     }
 
-    private func menuItem(_ symbol: String, _ title: String, _ keys: String, _ run: @escaping () -> Void) -> some View {
+    private func isProject(_ e: LauncherEntry) -> Bool { LauncherSection.of(e) == .projects }
+    /// Sessions and terminals are launcher entries named like their pane: while the pane is open it can be closed from here.
+    private func isOpen(_ e: LauncherEntry) -> Bool { shell.allPanes.contains { $0.id == e.id } }
+
+    private func closeIt(_ e: LauncherEntry) {
+        guard isOpen(e) else { return }
+        menuFor = nil
+        shell.dismissPane(e.id)
+        rebuild()
+    }
+
+    private func menuItem(
+        _ symbol: String, _ title: String, _ keys: String, enabled: Bool = true, _ run: @escaping () -> Void
+    ) -> some View {
         Button(action: run) {
             HStack(spacing: Space.s2) {
                 Image(systemName: symbol).frame(width: 16).accessibilityHidden(true)
@@ -197,6 +255,8 @@ struct LauncherView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
     }
 
     private var footer: some View {
@@ -240,22 +300,20 @@ struct LauncherView: View {
     private func key(_ press: KeyPress) -> KeyPress.Result {
         let count = lines.count
         guard count > 0 else { return .ignored }
-        let step: Int
         let control = press.modifiers == .control
         switch press.key {
         case .downArrow where press.modifiers == .command: return jump(count - 1)
         case .upArrow where press.modifiers == .command: return jump(0)
-        case .downArrow where press.modifiers.isEmpty: step = 1
-        case .upArrow where press.modifiers.isEmpty: step = -1
+        case .downArrow where press.modifiers.isEmpty: return go(.down)
+        case .upArrow where press.modifiers.isEmpty: return go(.up)
+        case .leftArrow where press.modifiers.isEmpty: return go(.left)
+        case .rightArrow where press.modifiers.isEmpty: return go(.right)
         case .pageDown: return jump(min(selection + 8, count - 1))
         case .pageUp: return jump(max(selection - 8, 0))
-        case KeyEquivalent("n") where control: step = 1
-        case KeyEquivalent("p") where control: step = -1
+        case KeyEquivalent("n") where control: return go(.down)
+        case KeyEquivalent("p") where control: return go(.up)
         default: return .ignored
         }
-        keyAt = Date()
-        glide((selection + step + count) % count)
-        return .handled
     }
 
     private func catchKeys() {
@@ -278,12 +336,18 @@ struct LauncherView: View {
                 menuFor = lines[selection].id
             case 125 where count > 0 && command: _ = jump(count - 1)  // ⌘↓
             case 126 where count > 0 && command: _ = jump(0)  // ⌘↑
-            case 125 where count > 0: step(1, count)  // ↓
-            case 126 where count > 0: step(-1, count)  // ↑
+            case 125 where count > 0: go(.down)  // ↓
+            case 126 where count > 0: go(.up)  // ↑
+            case 123 where count > 0 && selectedIsPick(): go(.left)  // ← across the suggestions
+            case 124 where count > 0 && selectedIsPick(): go(.right)  // → across the suggestions
+            case 35 where command && shift:  // ⌘⇧P show in Projects
+                if lines.indices.contains(selection), let e = lines[selection].entry, isProject(e) { activate(at: selection) } else { return e }
+            case 51 where command && menuFor != nil:  // ⌘⌫ close it, while the menu is open
+                if lines.indices.contains(selection), let en = lines[selection].entry, isOpen(en) { closeIt(en) }
             case 121 where count > 0: _ = jump(min(selection + 8, count - 1))  // page down
             case 116 where count > 0: _ = jump(max(selection - 8, 0))  // page up
-            case 45 where count > 0 && control: step(1, count)  // ⌃N
-            case 35 where count > 0 && control: step(-1, count)  // ⌃P
+            case 45 where count > 0 && control: go(.down)  // ⌃N
+            case 35 where count > 0 && control: go(.up)  // ⌃P
             default: return e
             }
             return nil
@@ -295,10 +359,15 @@ struct LauncherView: View {
         return tv.selectedRange.length == 0 && tv.selectedRange.location == (tv.string as NSString).length
     }
 
-    private func step(_ by: Int, _ count: Int) {
-        keyAt = Date()
-        menuFor = nil
-        glide((selection + by + count) % count)
+    private func selectedIsPick() -> Bool {
+        guard lines.indices.contains(selection), case .pick = lines[selection] else { return false }
+        return true
+    }
+
+    /// One arrow press: the grid moves in two dimensions, the rest of the list in one.
+    @discardableResult private func go(_ d: LauncherDirection) -> KeyPress.Result {
+        guard let to = LauncherLines.move(lines, from: selection, d) else { return .ignored }
+        return jump(to)
     }
 
     @discardableResult private func jump(_ to: Int) -> KeyPress.Result {
@@ -341,8 +410,19 @@ struct LauncherView: View {
         shell.launcher.remember(entry.id)
         shell.launcherOpen = false
         shell.actionsOpen = false
+        if beside {
+            // The app comes next to the current one (a new workspace when it does not fit), even from another workspace.
+            shell.openBeside = true
+            shell.focusedPane = nil
+        }
         entry.run()
-        if beside { shell.focusedPane = nil }
+        if beside {
+            // Entries that open their app after a fetch still see the flag for a moment.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                shell.openBeside = false
+            }
+        }
     }
 
     private func copyName(_ entry: LauncherEntry) {
@@ -351,6 +431,54 @@ struct LauncherView: View {
         shell.launcherOpen = false
         shell.actionsOpen = false
         shell.showToast("Name copied")
+    }
+}
+
+/// One of the suggestions: icon, name and why, in a half-width cell.
+private struct LauncherPickCell: View {
+    let entry: LauncherEntry
+    let reason: String
+    let number: Int?
+    let selected: Bool
+    let glide: Namespace.ID
+    let hover: () -> Void
+    let action: () -> Void
+    @Environment(\.corePalette) private var palette
+    @State private var lastPoint: CGPoint?
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.s3) {
+                IconTile(entry.symbol, hue: GlassInk.blue, size: MacSize.controlLg)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(entry.title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
+                    Text(reason).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+                Spacer(minLength: Space.s1)
+                if let number { CoreKeycap("⌘\(number)") }
+            }
+            .foregroundStyle(GlassInk.primary)
+            .padding(.horizontal, Space.s2)
+            .frame(maxWidth: .infinity, minHeight: MacSize.controlLg + Space.s3, alignment: .leading)
+            .background {
+                if selected {
+                    coreShape(Radius.row).fill(palette.navActive).matchedGeometryEffect(id: "selection", in: glide)
+                }
+            }
+            .contentShape(coreShape(Radius.row))
+        }
+        .buttonStyle(.plain)
+        .onContinuousHover { phase in
+            guard case .active = phase else {
+                lastPoint = nil
+                return
+            }
+            let p = NSEvent.mouseLocation
+            if let last = lastPoint, last != p { hover() }
+            lastPoint = p
+        }
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityLabel("\(entry.title), \(reason)")
     }
 }
 
