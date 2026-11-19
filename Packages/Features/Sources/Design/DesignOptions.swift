@@ -57,10 +57,11 @@ import SwiftUI
 }
 
 struct DesignOptionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let options = DesignOptions.options
 
     var body: some View {
-        GlassSection("Canvas", sub: "How a design is laid out and where it starts", symbol: "square.dashed", hue: GlassInk.blue)
+        GlassSection("Canvas", sub: "How a design is laid out and where it starts", symbol: "square.dashed", hue: GlassInk.accent(paneAccent))
         {
             VStack(spacing: Space.s2) {
                 OptionSwitchRow(

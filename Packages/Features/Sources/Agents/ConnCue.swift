@@ -4,6 +4,7 @@ import SwiftUI
 /// CN5: an agent's call through a Core connection (the runner's typed tools, `github.get_issue`, `jira.create_issue`) as
 /// one quiet line in the transcript; a refused one as a warning line with the way to allow it. Names only, never payloads.
 struct ConnCue: View {
+    @Environment(\.coreAccent) private var paneAccent
     let tool: String
     let summary: String
     /// nil while it runs.
@@ -57,7 +58,7 @@ struct ConnCue: View {
             .lineLimit(2)
             if refused, let openConnections {
                 Button("Allow in Connections", action: openConnections).buttonStyle(.plain)
-                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.blueInk)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.accent(paneAccent)Ink)
             }
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)

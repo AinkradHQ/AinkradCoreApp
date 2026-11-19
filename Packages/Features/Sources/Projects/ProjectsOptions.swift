@@ -75,12 +75,13 @@ struct ProjectLimits: Equatable, Sendable {
 }
 
 struct ProjectsOptionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ProjectsModel
     let options = ProjectsOptions.options
 
     var body: some View {
         VStack(spacing: Space.s4) {
-            GlassSection("When a project runs", symbol: "play.circle", hue: GlassInk.blue) {
+            GlassSection("When a project runs", symbol: "play.circle", hue: GlassInk.accent(paneAccent)) {
                 VStack(spacing: Space.s2) {
                     if let l = model.limits {
                         OptionSelectRow(
@@ -106,7 +107,7 @@ struct ProjectsOptionsTab: View {
                     }
                 }
             }
-            GlassSection("Tidying", symbol: "archivebox", hue: GlassInk.blue, index: 1) {
+            GlassSection("Tidying", symbol: "archivebox", hue: GlassInk.accent(paneAccent), index: 1) {
                 VStack(spacing: Space.s2) {
                     OptionSwitchRow(
                         "Show archived projects", sub: "Archived projects keep their repos, secrets and notes",

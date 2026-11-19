@@ -114,6 +114,7 @@ private struct AccountTile {
 /// Settings, Notifications: whether macOS lets Ainkrad show banners, what it tells you about, and where activity shows
 /// inside Ainkrad. Saved on this Mac.
 struct NotificationsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
 
     var body: some View {
@@ -155,7 +156,7 @@ struct NotificationsSection: View {
 
     private var permission: some View {
         let p = model.notifierPermission
-        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.blue : GlassInk.amber
+        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.accent(paneAccent) : GlassInk.amber
         return HStack(spacing: Space.s4) {
             IconTile(p == .allowed ? "bell.fill" : "bell.slash.fill", hue: hue, size: 56, bounce: p == .allowed)
                 .shadow(color: hue.opacity(0.5), radius: 14)
@@ -176,7 +177,7 @@ struct NotificationsSection: View {
             }
             Spacer(minLength: Space.s3)
             if p == .notAsked {
-                AppActionTile(title: "Turn on", symbol: "bell.badge", key: "↩", hue: GlassInk.blue, prominent: true) {
+                AppActionTile(title: "Turn on", symbol: "bell.badge", key: "↩", hue: GlassInk.accent(paneAccent), prominent: true) {
                     Task { await model.turnOnNotifications() }
                 }
                 .keyboardShortcut(.defaultAction)

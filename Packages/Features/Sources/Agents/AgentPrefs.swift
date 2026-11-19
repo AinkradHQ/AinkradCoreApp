@@ -96,6 +96,7 @@ extension AgentPrefs {
 
 /// The Agents settings: surface and defaults. Used in Settings and in the Appearance popover.
 struct AgentSettingsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var prefs = AgentPrefs.shared
     weak var model: AgentsModel?
     var compact = false
@@ -107,7 +108,7 @@ struct AgentSettingsView: View {
                 AppLookSection(appName: "AI Sessions", prefs: prefs.appLook)
                 GlassSection(
                     "Text", sub: "The conversation and the message field. Code stays monospaced.", symbol: "textformat",
-                    hue: GlassInk.blue, index: 1
+                    hue: GlassInk.accent(paneAccent), index: 1
                 ) {
                     SettingRow("Size", symbol: "textformat.size") {
                         CoreSegmented(
@@ -133,7 +134,7 @@ struct AgentSettingsView: View {
             if part.showsOptions {
                 GlassSection(
                     "Safety", sub: "What new sessions may do, and how long they stay", symbol: "hand.raised",
-                    hue: GlassInk.blue, index: 2
+                    hue: GlassInk.accent(paneAccent), index: 2
                 ) {
                     VStack(spacing: Space.s2) {
                         OptionSwitchRow(
@@ -146,7 +147,7 @@ struct AgentSettingsView: View {
                     }
                 }
                 GlassSection(
-                    "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.blue,
+                    "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.accent(paneAccent),
                     index: 2
                 ) {
                     SettingRow("Harness", symbol: "cpu") {
@@ -187,12 +188,13 @@ struct AgentSettingsView: View {
 
 /// The model name as a glass field: a sparkle that bounces while typing, a clear tile once something is set.
 private struct ModelField: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Binding var text: String
     @FocusState private var focused: Bool
     var body: some View {
         HStack(spacing: Space.s2) {
             Image(systemName: text.isEmpty ? "sparkles" : "brain.head.profile")
-                .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.blue)
+                .foregroundStyle(text.isEmpty ? GlassInk.secondary : GlassInk.accent(paneAccent))
                 .contentTransition(.symbolEffect(.replace)).coreBounce(text.count)
             TextField("The harness default", text: $text).textFieldStyle(.plain).focused($focused)
                 .autocorrectionDisabled()

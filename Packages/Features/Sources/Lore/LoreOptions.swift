@@ -25,10 +25,11 @@ import SwiftUI
 }
 
 struct LoreWritingSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let options = LoreOptions.options
 
     var body: some View {
-        GlassSection("Writing", symbol: "text.alignleft", hue: GlassInk.blue) {
+        GlassSection("Writing", symbol: "text.alignleft", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 OptionSwitchRow(
                     "Open last note at start", sub: "Otherwise Lore opens today's note", symbol: "clock.arrow.circlepath",
