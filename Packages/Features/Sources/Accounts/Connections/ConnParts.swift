@@ -86,7 +86,63 @@ struct ConnTiles: View {
     let pick: (String) -> Void
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
-            ForEach(kinds) { k in ConnTileButton(kind: k) { pick(k.id) } }
+            ForEach(Array(kinds.enumerated()), id: \.element.id) { i, k in
+                ConnTileButton(kind: k) { pick(k.id) }.connRise(index: i)
+            }
         }
     }
+}
+
+/// The motion maths of the Connections tiles, apart from the views so Reduce Motion can be tested.
+enum ConnMotion {
+    static let floatPeriod = 5.5  // the mockup's k-float: 5.5s, ease-in-out, forever
+    static let floatLift = 4.0  // px up at the peak
+    static let heroPhase = -2.7  // the second hero tile starts half a loop later
+    static let riseStep = 0.045  // Kit.stagger: 45ms per tile
+    static let riseDistance = 8.0
+
+    /// Vertical offset at time `t` (negative is up): 0 -> lift -> 0 as a smooth sine. Reduce Motion rests at 0.
+    static func floatOffset(at t: Double, phase: Double = 0, reduce: Bool) -> Double {
+        if reduce { return 0 }
+        let x = (t - phase).truncatingRemainder(dividingBy: floatPeriod) / floatPeriod
+        return -floatLift * (1 - cos(2 * .pi * x)) / 2
+    }
+}
+
+/// A tile floating up and down. Time-driven, no pointer input; a still tile under Reduce Motion.
+private struct ConnFloat: ViewModifier {
+    let phase: Double
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    func body(content: Content) -> some View {
+        if reduce {
+            content
+        } else {
+            TimelineView(.animation) { ctx in
+                content.offset(y: ConnMotion.floatOffset(at: ctx.date.timeIntervalSinceReferenceDate, phase: phase, reduce: false))
+            }
+        }
+    }
+}
+
+/// A tile rising in once, 45ms after the one before (Kit.stagger). Already in place under Reduce Motion.
+private struct ConnRise: ViewModifier {
+    let index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var shown = false
+    func body(content: Content) -> some View {
+        content
+            .opacity(reduce || shown ? 1 : 0)
+            .offset(y: reduce || shown ? 0 : ConnMotion.riseDistance)
+            .onAppear {
+                guard !reduce else { return }
+                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.5).delay(Double(index) * ConnMotion.riseStep)) {
+                    shown = true
+                }
+            }
+    }
+}
+
+extension View {
+    func connFloat(phase: Double = 0) -> some View { modifier(ConnFloat(phase: phase)) }
+    func connRise(index: Int) -> some View { modifier(ConnRise(index: index)) }
 }
