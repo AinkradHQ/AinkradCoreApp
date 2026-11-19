@@ -19,8 +19,6 @@ final class SetupWizardModel {
         case connecting
         /// Paired. Asked once, only when this Mac has no name yet.
         case name
-        /// "Ready: 2 machines" (only when this build has a runner inside).
-        case ready
         case failed(Failure)
     }
 
@@ -57,19 +55,21 @@ final class SetupWizardModel {
     private let profile: UserProfile?
     private let driver: any PairingDriver
     private let onPaired: @MainActor () -> Void
-    /// The runner inside the app; its end screen shows only when it is there.
-    let macRunner: MacRunnerModel?
+    /// Called once a new Core is paired, just before the desktop opens: the setup tour (About you, AI, Look, runner) starts there.
+    var armTour: @MainActor () -> Void = {}
+    /// The first screen's hero has been left: Get started was pressed (or a link came in).
+    private(set) var welcomed = false
     private var task: Task<Void, Never>?
 
     init(
-        driver: any PairingDriver, profile: UserProfile? = nil, macRunner: MacRunnerModel? = nil,
-        onPaired: @escaping @MainActor () -> Void
+        driver: any PairingDriver, profile: UserProfile? = nil, onPaired: @escaping @MainActor () -> Void
     ) {
         self.driver = driver
         self.profile = profile
-        self.macRunner = macRunner
         self.onPaired = onPaired
     }
+
+    func getStarted() { welcomed = true }
 
     func chooseNew() {
         installed = true
@@ -94,6 +94,7 @@ final class SetupWizardModel {
     @discardableResult
     func receive(url: URL) -> Bool {
         guard stage != .connecting else { return false }
+        welcomed = true
         linkText = url.absoluteString
         receivedLink = link
         stage = .connect
@@ -117,6 +118,7 @@ final class SetupWizardModel {
         task?.cancel()
         scrub()
         installed = false
+        welcomed = false
         stage = .choose
     }
 
@@ -160,9 +162,10 @@ final class SetupWizardModel {
         finishSetup()
     }
 
-    /// The last screen, when there is one; then the desktop.
+    /// Paired: the desktop opens, with the setup tour over it.
     func finishSetup() {
-        if macRunner?.isAvailable == true, stage != .ready { stage = .ready } else { onPaired() }
+        armTour()
+        onPaired()
     }
 
     private func fail(_ error: any Error) {

@@ -23,16 +23,14 @@ struct SetupWizardView: View {
                 header
                 Group {
                     switch model.stage {
-                    case .choose: choose
+                    case .choose: model.welcomed ? choose : welcome
                     case .install: install
                     case .connect, .connecting: connect
                     case .name: nameStep
-                    case .ready:
-                        if let m = model.macRunner { MacRunnerReadyView(macRunner: m, finish: model.finishSetup) }
                     case .failed(let f): failed(f)
                     }
                 }
-                .id(model.stage == .connecting ? Stage.connect : Stage(model.stage))
+                .id(screen)
                 .transition(.opacity.combined(with: .offset(x: coreMove(reduce, 12))))
             }
             .foregroundStyle(palette.text)
@@ -43,32 +41,33 @@ struct SetupWizardView: View {
             .accessibilityElement(children: .contain)
         }
         .coreTheme()
-        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: Stage(model.stage))
+        .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: screen)
         .ignoresSafeArea()
     }
 
     /// The screen a stage belongs to (connecting stays on the paste screen).
     private enum Stage: Hashable {
-        case choose, install, connect, name, ready, failed
+        case welcome, choose, install, connect, name, failed
         init(_ s: SetupWizardModel.Stage) {
             switch s {
             case .choose: self = .choose
             case .install: self = .install
             case .connect, .connecting: self = .connect
             case .name: self = .name
-            case .ready: self = .ready
             case .failed: self = .failed
             }
         }
     }
 
+    private var screen: Stage { model.stage == .choose && !model.welcomed ? .welcome : Stage(model.stage) }
+
+    /// The bar this screen lights (of seven, see `SetupBars`) and its name.
     private var step: (Int, String) {
         switch model.stage {
-        case .choose: (1, "Welcome")
-        case .install: (2, "Install Core")
-        case .connect, .connecting: (3, "Connect")
-        case .name: (0, "Connected")
-        case .ready: (0, "Ready")
+        case .choose: model.welcomed ? (1, "Your Core") : (0, "Welcome")
+        case .install: (1, "Install Core")
+        case .connect, .connecting: (1, "Connect")
+        case .name: (1, "Connected")
         case .failed: (0, "Connect to a Core")
         }
     }
@@ -77,17 +76,8 @@ struct SetupWizardView: View {
         HStack(spacing: Space.s2) {
             Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
                 .accessibilityHidden(true)
-            if step.0 > 0 {
-                HStack(spacing: Space.s1) {
-                    ForEach(1...3, id: \.self) { i in
-                        coreShape(Radius.chip / 3).fill(i <= step.0 ? palette.primary : palette.track)
-                            .frame(width: Space.s5, height: Space.s1)
-                    }
-                }
-                .accessibilityHidden(true)
-            }
+            SetupBars(at: step.0)
             Text(step.1).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
-                .accessibilityLabel(step.0 > 0 ? "Step \(step.0) of 3, \(step.1)" : step.1)
         }
     }
 
@@ -97,6 +87,36 @@ struct SetupWizardView: View {
 
     private func note(_ t: LocalizedStringKey) -> some View {
         Text(t).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: 0, welcome
+
+    private var welcome: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            Text("Welcome to Ainkrad").coreFont(size: MacTextSize.large, weight: .semibold)
+                .accessibilityAddTraits(.isHeader)
+            note("Your Core keeps your work, notes and AI in one calm place. Setup takes about three minutes, and you can skip anything.")
+            HStack(alignment: .top, spacing: Space.s3) {
+                welcomeTile("server.rack", "Your Core", "One place for everything")
+                welcomeTile("person", "About you", "So the AI knows you")
+                welcomeTile("sparkles", "Your look", "Make it yours")
+            }
+            HStack {
+                Spacer()
+                Button("Get started") { model.getStarted() }.buttonStyle(CoreButtonStyle(.prominent, size: .large))
+                    .coreShortcut(.primary)
+            }
+        }
+    }
+
+    private func welcomeTile(_ symbol: String, _ title: String, _ sub: String) -> some View {
+        VStack(spacing: Space.s1) {
+            IconTile(symbol, hue: GlassInk.blue, size: 36)
+            Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
+            Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+        }
+        .frame(maxWidth: .infinity).padding(Space.s4).coreWell()
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: 1, new or existing
