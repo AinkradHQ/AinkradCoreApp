@@ -1,3 +1,4 @@
+import CoreKit
 import CoreUI
 import SwiftUI
 
@@ -85,7 +86,13 @@ struct TerminalCard: View {
         // Staggered, so a full list does not ask all at once.
         try? await Task.sleep(for: .milliseconds(120 * min(index, 10)))
         while !Task.isCancelled {
-            if let rows = try? await model.service.tail(item.id, lines: 5) { tail = rows }
+            do {
+                tail = try await model.service.tail(item.id, lines: 5)
+            } catch {
+                // A locked Core answers `unlock_required`, and a rate limit says slow down: stop asking, and the card
+                // keeps its prompt line. The list asks again when the person unlocks and the card comes back.
+                if case .http(_, let code, _)? = CoreError.unwrapping(error), code == "unlock_required" { return }
+            }
             if reduce { return }
             try? await Task.sleep(for: .seconds(3))
         }

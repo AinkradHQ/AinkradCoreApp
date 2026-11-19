@@ -263,6 +263,7 @@ struct MacRunnerPlistTests {
         let a = try #require(plain["ProgramArguments"] as? [String])
         let b = try #require(terms["ProgramArguments"] as? [String])
         #expect(a.contains("--enable-agents") && !a.contains("--enable-pty"))
+        #expect(a.contains("--bundled") && b.contains("--bundled"))
         #expect(b.contains("--enable-agents") && b.contains("--enable-pty"))
         let ea = try #require(plain["EnvironmentVariables"] as? [String: String])
         let eb = try #require(terms["EnvironmentVariables"] as? [String: String])
@@ -302,9 +303,13 @@ struct MacRunnerPairProcessTests {
     @Test func launchdFailureAndMissingToolAreSaidInPlainWords() {
         let launchd = "job state = spawn failed\n\tlast exit code = 78: EX_CONFIG\n"
         #expect(MacRunnerProblem.exitCode(launchd) == 78)
-        #expect(MacRunnerProblem.words(launchd: launchd, lastErrorFile: nil)?.hasPrefix("macOS could not start the runner (error 78)") == true)
+        #expect(
+            MacRunnerProblem.words(launchd: launchd, lastErrorFile: nil)?.hasPrefix(
+                "macOS could not start the runner (error 78)") == true)
         #expect(MacRunnerProblem.words(launchd: "last exit code = (never exited)", lastErrorFile: nil) == nil)
-        #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "no AI tool installed: x")?.contains("no AI tool is installed") == true)
+        #expect(
+            MacRunnerProblem.words(launchd: nil, lastErrorFile: "no AI tool installed: x")?.contains(
+                "no AI tool is installed") == true)
         #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "\n") == nil)
     }
 
