@@ -41,7 +41,7 @@ extension SettingsRegistry {
             .compactMap { i, id in byID[id].map { (i, $0) } }
             .filter { _, t in (advanced || !t.advanced) && !hidden.contains("\(s.id).\(t.id)") }
             .sorted { ($0.1.order, $0.0) < ($1.1.order, $1.0) }
-            .map(\.1)
+            .map { $0.1 }
     }
 
     /// The tab shown: the one picked in this section, falling back to the first when it is gone (Advanced turned off).

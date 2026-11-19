@@ -27,7 +27,8 @@ struct CoreOverviewTab: View {
         let h = shell.home.health
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                shell.home.coreName, sub: h.map { "Version \($0.version) · up for \($0.uptime)" } ?? "Not reported yet",
+                shell.home.coreName,
+                sub: h.map { "Version \($0.version) · up for \($0.uptime)" } ?? "Not reported yet",
                 symbol: "server.rack", hue: GlassInk.blue
             ) {
                 Text(shell.chipState?.popTitle ?? "Not connected").foregroundStyle(GlassInk.secondary)

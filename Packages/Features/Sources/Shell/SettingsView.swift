@@ -358,7 +358,9 @@ extension ShellModel {
             advancedOnly: Bool = false
         ) {
             settings.section(
-                SettingsSection(id: id, group: g, title: title, symbol: symbol, order: order, advancedOnly: advancedOnly) {
+                SettingsSection(
+                    id: id, group: g, title: title, symbol: symbol, order: order, advancedOnly: advancedOnly
+                ) {
                     PlaceholderSection(what: what)
                 })
         }
@@ -382,7 +384,9 @@ extension ShellModel {
                 symbol: "circle.lefthalf.filled", order: 1,
                 tabs: [
                     SettingsTab("look", "Look", order: 0) { AppearanceSection(shell: self) },
-                    SettingsTab("wallpaper", "Wallpaper", order: 1) { AppearanceSection(shell: self, part: .wallpaper) },
+                    SettingsTab("wallpaper", "Wallpaper", order: 1) {
+                        AppearanceSection(shell: self, part: .wallpaper)
+                    },
                     SettingsTab("clock", "Clock", order: 2) { ClockSettings() },
                 ]))
     }
