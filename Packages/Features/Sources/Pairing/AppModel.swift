@@ -782,6 +782,9 @@ extension AppModel: AgentsHost {
     public var thisMacRunnerID: String? { macRunner.runnerID }
 
     public func openTerminal(on runner: String, session: String?) { terminals?.open(on: runner, session: session) }
+    public func embeddedTerminal(on runner: String, session: String) -> AnyView? {
+        terminals.map { AnyView(EmbeddedTerminal(model: $0, runner: runner, session: session)) }
+    }
 
     /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
     public func elevate(reason: String, force: Bool) async -> InlineNotice? {

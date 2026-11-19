@@ -179,7 +179,8 @@ struct TranscriptView: View {
         } else {
             EntryRow(
                 entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
-                latest: latest, streaming: latest && session.live && !session.idle,
+                latest: latest, streaming: e.seq == store.entries.last(where: { $0.kind != .hidden })?.seq && latest && session.live
+                    && !session.idle,
                 openConnections: { model.shell.launcher.entry("connections")?.run() },
                 actions: EntryActions.make(model, session, ui: ui)
             )
@@ -307,6 +308,7 @@ struct EntryRow: View, Equatable {
             // Printed on the glass, no bubble.
             MarkdownText(text, streaming: streaming).frame(maxWidth: .infinity, alignment: .leading)
                 .messageActions(text: text, user: false, latest: latest, actions)
+        case .thinking(let text): ThinkingBlock(text: text)
         case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
             CodeModeCard(
                 tool: CodeModeTool.of(name)!, summary: summary, status: .running, output: "", durationMs: nil,

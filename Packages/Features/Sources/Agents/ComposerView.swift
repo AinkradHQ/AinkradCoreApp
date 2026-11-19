@@ -65,6 +65,23 @@ struct ComposerView: View {
     private var enabled: Bool { model.canWrite(session) }
     private var commands: [(name: String, help: String)] { enabled ? SlashCommands.matches(text) : [] }
 
+    /// The `@name` being typed, with the files it can mean (the Core's folder listing, one directory at a time).
+    private var mention: MentionToken? {
+        model.sessionTools && enabled && commands.isEmpty ? MentionToken.at(end: text) : nil
+    }
+    private var mentionEntries: [FolderEntry] {
+        guard let m = mention else { return [] }
+        return Array(model.mentionMatches(session.id, dir: m.dir, prefix: m.prefix).prefix(8))
+    }
+
+    /// Puts the picked name in place of what was typed: a folder keeps the picker open one level down.
+    private func take(_ e: FolderEntry) {
+        guard let m = mention else { return }
+        let keep = String(text.dropLast(m.length))
+        let base = m.dir.isEmpty ? e.name : m.dir + "/" + e.name
+        draft.wrappedValue = keep + "@" + base + (e.dir ? "/" : " ")
+    }
+
     private var placeholder: String { ConversationWords.placeholder(session) }
 
     var body: some View {
@@ -85,6 +102,7 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
+            if !mentionEntries.isEmpty { MentionPicker(entries: mentionEntries, pick: min(pick, mentionEntries.count - 1), choose: take) }
             // The agent's own steps, one line above the composer (opens upward).
             if let todos = TodoStrip.items(model.transcripts[session.id]?.entries ?? []) { TodoStrip(items: todos) }
             // What went wrong with the last send (or resume, wake...), right where you typed it.
@@ -114,6 +132,7 @@ struct ComposerView: View {
                     // Icon-first (the mockup's): the chips show their words only while you write.
                     modelPicker(labels: on)
                     ModeChip(model: model, session: session, labels: on)
+                    if session.canSetEffort, enabled { effortChip(labels: on) }
                     Spacer(minLength: Space.s2)
                     contextButton
                     if Dictation.available, enabled { micButton }
@@ -154,6 +173,9 @@ struct ComposerView: View {
         }
         .readingColumn()
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
+        .task(id: mention?.dir) {
+            if let m = mention { await model.listFolder(session.id, dir: m.dir) }
+        }
         .onChange(of: text) { _, new in
             pick = 0
             DraftStore.save(session.id, new)
@@ -281,6 +303,30 @@ struct ComposerView: View {
         .onDisappear { voice.stop() }
     }
 
+    /// How hard the tool thinks, for the tools that take it (the Core says which): a menu of the four levels.
+    private func effortChip(labels: Bool) -> some View {
+        CoreDropdown(
+            items: Effort.all.map { e in
+                CoreDropdownItem(e.title, checked: session.effort == e.id, note: e.note) {
+                    Task { await model.setEffort(session.id, e.id) }
+                }
+            }
+        ) {
+            HStack(spacing: Space.s1) {
+                Image(systemName: "gauge.with.dots.needle.67percent")
+                if labels {
+                    Text(Effort.title(session.effort))
+                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                }
+            }
+            .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(SessionInk.text2)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .background(SessionInk.row, in: coreShape(Radius.chip))
+        }
+        .help("Effort: \(Effort.title(session.effort)). How hard the tool thinks before it answers.")
+        .accessibilityLabel("Effort: \(Effort.title(session.effort))")
+    }
+
     /// Steer needs the tool to take an interrupt (every tool the Core can stop a turn of).
     private var canSteer: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.canSend(session.id)
@@ -305,6 +351,10 @@ struct ComposerView: View {
     private var keys: ComposerKeys {
         ComposerKeys(
             submit: { shift in
+                if !shift, !mentionEntries.isEmpty {
+                    take(mentionEntries[min(pick, mentionEntries.count - 1)])
+                    return true
+                }
                 switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
                 case .newline: return false
                 case .fill(let name): draft.wrappedValue = name + " "
@@ -313,6 +363,10 @@ struct ComposerView: View {
                 return true
             },
             up: {
+                if !mentionEntries.isEmpty {
+                    pick = max(0, pick - 1)
+                    return true
+                }
                 if !commands.isEmpty {
                     pick = max(0, pick - 1)
                     return true
@@ -328,11 +382,19 @@ struct ComposerView: View {
                 return true
             },
             down: {
+                if !mentionEntries.isEmpty {
+                    pick = min(mentionEntries.count - 1, pick + 1)
+                    return true
+                }
                 guard !commands.isEmpty else { return false }
                 pick = min(commands.count - 1, pick + 1)
                 return true
             },
             tab: {
+                if !mentionEntries.isEmpty {
+                    take(mentionEntries[min(pick, mentionEntries.count - 1)])
+                    return true
+                }
                 // Tab takes the highlighted command; otherwise the field moves focus on (KeyTextView).
                 guard !commands.isEmpty else { return false }
                 draft.wrappedValue = commands[min(pick, commands.count - 1)].name + " "

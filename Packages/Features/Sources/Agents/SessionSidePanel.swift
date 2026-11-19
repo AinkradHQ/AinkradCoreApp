@@ -11,7 +11,7 @@ struct SessionSidePanel: View {
     var find: (() -> Void)?
     @Environment(\.sessionUI) private var ui
 
-    static let width: CGFloat = 304
+    static let width: CGFloat = 380
 
     @AppStorage("agents.panel.tab") private var tabName = PanelTab.plan.rawValue
 
