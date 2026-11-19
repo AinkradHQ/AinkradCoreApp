@@ -25,7 +25,7 @@ extension AccountsModel {
         removed = RemovedAccount(account: a, index: index, until: deadline)
         let name = ProviderCatalog.name(a.provider, fallback: providerName(a.provider))
         host.shell.showToast(
-            "\(name) removed", lifetime: max(1, deadline.timeIntervalSince(now()))
+            AccountNotes.removedWords(name, note: a.wipeNote), lifetime: max(1, deadline.timeIntervalSince(now()))
         ) { [weak self] in Task { @MainActor in await self?.undoRemoval(a.id) } }
         return true
     }

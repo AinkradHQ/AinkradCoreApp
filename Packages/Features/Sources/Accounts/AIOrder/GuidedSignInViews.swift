@@ -10,19 +10,34 @@ struct GuidedTerminal: View {
     let sending: Bool
     let send: (String) -> Void
     @State private var line = ""
+    /// "This is a secret": the line is typed into a secure field, so it is never shown. Off for each new sign-in.
+    @State private var secret = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             screen
             HStack(alignment: .bottom, spacing: Space.s2) {
-                CoreTextField("", placeholder: "Type a line, then press Return", text: $line, error: error, mono: true) {
-                    go()
+                Group {
+                    if secret {
+                        CoreSecureField("", placeholder: "Type it, then press Return", text: $line, error: error) {
+                            go()
+                        }
+                    } else {
+                        CoreTextField(
+                            "", placeholder: "Type a line, then press Return", text: $line, error: error, mono: true
+                        ) {
+                            go()
+                        }
+                    }
                 }
                 .accessibilityIdentifier("guided-input")
                 Button("Send", action: go).buttonStyle(CoreButtonStyle(.secondary))
                     .disabled(sending || line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("guided-send")
             }
+            Text(GuidedInput.hint).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            CoreCheckbox("This is a secret", isOn: $secret).accessibilityIdentifier("guided-secret")
         }
     }
 
@@ -63,6 +78,8 @@ struct RunnerPickView: View {
     let provider: String
     let choice: RunnerChoice
     let pick: (String) -> Void
+    /// Set for Codex and Antigravity: the risk note is agreed to here, before the sign-in starts.
+    var consent: Binding<Bool>?
     let start: () -> Void
     let back: () -> Void
 
@@ -77,14 +94,39 @@ struct RunnerPickView: View {
             .frame(maxWidth: .infinity)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
                 ForEach(choice.eligible) { r in
-                    AccPick(title: r.name, sub: "Online", symbol: "server.rack", hue: GlassInk.blue, on: choice.selected == r.id) {
+                    AccPick(
+                        title: r.name, sub: "Online", symbol: "server.rack", hue: GlassInk.blue,
+                        on: choice.selected == r.id
+                    ) {
                         pick(r.id)
                     }
                 }
             }
-            AccDialogButtons(confirm: "Continue", cancelTitle: "Back", enabled: choice.chosen != nil, cancel: back, run: start)
+            if let consent {
+                RiskConsent(agreed: consent)
+            }
+            AccDialogButtons(
+                confirm: "Continue", cancelTitle: "Back",
+                enabled: choice.chosen != nil && (consent?.wrappedValue ?? true),
+                cancel: back, run: start)
         }
         .accessibilityIdentifier("runner-pick")
+    }
+}
+
+/// The risk note, agreed to before the sign-in starts (the mockup's a9-risk line, as a checkbox).
+struct RiskConsent: View {
+    static let note = "Uses your subscription at your own risk. The provider's rules may not allow it."
+    static let agree = "I understand this may break the provider's rules and is my own risk"
+    @Binding var agreed: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Label(Self.note, systemImage: "exclamationmark.triangle").coreFont(size: MacTextSize.meta)
+                .foregroundStyle(GlassInk.amberInk).fixedSize(horizontal: false, vertical: true)
+            CoreCheckbox(Self.agree, isOn: $agreed)
+                .accessibilityIdentifier("risk-consent")
+        }
     }
 }
 
@@ -134,7 +176,8 @@ struct WaitingDots: View {
                 TimelineView(.animation) { t in
                     dots { i in
                         // 1.5 s loop, each square 0.18 s behind the last: up at 40 %, back down by 80 %.
-                        let p = ((t.date.timeIntervalSinceReferenceDate - Double(i) * 0.18) / 1.5).truncatingRemainder(dividingBy: 1)
+                        let p = ((t.date.timeIntervalSinceReferenceDate - Double(i) * 0.18) / 1.5).truncatingRemainder(
+                            dividingBy: 1)
                         let q = p < 0 ? p + 1 : p
                         let lift = q < 0.4 ? q / 0.4 : q < 0.8 ? 1 - (q - 0.4) / 0.4 : 0
                         return (0.3 + 0.7 * lift, -3 * lift)

@@ -237,6 +237,8 @@ final class FakeService: AccountsService, @unchecked Sendable {
         try note("sendLoginInput \(id) \(line.count)")
     }
     func boundRunners() async -> [Int64: String] { bound }
+    var notes: [Int64: AccountNotes] = [:]
+    func accountNotes() async -> [Int64: AccountNotes] { notes }
     var runnerList = [AccountRunner(id: "r_1", name: "linux-01", online: true)]
     var lastKey = ""
     func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {
@@ -285,7 +287,8 @@ final class FakeService: AccountsService, @unchecked Sendable {
     var budgetList: [BudgetItem] = []
     func budgets() async throws -> [BudgetItem] { budgetList }
     func setBudget(_ b: BudgetDraft) async throws {
-        try note("setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)\(b.messageCap.map { " msgs=\($0)" } ?? "")")
+        try note(
+            "setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)\(b.messageCap.map { " msgs=\($0)" } ?? "")")
     }
     func deleteBudget(_ id: Int64) async throws { try note("deleteBudget \(id)") }
     func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {

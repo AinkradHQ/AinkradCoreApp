@@ -31,25 +31,31 @@ enum SignInStyle: Equatable, Sendable {
     static func showsRisk(_ provider: String) -> Bool { provider != "opencode-sub" }
 }
 
-/// One line typed into a guided sign-in: what the Core takes (up to 512 printable characters, never a second line).
+/// One line typed into a guided sign-in. The Core takes only a menu choice or a short code: letters, digits, `_` and `-`,
+/// up to `maxLength`. The same rule is checked here first, so a refused line is explained and never sent.
 enum GuidedInput {
-    static let maxLength = 512
-    enum Verdict: Equatable { case send(String), empty, tooLong, notOneLine }
+    static let maxLength = 128
+    static let hint = "Type the number of a choice, or the code shown."
+    enum Verdict: Equatable { case send(String), empty, tooLong, badCharacters }
 
     static func check(_ raw: String) -> Verdict {
         // A paste often ends in a newline; that is the Enter the Core adds itself.
         let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if line.isEmpty { return .empty }
         if line.count > maxLength { return .tooLong }
-        if line.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) { return .notOneLine }
+        if !line.unicodeScalars.allSatisfy(allowed) { return .badCharacters }
         return .send(line)
+    }
+
+    private static func allowed(_ c: Unicode.Scalar) -> Bool {
+        c.isASCII && (c.properties.isAlphabetic || ("0"..."9").contains(c) || c == "_" || c == "-")
     }
 
     static func words(_ v: Verdict) -> String? {
         switch v {
         case .send, .empty: nil
-        case .tooLong: "That line is too long to type. Send a shorter one."
-        case .notOneLine: "Send one line at a time."
+        case .tooLong: "That is too long for a choice or a code. \(hint)"
+        case .badCharacters: "Only letters, numbers, dashes and underscores. \(hint)"
         }
     }
 }
@@ -97,7 +103,9 @@ struct RunnerChoice: Equatable, Sendable {
 
     /// Why nothing can sign in, and what to do, in the order of what is most likely wrong.
     func why(provider: String) -> String {
-        if others.isEmpty { return "No runner is connected to your Core yet. Connect a runner, then sign in to \(provider)." }
+        if others.isEmpty {
+            return "No runner is connected to your Core yet. Connect a runner, then sign in to \(provider)."
+        }
         if !others.contains(where: \.online) {
             return "None of your runners is online. Turn one on, then sign in to \(provider)."
         }
@@ -112,7 +120,9 @@ struct RunnerBinding: Equatable, Sendable {
     var name: String?
     var words: String { name.map { "Runs only on \($0)" } ?? "Runs on one runner only" }
     var detail: String {
-        name.map { "This account signed in on \($0), so it only runs there. If \($0) is offline, Core moves on to the next account." }
+        name.map {
+            "This account signed in on \($0), so it only runs there. If \($0) is offline, Core moves on to the next account."
+        }
             ?? "This account signed in on one runner, so it only runs there. If that runner is offline, Core moves on to the next account."
     }
 }

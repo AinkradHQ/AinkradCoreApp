@@ -66,8 +66,11 @@ extension AccountsModel {
         let said = await service.boundRunners()
         let names = Dictionary(
             ((try? await service.runners()) ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        let notes = await service.accountNotes()
         accounts = accounts.map { a in
             var n = a
+            n.wipeNote = notes[a.id]?.wipeNote
+            n.modelsEnforced = notes[a.id]?.modelsEnforced
             let bound = SignInStyle.of(a.provider, methods: providerMethods(a.provider)).runnerBound
             let runner = said[a.id] ?? boundSeen[a.id]
             n.runnerBinding = (bound || runner != nil) ? RunnerBinding(name: runner.flatMap { names[$0] }) : nil

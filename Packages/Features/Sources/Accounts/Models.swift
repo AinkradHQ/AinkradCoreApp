@@ -57,6 +57,10 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var health: AccountHealthItem?
     /// A runner-bound sign-in (Codex, OpenCode, Antigravity): the account only runs on one runner (E7-4).
     var runnerBinding: RunnerBinding?
+    /// What the Core says may be left behind when this account is removed (Antigravity's keyring); nil when it says nothing.
+    var wipeNote: String?
+    /// False when the Core cannot make this account's sessions refuse a disallowed model; nil when it does not say.
+    var modelsEnforced: Bool?
     /// The usage meter the Core works out (0.10); nil on an older Core or for a device without `admin`.
     var meter: AccountMeterItem?
     var phase: AccountPhase { AccountPhase(state) }
@@ -71,7 +75,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
             && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
             && l.monthSpendUSDMicros == r.monthSpendUSDMicros && l.monthLimitUSDMicros == r.monthLimitUSDMicros
-            && l.runnerBinding == r.runnerBinding
+            && l.runnerBinding == r.runnerBinding && l.wipeNote == r.wipeNote && l.modelsEnforced == r.modelsEnforced
             && l.meter == r.meter
     }
 }

@@ -28,10 +28,15 @@ struct GuidedLoginRulesTests {
     @Test func aTypedLineIsOneShortPrintableLine() {
         #expect(GuidedInput.check("  1\n") == .send("1"))
         #expect(GuidedInput.check("   \n") == .empty)
-        #expect(GuidedInput.check(String(repeating: "a", count: 513)) == .tooLong)
-        #expect(GuidedInput.check(String(repeating: "a", count: 512)) == .send(String(repeating: "a", count: 512)))
-        #expect(GuidedInput.check("one\ntwo") == .notOneLine)
-        #expect(GuidedInput.words(.notOneLine) == "Send one line at a time.")
+        #expect(GuidedInput.check(String(repeating: "a", count: 129)) == .tooLong)
+        #expect(GuidedInput.check(String(repeating: "a", count: 128)) == .send(String(repeating: "a", count: 128)))
+        #expect(GuidedInput.check("one\ntwo") == .badCharacters)
+        #expect(GuidedInput.check("K7QM-4XZP_9") == .send("K7QM-4XZP_9"))
+        for bad in ["a b", "a;b", "a/b", "é", "a.b", "٣"] {
+            #expect(GuidedInput.check(bad) == .badCharacters, "\(bad)")
+        }
+        #expect(GuidedInput.words(.badCharacters)?.hasSuffix(GuidedInput.hint) == true)
+        #expect(GuidedInput.words(.tooLong)?.hasSuffix(GuidedInput.hint) == true)
     }
 
     @Test func theScreenIsReadQuicklyWhileItChangesAndSlowerWhileStillNeverPastTheCap() {
@@ -61,7 +66,8 @@ struct GuidedLoginRulesTests {
 
     @Test func whenNoRunnerCanTheWordsSayWhy() {
         let none = RunnerChoice.make(runners: [], harness: "agy")
-        #expect(none.none && none.chosen == nil && none.why(provider: "Antigravity").hasPrefix("No runner is connected"))
+        #expect(
+            none.none && none.chosen == nil && none.why(provider: "Antigravity").hasPrefix("No runner is connected"))
         let off = RunnerChoice.make(runners: [runner("a", online: false)], harness: "opencode")
         #expect(off.why(provider: "OpenCode").hasPrefix("None of your runners is online"))
         let old = RunnerChoice.make(runners: [runner("a", can: [])], harness: "opencode")
@@ -169,5 +175,68 @@ struct GuidedSignInModelTests {
         svc.bound = [:]
         await m.reload()
         #expect(m.account(5)?.runnerBinding?.words == "Runs on one runner only", "bound by its provider")
+    }
+}
+
+/// The review fixes (E7): consent before the start, the secret toggle's rule, the notes.
+@MainActor struct GuidedReviewFixTests {
+    func provider(_ id: String, harness: String) -> ProviderItem {
+        ProviderItem(
+            id: id, name: id, harness: harness, authVar: "T", baseURL: "", delivery: [],
+            loginMethods: ["runner_login"], models: [], pricedAt: nil, builtin: true)
+    }
+
+    func ready(_ svc: FakeService) async -> AccountsModel {
+        let m = AccountsModel(host: FakeHost())
+        svc.runnerList = [
+            AccountRunner(
+                id: "r_1", name: "linux-01", online: true, commands: ["login-bound:agy", "login-bound:opencode"])
+        ]
+        svc.orderOn = true
+        m.use(svc)
+        return m
+    }
+
+    @Test func noSignInStartsBeforeConsentForAntigravityAndCodex() async {
+        let svc = FakeService()
+        let m = await ready(svc)
+        let flow = AddAccountFlow()
+        await flow.choose(provider("agy-sub", harness: "agy"), m)
+        #expect(flow.needsConsent && flow.runners?.only != nil && m.signIn == nil)
+        await flow.startOnRunner(m)
+        #expect(m.signIn == nil && !svc.log.contains { $0.hasPrefix("startLogin") }, "no login.start without consent")
+        flow.consent = true
+        flow.back(m)
+        #expect(!flow.consent, "consent is not kept across tries")
+    }
+
+    @Test func openCodeNeedsNoConsent() async {
+        let flow = AddAccountFlow()
+        let m = await ready(FakeService())
+        await flow.choose(provider("opencode-sub", harness: "opencode"), m)
+        #expect(!flow.needsConsent)
+    }
+
+    @Test func theNotesLandOnTheAccountAndTheRemovalToast() async {
+        let svc = FakeService()
+        svc.orderOn = true
+        let m = await ready(svc)
+        await m.reload()
+        guard let id = m.accounts.first?.id else { return Issue.record("no account") }
+        svc.notes = [id: AccountNotes(wipeNote: AccountNotes.keyringWords, modelsEnforced: false)]
+        await m.reloadBindings(svc)
+        #expect(m.account(id)?.wipeNote == AccountNotes.keyringWords && m.account(id)?.modelsEnforced == false)
+        svc.notes = [:]
+        await m.reloadBindings(svc)
+        #expect(m.account(id)?.wipeNote == nil && m.account(id)?.modelsEnforced == nil)
+    }
+
+    @Test func theNotesReadLeniently() {
+        #expect(AccountNotes.wipe(note: nil, flag: nil) == nil && AccountNotes.wipe(note: " ", flag: false) == nil)
+        #expect(AccountNotes.wipe(note: "Sign out on box.", flag: true) == "Sign out on box.")
+        #expect(AccountNotes.wipe(note: nil, flag: true) == AccountNotes.keyringWords)
+        #expect(AccountNotes.removedWords("Antigravity", note: nil) == "Antigravity removed")
+        #expect(AccountNotes.removedWords("Antigravity", note: "Sign out.") == "Antigravity removed. Sign out.")
+        #expect(AccountNotes.unenforcedWords.hasPrefix("This account's sessions cannot restrict models"))
     }
 }
