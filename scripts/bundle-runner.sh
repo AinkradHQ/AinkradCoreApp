@@ -28,7 +28,10 @@ if [ -z "$src" ]; then
   cache=$ROOT/build/runner-cache/$VERSION
   mkdir -p "$cache"
   if [ ! -f "$cache/$name.zip" ]; then
-    curl -fsSL -o "$cache/$name.zip.part" "https://github.com/AinkradHQ/AinkradCore/releases/download/v$VERSION/$name.zip"
+    # ainkrad.io first (E12-1), then the GitHub release (core-vX.Y.Z since E12-4b, vX.Y.Z before): the checksum below holds either way.
+    curl -fsSL -o "$cache/$name.zip.part" "https://ainkrad.io/releases/core/$VERSION/$name.zip" \
+      || curl -fsSL -o "$cache/$name.zip.part" "https://github.com/AinkradHQ/AinkradCore/releases/download/core-v$VERSION/$name.zip" \
+      || curl -fsSL -o "$cache/$name.zip.part" "https://github.com/AinkradHQ/AinkradCore/releases/download/v$VERSION/$name.zip"
     mv "$cache/$name.zip.part" "$cache/$name.zip"
   fi
   got=$(shasum -a 256 "$cache/$name.zip" | cut -d' ' -f1)

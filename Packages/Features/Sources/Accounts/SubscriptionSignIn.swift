@@ -57,6 +57,11 @@ struct SubscriptionSignIn: View {
                 "Sign in with your Claude Pro or Max plan. You sign in on claude.ai; Ainkrad never sees your password."
             )
             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            // D-33 (E12-7): shown to every user, one line, before they confirm.
+            CoreNotice(
+                symbol: "exclamationmark.triangle", title: "Uses your subscription at your own risk.", tone: .warn
+            )
+            .accessibilityIdentifier("subscription-risk")
             GlassToggleTile(
                 "This is my own Claude plan, for my own use.",
                 sub: "Anthropic's terms don't allow sharing a plan or using someone else's.", symbol: "person",

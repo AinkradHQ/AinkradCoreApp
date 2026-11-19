@@ -163,16 +163,6 @@ public struct DeviceGlance: Identifiable, Sendable, Equatable {
     }
 }
 
-/// The "Update available" row of the Core dropdown.
-public struct CoreUpdateGlance: Sendable {
-    public let line: String
-    public let installNow: @MainActor @Sendable () -> Void
-    public init(line: String, installNow: @escaping @MainActor @Sendable () -> Void) {
-        self.line = line
-        self.installNow = installNow
-    }
-}
-
 /// What the Brain dropdown shows: how it is, what it does now, and a few counts.
 public struct BrainGlance: Sendable, Equatable {
     public struct Stat: Sendable, Equatable, Identifiable {
@@ -298,8 +288,6 @@ public final class ShellModel {
     }
     /// How long the last call to the Core took, in milliseconds; the app sets it after each health read.
     public var responseMs: Int?
-    /// An update the Core is ready to install ("0.10.0 to 0.10.1 · installs tonight, or now"); the updater (E12) sets it.
-    public var coreUpdate: CoreUpdateGlance?
     /// What the Devices block of the Core dropdown lists; the app (Pairing) supplies it.
     public var devicesGlance: (@MainActor () -> [DeviceGlance])?
     /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.
@@ -318,6 +306,12 @@ public final class ShellModel {
     public var brainOpenArea: (@MainActor (String) -> Void)?
     /// Takes back what the Brain learned today.
     public var brainUndoLearned: (@MainActor () -> Void)?
+    /// The Core's self-update (E12-3): what its pop-up shows. The app fills it from `GET /system/update`.
+    public var coreUpdate = CoreUpdateStatus()
+    /// "Update now" and "Try again now" in the pop-up; nil until the app has a Core that serves the route.
+    public var startCoreUpdate: (@MainActor () -> Void)?
+    /// "What is new" for the Core's last update, and the update's own words under "See what happened".
+    public var coreUpdateNews: (@MainActor () -> Void)?
     @ObservationIgnored let networkWatch = NetworkWatch()
     public var chipState: ConnectionChipState? {
         ConnectionChipState.of(link: coreLink, networkUp: networkUp, attempt: retryAttempt)

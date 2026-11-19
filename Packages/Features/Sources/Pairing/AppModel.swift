@@ -75,6 +75,7 @@ public final class AppModel {
     private let demo: Bool
     private var events: Task<Void, Never>?
     private var homeFeed: HomeFeed?
+    private var coreUpdateFeed: CoreUpdateFeed?
     private var retry: Task<Void, Never>?
     private var noticeIDs: [String] = []
     /// One per terminal Core has warned about: the toast it owns and the task that keeps its words fresh until `reap_at`.
@@ -269,6 +270,12 @@ public final class AppModel {
                     throw CancellationError()
                 }
             }
+            let updates = CoreUpdateFeed(shell: shell, connection: live.connection) { [weak self] op in
+                guard let self else { return }
+                try await self.elevated("Update the Core", done: "The update did not start.") { try await op() }
+            }
+            updates.start()
+            coreUpdateFeed = updates
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
@@ -338,6 +345,20 @@ public final class AppModel {
         } catch { return false }
     }
 
+    /// E12-5/10: a Core that needs a newer app says so (`min_app`); the person is told to update Ainkrad (it updates by itself, or
+    /// Check for Updates). Skipped on a Core that does not serve minor 95, and when the answer is not readable.
+    private func checkMinApp() async {
+        guard let live = service as? LiveCoreService, await live.connection.serverSupports(minor: 95),
+            let data = try? await live.connection.signedRequest(method: "GET", target: "/api/v1/core/health"),
+            let min = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["min_app"] as? String,
+            let app = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            CoreSkew.appTooOld(app: app, minApp: min)
+        else { return }
+        shell.presentSheet(
+            title: "Update Ainkrad", message: "Your Core needs Ainkrad \(min) or newer, and this Mac has \(app). Ainkrad updates itself; to do it now, choose Ainkrad, then Check for Updates.",
+            actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
+    }
+
     /// Proves the Core and opens the session. Unreachable is a banner and a retry; anything else stops with its reason.
     func connect() async {
         guard let service else { return }
@@ -345,6 +366,18 @@ public final class AppModel {
         shell.coreLink = .connecting
         do {
             try await service.connect()
+            // E12-5: a Core below the oldest this app works with is not talked to; the person is told to update it.
+            if let live = service as? LiveCoreService, let v = await live.connection.coreProof?.serverVersion,
+                CoreSkew.tooOld(v)
+            {
+                await service.close()
+                shell.coreLink = .offline
+                shell.presentSheet(
+                    title: "Update the Core", message: CoreSkew.message(core: v),
+                    actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
+                return
+            }
+            await checkMinApp()
             shell.coreLink = .live
             shell.retryAttempt = 0
             shell.nextRetryAt = nil
@@ -976,6 +1009,8 @@ public final class AppModel {
         homeFeed?.stop()
         homeFeed = nil
         shell.corePage.source = nil
+        coreUpdateFeed?.stop()
+        coreUpdateFeed = nil
         agents.detach()
         await service?.close()
         await macRunner.coreForgotten()

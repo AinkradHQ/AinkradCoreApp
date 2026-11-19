@@ -170,6 +170,7 @@ struct FirstRunView: View {
             CoreTextField(
                 "Your name", placeholder: "Sam", text: $model.nameText, autofocus: true,
                 onSubmit: { model.submitName() })
+            CrashReportsSwitch()
             HStack {
                 Button("Not now") {
                     model.nameText = ""

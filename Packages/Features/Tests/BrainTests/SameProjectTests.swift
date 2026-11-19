@@ -12,7 +12,7 @@ struct SameProjectTests {
     func review(_ t: FakeBrainTransport, host: FakeHost = FakeHost()) -> ReviewModel {
         nonisolated(unsafe) let cards: [[String: Any]] = ["automotive", "dvx", "unsorted"].map {
             [
-                "id": $0, "name": $0 == "dvx" ? "dvxmotive" : $0, "kind": "product", "kind_guess": "product",
+                "id": $0, "name": $0 == "dvx" ? "harborauto" : $0, "kind": "product", "kind_guess": "product",
                 "state": "proposed",
                 "signals": [String](), "warnings": [String](), "item_count": 3, "sample_titles": [String](),
                 "config": [String: Any](),
@@ -28,7 +28,7 @@ struct SameProjectTests {
         t.routes["POST \(Self.base)/imports/r1/proposals/dvx/same-project"] = { b in
             seen.body = b.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             return [
-                "id": "automotive", "name": "AutomotiveAi", "kind": "product", "kind_guess": "product",
+                "id": "automotive", "name": "HarborMotors", "kind": "product", "kind_guess": "product",
                 "state": "proposed", "item_count": 6,
                 "signals": [String](), "warnings": [String](), "sample_titles": [String](), "config": [String: Any](),
             ]
@@ -47,7 +47,7 @@ struct SameProjectTests {
         await r.sameProject("dvx", into: "automotive")
         #expect(seen.body?["into"] as? String == "automotive" && r.notice == nil && r.sameProjectFor == nil)
         #expect(t.count("GET \(Self.base)/imports/r1/proposals") == 2)
-        #expect(host.shell.toast?.message == "dvxmotive is now part of AutomotiveAi.")
+        #expect(host.shell.toast?.message == "harborauto is now part of HarborMotors.")
     }
 
     @Test func aRefusedSameProjectKeepsThePickerAndSaysWhy() async throws {
@@ -63,12 +63,12 @@ struct SameProjectTests {
     @Test func theSettingsListReadsAndRemovesAnAlias() async {
         let t = FakeBrainTransport()
         t.routes["GET \(Self.base)/aliases"] = { _ in
-            [["from": "dvxmotive", "to": "AutomotiveAi"], ["from": "shopapi", "to": "Acme Shop"]]
+            [["from": "harborauto", "to": "HarborMotors"], ["from": "shopapi", "to": "Acme Shop"]]
         }
-        t.routes["DELETE \(Self.base)/aliases/dvxmotive"] = { _ in [["from": "shopapi", "to": "Acme Shop"]] }
+        t.routes["DELETE \(Self.base)/aliases/harborauto"] = { _ in [["from": "shopapi", "to": "Acme Shop"]] }
         let list = SameProjectList(routes: { BrainRoutes(transport: t) })
         await list.reload()
-        #expect(list.aliases.map(\.to) == ["AutomotiveAi", "Acme Shop"])
+        #expect(list.aliases.map(\.to) == ["HarborMotors", "Acme Shop"])
         await list.remove(list.aliases[0])
         #expect(list.aliases == [RoomAlias(from: "shopapi", to: "Acme Shop")] && list.notice == nil)
         await list.remove(list.aliases[0])  // no route: the list stays and says why

@@ -24,6 +24,17 @@ enum Registration {
         shell.settings.overviewDanger = { AnyView(ForgetSection(app: app)) }
         shell.settings.section(
             SettingsSection(
+                id: "privacy", group: .general, title: "Privacy", sub: "What Ainkrad may send to its own server",
+                symbol: "hand.raised", order: 5
+            ) {
+                GlassSection(
+                    "Crash reports", sub: "On by default. You can turn it off any time.", symbol: "ladybug",
+                    hue: GlassInk.blue
+                ) { CrashReportsSwitch() }
+                .foregroundStyle(GlassInk.primary)
+            })
+        shell.settings.section(
+            SettingsSection(
                 id: "lockouts", group: .core, title: "Lockouts", sub: "Addresses the Core has locked out",
                 symbol: "lock", order: 6, advancedOnly: true
             ) {

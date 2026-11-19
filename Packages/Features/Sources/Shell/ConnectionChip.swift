@@ -124,21 +124,10 @@ struct ConnectionPanel: View {
                     ForEach(stats(h), id: \.label) { DropStat($0.value, $0.label, share: $0.share, low: $0.low) }
                 }
             }
-            if let u = shell.coreUpdate {
-                HStack(spacing: Space.s3) {
-                    IconTile("arrow.down.circle", hue: GlassInk.accent(paneAccent), size: MacSize.controlMd)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Update available").coreFont(size: MacTextSize.headline, weight: .semibold)
-                        Text(u.line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                    }
-                    Spacer(minLength: Space.s2)
-                    Button("Update now") {
-                        shell.topMenu = nil
-                        u.installNow()
-                    }
-                    .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                }
-                .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))
+            if shell.coreUpdate.visible {
+                CoreUpdatePanel(
+                    status: shell.coreUpdate, update: { shell.startCoreUpdate?() },
+                    news: { shell.coreUpdateNews?() }, what: { showWhatHappened() })
             }
             let devices = shell.devicesGlance?() ?? []
             if !devices.isEmpty {
@@ -179,6 +168,14 @@ struct ConnectionPanel: View {
         let label: String
         var share: Double?
         var low = false
+    }
+
+    /// The run's steps with their times, as the mockup's "What happened".
+    private func showWhatHappened() {
+        let lines = shell.coreUpdate.events.map { "\($0.at.formatted(date: .omitted, time: .shortened)) · \($0.text)" }
+        shell.presentSheet(
+            title: "What happened", message: (lines + [shell.coreUpdate.errorWords]).joined(separator: "\n"),
+            actions: [ShellSheetAction("Done", primary: true)])
     }
 
     /// Memory, Disk and Response with a bar each when the Core says the share (the whole machine's memory, the disk, the
