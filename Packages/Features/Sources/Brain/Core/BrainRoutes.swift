@@ -10,7 +10,9 @@ public protocol BrainTransport: Sendable {
 }
 
 /// The Core answered with an error status.
-public struct BrainHTTPError: Error, Sendable, Equatable {
+public struct BrainHTTPError: Error, Sendable, Equatable, TransientFailure {
+    /// 5xx (503 while the Core is busy) passes; 4xx never does.
+    public var isTransient: Bool { status >= 500 }
     public let status: Int
     public let code: String
     public let message: String

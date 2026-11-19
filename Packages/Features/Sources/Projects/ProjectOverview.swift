@@ -194,9 +194,11 @@ struct Overview: View {
     }
 
     private func repoLine(_ r: RepoItem) -> String {
-        if let e = r.fetchError { return "\(r.branch) · \(e)" }
-        guard let at = r.fetchedAt else { return "\(r.branch) · copying…" }
-        return "\(r.branch) · fetched \(PickRepo.ago(at, model.now()))"
+        switch r.copy {
+        case .failed(_, let e): return "\(r.branch) · \(e)"
+        case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
+        case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
+        }
     }
 
     // MARK: Logs

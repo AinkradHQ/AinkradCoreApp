@@ -218,6 +218,14 @@ private struct CollectStep: View {
                 }
             }
             .padding(.horizontal, Space.s3)
+            if model.waitingForCore, model.failure == nil {
+                // Not an error and no button: the import carries on by itself when the Core is back.
+                CoreNotice(
+                    symbol: "clock", title: "Waiting for your Core",
+                    text: "Nothing is lost. This carries on by itself the moment your Core is back."
+                ) { EmptyView() }
+                .accessibilityIdentifier("brain-import-waiting")
+            }
             if let why = model.failure {
                 CoreNotice(symbol: "exclamationmark.triangle", title: why, tone: .fail) {
                     Button("Try again") { model.retry() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))

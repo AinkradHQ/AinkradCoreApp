@@ -58,6 +58,8 @@ public final class ImportModel {
     public private(set) var itemsFound = 0
     public private(set) var secondsLeft: Int?
     public internal(set) var failure: String?
+    /// The Core does not answer (or says 5xx) and the import tries again by itself: a calm state, not a failure.
+    public private(set) var waitingForCore = false
     public private(set) var result: CommitResult?
     public let review: ReviewModel
 
@@ -75,7 +77,7 @@ public final class ImportModel {
     public init(
         host: any AdminHost, routes: BrainRoutes, sources: [any ImportSource], poll: Duration = .seconds(1),
         resume: ResumeStore? = nil, places: ImportPlaces? = nil,
-        pause: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(for: .seconds(Double(1 << $0))) }
+        pause: @escaping @Sendable (Int) async -> Void = ImportRetry.pause
     ) {
         self.host = host
         self.routes = routes
@@ -281,7 +283,9 @@ public final class ImportModel {
             itemsFound = 0
             phase = .uploading
             startPoller(run: id)
-            let uploader = Uploader(transport: RoutesImportTransport(routes: routes), pause: pause)
+            let uploader = Uploader(
+                transport: RoutesImportTransport(routes: routes), pause: pause,
+                onWaiting: { [weak self] on in await self?.setWaiting(on) })
             for c in chosen {
                 let sid = c.id
                 guard let source = sources[sid], !collectedSources.contains(sid) else { continue }
@@ -293,7 +297,7 @@ public final class ImportModel {
                     onProgress: { [weak self] p in await self?.apply(p) })
                 for (k, n) in report.skipped { localSkipped[k, default: 0] += n }
                 itemsFound += report.items
-                do { _ = try await routes.collected(run: id, source: sid) } catch let e as BrainHTTPError
+                do { _ = try await retrying { try await routes.collected(run: id, source: sid) } } catch let e as BrainHTTPError
                     where e.status == 409
                 {}  // already reported by an earlier attempt
                 collectedSources.insert(sid)
@@ -319,14 +323,14 @@ public final class ImportModel {
         if let run { return (run, "collecting") }
         let ids = chosen.map(\.id)
         if let saved = resume?.load(), let r = saved.run, Set(saved.sources.keys).isSubset(of: ids),
-            let view = try? await routes.run(r), ["collecting", "discovering", "review"].contains(view.state)
+            let view = try? await retrying { try await routes.run(r) }, ["collecting", "discovering", "review"].contains(view.state)
         {
             resumeState = saved
             run = r
             return (r, view.state)
         }
         resume?.clear()
-        let id = try await routes.startRun(kind: "full", sources: ids)
+        let id = try await retrying { try await routes.startRun(kind: "full", sources: ids) }
         run = id
         resumeState = ResumeState()
         resumeState.run = id
@@ -366,12 +370,25 @@ public final class ImportModel {
         poller = nil
     }
 
+    func setWaiting(_ on: Bool) { waitingForCore = on }
+
+    /// `op` until it works: forever on a Core that does not answer or says 5xx (1 s up to 30 s apart), never on a 4xx.
+    func retrying<T>(_ op: () async throws -> T) async throws -> T {
+        try await ImportRetry.run(pause: pause, waiting: { setWaiting($0) }, op)
+    }
+
     /// One `GET /imports/{run}`; the progress bar and the status line read what it said.
     @discardableResult
     func refresh(run: String) async -> RunView? {
-        guard let v = try? await routes.run(run) else { return nil }
-        counts = v.counts
-        return v
+        do {
+            let v = try await routes.run(run)
+            waitingForCore = false
+            counts = v.counts
+            return v
+        } catch {
+            if ImportRetry.isTransient(error) { waitingForCore = true }
+            return nil
+        }
     }
 
     private func waitForReview(run: String) async throws {
@@ -380,6 +397,10 @@ public final class ImportModel {
             if let v = await refresh(run: run) {
                 if v.state == "abandoned" { throw BrainFailure("This import was abandoned.", code: "abandoned") }
                 if ["review", "committing", "committed"].contains(v.state) { return }
+                // Discovery failed on the Core and the run is open again: say "collected" again to start it.
+                if v.state == "collecting", !collectedSources.isEmpty {
+                    for sid in collectedSources { _ = try? await routes.collected(run: run, source: sid) }
+                }
             }
             try await Task.sleep(for: poll)
         }

@@ -53,8 +53,10 @@ struct ReposPage: View {
                             r.name, subtitle: line(r), symbol: "arrow.triangle.branch", selected: r.id == current?.id,
                             action: { pick = r.id }
                         ) {
-                            if r.fetchError != nil {
-                                StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
+                            switch r.copy {
+                            case .failed: StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
+                            case .fetching: StateBadge("Copying", tone: .warn, symbol: "gearshape")
+                            case .ready: EmptyView()
                             }
                         }
                         .help(r.remoteURL)
@@ -69,9 +71,11 @@ struct ReposPage: View {
     }
 
     private func line(_ r: RepoItem) -> String {
-        if r.fetchError != nil { return r.branch }
-        guard let at = r.fetchedAt else { return "\(r.branch) · copying…" }
-        return "\(r.branch) · fetched \(PickRepo.ago(at, model.now()))"
+        switch r.copy {
+        case .failed(let why, let text): return why.needsConnection ? "\(r.branch) · private" : "\(r.branch) · \(text)"
+        case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
+        case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
+        }
     }
 }
 
@@ -87,27 +91,34 @@ private struct RepoDetail: View {
         Island(
             title: repo.name, sub: Self.path(repo.remoteURL),
             accessory: {
-                // TODO(core): `POST /projects/{id}/repos/{repo}/fetch` (AinkradCore PR #287) is not in the synced client yet.
-                Button("Fetch Now") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                    .help("Fetching on demand arrives with the next Core update")
+                Button("Fetch Now") { model.fetchRepo(project, repo) }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly || copying)
+                    .help(copying ? "The Core is copying this repo now" : "Copy the latest changes into the Core now")
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s4) {
-                if let e = repo.fetchError { failure(e) }
+                if case .failed(let why, let text) = repo.copy { failure(why, text) }
                 facts
                 if let commits = extra?.commits, !commits.isEmpty { commitList(commits) }
             }
         }
     }
 
-    private func failure(_ error: String) -> some View {
+    private var copying: Bool { if case .fetching = repo.copy { true } else { false } }
+
+    private func failure(_ why: RepoFailure, _ text: String) -> some View {
         let last = repo.head == nil ? "" : " Sessions and runs keep using the last copy (\(short))."
         return CoreNotice(
-            symbol: "exclamationmark.triangle", title: "The Core could not fetch this repo.",
-            text: error + last, tone: .fail
+            symbol: "exclamationmark.triangle", title: "The Core could not copy this repo.", text: text + last,
+            tone: .fail
         ) {
-            Button("Reconnect GitHub…") { model.host.shell.launcher.entry("connections")?.run() }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            if why.needsConnection {
+                Button("Connect GitHub") { model.connectGithub() }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            } else if why != .sshNotSupported {
+                Button("Try again") { model.fetchRepo(project, repo) }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
+            }
         }
     }
 
@@ -143,8 +154,13 @@ private struct RepoDetail: View {
     }
 
     private var copyAge: String {
-        guard let at = repo.fetchedAt else { return repo.fetchError == nil ? "copying…" : "never copied" }
-        return "· fetched \(PickRepo.ago(at, model.now()))"
+        switch repo.copy {
+        case .fetching(let since): return RepoCopy.elapsed(since: since, now: model.now())
+        case .failed:
+            guard let at = repo.fetchedAt else { return "never copied" }
+            return "· last fetched \(PickRepo.ago(at, model.now()))"
+        case .ready: return "· fetched \(PickRepo.ago(repo.fetchedAt ?? model.now(), model.now()))"
+        }
     }
 
     private func label(_ s: String) -> some View {
