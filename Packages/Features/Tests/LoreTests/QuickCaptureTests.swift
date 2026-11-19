@@ -63,6 +63,7 @@ struct QuickCaptureTests {
         await capture.submit()
         #expect(core.log() == ["list active note -", "create personal"])
         #expect(core.notes["ln_bbbbbbbbbbbb"]?.text.hasPrefix("# Inbox\n") == true)
+        core.notes["ln_bbbbbbbbbbbb"]?.title = "Inbox"  // the Core derives it from the heading
         capture.close()
         capture.text = "Second"
         await capture.submit()
