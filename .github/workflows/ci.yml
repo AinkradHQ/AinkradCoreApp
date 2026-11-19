@@ -1,0 +1,22 @@
+# E12-6: App CI, build and test on the self-hosted Mac (the only machine with Xcode 27). It runs on PUSHES to the protected
+# branches only, never on pull requests: that runner holds the signing identity, so it never runs code nobody has merged.
+# Local `make build` and `make test` stay the definition of done; this is the second opinion on what landed.
+name: ci
+on:
+  push:
+    branches: [development, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-test:
+    if: github.repository == 'AinkradHQ/AinkradCoreApp'
+    runs-on: [self-hosted, macOS, ainkrad-release]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: make build
+      - run: make test

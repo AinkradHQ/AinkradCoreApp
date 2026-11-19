@@ -15,6 +15,7 @@ struct AinkradCoreApp: App {
         let a = AinkradCoreApp.makeApp()
         _app = State(initialValue: a)
         _updater = State(initialValue: AppUpdater(shell: a.shell))
+        CrashReporter.shared.start()
     }
 
     private var shell: ShellModel { app.shell }
