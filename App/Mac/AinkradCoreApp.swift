@@ -6,7 +6,7 @@ import Pairing
 import Shell
 import SwiftUI
 
-@main
+// Started from `main.swift`, which also has the background collector mode (E9-6).
 struct AinkradCoreApp: App {
     @NSApplicationDelegateAdaptor(BackgroundDelegate.self) private var delegate
     @State private var app = AinkradCoreApp.makeApp()
