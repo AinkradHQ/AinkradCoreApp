@@ -135,6 +135,15 @@ public final class AppModel {
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
+        shell.devicesGlance = { [weak devices] in
+            (devices?.active ?? []).prefix(4).map { d in
+                DeviceGlance(
+                    id: d.id, name: d.name,
+                    sub: devices?.isMe(d) == true ? "\(DeviceWords.platform(d.platform)) · this device" : "Last seen \(DeviceWords.seen(d.lastUsed).lowercased())",
+                    symbol: DeviceWords.symbol(d.kind, d.platform),
+                    online: !d.cutOff && (d.lastUsed.map { Date().timeIntervalSince($0) < 300 } ?? false))
+            }
+        }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
@@ -232,9 +241,19 @@ public final class AppModel {
         shell.home.coreName = (try? keyStore.loadIdentity())??.endpoint.host() ?? "Home Core"
         if let live = service as? LiveCoreService {
             homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
+            shell.corePage.source = LiveCorePageSource(connection: live.connection)
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
+            model.openRunnersApp = { [weak self] in self?.openHub(.runners) }
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let working = self.macRunner.runnerID.flatMap { self.terminals?.isWorking(runner: $0) } ?? false
+                    self.macRunner.holdAwake(working)
+                    try? await Task.sleep(for: .seconds(15))
+                }
+            }
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
@@ -313,10 +332,18 @@ public final class AppModel {
     }
 
     /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
-    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts", "mac-runner"]
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts"]
+    /// The settings pages a device without `admin` does not see: Core stays (Forget lives there), its Limits tab does not.
+    static let hiddenSettings = Set(adminOnly.filter { $0 != "core" } + ["core.limits"])
+    /// Whether this device holds `admin`: the This Mac tab of Devices & Runners is hidden without it.
+    private(set) var isAdminDevice = true
+    /// The tab the Devices & Runners app shows.
+    var hubTab: HubTab = .devices
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
-        shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
+        shell.settings.hidden = admin ? [] : Self.hiddenSettings
+        isAdminDevice = admin
+        if !admin, hubTab == .thisMac { hubTab = .devices }
         if admin {
             stashed.forEach(shell.launcher.register)
             stashed = []
@@ -733,6 +760,7 @@ public final class AppModel {
         retry?.cancel()
         homeFeed?.stop()
         homeFeed = nil
+        shell.corePage.source = nil
         agents.detach()
         await service?.close()
         await macRunner.coreForgotten()

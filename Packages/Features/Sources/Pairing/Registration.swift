@@ -19,40 +19,25 @@ enum Registration {
         app.leyline.install()
         app.design.install()
         app.lore.install()
+        // Forget this Core is the danger row of the Core Overview, shown while Advanced is on.
+        shell.settings.overviewDanger = { AnyView(ForgetSection(app: app)) }
         shell.settings.section(
             SettingsSection(
-                id: "devices", group: .core, title: "Devices",
-                sub: "This Core, and the Macs, phones, runners and passkeys that reach it",
-                symbol: "iphone", order: 1
-            ) {
-                DevicesSection(app: app)
-            })
-        shell.settings.section(
-            SettingsSection(
-                id: "mac-runner", group: .mac, title: "This Mac as a runner",
-                sub: "Terminals and AI sessions that run on this Mac for your Core", symbol: "laptopcomputer", order: 5
-            ) {
-                MacRunnerSection(
-                    model: app.macRunner,
-                    accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) },
-                    connected: app.macRunner.deviceID.flatMap { app.terminals?.isOnline(runner: $0) })
-            })
-        shell.settings.section(
-            SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
-                ForgetSection(app: app)
-            })
-        shell.settings.section(
-            SettingsSection(
-                id: "lockouts", group: .security, title: "Lockouts", sub: "Addresses the Core has locked out",
-                symbol: "lock", order: 0
+                id: "lockouts", group: .core, title: "Lockouts", sub: "Addresses the Core has locked out",
+                symbol: "lock", order: 6, advancedOnly: true
             ) {
                 LockoutsSection(app: app)
             })
         shell.launcher.register(
             LauncherEntry(
-                id: "devices", title: "Devices", sub: "Settings, Core", symbol: "iphone",
+                id: "devices-runners", title: "Devices & Runners", sub: "Devices, runners, this Mac, about",
+                symbol: "iphone.and.arrow.forward", keywords: ["pair", "revoke", "rename", "scopes", "runner", "about"]
+            ) { [weak app] in app?.openHub(.devices) })
+        shell.launcher.register(
+            LauncherEntry(
+                id: "devices", title: "Devices", sub: "Devices & Runners", symbol: "iphone",
                 keywords: ["pair", "revoke", "rename", "scopes"]
-            ) { openSettings(shell, "devices") })
+            ) { [weak app] in app?.openHub(.devices) })
         shell.launcher.register(
             LauncherEntry(
                 id: "add-device", title: "Add device", sub: "A device or a runner, step by step · needs Touch ID",
@@ -66,7 +51,7 @@ enum Registration {
             ) { app.openAddDevice() })
         shell.launcher.register(
             LauncherEntry(
-                id: "lockouts", title: "Lockouts", sub: "Settings, Security", symbol: "lock",
+                id: "lockouts", title: "Lockouts", sub: "Settings, Core", symbol: "lock",
                 keywords: ["locked", "clear", "failed", "attempts"]
             ) { openSettings(shell, "lockouts") })
     }

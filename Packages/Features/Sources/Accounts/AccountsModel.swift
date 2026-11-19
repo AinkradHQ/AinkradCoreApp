@@ -515,8 +515,7 @@ public final class AccountsModel {
     }
 
     func openAudit() {
-        host.shell.settings.selected = "audit"
-        host.shell.open(.settings)
+        host.shell.launcher.entry("admin-audit")?.run()
     }
 
     /// "Raise budget…" from an ended session: the Raise dialog for that account's spent budget when it is known, else the
@@ -620,9 +619,10 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
-            ) {
-                AccountsLinkSection(model: self)
-            })
+                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 9,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { AccountsLinkSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { AccountsLinkSection(model: self, part: .options) },
+                ]))
     }
 }

@@ -19,39 +19,19 @@ struct AppearanceSection: View {
     @State private var allWallpapers = !CoreWallpaper.presets.prefix(4).contains(WallpaperPrefs.shared.choice)
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
+    /// The Appearance page has tabs (Look, Wallpaper); Clock is its own view.
+    enum Part { case look, wallpaper }
+    var part: Part = .look
+
     var body: some View {
+        switch part {
+        case .look: lookPage
+        case .wallpaper: wallpaperPage
+        }
+    }
+
+    private var wallpaperPage: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            GlassSection(
-                "Theme", sub: "Night or day for every window.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.blue
-            ) {
-                Text(now).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
-                    .contentTransition(.opacity)
-            } content: {
-                HStack(alignment: .top, spacing: Space.s3) {
-                    ForEach(ThemeChoice.allCases, id: \.self) { c in
-                        ThemeTile(choice: c, selected: shell.theme == c) { pick(c) }
-                    }
-                }
-            }
-            GlassSection(
-                "Accent", sub: "Selection, the main button and switches. Status colours stay as they are.",
-                symbol: "paintbrush", hue: GlassInk.blue, index: 1
-            ) {
-                Text(accent.accent.title).coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
-            } content: {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 64), spacing: Space.s3, alignment: .top)],
-                    alignment: .leading, spacing: Space.s3
-                ) {
-                    ForEach(CoreAccent.allCases, id: \.self) { a in
-                        AccentTile(accent: a, selected: accent.accent == a) {
-                            withAnimation(Motion.out(Motion.ui)) { accent.accent = a }
-                        }
-                    }
-                }
-            }
             GlassSection(
                 "Wallpaper", sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
                 hue: GlassInk.blue, index: 2
@@ -87,6 +67,43 @@ struct AppearanceSection: View {
                     }
                 }
             }
+        }
+        .foregroundStyle(GlassInk.primary)
+    }
+
+    private var lookPage: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            GlassSection(
+                "Theme", sub: "Night or day for every window.", symbol: "circle.lefthalf.filled",
+                hue: GlassInk.blue
+            ) {
+                Text(now).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
+                    .contentTransition(.opacity)
+            } content: {
+                HStack(alignment: .top, spacing: Space.s3) {
+                    ForEach(ThemeChoice.allCases, id: \.self) { c in
+                        ThemeTile(choice: c, selected: shell.theme == c) { pick(c) }
+                    }
+                }
+            }
+            GlassSection(
+                "Accent", sub: "Selection, the main button and switches. Status colours stay as they are.",
+                symbol: "paintbrush", hue: GlassInk.blue, index: 1
+            ) {
+                Text(accent.accent.title).coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
+            } content: {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 64), spacing: Space.s3, alignment: .top)],
+                    alignment: .leading, spacing: Space.s3
+                ) {
+                    ForEach(CoreAccent.allCases, id: \.self) { a in
+                        AccentTile(accent: a, selected: accent.accent == a) {
+                            withAnimation(Motion.out(Motion.ui)) { accent.accent = a }
+                        }
+                    }
+                }
+            }
             GlassSection(
                 "Text size", sub: "How large the words are in every window. 100% is the usual size.",
                 symbol: "textformat.size", hue: GlassInk.blue, index: 3
@@ -105,7 +122,12 @@ struct AppearanceSection: View {
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
-                GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                VStack(alignment: .leading, spacing: Space.s3) {
+                    GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                    if look.mode == .blurred {
+                        GlassSlider(value: $look.blur, in: 0...1, low: "Sharp", high: "Soft")
+                    }
+                }
             }
             GlassSection(
                 "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",

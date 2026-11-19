@@ -450,11 +450,31 @@ public final class BrainModel {
             BrainHowItWorks.open($0.host.shell)
         }
         if service != nil { registerActions() }
+        // The top bar's Brain dropdown. "Doing now" arrives with the background learning (E9); until then it says how things are.
+        shell.brainGlance = { [weak self] in
+            guard let self, self.service != nil else { return nil }
+            let o = self.overview
+            let status =
+                switch o?.health {
+                case .paused?: "Paused"
+                case .needsYou?: "Something needs a look"
+                default: "Learning quietly in the background"
+                }
+            let records = self.rooms.reduce(0) { $0 + ($1.counts?.records ?? 0) }
+            return BrainGlance(
+                status: status, healthy: (o?.health ?? .healthy) == .healthy,
+                stats: [
+                    .init("Rooms", self.rooms.count), .init("Records", records), .init("To check", o?.needs.count ?? 0),
+                ])
+        }
         shell.settings.section(
             SettingsSection(
-                id: "brain-link", group: .apps, title: "Brain", sub: "Look of the memory app", symbol: "brain",
-                order: 5
-            ) { BrainLookSection(model: self) })
+                id: "brain-link", group: .apps, title: "Brain", sub: "Look and options of the memory app",
+                symbol: "brain", order: 5,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { BrainLookSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { BrainLookSection(model: self, part: .options) },
+                ]))
         // A locked Mac clears the room view from memory (security rule 7).
         lockWatch = DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main

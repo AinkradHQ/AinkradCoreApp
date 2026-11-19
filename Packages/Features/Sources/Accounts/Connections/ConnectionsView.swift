@@ -207,7 +207,7 @@ struct ConnCard: View {
 
     /// History moves into the menu (n35: a card shows Test and Disconnect only).
     private var history: [CoreDropdownItem] {
-        model.host.shell.settings.hidden.contains("audit")
+        model.host.shell.launcher.entry("admin-audit") == nil
             ? [] : [CoreDropdownItem("History", symbol: "clock.arrow.circlepath") { model.openHistory(item) }]
     }
 

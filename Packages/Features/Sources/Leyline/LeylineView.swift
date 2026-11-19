@@ -17,7 +17,7 @@ struct LeylineView: View {
                 LeylineHome(model: model).transition(.opacity)
             }
         }
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("leyline"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)

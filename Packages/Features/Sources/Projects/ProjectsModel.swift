@@ -368,6 +368,14 @@ public final class ProjectsModel {
 
     public func install() {
         let shell = host.shell
+        // Settings, Apps, Projects: its Look (follows Appearance unless turned off). No options of its own yet.
+        shell.settings.section(
+            SettingsSection(
+                id: "projects", group: .apps, title: "Projects", sub: "Its look", symbol: "square.grid.2x2", order: 1
+            ) {
+                AppLookSection(appName: "Projects", prefs: AppLookPrefs.shared("projects"))
+                    .foregroundStyle(GlassInk.primary)
+            })
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
             _ run: @escaping @MainActor (ProjectsModel) -> Void
