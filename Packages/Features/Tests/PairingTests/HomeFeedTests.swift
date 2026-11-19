@@ -145,4 +145,20 @@ private struct FakeHome: HomeSource {
         #expect(n == 1)  // "Harbor" matches the slug; the folder "harbor-redesign" is neither the slug nor the name
         #expect(HomeFeed.dayKey(Date(timeIntervalSince1970: 0)).count == 10)
     }
+
+    @Test func theCostSeriesBecomesOneTokenTotalPerUtcDayOldestFirst() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)  // 2027-01-15 08:00 UTC
+        let json =
+            #"[{"day":"2027-01-15","provider":"a","total_tokens":5,"cost_usd_micros":1},{"day":"2027-01-15","provider":"b","total_tokens":7,"cost_usd_micros":1},{"day":"2027-01-13","provider":"a","total_tokens":2,"cost_usd_micros":1}]"#
+        let d = try HomeFeed.series(Data(json.utf8), days: 4, now: now)
+        #expect(d == [0, 2, 0, 12])
+    }
+
+    @Test func brainWorksOnDistilsFirstThenOverviews() {
+        typealias P = HomeSnapshot.BrainGlance.Pipeline
+        #expect(P.stage(distilling: 1, queued: 0, overviews: 3) == .distill)
+        #expect(P.stage(distilling: 0, queued: 2, overviews: 0) == .distill)
+        #expect(P.stage(distilling: 0, queued: 0, overviews: 1) == .remember)
+        #expect(P.stage(distilling: 0, queued: 0, overviews: 0) == nil)
+    }
 }

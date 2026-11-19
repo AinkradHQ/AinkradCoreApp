@@ -116,7 +116,12 @@ public struct HomeSnapshot: Sendable {
             public let queued: Int
             public let overviews: Int
             public let lastDoneAt: Date?
-            public init(now: Stage?, working: Int, queued: Int, overviews: Int, lastDoneAt: Date?) {
+            /// 0...1 while it works: what is done of the work seen since it started, from the counts alone. nil when idle.
+            public var progress: Double?
+            public init(
+                now: Stage?, working: Int, queued: Int, overviews: Int, lastDoneAt: Date?, progress: Double? = nil
+            ) {
+                self.progress = progress
                 self.now = now
                 self.working = working
                 self.queued = queued
@@ -239,6 +244,8 @@ public struct HomeSnapshot: Sendable {
     public var brain: BrainGlance?
     public var note: NoteFact?
     public var usage: [UsageFact] = []
+    /// Tokens per day over the last 14 days, oldest first, from `GET /costs/series`; empty on a Core without it.
+    public var usageSeries: [Double] = []
 
     public var runningAgents: Int { running.count }
     public var machinesOnline: Int { machines.filter(\.online).count }

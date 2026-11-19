@@ -72,6 +72,7 @@ struct BrainBody: View {
                 Text(d.title).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.primary)
                 WCaption(d.sub)
             }
+            if let x = b.pipeline?.progress { CoreMeter(x, label: "Tidying progress") }
             Spacer(minLength: 0)
         case .w:
             WHead("brain", "Brain") { badge(b) }
@@ -86,6 +87,7 @@ struct BrainBody: View {
         case .l:
             WHead("brain", "Brain") { badge(b) }
             if let p = b.pipeline { flow(p, vertical: true) }
+            if let x = b.pipeline?.progress { CoreMeter(x, label: "Tidying progress") }
             WCaption(d.title)
             HStack(alignment: .top, spacing: Space.s5) {
                 stat("Rooms", "\(b.rooms)")

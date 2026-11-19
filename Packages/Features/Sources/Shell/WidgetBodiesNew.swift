@@ -321,14 +321,13 @@ struct AIUsageBody: View {
                             }
                         }
                         .frame(width: 190, alignment: .leading)
-                        if home.spendByDay.contains(where: { $0 > 0 }) {
-                            // The chart is what the AI sessions cost each day (the Core's cost events, newest 100).
+                        if home.usageSeries.contains(where: { $0 > 0 }) {
                             VStack(alignment: .leading, spacing: Space.s1) {
-                                WColumns(values: home.spendByDay)
+                                WColumns(values: home.usageSeries)
                                 HStack {
-                                    WCaption("30 days ago")
+                                    WCaption("14 days ago")
                                     Spacer(minLength: 0)
-                                    WCaption("Spend per day, today")
+                                    WCaption("Tokens per day, today")
                                 }
                             }
                         } else {
@@ -339,6 +338,9 @@ struct AIUsageBody: View {
                     WHead("chart.bar", "AI usage")
                     WFigure(value: top * 100, format: { "\(Int($0))%" }, caption: "of the tightest plan", size: 32)
                     if let r = soonest(us) { WCaption("Resets \(r.formatted(.relative(presentation: .named)))") }
+                    if home.usageSeries.contains(where: { $0 > 0 }) {
+                        WColumns(values: home.usageSeries).frame(height: 48)
+                    }
                     rows(us.prefix(6))
                     Spacer(minLength: 0)
                 }
