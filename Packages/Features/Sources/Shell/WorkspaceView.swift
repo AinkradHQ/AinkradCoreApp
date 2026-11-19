@@ -25,7 +25,7 @@ struct WorkspaceView: View {
             let mins = Dictionary(uniqueKeysWithValues: shell.panes.map { ($0.id, $0.minWidth) })
             let tiled = shell.tree.layout(
                 minWidth: { mins[$0] ?? ShellMetrics.paneMinWidth }, container: area, gap: ShellMetrics.paneGap,
-                minHeight: ShellMetrics.paneMinHeight)
+                minHeight: shell.panes.map(\.minHeight).max() ?? ShellMetrics.paneMinHeight)
             let focus = shell.focusedPane
             let stack = Stack.make(
                 order: shell.tree.leaves, tiled: tiled, area: area,

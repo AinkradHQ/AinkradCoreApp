@@ -359,6 +359,7 @@ public final class ProjectsModel {
             id: "projects", title: "Projects", sub: "Home Core", symbol: "square.grid.2x2", minWidth: 720
         ) { ProjectsView(model: self) }
         spec.tab = "Projects"
+        spec.fullScreenOnly = true
         spec.onNew = { [weak self] in self?.newItem() }
         shell.openPane(spec)
         Task { await reload() }

@@ -153,6 +153,7 @@ public final class LoreModel {
             LoreView(model: self)
         }
         spec.tab = "Lore"
+        spec.fullScreenOnly = true
         spec.onNew = { [weak self] in Task { await self?.newNote() } }
         shell.openPane(spec)
         if today, load != .ready { Task { await openDay(todayKey) } }

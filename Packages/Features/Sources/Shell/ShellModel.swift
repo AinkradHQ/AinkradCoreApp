@@ -26,13 +26,18 @@ public struct PaneSpec: Identifiable {
     public var chip: PaneChip?
     /// Panes with their own sidebar (Citadel, Core, admin) ask for more room than a list or terminal.
     public var minWidth: CGFloat
+    /// The least height the app works in; no app is squeezed below it (a taller window is asked for, never a shorter pane).
+    public var minHeight: CGFloat
+    /// Design, Lore and Projects need the whole screen: they open in a workspace of their own and nothing else tiles beside them.
+    public var fullScreenOnly: Bool
     public let content: AnyView
     /// What ⌘N does while this pane is the active one; nil leaves ⌘N to start an AI session.
     public var onNew: (@MainActor () -> Void)?
 
     public init<V: View>(
         id: String, title: String, sub: String? = nil, symbol: String, chip: PaneChip? = nil,
-        minWidth: CGFloat? = nil, @ViewBuilder content: () -> V
+        minWidth: CGFloat? = nil, minHeight: CGFloat? = nil, fullScreenOnly: Bool = false,
+        @ViewBuilder content: () -> V
     ) {
         self.id = id
         self.title = title
@@ -40,6 +45,8 @@ public struct PaneSpec: Identifiable {
         self.symbol = symbol
         self.chip = chip
         self.minWidth = max(minWidth ?? 0, ShellMetrics.paneMinWidth)
+        self.minHeight = max(minHeight ?? 0, ShellMetrics.paneMinHeight)
+        self.fullScreenOnly = fullScreenOnly
         self.content = AnyView(content())
     }
 }
