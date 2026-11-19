@@ -157,3 +157,26 @@ struct KeyboardFocusTests {
         #expect(CoreInputMode.navigationKeys.contains(48), "Tab navigates")
     }
 }
+
+struct LookAssetTests {
+    @Test func everyWallpaperPresetShipsItsFiles() throws {
+        // Packages/CoreUI/Tests/CoreUITests/CoreUITests.swift -> repo root -> App/Mac/Wallpapers
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "App/Mac/Wallpapers")
+        for w in CoreWallpaper.presets where w.isFile {
+            for t in ["day", "night"] {
+                for f in ["wall-\(w.rawValue)-\(t).heic", "wall-\(w.rawValue)-\(t)-thumb.jpg"] {
+                    #expect(FileManager.default.fileExists(atPath: dir.appending(path: f).path), "\(f)")
+                }
+            }
+        }
+    }
+
+    @Test func accentsAreDistinctAndTitled() {
+        #expect(Set(CoreAccent.allCases.map(\.rawValue)).count == CoreAccent.allCases.count)
+        #expect(CoreAccent.allCases.count == 13 && !CoreAccent.allCases.map(\.rawValue).contains("gold"))
+        #expect(Set(CoreAccent.allCases.map { "\($0.fill)" }).count == CoreAccent.allCases.count)
+        #expect(CoreWallpaper.presets.count == 26)
+    }
+}
