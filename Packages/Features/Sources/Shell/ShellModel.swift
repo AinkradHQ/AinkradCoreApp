@@ -129,6 +129,52 @@ public struct ShellDialog: Identifiable {
 }
 public enum ShellOverlay: Hashable, Sendable { case settings, shortcuts }
 
+/// The top bar's dropdowns that hold more than a list (E2-2, D-10).
+public enum TopMenu: Hashable, Sendable { case core, runners, brain }
+
+/// One device in the Core dropdown: its name, a line under it and whether it answers now.
+public struct DeviceGlance: Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let sub: String
+    public let symbol: String
+    public let online: Bool
+    public init(id: String, name: String, sub: String, symbol: String, online: Bool) {
+        self.id = id
+        self.name = name
+        self.sub = sub
+        self.symbol = symbol
+        self.online = online
+    }
+}
+
+/// What the Brain dropdown shows: how it is, what it does now, and a few counts.
+public struct BrainGlance: Sendable, Equatable {
+    public struct Stat: Sendable, Equatable, Identifiable {
+        public var id: String { label }
+        public let label: String
+        public let count: Int
+        public init(_ label: String, _ count: Int) {
+            self.label = label
+            self.count = count
+        }
+    }
+    /// "Learning quietly in the background", "Paused"...
+    public let status: String
+    public let healthy: Bool
+    /// What it is doing now ("Tidying 12 new notes"), with how far along it is (0...1), when known.
+    public let doing: String?
+    public let progress: Double?
+    public let stats: [Stat]
+    public init(status: String, healthy: Bool, doing: String? = nil, progress: Double? = nil, stats: [Stat] = []) {
+        self.status = status
+        self.healthy = healthy
+        self.doing = doing
+        self.progress = progress
+        self.stats = stats
+    }
+}
+
 /// The shell's one state holder. Feature modules talk to it only through `openPane`, `launcher`, `bell`, `settings`, `toast` and `sheet`.
 @MainActor @Observable
 public final class ShellModel {
@@ -186,19 +232,30 @@ public final class ShellModel {
     public var retryAttempt = 0
     public var nextRetryAt: Date?
     public var retrySpan: TimeInterval?
-    /// The panel under the connection chip.
-    public var connectionPanelOpen = false
+    /// The one top-bar dropdown that is open (Core, Runners or Brain). The bell and the launcher have their own flags.
+    public var topMenu: TopMenu?
+    /// The Core dropdown (formerly the connection panel).
+    public var connectionPanelOpen: Bool {
+        get { topMenu == .core }
+        set { topMenu = newValue ? .core : (topMenu == .core ? nil : topMenu) }
+    }
+    /// What the Devices block of the Core dropdown lists; the app (Pairing) supplies it.
+    public var devicesGlance: (@MainActor () -> [DeviceGlance])?
+    /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.
+    public var brainGlance: (@MainActor () -> BrainGlance?)?
     @ObservationIgnored let networkWatch = NetworkWatch()
     public var chipState: ConnectionChipState? {
         ConnectionChipState.of(link: coreLink, networkUp: networkUp, attempt: retryAttempt)
     }
     /// Starts watching the network once.
     public func watchNetwork() { networkWatch.start { [weak self] up in self?.networkUp = up } }
-    public func toggleConnectionPanel() {
+    public func toggleConnectionPanel() { toggleMenu(.core) }
+    /// Opens a top-bar dropdown, or closes it when it is the one open; any other layer closes.
+    public func toggleMenu(_ menu: TopMenu) {
         launcherOpen = false
         bellOpen = false
         elevationPanelOpen = false
-        connectionPanelOpen.toggle()
+        topMenu = topMenu == menu ? nil : menu
     }
     /// When the Core was last reachable: what the "resuming" banner says the screen is current to.
     public private(set) var lastLiveAt: Date?
@@ -472,14 +529,14 @@ public final class ShellModel {
     public func toggleLauncher() {
         bellOpen = false
         elevationPanelOpen = false
-        connectionPanelOpen = false
+        topMenu = nil
         launcherOpen.toggle()
     }
 
     public func toggleBell() {
         launcherOpen = false
         elevationPanelOpen = false
-        connectionPanelOpen = false
+        topMenu = nil
         bellOpen.toggle()
     }
 
@@ -498,8 +555,8 @@ public final class ShellModel {
             if top.dismissible { closeTopDialog() }
         } else if let dialog {
             if dialog.dismissible { closeDialog() }
-        } else if connectionPanelOpen {
-            connectionPanelOpen = false
+        } else if topMenu != nil {
+            topMenu = nil
         } else if elevationPanelOpen {
             elevationPanelOpen = false
         } else if launcherOpen {
@@ -524,7 +581,7 @@ public final class ShellModel {
 
     /// Anything the shell shows over Home or the workspace.
     public var coverOpen: Bool {
-        sheet != nil || launcherOpen || elevationPanelOpen || connectionPanelOpen || bellOpen || overlay != nil
+        sheet != nil || launcherOpen || elevationPanelOpen || topMenu != nil || bellOpen || overlay != nil
             || dialog != nil
             || topDialog != nil
     }

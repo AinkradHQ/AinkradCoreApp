@@ -145,13 +145,20 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var covers: some View {
-        if shell.connectionPanelOpen {
-            Color.clear.contentShape(Rectangle()).onTapGesture { shell.connectionPanelOpen = false }
+        if let menu = shell.topMenu {
+            Color.clear.contentShape(Rectangle()).onTapGesture { shell.topMenu = nil }
                 .accessibilityHidden(true)
-            ConnectionPanel(shell: shell)
-                .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .transition(.opacity)
+            Group {
+                switch menu {
+                case .core: ConnectionPanel(shell: shell)
+                case .runners: RunnersPanel(shell: shell)
+                case .brain: BrainPanel(shell: shell)
+                }
+            }
+            .id(menu)
+            .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .transition(.opacity)
         }
         if shell.elevationPanelOpen {
             Color.clear.contentShape(Rectangle()).onTapGesture { shell.elevationPanelOpen = false }
