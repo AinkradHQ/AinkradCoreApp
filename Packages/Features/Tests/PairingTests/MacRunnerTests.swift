@@ -298,4 +298,19 @@ struct MacRunnerPairProcessTests {
         #expect(args.split(separator: "\n").suffix(2) == ["--invite", "-"])
         #expect(stdin == "core.example/FP.SECRET\n")
     }
+
+    @Test func launchdFailureAndMissingToolAreSaidInPlainWords() {
+        let launchd = "job state = spawn failed\n\tlast exit code = 78: EX_CONFIG\n"
+        #expect(MacRunnerProblem.exitCode(launchd) == 78)
+        #expect(MacRunnerProblem.words(launchd: launchd, lastErrorFile: nil)?.hasPrefix("macOS could not start the runner (error 78)") == true)
+        #expect(MacRunnerProblem.words(launchd: "last exit code = (never exited)", lastErrorFile: nil) == nil)
+        #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "no AI tool installed: x")?.contains("no AI tool is installed") == true)
+        #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "\n") == nil)
+    }
+
+    @Test func runningIsConnectedOnlyWhenTheCoreSaysSo() {
+        #expect(MacRunnerModel.headline(connected: true).done)
+        #expect(!MacRunnerModel.headline(connected: false).done)
+        #expect(!MacRunnerModel.headline(connected: nil).done)
+    }
 }

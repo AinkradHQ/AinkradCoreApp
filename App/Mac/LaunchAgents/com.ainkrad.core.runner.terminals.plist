@@ -6,7 +6,9 @@
 	     com.ainkrad.core.runner.terminals.plist differs only in --enable-pty. Both offer agent sessions with the egress
 	     filter on (the runner advertises egress-filter only then); add a provider host to AINKRAD_AGENT_EGRESS_HOSTS in
 	     BOTH files (comma separated; MacRunnerPlistTests keeps them equal). A plist cannot change after signing, so the
-	     "Terminals on this Mac" switch registers one or the other. No --state: the runner's default is
+	     "Terminals on this Mac" switch registers one or the other. Logs and ~/.local/bin: launchd expands no "~" in
+     StandardOutPath or PATH, so the runner itself writes ~/Library/Logs/Ainkrad/runner.log when it sees the job label,
+     and looks for claude, codex, opencode and agy in ~/.local/bin before PATH (crates/runner v2/cli.rs). No --state: the runner's default is
 	     $HOME/.ainkrad-runner/core, and a plist cannot know the home folder. -->
 	<key>Label</key>
 	<string>com.ainkrad.core.runner.terminals</string>

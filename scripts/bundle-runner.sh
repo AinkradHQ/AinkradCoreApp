@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Xcode build phase: puts ainkrad-runner and ainkrad-ptyhost in Ainkrad.app/Contents/Helpers, the two agent plists in
-# Contents/Library/LaunchAgents, and signs the helpers with the app's identity (hardened runtime). No binary is in git.
+# Contents/Library/LaunchAgents, and signs the helpers with the app's identity (hardened runtime, no entitlements: release.sh signs them again, never with --deep). No binary is in git.
 # Where the binaries come from, first match wins:
 #   AINKRAD_RUNNER_DIR=<dir>   a folder holding both (a `cargo build --release -p ainkrad-runner -p ainkrad-ptyhost` target dir)
 #   scripts/runner.pin         the pinned release asset, downloaded and checked against its SHA-256 (cached in build/runner-cache)

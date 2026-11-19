@@ -42,6 +42,8 @@ final class MacRunnerModel {
 
     private(set) var state: State
     private(set) var deviceID: String?
+    /// Why the runner is not fully working, in plain words (`MacRunnerProblem`); read by `refreshProblem`.
+    private(set) var problem: String?
     private let control: any MacRunnerControl
     private let defaults: UserDefaults
     private let deps: MacRunnerDeps
@@ -156,4 +158,18 @@ final class MacRunnerModel {
     }
 
     func openLoginItems() { control.openLoginItems() }
+
+    /// Looks at launchd and the runner's own note again (off the main thread: it runs `launchctl`).
+    func refreshProblem(connected: Bool?) async {
+        guard control.isBundled, useThisMac else { problem = nil; return }
+        let control = control
+        problem = await Task.detached { control.lastProblem(connected: connected == true) }.value
+    }
+
+    /// The headline under the switch: connected to the Core (what the Core reports), not merely registered with macOS.
+    nonisolated static func headline(connected: Bool?) -> (title: String, text: String, done: Bool) {
+        connected == true
+            ? ("This Mac is connected to your Core", "Its terminals and AI sessions pause while the Mac sleeps.", true)
+            : ("Started, not connected yet", "macOS started the runner. The Core has not heard from it yet.", false)
+    }
 }
