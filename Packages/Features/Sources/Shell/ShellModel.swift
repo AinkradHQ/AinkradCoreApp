@@ -289,11 +289,6 @@ public final class ShellModel {
     /// Alarms (backup age, an account turned off...): counted on their own, never added to the approvals.
     public var alertsOnYou: Int { bell.items.filter { $0.kind == .alarm }.count }
 
-    /// Settings → Activity: the "N running · M waiting" chip in the status cluster. The bell is always there.
-    public var showActivityChip = true {
-        didSet { defaults.set(showActivityChip, forKey: Self.activityChipKey) }
-    }
-    static let activityChipKey = "ainkrad.core.activity.statusChip"
     /// The elevation chip: asks for Touch ID.
     public var elevate: (@MainActor () -> Void)?
     public var dialog: ShellDialog?
@@ -326,7 +321,6 @@ public final class ShellModel {
         tabNames = defaults.dictionary(forKey: Self.tabNamesKey) as? [String: String] ?? [:]
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
         if !WidgetKind.boardShown { widgets.items.removeAll { $0.kind == .board } }
-        showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
         // Follow the sun changes sides at 07:00 and 18:00: look again every minute.

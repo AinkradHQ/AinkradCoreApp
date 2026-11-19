@@ -161,29 +161,6 @@ struct NotificationsSection: View {
                 }
                 BannerPreview()
             }
-            GlassSection(
-                "Inside Ainkrad", sub: "What is running and what needs you.", symbol: "waveform.path.ecg",
-                hue: GlassInk.blue, index: 2
-            ) {
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: Space.s3), GridItem(.flexible())], spacing: Space.s3
-                ) {
-                    GlassToggleTile(
-                        "The bell", sub: "Always on: what waits on you, runners and recent events.", symbol: "bell",
-                        onSymbol: "bell.fill", isOn: .constant(true), fill: true
-                    )
-                    .disabled(true)
-                    GlassToggleTile(
-                        "Status bar chip", sub: "“2 running · 1 waiting” next to the bell.", symbol: "capsule",
-                        onSymbol: "capsule.fill",
-                        isOn: Binding(
-                            get: { model.shell.showActivityChip },
-                            set: {
-                                model.shell.showActivityChip = $0
-                                model.shell.settings.saved()
-                            }), fill: true)
-                }
-            }
         }
         .foregroundStyle(GlassInk.primary)
         .task { await model.refreshPermission() }
