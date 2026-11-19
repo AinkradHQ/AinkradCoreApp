@@ -286,7 +286,6 @@ struct AgentsListView: View {
                     else { return .ignored }
                     switch key {
                     case "p": model.togglePin(id)
-                    case "e": model.end(id)
                     case "a": model.toggleArchive(id)
                     default: return .ignored
                     }

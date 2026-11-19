@@ -118,7 +118,23 @@ extension AgentsModel {
         guard let s = sessions.session(id) else { return }
         run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
         shell.showToast(
-            "Cancelling the \(AgentWords.toolName(s.harness)) session. What it did stays in the transcript.", kind: .info)
+            "Cancelling the \(AgentWords.toolName(s.harness)) session. What it did stays in the transcript.",
+            kind: .info)
+    }
+
+    /// ⇧⌘E asks first (a key is easy to hit by mistake); the End button and the row's End… end at once.
+    public func confirmEnd(_ id: String) {
+        guard let s = sessions.session(id), s.live else { return }
+        shell.presentSheet(
+            title: "End this session?",
+            message:
+                "The \(AgentWords.toolName(s.harness)) process exits and the composer closes. The transcript stays.",
+            actions: [
+                ShellSheetAction("Keep running"),
+                ShellSheetAction("End session", primary: true, destructive: true) { [weak self] in
+                    self?.end(id)
+                },
+            ])
     }
 
     public func confirmKill(_ id: String) {

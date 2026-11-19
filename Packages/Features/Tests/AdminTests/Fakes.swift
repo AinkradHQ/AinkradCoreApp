@@ -13,8 +13,15 @@ final class FakeHost: AdminHost {
     private(set) var reasons: [String] = []
     private(set) var rateLimits: [TimeInterval?] = []
     func clearElevationNotice() { elevationNotice = nil }
+    private(set) var forces: [Bool] = []
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
+        try await elevated(reason, done: done, keepsEdit: keepsEdit, force: false, op)
+    }
+    func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
+        async throws -> T
+    {
         reasons.append(reason)
+        forces.append(force)
         if declines { throw AdminDeclined() }
         return try await op()
     }

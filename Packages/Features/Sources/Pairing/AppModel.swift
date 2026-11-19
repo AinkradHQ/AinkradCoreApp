@@ -139,7 +139,9 @@ public final class AppModel {
             (devices?.active ?? []).prefix(4).map { d in
                 DeviceGlance(
                     id: d.id, name: d.name,
-                    sub: devices?.isMe(d) == true ? "\(DeviceWords.platform(d.platform)) · this device" : "Last seen \(DeviceWords.seen(d.lastUsed).lowercased())",
+                    sub: devices?.isMe(d) == true
+                        ? "\(DeviceWords.platform(d.platform)) · this device"
+                        : "Last seen \(DeviceWords.seen(d.lastUsed).lowercased())",
                     symbol: DeviceWords.symbol(d.kind, d.platform),
                     online: !d.cutOff && (d.lastUsed.map { Date().timeIntervalSince($0) < 300 } ?? false))
             }
@@ -748,9 +750,11 @@ public final class AppModel {
     /// Runs an action that needs elevation: Touch ID first when the session is not elevated, and once more if the Core still
     /// says `step_up_required` (the session may have been renewed). `done` names what did not happen if Touch ID does not elevate.
     func elevated<T>(
-        _ reason: String, done: String, keepsEdit: Bool = true, _ op: () async throws -> T
+        _ reason: String, done: String, keepsEdit: Bool = true, force: Bool = false, _ op: () async throws -> T
     ) async throws -> T {
-        guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit) else { throw StepUpDeclined() }
+        guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: force) else {
+            throw StepUpDeclined()
+        }
         do { return try await op() } catch {
             guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
             shell.elevatedUntil = nil

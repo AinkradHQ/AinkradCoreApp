@@ -162,7 +162,11 @@ final class SecretsModel {
     private(set) var shown: ShownSecret?
     /// The Core can show and export a value (API minor 95). Older Cores keep the write-only list.
     private(set) var revealSupported = false
+    /// Export… has its own gate: the same minor (95), but not the reveal route.
+    private(set) var exportSupported = false
     private(set) var exporting = false
+    /// Where the export goes: the system save panel by default; a test sets its own.
+    @ObservationIgnored var chooseExportFile: @MainActor () -> URL? = SecretExport.askWhere
     @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     @ObservationIgnored private weak var hub: AdminModel?
@@ -195,7 +199,9 @@ final class SecretsModel {
             state = items.isEmpty && groups.isEmpty ? .empty : .ready
         } catch { state = hub.state(for: error) }
         runners = (try? await service.runners()) ?? runners
-        revealSupported = await service.supportsV010()
+        let v010 = await service.supportsV010()
+        revealSupported = v010
+        exportSupported = v010
     }
 
     // MARK: show, copy, export (D-4: Touch ID first)
@@ -247,21 +253,23 @@ final class SecretsModel {
         hub?.host.shell.showToast("Copied. It leaves your clipboard in 30 seconds.")
     }
 
-    /// Writes every secret to a file in Downloads (owner-only) after Touch ID, then forgets what it read.
+    /// Asks where to save, then writes every secret there (owner-only) after a fresh Touch ID (the Core takes only one proved
+    /// within 30 seconds, and spends it), then forgets what it read.
     func export() async {
         guard let hub, let service = hub.service, hub.mayWrite(), !exporting else { return }
+        guard let url = chooseExportFile() else { return }
         exporting = true
         defer { exporting = false }
         do {
             let count = try await hub.host.elevated(
-                "Export all your secrets to a file in Downloads. The file holds their values.", done: "exported",
-                keepsEdit: false
+                "Export all your secrets to a file. The file holds their values.", done: "exported",
+                keepsEdit: false, force: true
             ) { () async throws -> Int in
                 let all = try await service.exportSecrets()
-                try SecretExport.write(all)
+                try SecretExport.write(all, to: url)
                 return all.count
             }
-            hub.host.shell.showToast("Exported \(count) secrets to your Downloads folder")
+            hub.host.shell.showToast("Exported \(count) secrets to \(url.lastPathComponent)")
         } catch is AdminDeclined {
             return
         } catch { hub.host.shell.showToast("The export did not happen. \(hub.words(error))", kind: .warn) }
@@ -450,7 +458,6 @@ final class SecretsModel {
     }
 }
 
-
 /// The value on screen and when it goes. A struct of its own so nothing prints it by accident.
 struct ShownSecret: Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     let name: String
@@ -462,15 +469,22 @@ struct ShownSecret: Equatable, CustomStringConvertible, CustomDebugStringConvert
 
 /// The export file: JSON in Downloads, readable by the owner only.
 enum SecretExport {
-    static func write(_ all: [ExportedValue], now: Date = Date(), directory: URL? = nil) throws {
-        let dir =
-            try directory
-            ?? FileManager.default.url(
-                for: .downloadsDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    /// The save panel, named like the old Downloads file. Nil when the person cancels.
+    @MainActor static func askWhere() -> URL? {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd-HHmm"
-        let stamp = f.string(from: now)
+        let panel = NSSavePanel()
+        panel.title = "Export secrets"
+        panel.message = "The file holds every secret's value. Keep it somewhere safe."
+        panel.nameFieldStringValue = "ainkrad-secrets-\(f.string(from: Date())).json"
+        panel.allowedContentTypes = [.json]
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    /// Writes the export to `url`: the file is made new (a replaced one is removed first) with mode 0600 before any value goes
+    /// in, and kept out of backups.
+    static func write(_ all: [ExportedValue], to url: URL, now: Date = Date()) throws {
         let rows = all.map { r -> [String: Any] in
             var row: [String: Any] = ["name": r.name, "kind": r.kind, "value": r.value]
             if let g = r.group { row["group"] = g }
@@ -479,8 +493,20 @@ enum SecretExport {
         }
         let body: [String: Any] = ["exported_at": ISO8601DateFormatter().string(from: now), "secrets": rows]
         let data = try JSONSerialization.data(withJSONObject: body, options: [.prettyPrinted, .sortedKeys])
-        let url = dir.appendingPathComponent("ainkrad-secrets-\(stamp).json")
-        try data.write(to: url, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try? FileManager.default.removeItem(at: url)
+        let fd = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        do {
+            try handle.write(contentsOf: data)
+            try handle.close()
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            var target = url
+            try target.setResourceValues(values)
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
     }
 }
