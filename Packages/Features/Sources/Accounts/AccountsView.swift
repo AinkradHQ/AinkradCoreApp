@@ -56,7 +56,7 @@ struct AccountsView: View {
 
     /// The pages as tiles. Spend holds Budgets, Costs, Ledger and Prices, which the Core does not fill yet.
     static let tabs: [(title: String, page: AccountsPage)] = [
-        ("Accounts", .accounts), ("Spending", .spending), ("Connections", .connections),
+        ("Accounts", .accounts), ("Spending", .spending),
     ]
 
     private var tabs: [(title: String, page: AccountsPage)] { Self.tabs }
@@ -74,7 +74,6 @@ struct AccountsView: View {
         switch page {
         case .accounts: model.accounts.count
         case .spending: model.budgets.filter { $0.standing == .stopped }.count.nonZero ?? -1
-        case .connections: model.connections.items.count
         default: -1
         }
     }
@@ -124,11 +123,6 @@ struct AccountsView: View {
                 Task { await model.reloadCosts() }
             }
             .keyboardShortcut("r", modifiers: .command)
-        case .connections:
-            AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
-                ConnDialogs.openConnect(model.connections, kind: nil)
-            }
-            .keyboardShortcut("n", modifiers: .command).disabled(model.connections.service == nil)
         default:
             AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
                 AccountDialogs.openConnect(model, provider: nil, advanced: true)
@@ -159,8 +153,6 @@ struct AccountsView: View {
             AccStateCard(
                 symbol: "wifi.slash", title: "Not connected",
                 text: "Accounts and pools come from your Core. This Mac is not connected to one right now.")
-        } else if model.page == .connections {
-            ConnectionsTab(model: model.connections).transition(.opacity)
         } else if model.page.isSpend {
             Group {
                 switch model.page {

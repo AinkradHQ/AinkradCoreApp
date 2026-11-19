@@ -8,14 +8,13 @@ import SwiftUI
 /// clicking through (`CORE_ACC_DEMO=conn-list`). Nothing here reaches a Core.
 extension AccountsDemo {
     public static let connScenes = [
-        "conn-list", "conn-empty", "conn-pick", "conn-github-code", "conn-github-repos", "conn-jira-sites",
-        "conn-failed", "conn-done", "conn-token", "conn-access", "conn-access-write", "conn-rename",
-        "conn-disconnect", "conn-off", "conn-app-notset", "conn-app-set", "conn-app-saving",
-        "conn-app-error", "conn-app-readonly", "conn-default-menu", "conn-default-cleared", "conn-replace",
-        "conn-replace-working", "conn-replace-error", "conn-replace-done",
-        // The sign-in service (#95): Jira's browser step, GitHub connected with its repositories, and the refusals.
-        "conn-jira-signin", "conn-github-connected", "conn-error-service", "conn-error-not-yours",
-        "conn-error-signin-first", "conn-error-signin-again",
+        // The mockup's states (10-connections): the list, the empty page, the five steps, the error.
+        "conn-list", "conn-empty", "conn-add-1", "conn-add-2", "conn-add-2-code", "conn-add-3", "conn-add-3-write",
+        "conn-add-4", "conn-add-4-error", "conn-add-5", "conn-error", "conn-jira-sites", "conn-off",
+        // Around it: a token instead, rename, the app registration, replacing a token, the refusals.
+        "conn-token", "conn-rename", "conn-app-notset", "conn-app-set", "conn-app-saving", "conn-app-error",
+        "conn-app-readonly", "conn-replace", "conn-replace-working", "conn-replace-error", "conn-replace-done",
+        "conn-error-service", "conn-error-signin-first", "conn-error-signin-again",
     ]
 
     func showConnections(_ scene: String) async {
@@ -34,61 +33,55 @@ extension AccountsDemo {
         if scene == "conn-off" { m.detach() } else { m.use(svc, sample: true) }
         m.show()
         try? await Task.sleep(for: .milliseconds(500))
-        func open(_ kind: String?, then step: ConnFlow.Step? = nil) async {
-            ConnDialogs.openConnect(m, kind: kind)
-            guard let step, kind != nil else { return }
+        /// Opens the Add dialog on a service and sets the sign-in to `step` (the scene can't wait for a browser).
+        func open(_ kind: String, then step: ConnFlow.Step? = nil) async {
+            m.beginAdd(kind: kind)
+            guard let step else { return }
             try? await Task.sleep(for: .milliseconds(400))
             m.flow?.step = step
         }
+        /// The dialog on step `at` for a connection that is there.
+        func edit(_ id: Int64, at step: ConnStep, write: Bool = false) async {
+            guard let c = m.item(id) else { return }
+            if write { try? await svc.setAccess(id, allowed: ["read_repo", "pr_write", "push"], only: ["maple/harbor-web"]) }
+            await m.reload()
+            m.beginEdit(m.item(id) ?? c, at: step)
+        }
         switch scene {
-        case "conn-pick": await open(nil)
-        case "conn-github-code": await open("github")
-        case "conn-github-repos":
+        case "conn-add-1": m.beginAdd()
+        case "conn-add-2": await open("github")
+        case "conn-add-2-code":
+            await open("github")
+            try? await Task.sleep(for: .milliseconds(400))
+        case "conn-add-3": await edit(1, at: .allow)
+        case "conn-add-3-write": await edit(1, at: .allow, write: true)
+        case "conn-add-4", "conn-add-4-error":
+            svc.failPicks = scene == "conn-add-4-error"
+            await edit(1, at: .choose)
+        case "conn-add-5":
+            await edit(1, at: .choose)
+            try? await Task.sleep(for: .milliseconds(300))
+            m.add?.picked = ["maple/harbor-web", "maple/notes-app"]
+            m.add?.step = .done
+        case "conn-error", "conn-error-service":
             await open(
-                "github", then: .chooseResources(login: "@sample-dev", install: URL(string: "https://github.com/apps")!)
-            )
-        case "conn-jira-sites": await open("jira", then: .pickSite(["sample.atlassian.net", "other.atlassian.net"]))
-        case "conn-failed":
+                "github",
+                then: scene == "conn-error"
+                    ? .failed(title: ConnSay.expiredTitle, fix: "Try again for a new one.")
+                    : .failed(title: ConnSay.serviceDown, fix: "Nothing was connected."))
+        case "conn-jira-sites": await open("jira", then: .pickSite(["maple.atlassian.net", "other.atlassian.net"]))
+        case "conn-error-signin-first", "conn-error-signin-again":
             await open(
                 "github",
                 then: .failed(
-                    title: "The code ran out before you approved it.",
-                    fix: "Codes work for 15 minutes. Try again for a new code, then approve it on github.com."))
-        case "conn-done": await open("github", then: .connected(1))
-        case "conn-jira-signin": await open("jira")
-        case "conn-github-connected":
-            await open("github", then: .connected(1))
-            m.picked = ["sample/core", "sample/app", "sample/docs"]
-        case "conn-error-service":
-            await open("github", then: .failed(title: ConnSay.serviceDown, fix: "Nothing was connected."))
-        case "conn-error-not-yours":
-            await open(
-                "github",
-                then: .failed(
-                    title: ConnSay.notYours, fix: "Choose repositories with the GitHub account you signed in with."))
-        case "conn-error-signin-first":
-            await open(
-                "github",
-                then: ConnSay.installFailure(
-                    CoreError.http(status: 401, code: "github_sign_in_needed", message: ""), hasGitHub: false))
-        case "conn-error-signin-again":
-            await open(
-                "github",
-                then: ConnSay.installFailure(
-                    CoreError.http(status: 401, code: "github_sign_in_needed", message: ""), hasGitHub: true))
+                    title: scene == "conn-error-signin-first" ? ConnSay.signInFirst : ConnSay.signInAgain,
+                    fix: "Press Try again to sign in."))
         case "conn-token":
             shell.present(
                 ShellDialog(id: "connection-connect") {
                     TokenForm(model: m, kind: SampleConnections.kinds[1], back: {}, close: {})
                 })
-        case "conn-access", "conn-access-write":
-            if scene == "conn-access-write" {
-                try? await svc.setAccess(1, allowed: ["read", "write"], only: ["sample/core", "sample/app"])
-            }
-            await m.reload()
-            if let c = m.item(1) { ConnDialogs.openAccess(m, c) }
         case "conn-rename": if let c = m.item(1) { ConnDialogs.openRename(m, c) }
-        case "conn-disconnect": if let c = m.item(2) { ConnDialogs.openDisconnect(m, c) }
         case "conn-app-notset", "conn-app-set", "conn-app-saving", "conn-app-error", "conn-app-readonly":
             svc.appReadOnly = scene == "conn-app-readonly"
             if let k = m.kind(scene == "conn-app-notset" ? "jira" : "github") {
@@ -100,9 +93,6 @@ extension AccountsDemo {
                     m.writeError["app-\(k.id)"] = ConnSay.plain(CoreError.http(status: 500, code: "x", message: ""))
                 }
             }
-        case "conn-default-menu", "conn-default-cleared":
-            if scene == "conn-default-cleared", let c = m.item(1) { await m.clearDefault(c) }
-            m.cursor = 1
         case "conn-replace", "conn-replace-working", "conn-replace-error", "conn-replace-done":
             guard let c = m.item(2) else { break }
             ConnDialogs.openReplace(m, c, done: scene == "conn-replace-done")

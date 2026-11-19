@@ -127,7 +127,7 @@ struct LiveConnectionsTests {
         #expect(core.bodies("chooseConnectionSite").first?.contains("cloud-1") == true)
     }
 
-    @Test func gitHubAppInstallIsAConnectionNotAFlowStep() async throws {
+    @Test func aFinishedGitHubSignInIsAConnectionAndTheAppInstallIsNoStep() async throws {
         let core = StubCore([
             "listConnectionKinds": kindsJSON,
             "getConnectionFlow":
@@ -136,16 +136,47 @@ struct LiveConnectionsTests {
         ])
         let svc = live(core)
         let f = try await svc.flow("cf_2")
-        guard case .chooseResources(let login, let install) = f.step else {
-            Issue.record("no repository step")
-            return
-        }
-        #expect(login == "@dev" && install.host == "github.com" && f.userCode == "WDJB-MJHT")
+        #expect(f.step == .connected(4) && f.userCode == "WDJB-MJHT")
         // Skipping finishes with the connection the sign-in already made.
         #expect(try await svc.choose("cf_2", site: nil).step == .connected(4))
         _ = try await svc.install(kind: "github", installation: 4242)
         let sent = try #require(core.bodies("createConnection").first)
         #expect(sent.contains("app_install") && sent.contains("4242"))
+    }
+
+    @Test func thePickerListsWhatTheCoreSaysWithItsSecondLine() async throws {
+        let core = StubCore([
+            "listConnectionResources":
+                #"{"key":"repos","truncated":true,"resources":[{"id":"maple/harbor-web","name":"maple/harbor-web","updated_at":"2026-11-18T10:00:00.000Z"},{"id":"C1","name":"#build","detail":"14 people"}]}"#
+        ])
+        let p = try await live(core).picks(1)
+        #expect(p.truncated)
+        #expect(p.items.map(\.id) == ["maple/harbor-web", "C1"])
+        #expect(p.items[0].updatedAt != nil && p.items[1].detail == "14 people")
+    }
+
+    @Test func anOlderCoreOnlyShowsTheOnesAlreadyChosen() async throws {
+        let core = StubCore([
+            "listConnectionGrants":
+                #"[{"grantee_kind":"role","grantee":"member","capabilities":["read_repo"],"limits":{"repos":["a/b"]},"created_at":"\#(t)","updated_at":"\#(t)"}]"#
+        ])
+        var svc = live(core)
+        svc = LiveConnectionsService(client: svc.client, supportsPicks: { false })
+        let p = try await svc.picks(1)
+        #expect(p.items.map(\.id) == ["a/b"])
+        #expect(core.bodies("listConnectionResources").isEmpty)
+    }
+
+    @Test func aKindReadsItsCapabilitySentencesFromTheCore() {
+        let k = LiveConnectionsService.kind(
+            try! JSONDecoder().decode(
+                Components.Schemas.ConnectionKind.self,
+                from: Data(
+                    #"{"kind":"teams","title":"Microsoft Teams","summary":"s","configured":true,"auth_methods":[],"limits":[{"key":"channels","title":"Channels","help":""}],"capabilities":[{"name":"read_messages","title":"Read","class":"read","write":false,"summary":"See the conversation. Nothing is sent."},{"name":"post_messages","title":"Post","class":"write","write":true}]}"#
+                        .utf8)))
+        #expect(k.signIn == .deviceCode)
+        #expect(k.capabilities[0].say == "See the conversation. Nothing is sent.")
+        #expect(k.capabilities[1].say == "Changes things on Microsoft Teams.")
     }
 
     @Test func aFailedSignInIsASentenceWithAFix() {
@@ -156,7 +187,7 @@ struct LiveConnectionsTests {
                     #"{"id":"cf","kind":"github","step":"failed","expires_in_secs":0,"sites":[],"error_code":"\#(code)"}"#
                         .utf8)
             )
-            return LiveConnectionsService.flow(f, install: nil).step
+            return LiveConnectionsService.flow(f).step
         }
         for code in ["different_account", "identity_unavailable", "real_secret_refused", "whatever"] {
             guard case .failed(let title, let fix) = step(code) else {

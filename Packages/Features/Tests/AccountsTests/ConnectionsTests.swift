@@ -24,11 +24,11 @@ struct ConnectionsTests {
     @Test func listsByKindAndSaysWhatEachMayDo() async {
         let (m, _, _) = await make()
         #expect(m.load == .ready)
-        #expect(m.liveKinds.map(\.id) == ["github", "jira"])
-        #expect(m.laterKinds.map(\.id) == ["linear", "slack"])
+        #expect(m.liveKinds.map(\.id) == ["github", "jira", "linear", "slack", "teams"])
+        #expect(m.laterKinds.isEmpty)
         #expect(m.items(of: "github").count == 2)
         #expect(m.needLook == 1)
-        #expect(m.access(m.items[0]) == "Can read code and issues in all repositories.")
+        #expect(m.access(m.items[0]) == "Can read code, pull requests and issues in all repositories.")
         m.filter = .needsLook
         #expect(m.items(of: "github").map(\.id) == [2])
     }
@@ -38,42 +38,10 @@ struct ConnectionsTests {
         await m.startFlow("github")
         #expect(m.flow?.userCode == "WDJB-MJHT")
         m.openSignIn()
-        await settle(m) { if case .chooseResources = $0 { true } else { false } }
-        guard case .chooseResources(let login, _)? = m.flow?.step else {
-            Issue.record("no repo step")
-            return
-        }
-        #expect(login == "@sample-dev")
-        await m.choose(site: nil)
+        await settle(m) { if case .connected = $0 { true } else { false } }
         #expect(m.flow?.isConnected == true)
         #expect(m.items(of: "github").count == 3)
         #expect(m.items.last?.isDefault == false)  // the kind already has a default
-    }
-
-    @Test func choosingRepositoriesOnGitHubFinishesByItself() async {
-        let (m, _, _) = await make()
-        var opened: [URL] = []
-        m.opener = { opened.append($0) }
-        await m.startFlow("github")
-        m.openSignIn()
-        await settle(m) { if case .chooseResources = $0 { true } else { false } }
-        m.openInstall()
-        #expect(m.installing)
-        await settle(m) { if case .connected = $0 { true } else { false } }
-        #expect(m.flow?.isConnected == true)
-        #expect(opened.last?.absoluteString == "https://github.com/apps/ainkradhq/installations/new")
-    }
-
-    @Test func theInstallationCatchShowsTheRepositoriesPicked() async {
-        let (m, _, _) = await make()
-        await m.startFlow("github")
-        m.openSignIn()
-        await settle(m) { if case .chooseResources = $0 { true } else { false } }
-        #expect(m.picked.isEmpty)
-        await m.installed("4242")
-        #expect(m.flow?.isConnected == true)
-        #expect(m.picked.count == 6)
-        #expect(!m.installing)
     }
 
     @Test func gitHubWaitsForACodeAndJiraForTheBrowser() async {
@@ -121,8 +89,10 @@ struct ConnectionsTests {
     @Test func accessAndDefaultAreSaved() async {
         let (m, _, _) = await make()
         let org = m.items[1]
-        #expect(await m.setAccess(org, allowed: ["read", "write"], only: ["sample/core"]))
-        #expect(m.access(m.item(org.id)!) == "Can read code and issues and create and change things in sample/core.")
+        #expect(await m.setAccess(org, allowed: ["read_repo", "pr_write"], only: ["maple/harbor-web"]))
+        #expect(
+            m.access(m.item(org.id)!)
+                == "Can read code, pull requests and issues and comment on pull requests in maple/harbor-web.")
         await m.makeDefault(org)
         #expect(m.items(of: "github").filter(\.isDefault).map(\.id) == [org.id])
     }
@@ -327,8 +297,8 @@ struct TurnOnConnectionsTests {
     @Test func aSignInRefusedByTheGateIsMarkedSoTheSheetOffersTheAction() {
         let f = LiveConnectionsService.flow(
             .init(
-                errorCode: "real_secret_refused", expiresInSecs: 0, id: "f", kind: "github", sites: [], step: "failed"),
-            install: nil)
+                errorCode: "real_secret_refused", expiresInSecs: 0, id: "f", kind: "github", sites: [], step: "failed")
+        )
         #expect(f.gated)
         #expect(ConnSay.isGate(CoreError.http(status: 409, code: "secrets_disabled", message: "")))
         #expect(!ConnSay.isGate(CoreError.http(status: 409, code: "other", message: "")))
@@ -380,8 +350,7 @@ struct ConnectionsSignInServiceWordsTests {
     @Test func aFlowThatFailedAtTheServiceOrTheInstallIsPlain() {
         func title(_ code: String) -> String? {
             let f = LiveConnectionsService.flow(
-                .init(errorCode: code, expiresInSecs: 0, id: "f", kind: "jira", sites: [], step: "failed"),
-                install: nil)
+                .init(errorCode: code, expiresInSecs: 0, id: "f", kind: "jira", sites: [], step: "failed"))
             if case .failed(let t, _) = f.step { return t }
             return nil
         }
