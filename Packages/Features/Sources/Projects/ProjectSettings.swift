@@ -1,7 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// Project Settings: General (name, description, link, colour) beside Run limits and Archive, as in the approved mockup.
+/// Project Settings, laid out as in the approved mockup (`21-projects.html`): Name and colour, the public link, keeping copies
+/// fresh, where it runs by default and Delete this project (a few seconds to undo).
 ///
 /// What the Core lets change today decides what is editable: `PATCH /projects/{id}` takes the name and description only, so
 /// the link name and the limits are shown, not edited (TODO(core): link and limit fields on `UpdateProject`). The colour is a
@@ -29,10 +30,14 @@ struct SettingsPage: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
-            general.coreRise(settled, 0).frame(width: Space.s8 * 18)
             VStack(spacing: Space.s2) {
-                if insights.supported { keepFresh.coreRise(settled, 1) }
-                limits.coreRise(settled, 2)
+                general.coreRise(settled, 0)
+                publicLink.coreRise(settled, 1)
+            }
+            VStack(spacing: Space.s2) {
+                if insights.supported { keepFresh.coreRise(settled, 2) }
+                limits.coreRise(settled, 3)
+                deleteCard.coreRise(settled, 4)
             }
         }
         .onAppear { settled = true }
@@ -44,17 +49,12 @@ struct SettingsPage: View {
     // MARK: General
 
     private var general: some View {
-        Island("General") {
+        Island("Name and colour") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 CoreTextField(
                     "Name", placeholder: "Project name", text: $name, error: changed ? nameProblem : nil, onSubmit: save
                 )
                 CoreTextField("Description", placeholder: "What it is, in a line", text: $description, onSubmit: save)
-                CoreTextField(
-                    "Public link", placeholder: "link-name", text: .constant(project.slug),
-                    suffix: ".\(ProjectRules.domain)"
-                )
-                .disabled(true).help("The link name is fixed once the project exists")
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Colour")
                     CoreSegmented(
@@ -90,6 +90,40 @@ struct SettingsPage: View {
         Task { await model.saveGeneral(project, name: name, description: description) }
     }
 
+    // MARK: Public link
+
+    /// The switch, one line of words and the link with Copy, as the mockup's card.
+    private var publicLink: some View {
+        Island(
+            title: "Public link",
+            accessory: {
+                CoreSwitch(
+                    "",
+                    isOn: Binding(
+                        get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
+                )
+                .disabled(model.readOnly).accessibilityLabel("Public link")
+            }
+        ) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                Text("Anyone with the link can see the project page, not your code.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Space.s2) {
+                    Text(project.link).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
+                    Spacer(minLength: 0)
+                    CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString("https://\(project.link)", forType: .string)
+                        model.host.shell.showToast("Link copied")
+                    }
+                }
+                .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+                .coreCard(GlassInk.well, radius: Radius.row)
+                .opacity(project.expose ? 1 : 0.45)
+            }
+        }
+    }
+
     // MARK: Keep copies fresh
 
     /// How often the Core fetches the repos by itself (the Core's own setting, per project).
@@ -111,7 +145,7 @@ struct SettingsPage: View {
     // MARK: Run limits
 
     private var limits: some View {
-        Island("Where it runs") {
+        Island("Where it runs by default") {
             VStack(alignment: .leading, spacing: Space.s6) {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s5, verticalSpacing: Space.s3) {
                     GridRow {
@@ -154,20 +188,26 @@ struct SettingsPage: View {
                         }
                     }
                 }
-                archive
             }
         }
     }
 
-    private var archive: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Archive").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
-            HStack(alignment: .center, spacing: Space.s4) {
-                Text("Stops the run and hides the project. Repos, secrets and the Brain room are kept.")
+    // MARK: Delete
+
+    /// Delete this project: the Core archives it (nothing is erased) and the toast offers Undo for a few seconds. A Core without
+    /// the unarchive route (older than minor 95) asks first instead, since it cannot undo.
+    private var deleteCard: some View {
+        Island("Delete this project") {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                Text("Removes it from Core. Your repos stay on GitHub, and you can undo for a few seconds.")
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                Button("Archive Project…") { model.confirmArchive(project) }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
+                Button {
+                    if model.insightsService == nil { model.confirmArchive(project) } else { Task { await model.archive(project) } }
+                } label: {
+                    Label("Delete project", systemImage: "trash")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary)).disabled(model.readOnly || model.busy)
+                .accessibilityIdentifier("project-delete")
             }
         }
     }

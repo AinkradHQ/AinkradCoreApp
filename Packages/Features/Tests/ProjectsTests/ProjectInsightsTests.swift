@@ -57,7 +57,8 @@ final class FakeInsights: ProjectInsightsService, @unchecked Sendable {
         [SessionDocItem(note: "n", session: "s", path: "p.md", title: "P", sessionTitle: nil, project: "1", updatedAt: nil),
          SessionDocItem(note: "m", session: "s", path: "q.md", title: "Q", sessionTitle: nil, project: "2", updatedAt: nil)]
     }
-    func tuning(project: Int64) async throws -> ProjectTuning { ProjectTuning(fetchInterval: 10, defaultEnvironment: nil) }
+    func tuning(project: Int64) async throws -> ProjectTuning { ProjectTuning(fetchInterval: 10, defaultEnvironment: nil, roomID: "room_a") }
+    func unarchive(project: Int64) async throws { lock.withLock { saved.append("unarchive \(project)") } }
     func setTuning(project: Int64, fetchInterval: Int?, defaultEnvironment: String?) async throws {
         try lock.withLock {
             if refuse { throw RunFailure(sentence: "no", code: "x") }
@@ -92,6 +93,13 @@ struct ProjectInsightsModelTests {
         f.refuse = true
         await i.set(fetchInterval: 0)
         #expect(i.tuning.fetchInterval == 60)
+    }
+
+    @Test func undoingADeleteAsksTheCoreToUnarchive() async {
+        let (i, f) = make()
+        let p = ProjectItem(id: 1, slug: "demo", name: "Demo", description: "", expose: false, repos: [], updatedAt: Date())
+        await i.model.restore(p, f)
+        #expect(f.saved == ["unarchive 1"])
     }
 
     @Test func nothingLoadsOnAnOlderCore() async {

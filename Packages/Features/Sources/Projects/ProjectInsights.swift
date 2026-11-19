@@ -104,6 +104,8 @@ protocol ProjectInsightsService: Sendable {
     func sessionDocs() async throws -> [SessionDocItem]
     func tuning(project: Int64) async throws -> ProjectTuning
     func setTuning(project: Int64, fetchInterval: Int?, defaultEnvironment: String?) async throws
+    /// Undoes an archive (`POST /projects/{id}/unarchive`, admin, step-up): the project is active again.
+    func unarchive(project: Int64) async throws
 }
 
 struct LiveProjectInsightsService: ProjectInsightsService {
@@ -132,6 +134,10 @@ struct LiveProjectInsightsService: ProjectInsightsService {
         if let fetchInterval { o["fetch_interval_minutes"] = fetchInterval }
         if let defaultEnvironment { o["default_environment"] = defaultEnvironment }
         _ = try await call("PATCH", "/api/v1/projects/\(project)", try JSONSerialization.data(withJSONObject: o))
+    }
+
+    func unarchive(project: Int64) async throws {
+        _ = try await call("POST", "/api/v1/projects/\(project)/unarchive")
     }
 
     private func call(_ method: String, _ path: String, _ body: Data = Data()) async throws -> Data {
