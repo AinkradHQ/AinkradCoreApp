@@ -115,13 +115,11 @@ final class TerminalSession {
         }
         firstOutputAfterReattach = after > 0 && opened.seq > after
         link = .attached(letterbox: letterbox)
-        // The pane is often still sliding open here: its size goes through the same settle as every resize, so the shell
-        // redraws its prompt once, at the final width (an in-between width left a broken prompt line behind).
-        if !letterbox {
-            let size = surface.size
-            fit(size.cols, size.rows)
-        }
+        // The replay must land in an emulator that already has the pane's size, and the Core must know that size before
+        // it redraws: so the pump (which feeds the buffered replay) starts only after the pane is laid out and the
+        // resize is sent (spec: resize before replay). Without this the replay drew at 640x400 and the shell redrew over it.
         pump = Task { [weak self] in
+            if !letterbox { await self?.sizeBeforeReplay(l) }
             for await update in l.updates {
                 guard let self else { return }
                 self.handle(update, from: l, after: after)
@@ -129,6 +127,24 @@ final class TerminalSession {
         }
         surface.focus()
         onChange?()
+    }
+
+    /// How long the first layout is waited for before the replay is drawn at whatever size the emulator has.
+    static var layoutWait: Duration = .milliseconds(500)
+
+    private func sizeBeforeReplay(_ l: any TerminalLink) async {
+        let deadline = ContinuousClock.now + Self.layoutWait
+        while !surface.isLaidOut, ContinuousClock.now < deadline, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        guard !Task.isCancelled, attachment != nil, case .attached(false) = link else { return }
+        surface.container.layoutSubtreeIfNeeded()
+        let s = surface.size
+        guard s.cols > 0, s.rows > 0 else { return }
+        settle?.cancel()
+        item.cols = s.cols
+        item.rows = s.rows
+        l.resize(rows: s.rows, cols: s.cols)
     }
 
     private func handle(_ update: TerminalUpdate, from l: any TerminalLink, after: UInt64) {

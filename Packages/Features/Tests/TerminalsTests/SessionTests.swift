@@ -34,6 +34,17 @@ import Testing
         s.shutDown()
     }
 
+    @Test func theSizeIsSentBeforeTheReplayIsDrawn() async {
+        let (s, svc, _) = make()
+        let l = FakeLink(cols: 10, rows: 5, seq: 9)
+        l.push(.snapshot(Data("replay".utf8)))
+        svc.attachResults = [.success(l)]
+        await s.attach()
+        #expect(await until { l.drawnBytes > 0 })
+        #expect(l.events.first == "resize" && l.sizes.first.map { $0 != [10, 5] } == true, "pane size first, then the replay")
+        s.shutDown()
+    }
+
     @Test func decliningTouchIDLeavesTheTerminalRunning() async {
         let (s, svc, host) = make()
         host.declines = true
