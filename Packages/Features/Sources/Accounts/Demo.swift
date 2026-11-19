@@ -118,7 +118,7 @@ public final class AccountsDemo {
             ChainBindingItem(agent: "vesper", chain: 1),
         ]
         var gateState = GateState(mode: 1, providerAccounts: 1)
-        func providers() async throws -> [ProviderItem] { providerList }
+        func providers() async throws -> [ProviderItem] { order010 ? AIOrderDemo.providers() : providerList }
         func accounts() async throws -> [AccountItem] { accountList }
         func pools() async throws -> [PoolItem] { poolList }
         func gate() async throws -> GateState { gateState }
@@ -206,18 +206,38 @@ public final class AccountsDemo {
         var codeAt: Date?
         var loginLabel = "claude-plan"
         var loginFails = false
+        /// The guided sign-in (OpenCode, Antigravity): when a line was last typed.
+        var guidedSentAt: Date?
         func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
             if loginFails { throw CoreError.http(status: 409, code: "no_runner", message: "no runner can sign in") }
             loginStart = Date()
             codeAt = nil
+            guidedSentAt = nil
             loginLabel = label
+            loginProvider = provider
             return try await login("lg_demo")
         }
         func login(_ id: String) async throws -> LoginItem {
             let t = Date()
             var state = "starting"
             var account: Int64?
-            if let c = codeAt {
+            if loginProvider != "claude-sub", let s = loginStart {
+                // A runner-bound sign-in (device code): the person finishes on the provider's page.
+                state = t.timeIntervalSince(s) > 4.2 ? "done" : t.timeIntervalSince(s) > 1.2 ? "open_url" : "starting"
+                if SignInStyle.of(loginProvider) == .guided {
+                    // Waits for a typed line, then finishes a couple of seconds later.
+                    state = guidedSentAt.map { t.timeIntervalSince($0) > 2 ? "done" : "open_url" }
+                        ?? (t.timeIntervalSince(s) > 1.2 ? "open_url" : "starting")
+                }
+                if state == "done" {
+                    if !accountList.contains(where: { $0.label == loginLabel }) {
+                        accountList.append(a(31, loginLabel, loginProvider, "active", "dev1", 1, used: 0))
+                        orderEntries.append(
+                            AIOrderEntry(account: 31, provider: loginProvider, harness: nil, model: nil))
+                    }
+                    account = 31
+                }
+            } else if let c = codeAt {
                 state = t.timeIntervalSince(c) > 1.5 ? "done" : "storing"
                 if state == "done" {
                     if !accountList.contains(where: { $0.label == loginLabel }) {
@@ -229,9 +249,9 @@ public final class AccountsDemo {
                 state = "open_url"
             }
             return LoginItem(
-                id: id, provider: "claude-sub", label: loginLabel, runner: "linux-01", state: state,
-                url: state == "open_url" ? "https://claude.ai/login" : nil, reason: nil,
-                accountID: account)
+                id: id, provider: loginProvider, label: loginLabel, runner: "linux-01", state: state,
+                url: state == "open_url" ? "https://example.invalid/login" : nil, reason: nil,
+                accountID: account, code: loginProvider == "codex-sub" ? "K7QM-4XZP" : nil)
         }
         func sendLoginCode(_ id: String, code: String) async throws -> LoginItem {
             codeAt = Date()
@@ -374,7 +394,12 @@ public final class AccountsDemo {
             [
                 AccountRunner(
                     id: "r_linux01", name: "linux-01", online: true,
-                    commands: noLogin ? ["gateway"] : ["gateway", "login", "subscription-env"],
+                    commands: noLogin
+                        ? ["gateway"]
+                        : [
+                            "gateway", "login", "subscription-env", "login-bound:codex", "login-bound:opencode",
+                            "login-bound:agy",
+                        ],
                     drivers: ["agent"]),
                 AccountRunner(id: "r_mac", name: "studio-mac", online: true),
                 AccountRunner(id: "r_old", name: "old-box", online: false),
@@ -401,6 +426,13 @@ public final class AccountsDemo {
             }
         }
         var keyFails: String?
+        /// The AI order sample (`AIOrderDemo`): on, the Core speaks API minor 95.
+        var order010 = false
+        /// Models the demo's person switched off, by account (0.10).
+        var deniedModels: [Int64: Set<String>] = [:]
+        var orderEntries: [AIOrderEntry] = []
+        var agentOrders: [AIOrderOverride] = []
+        var loginProvider = "claude-sub"
         func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem
         {
             try await Task.sleep(for: .seconds(1))
@@ -427,6 +459,23 @@ public final class AccountsDemo {
                     members: $0.members.filter { $0 != id })
             }
         }
+        /// The demo's 10 s Undo window: the removed account waits here with its place in the order.
+        private var removedAccount: (item: AccountItem, entry: AIOrderEntry?, at: Int)?
+        func removeAccount(_ id: Int64) async throws -> Date? {
+            guard let item = accountList.first(where: { $0.id == id }) else { return nil }
+            let at = orderEntries.firstIndex { $0.account == id } ?? orderEntries.count
+            removedAccount = (item, orderEntries.first { $0.account == id }, at)
+            try await deleteAccount(id)
+            orderEntries.removeAll { $0.account == id }
+            return Date().addingTimeInterval(10)
+        }
+        func restoreAccount(_ id: Int64) async throws {
+            guard let r = removedAccount, r.item.id == id else { throw CoreError.invalidInput("Too late to undo.") }
+            removedAccount = nil
+            accountList.append(r.item)
+            // The seat comes back last, as the Core does; the app puts the row back where it stood.
+            orderEntries.append(r.entry ?? AIOrderEntry(account: id, provider: r.item.provider, harness: nil, model: nil))
+        }
     }
 
     public static let scenes = [
@@ -446,6 +495,8 @@ public final class AccountsDemo {
         "settings-gate",
         "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit", "usage-limit-clear",
         "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
+        "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
+        "ai-order-advanced",
     ]
 
     let model: AccountsModel
@@ -477,9 +528,13 @@ public final class AccountsDemo {
         model.chainSelection = scene == "chains-second" || scene == "chain-delete" ? 2 : nil
         model.opener = { _ in }
         model.signIn = nil
+        model.advancedOpen = false
         model.installs = [:]
         switch scene {
         case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
+        case "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
+            "ai-order-advanced":
+            svc.useAIOrderSample(limitHit: scene == "ai-order-limit-hit")
         case "connect-installing": svc.noLogin = true
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
@@ -502,7 +557,6 @@ public final class AccountsDemo {
         default: break
         }
         model.use(svc)
-        model.connections.use(SampleConnections(), sample: true)  // the Connections tab counts its sample connections
         try? await Task.sleep(for: .milliseconds(500))
         let page: AccountsPage =
             switch scene {
@@ -542,6 +596,10 @@ public final class AccountsDemo {
         try? await Task.sleep(for: .milliseconds(600))
         if scene == "accounts-need" { model.filter = .need }
         switch scene {
+        case "ai-order-add-pick": AccountDialogs.openConnect(model, provider: nil)
+        case "ai-order-add-key": AccountDialogs.openConnect(model, provider: "anthropic")
+        case "ai-order-add-signin": AccountDialogs.openConnect(model, provider: "codex-sub")
+        case "ai-order-advanced": model.advancedOpen = true
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
         case "connect-key", "connect-name", "connect-place":
             ConnectWizardState.debugStep =

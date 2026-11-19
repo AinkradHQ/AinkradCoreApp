@@ -56,15 +56,18 @@ struct AccountsView: View {
 
     /// The pages as tiles. Spend holds Budgets, Costs, Ledger and Prices, which the Core does not fill yet.
     static let tabs: [(title: String, page: AccountsPage)] = [
-        ("Accounts", .accounts), ("Spending", .spending), ("Connections", .connections),
+        ("Accounts", .accounts), ("Spending", .spending),
     ]
 
-    private var tabs: [(title: String, page: AccountsPage)] { Self.tabs }
+    /// From Core 0.10 the order list and Connections are the two places; Pools, Chains and Spending live under Advanced.
+    private var tabs: [(title: String, page: AccountsPage)] {
+        model.aiOrderOn ? Self.tabs.filter { $0.page != .spending } : Self.tabs
+    }
 
     /// Pools and Chains (Advanced) belong to the Accounts tab; the four older spend pages to Spending.
     private func on(_ page: AccountsPage) -> Bool {
         switch page {
-        case .accounts: [.accounts, .pools, .chains].contains(model.page)
+        case .accounts: [.accounts, .pools, .chains].contains(model.page) || (model.aiOrderOn && model.page.isSpend)
         case .spending: model.page.isSpend
         default: model.page == page
         }
@@ -74,7 +77,6 @@ struct AccountsView: View {
         switch page {
         case .accounts: model.accounts.count
         case .spending: model.budgets.filter { $0.standing == .stopped }.count.nonZero ?? -1
-        case .connections: model.connections.items.count
         default: -1
         }
     }
@@ -124,16 +126,13 @@ struct AccountsView: View {
                 Task { await model.reloadCosts() }
             }
             .keyboardShortcut("r", modifiers: .command)
-        case .connections:
-            AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
-                ConnDialogs.openConnect(model.connections, kind: nil)
-            }
-            .keyboardShortcut("n", modifiers: .command).disabled(model.connections.service == nil)
         default:
-            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
-                AccountDialogs.openConnect(model, provider: nil, advanced: true)
+            if !model.aiOrderOn {
+                AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+                    AccountDialogs.openConnect(model, provider: nil, advanced: true)
+                }
+                .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
             }
-            .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
             AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
                 AccountDialogs.openConnect(model, provider: nil)
             }
@@ -159,8 +158,6 @@ struct AccountsView: View {
             AccStateCard(
                 symbol: "wifi.slash", title: "Not connected",
                 text: "Accounts and pools come from your Core. This Mac is not connected to one right now.")
-        } else if model.page == .connections {
-            ConnectionsTab(model: model.connections).transition(.opacity)
         } else if model.page.isSpend {
             Group {
                 switch model.page {
@@ -182,7 +179,12 @@ struct AccountsView: View {
                     switch model.page {
                     case .pools: PoolsPage(model: model)
                     case .chains: ChainsPage(model: model)
-                    default: AccountsHome(model: model)
+                    default:
+                        if model.aiOrderOn && model.detail == nil {
+                            AIOrderView(model: model)
+                        } else {
+                            AccountsHome(model: model)
+                        }
                     }
                 }
                 .transition(.opacity)
