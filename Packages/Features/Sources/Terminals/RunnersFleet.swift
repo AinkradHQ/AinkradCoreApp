@@ -1,4 +1,5 @@
 import CoreUI
+import Shell
 import SwiftUI
 
 /// Where a runner stands, in the four words of the Runners screen (mockup 12). Only what the Core reports: a runner
@@ -6,9 +7,19 @@ import SwiftUI
 enum RunnerBucket: String, CaseIterable, Identifiable, Sendable {
     case working = "Working"
     case idle = "Idle"
+    /// A tool install under way (Core API minor 95): the chip says "Updating", the tile "Getting ready".
+    case updating = "Getting ready"
     case attention = "Not answering"
     case offline = "Offline"
     var id: String { rawValue }
+    /// The word on a runner's chip.
+    var chip: String { self == .updating ? "Updating" : rawValue }
+
+    /// An online runner that is getting its tools reads as `.updating`; offline and not answering still win.
+    static func of(_ r: RunnerItem, updating: Bool) -> RunnerBucket {
+        let b = RunnerBucket(of: r)
+        return updating && (b == .idle || b == .working) ? .updating : b
+    }
 
     init(of r: RunnerItem) {
         switch RunnerStatus(r) {
@@ -25,6 +36,7 @@ enum RunnerBucket: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .working: "play.fill"
         case .idle: "pause.fill"
+        case .updating: "arrow.triangle.2.circlepath"
         case .attention: "exclamationmark.triangle"
         case .offline: "power"
         }
@@ -34,16 +46,18 @@ enum RunnerBucket: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .working: .run
         case .idle: .queue
+        case .updating: .done
         case .attention: .warn
         case .offline: .fail
         }
     }
 
     /// "2 are busy, 1 is not answering."; empty when there is nothing to say.
-    static func sentence(_ runners: [RunnerItem]) -> String {
-        let counts = Dictionary(grouping: runners, by: { RunnerBucket(of: $0) }).mapValues(\.count)
+    static func sentence(_ runners: [RunnerItem], updating: Set<String> = []) -> String {
+        let counts = Dictionary(grouping: runners, by: { of($0, updating: updating.contains($0.id)) }).mapValues(\.count)
         var parts: [String] = []
         if let n = counts[.working] { parts.append("\(n) \(n == 1 ? "is" : "are") busy") }
+        if let n = counts[.updating] { parts.append("\(n) \(n == 1 ? "is" : "are") getting ready") }
         if let n = counts[.attention] { parts.append("\(n) \(n == 1 ? "is" : "are") not answering") }
         if let n = counts[.offline] { parts.append("\(n) \(n == 1 ? "is" : "are") offline") }
         guard let first = parts.first else { return "" }
@@ -60,8 +74,8 @@ struct RunnerSummary: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            ForEach(RunnerBucket.allCases) { b in
-                let n = model.runners.filter { RunnerBucket(of: $0) == b }.count
+            ForEach(RunnerBucket.allCases.filter { $0 != .updating || model.showsUpdates }) { b in
+                let n = model.runners.filter { model.bucket($0) == b }.count
                 let on = model.runnerBucket == b
                 Button {
                     model.runnerBucket = on ? nil : b
@@ -97,7 +111,7 @@ struct RunnerRow: View {
 
     var body: some View {
         let facts = RunnerFacts(runner: runner)
-        let bucket = RunnerBucket(of: runner)
+        let bucket = model.bucket(runner)
         let mine = model.host.thisMacRunnerID == runner.id
         Button {
             model.runnerDetail = runner.id
@@ -112,7 +126,7 @@ struct RunnerRow: View {
                         if runner.builtIn { BuiltInBadge() }
                         if mine { ThisMacBadge() }
                     }
-                    Text(Self.line(runner, bucket, terminals: model.onRunner(runner.id)))
+                    Text(Self.line(runner, bucket, terminals: model.onRunner(runner.id), install: model.installing(runner.id)))
                         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
                 }
                 .frame(width: 240, alignment: .leading)
@@ -123,7 +137,7 @@ struct RunnerRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                StateBadge(bucket.rawValue, tone: bucket.tone, symbol: bucket.symbol)
+                StateBadge(bucket.chip, tone: bucket.tone, symbol: bucket.symbol)
                 Image(systemName: "chevron.right").foregroundStyle(palette.text2).accessibilityHidden(true)
             }
             .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
@@ -135,12 +149,15 @@ struct RunnerRow: View {
         .buttonStyle(.coreQuietPress)
         .onHover { hovering = $0 }
         .help("Open \(runner.name)")
-        .accessibilityLabel("\(runner.name), \(bucket.rawValue)")
+        .accessibilityLabel("\(runner.name), \(bucket.chip)")
     }
 
     /// "Working on 2 AI sessions and 1 terminal", "Idle · ready for work", "Offline · last seen 2 hours ago".
-    static func line(_ r: RunnerItem, _ b: RunnerBucket, terminals: Int) -> String {
+    static func line(_ r: RunnerItem, _ b: RunnerBucket, terminals: Int, install: ToolInstall? = nil) -> String {
         switch b {
+        case .updating:
+            guard let i = install else { return "Getting ready · installing tools" }
+            return "Getting ready · installing \(RunnerUpdates.name(i.tool)) · \(i.percent)%"
         case .working:
             let a = r.slots?.agentsUsed ?? 0
             let t = r.slots?.terminalsUsed ?? terminals

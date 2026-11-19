@@ -145,19 +145,6 @@ struct NotificationsSection: View {
                             .disabled(!allowed)
                         }
                     }
-                    ForEach(
-                        [
-                            ("A session fails", "xmark.octagon"), ("A session finishes", "checkmark.circle"),
-                            ("A session stalls", "pause.circle"),
-                        ],
-                        id: \.0
-                    ) { title, symbol in
-                        GlassToggleTile(
-                            title, sub: "Coming: your Core can't send this yet.", symbol: symbol,
-                            isOn: .constant(false), fill: true
-                        )
-                        .disabled(true).opacity(0.55)
-                    }
                 }
                 BannerPreview()
             }

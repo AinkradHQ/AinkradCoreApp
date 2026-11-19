@@ -5,6 +5,8 @@ import Foundation
 import Shell
 
 struct HomeRunner: Equatable, Sendable {
+    /// The runner's device id, the key of its `runner.tool_install` events; empty when the source has none.
+    var id: String = ""
     var name: String
     var arch: String?
     var online: Bool
@@ -44,7 +46,7 @@ struct LiveHomeSource: HomeSource {
         try await run {
             try await client.listRunners().ok.body.json.map { r in
                 HomeRunner(
-                    name: r.name, arch: r.arch, online: r.online ?? false, capacity: Int(r.capacity ?? 0),
+                    id: r.id, name: r.name, arch: r.arch, online: r.online ?? false, capacity: Int(r.capacity ?? 0),
                     load: Int(r.load ?? 0),
                     perCore: r.hostLoad.flatMap { $0.cores > 0 ? $0.avg1 / Double($0.cores) : nil })
             }
@@ -143,7 +145,8 @@ final class HomeFeed {
                 if let p = m.perCore { h = Array((h + [min(1, p)]).suffix(12)) }
                 history[m.name] = h
                 return .init(
-                    id: m.name, os: m.arch ?? "runner", online: m.online, slots: m.capacity, used: m.load, load: h)
+                    id: m.name, os: m.arch ?? "runner", online: m.online, slots: m.capacity, used: m.load, load: h,
+                    runnerID: m.id)
             }
         }
         if let c = try? await source.costs() {

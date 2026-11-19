@@ -48,7 +48,8 @@ struct AccountsView: View {
             }
             footer
         }
-        .paneLook(AccountsPrefs.shared.look)
+        .paneLook(AppLookPrefs.shared("accounts").look)
+        .appLookTheme(AppLookPrefs.shared("accounts"))
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts-pane")

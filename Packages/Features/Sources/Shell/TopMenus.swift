@@ -147,7 +147,12 @@ struct RunnersPanel: View {
                     }
                 }
             }
-            HStack {
+            ForEach(machines) { m in if let u = update(m) { updatingRow(m, u) } }
+            HStack(spacing: Space.s3) {
+                if shell.showsRunnerUpdates, !machines.isEmpty {
+                    Text(footnote(machines)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                        .lineLimit(2)
+                }
                 Spacer(minLength: 0)
                 Button("Open Runners") { go("runners") }.buttonStyle(CoreButtonStyle(.plain))
             }
@@ -162,57 +167,39 @@ struct RunnersPanel: View {
     private func sub(_ m: HomeSnapshot.Machine) -> String {
         m.used > 0 && m.online ? "\(m.os) · \(m.used) \(m.used == 1 ? "task" : "tasks")" : m.os
     }
+    /// The runner being updated, only on a Core that reports it (API minor 95) and only while it is online.
+    private func update(_ m: HomeSnapshot.Machine) -> RunnerUpdate? {
+        shell.showsRunnerUpdates && m.online ? shell.runnerUpdates[m.runnerID] : nil
+    }
     private func state(_ m: HomeSnapshot.Machine) -> (String, Tone) {
-        !m.online ? ("Offline", .fail) : m.used > 0 ? ("Running", .run) : ("Idle", .queue)
+        !m.online ? ("Offline", .fail) : update(m) != nil ? ("Updating", .done) : m.used > 0 ? ("Running", .run) : ("Idle", .queue)
+    }
+    private func footnote(_ ms: [HomeSnapshot.Machine]) -> String {
+        let names = ms.filter { update($0) != nil }.map(\.id)
+        return names.isEmpty
+            ? "All runners are on the latest tools." : "All runners are on the latest tools except \(names.joined(separator: ", "))."
+    }
+    /// "Updating Dune": the tools update by themselves, so the row only shows how far it is.
+    private func updatingRow(_ m: HomeSnapshot.Machine, _ u: RunnerUpdate) -> some View {
+        Button { go("runners") } label: {
+            HStack(spacing: Space.s3) {
+                IconTile("arrow.triangle.2.circlepath", hue: GlassInk.blue, size: MacSize.controlLg)
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    Text("Updating \(m.id)").coreFont(size: MacTextSize.body, weight: .semibold)
+                    Text("Tools update by themselves, nothing to do").coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(palette.text2)
+                    CoreMeter(u.fraction, label: "Updating \(m.id)")
+                }
+            }
+            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+            .background(GlassInk.well, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Updating \(m.id), \(u.percent) percent. \(u.toolName)")
     }
     private func go(_ id: String) {
         shell.topMenu = nil
         shell.launcher.entry(id)?.run()
-    }
-}
-
-/// The Brain dropdown: how it is, what it does now and how much it knows.
-struct BrainPanel: View {
-    @Bindable var shell: ShellModel
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        let glance = shell.brainGlance?()
-        return VStack(alignment: .leading, spacing: Space.s3) {
-            if let g = glance {
-                DropHead(
-                    symbol: "brain", title: "Brain", meta: g.status,
-                    badge: DropBadge(g.healthy ? "Healthy" : "Needs a look", tone: g.healthy ? .done : .warn))
-                if let doing = g.doing {
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        Text("Doing now").coreFont(size: MacTextSize.meta, weight: .semibold)
-                            .foregroundStyle(palette.text2)
-                        Text(doing).coreFont(size: MacTextSize.headline, weight: .semibold)
-                        if let p = g.progress { CoreMeter(p, label: "Brain progress") }
-                    }
-                    .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GlassInk.well, in: coreShape(Radius.cardMac))
-                }
-                if !g.stats.isEmpty {
-                    HStack(spacing: Space.s2) { ForEach(g.stats) { DropStat("\($0.count)", $0.label) } }
-                }
-            } else {
-                DropHead(
-                    symbol: "brain", title: "Brain", meta: "Not ready yet", badge: DropBadge("Waiting", tone: .queue))
-            }
-            HStack {
-                Spacer(minLength: 0)
-                Button("Open Brain") {
-                    shell.topMenu = nil
-                    shell.launcher.entry("brain")?.run()
-                }
-                .buttonStyle(CoreButtonStyle(.prominent))
-            }
-        }
-        .padding(Space.s4)
-        .frame(width: Space.s8 * 13)
-        .corePanel(radius: Radius.pane, padding: 0, part: .popups)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Brain")
     }
 }

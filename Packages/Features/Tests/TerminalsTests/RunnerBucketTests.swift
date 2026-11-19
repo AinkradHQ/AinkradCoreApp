@@ -26,4 +26,24 @@ struct RunnerBucketTests {
         #expect(RunnerRow.line(r, .working, terminals: 0) == "Working on 2 AI sessions and 1 terminal")
         #expect(RunnerRow.line(r, .idle, terminals: 0) == "Idle · ready for work")
     }
+
+    @Test func aRunnerGettingItsToolsIsUpdating() {
+        #expect(RunnerBucket.of(runner(), updating: true) == .updating)
+        #expect(RunnerBucket.of(runner(online: false), updating: true) == .offline)
+        #expect(RunnerBucket.of(runner(), updating: false) == .working)
+        #expect(RunnerBucket.updating.chip == "Updating")
+        #expect(RunnerBucket.sentence([runner("r1"), runner("r2")], updating: ["r2"]) == " 1 is busy, 1 is getting ready.")
+        #expect(RunnerRow.line(runner(), .updating, terminals: 0) == "Getting ready · installing tools")
+        let i = ToolInstall(op: "o", tool: "node", state: .running, percent: 64, step: "")
+        #expect(RunnerRow.line(runner(), .updating, terminals: 0, install: i) == "Getting ready · installing Node.js · 64%")
+    }
+
+    @MainActor @Test func theCoreReportsInstallsOnlyFromMinor95() {
+        let m = TerminalsModel(host: FakeHost(), service: FakeService())
+        m.runners = [runner("r1")]
+        m.toolInstall(["runner": "r1", "tool": "node", "state": "running", "percent": "64"])
+        #expect(m.bucket(m.runners[0]) == .working, "an older Core never shows Updating")
+        m.showsUpdates = true
+        #expect(m.bucket(m.runners[0]) == .updating && m.updatingIDs == ["r1"])
+    }
 }
