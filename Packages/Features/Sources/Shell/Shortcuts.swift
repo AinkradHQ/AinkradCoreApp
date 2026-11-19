@@ -35,7 +35,8 @@ enum ShortcutCatalog {
             "Launcher",
             [
                 ("Move", "↑ ↓  ⌃N ⌃P"), ("Page", "⇞ ⇟"), ("First or last", "⌘↑ ⌘↓"), ("Open", "↵"),
-                ("Pick a result", "⌘1–9"), ("Close", "esc"),
+                ("Pick a result", "⌘1–9"), ("Next group", "⇥"), ("Open beside", "⌘↵"), ("Copy name", "⌥↵"),
+                ("Actions", "→"), ("Close", "esc"),
             ]
         ),
     ]

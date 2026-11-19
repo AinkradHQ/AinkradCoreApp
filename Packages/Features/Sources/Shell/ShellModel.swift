@@ -292,6 +292,7 @@ public final class ShellModel {
         if !WidgetKind.boardShown { widgets.items.removeAll { $0.kind == .board } }
         showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         spaces = [Workspace(id: currentSpace)]
+        launcher.attach(defaults)
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
         // Follow the sun changes sides at 07:00 and 18:00: look again every minute.
@@ -531,6 +532,7 @@ public final class ShellModel {
         bellOpen = false
         elevationPanelOpen = false
         connectionPanelOpen = false
+        if !launcherOpen { launcher.refreshPicks() }
         launcherOpen.toggle()
     }
 
