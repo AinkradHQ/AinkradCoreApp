@@ -80,13 +80,13 @@ import Testing
         m.runners = [r]
         m.applyReported()
         #expect(m.installs[r.id]?["claude"]?.percent == 55)
-        // Done: nothing in flight, and the tool counts as installed before the runner restarts to probe it.
+        // Done: nothing in flight, and the report alone does not make the tool installed (only the runner's probe does).
         var done = runner()
         RunnerReportWire(
             id: "r1", home: nil, lastError: nil,
             toolInstall: .init(tool: "codex", state: "done", percent: 100, step: "Installed", reason: nil)
         ).apply(to: &done)
-        #expect(done.tools["codex"] == "")
+        #expect(done.tools["codex"] == nil)
         m.runners = [done]
         m.applyReported()
         #expect(m.installs[done.id] == nil)
