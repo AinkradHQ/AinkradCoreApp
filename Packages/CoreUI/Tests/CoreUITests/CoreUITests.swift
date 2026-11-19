@@ -157,3 +157,28 @@ struct KeyboardFocusTests {
         #expect(CoreInputMode.navigationKeys.contains(48), "Tab navigates")
     }
 }
+
+@MainActor struct AppLookPrefsTests {
+    private func suite() -> UserDefaults {
+        let name = "applook-test-\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
+    @Test func followsAppearanceByDefault() {
+        let p = AppLookPrefs(app: "lore", defaults: suite())
+        #expect(!p.own && p.palette == nil)
+    }
+
+    @Test func ownFlagRoundTrips() {
+        let d = suite()
+        let p = AppLookPrefs(app: "lore", defaults: d)
+        p.own = true
+        p.day = true
+        p.accent = .teal
+        let q = AppLookPrefs(app: "lore", defaults: d)
+        #expect(q.own && q.day && q.accent == .teal && q.palette?.isDay == true)
+        #expect(!AppLookPrefs(app: "design", defaults: d).own)
+    }
+}

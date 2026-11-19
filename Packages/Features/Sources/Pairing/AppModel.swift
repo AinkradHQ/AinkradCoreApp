@@ -135,6 +135,15 @@ public final class AppModel {
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
+        shell.devicesGlance = { [weak devices] in
+            (devices?.active ?? []).prefix(4).map { d in
+                DeviceGlance(
+                    id: d.id, name: d.name,
+                    sub: devices?.isMe(d) == true ? "\(DeviceWords.platform(d.platform)) · this device" : "Last seen \(DeviceWords.seen(d.lastUsed).lowercased())",
+                    symbol: DeviceWords.symbol(d.kind, d.platform),
+                    online: !d.cutOff && (d.lastUsed.map { Date().timeIntervalSince($0) < 300 } ?? false))
+            }
+        }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
