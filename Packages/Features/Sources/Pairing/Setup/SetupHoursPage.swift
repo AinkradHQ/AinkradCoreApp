@@ -21,18 +21,22 @@ struct SetupHoursPage: View {
             switch profile.hoursMode {
             case .set: setHours
             case .vary:
-                note("sparkles", "Your days change, and that is fine",
+                note(
+                    "sparkles", "Your days change, and that is fine",
                     "Ainkrad learns your rhythm from when you are active, and only asks when it is unsure.")
             case .onCall:
                 note("bell", "Any hour can be work time", "The AI can reach you any time, except your quiet hours.")
                 axis
                 HStack(spacing: Space.s3) {
-                    Text("Quiet").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).frame(width: 52, alignment: .leading)
+                    Text("Quiet").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).frame(
+                        width: 52, alignment: .leading)
                     track(
                         profile.quiet, empty: "No quiet hours",
-                        menu: [("Night · 22 to 6", [.init(from: 22, to: 24), .init(from: 0, to: 6)]),
+                        menu: [
+                            ("Night · 22 to 6", [.init(from: 22, to: 24), .init(from: 0, to: 6)]),
                             ("Late night · 0 to 7", [.init(from: 0, to: 7)]),
-                            ("Early · 23 to 7", [.init(from: 23, to: 24), .init(from: 0, to: 7)])],
+                            ("Early · 23 to 7", [.init(from: 23, to: 24), .init(from: 0, to: 7)]),
+                        ],
                         remove: ("No quiet hours", { profile.quiet = [] })
                     ) { profile.quiet = $0 }
                 }
@@ -75,9 +79,13 @@ struct SetupHoursPage: View {
                     .accessibilityLabel("\(d), \(bands.isEmpty ? "day off" : "working")")
                     track(
                         bands, empty: "Day off",
-                        menu: [("Morning · 6 to 12", [.init(from: 6, to: 12)]), ("Day · 9 to 17", [.init(from: 9, to: 17)]),
-                            ("Afternoon · 13 to 18", [.init(from: 13, to: 18)]), ("Evening · 18 to 23", [.init(from: 18, to: 23)]),
-                            ("Late · 20 to 24", [.init(from: 20, to: 24)])],
+                        menu: [
+                            ("Morning · 6 to 12", [.init(from: 6, to: 12)]),
+                            ("Day · 9 to 17", [.init(from: 9, to: 17)]),
+                            ("Afternoon · 13 to 18", [.init(from: 13, to: 18)]),
+                            ("Evening · 18 to 23", [.init(from: 18, to: 23)]),
+                            ("Late · 20 to 24", [.init(from: 20, to: 24)]),
+                        ],
                         remove: ("Remove this range", nil), day: d, quiet: false
                     ) { _ in }
                     CoreIconButton(symbol: "plus", label: "Add another range") { profile.addRange(d) }
@@ -110,7 +118,8 @@ struct SetupHoursPage: View {
             ZStack(alignment: .leading) {
                 coreShape(Radius.chip).fill(GlassInk.well)
                 if bands.isEmpty {
-                    Text(empty).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).padding(.leading, Space.s3)
+                    Text(empty).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).padding(
+                        .leading, Space.s3)
                 }
                 ForEach(Array(bands.enumerated()), id: \.offset) { i, b in
                     let w = g.size.width
@@ -118,7 +127,8 @@ struct SetupHoursPage: View {
                         coreShape(Radius.chip).fill(quiet ? palette.text2.opacity(0.6) : palette.primary)
                             .overlay {
                                 if b.to - b.from >= 3 {
-                                    Text(b.text).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(.white)
+                                    Text(b.text).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
+                                        .white)
                                 }
                             }
                             .frame(width: max(8, w * CGFloat(b.to - b.from) / 24), height: g.size.height - 4)
@@ -154,13 +164,16 @@ struct SetupHoursPage: View {
     // MARK: zones
 
     private static func zones(including current: String) -> [String] {
-        let common = ["Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Dubai", "Asia/Tokyo"]
+        let common = [
+            "Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Dubai", "Asia/Tokyo",
+        ]
         return Array(NSOrderedSet(array: [current] + common)) as? [String] ?? [current]
     }
 
     private static func label(_ id: String) -> String {
         guard let z = TimeZone(identifier: id) else { return id }
         let h = z.secondsFromGMT() / 3600
-        return "\(id.split(separator: "/").last.map { $0.replacingOccurrences(of: "_", with: " ") } ?? id) (UTC\(h >= 0 ? "+" : "")\(h))"
+        return
+            "\(id.split(separator: "/").last.map { $0.replacingOccurrences(of: "_", with: " ") } ?? id) (UTC\(h >= 0 ? "+" : "")\(h))"
     }
 }

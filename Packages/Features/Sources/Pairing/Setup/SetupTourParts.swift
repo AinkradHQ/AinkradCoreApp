@@ -12,7 +12,8 @@ struct SetupFlow: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let r = arrange(bounds.width, subviews)
         for (i, f) in r.frames.enumerated() {
-            subviews[i].place(at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(f.size))
+            subviews[i].place(
+                at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(f.size))
         }
     }
 
@@ -83,8 +84,10 @@ struct SetupOption: View {
                 IconTile(symbol, hue: on ? GlassInk.blue : GlassInk.slate, size: 40)
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
                 if !sub.isEmpty {
-                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(
+                        .center
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity).padding(.vertical, Space.s4).padding(.horizontal, Space.s2)

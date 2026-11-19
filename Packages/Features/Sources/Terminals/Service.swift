@@ -207,7 +207,9 @@ struct LiveTerminalService: TerminalService {
     }
 
     private func reported() async -> [String: RunnerReportWire]? {
-        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/runners") else { return nil }
+        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/runners") else {
+            return nil
+        }
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
         guard let all = try? d.decode([RunnerReportWire].self, from: data) else { return nil }
@@ -453,7 +455,8 @@ struct RunnerReportWire: Decodable {
         r.lastError = lastError
         guard let t = toolInstall else { return }
         let state = ToolInstall.State(rawValue: t.state) ?? .running
-        r.reported = ToolInstall(op: "report", tool: t.tool, state: state, percent: t.percent, step: t.step, reason: t.reason)
+        r.reported = ToolInstall(
+            op: "report", tool: t.tool, state: state, percent: t.percent, step: t.step, reason: t.reason)
         // A report alone never marks a tool installed: only the runner's own probe (`tools`) does, after it restarts.
     }
 }

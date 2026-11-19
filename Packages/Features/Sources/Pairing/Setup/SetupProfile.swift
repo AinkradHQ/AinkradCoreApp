@@ -21,10 +21,15 @@ struct SetupProfile: Equatable {
     static let roles = ["Build software", "Design", "Write and plan", "Research", "Run a team", "Something else"]
     static let workKinds = ["New products", "Client projects", "Maintenance", "Open source", "Learning", "Operations"]
     static let languages = ["Swift", "TypeScript", "Python", "Go", "Rust", "PHP", "Java", "C#", "Ruby", "Kotlin"]
-    static let tools = ["Git", "Docker", "Xcode", "VS Code", "Figma", "Linear", "Notion", "Slack", "GitHub", "Postgres"]
+    static let tools = [
+        "Git", "Docker", "Xcode", "VS Code", "Figma", "Linear", "Notion", "Slack", "GitHub", "Postgres",
+    ]
     static let hosting = ["This Mac", "A home server", "Cloud", "Containers"]
     static let tones = [
-        ("Short and direct", "The answer first, no extras.", "Likes short, direct answers: the answer first, no extras."),
+        (
+            "Short and direct", "The answer first, no extras.",
+            "Likes short, direct answers: the answer first, no extras."
+        ),
         ("Friendly and clear", "Plain words, a bit of warmth.", "Likes friendly, clear answers in plain words."),
         ("Detailed", "Full reasoning, step by step.", "Likes detailed answers with the full reasoning, step by step."),
     ]
@@ -137,13 +142,17 @@ struct SetupProfile: Equatable {
         switch hoursMode {
         case .set:
             if hoursTouched {
-                out.append(Item(key: "hours", body: String("Works \(Self.hoursText(hours)) (\(timeZone)).".prefix(200))))
+                out.append(
+                    Item(key: "hours", body: String("Works \(Self.hoursText(hours)) (\(timeZone)).".prefix(200))))
             }
         case .vary:
             out.append(Item(key: "hours", body: "Work hours change from day to day. Ask rather than assume."))
         case .onCall:
             let q = quiet.sorted().map(\.text).joined(separator: " and ")
-            let line = q.isEmpty ? "On call: any hour can be work time." : "On call: any hour is work time except quiet hours \(q) (\(timeZone))."
+            let line =
+                q.isEmpty
+                ? "On call: any hour can be work time."
+                : "On call: any hour is work time except quiet hours \(q) (\(timeZone))."
             out.append(Item(key: "hours", body: String(line.prefix(200))))
         }
         if let tone, Self.tones.indices.contains(tone) { out.append(Item(key: "tone", body: Self.tones[tone].2)) }

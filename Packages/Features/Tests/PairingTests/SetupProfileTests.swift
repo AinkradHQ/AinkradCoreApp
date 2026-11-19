@@ -75,7 +75,12 @@ struct SetupProfileTests {
 struct SetupTourTests {
     @Test func theTourRunsOnlyWhenArmedAndSavesTheProfileLeavingTheLastAboutYouPage() async {
         var sent: [[SetupProfile.Item]] = []
-        let m = SetupTourModel(macRunner: nil, save: { sent.append($0); return true })
+        let m = SetupTourModel(
+            macRunner: nil,
+            save: {
+                sent.append($0)
+                return true
+            })
         m.startIfArmed()
         #expect(!m.isActive)
         m.arm()
@@ -90,7 +95,12 @@ struct SetupTourTests {
     }
 
     @Test func skippingEverythingSendsNothingAndSaysSo() {
-        let m = SetupTourModel(macRunner: nil, save: { _ in Issue.record("nothing to send"); return true })
+        let m = SetupTourModel(
+            macRunner: nil,
+            save: { _ in
+                Issue.record("nothing to send")
+                return true
+            })
         m.begin()
         while m.step != .ready { m.next() }
         #expect(m.aboutLine == "Skipped for now")
@@ -103,7 +113,12 @@ struct SetupTourTests {
 struct SetupDetourTests {
     @Test func anAboutYouDetourEndsOnTheWelcomePageAndSendsNothing() {
         var sent = 0
-        let m = SetupTourModel(macRunner: nil, save: { _ in sent += 1; return true })
+        let m = SetupTourModel(
+            macRunner: nil,
+            save: { _ in
+                sent += 1
+                return true
+            })
         m.beginDetour(.you)
         m.profile.roleSet = ["Design"]
         #expect(m.step == .role && !m.isFirst)

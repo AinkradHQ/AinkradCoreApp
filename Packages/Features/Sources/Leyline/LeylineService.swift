@@ -312,7 +312,8 @@ struct HostWire: Decodable {
             os: os, createdAt: Self.date(createdAt), runnerDevice: runnerDevice)
         h.reach = reach.map {
             HostReach(
-                up: $0.up, latencyMS: $0.latencyMs, checkedAt: Self.date($0.checkedAt), seenAt: $0.seenAt.flatMap(Self.date))
+                up: $0.up, latencyMS: $0.latencyMs, checkedAt: Self.date($0.checkedAt),
+                seenAt: $0.seenAt.flatMap(Self.date))
         }
         h.runnerInstall = runnerInstall.map { HostRunnerInstall(state: $0.state, mode: $0.mode, reason: $0.reason) }
         return h

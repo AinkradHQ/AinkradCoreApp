@@ -154,7 +154,10 @@ final class AddRunnerModel {
                 "Allow Ainkrad Core in System Settings > General > Login Items. The runner starts as soon as you do.")
         default:
             progress = app?.terminals?.runnerProgress(id: m.deviceID)
-            if let p = progress, p.online { connectedName = p.name; connectedID = p.id }
+            if let p = progress, p.online {
+                connectedName = p.name
+                connectedID = p.id
+            }
         }
     }
 
@@ -216,9 +219,14 @@ final class AddRunnerModel {
         }
     }
 
-    private func line(_ i: Int, _ title: String, _ working: String, _ note: String, at current: Int, bad: Bool = false, progress: Double? = nil) -> Check {
+    private func line(
+        _ i: Int, _ title: String, _ working: String, _ note: String, at current: Int, bad: Bool = false,
+        progress: Double? = nil
+    ) -> Check {
         let state: Check.State = bad && i == current ? .bad : i < current ? .done : i == current ? .current : .pending
-        return Check(id: i, title: title, working: working, note: note, state: state, progress: state == .current ? progress : nil)
+        return Check(
+            id: i, title: title, working: working, note: note, state: state,
+            progress: state == .current ? progress : nil)
     }
 
     private func thisMacChecks() -> [Check] {

@@ -103,7 +103,9 @@ struct SetupWizardView: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             Text("Welcome to Ainkrad").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
-            note("Your Core keeps your work, notes and AI in one calm place. Setup takes about three minutes, and you can skip anything.")
+            note(
+                "Your Core keeps your work, notes and AI in one calm place. Setup takes about three minutes, and you can skip anything."
+            )
             HStack(alignment: .top, spacing: Space.s3) {
                 welcomeTile("server.rack", "Your Core", "One place for everything") { model.getStarted() }
                 welcomeTile("person", "About you", "So the AI knows you") { startTour(.you) }
@@ -117,7 +119,8 @@ struct SetupWizardView: View {
         }
     }
 
-    private func welcomeTile(_ symbol: String, _ title: String, _ sub: String, open: @escaping () -> Void) -> some View {
+    private func welcomeTile(_ symbol: String, _ title: String, _ sub: String, open: @escaping () -> Void) -> some View
+    {
         Button(action: open) {
             VStack(spacing: Space.s1) {
                 IconTile(symbol, hue: GlassInk.blue, size: 36)
@@ -222,7 +225,9 @@ struct SetupWizardView: View {
     private var found: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             title("Your Core is here")
-            note("It is running and ready to connect. Compare the fingerprint below with the Fingerprint line your installer printed, and press Connect only if they are the same.")
+            note(
+                "It is running and ready to connect. Compare the fingerprint below with the Fingerprint line your installer printed, and press Connect only if they are the same."
+            )
             if let link = model.link {
                 FactCard {
                     FactRow(key: "Core", value: String(link.address.prefix(80)), mono: true, oneLine: true)
@@ -264,8 +269,10 @@ struct SetupWizardView: View {
                         IconTile("server.rack", hue: GlassInk.blue, size: 36)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(core.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                            Text("Fingerprint \(core.fingerprintHint)").coreFont(size: MacTextSize.meta, design: .monospaced)
-                                .foregroundStyle(palette.text2)
+                            Text("Fingerprint \(core.fingerprintHint)").coreFont(
+                                size: MacTextSize.meta, design: .monospaced
+                            )
+                            .foregroundStyle(palette.text2)
                         }
                         Spacer()
                     }

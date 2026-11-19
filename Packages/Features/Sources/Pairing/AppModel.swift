@@ -142,7 +142,9 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in await self?.saveMeProfile(items) ?? false }
+        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in
+            await self?.saveMeProfile(items) ?? false
+        }
         wizard.armTour = { [weak self] in self?.tour.arm() }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)

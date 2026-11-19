@@ -114,7 +114,9 @@ struct HostCards: View {
             HostDialogs.openEdit(model, host)
         } preview: {
             VStack(alignment: .leading, spacing: Space.s2) {
-                if let g = host.group { previewLine("folder", g) } else {
+                if let g = host.group {
+                    previewLine("folder", g)
+                } else {
                     previewLine("folder", "Not in a project yet")
                 }
                 if !host.tags.isEmpty {
@@ -279,8 +281,12 @@ private struct HostAdvancedSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(spacing: Space.s2) {
-                    row("lock", "Access and AI rules", "Route, sign-in, host key and what AI may do here") { go(.access) }
-                    row("chevron.right.2", "Commands and runbooks", "Pre-set commands and what they did") { go(.commands) }
+                    row("lock", "Access and AI rules", "Route, sign-in, host key and what AI may do here") {
+                        go(.access)
+                    }
+                    row("chevron.right.2", "Commands and runbooks", "Pre-set commands and what they did") {
+                        go(.commands)
+                    }
                     row("clock.arrow.circlepath", "History and recordings", "Everything you and AI did on this host") {
                         go(.history)
                     }
@@ -291,7 +297,8 @@ private struct HostAdvancedSheet: View {
                 }
                 HStack {
                     Spacer()
-                    Button("Done", action: close).buttonStyle(CoreButtonStyle(.prominent)).keyboardShortcut(.defaultAction)
+                    Button("Done", action: close).buttonStyle(CoreButtonStyle(.prominent)).keyboardShortcut(
+                        .defaultAction)
                 }
             }
         }
