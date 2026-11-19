@@ -70,6 +70,7 @@ public final class TerminalsModel {
     let service: any TerminalService
     private var reloading: Task<Void, Never>?
     private var registeredRunners: Set<String> = []
+    @ObservationIgnored private var registeredTerminals: Set<String> = []
 
     public convenience init(host: any TerminalHost, connection: CoreConnection) {
         self.init(
@@ -142,6 +143,7 @@ public final class TerminalsModel {
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
             syncRunners()
+            syncLauncherTerminals()
         } catch { load = .failed(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription) }
     }
 
@@ -220,6 +222,21 @@ public final class TerminalsModel {
                 id: "runners", title: "Runners", sub: "Load, drivers and isolation of each runner",
                 symbol: "server.rack", keywords: ["runner", "machine", "load"]
             ) { [weak self] in self?.openRunners() })
+    }
+
+    /// One launcher entry per terminal that is still there (⌘K → Terminals), opening its pane.
+    private func syncLauncherTerminals() {
+        let live = items.filter { ["created", "running"].contains($0.status) }
+        let ids = Set(live.map(\.id))
+        for gone in registeredTerminals.subtracting(ids) { shell.launcher.unregister("terminal-\(gone)") }
+        for t in live {
+            shell.launcher.register(
+                LauncherEntry(
+                    id: "terminal-\(t.id)", title: displayName(ofTerminal: t.id) ?? "Terminal",
+                    sub: "On \(name(of: t.runner))", symbol: "terminal", keywords: ["terminal", "shell", name(of: t.runner)]
+                ) { [weak self] in self?.openTerminal(t.id) })
+        }
+        registeredTerminals = ids
     }
 
     /// One launcher entry per runner, and a bell item for each runner that is off or slow.

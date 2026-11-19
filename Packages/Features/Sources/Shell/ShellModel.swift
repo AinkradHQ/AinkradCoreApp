@@ -154,6 +154,8 @@ public final class ShellModel {
     public var spaceNote: SpaceNote?
     /// The workspace switcher strip (⌃↑).
     public var spacesOpen = false
+    /// Set while the launcher opens something with ⌘↵: the app comes next to the current one, even from another workspace.
+    public var openBeside = false
     /// The open panes of the current workspace, in reading order of the tiling tree.
     public var panes: [PaneSpec] { allPanes.filter { paneSpace[$0.id] == currentSpace } }
     /// How the open panes of the current workspace are tiled (`tiles.js`): an N-ary split tree, equal columns until a seam is dragged or a pane is dropped.
@@ -354,7 +356,7 @@ public final class ShellModel {
     public func openPane(_ spec: PaneSpec) {
         animate {
             if let home = paneSpace[spec.id] {
-                enterSpace(home)
+                if openBeside && home != currentSpace { bringHere(spec.id) } else { enterSpace(home) }
                 if focusedPane != nil { focusedPane = spec.id }
             } else {
                 if needsNewSpace(for: spec) { openSpace(for: spec) }

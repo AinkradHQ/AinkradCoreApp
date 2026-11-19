@@ -60,6 +60,23 @@ extension ShellModel {
         }
     }
 
+    /// ⌘↵ on an app that is open in another workspace: it moves here, beside the current app, or into a new workspace when it
+    /// does not fit (the same rule as opening it new).
+    func bringHere(_ id: String) {
+        guard let home = paneSpace[id], home != currentSpace, let spec = allPanes.first(where: { $0.id == id }),
+            let k = spaces.firstIndex(where: { $0.id == home })
+        else { return }
+        spaces[k].tree.remove(id)
+        if spaces[k].active == id { spaces[k].active = spaces[k].tree.leaves.first }
+        if spaces[k].focused == id { spaces[k].focused = nil }
+        if spaces[k].tree.leaves.isEmpty { spaces.remove(at: k) }
+        paneSpace[id] = nil
+        if needsNewSpace(for: spec) { openSpace(for: spec) }
+        paneSpace[id] = currentSpace
+        tree.open(id)
+        focusedPane = nil
+    }
+
     /// Adds an empty workspace after the current one.
     func addSpace() -> UUID {
         let w = Workspace()

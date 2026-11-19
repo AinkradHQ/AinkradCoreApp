@@ -97,3 +97,91 @@ struct LauncherV2Tests {
         #expect(boosted.first?.entry.id == "Terminal tricks")
     }
 }
+
+@MainActor
+struct LauncherGridTests {
+    private func pick(_ id: String) -> LauncherLine {
+        .pick(LauncherPick(entry: LauncherEntry(id: id, title: id) {}, reason: ""))
+    }
+    private func group(_ s: LauncherSection) -> LauncherLine { .group(s, count: 1, open: false) }
+
+    @Test func picksMoveInTwoDimensionsAndLeaveTheGridDownwards() {
+        // five picks (3 rows: 0 1 / 2 3 / 4) then two groups
+        let l = (0..<5).map { pick("p\($0)") } + [group(.apps), group(.sessions)]
+        #expect(LauncherLines.move(l, from: 0, .right) == 1)
+        #expect(LauncherLines.move(l, from: 1, .right) == nil)
+        #expect(LauncherLines.move(l, from: 1, .left) == 0)
+        #expect(LauncherLines.move(l, from: 0, .left) == nil)
+        #expect(LauncherLines.move(l, from: 1, .down) == 3)
+        #expect(LauncherLines.move(l, from: 3, .down) == 5)  // no cell below: on to the first group
+        #expect(LauncherLines.move(l, from: 2, .down) == 4)
+        #expect(LauncherLines.move(l, from: 3, .up) == 1)
+        #expect(LauncherLines.move(l, from: 0, .up) == 6)  // wraps to the last line
+    }
+
+    @Test func fromTheFirstGroupUpGoesBackToTheLastRowOfPicks() {
+        let l = (0..<5).map { pick("p\($0)") } + [group(.apps), group(.sessions)]
+        #expect(LauncherLines.move(l, from: 5, .up) == 4)
+        #expect(LauncherLines.move(l, from: 5, .left) == nil)
+        #expect(LauncherLines.move(l, from: 6, .down) == 0)
+        let six = (0..<6).map { pick("p\($0)") } + [group(.apps)]
+        #expect(LauncherLines.move(six, from: 6, .up) == 4)
+    }
+
+    @Test func fallbacksAreOfferedByModulesAndTakeTheWords() {
+        let reg = LauncherRegistry()
+        var got = ""
+        reg.registerFallback(LauncherFallback(id: "ask", symbol: "sparkles", title: { "Ask AI about “\($0)”" }) { got = $0 })
+        reg.registerFallback(LauncherFallback(id: "ask", symbol: "sparkles", title: { "Ask \($0)" }) { got = $0 })
+        #expect(reg.fallbacks.count == 1 && reg.fallbacks[0].title("x") == "Ask x")
+        reg.fallbacks[0].run("hello")
+        #expect(got == "hello")
+    }
+
+    @Test func notesBelongToTheirOwnGroup() {
+        let e = LauncherEntry(id: "note-n_1", title: "Weekly plan") {}
+        #expect(LauncherSection.of(e) == .notes && LauncherSection.of(LauncherEntry(id: "project-3", title: "x") {}) == .projects)
+        #expect(LauncherSection.of(LauncherEntry(id: "terminal-t", title: "x") {}) == .terminals)
+    }
+}
+
+@MainActor
+struct OpenBesideTests {
+    private func spec(_ id: String, full: Bool = false) -> PaneSpec {
+        PaneSpec(id: id, title: id, symbol: "square", fullScreenOnly: full) { EmptyView() }
+    }
+
+    @Test func plainOpenSwitchesToTheWorkspaceItIsIn() {
+        let shell = ShellModel()
+        shell.workspaceWidth = 3000
+        shell.openPane(spec("a"))
+        shell.openPane(spec("design", full: true))
+        shell.openPane(spec("a"))
+        #expect(shell.spaceIndex == 0 && shell.allPanes.count == 2 && shell.spaces.count == 2)
+    }
+
+    @Test func openBesideMovesItNextToTheCurrentAppWhenItFits() {
+        let shell = ShellModel()
+        shell.workspaceWidth = 3000
+        shell.openPane(spec("a"))
+        shell.openPane(spec("design", full: true))
+        shell.openPane(spec("b"))  // third workspace, b alone
+        shell.switchSpace(to: 0)
+        shell.openBeside = true
+        shell.openPane(spec("b"))
+        #expect(shell.panes.map(\.id) == ["a", "b"] && shell.spaces.count == 2 && shell.activePane == "b")
+    }
+
+    @Test func openBesideGoesToANewWorkspaceWhenItDoesNotFit() {
+        let shell = ShellModel()
+        shell.workspaceWidth = 3000
+        shell.openPane(spec("a"))
+        shell.openPane(spec("design", full: true))
+        shell.switchSpace(to: 0)
+        shell.openBeside = true
+        shell.openPane(spec("design", full: true))
+        // design is full-screen-only and `a` is here: it gets a workspace of its own, which is where it already was.
+        #expect(shell.panes.map(\.id) == ["design"] && shell.allPanes.count == 2)
+        #expect(shell.spaces.count == 2)
+    }
+}

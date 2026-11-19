@@ -45,6 +45,11 @@ public struct LauncherEntry: Identifiable {
 public final class LauncherRegistry {
     public private(set) var entries: [LauncherEntry] = []
     public var recents: [String] = []
+    public private(set) var fallbacks: [LauncherFallback] = []
+    public func registerFallback(_ f: LauncherFallback) {
+        fallbacks.removeAll { $0.id == f.id }
+        fallbacks.append(f)
+    }
     /// The few suggestions the empty launcher opens with, ranked by use. Computed when the launcher opens and when something is
     /// opened from it, never while drawing.
     private(set) var picks: [LauncherPick] = []
@@ -110,6 +115,23 @@ struct LauncherRow: Identifiable {
     let matched: [Int]
     var score: Double = 0
     var id: String { entry.id }
+}
+
+/// What a search offers when nothing matches: modules register theirs ("Ask AI about …"), each takes the typed words.
+public struct LauncherFallback: Identifiable {
+    public let id: String
+    public let title: @MainActor (String) -> String
+    public let symbol: String
+    public let run: @MainActor (String) -> Void
+    public init(
+        id: String, symbol: String, title: @escaping @MainActor (String) -> String,
+        run: @escaping @MainActor (String) -> Void
+    ) {
+        self.id = id
+        self.symbol = symbol
+        self.title = title
+        self.run = run
+    }
 }
 
 /// Fuzzy ranking from the prototype (`shell-glance.js`): word starts beat prefixes beat substrings beat scattered letters.

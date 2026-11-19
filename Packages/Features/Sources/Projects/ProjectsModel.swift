@@ -131,6 +131,7 @@ public final class ProjectsModel {
             runStates = runs
             projects = list.map(applying)
             load = .ready
+            syncLauncherProjects()
             pollWhileCopying()
         } catch {
             // A list already on screen stays; only a first load that failed shows the failure.
@@ -139,6 +140,22 @@ public final class ProjectsModel {
     }
 
     @ObservationIgnored private var pollTask: Task<Void, Never>?
+    @ObservationIgnored private var registeredProjects: Set<String> = []
+
+    /// The twelve most recently touched projects as launcher entries (⌘K → Projects).
+    private func syncLauncherProjects() {
+        let recent = projects.prefix(12)
+        let ids = Set(recent.map { "project-\($0.id)" })
+        for gone in registeredProjects.subtracting(ids) { host.shell.launcher.unregister(gone) }
+        for p in recent {
+            host.shell.launcher.register(
+                LauncherEntry(
+                    id: "project-\(p.id)", title: p.name, sub: p.description.isEmpty ? "Project" : p.description,
+                    symbol: "folder", keywords: ["project", p.slug]
+                ) { [weak self] in self?.show(project: p.id) })
+        }
+        registeredProjects = ids
+    }
 
     /// While the Core is copying a repo the page reads again every few seconds (the Core's `project.mirror_changed`
     /// event usually does it sooner), so "copying" always ends in ready or a reason.
