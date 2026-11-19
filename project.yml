@@ -84,6 +84,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.ainkrad.core.connect
             CFBundleURLSchemes: [ainkrad]
+        # Setup's "Use an existing Core" lists Cores that advertise _ainkrad._tcp; macOS asks for Local Network access then.
+        NSBonjourServices: [_ainkrad._tcp]
+        NSLocalNetworkUsageDescription: Ainkrad looks for your Core on this network. Nothing is sent until you connect.
     settings:
       base:
         PRODUCT_NAME: Ainkrad

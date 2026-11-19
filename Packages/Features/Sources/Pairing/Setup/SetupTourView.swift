@@ -77,7 +77,8 @@ struct SetupTourView: View {
 
     private func label(_ step: SetupTourModel.Step) -> String {
         switch step {
-        case .life: "Save about me"
+        case .life: model.detour == nil ? "Save about me" : "Done"
+        case .look where model.detour != nil: "Done"
         case .ready: "Open Ainkrad"
         default: "Continue"
         }
@@ -201,6 +202,8 @@ struct SetupRunnerPage: View {
             )
             .onChange(of: on) { _, v in macRunner.setPreference(v) }
             .accessibilityIdentifier("setup-mac-runner-switch")
+            // TODO(E12-6): the "Send anonymous crash reports" switch of the approved mockup goes here once E12-6 builds the
+            // crash-report service. It is left out until then, not hidden: there is nothing for it to turn on yet.
         }
     }
 }

@@ -23,6 +23,10 @@ struct SetupYouPage: View {
             meta: "About you · 1 of 5", title: "What do you do?",
             sub: "Pick everything that fits. This helps the AI talk about your work in your words."
         ) {
+            // The first question of About you; it is also the name Home greets you with.
+            CoreTextField(
+                "What should we call you?", placeholder: "Sam", text: $model.profile.name, autofocus: true,
+                onSubmit: {})
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 3), spacing: Space.s3) {
                 ForEach(Array(SetupProfile.roles.enumerated()), id: \.offset) { i, r in
                     SetupOption(symbol: Self.roleSymbols[i], title: r, on: model.profile.roleSet.contains(r)) {

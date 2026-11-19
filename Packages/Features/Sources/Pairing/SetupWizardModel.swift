@@ -12,13 +12,17 @@ final class SetupWizardModel {
     enum Stage: Equatable {
         /// "Set up a new Core" or "Use an existing Core".
         case choose
-        /// The one command to run on a Linux machine.
+        /// The one command to run on a Linux machine, with this install's code in it.
         case install
+        /// The command was pasted: waiting for the Core's installer to leave the link (or for the person to paste it).
+        case waiting
+        /// The installer's link arrived: its Core is shown, and the person presses Connect.
+        case found
+        /// "Use an existing Core": the Cores this network advertises, and the paste screen as the way on.
+        case nearby
         /// Paste the link the installer printed.
         case connect
         case connecting
-        /// Paired. Asked once, only when this Mac has no name yet.
-        case name
         case failed(Failure)
     }
 
@@ -26,6 +30,13 @@ final class SetupWizardModel {
     static let installURL = "https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh"
     /// The oldest Core this app works with: the installer refuses anything older.
     static let minCoreVersion = "0.2.1"
+    /// The command with this install's code and key in it (`AINKRAD_RENDEZVOUS`), so the installer can hand the link back by
+    /// itself. The code is single use and is never printed again by the installer's re-run command.
+    static func installCommand(rendezvous spec: String) -> String {
+        installCommand.replacingOccurrences(
+            of: "AINKRAD_MIN_VERSION=\(minCoreVersion) ", with: "AINKRAD_MIN_VERSION=\(minCoreVersion) AINKRAD_RENDEZVOUS=\(spec) ")
+    }
+
     /// Never piped into `sudo`: that stops the installer at its first question (SIGTTIN) and Ctrl-C does nothing. `sh -c` with
     /// the script as an argument keeps the terminal for its questions.
     static let installCommand = "sudo AINKRAD_MIN_VERSION=\(minCoreVersion) sh -c \"$(curl -fsSL \(installURL))\""
@@ -50,9 +61,6 @@ final class SetupWizardModel {
     /// Why `linkText` is not a link yet. Not shown until something has been typed.
     private(set) var linkError: String?
 
-    /// The name the person gives on the `.name` step; starts as the first word of the Mac's full name.
-    var nameText = ""
-    private let profile: UserProfile?
     private let driver: any PairingDriver
     private let onPaired: @MainActor () -> Void
     /// Called once a new Core is paired, just before the desktop opens: the setup tour (About you, AI, Look, runner) starts there.
@@ -61,11 +69,28 @@ final class SetupWizardModel {
     private(set) var welcomed = false
     private var task: Task<Void, Never>?
 
+    /// This install's code and key; made when the person chooses "Set up a new Core" and dropped when they leave.
+    private(set) var rendezvous: RendezvousSession?
+    private let rendezvousClient: any RendezvousClient
+    private var waiter: Task<Void, Never>?
+    /// The wait ran out (15 minutes) or the code was used: the screen says so and points at the paste screen.
+    private(set) var waitEnded: String?
+    /// Cores this network advertises, for "Use an existing Core".
+    private(set) var nearby: [NearbyCore] = []
+    private let discovery: any CoreDiscovery
+    /// The Core the person picked from the list: a pasted link must be for this one.
+    private(set) var picked: NearbyCore?
+    /// How often the rendezvous is asked, and how long to wait in all; a test makes them small.
+    var pollEvery: Duration = .seconds(2)
+    var waitFor: Duration = .seconds(15 * 60)
+
     init(
-        driver: any PairingDriver, profile: UserProfile? = nil, onPaired: @escaping @MainActor () -> Void
+        driver: any PairingDriver, rendezvous: any RendezvousClient = LiveRendezvous(),
+        discovery: any CoreDiscovery = NoDiscovery(), onPaired: @escaping @MainActor () -> Void
     ) {
         self.driver = driver
-        self.profile = profile
+        self.rendezvousClient = rendezvous
+        self.discovery = discovery
         self.onPaired = onPaired
     }
 
@@ -73,16 +98,94 @@ final class SetupWizardModel {
 
     func chooseNew() {
         installed = true
+        picked = nil
+        if rendezvous == nil { rendezvous = RendezvousSession() }
         stage = .install
     }
     func chooseExisting() {
         installed = false
+        stage = .nearby
+        discovery.start { [weak self] in self?.nearby = $0 }
+    }
+
+    /// A Core from the list: the paste screen follows, and only that Core's link is taken.
+    func pick(_ core: NearbyCore) {
+        picked = core
+        discovery.stop()
         stage = .connect
     }
-    func haveLink() { stage = .connect }
+
+    /// "Paste a link instead" (or "I have the link"): the paste screen, whatever was found.
+    func haveLink() {
+        stopWaiting()
+        discovery.stop()
+        stage = .connect
+    }
+
     func back() {
         task?.cancel()
-        stage = stage == .connect && installed ? .install : .choose
+        switch stage {
+        case .waiting, .found:
+            stopWaiting()
+            scrub()
+            stage = .install
+        case .connect where picked != nil:
+            picked = nil
+            chooseExisting()
+        case .connect where installed: stage = .install
+        case .nearby:
+            discovery.stop()
+            stage = .choose
+        default: stage = .choose
+        }
+    }
+
+    /// "I pasted it": waits for the installer to leave the link, asking the rendezvous every couple of seconds.
+    func startWaiting() {
+        guard let session = rendezvous else { return haveLink() }
+        waitEnded = nil
+        stage = .waiting
+        waiter?.cancel()
+        waiter = Task { [weak self, rendezvousClient, pollEvery, waitFor] in
+            let clock = ContinuousClock()
+            let deadline = clock.now + waitFor
+            while !Task.isCancelled {
+                do {
+                    if let m = try await rendezvousClient.fetch(id: session.id) {
+                        if let text = session.open(epk: m.epk, ct: m.ct) { self?.arrived(text) } else {
+                            self?.waitEnded = "A message came, but it was not for this setup. Paste the link instead."
+                        }
+                        return
+                    }
+                } catch RendezvousError.used {
+                    self?.waitEnded = "This setup code was used already. Start again, or paste the link."
+                    return
+                } catch is CancellationError {
+                    return
+                } catch {}
+                if clock.now >= deadline {
+                    self?.waitEnded = "Nothing arrived. Check the line was pasted in full, or paste the link instead."
+                    return
+                }
+                try? await Task.sleep(for: pollEvery)
+            }
+        }
+    }
+
+    private func stopWaiting() {
+        waiter?.cancel()
+        waiter = nil
+    }
+
+    /// The installer's link came through the rendezvous: shown for the person to check, never connected by itself.
+    private func arrived(_ text: String) {
+        linkText = text
+        guard link != nil, stage == .waiting else {
+            linkText = ""
+            waitEnded = "The link that arrived could not be read. Paste it instead."
+            return
+        }
+        stage = .found
     }
     /// Whether the person came through the install screen (Back goes there instead of the first screen).
     private var installed = false
@@ -101,22 +204,32 @@ final class SetupWizardModel {
         return true
     }
 
-    var canConnect: Bool { link != nil && stage != .connecting }
+    var canConnect: Bool { link != nil && stage != .connecting && !pickedMismatch }
+
+    /// A Core was picked from the list and the link pasted is for another one: nothing is sent to it.
+    var pickedMismatch: Bool { picked.map { link != nil && link?.coreFingerprint != $0.fingerprint } ?? false }
 
     func connect() {
-        guard let link, stage != .connecting else { return }
+        guard let link, stage != .connecting, !pickedMismatch else { return }
         stage = .connecting
         task?.cancel()
         task = Task { [weak self] in await self?.claim(link) }
     }
 
     /// Back to the paste screen with the same text, for a failure the person can retry.
-    func tryAgain() { stage = .connect }
+    func tryAgain() {
+        stopWaiting()
+        stage = .connect
+    }
 
     /// Back to the very first screen, nothing kept (after a Core that was not the expected one).
     func startOver() {
         task?.cancel()
+        stopWaiting()
+        discovery.stop()
         scrub()
+        rendezvous = nil
+        picked = nil
         installed = false
         welcomed = false
         stage = .choose
@@ -146,24 +259,15 @@ final class SetupWizardModel {
                 return
             }
             scrub()
-            if let profile, !profile.hasName {
-                nameText = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
-                stage = .name
-            } else {
-                finishSetup()
-            }
+            finishSetup()
         } catch is CancellationError {
         } catch { fail(error) }
     }
 
-    /// "Continue" or "Not now" on the name step. An empty name is fine: Home then greets without one.
-    func finishName(save: Bool) {
-        if save { profile?.set(nameText) }
-        finishSetup()
-    }
-
-    /// Paired: the desktop opens, with the setup tour over it.
+    /// Paired: the desktop opens, with the setup tour over it (its first question is the name).
     func finishSetup() {
+        stopWaiting()
+        rendezvous = nil
         armTour()
         onPaired()
     }

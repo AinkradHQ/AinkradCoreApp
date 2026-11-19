@@ -9,6 +9,14 @@ struct SetupProfileTests {
         #expect(SetupProfile().items.isEmpty)
     }
 
+    @Test func theNameIsTheFirstAnswerAndIsTrimmed() {
+        var p = SetupProfile()
+        p.name = "  Sam  "
+        p.roleSet = ["Design"]
+        #expect(p.items.map(\.key) == ["name", "role"])
+        #expect(p.items[0].body == "Prefers to be called Sam.")
+    }
+
     @Test func eachPageBecomesOneSentenceInTheOrderOfItsChoices() {
         var p = SetupProfile()
         p.roleSet = ["Design", "Build software"]
@@ -88,5 +96,31 @@ struct SetupTourTests {
         #expect(m.aboutLine == "Skipped for now")
         m.finish()
         #expect(!m.isActive)
+    }
+}
+
+@MainActor
+struct SetupDetourTests {
+    @Test func anAboutYouDetourEndsOnTheWelcomePageAndSendsNothing() {
+        var sent = 0
+        let m = SetupTourModel(macRunner: nil, save: { _ in sent += 1; return true })
+        m.beginDetour(.you)
+        m.profile.roleSet = ["Design"]
+        #expect(m.step == .role && !m.isFirst)
+        while m.step != .life { m.next() }
+        m.next()
+        #expect(m.step == nil && m.detour == nil && sent == 0)
+        #expect(m.profile.roleSet == ["Design"], "the answers wait for the tour")
+    }
+
+    @Test func backOnTheFirstDetourPageAndTheLookDetourReturnToWelcome() {
+        let m = SetupTourModel(macRunner: nil, save: { _ in true })
+        m.beginDetour(.you)
+        m.back()
+        #expect(m.step == nil)
+        m.beginDetour(.look)
+        #expect(m.step == .look)
+        m.next()
+        #expect(m.step == nil && m.detour == nil)
     }
 }
