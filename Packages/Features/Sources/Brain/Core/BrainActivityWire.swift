@@ -133,6 +133,24 @@ public struct LearnedWire: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+/// `GET /rooms/{room}/sources/{item}/trace`: the start of a source's text and what it produced, with each record's history.
+public struct SourceTraceWire: Codable, Sendable, Equatable {
+    public var excerpt: String
+    public var records: [Record]
+    public struct Record: Codable, Sendable, Equatable, Identifiable {
+        public var id: String
+        public var type: String
+        public var body: String
+        public var archived: Bool
+        public var history: [Step]
+    }
+    public struct Step: Codable, Sendable, Equatable {
+        public var op: String
+        public var at: String
+    }
+}
+
+struct RestoredWire: Decodable { var restored: Bool }
 struct ArchivedWire: Decodable { var archived: Bool }
 
 struct UndoneWire: Decodable {
@@ -149,6 +167,13 @@ extension BrainRoutes {
         var q = "?limit=\(limit)"
         if let type { q += "&type=\(Self.seg(type))" }
         return try await call("GET", "/areas/\(Self.seg(area))" + q)
+    }
+    public func trace(room: String, item: String) async throws -> SourceTraceWire {
+        try await call("GET", "/rooms/\(Self.seg(room))/sources/\(Self.seg(item))/trace")
+    }
+    /// The Undo of an archive.
+    public func restoreRecord(room: String, id: String) async throws {
+        _ = try await call("POST", "/rooms/\(Self.seg(room))/records/\(Self.seg(id))/restore", as: RestoredWire.self)
     }
     public func learned() async throws -> [LearnedWire] { try await call("GET", "/learned") }
     /// Takes one record out of memory (archived and kept, never deleted).
