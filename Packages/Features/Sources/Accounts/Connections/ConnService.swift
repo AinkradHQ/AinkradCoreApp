@@ -9,6 +9,9 @@ protocol ConnectionsService: Sendable {
     func activity(connection: Int64?) async throws -> [ConnActivity]
     /// The repositories or projects a connection can reach, for the "Only these" picker.
     func resources(_ id: Int64) async throws -> [String]
+    /// The same with names and a second line, for the guided Add's list (Core minor 95 and later; older Cores say only the
+    /// ones already chosen).
+    func picks(_ id: Int64) async throws -> ConnPicks
     /// `again`: sign in again to that connection instead of making a new one.
     func start(kind: String, again: Int64?) async throws -> ConnFlow
     func flow(_ id: String) async throws -> ConnFlow
@@ -41,6 +44,12 @@ protocol ConnectionsService: Sendable {
     func setCoreSetting(_ key: String, _ value: Int64) async throws
 }
 
+extension ConnectionsService {
+    func picks(_ id: Int64) async throws -> ConnPicks {
+        ConnPicks(items: try await resources(id).map { ConnPick(id: $0, name: $0) })
+    }
+}
+
 #if DEBUG
 /// Stand-in data for Debug builds, screenshots and tests, labelled as such on screen. Made-up names, no credentials.
 final class SampleConnections: ConnectionsService, @unchecked Sendable {
@@ -59,6 +68,8 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
     private var nextID: Int64 = 10
     /// The next sign-in fails (the error scene).
     var failNext = false
+    /// The picker's list can't be read (tests, the error scene).
+    var failPicks = false
     let now = Date()
 
     init(empty: Bool = false) {
@@ -68,62 +79,89 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
             ? []
             : [
                 ConnItem(
-                    id: 1, kind: "github", name: "Personal GitHub", identity: "@sample-dev", status: .connected,
-                    isDefault: true, allowed: ["read"], only: nil, lastUsed: n.addingTimeInterval(-720), users: 4),
+                    id: 1, kind: "github", name: "Personal GitHub", identity: "@maple-fox", status: .connected,
+                    isDefault: true, allowed: ["read_repo"], only: nil, lastUsed: n.addingTimeInterval(-720), users: 4),
                 ConnItem(
-                    id: 2, kind: "github", name: "Sample org", identity: "@sample-org · organisation",
+                    id: 2, kind: "github", name: "Sample org", identity: "@maple-studio · organisation",
                     status: .needsLook, reason: "GitHub says this sign-in expired.", isDefault: false,
-                    allowed: ["read"], only: nil, lastChecked: n.addingTimeInterval(-3600), users: 3),
+                    allowed: ["read_repo"], only: nil, lastChecked: n.addingTimeInterval(-3600), users: 3,
+                    signInNeeded: true),
                 ConnItem(
-                    id: 3, kind: "jira", name: "Sample Jira", identity: "sample.atlassian.net",
-                    status: .connected, isDefault: true, allowed: ["read"], only: nil,
+                    id: 3, kind: "jira", name: "Sample Jira", identity: "maple@example.test",
+                    status: .connected, isDefault: true, allowed: ["read_issues"], only: nil,
                     lastUsed: n.addingTimeInterval(-10800), users: 4),
             ]
     }
 
     func kinds() async throws -> [ConnKind] { Self.kinds }
+    /// The five services of the mockup, with its made-up wording.
     static let kinds: [ConnKind] = [
-        ConnKind(
-            id: "github", name: "GitHub", say: "Issues, pull requests and code", signIn: .deviceCode,
-            resource: "repositories",
-            capabilities: [
-                ConnCapability(
-                    id: "read", title: "Read code and issues", say: "Look at repositories, issues and pull requests.",
-                    writes: false),
-                ConnCapability(
-                    id: "write", title: "Create and change things",
-                    say: "Open issues and pull requests, comment, add labels.", writes: true),
-                ConnCapability(
-                    id: "push", title: "Push code", say: "Send commits to branches. Never to protected branches.",
-                    writes: true),
-            ],
-            tokenTitle: "Use a personal access token",
-            tokenHelp: [
-                "On github.com, open Settings → Developer settings → Personal access tokens.",
+        kind(
+            "github", "GitHub", "Code, pull requests and issues", .deviceCode, "repositories", "repos",
+            [
+                ("read_repo", "Read code, pull requests and issues", "See what is in your projects. Nothing changes.", false),
+                ("pr_write", "Comment on pull requests", "Leave notes for you and your team.", true),
+                ("push", "Open pull requests and push branches", "Make changes in your repositories.", true),
+            ]),
+        kind(
+            "jira", "Jira", "Tickets and boards", .browser, "projects", "projects",
+            [
+                ("read_issues", "Read tickets and boards", "See your tickets. Nothing changes.", false),
+                ("write_issues", "Comment on tickets", "Leave notes on a ticket.", true),
+                ("transition", "Create and move tickets", "Add tickets and change their status.", true),
+            ]),
+        kind(
+            "linear", "Linear", "Issues and cycles", .browser, "teams", "teams",
+            [
+                ("read_issues", "Read issues and cycles", "See your issues. Nothing changes.", false),
+                ("write_issues", "Create and update issues", "Add issues and change their status.", true),
+            ]),
+        kind(
+            "slack", "Slack", "Messages and channels", .browser, "channels", "channels",
+            [
+                ("read_messages", "Read messages in channels you pick", "See the conversation. Nothing is sent.", false),
+                ("post_messages", "Post new messages", "Write in the channels you pick.", true),
+            ]),
+        kind(
+            "teams", "Microsoft Teams", "Chats and channels", .deviceCode, "channels", "channels",
+            [
+                ("read_messages", "Read messages in channels you pick", "See the conversation. Nothing is sent.", false),
+                ("post_messages", "Post new messages", "Write in the channels you pick.", true),
+            ]),
+    ]
+
+    private static func kind(
+        _ id: String, _ name: String, _ say: String, _ signIn: ConnKind.SignIn, _ resource: String, _ key: String,
+        _ caps: [(String, String, String, Bool)]
+    ) -> ConnKind {
+        let help: [String: [String]] = [
+            "github": [
+                "On github.com, open Settings, then Developer settings, then Personal access tokens.",
                 "Make a fine-grained token for the repositories you want.", "Copy it and paste it below.",
-            ], tokenFields: []),
-        ConnKind(
-            id: "jira", name: "Jira", say: "Issues and boards on your Atlassian sites", signIn: .browser,
-            resource: "projects",
-            capabilities: [
-                ConnCapability(
-                    id: "read", title: "Read issues", say: "Look at issues, boards and comments.", writes: false),
-                ConnCapability(
-                    id: "write", title: "Create and change issues", say: "Create issues, comment, edit fields.",
-                    writes: true),
-                ConnCapability(id: "transition", title: "Move issues", say: "Change an issue's status.", writes: true),
             ],
-            tokenTitle: "Use an API token",
-            tokenHelp: [
-                "Open id.atlassian.com → Security → API tokens.", "Create a token with a name you will recognise.",
-                "Copy it and paste it below.",
-            ], tokenFields: ["Site", "Your Atlassian email"]),
-        ConnKind(
-            id: "linear", name: "Linear", say: "Issues and projects", signIn: .browser, resource: "teams",
-            capabilities: [], tokenTitle: "", tokenHelp: [], tokenFields: [], available: false),
-        ConnKind(
-            id: "slack", name: "Slack", say: "Messages and channels", signIn: .browser, resource: "channels",
-            capabilities: [], tokenTitle: "", tokenHelp: [], tokenFields: [], available: false),
+            "jira": [
+                "Open id.atlassian.com, then Security, then API tokens.",
+                "Create a token with a name you will recognise.", "Copy it and paste it below.",
+            ],
+        ]
+        return ConnKind(
+            id: id, name: name, say: say, signIn: signIn, resource: resource,
+            capabilities: caps.map { ConnCapability(id: $0.0, title: $0.1, say: $0.2, writes: $0.3) },
+            tokenTitle: help[id] == nil ? "" : "Use a token", tokenHelp: help[id] ?? [],
+            tokenFields: id == "jira" ? ["Site", "Your Atlassian email"] : [], limitKey: key)
+    }
+
+    /// The pick lists of the mockup, by kind: an id and the line the mockup shows.
+    static let pickLists: [String: [(String, String)]] = [
+        "github": [
+            ("maple/harbor-web", "Updated today"), ("maple/notes-app", "Updated yesterday"),
+            ("maple/release-tools", "3 days ago"), ("maple/photo-sorter", "Last week"),
+            ("maple/garden-planner", "Last month"), ("maple/recipe-box", "Last month"),
+        ],
+        "jira": [("HAR", "Harbor"), ("GRD", "Garden"), ("KIT", "Kitchen"), ("PLN", "Planning")],
+        "linear": [("PRO", "Product"), ("DES", "Design"), ("SUP", "Support")],
+        "slack": [("C01", "#general"), ("C02", "#build"), ("C03", "#ideas"), ("C04", "#launch")],
+        "teams": [("t1/g", "General"), ("t1/b", "Build team"), ("t1/p", "Planning")],
     ]
 
     func connections() async throws -> [ConnItem] { lock.withLock { list } }
@@ -153,15 +191,29 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
     }
 
     func resources(_ id: Int64) async throws -> [String] {
-        lock.withLock { list.first { $0.id == id }?.kind } == "jira"
-            ? ["SHOP", "OPS", "WEB"]
-            : ["sample/core", "sample/app", "sample/site", "sample/docs", "sample/infra", "sample/tap"]
+        let kind = lock.withLock { list.first { $0.id == id }?.kind } ?? "github"
+        return (Self.pickLists[kind] ?? []).map(\.0)
+    }
+
+    /// Made-up lists, the second line as the mockup words it. Sample only.
+    func picks(_ id: Int64) async throws -> ConnPicks {
+        if failPicks { throw CoreError.http(status: 502, code: "upstream_failed", message: "") }
+        let kind = lock.withLock { list.first { $0.id == id }?.kind } ?? "github"
+        let days: [String: Double] = [
+            "Updated today": 0, "Updated yesterday": 1, "3 days ago": 3, "Last week": 8, "Last month": 40,
+        ]
+        return ConnPicks(
+            items: (Self.pickLists[kind] ?? []).map { r in
+                kind == "github"
+                    ? ConnPick(id: r.0, name: r.0, updatedAt: Date().addingTimeInterval(-86_400 * (days[r.1] ?? 40)))
+                    : ConnPick(id: r.0, name: r.1, detail: r.0)
+            })
     }
 
     func start(kind: String, again: Int64?) async throws -> ConnFlow {
         let f = ConnFlow(
-            id: UUID().uuidString, kind: kind, userCode: kind == "github" ? "WDJB-MJHT" : nil,
-            url: URL(string: kind == "github" ? "https://github.com/login/device" : "https://auth.atlassian.com")!,
+            id: UUID().uuidString, kind: kind, userCode: kind == "github" || kind == "teams" ? "WDJB-MJHT" : nil,
+            url: URL(string: kind == "github" ? "https://github.com/login/device" : "https://auth.example.test")!,
             step: .waiting)
         lock.withLock { flows[f.id] = (f, 0) }
         return f
@@ -182,17 +234,12 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
                             fix: "Codes work for 15 minutes. Try again for a new code, then approve it on github.com.")
                         : .failed(
                             title: "The browser didn't come back in time.",
-                            fix: "Atlassian may still be open in your browser. Press Accept there, or try again.")
+                            fix: "The service may still be open in your browser. Press Accept there, or try again.")
+                } else if f.kind == "jira" {
+                    f.step = .pickSite(["sample.atlassian.net", "other.atlassian.net"])
                 } else {
-                    f.step =
-                        f.kind == "github"
-                        ? .chooseResources(
-                            login: "@sample-dev",
-                            install: URL(string: "https://github.com/apps/ainkradhq/installations/new")!)
-                        : .pickSite(["sample.atlassian.net", "other.atlassian.net"])
+                    add(&f, site: nil)
                 }
-            } else if n >= 5, case .chooseResources = f.step {
-                add(&f, site: nil)  // the person picked repositories on GitHub
             }
             flows[id] = (f, n)
             return f
@@ -212,12 +259,13 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
     /// Called under the lock: the new connection, and the flow marked done.
     private func add(_ f: inout ConnFlow, site: String?) {
         nextID += 1
-        let gh = f.kind == "github"
+        let title = Self.kinds.first { $0.id == f.kind }?.name ?? f.kind
+        let who = ["github": "@maple-fox", "slack": "Maple Studio workspace"]
         list.append(
             ConnItem(
-                id: nextID, kind: f.kind, name: gh ? "GitHub (\(nextID))" : "Jira (\(nextID))",
-                identity: gh ? "@sample-dev" : (site ?? "sample.atlassian.net"), status: .connected,
-                isDefault: !list.contains { $0.kind == f.kind }, allowed: ["read"], only: nil, users: 1))
+                id: nextID, kind: f.kind, name: "\(title) (\(nextID))",
+                identity: site ?? who[f.kind] ?? "maple@example.test", status: .connected,
+                isDefault: !list.contains { $0.kind == f.kind }, allowed: [], only: nil, users: 1))
         f.step = .connected(nextID)
     }
 
@@ -257,8 +305,8 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         return lock.withLock {
             nextID += 1
             let c = ConnItem(
-                id: nextID, kind: kind, name: name, identity: fields["Site"] ?? "@sample-dev", status: .connected,
-                isDefault: !list.contains { $0.kind == kind }, allowed: ["read"], only: nil, users: 1)
+                id: nextID, kind: kind, name: name, identity: fields["Site"] ?? "@maple-fox", status: .connected,
+                isDefault: !list.contains { $0.kind == kind }, allowed: [], only: nil, users: 1, authMethod: "token")
             list.append(c)
             return c
         }
@@ -286,6 +334,7 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
     func expire(_ id: Int64) {
         edit(id) {
             $0.status = .needsLook
+            $0.signInNeeded = true
             $0.reason = "GitHub says this sign-in expired."
         }
     }
@@ -319,6 +368,7 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         lock.withLock { sent.append(token) }
         edit(id) {
             $0.status = .connected
+            $0.signInNeeded = false
             $0.reason = nil
         }
     }

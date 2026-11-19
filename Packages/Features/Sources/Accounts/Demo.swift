@@ -525,7 +525,6 @@ public final class AccountsDemo {
         default: break
         }
         model.use(svc)
-        model.connections.use(SampleConnections(), sample: true)  // the Connections tab counts its sample connections
         try? await Task.sleep(for: .milliseconds(500))
         let page: AccountsPage =
             switch scene {
