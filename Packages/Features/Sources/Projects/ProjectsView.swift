@@ -16,7 +16,7 @@ struct ProjectsView: View {
                 GalleryView(model: model).transition(.opacity)
             }
         }
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("projects"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)
