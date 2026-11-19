@@ -342,6 +342,14 @@ public final class DesignModel {
 
     public func install() {
         let shell = host.shell
+        // Settings, Apps, Design: its Look (follows Appearance unless turned off). No options of its own yet.
+        shell.settings.section(
+            SettingsSection(
+                id: "design", group: .apps, title: "Design", sub: "Its look", symbol: "paintbrush.pointed", order: 8
+            ) {
+                AppLookSection(appName: "Design", prefs: AppLookPrefs.shared("design"))
+                    .foregroundStyle(GlassInk.primary)
+            })
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String],
             _ run: @escaping @MainActor (DesignModel) -> Void

@@ -202,12 +202,15 @@ extension AgentsModel {
         shell.settings.section(
             SettingsSection(
                 id: "agents", group: .apps, title: "AI Sessions", sub: "Surface and the defaults for new AI sessions",
-                symbol: "text.cursor", order: 30
-            ) { AgentSettingsView(model: self) })
+                symbol: "text.cursor", order: 2,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { AgentSettingsView(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { AgentSettingsView(model: self, part: .options) },
+                ]))
         shell.settings.section(
             SettingsSection(
                 id: "agent-chains", group: .apps, title: "Account orders",
-                sub: "Which order of accounts AI sessions draw from", symbol: "link", order: 31
+                sub: "Which order of accounts AI sessions draw from", symbol: "link", order: 3
             ) { AgentChainsSection(model: self) })
         shell.launcher.register(
             LauncherEntry(

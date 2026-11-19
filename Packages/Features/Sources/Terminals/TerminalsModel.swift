@@ -187,9 +187,12 @@ public final class TerminalsModel {
         followElevation()
         shell.settings.section(
             SettingsSection(
-                id: "terminal", group: .apps, title: "Terminals", sub: "Look, screen, surface and defaults",
-                symbol: "terminal", order: 10
-            ) { TerminalSettingsView(model: self) })
+                id: "terminal", group: .apps, title: "Terminal", sub: "Look, screen, surface and defaults",
+                symbol: "terminal", order: 4,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { TerminalSettingsView(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { TerminalSettingsView(model: self, part: .options) },
+                ]))
         let l = shell.launcher
         l.register(
             LauncherEntry(

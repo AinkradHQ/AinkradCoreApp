@@ -54,3 +54,10 @@ extension SettingsRegistry {
         tabChoice[sectionID] = id
     }
 }
+
+/// Which half of an app's settings view a tab shows (E2-4): its Look, its Options, or all of it (the Appearance popover).
+public enum SettingsPart: Sendable {
+    case all, look, options
+    public var showsLook: Bool { self != .options }
+    public var showsOptions: Bool { self != .look }
+}

@@ -90,3 +90,12 @@ struct SettingsTabsTests {
         #expect(r.current()?.id == "lockouts")
     }
 }
+
+@MainActor
+struct SettingsPartTests {
+    @Test func aPartShowsItsHalfAndAllShowsBoth() {
+        #expect(SettingsPart.look.showsLook && !SettingsPart.look.showsOptions)
+        #expect(!SettingsPart.options.showsLook && SettingsPart.options.showsOptions)
+        #expect(SettingsPart.all.showsLook && SettingsPart.all.showsOptions)
+    }
+}
