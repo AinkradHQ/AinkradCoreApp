@@ -153,9 +153,18 @@ public final class LeylineModel {
 
     /// Whether an address answers like an SSH server from the Core, for Add Host's live check.
     func checkHost(_ address: String, _ port: Int) async throws -> HostCheck {
-        guard let service else { throw LeylineFailure.notYet }
-        return try await service.checkHost(address: address, port: port)
+        guard let service, !checkNeedsStepUp else { throw LeylineFailure.notYet }
+        do { return try await service.checkHost(address: address, port: port) } catch let e as LeylineFailure
+            where e.code == "step_up_required"
+        {
+            // The check needs a live step-up; typing never prompts for one, so it stays quiet until the person unlocks.
+            checkNeedsStepUp = true
+            throw e
+        }
     }
+
+    /// The Core refused a host check for want of a step-up: Add Host stops asking while it is typed into.
+    var checkNeedsStepUp = false
 
     func hostItem(_ id: String?) -> HostItem? { id.flatMap { id in hosts.first { $0.id == id } } }
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
@@ -377,6 +386,7 @@ public final class LeylineModel {
         page = .hosts
         quickText = ""
         writeError = nil
+        checkNeedsStepUp = false
         quickOpen = true
     }
 

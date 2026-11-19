@@ -397,7 +397,6 @@ struct RunnerReportWire: Decodable {
         guard let t = toolInstall else { return }
         let state = ToolInstall.State(rawValue: t.state) ?? .running
         r.reported = ToolInstall(op: "report", tool: t.tool, state: state, percent: t.percent, step: t.step, reason: t.reason)
-        // Installed, but the runner has not restarted to probe it yet: it is there.
-        if state == .done, r.tools[t.tool] == nil { r.tools[t.tool] = "" }
+        // A report alone never marks a tool installed: only the runner's own probe (`tools`) does, after it restarts.
     }
 }
