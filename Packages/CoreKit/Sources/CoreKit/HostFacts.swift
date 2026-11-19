@@ -112,11 +112,15 @@ public struct CoreBackups: Equatable, Sendable {
     public var lastFinishedAt: Date?
     /// Newest first.
     public var history: [CoreBackupFile]
+    /// How many backups the Core keeps on its own disk, when it says (Core 0.10 with the retention route).
+    public var keep: Int?
 
     public init(
         helper: String = "present", installed: Bool = true, schedule: String? = nil, nextAt: Date? = nil,
-        running: Bool = false, lastResult: String? = nil, lastFinishedAt: Date? = nil, history: [CoreBackupFile] = []
+        running: Bool = false, lastResult: String? = nil, lastFinishedAt: Date? = nil, history: [CoreBackupFile] = [],
+        keep: Int? = nil
     ) {
+        self.keep = keep
         self.helper = helper
         self.installed = installed
         self.schedule = schedule
@@ -173,13 +177,15 @@ public struct CoreBackups: Equatable, Sendable {
             let next_at: String?
             let last_run: Run?
             let history: [File]?
+            let keep: Int?
         }
         guard let w = try? JSONDecoder().decode(Wire.self, from: data) else { return nil }
         return CoreBackups(
             helper: w.helper, installed: w.installed ?? false, schedule: w.schedule, nextAt: w.next_at.flatMap(date),
             running: w.last_run?.running ?? false, lastResult: w.last_run?.result,
             lastFinishedAt: w.last_run?.finished_at.flatMap(date),
-            history: (w.history ?? []).compactMap { f in date(f.at).map { CoreBackupFile(at: $0, bytes: f.bytes) } })
+            history: (w.history ?? []).compactMap { f in date(f.at).map { CoreBackupFile(at: $0, bytes: f.bytes) } },
+            keep: w.keep)
     }
 
     static func date(_ s: String) -> Date? {
@@ -189,7 +195,96 @@ public struct CoreBackups: Equatable, Sendable {
     }
 }
 
+/// How many backups the Core keeps (`GET /system/backups/retention`).
+public struct CoreBackupRetention: Equatable, Sendable {
+    public var keep: Int?
+    public var min: Int
+    public var max: Int
+    public init(keep: Int?, min: Int = 1, max: Int = 60) {
+        self.keep = keep
+        self.min = min
+        self.max = max
+    }
+
+    public static func decode(_ data: Data) -> CoreBackupRetention? {
+        struct Wire: Decodable {
+            let helper: String
+            let keep: Int?
+            let min: Int?
+            let max: Int?
+        }
+        guard let w = try? JSONDecoder().decode(Wire.self, from: data), w.helper == "present" else { return nil }
+        return CoreBackupRetention(keep: w.keep, min: w.min ?? 1, max: w.max ?? 60)
+    }
+}
+
+/// A restart of the Core or the local runner that someone asked for, from the audit log.
+public struct CoreRestart: Equatable, Sendable, Identifiable {
+    public var id: String
+    public var at: Date
+    /// `core` or `runner`.
+    public var target: String
+    /// False when the helper refused or failed; true when it accepted or nothing says otherwise.
+    public var worked: Bool
+    public init(id: String, at: Date, target: String, worked: Bool = true) {
+        self.id = id
+        self.at = at
+        self.target = target
+        self.worked = worked
+    }
+
+    /// Newest first, from the pages of `host.restart_requested` and `host.action_result` rows.
+    public static func decode(requested: Data, results: Data?) -> [CoreRestart] {
+        struct Details: Decodable {
+            let request_id: String?
+            let target: String?
+            let code: String?
+        }
+        struct Item: Decodable {
+            let at: String
+            let details: Details
+        }
+        struct Page: Decodable { let items: [Item] }
+        guard let asked = try? JSONDecoder().decode(Page.self, from: requested) else { return [] }
+        var codes: [String: String] = [:]
+        if let results, let page = try? JSONDecoder().decode(Page.self, from: results) {
+            for i in page.items { if let id = i.details.request_id, let c = i.details.code { codes[id] = c } }
+        }
+        return asked.items.compactMap { i in
+            guard let id = i.details.request_id, let target = i.details.target, let at = CoreBackups.date(i.at)
+            else { return nil }
+            return CoreRestart(id: id, at: at, target: target, worked: codes[id].map { $0 == "accepted" } ?? true)
+        }
+    }
+}
+
 extension CoreConnection {
+    /// The newest restarts asked for through this Core, newest first; empty on a Core before 0.10.
+    public func recentRestarts(limit: Int = 5) async -> [CoreRestart] {
+        guard await serverSupports(minor: coreMinorV010),
+            let asked = try? await signedRequest(
+                method: "GET", target: "/api/v1/audit?kind=host.restart_requested&limit=\(limit)")
+        else { return [] }
+        let results = try? await signedRequest(
+            method: "GET", target: "/api/v1/audit?kind=host.action_result&limit=100")
+        return CoreRestart.decode(requested: asked, results: results)
+    }
+
+    /// How many backups the Core keeps; nil on a Core before 0.10, without the route, or without a host helper.
+    public func backupRetention() async -> CoreBackupRetention? {
+        guard await serverSupports(minor: coreMinorV010),
+            let data = try? await signedRequest(method: "GET", target: "/api/v1/system/backups/retention")
+        else { return nil }
+        return CoreBackupRetention.decode(data)
+    }
+
+    /// Sets how many backups the Core keeps (`PUT /system/backups/retention`, a step-up). Returns what the Core now keeps.
+    public func setBackupRetention(_ keep: Int) async throws -> Int? {
+        let body = try JSONEncoder().encode(["keep": keep])
+        let data = try await signedRequest(method: "PUT", target: "/api/v1/system/backups/retention", body: body)
+        return CoreBackupRetention.decode(data)?.keep
+    }
+
     /// The host facts from `GET /core/health`; nil on a Core before 0.10 or when the call fails.
     public func hostFacts() async -> CoreHostFacts? {
         guard await serverSupports(minor: coreMinorV010),

@@ -58,11 +58,17 @@ public protocol CorePageSource: Sendable {
     func backups() async throws -> CoreBackups?
     /// Starts a backup on the Core machine.
     func backupNow() async throws
+    /// How many backups the Core keeps, with the range it accepts; nil where the Core cannot say (no retention route).
+    func backupRetention() async -> CoreBackupRetention?
+    /// Sets how many backups the Core keeps (needs a step-up); returns what it now keeps.
+    func setBackupRetention(_ keep: Int) async throws -> Int?
 }
 
 extension CorePageSource {
     public func backups() async throws -> CoreBackups? { nil }
     public func backupNow() async throws {}
+    public func backupRetention() async -> CoreBackupRetention? { nil }
+    public func setBackupRetention(_ keep: Int) async throws -> Int? { nil }
 }
 
 /// State behind the Core page's tabs. Without a source, or on an older Core, `supported` is false and the page shows
@@ -83,6 +89,10 @@ public final class CorePageModel {
     public private(set) var backupStarting = false
     /// One line about the last "Back up now".
     public private(set) var backupNote: String?
+    /// How many backups the Core keeps and the range it accepts; nil on a Core without the retention route.
+    public private(set) var retention: CoreBackupRetention?
+    /// Runs an action behind Touch ID (the app sets it). Throws `CancellationError` when the person did not unlock.
+    public var gate: (@MainActor (String, @escaping @MainActor () async throws -> Void) async throws -> Void)?
     public init() {}
 
     private func reset() {
@@ -90,6 +100,7 @@ public final class CorePageModel {
         prefs = CorePagePrefs()
         storage = nil
         backups = nil
+        retention = nil
         backupNote = nil
         checkNote = nil
     }
@@ -109,6 +120,29 @@ public final class CorePageModel {
     public func loadBackups() async {
         guard let source, await source.supported() else { return }
         do { backups = try await source.backups() } catch { failure = Self.words(error) }
+        retention = await source.backupRetention()
+    }
+
+    /// Sets how many backups the Core keeps, behind Touch ID, and keeps what the Core answers. A decline changes nothing.
+    public func setKeep(_ keep: Int) async {
+        guard let source, supported, let r = retention, keep != r.keep, (r.min...r.max).contains(keep) else { return }
+        let change: @MainActor () async throws -> Void = { [weak self] in
+            let now = try await source.setBackupRetention(keep)
+            self?.retention?.keep = now ?? keep
+        }
+        do {
+            if let gate {
+                try await gate("Change how many backups your Core keeps.", change)
+            } else {
+                try await change()
+            }
+            backupNote = "Your Core keeps the last \(retention?.keep ?? keep) backups."
+            failure = nil
+        } catch is CancellationError {
+        } catch {
+            failure = Self.words(error)
+            if let again = await source.backupRetention() { retention = again }
+        }
     }
 
     /// Starts a backup, then reads the schedule again so the page shows it running.
