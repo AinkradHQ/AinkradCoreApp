@@ -19,6 +19,12 @@ public enum CoreSkew {
         return s.lexicographicallyPrecedes(m)
     }
 
+    /// E12-5/10: the Core reports the oldest app it works with (`min_app` in `GET /core/health`). True only when both parse and this app is older.
+    public static func appTooOld(app: String, minApp: String?) -> Bool {
+        guard let m = minApp.flatMap(numbers), let a = numbers(app) else { return false }
+        return a.lexicographicallyPrecedes(m)
+    }
+
     public static func message(core: String, min: String = minCore) -> String {
         "Your Core is on \(core). This version of Ainkrad needs Core \(min) or newer. Update the Core (it can update itself at night once it is on \(min)), or run the installer again, then open Ainkrad."
     }

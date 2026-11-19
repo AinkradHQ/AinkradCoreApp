@@ -96,6 +96,9 @@ targets:
         SUPublicEDKey: ZfzFnEOyjj3JvJZl7UsuIy6Y29xRPxSYWdBwv3RiWL4=
         SUEnableAutomaticChecks: true
         SUAutomaticallyUpdate: true
+        # The feed and every archive must be signed with the EdDSA key; the archive is verified before it is unpacked.
+        SURequireSignedFeed: true
+        SUVerifyUpdateBeforeExtraction: true
         SUScheduledCheckInterval: 14400
     settings:
       base:

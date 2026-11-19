@@ -268,6 +268,20 @@ public final class AppModel {
         await connect()
     }
 
+    /// E12-5/10: a Core that needs a newer app says so (`min_app`); the person is told to update Ainkrad (it updates by itself, or
+    /// Check for Updates). Skipped on a Core that does not serve minor 95, and when the answer is not readable.
+    private func checkMinApp() async {
+        guard let live = service as? LiveCoreService, await live.connection.serverSupports(minor: 95),
+            let data = try? await live.connection.signedRequest(method: "GET", target: "/api/v1/core/health"),
+            let min = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["min_app"] as? String,
+            let app = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            CoreSkew.appTooOld(app: app, minApp: min)
+        else { return }
+        shell.presentSheet(
+            title: "Update Ainkrad", message: "Your Core needs Ainkrad \(min) or newer, and this Mac has \(app). Ainkrad updates itself; to do it now, choose Ainkrad, then Check for Updates.",
+            actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
+    }
+
     /// Proves the Core and opens the session. Unreachable is a banner and a retry; anything else stops with its reason.
     func connect() async {
         guard let service else { return }
@@ -286,6 +300,7 @@ public final class AppModel {
                     actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
                 return
             }
+            await checkMinApp()
             shell.coreLink = .live
             shell.retryAttempt = 0
             shell.nextRetryAt = nil
