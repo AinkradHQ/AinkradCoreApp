@@ -19,7 +19,8 @@ enum AIOrderDemo {
                 pricedAt: "2026-11-19", builtin: id == "anthropic")
         }
         return [
-            sub("claude-sub", "Claude subscription", "claude"), sub("codex-sub", "Codex subscription", "codex", "device_code"),
+            sub("claude-sub", "Claude subscription", "claude"),
+            sub("codex-sub", "Codex subscription", "codex", "device_code"),
             sub("agy-sub", "Antigravity", "agy", "runner_login"),
             sub("opencode-sub", "OpenCode", "opencode", "runner_login"),
             key("anthropic", "Anthropic API"), key("openai", "OpenAI API", "codex"), key("google", "Gemini API", "agy"),
@@ -34,7 +35,19 @@ enum AIOrderDemo {
             _ id: Int64, _ label: String, _ provider: String, state: String = "active", until: Date? = nil,
             spend: (Int64, Int64)? = nil, week: Double? = nil
         ) -> AccountItem {
-            AccountItem(
+            // The Core's own meter, as it would answer for each row of the mockup.
+            var meter: AccountMeterItem?
+            if let week {
+                meter = AccountMeterItem(
+                    state: week >= 1 ? "limit_hit" : "ready", stateUntil: week >= 1 ? until : nil,
+                    fraction: min(week, 1),
+                    used: (min(week, 1) * 100).rounded(), limit: 100, unit: "percent", window: "week", resetsAt: until)
+            } else if let spend {
+                meter = AccountMeterItem(
+                    state: "ready", fraction: Double(spend.0) / Double(spend.1), used: Double(spend.0),
+                    limit: Double(spend.1), unit: "usd_micros", window: "month")
+            }
+            var item = AccountItem(
                 id: id, provider: provider, label: label, maskedTail: "demo", baseURL: "", state: state,
                 stateReason: nil,
                 stateUntil: until, cap: 4, lastUsedAt: now.addingTimeInterval(-600),
@@ -43,6 +56,8 @@ enum AIOrderDemo {
                 health: week.map {
                     AccountHealthItem(windows: [PlanWindowItem(name: "seven_day", utilization: $0, resetsAt: until)])
                 })
+            item.meter = meter
+            return item
         }
         let friday = Calendar.current.nextDate(
             after: now, matching: DateComponents(hour: 9, minute: 0, weekday: 6), matchingPolicy: .nextTime)
@@ -95,6 +110,21 @@ extension AccountsDemo.Service {
     }
     func sendLoginInput(_ id: String, line: String) async throws { guidedSentAt = Date() }
     func boundRunners() async -> [Int64: String] { order010 ? [2: "r_linux01"] : [:] }
+    func accountMeters() async -> [Int64: AccountMeterItem] {
+        Dictionary(uniqueKeysWithValues: accountList.compactMap { a in a.meter.map { (a.id, $0) } })
+    }
+    func accountModels(account: Int64) async -> [ModelRowItem] {
+        guard order010, let a = accountList.first(where: { $0.id == account }) else { return [] }
+        let denied = deniedModels[account] ?? []
+        let list = AIOrderDemo.providers().first { $0.id == a.provider }?.models ?? []
+        return list.map {
+            ModelRowItem(
+                model: $0.id, allowed: !denied.contains($0.id), inputMicro: $0.inputMicro, outputMicro: $0.outputMicro)
+        }
+    }
+    func setModelAllowed(account: Int64, model: String, allowed: Bool) async throws {
+        if allowed { deniedModels[account]?.remove(model) } else { deniedModels[account, default: []].insert(model) }
+    }
     func loginCode(_ id: String) async -> String? { loginProvider == "codex-sub" ? "K7QM-4XZP" : nil }
 }
 #endif

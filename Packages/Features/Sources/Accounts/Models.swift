@@ -27,6 +27,8 @@ struct ProviderItem: Identifiable, Equatable, Sendable {
     var keyPrefix: String? = nil
     var testPath: String? = nil
     var version: Int64 = 1
+    /// A preset (OpenRouter, Groq...): shipped in code and read-only; absent on a Core below 0.10.
+    var preset = false
 }
 
 /// An account as a `read` device sees it: its key's last four characters, never the key.
@@ -55,6 +57,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var health: AccountHealthItem?
     /// A runner-bound sign-in (Codex, OpenCode, Antigravity): the account only runs on one runner (E7-4).
     var runnerBinding: RunnerBinding?
+    /// The usage meter the Core works out (0.10); nil on an older Core or for a device without `admin`.
+    var meter: AccountMeterItem?
     var phase: AccountPhase { AccountPhase(state) }
     /// A Claude plan: a signed-in token the runner is lent, never an API key the gateway can test.
     var isPlan: Bool { provider == "claude-sub" }
@@ -68,6 +72,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
             && l.monthSpendUSDMicros == r.monthSpendUSDMicros && l.monthLimitUSDMicros == r.monthLimitUSDMicros
             && l.runnerBinding == r.runnerBinding
+            && l.meter == r.meter
     }
 }
 

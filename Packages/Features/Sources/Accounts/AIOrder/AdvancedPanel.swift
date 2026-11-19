@@ -61,17 +61,11 @@ struct LimitsTab: View {
                     header("Warn me at").frame(width: Space.s8 * 3, alignment: .leading)
                     Color.clear.frame(width: Space.s6, height: 1)
                 }
-                let rows = model.limits(of: a)
-                ForEach(rows) { l in
-                    LimitEditRow(model: model, account: a, existing: l, done: {}).id(
-                        "\(a.id)-\(l.id)-\(l.cap)-\(l.warnPercent)")
+                if model.aiOrderOn {
+                    BudgetLimitRows(model: model, account: a, adding: $adding)
+                } else {
+                    legacyRows(a)
                 }
-                if rows.isEmpty && !adding {
-                    Text("No limit. Add one to cap the messages or tokens this account may use in a window.")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                }
-                if adding { LimitEditRow(model: model, account: a, existing: nil) { adding = false } }
-                if model.limitsLoad == .ready, let e = model.writeError["limit-\(a.id)"] { AccIssue(text: e) }
                 HStack(spacing: Space.s2) {
                     AccLink(title: "Add a limit", symbol: "plus") { adding = true }
                         .disabled(model.readOnly || adding)
@@ -84,7 +78,25 @@ struct LimitsTab: View {
                 Text("Add an account first. Limits belong to an account.").foregroundStyle(GlassInk.secondary)
             }
         }
-        .task { await model.reloadLimits() }
+        .task {
+            await model.reloadLimits()
+            await model.reloadBudgets()
+        }
+    }
+
+    /// A Core below 0.10: the usage limits it has always had.
+    @ViewBuilder private func legacyRows(_ a: AccountItem) -> some View {
+        let rows = model.limits(of: a)
+        ForEach(rows) { l in
+            LimitEditRow(model: model, account: a, existing: l, done: {}).id(
+                "\(a.id)-\(l.id)-\(l.cap)-\(l.warnPercent)")
+        }
+        if rows.isEmpty && !adding {
+            Text("No limit. Add one to cap the messages or tokens this account may use in a window.")
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+        }
+        if adding { LimitEditRow(model: model, account: a, existing: nil) { adding = false } }
+        if model.limitsLoad == .ready, let e = model.writeError["limit-\(a.id)"] { AccIssue(text: e) }
     }
 
     private func header(_ s: String) -> some View {
