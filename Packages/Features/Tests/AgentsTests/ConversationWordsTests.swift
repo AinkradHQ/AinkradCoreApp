@@ -124,6 +124,6 @@ struct ConversationWordsTests {
     }
 
     @Test func theSheetOffersTheApprovedTools() {
-        #expect(NewSessionSheet.tools == ["claude", "codex", "opencode"])
+        #expect(NewSessionSheet.tools == ["claude", "codex", "opencode", "agy"])
     }
 }

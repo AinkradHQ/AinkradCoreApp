@@ -27,6 +27,14 @@ struct SecretsTests {
         return f
     }
 
+    @Test("An account's key never shows in the secrets list, even when an older Core sends it")
+    func accountKeysAreHidden() async {
+        let (admin, svc, _) = await world()
+        svc.secretList = [secret("acct.google.7"), secret("e5-07-old")]
+        await admin.secrets.reload()
+        #expect(admin.secrets.items.map(\.name) == ["e5-07-old"])
+    }
+
     @Test("Secrets are off only once the registry has loaded with mode 0, never while it loads or after it failed")
     func offOnlyWhenKnown() async {
         let (off, _, _) = await world(mode: 0)

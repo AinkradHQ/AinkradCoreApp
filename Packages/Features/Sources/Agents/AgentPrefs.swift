@@ -153,6 +153,7 @@ struct AgentSettingsView: View {
                             CoreSegment("claude", "claude", symbol: "sparkles"),
                             CoreSegment("codex", "codex", symbol: "chevron.left.forwardslash.chevron.right"),
                             CoreSegment("opencode", "opencode", symbol: "curlybraces"),
+                            CoreSegment("agy", "agy", symbol: "terminal"),
                         ], selection: $prefs.harness, fill: true)
                 }
                 SettingRow("Mode", symbol: "hand.raised") {

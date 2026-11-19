@@ -33,14 +33,15 @@ struct NewSessionSheet: View {
     }
     private var ready: Bool { runner != nil && placeOK && !busy }
 
-    /// The tools the sheet offers (approved mockup): Claude Code, Codex, OpenCode.
-    static let tools = ["claude", "codex", "opencode"]
+    /// The tools the sheet offers (approved mockup): Claude Code, Codex, OpenCode, plus Antigravity (agy), the Gemini harness.
+    static let tools = ["claude", "codex", "opencode", "agy"]
 
     /// The sub-line under each tool. The app knows no installed versions, so it says whose CLI it is instead.
     static func toolLine(_ tool: String) -> String {
         switch tool {
         case "claude": "Anthropic's CLI"
         case "codex": "OpenAI's CLI"
+        case "agy": "Google's CLI"
         default: "Open source CLI"
         }
     }
