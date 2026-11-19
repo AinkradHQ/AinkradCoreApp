@@ -317,33 +317,3 @@ private struct EmptyAccounts: View {
         .accessibilityIdentifier("first-account")
     }
 }
-
-/// The Connections tab: the same page as the Connections pane, inside Accounts.
-struct ConnectionsTab: View {
-    let model: ConnectionsModel
-    var body: some View {
-        Group {
-            if model.service == nil {
-                AccStateCard(
-                    symbol: "link", title: "Not connected to a Core",
-                    text: "Connect this Mac to your Core first. Then you sign in to GitHub, Jira and others here.")
-            } else {
-                switch model.load {
-                case .loading: AccSkeleton()
-                case .ready: ConnListPage(model: model)
-                default:
-                    AccStateCard(
-                        symbol: "exclamationmark.triangle", title: "Couldn't load connections",
-                        text: "Your Core didn't answer. Nothing was changed.", tone: .fail
-                    ) {
-                        AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
-                            Task { await model.reload() }
-                        }
-                    }
-                }
-            }
-        }
-        .task { await model.reload() }
-        .accessibilityIdentifier("connections-tab")
-    }
-}

@@ -557,7 +557,6 @@ public final class AccountsModel {
         case .prices: AccountDialogs.openPrice(self, editing: nil)
         case .costs, .ledger: break
         case .spending: AccountDialogs.openBudget(self, editing: nil)
-        case .connections: if connections.service != nil { ConnDialogs.openConnect(connections, kind: nil) }
         default: AccountDialogs.openConnect(self, provider: nil)
         }
     }

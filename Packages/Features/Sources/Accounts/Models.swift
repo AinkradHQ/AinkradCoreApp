@@ -240,7 +240,7 @@ enum AccountsLoad: Equatable {
 }
 
 enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
-    case accounts, pools, chains, spending, budgets, costs, ledger, prices, connections
+    case accounts, pools, chains, spending, budgets, costs, ledger, prices
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -248,7 +248,6 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .pools: "Pools"
         case .chains: "Chains"
         case .spending: "Spending"
-        case .connections: "Connections"
         case .budgets: "Budgets"
         case .costs: "Costs and usage"
         case .ledger: "Ledger"
@@ -261,7 +260,6 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .pools: "square.grid.2x2"
         case .chains: "link"
         case .spending: "dollarsign.circle"
-        case .connections: "link"
         case .budgets: "dollarsign.circle"
         case .costs: "chart.bar"
         case .ledger: "list.bullet"
@@ -271,7 +269,6 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
     var isSpend: Bool { [.spending, .budgets, .costs, .ledger, .prices].contains(self) }
     static let groups: [(String?, [AccountsPage])] = [
         ("Accounts", [.accounts, .pools, .chains]), ("Spending", [.spending, .budgets, .costs, .ledger, .prices]),
-        ("Connections", [.connections]),
     ]
 }
 
