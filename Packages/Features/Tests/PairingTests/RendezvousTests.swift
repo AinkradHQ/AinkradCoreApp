@@ -56,6 +56,26 @@ struct RendezvousTests {
         #expect(s.open(epk: m.epk, ct: bad) == nil, "altered")
     }
 
+    private func hex(_ h: String) -> Data {
+        Data(stride(from: 0, to: h.count, by: 2).map { i in
+            let a = h.index(h.startIndex, offsetBy: i)
+            return UInt8(h[a..<h.index(a, offsetBy: 2)], radix: 16)!
+        })
+    }
+
+    /// The same vector the Core's `rendezvous.rs` pins: sealed there (and by an independent implementation), opened here.
+    @Test func theVectorSealedByTheInstallerSideOpens() throws {
+        let key = try Curve25519.KeyAgreement.PrivateKey(
+            rawRepresentation: hex("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"))
+        let s = RendezvousSession(code: Data(repeating: 7, count: 16), key: key)
+        #expect(s.spec == "BwcHBwcHBwcHBwcHBwcHBw.3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08")
+        #expect(s.id == "12HUBq8qSloV9nySQ3jtiNH4XBPxo3_HNm9ZeJs7zWU")
+        let epk = try #require(Wire.unb64("hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"))
+        let ct = try #require(
+            Wire.unb64("rBL1S5cKm3hdu54gCEaoH51O343FmiVAKIZp0hurr2NGiMlq9YW-qXbI7lhtVvKrn3askCu1qcmh8FhkA5PS2e4c_rqnPQ"))
+        #expect(s.open(epk: epk, ct: ct) == "ainkrad://connect?host=core.example.com&fp=FP&secret=S")
+    }
+
     @Test func theCommandCarriesTheCodeAndTheKeyAndTheIdHidesTheCode() {
         let s = RendezvousSession()
         let cmd = SetupWizardModel.installCommand(rendezvous: s.spec)

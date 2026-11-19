@@ -117,6 +117,8 @@ final class SetupWizardModel {
 
     /// "Paste a link instead" (or "I have the link"): the paste screen, whatever was found.
     func haveLink() {
+        // Leaving the found screen drops the link that came through the rendezvous: the person pastes their own.
+        if stage == .found { scrub() }
         stopWaiting()
         discovery.stop()
         stage = .connect
@@ -152,6 +154,7 @@ final class SetupWizardModel {
             while !Task.isCancelled {
                 do {
                     if let m = try await rendezvousClient.fetch(id: session.id) {
+                        if Task.isCancelled { return }
                         if let text = session.open(epk: m.epk, ct: m.ct) { self?.arrived(text) } else {
                             self?.waitEnded = "A message came, but it was not for this setup. Paste the link instead."
                         }
@@ -179,8 +182,10 @@ final class SetupWizardModel {
 
     /// The installer's link came through the rendezvous: shown for the person to check, never connected by itself.
     private func arrived(_ text: String) {
+        // Only while waiting: a message that comes after the person left (Back, paste) must not touch what they typed.
+        guard stage == .waiting else { return }
         linkText = text
-        guard link != nil, stage == .waiting else {
+        guard link != nil else {
             linkText = ""
             waitEnded = "The link that arrived could not be read. Paste it instead."
             return
