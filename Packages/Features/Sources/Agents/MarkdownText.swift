@@ -123,18 +123,31 @@ enum MarkdownBlock: Equatable {
 struct MarkdownText: View {
     let source: String
     private let blocks: [MarkdownBlock]
+    /// True while this answer is still being written: a soft caret ends its last paragraph (static under Reduce Motion).
+    var streaming = false
 
-    init(_ source: String) {
+    init(_ source: String, streaming: Bool = false) {
         self.source = source
+        self.streaming = streaming
         blocks = MarkdownBlock.parse(source)
+    }
+
+    /// The words of a paragraph, for finding the file a code block after it is about.
+    private static func words(_ b: MarkdownBlock) -> String? {
+        if case .paragraph(let t) = b { return t }
+        return nil
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 switch block {
                 case .paragraph(let t):
-                    Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
+                    if streaming && index == blocks.count - 1 {
+                        CaretParagraph(text: MarkdownBlock.inline(t))
+                    } else {
+                        Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
+                    }
                 case .heading(let t):
                     // A report's headings read as headings: one step up from the body.
                     // 16 pt above a heading (8 from the stack + 8), so a section starts clearly (review 2026-11-16).
@@ -142,12 +155,20 @@ struct MarkdownText: View {
                         .padding(.top, Space.s2).textSelection(.enabled)
                 case .item(let marker, let t):
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                        // One 20 pt marker column for bullets and numbers alike, numbers right-aligned in it.
-                        Text(marker).foregroundStyle(SessionInk.text2).frame(width: 20, alignment: .trailing)
+                        // One 20 pt marker column for bullets and numbers alike, numbers right-aligned in it. A bullet is a
+                        // small rounded square (the mockup's), not a dot character.
+                        Group {
+                            if marker == "•" {
+                                coreShape(1.5).fill(SessionInk.text2).frame(width: 5, height: 5).offset(y: -1)
+                            } else {
+                                Text(marker).foregroundStyle(SessionInk.text2).monospacedDigit()
+                            }
+                        }
+                        .frame(width: 20, alignment: .trailing)
                         Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                     }
                 case .code(let lang, let t):
-                    CodeBlock(text: t, language: lang)
+                    CodeBlock(text: t, language: lang, before: index > 0 ? Self.words(blocks[index - 1]) : nil)
                 case .table(let header, let rows):
                     MarkdownTable(header: header, rows: rows)
                 case .quote(let t):
@@ -170,33 +191,67 @@ struct MarkdownText: View {
     }
 }
 
-/// Monospaced card, scrolls sideways, with Copy.
+/// A code block as a card (the mockup's): a header with the language, Wrap, Copy and Apply. Apply writes the block to the file
+/// named in the fence or the sentence before it; a block that names none asks which of the session's files.
 private struct CodeBlock: View {
     let text: String
+    /// The fence's whole info string (```swift Sources/A.swift).
     var language = ""
+    var before: String?
+    @Environment(\.applyCode) private var apply
     @State private var copied = false
+    @State private var wrap = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            ScrollView(.horizontal) {
-                Text(SyntaxHighlight.attributed(text)).font(.system(size: MacTextSize.body - 1, design: .monospaced))
-                    .textSelection(.enabled).fixedSize().padding(Space.s3).padding(
-                        .top, language.isEmpty ? 0 : Space.s3
-                    )
-                    .padding(.trailing, Space.s6)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: Space.s1) {
+                let target = CodeTarget.path(info: language, before: before)
+                Text(language.split(separator: " ").first.map { String($0).components(separatedBy: ":")[0] } ?? "code")
+                    .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(SessionInk.text2)
+                if let target {
+                    Text(target).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(SessionInk.text2)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: Space.s2)
+                if let apply {
+                    if let target {
+                        CoreIconButton(symbol: "square.and.arrow.down", label: "Apply to \(target)") {
+                            apply.write(target, text)
+                        }
+                        .help("Write this to \(target)")
+                    } else if !apply.files.isEmpty {
+                        Menu {
+                            ForEach(apply.files, id: \.self) { f in Button(f) { apply.write(f, text) } }
+                        } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
+                        .menuStyle(.borderlessButton).fixedSize().help("Apply to a file: pick which")
+                    }
+                }
+                CoreIconButton(symbol: "text.alignleft", label: wrap ? "Do not wrap lines" : "Wrap lines") {
+                    wrap.toggle()
+                }
+                .help(wrap ? "Scroll long lines" : "Wrap long lines")
+                CoreIconButton(symbol: copied ? "checkmark" : "doc.on.doc", label: copied ? "Copied" : "Copy the code") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                    copied = true
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copied = false
+                    }
+                }
+                .help("Copy the code")
             }
-            if !language.isEmpty {
-                Text(language).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
-                    .padding(.horizontal, Space.s3).padding(.top, Space.s2)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.leading, Space.s3).padding(.trailing, Space.s1).frame(height: MacSize.controlLg)
+            let code = Text(SyntaxHighlight.attributed(text))
+                .font(.system(size: MacTextSize.body - 1, design: .monospaced)).textSelection(.enabled)
+            if wrap {
+                code.frame(maxWidth: .infinity, alignment: .leading).padding([.horizontal, .bottom], Space.s3)
+            } else {
+                ScrollView(.horizontal) { code.fixedSize().padding([.horizontal, .bottom], Space.s3) }
+                    .scrollIndicators(.never)
             }
-            Button(copied ? "Copied" : "Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-                copied = true
-            }
-            .buttonStyle(.plain).coreFont(size: MacTextSize.meta, weight: .semibold)
-            .foregroundStyle(SessionInk.text2).padding(Space.s2)
         }
         .background(SessionInk.code, in: coreShape(Radius.row))
     }
@@ -263,5 +318,30 @@ private struct MarkdownImage: View {
 
     private var fallback: some View {
         CoreChip(alt.isEmpty ? src : alt, symbol: "photo", minWidth: 0).help(src)
+    }
+}
+
+
+/// The last paragraph of an answer that is still being written: its text and a calm caret that breathes between faint and full
+/// about every 0.6 s. Reduce Motion: the caret stays, still and full.
+private struct CaretParagraph: View {
+    let text: AttributedString
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        if reduce {
+            paragraph(on: true)
+        } else {
+            TimelineView(.periodic(from: .now, by: 0.6)) { ctx in
+                paragraph(on: Int(ctx.date.timeIntervalSinceReferenceDate / 0.6) % 2 == 0)
+                    .animation(Motion.out(0.3), value: Int(ctx.date.timeIntervalSinceReferenceDate / 0.6) % 2)
+            }
+        }
+    }
+
+    private func paragraph(on: Bool) -> some View {
+        var caret = AttributedString(" \u{258D}")
+        caret.foregroundColor = GlassInk.blue.opacity(on ? 1 : 0.25)
+        return Text(text + caret).lineSpacing(6).textSelection(.enabled)
     }
 }

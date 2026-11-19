@@ -63,6 +63,8 @@ public final class TerminalsModel {
     var runnerFilter: RunnerFacts.Live?
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
+    /// Why the last embedded terminal did not open.
+    var embedError: String?
     /// Terminals whose bell rang since they were last opened.
     private(set) var rang: Set<String> = []
     /// Host load (1 minute average per core) of each runner, as this Mac read it on each look, oldest first. The Core reports
@@ -479,6 +481,37 @@ public final class TerminalsModel {
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }
+        }
+    }
+
+    /// A terminal for an embedded view (an AI session's Terminal tab): created in `session`'s folder on `runner` and attached, with
+    /// no pane of its own. nil when it could not open (the reason is in `embedError`).
+    func embed(on runner: String, session: String) async -> TerminalSession? {
+        embedError = nil
+        if runners.isEmpty { await reload() }
+        let form = NewTerminalModel(model: self, runner: runner)
+        form.session = session
+        guard form.canOpen else {
+            embedError = form.blockedReason
+            return nil
+        }
+        do {
+            let t = try await host.elevated(
+                "Open a terminal in this AI session's folder. This approval covers this terminal only.", done: "opened",
+                keepsEdit: true
+            ) { try await self.service.create(runner: runner, program: nil, session: session, rows: 30, cols: 100) }
+            items.insert(t, at: 0)
+            let s = TerminalSession(item: t, runner: self.runner(t.runner), service: service, host: host)
+            s.onBell = { [weak self] in self?.bell(t.id) }
+            s.onChange = { [weak self] in self?.paneChanged(t.id) }
+            sessions[t.id] = s
+            await s.attach()
+            return s
+        } catch is ElevationDeclined {
+            return nil
+        } catch {
+            embedError = NewTerminalModel.refusal(CoreError.unwrapping(error), runner: name(of: runner)).title
+            return nil
         }
     }
 

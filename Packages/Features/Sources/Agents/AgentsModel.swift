@@ -3,6 +3,7 @@ import CoreUI
 import Foundation
 import Observation
 import Shell
+import SwiftUI
 
 /// Why an elevated action did not run, in words for an inline banner.
 public struct InlineNotice: Equatable, Sendable {
@@ -26,11 +27,14 @@ public protocol AgentsHost: AnyObject {
     var thisMacRunnerID: String? { get }
     /// Opens a new terminal on a runner (the Terminals module owns it), in `session`'s folder when the Core can.
     func openTerminal(on runner: String, session: String?)
+    /// A live terminal for the session's Terminal tab (the Terminals module draws it); nil where there is none.
+    func embeddedTerminal(on runner: String, session: String) -> AnyView?
 }
 
 extension AgentsHost {
     public var thisMacRunnerID: String? { nil }
     public func openTerminal(on runner: String, session: String?) {}
+    public func embeddedTerminal(on runner: String, session: String) -> AnyView? { nil }
 }
 
 struct ElevationDeclined: Error { let notice: InlineNotice }
@@ -62,6 +66,10 @@ public final class AgentsModel {
     public var drafts: [String: String] = [:]
     /// Messages typed during a turn, held here and sent when the turn ends (`AgentsModel+Queue`).
     public var queued: [String: [QueuedMessage]] = [:]
+    /// The folders listed so far per session, by directory ("" is the root): the Files tab and the @ picker read them.
+    var folders: [String: [String: FolderListing]] = [:]
+    /// The Core has the API 95 session routes: the tree, revert, write, effort and always-allow show only then.
+    var sessionTools = false
     /// Files attached to each session's message, sent as `@path` after its words (pasted, dropped or picked).
     public var attachments: [String: [URL]] = [:]
     /// The quick popup's prompt, carried into the advanced sheet.
