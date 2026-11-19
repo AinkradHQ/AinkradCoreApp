@@ -1,4 +1,5 @@
 import AppKit
+import CoreUI
 
 /// Where each paragraph came from in the Markdown that was loaded, so saving gives the same bytes back (plan T1).
 /// A paragraph whose canonical Markdown still equals what it was at load is written as its original source lines; a
@@ -87,15 +88,18 @@ struct LoreSourceMap {
                 m.range(at: $0).location == NSNotFound ? nil : ns.substring(with: m.range(at: $0))
             }
         }
-        func startsBlock(_ s: String) -> Bool {
+        func startsBlock(_ n: Int) -> Bool {
+            let s = lines[n]
             let t = s.trimmingCharacters(in: .whitespaces)
             return t.isEmpty || t.hasPrefix("```") || t.hasPrefix("|") || match(headingRE, s) != nil
-                || match(listRE, s) != nil || match(quoteRE, s) != nil
+                || match(listRE, s) != nil || match(quoteRE, s) != nil || GFMTable.extent(lines, at: n) != nil
         }
-        func rawBlock(_ a: Int, _ e: Int, open: String, close: String) {
+        func rawBlock(_ a: Int, _ e: Int, open: String, close: String, table: Bool = false) {
+            var extra: [NSAttributedString.Key: Any] = [.loreCodeOpen: open, .loreCodeClose: close]
+            if table { extra[.loreTable] = true }
             add(
                 NSAttributedString(string: lines[a..<e].joined(separator: "\u{2028}")), .code,
-                a - (open.isEmpty ? 0 : 1), e + (close.isEmpty ? 0 : 1), [.loreCodeOpen: open, .loreCodeClose: close])
+                a - (open.isEmpty ? 0 : 1), e + (close.isEmpty ? 0 : 1), extra)
             indents = []
         }
 
@@ -122,12 +126,11 @@ struct LoreSourceMap {
                 i = closed ? e + 1 : e
                 continue
             }
-            // Tables stay text (mono, on a well): every edit is plain typing, so undo and the source never disagree.
-            if t.hasPrefix("|"), i + 1 < lines.count, lines[i + 1].contains("---") {
-                var e = i + 2
-                while e < lines.count, lines[e].trimmingCharacters(in: .whitespaces).hasPrefix("|") { e += 1 }
-                rawBlock(i, e, open: "", close: "")
-                i = e
+            // A table stays text (mono lines, so every edit is plain typing and undo and the source never disagree);
+            // the fragment draws it as a grid while the caret is elsewhere.
+            if let n = GFMTable.extent(lines, at: i) {
+                rawBlock(i, i + n, open: "", close: "", table: true)
+                i += n
                 continue
             }
             if let g = match(headingRE, line) {
@@ -153,7 +156,7 @@ struct LoreSourceMap {
                 // backslash) stays a line break (U+2028), with the next line's indentation. Untouched, the paragraph is
                 // saved as its original bytes anyway; once edited, soft wraps are written as one line.
                 var text = String(line.drop { $0 == " " || $0 == "\t" })
-                while i + 1 < lines.count, !startsBlock(lines[i + 1]) {
+                while i + 1 < lines.count, !startsBlock(i + 1) {
                     let hard = lines[i].hasSuffix("  ") || lines[i].hasSuffix("\\")
                     i += 1
                     if hard {

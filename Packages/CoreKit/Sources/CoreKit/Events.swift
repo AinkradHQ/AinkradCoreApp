@@ -65,6 +65,11 @@ protocol EventSocket: Sendable {
 
 extension EventSocket {
     func send(_ data: Data) async throws { throw CoreError.protocolViolation("this socket cannot send") }
+    func receiveFrame() async throws -> CoreSocketFrame { .text(String(decoding: try await receive(), as: UTF8.self)) }
+    func sendFrame(_ frame: CoreSocketFrame) async throws {
+        guard case .text(let t) = frame else { throw CoreError.protocolViolation("this socket cannot send binary") }
+        try await send(Data(t.utf8))
+    }
 }
 
 /// `URLSessionWebSocketTask`. It is documented thread-safe; its state is only read after the task ended.
@@ -83,6 +88,19 @@ final class URLSessionEventSocket: EventSocket, @unchecked Sendable {
         }
     }
     func send(_ data: Data) async throws { try await task.send(.string(String(decoding: data, as: UTF8.self))) }
+    func receiveFrame() async throws -> CoreSocketFrame {
+        switch try await task.receive() {
+        case .string(let text): .text(text)
+        case .data(let data): .binary(data)
+        @unknown default: .text("")
+        }
+    }
+    func sendFrame(_ frame: CoreSocketFrame) async throws {
+        switch frame {
+        case .text(let t): try await task.send(.string(t))
+        case .binary(let d): try await task.send(.data(d))
+        }
+    }
     func cancel() { task.cancel(with: .goingAway, reason: nil) }
     var closeCode: Int { task.closeCode.rawValue }
     var closeReason: String { task.closeReason.flatMap { String(data: $0, encoding: .utf8) } ?? "" }
