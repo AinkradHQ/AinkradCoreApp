@@ -21,7 +21,6 @@ struct StatusCluster: View {
                 ) { shell.toggleFocusMode() }
             }
             activity
-            ElevationChip(shell: shell)
             StatusButton(
                 title: shell.bell.count > 0 ? "\(shell.bell.count)" : nil, symbol: "bell",
                 label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
@@ -135,87 +134,7 @@ struct StatusBarStyle: ButtonStyle {
     }
 }
 
-/// Shown only while admin actions are unlocked: "Admin unlocked · 4 min". Minutes change slowly, so it looks twice a minute;
-/// the panel it opens has the live m:ss.
-private struct ElevationChip: View {
-    @Bindable var shell: ShellModel
-
-    var body: some View {
-        if let until = shell.elevatedUntil, until > Date() {
-            TimelineView(.periodic(from: .now, by: 15)) { ctx in
-                let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
-                StatusButton(
-                    title: "Admin unlocked · \(coreUnit("\((left + 59) / 60)", "min"))", symbol: "lock.open",
-                    label: "Admin actions are unlocked, no Touch ID needed until then",
-                    on: shell.elevationPanelOpen, meter: (Double(left) / shell.elevationSpan, left <= 60)
-                ) { shell.elevationPanelOpen.toggle() }
-            }
-        }
-    }
-}
-
 /// m:ss, as the prototype's `mmss`.
 public enum Countdown {
     public static func text(_ seconds: Int) -> String { coreClock(seconds) }
-}
-
-/// What the elevation chip opens: what is unlocked, the time left, and Renew / Unlock with Touch ID.
-struct ElevationPanel: View {
-    @Bindable var shell: ShellModel
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            if let until = shell.elevatedUntil, until > Date() {
-                // The words count down on their own (`.timer`); only the bar needs a clock, and 5 s moves it a pixel at most.
-                TimelineView(.periodic(from: .now, by: 5)) { ctx in
-                    let left = max(0, Int(until.timeIntervalSince(ctx.date).rounded(.up)))
-                    VStack(alignment: .leading, spacing: Space.s3) {
-                        HStack(spacing: Space.s2) {
-                            Image(systemName: "lock.open").accessibilityHidden(true)
-                            (Text(left <= 60 ? "Locks in " : "Unlocked for ")
-                                + Text(timerInterval: Date.now...max(until, .now), countsDown: true))
-                                .coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
-                        }
-                        .accessibilityElement(children: .combine)
-                        CoreMeter(Double(left) / shell.elevationSpan, low: left <= 60, label: "Time left")
-                    }
-                }
-                text(
-                    "Adding devices, renaming, revoking, scopes and clearing lockouts go through without asking again.")
-            } else {
-                header("Admin actions are locked", "lock")
-                text(
-                    "Adding, renaming or revoking a device, changing scopes and clearing lockouts ask for Touch ID. Once confirmed they stay unlocked for 5 minutes."
-                )
-            }
-            Text("Admin unlock ends early if the Core restarts or this device is revoked.")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                .fixedSize(horizontal: false, vertical: true)
-            let on = shell.elevatedUntil.map { $0 > Date() } ?? false
-            Button(on ? "Renew with Touch ID" : "Unlock with Touch ID") {
-                shell.elevationPanelOpen = false
-                shell.elevate?()
-            }
-            .buttonStyle(CoreButtonStyle(on ? .secondary : .prominent))
-            .frame(maxWidth: .infinity)
-        }
-        .padding(Space.s4)
-        .frame(width: Space.s8 * 10)
-        .corePanel(radius: Radius.pane, padding: 0, part: .popups)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Admin unlock")
-    }
-
-    private func header(_ title: String, _ symbol: String) -> some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: symbol).accessibilityHidden(true)
-            Text(title).coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func text(_ s: String) -> some View {
-        Text(s).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-    }
 }

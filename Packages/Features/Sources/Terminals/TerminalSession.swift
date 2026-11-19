@@ -225,7 +225,7 @@ final class TerminalSession {
         } catch let e as CoreError {
             switch e {
             case .offline, .coreUnproven, .sessionExpired, .rateLimited: return false
-            case .stepUpRequired:
+            case .stepUpRequired, .unlockRequired:
                 link = .stepUp
                 return true
             default:
@@ -238,7 +238,7 @@ final class TerminalSession {
     private func failed(_ error: any Error) {
         let e = CoreError.unwrapping(error) ?? error
         switch e as? CoreError {
-        case .stepUpRequired?: link = .stepUp
+        case .stepUpRequired?, .unlockRequired?: link = .stepUp
         case .http(_, let code, let message)?: link = .failed(code: code, message: message)
         case .forbiddenScope?:
             link = .failed(code: "forbidden_scope", message: "This device may not use terminals.")
@@ -343,7 +343,7 @@ final class TerminalSession {
                 try await host.elevated(reason, done: "sent") { try await self.service.signal(self.id, name) }
             } else {
                 do { try await service.signal(id, name) } catch {
-                    guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
+                    guard CoreError.unwrapping(error)?.needsProof == true else { throw error }
                     try await host.elevated(reason, done: "sent") { try await self.service.signal(self.id, name) }
                 }
             }

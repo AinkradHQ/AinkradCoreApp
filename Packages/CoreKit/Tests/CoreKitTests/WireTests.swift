@@ -100,6 +100,10 @@ import Testing
         #expect(e(401, "session_expired") == .sessionExpired)
         #expect(e(401, "pairing_failed") == .pairingFailed)
         #expect(e(403, "step_up_required") == .stepUpRequired)
+        #expect(e(403, "unlock_required") == .unlockRequired)
+        #expect(
+            CoreError.unlockRequired.needsProof && CoreError.stepUpRequired.needsProof
+                && !CoreError.forbiddenScope.needsProof)
         #expect(e(403, "forbidden_scope") == .forbiddenScope)
         #expect(e(429, "rate_limited", h: ["retry-after": "12"]) == .rateLimited(retryAfter: 12))
         #expect(e(409, "sas_mismatch") == .sasMismatch)
@@ -110,5 +114,14 @@ import Testing
         #expect(
             CoreError.from(status: 502, headers: [:], body: Data("<html>".utf8))
                 == .http(status: 502, code: "unknown", message: "HTTP 502"))
+    }
+}
+
+struct SessionProofMessageTests {
+    @Test func aSessionProofSignsItsOwnVersionWithThePurpose() {
+        let v1 = Wire.stepUpMessage(coreFP: "fp", deviceID: "d", sessionID: "s", challenge: "c")
+        let v2 = Wire.stepUpMessageV2(coreFP: "fp", deviceID: "d", sessionID: "s", challenge: "c", purpose: "session")
+        #expect(String(decoding: v2, as: UTF8.self) == "AINKRAD-STEPUP-V2\nfp\nd\ns\nc\nsession")
+        #expect(v1 != v2, "an action proof is never an unlock proof")
     }
 }

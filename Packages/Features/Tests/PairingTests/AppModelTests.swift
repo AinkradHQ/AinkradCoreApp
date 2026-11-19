@@ -105,8 +105,16 @@ struct AppModelTests {
         let m = try app(s)
         await m.start()
         var ran = false
+        var refused = false
         do {
-            try await m.elevated("test", done: "renamed") { ran = true }
+            // The Core refuses a danger action until a fresh Touch ID (it runs first now, then asks).
+            try await m.elevated("test", done: "renamed") {
+                if !refused {
+                    refused = true
+                    throw CoreError.stepUpRequired
+                }
+                ran = true
+            }
             Issue.record("it ran")
         } catch { #expect(error is StepUpDeclined) }
         #expect(!ran && m.shell.elevatedUntil == nil && m.shell.topDialog == nil, "no modal is left behind")
@@ -120,7 +128,9 @@ struct AppModelTests {
         s.stepUpError = CoreError.keyStore("sign")
         let m = try app(s)
         await m.start()
-        await #expect(throws: StepUpDeclined.self) { try await m.elevated("test", done: "revoked") {} }
+        await #expect(throws: StepUpDeclined.self) {
+            try await m.elevated("test", done: "revoked") { throw CoreError.stepUpRequired }
+        }
         let n = try #require(m.stepUpNotice)
         #expect(n.title == "Touch ID didn't match. Nothing was revoked." && n.phase != .cancelled)
     }
@@ -130,14 +140,91 @@ struct AppModelTests {
         s.stepUpError = CoreError.stepUpCancelled
         let m = try app(s)
         await m.start()
-        await #expect(throws: StepUpDeclined.self) { try await m.elevated("test", done: "changed") {} }
+        await #expect(throws: StepUpDeclined.self) {
+            try await m.elevated("test", done: "changed") { throw CoreError.stepUpRequired }
+        }
         s.stepUpError = nil
         var ran = false
-        try await m.elevated("test", done: "changed") { ran = true }
+        var refused = false
+        try await m.elevated("test", done: "changed") {
+            if !refused {
+                refused = true
+                throw CoreError.stepUpRequired
+            }
+            ran = true
+        }
         #expect(ran && m.isElevated && s.stepUps == 2 && m.stepUpNotice == nil)
-        // Already elevated: no second prompt.
+        // An action the Core lets through never asks: no Touch ID for a normal write.
         try await m.elevated("again", done: "changed") {}
         #expect(s.stepUps == 2)
+    }
+
+    @Test func aNormalWriteNeverAsksForTouchID() async throws {
+        let s = FakeService()
+        let m = try app(s)
+        await m.start()
+        var ran = false
+        try await m.elevated("test", done: "changed") { ran = true }
+        #expect(ran && s.stepUps == 0 && m.shell.topDialog == nil)
+    }
+
+    @Test func oneTouchIDOpensTheAppAndTheHeartbeatHoldsIt() async throws {
+        let s = FakeService()
+        s.unlockSupported = true
+        let m = try app(s)
+        m.beatEvery = .milliseconds(20)
+        await m.start()
+        #expect(m.shell.lock == .open && s.unlocks == 1 && m.isUnlocked)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(s.beats >= 2, "the unlock is held by heartbeat")
+        // The Mac locks or sleeps: the Core is told, the card covers the app.
+        m.lockApp()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(m.shell.lock == .locked && s.ends == 1 && !m.isUnlocked)
+        // Unlock again: one more Touch ID.
+        #expect(await m.unlockApp())
+        #expect(m.shell.lock == .open && s.unlocks == 2)
+    }
+
+    @Test func aCoreThatForgotTheUnlockAsksOnceAgain() async throws {
+        let s = FakeService()
+        s.unlockSupported = true
+        let m = try app(s)
+        m.beatEvery = .milliseconds(20)
+        await m.start()
+        s.beatError = CoreError.unlockRequired
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(s.unlocks == 2 && m.shell.lock == .open, "a Core restart costs one Touch ID, not a lockout")
+    }
+
+    @Test func anUnlockRequiredAnswerSignsInAgainEvenWithTheCardDown() async throws {
+        let s = FakeService()
+        s.unlockSupported = true
+        let m = try app(s)
+        await m.start()
+        var refused = false
+        try await m.elevated("open", done: "opened") {
+            if !refused {
+                refused = true
+                throw CoreError.unlockRequired
+            }
+        }
+        #expect(s.unlocks == 2 && s.stepUps == 0 && m.shell.lock == .open, "the unlock, not a danger step-up")
+    }
+
+    @Test func aDangerActionAsksFreshEvenWhenTheAppIsUnlocked() async throws {
+        let s = FakeService()
+        s.unlockSupported = true
+        let m = try app(s)
+        await m.start()
+        var refused = false
+        try await m.elevated("revoke", done: "revoked") {
+            if !refused {
+                refused = true
+                throw CoreError.stepUpRequired
+            }
+        }
+        #expect(s.stepUps == 1 && s.unlocks == 1)
     }
 
     @Test func stepUpFailuresAreToldApart() {
