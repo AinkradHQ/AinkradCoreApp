@@ -25,6 +25,20 @@ struct GuidedLoginRulesTests {
         #expect(!SignInStyle.showsRisk("opencode-sub"))
     }
 
+    @Test func antigravityTakesOnlyAMenuNumberOrACodeLikeTheCore() {
+        let agy = "agy-sub"
+        for ok in ["1", "12", "4/0AbCdEf-gh_ij", String(repeating: "a", count: 256)] {
+            #expect(GuidedInput.check(ok, provider: agy) == .send(ok), "\(ok.prefix(8))")
+        }
+        #expect(GuidedInput.check(String(repeating: "a", count: 257), provider: agy) == .tooLong)
+        for bad in ["a", "123", "abcdefg", "abcd efgh", "abcd.efgh", "x1", "٣١"] {
+            #expect(GuidedInput.check(bad, provider: agy) == .badCharacters, "\(bad)")
+        }
+        #expect(GuidedInput.words(.badCharacters, provider: agy)?.hasSuffix(GuidedInput.agyHint) == true)
+        // OpenCode keeps its free word, and `/` is still refused there.
+        #expect(GuidedInput.check("a/b", provider: "opencode-sub") == .badCharacters)
+    }
+
     @Test func aTypedLineIsOneShortPrintableLine() {
         #expect(GuidedInput.check("  1\n") == .send("1"))
         #expect(GuidedInput.check("   \n") == .empty)

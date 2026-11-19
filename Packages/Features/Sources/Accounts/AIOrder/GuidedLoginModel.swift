@@ -43,8 +43,9 @@ extension AccountsModel {
     @discardableResult
     func sendGuidedInput(_ raw: String) async -> Bool {
         guard let service, let id = signIn?.login, guidedOpen, signIn?.sending != true else { return false }
-        guard case .send(let line) = GuidedInput.check(raw) else {
-            signIn?.inputError = GuidedInput.words(GuidedInput.check(raw))
+        let provider = signIn?.provider ?? ""
+        guard case .send(let line) = GuidedInput.check(raw, provider: provider) else {
+            signIn?.inputError = GuidedInput.words(GuidedInput.check(raw, provider: provider), provider: provider)
             return false
         }
         signIn?.inputError = nil

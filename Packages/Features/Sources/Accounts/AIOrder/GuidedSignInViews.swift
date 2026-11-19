@@ -7,6 +7,7 @@ import SwiftUI
 struct GuidedTerminal: View {
     let lines: [String]
     let error: String?
+    var provider = ""
     let sending: Bool
     let send: (String) -> Void
     @State private var line = ""
@@ -35,7 +36,7 @@ struct GuidedTerminal: View {
                     .disabled(sending || line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("guided-send")
             }
-            Text(GuidedInput.hint).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(provider == "agy-sub" ? GuidedInput.agyHint : GuidedInput.hint).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             CoreCheckbox("This is a secret", isOn: $secret).accessibilityIdentifier("guided-secret")
         }

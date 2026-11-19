@@ -31,31 +31,47 @@ enum SignInStyle: Equatable, Sendable {
     static func showsRisk(_ provider: String) -> Bool { provider != "opencode-sub" }
 }
 
-/// One line typed into a guided sign-in. The Core takes only a menu choice or a short code: letters, digits, `_` and `-`,
-/// up to `maxLength`. The same rule is checked here first, so a refused line is explained and never sent.
+/// One line typed into a guided sign-in. Antigravity takes only a menu number (1 or 2 digits) or a code (8 to 256 of letters,
+/// digits, `_`, `-` and `/`): the Core's own rule, checked here first so a refused line is explained and never sent.
+/// OpenCode's provider menu filters as you type, so it keeps a short word: letters, digits, `_` and `-`, up to `maxLength`.
 enum GuidedInput {
     static let maxLength = 128
     static let hint = "Type the number of a choice, or the code shown."
     enum Verdict: Equatable { case send(String), empty, tooLong, badCharacters }
 
-    static func check(_ raw: String) -> Verdict {
+    static let agyHint = "Type the number of a choice, or paste the code shown (8 to 256 characters)."
+
+    static func check(_ raw: String, provider: String = "") -> Verdict {
         // A paste often ends in a newline; that is the Enter the Core adds itself.
         let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if line.isEmpty { return .empty }
+        if provider == "agy-sub" { return agy(line) }
         if line.count > maxLength { return .tooLong }
         if !line.unicodeScalars.allSatisfy(allowed) { return .badCharacters }
         return .send(line)
+    }
+
+    /// Mirrors the Core's `agy_input_ok`: 1 to 2 digits, or 8 to 256 of `[A-Za-z0-9_/-]`.
+    private static func agy(_ line: String) -> Verdict {
+        let n = line.utf8.count
+        if n > 256 { return .tooLong }
+        let ascii = line.unicodeScalars.allSatisfy { $0.isASCII }
+        if (1...2).contains(n) { return ascii && line.unicodeScalars.allSatisfy { ("0"..."9").contains($0) } ? .send(line) : .badCharacters }
+        if n < 8 { return .badCharacters }
+        return ascii && line.unicodeScalars.allSatisfy { allowed($0) || $0 == "/" } ? .send(line) : .badCharacters
     }
 
     private static func allowed(_ c: Unicode.Scalar) -> Bool {
         c.isASCII && (c.properties.isAlphabetic || ("0"..."9").contains(c) || c == "_" || c == "-")
     }
 
-    static func words(_ v: Verdict) -> String? {
+    static func words(_ v: Verdict, provider: String = "") -> String? {
+        let h = provider == "agy-sub" ? agyHint : hint
         switch v {
-        case .send, .empty: nil
-        case .tooLong: "That is too long for a choice or a code. \(hint)"
-        case .badCharacters: "Only letters, numbers, dashes and underscores. \(hint)"
+        case .send, .empty: return nil
+        case .tooLong: return "That is too long for a choice or a code. \(h)"
+        case .badCharacters:
+            return provider == "agy-sub" ? "That is not a choice number or a code. \(h)" : "Only letters, numbers, dashes and underscores. \(h)"
         }
     }
 }
