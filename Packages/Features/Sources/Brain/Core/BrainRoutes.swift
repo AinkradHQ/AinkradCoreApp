@@ -142,7 +142,7 @@ public struct BrainRoutes: Sendable {
     }
     /// The remembered "same project" names (API minor 72).
     public func aliases() async throws -> [RoomAlias] { try await call("GET", "/aliases") }
-    /// Forgets one; answers the ones left. The next Re-sort keeps the two rooms apart again.
+    /// Forgets one; answers the ones left. The Core keeps the two rooms apart again.
     public func removeAlias(_ from: String) async throws -> [RoomAlias] {
         try await call("DELETE", "/aliases/\(Self.seg(from))")
     }

@@ -28,8 +28,23 @@ public final class BrainModel {
     /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
     public var apiMinor: Int? {
         didSet {
+            updateStatusPolling()
             importer?.review.canSameProject = remembersSameProject
             importer?.review.keepsInCommit = keepsInCommit
+        }
+    }
+    /// The top-bar Brain icon's feed (E9-2).
+    public let status = BrainStatusModel()
+    /// The Core's status, areas and auto-import routes (API minor 95).
+    public var servesActivity: Bool { (apiMinor ?? 0) >= 95 }
+    private func updateStatusPolling() {
+        if servesActivity, let routes = service?.importRoutes, !isSample {
+            host.shell.brainStatus = { [weak self] in self?.status.chip }
+            host.shell.openBrain = { [weak self] in self?.show(.overview) }
+            status.start(routes)
+        } else {
+            host.shell.brainStatus = nil
+            status.stop()
         }
     }
     /// Import takes the ticked rooms in one call (Core API minor 73). The sample always has it.
@@ -90,11 +105,13 @@ public final class BrainModel {
         sync = SyncModel(host: host, service: service, sources: { sources() })
         registerActions()
         load = .loading
+        updateStatusPolling()
         Task { await reload() }
     }
 
     public func detach() {
         service = nil
+        updateStatusPolling()
         for id in Self.actionIDs { host.shell.launcher.unregister(id) }
         activity.reset()
         checks.reset()
