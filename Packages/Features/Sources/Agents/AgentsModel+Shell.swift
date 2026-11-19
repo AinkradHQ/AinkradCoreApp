@@ -217,7 +217,7 @@ extension AgentsModel {
             ) { [weak self] in self?.openChainBinding() })
         shell.settings.section(
             SettingsSection(
-                id: "notifications", group: .notifications, title: "Notifications", symbol: "bell", order: 0
+                id: "notifications", group: .general, title: "Notifications", symbol: "bell", order: 2
             ) {
                 NotificationsSection(model: self)
             })

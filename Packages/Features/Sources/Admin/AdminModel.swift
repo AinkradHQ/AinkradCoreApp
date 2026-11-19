@@ -113,7 +113,7 @@ public final class AdminModel {
 
     // MARK: Settings sections and launcher entries
 
-    /// Adds the five sections to Settings (Core settings, Feature switches, Ops under Core; Secrets and Audit under Security)
+    /// Adds the sections to Settings (Core settings as a tab of the Core page, Feature switches, Ops, Secrets and Audit under Core)
     /// and a launcher entry for each. Sections that the shell shipped as placeholders keep their ids.
     public func install() {
         let shell = host.shell
@@ -133,11 +133,11 @@ public final class AdminModel {
                         ["health", "alarms", "metrics", "prometheus"]
                     ),
                     (
-                        "secrets", .security, "Secrets", "key", 1, "Write-only values the broker leases to runners",
+                        "secrets", .core, "Secrets", "key", 4, "Write-only values the broker leases to runners",
                         ["broker", "keys", "leases", "tokens"]
                     ),
                     (
-                        "audit", .security, "Audit", "doc.text", 2, "Who did what, where and when",
+                        "audit", .core, "Audit", "doc.text", 5, "Who did what, where and when",
                         ["log", "history", "who did what"]
                     ),
                 ]
@@ -150,14 +150,24 @@ public final class AdminModel {
                 case "secrets": AnyView(SecretsSection(admin: self))
                 default: AnyView(AuditSection(admin: self))
                 }
-            shell.settings.section(
-                SettingsSection(id: e.id, group: e.group, title: e.title, symbol: e.symbol, order: e.order) { content })
+            if e.id == "core" {
+                // The registry values are the Core page's Advanced "Limits" tab (D-11); the page itself is the shell's.
+                shell.settings.tab(
+                    "core", SettingsTab("limits", "Limits", order: 9, advanced: true) { content })
+            } else {
+                shell.settings.section(
+                    SettingsSection(
+                        id: e.id, group: e.group, title: e.title, symbol: e.symbol, order: e.order,
+                        advancedOnly: e.id == "switches"
+                    ) { content })
+            }
             shell.launcher.register(
                 LauncherEntry(
                     id: "admin-\(e.id)", title: e.title, sub: "Settings, \(e.group.rawValue)", symbol: e.symbol,
                     keywords: e.keys
                 ) {
                     shell.settings.selected = e.id
+                    if e.id == "core" { shell.settings.selectTab("limits", in: "core") }
                     shell.open(.settings)
                 })
         }
