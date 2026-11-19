@@ -1,5 +1,6 @@
 import Accounts
 import Brain
+import CoreUI
 import Design
 import Leyline
 import Lore
@@ -36,6 +37,17 @@ enum Registration {
                     model: app.macRunner,
                     accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) },
                     connected: app.macRunner.deviceID.flatMap { app.terminals?.isOnline(runner: $0) })
+            })
+        shell.settings.section(
+            SettingsSection(
+                id: "privacy", group: .mac, title: "Privacy", sub: "What Ainkrad may send to its own server",
+                symbol: "hand.raised", order: 7
+            ) {
+                GlassSection(
+                    "Crash reports", sub: "On by default. You can turn it off any time.", symbol: "ladybug",
+                    hue: GlassInk.blue
+                ) { CrashReportsSwitch() }
+                .foregroundStyle(GlassInk.primary)
             })
         shell.settings.section(
             SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
