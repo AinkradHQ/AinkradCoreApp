@@ -218,6 +218,8 @@ public protocol LoreService: Sendable {
     func restore(_ id: String, version: String) async throws -> LoreSaveResult
     /// Moves a note to a project (nil = personal).
     func move(_ id: String, project: String?) async throws -> LoreNote
+    /// Puts a note in the trash (30 days, restorable). `PATCH /notes/{id}`.
+    func trash(_ id: String) async throws -> LoreNote
     /// Tags of live notes with their counts, most used first. `GET /tags` (Core minor 95).
     func tags() async throws -> [LoreTagCount]
     /// Notes imported from AI session files, newest first. `GET /session-docs` (Core minor 95).
@@ -226,6 +228,9 @@ public protocol LoreService: Sendable {
 
 /// A Core (or a test double) without these routes answers "not implemented", like an old Core does.
 extension LoreService {
+    public func trash(_ id: String) async throws -> LoreNote {
+        throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot trash notes.")
+    }
     public func tags() async throws -> [LoreTagCount] { [] }
     public func sessionDocs() async throws -> [LoreSessionDoc] { [] }
     public func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
@@ -325,6 +330,11 @@ public struct LiveLoreService: LoreService {
         // Core minor 95 filters the list by `tag`; an older Core ignores it and answers every note.
         try await call("GET", "/notes?" + String(Self.filterQuery(filter).dropFirst()), as: [NoteWire].self).map(
             \.note)
+    }
+
+    public func trash(_ id: String) async throws -> LoreNote {
+        struct Body: Encodable { let trashed: Bool }
+        return try await call("PATCH", "/notes/\(Self.seg(id))", Body(trashed: true), as: NoteWire.self).note
     }
 
     public func restore(_ id: String) async throws -> LoreNote {
