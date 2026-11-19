@@ -241,6 +241,7 @@ public final class AppModel {
         shell.home.coreName = (try? keyStore.loadIdentity())??.endpoint.host() ?? "Home Core"
         if let live = service as? LiveCoreService {
             homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
+            shell.corePage.source = LiveCorePageSource(connection: live.connection)
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
@@ -759,6 +760,7 @@ public final class AppModel {
         retry?.cancel()
         homeFeed?.stop()
         homeFeed = nil
+        shell.corePage.source = nil
         agents.detach()
         await service?.close()
         await macRunner.coreForgotten()
