@@ -21,7 +21,7 @@ struct DesignView: View {
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("design"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)
