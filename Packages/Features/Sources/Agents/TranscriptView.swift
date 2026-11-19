@@ -179,7 +179,7 @@ struct TranscriptView: View {
         } else {
             EntryRow(
                 entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
-                latest: latest,
+                latest: latest, streaming: latest && session.live && !session.idle,
                 openConnections: { model.shell.launcher.entry("connections")?.run() },
                 actions: EntryActions.make(model, session, ui: ui)
             )
@@ -257,6 +257,8 @@ struct EntryRow: View, Equatable {
     var turn: ConversationWords.Turn?
     /// Your latest message or the latest answer: it carries the action row.
     var latest = false
+    /// The answer is still being written: its text ends in a soft caret.
+    var streaming = false
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
     /// Copy, Edit, Resend, Retry, Quote. Only `canSend` is compared.
@@ -268,6 +270,7 @@ struct EntryRow: View, Equatable {
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool {
         a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn && a.latest == b.latest
+            && a.streaming == b.streaming
             && a.actions?.canSend == b.actions?.canSend
     }
     @Environment(\.corePalette) private var palette
@@ -302,7 +305,7 @@ struct EntryRow: View, Equatable {
             .accessibilityLabel("You: \(text)")
         case .assistant(let text):
             // Printed on the glass, no bubble.
-            MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
+            MarkdownText(text, streaming: streaming).frame(maxWidth: .infinity, alignment: .leading)
                 .messageActions(text: text, user: false, latest: latest, actions)
         case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
             CodeModeCard(

@@ -123,18 +123,30 @@ enum MarkdownBlock: Equatable {
 struct MarkdownText: View {
     let source: String
     private let blocks: [MarkdownBlock]
+    /// True while this answer is still being written: a soft caret ends its last paragraph (static under Reduce Motion).
+    var streaming = false
 
-    init(_ source: String) {
+    init(_ source: String, streaming: Bool = false) {
         self.source = source
+        self.streaming = streaming
         blocks = MarkdownBlock.parse(source)
+    }
+
+    /// The streaming caret: a thin block glyph at the end of the last paragraph.
+    private func caret(last: Bool) -> AttributedString {
+        guard streaming, last else { return AttributedString() }
+        var c = AttributedString(" \u{258D}")
+        c.foregroundColor = GlassInk.blue
+        return c
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 switch block {
                 case .paragraph(let t):
-                    Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
+                    Text(MarkdownBlock.inline(t) + caret(last: index == blocks.count - 1)).lineSpacing(6)
+                        .textSelection(.enabled)
                 case .heading(let t):
                     // A report's headings read as headings: one step up from the body.
                     // 16 pt above a heading (8 from the stack + 8), so a section starts clearly (review 2026-11-16).
@@ -142,8 +154,16 @@ struct MarkdownText: View {
                         .padding(.top, Space.s2).textSelection(.enabled)
                 case .item(let marker, let t):
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                        // One 20 pt marker column for bullets and numbers alike, numbers right-aligned in it.
-                        Text(marker).foregroundStyle(SessionInk.text2).frame(width: 20, alignment: .trailing)
+                        // One 20 pt marker column for bullets and numbers alike, numbers right-aligned in it. A bullet is a
+                        // small rounded square (the mockup's), not a dot character.
+                        Group {
+                            if marker == "•" {
+                                coreShape(1.5).fill(SessionInk.text2).frame(width: 5, height: 5).offset(y: -1)
+                            } else {
+                                Text(marker).foregroundStyle(SessionInk.text2).monospacedDigit()
+                            }
+                        }
+                        .frame(width: 20, alignment: .trailing)
                         Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                     }
                 case .code(let lang, let t):
@@ -170,33 +190,44 @@ struct MarkdownText: View {
     }
 }
 
-/// Monospaced card, scrolls sideways, with Copy.
+/// A code block as a card (the mockup's): a header with the language, Wrap and Copy, then the code. Apply is not offered:
+/// an answer's snippet does not say which file it belongs to, so it would be a guess.
 private struct CodeBlock: View {
     let text: String
     var language = ""
     @State private var copied = false
+    @State private var wrap = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            ScrollView(.horizontal) {
-                Text(SyntaxHighlight.attributed(text)).font(.system(size: MacTextSize.body - 1, design: .monospaced))
-                    .textSelection(.enabled).fixedSize().padding(Space.s3).padding(
-                        .top, language.isEmpty ? 0 : Space.s3
-                    )
-                    .padding(.trailing, Space.s6)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: Space.s1) {
+                Text(language.isEmpty ? "code" : language).coreFont(size: MacTextSize.meta, weight: .medium)
+                    .foregroundStyle(SessionInk.text2)
+                Spacer(minLength: Space.s2)
+                CoreIconButton(symbol: "text.alignleft", label: wrap ? "Do not wrap lines" : "Wrap lines") {
+                    wrap.toggle()
+                }
+                .help(wrap ? "Scroll long lines" : "Wrap long lines")
+                CoreIconButton(symbol: copied ? "checkmark" : "doc.on.doc", label: copied ? "Copied" : "Copy the code") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                    copied = true
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copied = false
+                    }
+                }
+                .help("Copy the code")
             }
-            if !language.isEmpty {
-                Text(language).coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
-                    .padding(.horizontal, Space.s3).padding(.top, Space.s2)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.leading, Space.s3).padding(.trailing, Space.s1).frame(height: MacSize.controlLg)
+            let code = Text(SyntaxHighlight.attributed(text))
+                .font(.system(size: MacTextSize.body - 1, design: .monospaced)).textSelection(.enabled)
+            if wrap {
+                code.frame(maxWidth: .infinity, alignment: .leading).padding([.horizontal, .bottom], Space.s3)
+            } else {
+                ScrollView(.horizontal) { code.fixedSize().padding([.horizontal, .bottom], Space.s3) }
+                    .scrollIndicators(.never)
             }
-            Button(copied ? "Copied" : "Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-                copied = true
-            }
-            .buttonStyle(.plain).coreFont(size: MacTextSize.meta, weight: .semibold)
-            .foregroundStyle(SessionInk.text2).padding(Space.s2)
         }
         .background(SessionInk.code, in: coreShape(Radius.row))
     }
