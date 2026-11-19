@@ -15,13 +15,7 @@ enum MarkdownBlock: Equatable {
     /// `![alt](src)` on a line of its own: a local file this Mac can read, or an https address.
     case image(alt: String, src: String)
 
-    /// Cells of a `| a | b |` line.
-    static func cells(_ line: String) -> [String] {
-        var t = line.trimmingCharacters(in: .whitespaces)
-        if t.hasPrefix("|") { t.removeFirst() }
-        if t.hasSuffix("|") { t.removeLast() }
-        return t.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-    }
+    static func cells(_ line: String) -> [String] { GFMTable.cells(line) }
 
     /// `![alt](src)` alone on a line.
     static func image(_ line: String) -> MarkdownBlock? {
@@ -32,10 +26,7 @@ enum MarkdownBlock: Equatable {
         return src.isEmpty ? nil : .image(alt: alt, src: src)
     }
 
-    static func isSeparator(_ line: String) -> Bool {
-        let c = cells(line)
-        return !c.isEmpty && c.allSatisfy { !$0.isEmpty && $0.allSatisfy { "-:".contains($0) } && $0.contains("-") }
-    }
+    static func isSeparator(_ line: String) -> Bool { GFMTable.isSeparator(line) }
 
     static func parse(_ source: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
@@ -64,16 +55,11 @@ enum MarkdownBlock: Equatable {
             } else if line.hasPrefix("```") {
                 flush()
                 fence = (String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces), [])
-            } else if line.hasPrefix("|"), n + 1 < rawLines.count, isSeparator(rawLines[n + 1]) {
+            } else if let count = GFMTable.extent(rawLines, at: n) {
                 flush()
-                var rows: [[String]] = []
-                var k = n + 2
-                while k < rawLines.count, rawLines[k].trimmingCharacters(in: .whitespaces).hasPrefix("|") {
-                    rows.append(cells(rawLines[k]))
-                    k += 1
-                }
-                blocks.append(.table(header: cells(line), rows: rows))
-                skip = k - n - 1
+                blocks.append(
+                    .table(header: cells(line), rows: rawLines[(n + 2)..<(n + count)].map { cells($0) }))
+                skip = count - 1
             } else if line.hasPrefix(">") {
                 flush()
                 blocks.append(.quote(String(line.drop(while: { $0 == ">" })).trimmingCharacters(in: .whitespaces)))

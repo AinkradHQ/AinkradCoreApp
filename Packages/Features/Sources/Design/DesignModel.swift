@@ -20,6 +20,8 @@ public final class DesignModel {
     var service: (any DesignService)?
     /// Where the mockup viewer reads packages from (V3-07); nil until a Core is attached.
     var mockups: (any MockupSource)?
+    /// The paired connection, for the canvas's sync socket; nil until a Core is attached.
+    @ObservationIgnored var connection: CoreConnection?
 
     var docs: [DesignDoc] = []
     var assets: [DesignAsset] = []
@@ -62,6 +64,7 @@ public final class DesignModel {
 
     public func attach(connection: CoreConnection) {
         mockups = LiveMockupSource(connection: connection)
+        self.connection = connection
         use(LiveDesignService(connection: connection))
     }
 
@@ -74,6 +77,7 @@ public final class DesignModel {
     public func detach() {
         service = nil
         mockups = nil
+        connection = nil
         docs = []
         assets = []
         kits = []
@@ -248,6 +252,52 @@ public final class DesignModel {
         }
     }
 
+    /// New design, quick: made at once with the defaults (named for the category being looked at) and opened.
+    func quickNew() async {
+        let kind: DesignDoc.Kind = category == .systems ? .system : category == .mockups ? .mockup : .design
+        await create(kind: kind, name: Self.defaultName(kind), project: project)
+    }
+
+    static func defaultName(_ kind: DesignDoc.Kind) -> String {
+        switch kind {
+        case .design: "Untitled design"
+        case .system: "Untitled design system"
+        case .mockup: "Untitled mockup"
+        }
+    }
+
+    /// Makes the design and opens it. Returns the Core's refusal in words (the advanced sheet shows it inline), nil on
+    /// success; the quick path toasts it.
+    @discardableResult
+    func create(kind: DesignDoc.Kind, name: String, project: String?, toast: Bool = true) async -> String? {
+        guard let service else { return "Not connected to a Core." }
+        if readOnly || host.pausedReason != nil {
+            let why = host.pausedReason ?? "This device can look at designs but not change them."
+            if toast { host.shell.showToast(why, kind: .warn) }
+            return why
+        }
+        do {
+            let d = try await service.create(kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project)
+            docs.append(d)
+            host.shell.closeDialog()
+            category = .all
+            filter = ""
+            openItem(DesignItem.doc(d).id)
+            Task { await reload() }
+            return nil
+        } catch {
+            if CoreError.unwrapping(error) == .forbiddenScope { readOnly = true }
+            let why = words(error)
+            if toast { host.shell.showToast(why, kind: .warn) }
+            return why
+        }
+    }
+
+    /// New design (advanced): the sheet with name, kind and project.
+    func openNew() {
+        host.shell.present(ShellDialog(id: "new-design") { NewDesignView(model: self) })
+    }
+
     // MARK: navigation
 
     func openItem(_ id: String) {
@@ -305,6 +355,23 @@ public final class DesignModel {
             "design", "Design", "Every design, by category · the library", "paintbrush.pointed",
             ["mockup", "screen", "logo", "icon", "brand", "font", "library"]
         ) { $0.show() }
+        // Quick by default, advanced on request (Ahmed, 2026-11-05).
+        shell.launcher.register(
+            LauncherEntry(
+                id: "new-design", title: "New design", sub: "Opens a blank design at once", symbol: "plus",
+                keywords: ["create", "canvas", "screen"], isAction: true
+            ) { [weak self] in
+                self?.show()
+                Task { await self?.quickNew() }
+            })
+        shell.launcher.register(
+            LauncherEntry(
+                id: "new-design-advanced", title: "New design (advanced)…", sub: "Name, kind and project",
+                symbol: "slider.horizontal.3", keywords: ["create", "design system", "mockup"], isAction: true
+            ) { [weak self] in
+                self?.show()
+                self?.openNew()
+            })
         entry(
             "design-library", "Design Library", "Logos, icons, illustrations, fonts and brand kits",
             "photo.on.rectangle",

@@ -38,6 +38,17 @@ final class FakeService: DesignService, @unchecked Sendable {
         lock.withLock { calls.append("data \(sha)") }
         return Data()
     }
+    func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc {
+        if let fail { throw fail }
+        return lock.withLock {
+            calls.append("create \(kind.rawValue) \(name) \(project ?? "-")")
+            let d = DesignDoc(
+                id: "dd_0000000000000001", kind: kind, name: name, system: nil, projects: project.map { [$0] } ?? [],
+                aiPaused: false, createdBy: "device:d_1", updatedAt: Date())
+            docList.append(d)
+            return d
+        }
+    }
     func link(_ item: DesignItem, project: String, _ on: Bool) async throws {
         lock.withLock {
             calls.append("\(on ? "link" : "unlink") \(item.id) \(project)")
@@ -76,6 +87,26 @@ private func ready(_ s: FakeService) async -> DesignModel {
 
 @MainActor
 @Suite struct DesignModelTests {
+    @Test func quickNewMakesADesignAtOnceAndOpensIt() async {
+        let s = FakeService()
+        let m = await ready(s)
+        await m.quickNew()
+        #expect(s.calls.contains("create design Untitled design -"))
+        #expect(m.openID == "doc:dd_0000000000000001")
+        m.closeItem()
+        m.pick(.systems)
+        await m.quickNew()
+        #expect(s.calls.contains("create system Untitled design system -"))
+    }
+
+    @Test func aRefusalIsReturnedInWords() async {
+        let s = FakeService()
+        s.fail = DesignFailure(sentence: "No.", code: "bad_request", status: 400)
+        let m = await ready(s)
+        #expect(await m.create(kind: .design, name: "x", project: nil, toast: false) == "No.")
+        #expect(m.openID == nil)
+    }
+
     @Test func categoriesSortEveryKindIntoItsRow() async {
         let s = FakeService()
         s.docList = [

@@ -20,6 +20,8 @@ protocol DesignService: Sendable {
     func saveVersion(doc: String, name: String) async throws -> DesignVersion
     /// Rewrites the live design to a version (one Core transaction, so it is an ordinary edit for everyone and Undo works).
     func restoreVersion(doc: String, id: String) async throws
+    /// Makes an empty design (`POST /docs`), related to `project` when there is one.
+    func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc
 }
 
 /// A failure the screens can word. `code` is for hover help only.
@@ -34,6 +36,9 @@ extension DesignService {
     func versions(doc: String) async throws -> [DesignVersion] { throw Self.noVersions }
     func saveVersion(doc: String, name: String) async throws -> DesignVersion { throw Self.noVersions }
     func restoreVersion(doc: String, id: String) async throws { throw Self.noVersions }
+    func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc {
+        throw DesignFailure(sentence: "This Core cannot make designs.", code: "not_found", status: 404)
+    }
     static var noVersions: DesignFailure {
         DesignFailure(sentence: "This Core does not keep versions yet.", code: "not_found", status: 404)
     }
@@ -85,6 +90,16 @@ struct LiveDesignService: DesignService {
     }
     func restoreVersion(doc: String, id: String) async throws {
         _ = try await raw("POST", "/docs/\(Self.seg(doc))/versions/\(Self.seg(id))/restore")
+    }
+
+    func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc {
+        struct NewDoc: Encodable {
+            let kind: String
+            let name: String
+            let project: String?
+        }
+        let body = try JSONEncoder().encode(NewDoc(kind: kind.rawValue, name: name, project: project))
+        return try await call("POST", "/docs", body: body, as: DocWire.self).doc
     }
 
     private func raw(_ method: String, _ path: String, body: Data = Data()) async throws -> Data {

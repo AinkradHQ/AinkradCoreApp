@@ -46,10 +46,7 @@ struct DesignHome: View {
             TopBar(model: model)
             HStack(alignment: .top, spacing: Space.s2) {
                 CategoryRail(model: model).frame(width: Space.s8 * 7 + Space.s2)
-                VStack(spacing: Space.s2) {
-                    Composer()
-                    wall
-                }
+                wall
             }
         }
     }
@@ -106,6 +103,22 @@ private struct TopBar: View {
             }
             .buttonStyle(CoreButtonStyle(.secondary))
             .help("Show the design systems")
+            Button {
+                model.openNew()
+            } label: {
+                Label("Advanced…", systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary))
+            .help("New design (advanced): name, kind and project")
+            .accessibilityIdentifier("design-new-advanced")
+            Button {
+                Task { await model.quickNew() }
+            } label: {
+                Label("New design", systemImage: "plus")
+            }
+            .buttonStyle(CoreButtonStyle(.prominent))
+            .help("Make a blank design and open it")
+            .accessibilityIdentifier("design-new")
         }
         .padding(.top, Space.s2)
         .frame(maxWidth: .infinity)
@@ -160,49 +173,7 @@ private struct CategoryRail: View {
     }
 }
 
-/// The brief composer of the mockup. AI drawing from a brief is V7-02: until then the composer shows its parts, off, and says
-/// so on hover. TODO(V7-02): "Draw 3 directions" starts the AI session; the chips pick kind, project and system.
-private struct Composer: View {
-    @State private var brief = ""
-    @State private var vary = "layout"
-    private let soon = "Drawing from a brief arrives with AI drawing, in a later update"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            CoreTextArea(
-                nil, placeholder: "Describe what AI should design…", text: $brief, size: MacTextSize.title,
-                minHeight: Space.s8 + Space.s4, maxHeight: Space.s8 * 3)
-            HStack(spacing: Space.s2) {
-                chip("App screens", DesignCategory.screens.symbol)
-                chip("Project", "folder")
-                chip("Design system", DesignCategory.systems.symbol)
-                chip("Reference", "plus")
-                Text("Vary").foregroundStyle(GlassInk.secondary).padding(.leading, Space.s1)
-                CoreSegmented(
-                    "Vary",
-                    segments: [
-                        CoreSegment("layout", "Layout"), CoreSegment("colour", "Colour"),
-                        CoreSegment("imagery", "Imagery"),
-                    ],
-                    selection: $vary
-                )
-                .fixedSize()
-                Spacer(minLength: Space.s2)
-                Soon(prominent: true, help: soon) { Label("Draw 3 directions", systemImage: "sparkles") }
-            }
-        }
-        .disabled(true)
-        .padding(Space.s3)
-        .coreWell(radius: Radius.pane)
-        .help(soon)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("design-composer")
-    }
-
-    private func chip(_ title: String, _ symbol: String) -> some View {
-        Soon(prominent: false, help: soon) { Label(title, systemImage: symbol) }.controlSize(.small)
-    }
-}
+// The brief composer (describe what AI should design) stays out until AI drawing (E11-4): a disabled copy only looked broken.
 
 /// The wall: on All designs a section per category that has something; on one category its cards; Needs you and Drawing
 /// now say what will show there.
@@ -279,9 +250,17 @@ struct DesignWall: View {
             Text("Nothing matches “\(model.filter)”.").foregroundStyle(GlassInk.secondary)
                 .frame(maxWidth: .infinity).padding(.top, Space.s8)
         } else {
-            empty(
-                model.category.symbol, "Nothing here yet",
-                "Designs, logos, icons and fonts land here when AI sessions or other devices add them to the Core.")
+            // Designs, design systems and mockups can be made here; the library's files only arrive from elsewhere.
+            let makes = [.all, .screens, .systems, .mockups].contains(model.category)
+            CoreStateCard(
+                symbol: model.category.symbol, title: makes ? "Nothing designed yet" : "Nothing here yet",
+                line: makes
+                    ? "Start with a blank canvas. Logos, icons and fonts land in the library when AI sessions or other devices add them."
+                    : "Designs, logos, icons and fonts land here when AI sessions or other devices add them to the Core.",
+                secondary: makes ? CoreAction("New design (advanced)…") { model.openNew() } : nil,
+                primary: makes ? CoreAction("New design") { Task { await model.quickNew() } } : nil
+            )
+            .frame(maxWidth: .infinity).padding(.top, Space.s8)
         }
     }
 
