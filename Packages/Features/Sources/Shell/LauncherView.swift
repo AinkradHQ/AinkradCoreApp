@@ -163,7 +163,7 @@ struct LauncherView: View {
             .padding(.top, Space.s3).padding(.horizontal, Space.s2).accessibilityAddTraits(.isHeader)
     }
 
-    /// Nothing matched: two things that always work, and the way to try again.
+    /// Nothing matched: says so and how to try again.
     private var empty: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Text("Nothing matches “\(query)”").coreFont(size: MacTextSize.headline, weight: .semibold)
