@@ -137,18 +137,54 @@ struct BrainImportFlowTests {
         #expect(m.review.visible.map(\.id) == ["alpha", "acme", "unsorted"])
     }
 
-    @Test func aDroppedCoreFailsInWordsAndRetryKeepsTheRun() async {
+    @Test func aCoreThatSays5xxIsWaitedForNotFailedAndTheImportContinuesByItself() async {
         let t = FakeBrainTransport()
         let (m, _) = wizard(t)
+        t.routes["POST /modules/brain/v1/imports"] = { _ in throw BrainHTTPError(status: 503, code: "busy") }
+        m.start()
+        for _ in 0..<500 where !m.waitingForCore { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(m.waitingForCore && m.failure == nil && m.step == .collecting)
+        t.routes["POST /modules/brain/v1/imports"] = { _ in ["run": "r1"] }
         t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in throw BrainHTTPError(status: 500, code: "x") }
+        for _ in 0..<500 where t.count("POST /modules/brain/v1/imports/r1/items") == 0 {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in ["results": []] }
+        await untilStep(m, .review)  // no Try again was pressed
+        #expect(m.step == .review && m.failure == nil && !m.waitingForCore)
+        #expect(t.count("POST /modules/brain/v1/imports") >= 2 && t.count("POST /modules/brain/v1/imports/r1/items") >= 2)
+    }
+
+    @Test func aCollectedThatTimesOutIsRetriedUntilItAnswers() async {
+        let t = FakeBrainTransport()
+        let (m, _) = wizard(t)
+        t.routes["POST /modules/brain/v1/imports/r1/collected"] = { _ in throw BrainHTTPError(status: 502, code: "x") }
+        m.start()
+        for _ in 0..<500 where t.count("POST /modules/brain/v1/imports/r1/collected") < 2 {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        t.routes["POST /modules/brain/v1/imports/r1/collected"] = { _ in runView("discovering", stored: 2) }
+        await untilStep(m, .review)
+        #expect(m.step == .review && m.failure == nil)
+    }
+
+    @Test func aRefusalIsAFailureNotAWaitAndRetryKeepsTheRun() async {
+        let t = FakeBrainTransport()
+        let (m, _) = wizard(t)
+        t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in throw BrainHTTPError(status: 400, code: "bad") }
         m.start()
         for _ in 0..<500 where m.failure == nil { try? await Task.sleep(for: .milliseconds(5)) }
-        #expect(m.failure != nil && m.step == .collecting)
+        #expect(m.failure != nil && m.step == .collecting && !m.waitingForCore)
         t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in ["results": []] }
         m.retry()
         await untilStep(m, .review)
         #expect(m.step == .review)
         #expect(t.count("POST /modules/brain/v1/imports") == 1, "one run, not two")
+    }
+
+    @Test func httpStatusesDecideWhetherAnImportWaits() {
+        #expect(BrainHTTPError(status: 503, code: "x").isTransient && BrainHTTPError(status: 500, code: "x").isTransient)
+        #expect(!BrainHTTPError(status: 400, code: "x").isTransient && !BrainHTTPError(status: 409, code: "x").isTransient)
     }
 
     @Test func everyRoomStartsTickedButOneThatMixesTwoEmployers() async {

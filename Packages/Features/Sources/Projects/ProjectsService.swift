@@ -17,6 +17,8 @@ protocol ProjectsService: Sendable {
     func control(project: Int64, _ action: RunAction) async throws -> ProjectRunState
     /// "A viewer is on the Run tab": pushes the idle stop back.
     func touch(project: Int64) async throws -> ProjectRunState?
+    /// "Fetch now": the Core copies the repo again (a failed fetch is still an answer; the repo's state says why).
+    func fetch(project: Int64, repo: Int64) async throws
 }
 
 extension ProjectsService {
@@ -28,6 +30,7 @@ extension ProjectsService {
         throw CoreError.protocolViolation("This Core cannot run projects.")
     }
     func touch(project: Int64) async throws -> ProjectRunState? { nil }
+    func fetch(project: Int64, repo: Int64) async throws {}
 }
 
 struct LiveProjectsService: ProjectsService {
@@ -51,6 +54,10 @@ struct LiveProjectsService: ProjectsService {
                 body: .json(.init(defaultBranch: "main", name: name, primary: primary, remoteUrl: url))
             ).ok
         }
+    }
+
+    func fetch(project: Int64, repo: Int64) async throws {
+        try await run { _ = try await client.fetchProjectRepo(path: .init(id: String(project), repo: String(repo))).ok }
     }
 
     func setExpose(project: Int64, _ on: Bool) async throws {
@@ -129,8 +136,38 @@ struct LiveProjectsService: ProjectsService {
                 RepoItem(
                     id: $0.id, name: $0.name, remoteURL: $0.remoteUrl, branch: $0.defaultBranch,
                     primary: $0.isPrimary, fetchedAt: $0.mirror?.fetchedAt, fetchError: $0.mirror?.error,
-                    head: $0.mirror?.head)
+                    head: $0.mirror?.head, state: $0.mirror?.state, reason: $0.mirror?.reason,
+                    startedAt: $0.mirror?.startedAt)
             }, updatedAt: p.updatedAt, cpuLimit: p.cpuLimit, memLimitMb: p.memLimitMb,
             idleMinutes: Int(p.idleMinutes))
+    }
+}
+
+
+/// GitHub's repos as the Core lists them for the workspace's connection; nil while no connection is set up
+/// (409 `no_connection`), so the picker says "Connect GitHub".
+struct LiveRepoCatalog: RepoCatalog {
+    let connection: CoreConnection
+
+    func repos() async throws -> [PickRepo]? {
+        var out: [PickRepo] = []
+        var page: Int64 = 1
+        while page <= 10 {
+            let list: Components.Schemas.GithubRepoList
+            do {
+                list = try await connection.client.listGithubRepos(query: .init(page: page, perPage: 100)).ok.body.json
+            } catch {
+                if case CoreError.http(409, _, _)? = CoreFailure.of(error) { return nil }
+                throw CoreFailure.of(error) ?? error
+            }
+            for o in list.owners {
+                for r in o.repos {
+                    out.append(PickRepo(org: o.owner, name: r.name, url: "https://github.com/\(r.fullName)"))
+                }
+            }
+            if !list.hasMore { break }
+            page += 1
+        }
+        return out
     }
 }

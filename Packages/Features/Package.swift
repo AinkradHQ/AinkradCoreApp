@@ -123,7 +123,7 @@ let package = Package(
         .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "Projects", "Leyline", "Design", "Lore",
+                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "BrainImport", "Projects", "Leyline", "Design", "Lore",
                 .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),

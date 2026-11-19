@@ -5,12 +5,14 @@ public protocol ImportTransport: Sendable {
     func post(path: String, body: Data) async throws -> Data
 }
 
-/// Sends items in batches under the Core's signed-body cap, retrying a dropped connection and
+/// Sends items in batches under the Core's signed-body cap, retrying a dropped connection (forever, when `retries` is
+/// nil: only transient failures, see `ImportRetry`) and
 /// remembering which batches were confirmed so a second call (or a restart that keeps `Progress`)
 /// does not send them again. The Core dedupes by hash anyway; this just saves the bytes.
 public struct Uploader: Sendable {
     public static let maxBatchBytes = 900_000
-    public static let maxBatchItems = 500
+    /// Small, so the Core holds its write lock only briefly for each.
+    public static let maxBatchItems = 100
 
     public actor Progress {
         var confirmed: Set<String> = []
@@ -23,16 +25,21 @@ public struct Uploader: Sendable {
     public struct Failure: Error, Equatable { public let afterRetries: Int }
 
     let transport: any ImportTransport
-    let retries: Int
+    /// Nil: retry transient failures forever and stop on anything else.
+    let retries: Int?
     let pause: @Sendable (Int) async -> Void
+    /// True while a batch waits to be sent again, false once it went through.
+    let onWaiting: @Sendable (Bool) async -> Void
 
     public init(
-        transport: any ImportTransport, retries: Int = 3,
-        pause: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(for: .seconds(Double(1 << $0))) }
+        transport: any ImportTransport, retries: Int? = nil,
+        pause: @escaping @Sendable (Int) async -> Void = ImportRetry.pause,
+        onWaiting: @escaping @Sendable (Bool) async -> Void = { _ in }
     ) {
         self.transport = transport
         self.retries = retries
         self.pause = pause
+        self.onWaiting = onWaiting
     }
 
     /// Items grouped into batches whose JSON stays under the cap.
@@ -63,15 +70,21 @@ public struct Uploader: Sendable {
         var sent = 0
         for batch in try Self.batches(pending) {
             let body = try JSONEncoder().encode(["items": batch])
-            var attempt = 0
-            while true {
-                do {
-                    _ = try await transport.post(path: "/imports/\(run)/items", body: body)
-                    break
-                } catch {
-                    attempt += 1
-                    if attempt > retries { throw Failure(afterRetries: retries) }
-                    await pause(attempt)
+            if let retries {
+                var attempt = 0
+                while true {
+                    do {
+                        _ = try await transport.post(path: "/imports/\(run)/items", body: body)
+                        break
+                    } catch {
+                        attempt += 1
+                        if attempt > retries { throw Failure(afterRetries: retries) }
+                        await pause(attempt)
+                    }
+                }
+            } else {
+                _ = try await ImportRetry.run(pause: pause, waiting: onWaiting) {
+                    try await transport.post(path: "/imports/\(run)/items", body: body)
                 }
             }
             await progress.add(batch.map(\.item_id))

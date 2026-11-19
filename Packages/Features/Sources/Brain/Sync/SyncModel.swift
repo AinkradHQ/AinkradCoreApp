@@ -126,7 +126,7 @@ public final class SyncModel {
             let next = src.cursorAfter(row.cursor, began: began)
             guard await src.newCount(cursor: row.cursor) > 0 else { continue }
             let run = try await routes.startRun(kind: "incremental", sources: [src.id])
-            let uploader = Uploader(transport: RoutesImportTransport(routes: routes), pause: pause)
+            let uploader = Uploader(transport: RoutesImportTransport(routes: routes), retries: 3, pause: pause)
             _ = try await src.streamNew(cursor: row.cursor, run: run, uploader: uploader, uploaded: .init())
             do { _ = try await routes.collected(run: run, source: src.id) } catch let e as BrainHTTPError
                 where e.status == 409

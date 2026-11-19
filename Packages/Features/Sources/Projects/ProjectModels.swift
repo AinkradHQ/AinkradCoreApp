@@ -13,6 +13,51 @@ struct RepoItem: Identifiable, Equatable, Sendable {
     let fetchError: String?
     /// The commit the Core's copy is at (`mirror.head`).
     var head: String? = nil
+    /// The mirror's own words (`mirror.state`, `.reason`, `.started_at`); nil from a Core that does not say them yet.
+    var state: String? = nil
+    var reason: String? = nil
+    var startedAt: Date? = nil
+
+    /// Where the Core's copy stands: copying (since when), ready, or failed with a reason the person can act on.
+    var copy: RepoCopy {
+        if state == "fetching" { return .fetching(since: startedAt) }
+        if state == "failed" || fetchError != nil {
+            return .failed(RepoFailure(code: reason), fetchError ?? "The Core could not copy this repo.")
+        }
+        return fetchedAt == nil ? .fetching(since: startedAt) : .ready
+    }
+}
+
+/// Why a copy failed, as the Core classifies it (`mirror.reason`).
+enum RepoFailure: Equatable, Sendable {
+    case needsGithub, notFoundOrPrivate, authFailed, timeout, sshNotSupported, other
+
+    init(code: String?) {
+        switch code {
+        case "needs_github": self = .needsGithub
+        case "not_found_or_private": self = .notFoundOrPrivate
+        case "auth_failed": self = .authFailed
+        case "timeout": self = .timeout
+        case "ssh_not_supported": self = .sshNotSupported
+        default: self = .other
+        }
+    }
+
+    /// The fix is in Connections, not another try.
+    var needsConnection: Bool { self == .needsGithub || self == .authFailed }
+}
+
+enum RepoCopy: Equatable, Sendable {
+    case fetching(since: Date?)
+    case ready
+    case failed(RepoFailure, String)
+
+    /// "copying · 40 s" (the Core's start time, else just "copying…").
+    static func elapsed(since: Date?, now: Date) -> String {
+        guard let since else { return "copying…" }
+        let s = max(0, Int(now.timeIntervalSince(since)))
+        return s < 60 ? "copying · \(s) s" : "copying · \(s / 60) min \(s % 60) s"
+    }
 }
 
 /// What the Core's run engine says of a project. The engine (P5) does not exist yet, so a live project has none and the
@@ -219,13 +264,9 @@ struct PickRepo: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Where the picker's repos come from.
-///
-/// TODO(core): the Core has no "list my GitHub repos" endpoint yet (AinkradCore PR #279 has the project routes only), so
-/// `NoRepoCatalog` answers `unavailable` and the picker offers pasted links. When the endpoint ships, add a live catalog
-/// next to `LiveProjectsService` and make it the default; the picker, its search and its grouping need no change.
+/// Where the picker's repos come from: the Core's GitHub list (`LiveRepoCatalog`).
 protocol RepoCatalog: Sendable {
-    /// Nil when this Core cannot list GitHub repos.
+    /// Nil when there is no GitHub connection (or this Core cannot list repos): the picker then says "Connect GitHub".
     func repos() async throws -> [PickRepo]?
 }
 

@@ -85,6 +85,7 @@ public final class ProjectsModel {
     public func attach(connection: CoreConnection) {
         lore = LiveLoreService(connection: connection)
         runService = LiveProjectRunService(connection: connection)
+        catalog = LiveRepoCatalog(connection: connection)
         use(LiveProjectsService(connection: connection))
     }
 
@@ -99,6 +100,8 @@ public final class ProjectsModel {
         lore = nil
         runService = nil
         projects = []
+        pollTask?.cancel()
+        pollTask = nil
         load = .notConnected
         openID = nil
         cursor = nil
@@ -128,11 +131,40 @@ public final class ProjectsModel {
             runStates = runs
             projects = list.map(applying)
             load = .ready
+            pollWhileCopying()
         } catch {
             // A list already on screen stays; only a first load that failed shows the failure.
             if projects.isEmpty { load = .failed(words(error)) }
         }
     }
+
+    @ObservationIgnored private var pollTask: Task<Void, Never>?
+
+    /// While the Core is copying a repo the page reads again every few seconds (the Core's `project.mirror_changed`
+    /// event usually does it sooner), so "copying" always ends in ready or a reason.
+    private func pollWhileCopying() {
+        let copying = projects.contains { $0.repos.contains { if case .fetching = $0.copy { true } else { false } } }
+        guard copying, pollTask == nil else { return }
+        pollTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            pollTask = nil
+            if !Task.isCancelled { await reload() }
+        }
+    }
+
+    /// "Fetch Now" and "Try again": the Core copies the repo again. The call lasts as long as the fetch, so it is not
+    /// awaited here; the Core says "fetching" at once and the page reads that.
+    func fetchRepo(_ project: ProjectItem, _ repo: RepoItem) {
+        guard let service else { return }
+        Task { _ = try? await service.fetch(project: project.id, repo: repo.id) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            await reload()
+        }
+    }
+
+    /// Opens the Connections flow (GitHub).
+    func connectGithub() { host.shell.launcher.entry("connections")?.run() }
 
     /// Reads the picker's repos (once per open of a sheet).
     func loadCatalog() async {
