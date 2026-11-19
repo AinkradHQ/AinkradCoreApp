@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import Observation
+import Shell
 
 /// The part of setup that runs once the Core is connected (E3-1): About you, the AI account, Look and the Mac runner, over
 /// the live desktop so a change of look shows behind the card. Every page can be skipped. Pure state; the views and the
@@ -22,10 +24,16 @@ final class SetupTourModel {
         var isYou: Bool { rawValue <= Step.life.rawValue }
     }
 
+    /// A part of setup the welcome cards open before a Core is connected; it ends back on the welcome page.
+    enum Detour { case you, look }
+
     /// The first Core version that has `PUT /brain/me/profile`. The coordinator renumbers it at integration.
     static let profileMinor = 95
 
     private(set) var step: Step?
+    private(set) var detour: Detour?
+    /// This Mac's own record of the name (the Home greeting); the name question writes to it.
+    private let userProfile: UserProfile?
     var profile = SetupProfile()
     /// nil: nothing sent yet. true: the Core kept it. false: it could not (an older Core, or it was unreachable).
     private(set) var saved: Bool?
@@ -39,10 +47,11 @@ final class SetupTourModel {
     private(set) var pending = false
 
     init(
-        macRunner: MacRunnerModel?, save: @escaping @MainActor ([SetupProfile.Item]) async -> Bool,
+        macRunner: MacRunnerModel?, profile userProfile: UserProfile? = nil, save: @escaping @MainActor ([SetupProfile.Item]) async -> Bool,
         done: @escaping @MainActor () -> Void = {}
     ) {
         self.macRunner = macRunner
+        self.userProfile = userProfile
         self.save = save
         self.done = done
     }
@@ -56,31 +65,57 @@ final class SetupTourModel {
     func startIfArmed() {
         guard pending else { return }
         pending = false
+        begin()
+    }
+
+    func begin() {
+        if profile.name.isEmpty {
+            profile.name = userProfile?.name.nilIfEmpty ?? NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+        }
         step = .role
     }
 
-    func begin() { step = .role }
+    /// "About you" or "Your look" from the welcome page: just those pages, then back to the welcome page.
+    func beginDetour(_ d: Detour) {
+        begin()
+        detour = d
+        if d == .look { step = .look }
+    }
 
     /// The pages that apply to this build: no runner page when the runner is not inside the app.
     private var order: [Step] {
         Step.allCases.filter { $0 != .runner || macRunner?.isAvailable == true }
     }
 
-    var isFirst: Bool { step == order.first }
+    /// No Back on the very first page of the tour; a detour always has one (it returns to the welcome page).
+    var isFirst: Bool { detour == nil && step == order.first }
 
     func next() {
         guard let step, let i = order.firstIndex(of: step) else { return }
-        if step == .life { sendProfile() }
+        if step == .role { userProfile?.set(profile.name) }
+        if let detour {
+            // Nothing is sent from a detour: there is no Core yet. The answers wait in `profile` for the tour.
+            if (detour == .you && step == .life) || detour == .look { return endDetour() }
+        } else if step == .life {
+            sendProfile()
+        }
         if i + 1 < order.count { self.step = order[i + 1] } else { finish() }
     }
 
     func back() {
-        guard let step, let i = order.firstIndex(of: step), i > 0 else { return }
-        self.step = order[i - 1]
+        guard let step, let i = order.firstIndex(of: step) else { return }
+        if detour != nil, i == 0 || step == .look { return endDetour() }
+        if i > 0 { self.step = order[i - 1] }
+    }
+
+    private func endDetour() {
+        detour = nil
+        step = nil
     }
 
     func finish() {
         step = nil
+        detour = nil
         done()
     }
 
@@ -114,4 +149,8 @@ final class SetupTourModel {
     var runnerLine: String {
         macRunner?.isAvailable == true ? (macRunner?.useThisMac == true ? "Runner is on" : "Runner is off") : "Not in this build"
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

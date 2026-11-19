@@ -123,11 +123,11 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        wizard = SetupWizardModel(driver: driver, profile: shell.profile) { [weak self] in
+        wizard = SetupWizardModel(driver: driver, discovery: BonjourDiscovery()) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        tour = SetupTourModel(macRunner: macRunner) { [weak self] items in await self?.saveMeProfile(items) ?? false }
+        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in await self?.saveMeProfile(items) ?? false }
         wizard.armTour = { [weak self] in self?.tour.arm() }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)

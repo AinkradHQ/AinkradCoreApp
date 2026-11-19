@@ -1,4 +1,5 @@
 import Foundation
+import Shell
 
 /// What the setup's "About you" pages collect (D-9), and the plain sentences it becomes in the Brain's Me space. Pure data:
 /// every page edits it, `items` turns it into the `PUT /brain/me/profile` body.
@@ -44,6 +45,8 @@ struct SetupProfile: Equatable {
     /// The ranges the `+` button tries, in order, for a day's next range.
     static let extraBands = [Band(from: 9, to: 13), Band(from: 14, to: 18), Band(from: 19, to: 22)]
 
+    /// What to call the person: the first About you question. Also kept on this Mac for the Home greeting.
+    var name = ""
     var roleSet: Set<String> = []
     var workSet: Set<String> = []
     var languageSet: Set<String> = []
@@ -125,6 +128,7 @@ struct SetupProfile: Equatable {
         func add(_ key: String, _ lead: String, _ list: String) {
             if !list.isEmpty { out.append(Item(key: key, body: String((lead + list + ".").prefix(200)))) }
         }
+        add("name", "Prefers to be called ", UserProfile.clean(name))
         add("role", "Does this kind of work: ", Self.join(Self.roles, roleSet))
         add("work", "Mostly works on: ", Self.join(Self.workKinds, workSet))
         add("languages", "Programs in: ", Self.join(Self.languages, languageSet))
