@@ -179,6 +179,7 @@ private struct WarningCard: View {
                 AppActionTile(title: "Warns at \(limit)", symbol: "slider.horizontal.3", key: "", hue: GlassInk.slate) {
                     admin.registry.cursor = key
                     admin.host.shell.settings.selected = "core"
+                    admin.host.shell.settings.selectTab("limits", in: "core")
                 }
                 .help("Change this limit in Core settings (\(key))")
             }

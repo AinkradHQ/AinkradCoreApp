@@ -82,7 +82,9 @@ struct LiveHomeSource: HomeSource {
             let h = try await client.getCoreHealth().ok.body.json
             return CoreHealthFacts(
                 version: h.version, uptimeSecs: h.uptimeSecs, certDaysLeft: h.certDaysLeft.map(Int.init),
-                lastBackupAt: h.lastBackupAt, lastBackupBytes: h.lastBackupBytes)
+                lastBackupAt: h.lastBackupAt, lastBackupBytes: h.lastBackupBytes,
+                // New in 0.10 (needs `make clients`, done by the coordinator at the epic merge).
+                memoryBytes: h.memoryBytes, diskUsedPct: h.diskUsedPct.map(Int.init))
         }
     }
 
@@ -157,7 +159,12 @@ final class HomeFeed {
                     minutesAgo: max(0, Int(at.timeIntervalSince($0.at) / 60)), symbol: "list.bullet")
             }
         }
-        if let h = try? await source.health() { home.health = h }
+        let began = ContinuousClock.now
+        if let h = try? await source.health() {
+            home.health = h
+            let d = ContinuousClock.now - began
+            shell.responseMs = Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
+        }
         shell.home = home
     }
 

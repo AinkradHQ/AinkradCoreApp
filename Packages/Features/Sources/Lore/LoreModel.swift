@@ -480,9 +480,15 @@ public final class LoreModel {
             ) { [weak self] in self?.capture.toggle() })
         shell.settings.section(
             SettingsSection(
-                id: "lore", group: .apps, title: "Lore", sub: "The quick capture shortcut", symbol: "text.book.closed",
-                order: 40
-            ) { [capture] in LoreSettingsSection(capture: capture) })
+                id: "lore", group: .apps, title: "Lore", sub: "Look and the quick capture shortcut",
+                symbol: "text.book.closed", order: 6,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Lore", prefs: AppLookPrefs.shared("lore"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { [capture] in LoreSettingsSection(capture: capture) },
+                ]))
         capture.start()
     }
 }

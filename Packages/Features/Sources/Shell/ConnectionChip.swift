@@ -119,10 +119,25 @@ struct ConnectionPanel: View {
             }
             if let h = health {
                 HStack(spacing: Space.s2) {
-                    DropStat(h.version, "Version")
-                    DropStat(h.uptime, "Up for")
-                    DropStat(h.backupAge(now: now) ?? "Not yet", "Last backup")
+                    // Memory, disk and response when the Core says them; a Core that does not still shows its version and uptime.
+                    ForEach(stats(h), id: \.1) { DropStat($0.0, $0.1) }
                 }
+            }
+            if let u = shell.coreUpdate {
+                HStack(spacing: Space.s3) {
+                    IconTile("arrow.down.circle", hue: GlassInk.blue, size: MacSize.controlMd)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Update available").coreFont(size: MacTextSize.headline, weight: .semibold)
+                        Text(u.line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    }
+                    Spacer(minLength: Space.s2)
+                    Button("Update now") {
+                        shell.topMenu = nil
+                        u.installNow()
+                    }
+                    .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                }
+                .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))
             }
             let devices = shell.devicesGlance?() ?? []
             if !devices.isEmpty {
@@ -156,6 +171,14 @@ struct ConnectionPanel: View {
         .corePanel(radius: Radius.pane, padding: 0, part: .popups)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Connection to \(shell.home.coreName)")
+    }
+
+    private func stats(_ h: CoreHealthFacts) -> [(String, String)] {
+        let all: [(String?, String)] = [
+            (h.memory, "Memory"), (h.diskUsedPct.map { "\($0)%" }, "Disk"),
+            (shell.responseMs.map { "\($0) ms" }, "Response"), (h.version, "Version"), (h.uptime, "Up for"),
+        ]
+        return Array(all.compactMap { v, k in v.map { ($0, k) } }.prefix(3))
     }
 
     /// "Up for 12 days · everything is fine", or what is wrong in a few words.

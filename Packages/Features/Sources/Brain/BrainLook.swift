@@ -44,39 +44,45 @@ struct BrainLookSection: View {
     @Bindable private var prefs = BrainPrefs.shared
     @State private var ai: AISettings
     @State private var same: SameProjectList
-    init(model: BrainModel) {
+    let part: SettingsPart
+    init(model: BrainModel, part: SettingsPart = .all) {
+        self.part = part
         self.model = model
         _ai = State(initialValue: AISettings(routes: { [weak model] in model?.service?.importRoutes }))
         _same = State(initialValue: SameProjectList(routes: { [weak model] in model?.service?.importRoutes }))
     }
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            GlassSection(
-                "Look", sub: "The Brain's content background.", symbol: "circle.lefthalf.filled", hue: GlassInk.blue
-            ) {
-                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
-            } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
-                }
-            }
-            GlassSection(
-                "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain", hue: GlassInk.blue, index: 1
-            ) {
-                AppActionTile(
-                    title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
+            if part.showsLook {
+                GlassSection(
+                    "Look", sub: "The Brain's content background.", symbol: "circle.lefthalf.filled", hue: GlassInk.blue
                 ) {
-                    model.host.shell.overlay = nil
-                    model.show(.overview)
+                    AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
+                } content: {
+                    if prefs.followLook {
+                        Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(GlassInk.secondary)
+                    } else {
+                        GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                    }
                 }
-            } content: {
-                EmptyView()
             }
-            BrainAISection(settings: ai)
-            if model.remembersSameProject { SameProjectSection(list: same) }
+            if part.showsOptions {
+                GlassSection(
+                    "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain", hue: GlassInk.blue, index: 1
+                ) {
+                    AppActionTile(
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
+                    ) {
+                        model.host.shell.overlay = nil
+                        model.show(.overview)
+                    }
+                } content: {
+                    EmptyView()
+                }
+                BrainAISection(settings: ai)
+                if model.remembersSameProject { SameProjectSection(list: same) }
+            }
         }
         .foregroundStyle(GlassInk.primary)
         .frame(maxWidth: .infinity, alignment: .leading)

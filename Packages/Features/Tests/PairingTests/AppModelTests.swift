@@ -48,7 +48,7 @@ struct AppModelTests {
         s.scopes = ["read"]
         let m = try app(s)
         await m.start()
-        #expect(m.shell.settings.hidden == Set(AppModel.adminOnly))
+        #expect(m.shell.settings.hidden == AppModel.hiddenSettings)
         #expect(m.shell.launcher.entry("lockouts") == nil && m.shell.launcher.entry("admin-ops") == nil)
         #expect(m.shell.launcher.entry("devices") != nil)
         m.showAdminPages(true)
@@ -394,5 +394,16 @@ struct AppModelTests {
             d.status = status
             #expect(d.cutOff == cut)
         }
+    }
+}
+
+struct HubTabTests {
+    @Test func launcherEntriesLandOnTheRightTab() {
+        #expect(HubTab.forEntry("devices") == .devices)
+        #expect(HubTab.forEntry("add-device") == .devices)
+        #expect(HubTab.forEntry("devices-runners") == .devices)
+        #expect(HubTab.forEntry("runners") == .runners)
+        #expect(HubTab.forEntry("mac-runner") == .thisMac)
+        #expect(HubTab.forEntry("lockouts") == nil)
     }
 }
