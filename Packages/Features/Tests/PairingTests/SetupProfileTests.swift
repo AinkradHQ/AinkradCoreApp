@@ -88,6 +88,7 @@ struct SetupTourTests {
         m.arm()
         m.startIfArmed()
         #expect(m.step == .role)
+        m.profile.name = ""  // the tour prefills this Mac's user name; this test is about the role
         m.profile.roleSet = ["Design"]
         while m.step != .life { m.next() }
         m.next()
@@ -104,6 +105,7 @@ struct SetupTourTests {
                 return true
             })
         m.begin()
+        m.profile.name = ""  // the tour prefills this Mac's user name
         while m.step != .ready { m.next() }
         #expect(m.aboutLine == "Skipped for now")
         m.finish()
