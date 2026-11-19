@@ -26,3 +26,14 @@ struct CoreUpdateTests {
         #expect(items == [WhatsNewItem(title: "Calmer Settings", sub: "One page for each app"), WhatsNewItem(title: "Touch ID once", sub: "")])
     }
 }
+
+struct WhatsNewStoreTests {
+    @Test func notesAreShownOnceAndOnlyByTheVersionTheyBelongTo() throws {
+        let d = try #require(UserDefaults(suiteName: "whatsnew-\(UUID().uuidString)"))
+        WhatsNewStore.save(version: "0.10.2", items: [WhatsNewItem(title: "A", sub: "b")], defaults: d)
+        #expect(WhatsNewStore.take(installed: "0.10.1", defaults: d) == nil, "still the old version")
+        let got = try #require(WhatsNewStore.take(installed: "0.10.2", defaults: d))
+        #expect(got.items == [WhatsNewItem(title: "A", sub: "b")])
+        #expect(WhatsNewStore.take(installed: "0.10.2", defaults: d) == nil, "shown once")
+    }
+}

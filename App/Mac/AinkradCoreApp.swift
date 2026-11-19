@@ -8,7 +8,14 @@ import SwiftUI
 
 @main
 struct AinkradCoreApp: App {
-    @State private var app = AinkradCoreApp.makeApp()
+    @State private var app: AppModel
+    @State private var updater: AppUpdater
+
+    init() {
+        let a = AinkradCoreApp.makeApp()
+        _app = State(initialValue: a)
+        _updater = State(initialValue: AppUpdater(shell: a.shell))
+    }
 
     private var shell: ShellModel { app.shell }
 
@@ -32,6 +39,7 @@ struct AinkradCoreApp: App {
                 coreOffline: shell.coreLink == .offline || shell.coreLink == .reconnecting,
                 paneTitles: shell.panes.map { ($0.id, $0.title) })
             QuitCommands(shell: shell)
+            CommandGroup(after: .appInfo) { Button("Check for Updates…") { updater.check() } }
             #if DEBUG
             DemoCommands(shell: shell)
             #endif

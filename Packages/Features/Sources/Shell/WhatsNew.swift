@@ -23,3 +23,20 @@ public enum WhatsNew {
         items.map { $0.sub.isEmpty ? "• \($0.title)" : "• \($0.title): \($0.sub)" }.joined(separator: "\n")
     }
 }
+
+/// The notes of an update that is waiting to install, kept so the first launch of the new version can show them ("Installed
+/// last night") once. `take` returns them only when the running version is the one they belong to.
+public enum WhatsNewStore {
+    private static let key = "ainkrad.update.whatsnew"
+
+    public static func save(version: String, items: [WhatsNewItem], defaults: UserDefaults = .standard) {
+        let lines = items.map { "\($0.title) | \($0.sub)" }
+        defaults.set(["version": version, "notes": lines.joined(separator: "\n")], forKey: key)
+    }
+
+    public static func take(installed current: String, defaults: UserDefaults = .standard) -> (version: String, items: [WhatsNewItem])? {
+        guard let d = defaults.dictionary(forKey: key) as? [String: String], d["version"] == current else { return nil }
+        defaults.removeObject(forKey: key)
+        return (current, WhatsNew.parse(d["notes"] ?? ""))
+    }
+}
