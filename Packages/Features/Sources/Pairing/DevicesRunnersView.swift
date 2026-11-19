@@ -52,19 +52,8 @@ struct DevicesRunnersView: View {
                 } else {
                     page { NotConnectedNote(what: "Runners") }
                 }
-            case .thisMac:
-                page {
-                    Header("This Mac", "Let Core use this Mac to run work while you are away.")
-                    MacRunnerSection(
-                        model: app.macRunner,
-                        accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) },
-                        connected: app.macRunner.deviceID.flatMap { app.terminals?.isOnline(runner: $0) })
-                }
-            case .about:
-                page {
-                    Header("Ainkrad Core", "Which Core this is and what this device may do on it.")
-                    AboutBlock(app: app)
-                }
+            case .thisMac: page { ThisMacView(app: app) }
+            case .about: page { AboutTabView(app: app) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -74,22 +63,6 @@ struct DevicesRunnersView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s4) { content() }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s4)
-        }
-    }
-
-    private struct Header: View {
-        let title: String
-        let sub: String
-        @Environment(\.corePalette) private var palette
-        init(_ title: String, _ sub: String) {
-            self.title = title
-            self.sub = sub
-        }
-        var body: some View {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
-                Text(sub).foregroundStyle(palette.text2)
-            }
         }
     }
 }

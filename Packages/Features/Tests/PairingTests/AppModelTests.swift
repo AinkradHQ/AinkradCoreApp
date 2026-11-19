@@ -407,3 +407,25 @@ struct HubTabTests {
         #expect(HubTab.forEntry("lockouts") == nil)
     }
 }
+
+struct DeviceRoleTests {
+    @Test func scopesReadAsAdminMemberOrViewer() {
+        #expect(DeviceRole(scopes: ["read", "admin"]).title == "Admin")
+        #expect(DeviceRole(scopes: ["read", "approve", "agent"]).title == "Member")
+        #expect(DeviceRole(scopes: ["read", "approve", "agent"]).line == "Can approve AI actions, use your accounts")
+        #expect(DeviceRole(scopes: ["read"]).title == "Viewer")
+    }
+
+    @Test func makingAnAdminKeepsWhatItHadAndAddsAdminOnce() {
+        #expect(DeviceRole.withAdmin(["read", "approve"]) == ["read", "approve", "admin"])
+        #expect(DeviceRole.withAdmin(["read", "admin"]) == ["read", "admin"])
+    }
+}
+
+struct MacVitalsTests {
+    @Test func theShareIsBetweenNothingAndAll() {
+        let v = MacVitals.read()
+        #expect((0...1).contains(v.memory ?? 0.5) && (0...1).contains(v.disk ?? 0.5))
+        #expect(ThisMacView.percent(0.34) == "34%")
+    }
+}
