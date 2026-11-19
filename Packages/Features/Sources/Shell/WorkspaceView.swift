@@ -12,8 +12,6 @@ struct WorkspaceView: View {
     /// How far the workspace strip is scrolled, so a drag measured on screen lands on the right pane.
     @State private var scrollX: CGFloat = 0
     @State private var scrolling = false
-    /// The pane on top of the stack when the active pane is elsewhere.
-    @State private var stackFront: String?
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -21,35 +19,24 @@ struct WorkspaceView: View {
         GeometryReader { geo in
             let area = CGSize(
                 width: geo.size.width - ShellMetrics.paneInset * 2,
-                height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset)
+                height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset
+                    - (shell.spaces.count > 1 ? SpaceBar.height : 0))
             let mins = Dictionary(uniqueKeysWithValues: shell.panes.map { ($0.id, $0.minWidth) })
             let tiled = shell.tree.layout(
                 minWidth: { mins[$0] ?? ShellMetrics.paneMinWidth }, container: area, gap: ShellMetrics.paneGap,
                 minHeight: shell.panes.map(\.minHeight).max() ?? ShellMetrics.paneMinHeight)
             let focus = shell.focusedPane
-            let stack = Stack.make(
-                order: shell.tree.leaves, tiled: tiled, area: area,
-                minWidth: mins.values.max() ?? ShellMetrics.paneMinWidth,
-                active: shell.activePane, front: stackFront, focused: focus != nil)
-            let layout = stack.layout
+            // Apps are never stacked (D-14): what does not fit opens a workspace, and a window shrunk later scrolls sideways.
+            let layout = tiled
             ZStack(alignment: .topLeading) {
-                if shell.panes.isEmpty { empty }
+                if shell.panes.isEmpty { EmptyWorkspace(shell: shell) }
                 // The strip scrolls by its own offset, not a ScrollView: a terminal pane takes every scroll event, so
                 // sideways swipes are caught for the whole workspace (StripSwipe), and picking a pane slides it into view.
                 let maxX = focus == nil && layout.isStrip ? max(0, layout.contentWidth - area.width) : 0
                 ZStack(alignment: .topLeading) {
                     ZStack(alignment: .topLeading) {
-                        if let slot = stack.slot, stack.hidden.count > 0 {
-                            StackBehind(slot: slot, count: stack.hidden.count)
-                        }
-                        ForEach(shell.panes) { spec in
-                            pane(spec, layout: layout, area: area, hidden: stack.hidden.contains(spec.id))
-                        }
-                        if let slot = stack.slot, let front = stack.front {
-                            StackBadge(
-                                index: (stack.members.firstIndex(of: front) ?? 0) + 1, count: stack.members.count,
-                                slot: slot
-                            )
+                        ForEach(shell.allPanes) { spec in
+                            pane(spec, layout: layout, area: area)
                         }
                         if focus == nil {
                             if let drop {
@@ -87,7 +74,6 @@ struct WorkspaceView: View {
                     }
                 }
                 .onChange(of: shell.activePane) { _, id in
-                    if let id, stack.members.contains(id) { stackFront = id }
                     guard maxX > 0, let id, let f = layout.frames[id] else { return }
                     let target =
                         f.minX < scrollX ? f.minX : f.maxX > scrollX + area.width ? f.maxX - area.width : scrollX
@@ -105,6 +91,17 @@ struct WorkspaceView: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if shell.spaces.count > 1 { SpaceBar(shell: shell) }
+            }
+            .overlay(alignment: .bottom) {
+                if let note = shell.spaceNote { SpaceNoteCard(shell: shell, note: note) }
+            }
+            .overlay {
+                if shell.spacesOpen && shell.surface == .workspace { SpaceStrip(shell: shell) }
+            }
+            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.spacesOpen)
+            .onChange(of: area.width, initial: true) { _, w in shell.workspaceWidth = w }
             .coordinateSpace(name: "wsroot")
         }
     }
@@ -127,9 +124,11 @@ struct WorkspaceView: View {
     }
 
     @ViewBuilder
-    private func pane(_ spec: PaneSpec, layout: TileLayout, area: CGSize, hidden: Bool) -> some View {
+    private func pane(_ spec: PaneSpec, layout: TileLayout, area: CGSize) -> some View {
         let focus = shell.focusedPane
-        let folded = (focus != nil && focus != spec.id) || hidden
+        // Panes of other workspaces stay in the tree (a terminal keeps its view) and wait off to the side.
+        let away = shell.spaceOffset(of: spec.id)
+        let folded = (focus != nil && focus != spec.id) || away != 0
         let tiled = layout.frames[spec.id] ?? CGRect(origin: .zero, size: area)
         let slot = focus == spec.id ? CGRect(origin: .zero, size: area) : tiled
         let dragging = drag?.id == spec.id
@@ -142,7 +141,9 @@ struct WorkspaceView: View {
         // Reduce Motion: positions snap, the pane fades in and out; otherwise it travels and scales.
         .scaleEffect(folded || dragging ? coreScale(0.96) : 1)
         .offset(
-            x: dragging ? drag!.origin.x + drag!.translation.width : slot.minX,
+            x: dragging
+                ? drag!.origin.x + drag!.translation.width
+                : slot.minX + (reduce ? 0 : CGFloat(away) * (area.width + ShellMetrics.paneInset)),
             y: dragging ? drag!.origin.y + drag!.translation.height : slot.minY
         )
         .animation(reduce || resizing ? nil : Motion.out(Motion.move), value: slot)
@@ -169,15 +170,6 @@ struct WorkspaceView: View {
     }
 
     private func coreScale(_ s: CGFloat) -> CGFloat { reduce ? 1 : s }
-
-    private var empty: some View {
-        VStack(spacing: Space.s1) {
-            Text("No apps in this workspace").coreFont(size: MacTextSize.title, weight: .semibold)
-            Text("Open one from the launcher with ⌘K.").foregroundStyle(palette.text2)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .combine)
-    }
 }
 
 /// Every pane's tab in the top bar's left (Ahmed, 2026-11-05): the pane's icon, title and state, and a menu with all its
