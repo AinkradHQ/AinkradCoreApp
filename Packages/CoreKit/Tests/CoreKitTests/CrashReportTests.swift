@@ -9,7 +9,9 @@ import Testing
             version: "0.10.1", os: "macOS 27.2", arch: "arm64", kind: "NSRangeException\n/Users/sam/secret",
             frames: ["Ainkrad+0x1a2", "x\ny"])
         #expect(r.kind == "NSRangeException", "only the first word of a kind survives, never a path")
-        #expect(r.frames[1] == "xy")
+        #expect(r.frames == ["Ainkrad+0x1a2"], "a frame that is not Module+0xOffset is dropped")
+        let leak = CrashReport(version: "1", os: "macOS", arch: "arm64", kind: "crash", frames: ["/Users/sam/Ainkrad+0x1", "sam's Mac+0x1", "Ok+0xZZ", "Ok+0x1f"])
+        #expect(leak.frames == ["Ok+0x1f"], "paths, spaces and non-hex offsets never pass")
         let keys = Set(try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as? [String: Any]).keys)
         #expect(keys == ["app", "version", "os", "arch", "kind", "frames"], "no message, no id, no path")
     }

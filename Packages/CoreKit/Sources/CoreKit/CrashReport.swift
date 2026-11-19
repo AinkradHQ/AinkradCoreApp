@@ -19,14 +19,24 @@ public struct CrashReport: Codable, Equatable, Sendable {
         return t.isEmpty ? fallback : t
     }
 
+    /// `Module+0xhex`: a module name of `A-Za-z0-9_.-` (at most 64) and a lower-case hex offset (at most 16 digits).
+    static func isFrame(_ f: String) -> Bool {
+        guard let plus = f.range(of: "+0x") else { return false }
+        let module = f[..<plus.lowerBound], off = f[plus.upperBound...]
+        return (1...64).contains(module.count) && module.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "_.-".contains($0)) }
+            && (1...16).contains(off.count) && off.allSatisfy { $0.isASCII && ($0.isNumber || ("a"..."f").contains($0)) }
+    }
+
     public init(version: String, os: String, arch: String, kind: String, frames: [String]) {
         self.version = Self.clean(version, fallback: "unknown")
         self.os = Self.clean(os, fallback: "unknown")
         self.arch = Self.clean(arch, fallback: "unknown")
-        // A kind is one word (an exception's class name, `crash`): cut at the first space, slash or line break.
-        self.kind = Self.clean(String(kind.prefix { !" /\n\r".contains($0) }), fallback: "crash")
-        // A frame is a module and an offset; anything longer or with a line break is cut (a path would be a leak).
-        self.frames = frames.prefix(200).map { String($0.filter { $0 != "\n" && $0 != "\r" }.prefix(160)) }
+        // A kind is one word (an exception's class name, `crash`): letters, digits and `_.-` only, as the server insists.
+        let word = String(kind.prefix { $0.isLetter || $0.isNumber || "_.-".contains($0) }.prefix(60))
+        self.kind = word.isEmpty ? "crash" : word
+        // A frame is exactly `Module+0xOffset` (what the server accepts); anything else is dropped, so a path or a user name
+        // can never ride along.
+        self.frames = frames.filter(Self.isFrame).prefix(200).map { $0 }
     }
 
     /// The frames of the crashing thread from MetricKit's call stack tree JSON (`MXCallStackTree.jsonRepresentation()`):
@@ -39,7 +49,7 @@ public struct CrashReport: Codable, Equatable, Sendable {
         var out: [String] = []
         var frame = (stack?["callStackRootFrames"] as? [[String: Any]])?.first
         while let f = frame, out.count < 200 {
-            let name = (f["binaryName"] as? String).map { Self.clean($0, fallback: "unknown") } ?? "unknown"
+            let name = (f["binaryName"] as? String) ?? "unknown"
             let off = (f["offsetIntoBinaryTextSegment"] as? NSNumber)?.uint64Value ?? 0
             out.append("\(name)+0x\(String(off, radix: 16))")
             frame = (f["subFrames"] as? [[String: Any]])?.first
