@@ -55,16 +55,22 @@ extension DropHead where Trailing == DropBadge {
 struct DropStat: View {
     let value: String
     let label: String
+    /// A share, 0...1, drawn as a thin bar under the figure (the Core menu's Memory, Disk and Response); nil draws none.
+    let share: Double?
+    let low: Bool
     @Environment(\.corePalette) private var palette
-    init(_ value: String, _ label: String) {
+    init(_ value: String, _ label: String, share: Double? = nil, low: Bool = false) {
         self.value = value
         self.label = label
+        self.share = share
+        self.low = low
     }
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Text(value).coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit().lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+            if let share { CoreMeter(share, low: low, label: label) }
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,7 +120,9 @@ struct RunnersPanel: View {
                 symbol: "server.rack", title: "Runners",
                 meta: machines.isEmpty
                     ? "No runner yet"
-                    : working.isEmpty ? "Nothing is running right now" : "\(working.count) running right now · \(tasks) \(tasks == 1 ? "task" : "tasks")"
+                    : working.isEmpty
+                        ? "Nothing is running right now"
+                        : "\(working.count) running right now · \(tasks) \(tasks == 1 ? "task" : "tasks")"
             ) {
                 Button("Add runner") { go("add-device") }.buttonStyle(CoreButtonStyle(.prominent, size: .small))
             }
@@ -125,7 +133,11 @@ struct RunnersPanel: View {
             } else {
                 VStack(spacing: Space.s1) {
                     ForEach(machines) { m in
-                        CoreRow(m.id, subtitle: sub(m), symbol: m.os.lowercased().contains("mac") ? "laptopcomputer" : "server.rack", action: { go("runners") }) {
+                        CoreRow(
+                            m.id, subtitle: sub(m),
+                            symbol: m.os.lowercased().contains("mac") ? "laptopcomputer" : "server.rack",
+                            action: { go("runners") }
+                        ) {
                             HStack(spacing: Space.s3) {
                                 ActivityBars(working: m.online && m.used > 0, off: !m.online)
                                 DropBadge(state(m).0, tone: state(m).1)

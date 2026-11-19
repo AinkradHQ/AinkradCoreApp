@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Observation
 
@@ -53,6 +54,15 @@ public protocol CorePageSource: Sendable {
     func storage() async throws -> CorePageStorage
     /// Runs "check now": when it ran, and whether a release feed answered.
     func checkUpdate() async throws -> (at: Date, feed: Bool)
+    /// The backup schedule and history from the Core machine's helper; nil where the Core cannot say.
+    func backups() async throws -> CoreBackups?
+    /// Starts a backup on the Core machine.
+    func backupNow() async throws
+}
+
+extension CorePageSource {
+    public func backups() async throws -> CoreBackups? { nil }
+    public func backupNow() async throws {}
 }
 
 /// State behind the Core page's tabs. Without a source, or on an older Core, `supported` is false and the page shows
@@ -69,12 +79,18 @@ public final class CorePageModel {
     /// One line about the last check: "No release feed yet", or nil.
     public private(set) var checkNote: String?
     public private(set) var failure: String?
+    public private(set) var backups: CoreBackups?
+    public private(set) var backupStarting = false
+    /// One line about the last "Back up now".
+    public private(set) var backupNote: String?
     public init() {}
 
     private func reset() {
         supported = false
         prefs = CorePagePrefs()
         storage = nil
+        backups = nil
+        backupNote = nil
         checkNote = nil
     }
 
@@ -88,6 +104,24 @@ public final class CorePageModel {
     public func loadStorage() async {
         guard let source, await source.supported() else { return }
         do { storage = try await source.storage() } catch { failure = Self.words(error) }
+    }
+
+    public func loadBackups() async {
+        guard let source, await source.supported() else { return }
+        do { backups = try await source.backups() } catch { failure = Self.words(error) }
+    }
+
+    /// Starts a backup, then reads the schedule again so the page shows it running.
+    public func backupNow() async {
+        guard let source, supported, !backupStarting else { return }
+        backupStarting = true
+        defer { backupStarting = false }
+        do {
+            try await source.backupNow()
+            backupNote = "Backup started. It finishes by itself."
+            failure = nil
+            if let again = try? await source.backups() { backups = again }
+        } catch { failure = Self.words(error) }
     }
 
     /// Saves one change and keeps what the Core answers, so the page never shows a value the Core refused.
@@ -117,5 +151,7 @@ public final class CorePageModel {
         } catch { failure = Self.words(error) }
     }
 
-    static func words(_ error: Error) -> String { (error as? LocalizedError)?.errorDescription ?? "The Core did not accept that." }
+    static func words(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? "The Core did not accept that."
+    }
 }

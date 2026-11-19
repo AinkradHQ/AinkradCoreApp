@@ -106,8 +106,11 @@ struct SecretsApp: View {
                         .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 }
                 SecretsSection(admin: admin)
-                Label("Storing, replacing, showing, exporting or handing out a secret asks for Touch ID first.", systemImage: "lock")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                Label(
+                    "Storing, replacing, showing, exporting or handing out a secret asks for Touch ID first.",
+                    systemImage: "lock"
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
             .coreFont(size: MacTextSize.body)
             .foregroundStyle(GlassInk.primary)
@@ -141,7 +144,7 @@ struct ActivityApp: View {
                     LiveNow(events: admin.liveEvents)
                     switch admin.activityTab {
                     case .ops:
-                        OpsHistoryCards(points: admin.ops.coreHistory)
+                        OpsHostCards(admin: admin)
                         OpsSection(admin: admin)
                     case .audit:
                         AuditCards(model: admin.audit)
@@ -245,7 +248,8 @@ private struct AuditCards: View {
             let when = model.selectedDay == 0 ? "today" : ActivityStats.dayLabel(day.date, index: model.selectedDay)
             HStack(alignment: .top, spacing: Space.s3) {
                 StatCard(
-                    index: 0, title: "Actions \(when)", value: day.total, series: ActivityStats.series(days) { $0.total },
+                    index: 0, title: "Actions \(when)", value: day.total,
+                    series: ActivityStats.series(days) { $0.total },
                     tone: .run)
                 StatCard(
                     index: 1, title: "AI sessions \(when)", value: day.count("sessions"),
@@ -289,7 +293,11 @@ private struct StatCard: View {
             Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             Text("\(value)").coreFont(size: MacTextSize.large, weight: .bold, design: .rounded)
                 .contentTransition(.numericText(value: Double(value)))
-            if series.count >= 2 { CoreSpark(series, tone: tone).chartReveal() } else { Spacer().frame(height: Space.s6 + Space.s2) }
+            if series.count >= 2 {
+                CoreSpark(series, tone: tone).chartReveal()
+            } else {
+                Spacer().frame(height: Space.s6 + Space.s2)
+            }
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)

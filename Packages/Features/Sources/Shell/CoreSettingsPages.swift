@@ -179,25 +179,56 @@ struct CoreUpdatesTab: View {
     }
 }
 
-/// The last backup the Core reports, and what the backup files use. The schedule, how long backups are kept and "Back up now"
-/// belong to the Core machine's backup timer and its root-owned helper, which the app cannot change.
+/// The last backup, when they run and what is kept, and "Back up now". The schedule and the backups come from the Core machine's
+/// root-owned helper (Core 0.10); the app reads them and can start one, but cannot change the timer.
 struct CoreBackupTab: View {
     @Bindable var shell: ShellModel
 
     var body: some View {
         let h = shell.home.health
+        let b = shell.corePage.backups
         GlassSection("Backup", sub: "Kept safe on your Core", symbol: "externaldrive", hue: GlassInk.blue) {
             VStack(spacing: Space.s2) {
                 fact("Last backup", value: h?.backup(now: Date()) ?? "Not reported yet")
-                if let s = shell.corePage.storage, let n = s.backupsCount, let b = s.backups {
-                    fact("Kept", value: "\(n) \(n == 1 ? "backup" : "backups"), \(Self.size(b))")
+                if let words = b?.scheduleWords { fact("Runs", "On the Core machine", value: words) }
+                if let next = b?.nextAt, b?.available == true {
+                    fact(
+                        "Next backup",
+                        value: next.formatted(.dateTime.weekday(.abbreviated).day().month().hour().minute()))
                 }
-                Text("Back up on a schedule, and keep them for as long as you like, on the Core machine.")
+                if let s = shell.corePage.storage, let n = s.backupsCount, let bytes = s.backups {
+                    fact("Kept", value: "\(n) \(n == 1 ? "backup" : "backups"), \(Self.size(bytes))")
+                } else if let n = b?.history.count, n > 0 {
+                    fact("Kept", value: "\(n) \(n == 1 ? "backup" : "backups")")
+                }
+                if b?.available == true {
+                    HStack(spacing: Space.s3) {
+                        AppActionTile(
+                            title: shell.corePage.backupStarting || b?.running == true ? "Backing up…" : "Back up now",
+                            symbol: "externaldrive.badge.timemachine", key: "", hue: GlassInk.slate
+                        ) { Task { await shell.corePage.backupNow() } }
+                        .disabled(shell.corePage.backupStarting || b?.running == true)
+                        if let note = shell.corePage.backupNote { Text(note).foregroundStyle(GlassInk.secondary) }
+                        Spacer(minLength: 0)
+                    }
+                } else if shell.corePage.supported {
+                    Text(
+                        b == nil
+                            ? "Reading the backup schedule…"
+                            : "Backups are set up on the Core machine itself, so this app can only read them."
+                    )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("This Core is too old to show or start backups.").foregroundStyle(GlassInk.secondary)
+                }
+                if let why = shell.corePage.failure { Text(why).foregroundStyle(GlassInk.secondary) }
             }
         }
         .foregroundStyle(GlassInk.primary)
-        .task { await shell.corePage.loadStorage() }
+        .task {
+            await shell.corePage.loadStorage()
+            await shell.corePage.loadBackups()
+        }
     }
 
     static func size(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }

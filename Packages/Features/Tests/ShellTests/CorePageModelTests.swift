@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Testing
 
@@ -21,6 +22,14 @@ private actor FakeCore: CorePageSource {
     }
     func storage() async throws -> CorePageStorage { CorePageStorage(backups: 5, backupsCount: 2) }
     func checkUpdate() async throws -> (at: Date, feed: Bool) { (Date(timeIntervalSince1970: 100), false) }
+    var backupInfo = CoreBackups(schedule: "daily")
+    var started = 0
+    func backups() async throws -> CoreBackups? { backupInfo }
+    func backupNow() async throws {
+        if refuse { throw Refused() }
+        started += 1
+        backupInfo.running = true
+    }
     func setMinor95(_ on: Bool) { minor95 = on }
     func setRefuse(_ on: Bool) { refuse = on }
 }
@@ -74,5 +83,30 @@ struct CorePageModelTests {
         #expect(m.storage?.backupsCount == 2)
         m.source = nil
         #expect(!m.supported && m.storage == nil && m.prefs.name == nil)
+    }
+
+    @Test func backUpNowStartsOnceAndReadsTheScheduleAgain() async {
+        let core = FakeCore()
+        let m = CorePageModel()
+        m.source = core
+        await m.load()
+        await m.loadBackups()
+        #expect(m.backups?.scheduleWords == "Every day" && m.backups?.running == false)
+        await m.backupNow()
+        #expect(await core.started == 1)
+        #expect(m.backups?.running == true)
+        #expect(m.backupNote == "Backup started. It finishes by itself.")
+    }
+
+    @Test func anOlderCoreNeitherReadsNorStartsBackups() async {
+        let core = FakeCore()
+        await core.setMinor95(false)
+        let m = CorePageModel()
+        m.source = core
+        await m.load()
+        await m.loadBackups()
+        await m.backupNow()
+        #expect(m.backups == nil)
+        #expect(await core.started == 0)
     }
 }

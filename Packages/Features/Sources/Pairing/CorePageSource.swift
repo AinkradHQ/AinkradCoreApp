@@ -23,7 +23,8 @@ struct LiveCorePageSource: CorePageSource {
     func set(name: String?, crashReports: Bool?, autoUpdate: Bool?, updateHour: Int?) async throws -> CorePagePrefs {
         try await run {
             let body = Components.Schemas.SetCorePrefs(
-                name: name, crashReports: crashReports, autoUpdate: autoUpdate, updateHour: updateHour.map { Int64($0) })
+                name: name, crashReports: crashReports, autoUpdate: autoUpdate, updateHour: updateHour.map { Int64($0) }
+            )
             return Self.prefs(try await client.setCorePrefs(body: .json(body)).ok.body.json)
         }
     }
@@ -45,6 +46,10 @@ struct LiveCorePageSource: CorePageSource {
             return (r.checkedAt, r.status != "feed_unavailable")
         }
     }
+
+    func backups() async throws -> CoreBackups? { try await run { try await connection.backupStatus() } }
+
+    func backupNow() async throws { try await run { try await connection.startBackup() } }
 
     private static func prefs(_ p: Components.Schemas.CorePrefs) -> CorePagePrefs {
         CorePagePrefs(
