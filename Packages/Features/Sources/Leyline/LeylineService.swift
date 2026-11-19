@@ -287,6 +287,7 @@ struct KeyWire: Decodable {
     let id: String
     let name: String
     let algo: String
+    let bits: Int?
     let publicKey: String
     let fingerprint: String
     let origin: String
@@ -295,6 +296,6 @@ struct KeyWire: Decodable {
     var item: KeyItem {
         KeyItem(
             id: id, name: name, algo: algo, publicKey: publicKey, fingerprint: fingerprint,
-            imported: origin == "imported", createdAt: HostWire.date(createdAt))
+            imported: origin == "imported", createdAt: HostWire.date(createdAt), bits: bits)
     }
 }

@@ -221,7 +221,7 @@ struct HostSheet: View {
 
     private var keyOptions: [CoreSelectOption<String>] {
         [CoreSelectOption("", "None · password")]
-            + model.keys.map { CoreSelectOption($0.id, $0.name, note: $0.algo) }
+            + model.keys.map { CoreSelectOption($0.id, $0.name, note: $0.typeWord) }
     }
 
     private func hopOptions(_ i: Int) -> [CoreSelectOption<String>] {

@@ -308,6 +308,9 @@ public final class LeylineModel {
         return true
     }
 
+    /// The Core refused an RSA key under 2048 bits (its sentence starts this way).
+    var keyTooWeak: Bool { writeError?.hasPrefix("This key is too weak") == true }
+
     /// Hands the Core a private key it keeps sealed. Needs Touch ID. The key text is not kept here.
     @discardableResult
     func importKey(name: String, privateKey: String, passphrase: String) async -> Bool {
@@ -317,10 +320,7 @@ public final class LeylineModel {
             writeError = "Give the key a name of up to 64 characters."
             return false
         }
-        guard privateKey.contains("BEGIN OPENSSH PRIVATE KEY") else {
-            writeError = "Paste an OpenSSH private key (it starts with BEGIN OPENSSH PRIVATE KEY)."
-            return false
-        }
+        // No format check here: OpenSSH and PEM keys both go to the Core, which decides and says why not.
         busy = true
         writeError = nil
         defer { busy = false }

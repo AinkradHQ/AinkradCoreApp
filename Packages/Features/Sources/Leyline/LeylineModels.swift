@@ -66,17 +66,25 @@ struct HostItem: Identifiable, Equatable, Sendable {
 struct KeyItem: Identifiable, Equatable, Sendable {
     let id: String
     var name: String
-    /// `ed25519`, `ecdsa-p256` or `ecdsa-p384`.
+    /// `ed25519`, `ecdsa-p256`, `ecdsa-p384` or `rsa`.
     var algo: String
     var publicKey: String
     /// `SHA256:…`, as `ssh-keygen -l` prints it.
     var fingerprint: String
     var imported: Bool
     var createdAt: Date?
+    /// The size the Core reports (RSA modulus, or the curve); nil from a Core that does not say.
+    var bits: Int? = nil
+
+    /// "ed25519", "ecdsa" or "RSA 4096".
+    var typeWord: String {
+        if algo == "rsa" { return bits.map { "RSA \($0)" } ?? "RSA" }
+        return algo.hasPrefix("ecdsa") ? "ecdsa" : algo
+    }
 
     /// "ed25519 · made in the Core · 3 Nov".
     var line: String {
-        let algoWord = algo.hasPrefix("ecdsa") ? "ecdsa" : algo
+        let algoWord = typeWord
         let how = imported ? "imported" : "made in the Core"
         guard let createdAt else { return "\(algoWord) · \(how)" }
         return "\(algoWord) · \(how) · \(createdAt.formatted(.dateTime.day().month(.abbreviated)))"

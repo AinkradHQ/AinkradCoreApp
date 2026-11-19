@@ -191,9 +191,19 @@ struct LeylineTests {
                 passphrase: ""))
         #expect(host.reasons.count == 2)
         #expect(s.calls == ["generate deploy", "import ops passphrase=false", "generate ops"])
-        // Not an OpenSSH key: refused here, nothing sent, no Touch ID.
-        #expect(!(await m.importKey(name: "rsa", privateKey: "-----BEGIN RSA PRIVATE KEY-----", passphrase: "")))
-        #expect(host.reasons.count == 2)
+        // A PEM key is sent like any other (the Core decides what it accepts): Touch ID, then the call.
+        #expect(await m.importKey(name: "rsa", privateKey: "-----BEGIN RSA PRIVATE KEY-----", passphrase: ""))
+        #expect(host.reasons.count == 3)
+    }
+
+    @Test func aKeyListShowsItsTypeAndBits() {
+        let k = { (algo: String, bits: Int?) in
+            KeyItem(id: "k_1", name: "n", algo: algo, publicKey: "", fingerprint: "", imported: true, createdAt: nil, bits: bits)
+        }
+        #expect(k("rsa", 4096).line == "RSA 4096 · imported")
+        #expect(k("rsa", nil).typeWord == "RSA")
+        #expect(k("ecdsa-p384", 384).typeWord == "ecdsa")
+        #expect(k("ed25519", 256).typeWord == "ed25519")
     }
 
     @MainActor @Test func aKeyShowsTheHostsThatUseIt() async {

@@ -238,7 +238,7 @@ struct AccessPage: View {
             return host.keyID == nil
                 ? "\(host.login) · a password typed in the terminal" : "\(host.login) · a key that is gone"
         }
-        return "\(host.login) · key “\(k.name)” (\(k.algo.hasPrefix("ecdsa") ? "ecdsa" : k.algo))"
+        return "\(host.login) · key “\(k.name)” (\(k.typeWord))"
     }
 
     @ViewBuilder private var hostKey: some View {
