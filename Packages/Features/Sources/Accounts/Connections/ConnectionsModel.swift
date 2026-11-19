@@ -50,6 +50,8 @@ public final class ConnectionsModel {
     @ObservationIgnored public var notify: ((String, String, String) -> Void)?
     @ObservationIgnored var pollEvery: Duration = .seconds(1)
     @ObservationIgnored private var poller: Task<Void, Never>?
+    /// The background check (Settings, Connections): tests each sign-in on the chosen interval.
+    @ObservationIgnored private var checker: Task<Void, Never>?
     @ObservationIgnored private var catcher: LoopbackCatcher?
 
     public init(host: any AdminHost) { self.host = host }
@@ -64,9 +66,29 @@ public final class ConnectionsModel {
         service = s
         self.sample = sample
         Task { await reload() }
+        startChecks()
+    }
+
+    /// Every interval (Settings, Connections, Options) each connected sign-in is tested, and a broken one again when
+    /// "Reconnect automatically" is on; the list is read again after. Not on stand-in data.
+    private func startChecks() {
+        checker?.cancel()
+        guard !sample else { return }
+        checker = Task { [weak self] in
+            while !Task.isCancelled {
+                let o = ConnectionsOptions.options
+                try? await Task.sleep(for: .seconds(ConnectionsOptions.seconds(o.string(ConnectionsOptions.every, "5m"))))
+                guard let self, !Task.isCancelled, let service = self.service, self.load == .ready else { continue }
+                let due = ConnectionsOptions.due(self.items, reconnect: o.bool(ConnectionsOptions.reconnect, true))
+                for c in due { _ = try? await service.test(c.id) }
+                if !due.isEmpty { await self.reload() }
+            }
+        }
     }
 
     public func detach() {
+        checker?.cancel()
+        checker = nil
         stopFlow()
         service = nil
         items = []
@@ -470,6 +492,17 @@ public final class ConnectionsModel {
 
     public func install() {
         let shell = host.shell
+        shell.settings.section(
+            SettingsSection(
+                id: "connections", group: .apps, title: "Connections", sub: "Its look and how it checks sign-ins",
+                symbol: "link", order: 10,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Connections", prefs: AppLookPrefs.shared("connections"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { ConnectionsOptionsTab() },
+                ]))
         shell.launcher.register(
             LauncherEntry(
                 id: "connections", title: "Connections", sub: "GitHub, Jira and other services", symbol: "link",

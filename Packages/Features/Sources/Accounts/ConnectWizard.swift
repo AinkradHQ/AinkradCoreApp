@@ -119,7 +119,10 @@ struct ConnectWizard: View {
         self.model = model
         self.close = close
         let first =
-            provider ?? ProviderLook.ordered(model.providers).first { ProviderSites.page($0.id) != nil }?.id
+            provider
+            ?? AccountsOptions.startProvider(
+                AccountsOptions.options.string(AccountsOptions.provider, "claude"), among: model.providers.map(\.id))
+            ?? ProviderLook.ordered(model.providers).first { ProviderSites.page($0.id) != nil }?.id
             ?? model.providers.first?.id ?? ""
         let state = ConnectWizardState(provider: first, advanced: advanced)
         #if DEBUG
