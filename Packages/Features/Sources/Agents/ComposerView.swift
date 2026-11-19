@@ -85,6 +85,8 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
+            // The agent's own steps, one line above the composer (opens upward).
+            if let todos = TodoStrip.items(model.transcripts[session.id]?.entries ?? []) { TodoStrip(items: todos) }
             // What went wrong with the last send (or resume, wake...), right where you typed it.
             if let n = model.notices[session.id] {
                 CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.tone)
@@ -238,7 +240,7 @@ struct ComposerView: View {
             }
             .help("Switch the model for the rest of this session (⇧⌘M)").keyHint(.model)
         } else {
-            CoreChip(labels ? label : "", symbol: "sparkles").help(label)
+            CoreChip(labels ? label : "", symbol: "sparkles", minWidth: 0).help(label)
         }
     }
 
