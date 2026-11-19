@@ -79,8 +79,8 @@ struct LoreServiceTests {
     @Test func listRestoreAndExport() async throws {
         let w = Wire()
         w.answer = Data("[\(Self.note)]".utf8)
-        let list = try await service(w).list(filter: LoreFilter(state: "trashed", tag: "ignored"))
-        #expect(w.sent[0].1 == "/modules/lore/v1/notes?state=trashed")
+        let list = try await service(w).list(filter: LoreFilter(state: "trashed", tag: "plans"))
+        #expect(w.sent[0].1 == "/modules/lore/v1/notes?state=trashed&tag=plans")
         #expect(list.count == 1 && list[0].text == "# Hi\n")
 
         w.answer = Data(Self.note.utf8)
@@ -91,6 +91,19 @@ struct LoreServiceTests {
         w.answer = Data([0x50, 0x4b, 0x03, 0x04])
         let zip = try await service(w).export(project: "7")
         #expect(zip == w.answer && w.sent[2].1 == "/modules/lore/v1/export?project=7")
+    }
+
+    @Test func tagsAndSessionDocs() async throws {
+        let w = Wire()
+        w.answer = Data(#"[{"tag":"plans","count":3}]"#.utf8)
+        #expect(try await service(w).tags() == [LoreTagCount(tag: "plans", count: 3)])
+        #expect(w.sent[0].1 == "/modules/lore/v1/tags")
+        w.answer = Data(
+            #"[{"note":"ln_abcdefgh2345","session":"as_1","path":"docs/login-plan.md","title":"Plan","session_title":"Fix the login flow","project":null,"updated_at":"x"}]"#
+                .utf8)
+        let d = try await service(w).sessionDocs()
+        #expect(w.sent[1].1 == "/modules/lore/v1/session-docs")
+        #expect(d.first?.fileName == "login-plan.md" && d.first?.sessionTitle == "Fix the login flow")
     }
 
     @Test func backlinksVersionsRestoreAndMove() async throws {

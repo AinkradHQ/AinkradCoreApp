@@ -86,7 +86,8 @@ final class LoreFragment: NSTextLayoutFragment {
     /// The table's lines when it is drawn as a grid: a table block with the caret elsewhere. With the caret inside it
     /// stays text, so every edit is plain typing.
     private func tableRows(_ s: NSAttributedString) -> [String]? {
-        guard s.attribute(.loreTable, at: 0, effectiveRange: nil) != nil, !caretInside else { return nil }
+        let text = (textLayoutManager?.textContainer?.textView as? LoreTextView)?.tablesAsText == true
+        guard s.attribute(.loreTable, at: 0, effectiveRange: nil) != nil, !caretInside, !text else { return nil }
         let lines = s.string.trimmingCharacters(in: .newlines).components(separatedBy: "\u{2028}")
         guard lines.count >= 2, textLineFragments.count >= lines.count - 1, GFMTable.isSeparator(lines[1]) else {
             return nil

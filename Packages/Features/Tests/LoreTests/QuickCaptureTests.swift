@@ -31,7 +31,7 @@ struct QuickCaptureTests {
         capture.open()
         capture.text = "  Call the bike shop \n"
         await capture.submit()
-        #expect(!capture.shown)
+        #expect(capture.saved?.destination == "Today", "the bar says where it went")
         #expect(capture.text.isEmpty)
         #expect(core.log() == ["today \(today)", "save ln_cccccccccccc 4"])
         let text = core.notes["ln_cccccccccccc"]?.text ?? ""
@@ -49,13 +49,41 @@ struct QuickCaptureTests {
         #expect(text.contains("From the panel") && text.contains("AI line") && text.contains("Second"))
     }
 
-    @Test func advancedMakesANewNoteInTheProject() async {
-        capture.toggleAdvanced()
-        capture.project = "7"
+    @Test func aProjectDestinationMakesANewNote() async {
+        capture.destination = .project(id: "7", name: "Atlas")
         capture.text = "Plot map ideas"
         await capture.submit()
         #expect(core.log() == ["create 7"])
-        #expect(!capture.advanced)
+        #expect(capture.saved?.destination == "Atlas")
+    }
+
+    @Test func inboxIsMadeOnceThenAppendedTo() async {
+        capture.destination = .inbox
+        capture.text = "First"
+        await capture.submit()
+        #expect(core.log() == ["list active note -", "create personal"])
+        #expect(core.notes["ln_bbbbbbbbbbbb"]?.text.hasPrefix("# Inbox\n") == true)
+        core.notes["ln_bbbbbbbbbbbb"]?.title = "Inbox"  // the Core derives it from the heading
+        capture.close()
+        capture.text = "Second"
+        await capture.submit()
+        #expect(core.notes["ln_bbbbbbbbbbbb"]?.text.contains("Second") == true)
+    }
+
+    @Test func undoPutsTheNoteBackAndReturnsTheText() async {
+        core.put(LoreNote(id: "ln_cccccccccccc", kind: "daily", day: today, rev: 1, text: "# Day\n"))
+        capture.text = "Oops"
+        await capture.submit()
+        await capture.undo("Oops")
+        #expect(core.notes["ln_cccccccccccc"]?.text == "# Day\n")
+        #expect(capture.text == "Oops" && capture.saved == nil)
+    }
+
+    @Test func escapeClearsTheText() {
+        capture.open()
+        capture.text = "Never mind"
+        capture.cancel()
+        #expect(capture.text.isEmpty && !capture.shown)
     }
 
     @Test func aFailedSendComesBackWithTheText() async {
