@@ -14,6 +14,7 @@ extension AgentsModel {
         return SessionIndex(
             SessionIndex.Inputs(
                 items: sessions.items, needsYou: needs, pinned: pinned, archived: archived, now: now,
+                archiveDays: AgentPrefs.shared.keepDays,
                 title: { [self] in title($0) }, runnerName: { [self] in runnerName($0) }, project: { $0.project }))
     }
 
