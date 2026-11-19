@@ -168,7 +168,17 @@ struct SessionActions: View {
         .accessibilityIdentifier("session-open-in")
     }
 
+    /// Open In…: the AI documents the session wrote come first (D-28), then the folder.
     private var openInItems: [CoreDropdownItem] {
+        let notes = model.loreNotes?(session.id) ?? []
+        guard let first = notes.first else { return folderItems }
+        let doc = CoreDropdownItem(
+            notes.count == 1 ? "Open document in Lore" : "Open documents in Lore", symbol: "text.book.closed"
+        ) { model.openNoteInLore?(first) }
+        return [doc] + folderItems
+    }
+
+    private var folderItems: [CoreDropdownItem] {
         if onThisMac, let url = localFolder {
             var items = [
                 CoreDropdownItem("Reveal in Finder", symbol: "folder") {

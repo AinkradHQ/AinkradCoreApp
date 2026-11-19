@@ -130,6 +130,8 @@ final class FakeLore: LoreService, @unchecked Sendable {
             return notes.values.filter { Self.match($0, filter) }.sorted { $0.id < $1.id }
         }
     }
+    var docs: [LoreSessionDoc] = []
+    func sessionDocs() async throws -> [LoreSessionDoc] { lock.withLock { docs } }
     func trash(_ id: String) async throws -> LoreNote {
         lock.withLock {
             calls.append("trash \(id)")
@@ -205,6 +207,17 @@ struct LoreModelTests {
         #expect(page.text == "")
         // The sidebars load their lists beside it, so only the first call is fixed.
         #expect(core.log().first == "today \(today)")
+    }
+
+    @Test func aNoteFromAnAISessionFileKnowsItsSessionAndFile() async {
+        core.put(LoreNote(id: "ln_cccccccccccc", project: nil, title: "Plan", rev: 1, text: "# Plan\n"))
+        core.docs = [LoreSessionDoc(note: "ln_cccccccccccc", session: "as_1", path: "docs/login-plan.md")]
+        model.service = core
+        await model.openNote("ln_cccccccccccc")
+        #expect(await until { model.openDoc?.session == "as_1" })
+        #expect(model.savedIn == "docs/login-plan.md")
+        await model.openDay(today)
+        #expect(model.openDoc == nil && model.savedIn == "Lore")
     }
 
     @Test func autosavesFromTheBaseRevision() async {

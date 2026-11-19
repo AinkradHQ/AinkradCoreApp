@@ -101,6 +101,10 @@ public final class AgentsModel {
     var filters = SessionFilters()
     public internal(set) var pinned: Set<String> = []
     public internal(set) var archived: Set<String> = []
+    /// The notes Lore imported from a session's `.md` files, and how to open one (the app wires both; Agents does not
+    /// depend on Lore, D-28).
+    @ObservationIgnored public var loreNotes: (@MainActor (String) -> [String])?
+    @ObservationIgnored public var openNoteInLore: (@MainActor (String) -> Void)?
     @ObservationIgnored var raiseBudgetHook: ((AgentSessionInfo) -> Void)?
     @ObservationIgnored var titleLoading: Set<String> = []
 
