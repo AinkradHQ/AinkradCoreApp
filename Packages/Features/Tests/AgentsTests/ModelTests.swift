@@ -274,6 +274,21 @@ struct ModelTests {
         #expect(m.shell.toast?.message.contains("Ended") == true && m.shell.toast?.undo == nil)
     }
 
+    @Test func theEndShortcutAsksFirstAndOnlyConfirmingEnds() async throws {
+        let (m, api, _, _) = await make()
+        let id = "as_01JC4X7Q3MZ8N5V2K9R004"
+        api.update(id) { $0.state = .running }
+        await m.reloadAll()
+        m.confirmEnd(id)
+        let sheet = try #require(m.shell.sheet)
+        #expect(sheet.title == "End this session?" && !api.calls.contains("end"))
+        sheet.actions.first { $0.label == "Keep running" }?.run()
+        #expect(!api.calls.contains("end"))
+        m.confirmEnd(id)
+        m.shell.sheet?.actions.first { $0.primary }?.run()
+        #expect(await until { api.calls.contains("end") })
+    }
+
     @Test func aNewLiveSessionOpensWithNoPromptAndWaits() async throws {
         let (m, api, _, _) = await make()
         let n = await m.startLiveSession()

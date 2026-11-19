@@ -208,7 +208,7 @@ struct SessionView: View {
             // of bare wallpaper beside the conversation (Ahmed, 2026-11-16).
             .background(SessionInk.backing)
             .paneLook(AgentPrefs.shared.look)
-        .appLookTheme(AgentPrefs.shared.appLook)
+            .appLookTheme(AgentPrefs.shared.appLook)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {
@@ -306,7 +306,7 @@ struct SessionView: View {
             model.stopTurn(s.id)
         case .endSession:
             guard s.live, model.stopping[s.id] == nil else { return false }
-            model.end(s.id)
+            model.confirmEnd(s.id)
         case .terminal:
             guard s.live || s.state != .lost else { return false }
             model.host?.openTerminal(on: s.runner, session: s.id)

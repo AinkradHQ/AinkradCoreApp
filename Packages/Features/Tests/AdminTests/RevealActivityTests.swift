@@ -60,15 +60,39 @@ struct RevealActivityTests {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("ainkrad-secrets-test.json")
+        try Data("old".utf8).write(to: url)  // a file the person chose to replace
         try SecretExport.write(
-            [ExportedValue(name: "a", kind: "text", group: "Work", fileName: nil, value: "dummy-1")], directory: dir)
-        let file = try #require(FileManager.default.contentsOfDirectory(atPath: dir.path).first)
-        #expect(file.hasPrefix("ainkrad-secrets-") && file.hasSuffix(".json"))
-        let path = dir.appendingPathComponent(file).path
+            [ExportedValue(name: "a", kind: "text", group: "Work", fileName: nil, value: "dummy-1")], to: url)
+        let path = url.path
+        #expect(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
         let mode = try FileManager.default.attributesOfItem(atPath: path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
         let text = try String(contentsOfFile: path, encoding: .utf8)
         #expect(text.contains("dummy-1") && text.contains("\"group\""))
+    }
+
+    @Test("An export asks for a fresh Touch ID, then writes where the person chose; cancelling asks nothing")
+    func exportIsFresh() async throws {
+        let (admin, svc, host) = await world()
+        await admin.secrets.reload()
+        #expect(admin.secrets.exportSupported)
+        admin.secrets.chooseExportFile = { nil }
+        await admin.secrets.export()
+        #expect(host.forces.isEmpty && !svc.log.contains { $0.hasPrefix("export") })
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        admin.secrets.chooseExportFile = { url }
+        await admin.secrets.export()
+        #expect(host.forces == [true])
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test("The export action does not wait for the reveal route")
+    func exportHasItsOwnGate() async {
+        let (admin, _, _) = await world(v010: false)
+        await admin.secrets.reload()
+        #expect(!admin.secrets.exportSupported)
     }
 
     @Test("The shown value never prints")

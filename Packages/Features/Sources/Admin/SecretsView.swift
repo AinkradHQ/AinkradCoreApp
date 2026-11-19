@@ -52,7 +52,7 @@ struct SecretsSection: View {
             Text(SecretWords.header(count: model.items.count)).coreFont(size: MacTextSize.meta)
                 .foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
-            if model.revealSupported {
+            if model.exportSupported {
                 Button {
                     Task { await model.export() }
                 } label: {
@@ -97,8 +97,8 @@ struct SecretsSection: View {
                         admin.host.shell.settings.selected = "switches"
                         admin.host.shell.open(.settings)
                     }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .help("Keys and secrets in Feature switches")
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .help("Keys and secrets in Feature switches")
                 }
                 .accessibilityIdentifier("secrets-mode")
             }
@@ -299,7 +299,9 @@ private struct SecretRow: View {
         let shape = coreShape(Radius.row)
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s3) {
-                IconTile(kind.symbol, hue: names.isEmpty ? GlassInk.slate : GlassInk.accent(paneAccent), size: SecretColumn.tile)
+                IconTile(
+                    kind.symbol, hue: names.isEmpty ? GlassInk.slate : GlassInk.accent(paneAccent),
+                    size: SecretColumn.tile)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(secret.name).coreFont(size: MacTextSize.body, weight: .medium)
                         .lineLimit(1).truncationMode(.middle)
