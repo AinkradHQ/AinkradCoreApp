@@ -14,6 +14,8 @@ public struct AppSurfaceFill: View {
     let opacity: Double
     let tint: Color
     let blur: Bool
+    /// 0 (sharp) to 1 (soft): how much of the frosted material shows when `blur` is on.
+    let blurAmount: Double
     let radius: CGFloat
     @Environment(\.coreSolidOnly) private var solidOnly
     @Environment(\.corePalette) private var palette
@@ -31,8 +33,9 @@ public struct AppSurfaceFill: View {
         day: Color(red: 238 / 255, green: 239 / 255, blue: 242 / 255))
     public init(
         style: AppSurfaceStyle, opacity: Double, tint: Color = AppSurfaceFill.tint, blur: Bool = true,
-        radius: CGFloat = Radius.cardMac
+        radius: CGFloat = Radius.cardMac, blurAmount: Double = 1
     ) {
+        self.blurAmount = blurAmount
         self.style = style
         self.opacity = opacity
         self.tint = tint
@@ -41,7 +44,7 @@ public struct AppSurfaceFill: View {
     }
     /// One Look (Settings, Appearance, or an app's own) as a fill.
     public init(_ look: CoreLook, tint: Color = AppSurfaceFill.tint, radius: CGFloat = Radius.cardMac) {
-        self.init(style: look.mode.style, opacity: look.opacity, tint: tint, blur: look.mode.blur, radius: radius)
+        self.init(style: look.mode.style, opacity: look.opacity, tint: tint, blur: look.mode.blur, radius: radius, blurAmount: look.blur)
     }
     public var body: some View {
         let shape = coreShape(radius)
@@ -50,7 +53,7 @@ public struct AppSurfaceFill: View {
             if solidOnly {
                 shape.fill(Self.solid)
             } else {
-                if blur { shape.fill(.ultraThinMaterial) }
+                if blur { shape.fill(.ultraThinMaterial).opacity(0.25 + 0.75 * blurAmount) }
                 // Only three looks are offered (Blurred, Clear, Solid); a stored clear or frosted from before draws as
                 // the tint, so the same choice looks the same in every app.
                 if style == .solid {
@@ -64,6 +67,7 @@ public struct AppSurfaceFill: View {
         .animation(Motion.out(Motion.ui), value: style)
         .animation(Motion.out(Motion.ui), value: opacity)
         .animation(Motion.out(Motion.ui), value: blur)
+        .animation(Motion.out(Motion.ui), value: blurAmount)
     }
 }
 

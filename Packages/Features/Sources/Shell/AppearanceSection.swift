@@ -119,7 +119,12 @@ struct AppearanceSection: View {
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
-                GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                VStack(alignment: .leading, spacing: Space.s3) {
+                    GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                    if look.mode == .blurred {
+                        GlassSlider(value: $look.blur, in: 0...1, low: "Sharp", high: "Soft")
+                    }
+                }
             }
             GlassSection(
                 "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
