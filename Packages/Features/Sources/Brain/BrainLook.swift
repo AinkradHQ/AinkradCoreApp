@@ -4,6 +4,7 @@ import SwiftUI
 
 /// Settings, Apps, Brain: the Look and a way in.
 struct BrainLookSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     @State private var ai: AISettings
     @State private var same: SameProjectList
@@ -22,10 +23,10 @@ struct BrainLookSection: View {
             if part.showsOptions {
                 BrainLearningSection(settings: ai)
                 GlassSection(
-                    "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain", hue: GlassInk.blue, index: 1
+                    "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain", hue: GlassInk.accent(paneAccent), index: 1
                 ) {
                     AppActionTile(
-                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent), prominent: true
                     ) {
                         model.host.shell.overlay = nil
                         model.show(.overview)

@@ -55,6 +55,7 @@ extension BrainModel {
 /// The five steps in one sheet: sources, collect, review rooms, import, done. Closing the sheet leaves the work running in
 /// the model; the pane says "Import in progress" until it is done.
 struct ImportWizard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let brain: BrainModel
     let model: ImportModel
     let close: () -> Void
@@ -68,7 +69,7 @@ struct ImportWizard: View {
                     Text("Import into the Brain").coreFont(size: MacTextSize.title + 2, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: Space.s3)
-                    StepTrack(Self.steps, at: model.step.rawValue, hue: GlassInk.blue)
+                    StepTrack(Self.steps, at: model.step.rawValue, hue: GlassInk.accent(paneAccent))
                         .accessibilityIdentifier("brain-import-step")
                 }
                 Group {
