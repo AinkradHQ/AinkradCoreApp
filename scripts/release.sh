@@ -25,7 +25,7 @@ plan() {
   echo "1. xcodegen generate, then nice -n 19 xcodebuild Release (unsigned) into $DD"
   echo "2. stage Ainkrad.app + Applications symlink, hdiutil create $DMG"
   if [ -n "$SIGN" ] && [ -n "$PROFILE" ]; then
-    echo "3. codesign app (hardened runtime) and dmg with SIGN_IDENTITY; notarytool submit --wait with NOTARY_PROFILE; stapler staple"
+    echo "3. codesign frameworks and helpers (no entitlements), then the app (no --deep), and the dmg with SIGN_IDENTITY; notarytool submit --wait with NOTARY_PROFILE; stapler staple"
   else
     echo "3. SKIPPED signing: ${SIGN:+SIGN_IDENTITY set, }${SIGN:-SIGN_IDENTITY not set}"
     echo "   SKIPPED notarization + stapling: NOTARY_PROFILE ${PROFILE:+and SIGN_IDENTITY needed together}${PROFILE:-not set}"
@@ -46,12 +46,20 @@ nice -n 19 xcodebuild -project AinkradCore.xcodeproj -scheme AinkradCoreMac -con
 rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"; ln -s /Applications "$STAGE/Applications"
 
-if [ -n "$SIGN" ] && [ -n "$PROFILE" ]; then
-  codesign --force --deep --options runtime --timestamp --entitlements App/Mac/Ainkrad.entitlements --sign "$SIGN" "$STAGE/Ainkrad.app"
+if [ -n "$SIGN" ]; then
+  # Inside out, never --deep: --deep re-signs the helpers with the app's entitlements, and launchd then refuses to
+  # spawn the runner. Libraries and helpers get hardened runtime and no entitlements; only the app carries its own.
+  for inner in "$STAGE"/Ainkrad.app/Contents/Frameworks/* "$STAGE"/Ainkrad.app/Contents/Helpers/*; do
+    [ -e "$inner" ] && codesign --force --options runtime --timestamp --sign "$SIGN" "$inner"
+  done
+  codesign --force --options runtime --timestamp --entitlements App/Mac/Ainkrad.entitlements --sign "$SIGN" "$STAGE/Ainkrad.app"
+  codesign --verify --strict --verbose=2 "$STAGE/Ainkrad.app"
 fi
 hdiutil create -quiet -volname Ainkrad -srcfolder "$STAGE" -ov -format UDZO "$DMG"
-if [ -n "$SIGN" ] && [ -n "$PROFILE" ]; then
+if [ -n "$SIGN" ]; then
   codesign --force --timestamp --sign "$SIGN" "$DMG"
+fi
+if [ -n "$SIGN" ] && [ -n "$PROFILE" ]; then
   xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
   xcrun stapler staple "$DMG"
 fi

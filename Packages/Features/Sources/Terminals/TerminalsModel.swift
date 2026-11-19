@@ -99,6 +99,11 @@ public final class TerminalsModel {
         runners.first { $0.id == id }.flatMap { RunnerFacts(runner: $0).accountsAnswer }
     }
 
+    /// Whether the Core lists this runner as online; nil when it is not in the list yet.
+    public func isOnline(runner id: String) -> Bool? {
+        runners.first { $0.id == id }.map { [.ok, .busy].contains(RunnerFacts(runner: $0).status) }
+    }
+
     public func displayName(ofTerminal id: String) -> String? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
         return shell.tabNames["terminal-\(id)"] ?? name(of: item.runner)

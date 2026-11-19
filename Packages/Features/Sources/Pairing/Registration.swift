@@ -34,7 +34,8 @@ enum Registration {
             ) {
                 MacRunnerSection(
                     model: app.macRunner,
-                    accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) })
+                    accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) },
+                    connected: app.macRunner.deviceID.flatMap { app.terminals?.isOnline(runner: $0) })
             })
         shell.settings.section(
             SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
