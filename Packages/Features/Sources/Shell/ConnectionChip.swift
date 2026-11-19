@@ -123,6 +123,22 @@ struct ConnectionPanel: View {
                     ForEach(stats(h), id: \.1) { DropStat($0.0, $0.1) }
                 }
             }
+            if let u = shell.coreUpdate {
+                HStack(spacing: Space.s3) {
+                    IconTile("arrow.down.circle", hue: GlassInk.blue, size: MacSize.controlMd)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Update available").coreFont(size: MacTextSize.headline, weight: .semibold)
+                        Text(u.line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    }
+                    Spacer(minLength: Space.s2)
+                    Button("Update now") {
+                        shell.topMenu = nil
+                        u.installNow()
+                    }
+                    .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                }
+                .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))
+            }
             let devices = shell.devicesGlance?() ?? []
             if !devices.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s1) {
