@@ -62,6 +62,9 @@ public final class ImportModel {
     public private(set) var waitingForCore = false
     public private(set) var result: CommitResult?
     public let review: ReviewModel
+    /// The Core accepts the rooms and distils by itself (API minor 95): Sort and Learn replace Review and Import.
+    public var autoSort = false
+    public let auto: AutoFlow
 
     @ObservationIgnored private var job: Task<Void, Never>?
     @ObservationIgnored private var poller: Task<Void, Never>?
@@ -95,6 +98,7 @@ public final class ImportModel {
                 absent: ($0 as? NotReadableSource)?.absent ?? false)
         }
         review = ReviewModel(host: host, routes: routes)
+        auto = AutoFlow(routes: routes)
     }
 
     // MARK: step 1
@@ -533,4 +537,39 @@ public final class ImportModel {
 
     /// For the done page: which rooms were made and which wait for the backup.
     public func heldCards() -> [ProposalCard] { review.cards.filter(\.isHeld) }
+}
+
+// MARK: Sort and Learn (the Core accepts and distils by itself)
+
+extension ImportModel {
+    /// Starts watching the Core sort the run. Called by the Sort step when it appears.
+    func beginSort() {
+        guard autoSort, let run else { return }
+        auto.watchSort(run: run)
+    }
+
+    /// Undo on the Sort step: back to one pile. The review is reloaded so "Sort it myself" shows the run's items in Unsorted.
+    func undoSort() async {
+        guard let run else { return }
+        await auto.undo(run: run)
+        if case .undone = auto.sort { try? await review.load(run: run) }
+    }
+
+    /// The person sorts the undone run by hand: the ordinary Review step, and the Core does not take it over again.
+    func sortMyself() { autoSort = false }
+
+    /// Continue from Sort: the Core is distilling every place (mandatory, no cap); this step shows how far.
+    func beginLearning() {
+        guard autoSort, step == .review, let run else { return }
+        step = .importing
+        auto.watchLearning(run: run) { [weak self] in await self?.finishAuto() }
+    }
+
+    private func finishAuto() async {
+        resume?.clear()
+        if let since = started, let service {
+            await SyncModel.register(chosen.map(\.id), from: Array(sources.values), since: since, service: service)
+        }
+        step = .done
+    }
 }

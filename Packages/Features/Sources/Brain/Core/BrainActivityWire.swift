@@ -85,7 +85,41 @@ public struct AutoImportWire: Codable, Sendable, Equatable, Identifiable {
     public var id: String { run }
 }
 
-struct UndoneWire: Decodable { var rooms: Int }
+/// `GET /imports/{run}/learning`: the Learn step, per place, with the running cost.
+public struct LearningWire: Codable, Sendable, Equatable {
+    public var run: String
+    public var places: [Place]
+    public var totalCostUsdMicros: Int
+    public var unpriced: Int
+    public var done: Bool
+
+    public struct Place: Codable, Sendable, Equatable, Identifiable {
+        public var room: String
+        public var name: String
+        public var sources: Int
+        public var read: Int
+        public var learned: Int
+        /// `pending`, `learning`, `waiting` or `done`.
+        public var state: String
+        public var provider: String?
+        public var costUsdMicros: Int
+        public var id: String { room }
+        enum CodingKeys: String, CodingKey {
+            case room, name, sources, read, learned, state, provider
+            case costUsdMicros = "cost_usd_micros"
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case run, places, unpriced, done
+        case totalCostUsdMicros = "total_cost_usd_micros"
+    }
+}
+
+struct UndoneWire: Decodable {
+    var rooms: Int
+    var items: Int?
+}
 
 extension BrainRoutes {
     /// API minor 95.
@@ -98,8 +132,13 @@ extension BrainRoutes {
         return try await call("GET", "/areas/\(Self.seg(area))" + q)
     }
     public func autoImports() async throws -> [AutoImportWire] { try await call("GET", "/auto-imports") }
-    /// Archives the rooms the Core accepted for `run`; nothing is deleted. Returns how many.
-    public func undoAutoImport(run: String) async throws -> Int {
-        (try await call("POST", "/auto-imports/\(Self.seg(run))/undo", as: UndoneWire.self)).rooms
+    /// Puts the sort back to one pile: archives the rooms the Core made for `run` and returns the run's items to Unsorted,
+    /// open for review. Nothing is deleted. Returns the rooms archived and the items back in Unsorted.
+    public func undoAutoImport(run: String) async throws -> (rooms: Int, items: Int) {
+        let u = try await call("POST", "/auto-imports/\(Self.seg(run))/undo", as: UndoneWire.self)
+        return (u.rooms, u.items ?? 0)
+    }
+    public func learning(run: String) async throws -> LearningWire {
+        try await call("GET", "/imports/\(Self.seg(run))/learning")
     }
 }

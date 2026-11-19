@@ -33,6 +33,15 @@ public final class BrainModel {
             importer?.review.keepsInCommit = keepsInCommit
         }
     }
+    /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows it first; Explore is the console.
+    public let calm = BrainCalmModel()
+    public private(set) var exploring = false
+    public var calmAvailable: Bool { servesActivity && !isSample && service?.importRoutes != nil }
+    public func explore(_ on: Bool, tab: BrainTab? = nil) {
+        exploring = on
+        if let tab { self.tab = tab }
+        if !on { Task { await calm.reload() } }
+    }
     /// The top-bar Brain icon's feed (E9-2).
     public let status = BrainStatusModel()
     /// The Core's status, areas and auto-import routes (API minor 95).
@@ -42,6 +51,7 @@ public final class BrainModel {
             host.shell.brainStatus = { [weak self] in self?.status.chip }
             host.shell.openBrain = { [weak self] in self?.show(.overview) }
             status.start(routes)
+            calm.attach(routes: routes, service: service, rooms: { [weak self] in self?.rooms ?? [] })
         } else {
             host.shell.brainStatus = nil
             status.stop()
@@ -139,6 +149,7 @@ public final class BrainModel {
     public var visibleTabs: [BrainTab] {
         if isSample { return BrainTab.allCases }
         var tabs: [BrainTab] = service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
+        if calmAvailable { tabs.insert(.records, at: 0) }
         if service?.servesChanges == true { tabs.append(.activity) }
         return tabs
     }
