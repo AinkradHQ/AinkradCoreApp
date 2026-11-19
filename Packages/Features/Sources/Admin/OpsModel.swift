@@ -94,6 +94,8 @@ final class OpsModel {
         "ainkrad_disk_free_percent",
     ]
     var showRaw = false
+    /// The Core's own CPU, memory and disk for the last day, one reading a minute (API minor 95); empty on an older Core.
+    private(set) var coreHistory: [OpsPoint] = []
     @ObservationIgnored private weak var hub: AdminModel?
 
     /// The figures worth a tile, in this order, when the Core sends them.
@@ -110,6 +112,7 @@ final class OpsModel {
     func reset() {
         samples = []
         raw = ""
+        coreHistory = []
         state = .loading
     }
 
@@ -129,6 +132,7 @@ final class OpsModel {
                 history[name] = list
             }
             state = samples.isEmpty ? .empty : .ready
+            if await service.supportsV010(), let points = try? await service.opsHistory() { coreHistory = points }
         } catch { state = hub.state(for: error) }
     }
 

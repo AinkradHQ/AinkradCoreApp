@@ -15,6 +15,8 @@ public final class AdminModel {
     /// The tab Activity shows: Ops or Audit.
     var activityTab: ActivityTab = .ops
     private(set) var service: (any AdminService)?
+    /// What the Core's event stream just said, worded, newest first: "Happening now" in Activity.
+    private(set) var liveEvents: [LiveEvent] = []
     @ObservationIgnored private(set) lazy var registry = RegistryModel(hub: self)
     @ObservationIgnored private(set) var secrets: SecretsModel!
     @ObservationIgnored private(set) var audit: AuditModel!
@@ -41,6 +43,7 @@ public final class AdminModel {
         secrets.reset()
         audit.reset()
         ops.reset()
+        liveEvents = []
     }
 
     public var isConnected: Bool { service != nil }
@@ -54,6 +57,10 @@ public final class AdminModel {
 
     /// An event from the Core that may change what these screens show.
     public func event(kind: String) {
+        if let e = LiveWords.entry(kind) {
+            liveEvents.insert(LiveEvent(symbol: e.symbol, text: e.text, at: Date()), at: 0)
+            if liveEvents.count > LiveWords.keep { liveEvents.removeLast(liveEvents.count - LiveWords.keep) }
+        }
         if kind.hasPrefix("setting.") { Task { await registry.reload() } }
         if kind.hasPrefix("secret.") { Task { await secrets.reload() } }
         if kind.hasPrefix("alarm.") { Task { await ops.reload() } }

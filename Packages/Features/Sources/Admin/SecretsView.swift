@@ -52,6 +52,17 @@ struct SecretsSection: View {
             Text(SecretWords.header(count: model.items.count)).coreFont(size: MacTextSize.meta)
                 .foregroundStyle(palette.text2)
             Spacer(minLength: Space.s3)
+            if model.revealSupported {
+                Button {
+                    Task { await model.export() }
+                } label: {
+                    Label("Export…", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .help("Export your secrets to a file. Asks for Touch ID.")
+                .disabled(model.items.isEmpty || model.isOff || model.exporting)
+                .accessibilityIdentifier("secrets-export")
+            }
             Button {
                 SecretDialogs.openGroup(admin, nil)
             } label: {
@@ -103,7 +114,7 @@ struct SecretsSection: View {
                 Spacer(minLength: 0)
             }
             VStack(alignment: .leading, spacing: 0) {
-                SecretColumns()
+                SecretColumns(showsValue: model.revealSupported)
                 if shown.isEmpty {
                     Text("No secret matches.").foregroundStyle(palette.text2).padding(Space.s3)
                 }
@@ -210,17 +221,24 @@ enum SecretColumn {
     static let used: CGFloat = Space.s8 * 6
     static let last: CGFloat = Space.s8 * 5 - Space.s2
     static let size: CGFloat = Space.s8 * 3
+    /// The value: dots and Show, or the value, its 15 second bar and Copy.
+    static let value: CGFloat = Space.s8 * 7
 }
 
 /// The quiet column names above the rows.
 private struct SecretColumns: View {
+    let showsValue: Bool
     @Environment(\.corePalette) private var palette
     var body: some View {
         HStack(spacing: Space.s3) {
             Text("Name").padding(.leading, SecretColumn.tile + Space.s3).frame(maxWidth: .infinity, alignment: .leading)
             Text("Used by").frame(width: SecretColumn.used, alignment: .leading)
             Text("Last used").frame(width: SecretColumn.last, alignment: .leading)
-            Text("Sealed size").frame(width: SecretColumn.size, alignment: .trailing)
+            if showsValue {
+                Text("Value").frame(width: SecretColumn.value, alignment: .leading)
+            } else {
+                Text("Sealed size").frame(width: SecretColumn.size, alignment: .trailing)
+            }
         }
         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
         .padding(.horizontal, Space.s3).padding(.bottom, Space.s2)
@@ -299,16 +317,20 @@ private struct SecretRow: View {
                 HStack(spacing: Space.s3) {
                     Text(SecretWords.lastUsedShort(secret)).frame(width: SecretColumn.last, alignment: .leading)
                         .help(SecretWords.lastUsed(secret))
-                    Text(SecretWords.size(secret.size)).coreFont(size: MacTextSize.meta).monospacedDigit()
-                        .foregroundStyle(palette.text2).frame(width: SecretColumn.size, alignment: .trailing)
+                    if !model.revealSupported {
+                        Text(SecretWords.size(secret.size)).coreFont(size: MacTextSize.meta).monospacedDigit()
+                            .foregroundStyle(palette.text2).frame(width: SecretColumn.size, alignment: .trailing)
+                    }
                 }
                 .opacity(selected ? 0 : 1)
+                if model.revealSupported { SecretValueCell(model: model, secret: secret) }
             }
             // The worded actions float over the row's trailing end (secrets.html `.acts`), so they never widen the row
             // and push Used by out of its column.
             .overlay(alignment: .trailing) {
                 if selected {
                     actions.padding(Space.s1)
+                        .padding(.trailing, model.revealSupported ? SecretColumn.value + Space.s3 : 0)
                         .background(palette.panelStrong, in: coreShape(Radius.control))
                         .transition(.opacity)
                 }
@@ -329,6 +351,7 @@ private struct SecretRow: View {
         .contextMenu {
             Button("Let a runner use it…") { SecretDialogs.openLease(admin, secret) }
             Button("New value…") { SecretDialogs.openReplace(admin, secret) }
+            if model.canShow(secret) { Button("Show…") { Task { await model.show(secret) } } }
             Button("Delete…") { SecretDialogs.openDelete(admin, secret) }
             Button("Copy name") {
                 NSPasteboard.general.clearContents()
@@ -411,4 +434,67 @@ extension SecretsModel {
 /// How a runner receives a secret.
 enum Delivery {
     static let all = ["env", "file", "askpass"]
+}
+
+/// A row's value: dots and Show, or the value with a bar that runs out in 15 seconds and Copy. The value is in no accessibility
+/// text but its own cell, and it is gone when the Core's time is up. Under Reduce Motion the bar is still.
+private struct SecretValueCell: View {
+    let model: SecretsModel
+    let secret: SecretItem
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            if let shown = model.shown, shown.name == secret.name {
+                Text(shown.value).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1)
+                    .truncationMode(.middle).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HideBar(until: shown.until)
+                Button {
+                    model.copyShown()
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .accessibilityIdentifier("secret-copy")
+            } else {
+                Text("••••••••••••").coreFont(size: MacTextSize.body, design: .monospaced)
+                    .foregroundStyle(palette.text2).frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Value, \(secret.size) bytes, hidden")
+                if model.canShow(secret) {
+                    Button {
+                        Task { await model.show(secret) }
+                    } label: {
+                        Label("Show", systemImage: "eye")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .help("Show this secret. Asks for Touch ID.")
+                    .accessibilityIdentifier("secret-show")
+                }
+            }
+        }
+        .frame(width: SecretColumn.value)
+    }
+}
+
+/// The thin bar that empties as the value's time runs out.
+private struct HideBar: View {
+    let until: Date
+    @State private var emptied = false
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        coreShape(2).fill(palette.track).frame(width: Space.s8 + Space.s6, height: 3)
+            .overlay(alignment: .leading) {
+                coreShape(2).fill(palette.primary)
+                    .scaleEffect(x: reduce ? 0.6 : emptied ? 0 : 1, anchor: .leading)
+            }
+            .onAppear {
+                guard !reduce else { return }
+                withAnimation(.linear(duration: max(until.timeIntervalSinceNow, 0.1))) { emptied = true }
+            }
+            .help("Hides itself when the bar runs out")
+            .accessibilityHidden(true)
+    }
 }

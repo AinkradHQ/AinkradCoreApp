@@ -1,3 +1,4 @@
+import AppKit
 import CoreKit
 import Foundation
 import Observation
@@ -157,6 +158,13 @@ final class SecretsModel {
     private(set) var leases: [LeaseItem] = []
     private(set) var runners: [RunnerChoice] = []
     private(set) var rowError: [String: String] = [:]
+    /// The one value on screen: shown after Touch ID, gone after the Core's seconds (15), on reset, and when another is shown.
+    private(set) var shown: ShownSecret?
+    /// The Core can show and export a value (API minor 95). Older Cores keep the write-only list.
+    private(set) var revealSupported = false
+    private(set) var exporting = false
+    @ObservationIgnored private var hideTask: Task<Void, Never>?
+    @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     @ObservationIgnored private weak var hub: AdminModel?
 
     init(hub: AdminModel) { self.hub = hub }
@@ -171,6 +179,7 @@ final class SecretsModel {
     nonisolated static func isListed(_ name: String) -> Bool { !name.hasPrefix("acct.") }
 
     func reset() {
+        hide()
         items = []
         groups = []
         leases = []
@@ -186,6 +195,76 @@ final class SecretsModel {
             state = items.isEmpty && groups.isEmpty ? .empty : .ready
         } catch { state = hub.state(for: error) }
         runners = (try? await service.runners()) ?? runners
+        revealSupported = await service.supportsV010()
+    }
+
+    // MARK: show, copy, export (D-4: Touch ID first)
+
+    /// Whether a row can be shown here: a file's bytes are not text, so a file is exported, not shown.
+    func canShow(_ s: SecretItem) -> Bool { revealSupported && !isOff && s.kind != "file" }
+
+    /// Asks Touch ID, then keeps the value on screen for the Core's seconds. Nothing else holds it: not the row, not a log.
+    func show(_ s: SecretItem) async {
+        guard let hub, let service = hub.service, hub.mayWrite() else { return }
+        rowError[s.name] = nil
+        do {
+            let got = try await hub.host.elevated(
+                "Show \(s.name). It hides itself after 15 seconds.", done: "shown", keepsEdit: false
+            ) { try await service.revealSecret(s.name) }
+            hide()
+            let until = Date().addingTimeInterval(got.hideAfter)
+            shown = ShownSecret(name: got.name, value: got.value, until: until)
+            let wait = got.hideAfter
+            hideTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(wait))
+                if !Task.isCancelled { self?.hide() }
+            }
+        } catch is AdminDeclined {
+            return
+        } catch { rowError[s.name] = hub.words(error) }
+    }
+
+    /// Forgets the shown value now.
+    func hide() {
+        hideTask?.cancel()
+        hideTask = nil
+        shown = nil
+    }
+
+    /// Puts the shown value on the clipboard, marked as concealed, and takes it back after 30 seconds if nothing else was copied.
+    func copyShown() {
+        guard let v = shown?.value else { return }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setString(v, forType: .string)
+        board.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
+        let mine = board.changeCount
+        clipboardTask?.cancel()
+        clipboardTask = Task {
+            try? await Task.sleep(for: .seconds(30))
+            if !Task.isCancelled, NSPasteboard.general.changeCount == mine { NSPasteboard.general.clearContents() }
+        }
+        hub?.host.shell.showToast("Copied. It leaves your clipboard in 30 seconds.")
+    }
+
+    /// Writes every secret to a file in Downloads (owner-only) after Touch ID, then forgets what it read.
+    func export() async {
+        guard let hub, let service = hub.service, hub.mayWrite(), !exporting else { return }
+        exporting = true
+        defer { exporting = false }
+        do {
+            let count = try await hub.host.elevated(
+                "Export all your secrets to a file in Downloads. The file holds their values.", done: "exported",
+                keepsEdit: false
+            ) { () async throws -> Int in
+                let all = try await service.exportSecrets()
+                try SecretExport.write(all)
+                return all.count
+            }
+            hub.host.shell.showToast("Exported \(count) secrets to your Downloads folder")
+        } catch is AdminDeclined {
+            return
+        } catch { hub.host.shell.showToast("The export did not happen. \(hub.words(error))", kind: .warn) }
     }
 
     /// Stores a new secret. True when the Core took it.
@@ -368,5 +447,40 @@ final class SecretsModel {
             f.issue = FieldIssue(code: hub.code(error) ?? "error", message: hub.words(error))
             return false
         }
+    }
+}
+
+
+/// The value on screen and when it goes. A struct of its own so nothing prints it by accident.
+struct ShownSecret: Equatable, CustomStringConvertible, CustomDebugStringConvertible {
+    let name: String
+    let value: String
+    let until: Date
+    var description: String { "ShownSecret(\(name), hidden)" }
+    var debugDescription: String { description }
+}
+
+/// The export file: JSON in Downloads, readable by the owner only.
+enum SecretExport {
+    static func write(_ all: [ExportedValue], now: Date = Date(), directory: URL? = nil) throws {
+        let dir =
+            try directory
+            ?? FileManager.default.url(
+                for: .downloadsDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd-HHmm"
+        let stamp = f.string(from: now)
+        let rows = all.map { r -> [String: Any] in
+            var row: [String: Any] = ["name": r.name, "kind": r.kind, "value": r.value]
+            if let g = r.group { row["group"] = g }
+            if let f = r.fileName { row["file_name"] = f }
+            return row
+        }
+        let body: [String: Any] = ["exported_at": ISO8601DateFormatter().string(from: now), "secrets": rows]
+        let data = try JSONSerialization.data(withJSONObject: body, options: [.prettyPrinted, .sortedKeys])
+        let url = dir.appendingPathComponent("ainkrad-secrets-\(stamp).json")
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }

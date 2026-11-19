@@ -32,6 +32,18 @@ final class AdminLiveUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 15), "Settings shows \(title)")
     }
 
+    /// Secrets and Activity (Ops, Audit) are apps of their own: the launcher opens their pane, which carries this identifier.
+    private func openApp(_ query: String, identifier: String) {
+        app.typeKey(.escape, modifierFlags: [])  // closes Settings when it is open
+        app.typeKey("k", modifierFlags: .command)
+        let launcher = app.textFields["Launcher"]
+        if !launcher.waitForExistence(timeout: 4) { app.typeKey("k", modifierFlags: .command) }
+        XCTAssertTrue(launcher.waitForExistence(timeout: 10), "⌘K opens the launcher")
+        launcher.typeText(query)
+        launcher.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(element(identifier).waitForExistence(timeout: 15), "the \(query) app opens (\(identifier))")
+    }
+
     /// What the window showed when a step did not happen, for the person reading the failure.
     private func shot(_ name: String) {
         guard let dir = env["CORE_IT_SHOTS"] else { return }
@@ -69,7 +81,7 @@ final class AdminLiveUITests: XCTestCase {
                 .firstMatch.waitForExistence(timeout: 10), "the step track follows")
 
         // Secrets: store a dummy value and see only its metadata.
-        openSection("secrets", expect: "Secrets")
+        openApp("Secrets", identifier: "secrets-app")
         let new = app.buttons["New secret…"].firstMatch
         XCTAssertTrue(new.waitForExistence(timeout: 20), "an empty Core offers New secret")
         new.click()
@@ -90,7 +102,7 @@ final class AdminLiveUITests: XCTestCase {
         let card = element("secret-\(Self.secretName)")
         XCTAssertTrue(card.waitForExistence(timeout: 30), "the secret is listed by name")
         let note = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label CONTAINS 'Mode 1' OR value CONTAINS 'Mode 1'")
+            NSPredicate(format: "label CONTAINS 'Test values only' OR value CONTAINS 'Test values only'")
         ).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 20), "the note follows the Core's mode")
 
@@ -104,7 +116,7 @@ final class AdminLiveUITests: XCTestCase {
         XCTAssertEqual(leaks.count, 0, "the value is on no screen")
 
         // Audit: both changes are there, and the kind filter narrows the list.
-        openSection("audit", expect: "Audit")
+        openApp("Audit", identifier: "activity-app")
         XCTAssertTrue(element(containing: "secret.created").waitForExistence(timeout: 30), "the store is audited")
         XCTAssertTrue(element(containing: "setting.set").exists, "the switch changes are audited")
         let kind = app.textFields["Kind"]
