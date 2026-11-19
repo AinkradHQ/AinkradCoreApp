@@ -141,7 +141,7 @@ struct BrainPane: View {
         switch model.currentTab {
         case .activity: true
         case .inbox: model.inboxState.list != .noRoom
-        case .overview, .checks, .rooms, .sources, .records: false
+        case .overview, .checks, .rooms, .sources, .records, .evidence: false
         }
     }
 
@@ -189,6 +189,7 @@ struct BrainPane: View {
                 case .rooms: RoomsTab(model: model)
                 case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
                 case .records: ExploreRecordsTab(brain: model)
+                case .evidence: ExploreEvidenceTab(brain: model)
                 case .inbox: CandidateInboxTab(model: model)
                 case .activity:
                     if model.isSample || model.service?.servesChanges == true {
