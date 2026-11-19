@@ -5,12 +5,12 @@ import Testing
 @testable import Lore
 
 struct LoreOutlineTests {
-    @Test func headingsSkipCodeAndCountRepeats() {
+    @Test func headingsSkipCodeAndKeepTheirPlace() {
         let md = "# Title\n\ntext\n## Steps\n```\n# not a heading\n```\n## Steps\n#### deep\n#nospace\n### \n"
         let h = LoreOutline.headings(md)
         #expect(h.map(\.title) == ["Title", "Steps", "Steps"])
         #expect(h.map(\.level) == [1, 2, 2])
-        #expect(h.map(\.occurrence) == [0, 0, 1])
+        #expect(h.map(\.index) == [0, 1, 2], "repeated titles keep their own place")
     }
 
     @Test func wordsCountsWhitespaceSeparatedRuns() {
@@ -30,5 +30,12 @@ struct LoreOutlineTests {
         #expect(g.map(\.name) == ["Personal", "Atlas", "Journal"], "Birch is empty, so it is left out")
         #expect(g[1].notes.map(\.id) == ["b"], "a trashed note is not in the tree")
         #expect(g[2].notes.map(\.id) == ["d", "c"], "newest day first")
+    }
+
+    @Test func sidebarsAreOpenUntilHiddenAndRememberIt() {
+        let d = UserDefaults(suiteName: "lore-side-\(UUID().uuidString)")!
+        #expect(LoreSidebarPrefs.read("left", d))
+        LoreSidebarPrefs.write("left", false, d)
+        #expect(!LoreSidebarPrefs.read("left", d) && LoreSidebarPrefs.read("right", d))
     }
 }

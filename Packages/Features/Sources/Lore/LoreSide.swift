@@ -5,6 +5,17 @@ import CoreUI
 import Foundation
 import SwiftUI
 
+/// Whether each sidebar is open, kept per user (UserDefaults); both open until the person hides one.
+enum LoreSidebarPrefs {
+    static func read(_ side: String, _ d: UserDefaults = .standard) -> Bool {
+        d.object(forKey: "lore.sidebar.\(side)") as? Bool ?? true
+    }
+
+    static func write(_ side: String, _ open: Bool, _ d: UserDefaults = .standard) {
+        d.set(open, forKey: "lore.sidebar.\(side)")
+    }
+}
+
 enum LoreSideFilter: Equatable {
     case project(String)
     case tag(String)
@@ -83,7 +94,7 @@ extension LoreModel {
         editor?.tablesAsText = on
     }
 
-    func reveal(_ h: LoreHeading) { editor?.reveal(h.title, occurrence: h.occurrence) }
+    func reveal(_ h: LoreHeading) { editor?.reveal(headingIndex: h.index) }
 
     /// The AI document the open note is, if it is one.
     var openDoc: LoreSessionDoc? { sessionDocs.first { $0.note == note?.id } }

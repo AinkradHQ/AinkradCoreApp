@@ -83,17 +83,30 @@ extension LoreEditorController {
         }
     }
 
-    /// Moves the caret to the `occurrence`-th place `text` appears (an outline entry) and scrolls to it.
-    public func reveal(_ text: String, occurrence: Int = 0) {
-        let ns = textView.string as NSString
-        var from = 0
-        var hit = NSRange(location: NSNotFound, length: 0)
-        for _ in 0...max(0, occurrence) {
-            hit = ns.range(of: text, range: NSRange(location: from, length: ns.length - from))
-            guard hit.location != NSNotFound else { return }
-            from = NSMaxRange(hit)
+    /// Moves the caret to the `index`-th heading of level 1 to 3 (an outline entry, counted the way `LoreOutline`
+    /// counts: Markdown order, code blocks skipped) and scrolls to it. By position, so repeated titles are fine.
+    public func reveal(headingIndex index: Int) {
+        guard let at = LoreHeadingScan.location(ofHeading: index, in: textView.ts) else { return }
+        let line = (textView.string as NSString).paragraphRange(for: NSRange(location: at, length: 0))
+        textView.setSelectedRange(NSRange(location: line.location, length: 0))
+        textView.scrollRangeToVisible(line)
+    }
+}
+
+enum LoreHeadingScan {
+    /// The start of the `index`-th paragraph that is a heading of level 1 to 3.
+    static func location(ofHeading index: Int, in ts: NSAttributedString) -> Int? {
+        let ns = ts.string as NSString
+        var loc = 0
+        var seen = 0
+        while loc < ns.length {
+            let para = ns.paragraphRange(for: NSRange(location: loc, length: 0))
+            if case .h(let level) = Block.at(ts, para.location), level <= 3 {
+                if seen == index { return para.location }
+                seen += 1
+            }
+            loc = NSMaxRange(para)
         }
-        textView.setSelectedRange(NSRange(location: hit.location, length: 0))
-        textView.scrollRangeToVisible(hit)
+        return nil
     }
 }
