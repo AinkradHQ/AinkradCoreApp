@@ -130,7 +130,7 @@ struct AnalogClockBody: View {
         switch size {
         case .s:
             AnalogDial().frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .m:
+        case .m, .w:
             HStack(spacing: Space.s4) {
                 AnalogDial()
                 day { d in
@@ -203,19 +203,17 @@ struct DigitalClockBody: View {
                     date(d)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            case .t:
-                VStack(alignment: .leading, spacing: 0) {
-                    digits(ClockFace.time(d).hours, 62)
-                    digits(ClockFace.time(d).minutes, 62)
-                    if prefs.showsSeconds { digits(ClockFace.time(d).seconds, 28, ink: GlassInk.secondary) }
-                    VStack(alignment: .leading, spacing: 2) {
-                        ClockLine(d, .dateTime.weekday(.wide))
-                        ClockLine(d, .dateTime.day().month(.wide))
+            case .w:
+                HStack(alignment: .top, spacing: Space.s6) {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        time(d, 44)
+                        date(d)
                     }
-                    .padding(.top, Space.s3)
+                    places(d)
+                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            case .l, .x:
+            case .l:
                 VStack(alignment: .leading, spacing: 0) {
                     time(d, 56)
                     date(d).padding(.top, Space.s2)

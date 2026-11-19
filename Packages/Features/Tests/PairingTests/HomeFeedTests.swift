@@ -116,3 +116,33 @@ private struct FakeHome: HomeSource {
         #expect(shell.home.events.map(\.text) == ["Pairing approved", "Pairing claimed"])
     }
 }
+
+@MainActor @Suite struct HomeWidgetDataTests {
+    @Test func usageIsTheTightestAccountOfEachProviderWithTheSoonestReset() {
+        let soon = Date(timeIntervalSince1970: 1_800_000_000)
+        let u = LiveHomeSource.usage(
+            spent: [(1, 0.3), (2, 0.7), (3, 0.1)],
+            accounts: [
+                (1, "anthropic", [soon.addingTimeInterval(500)]), (2, "anthropic", [soon]), (3, "openai", []),
+                (4, "google", []),
+            ])
+        #expect(u.map(\.provider) == ["anthropic", "openai"])  // no usage row for account 4: nothing to show
+        #expect(u[0].share == 0.7 && u[0].resetsAt == soon && u[1].resetsAt == nil)
+    }
+
+    @Test func aProjectCountsTheLiveSessionsWorkingInItsFolder() {
+        let now = Date()
+        func s(_ id: String, _ folder: String?) -> AgentSessionInfo {
+            var x = AgentSessionInfo(
+                id: id, runner: "r", harness: "claude-code", model: "opus", state: .running, createdAt: now,
+                updatedAt: now)
+            x.project = folder
+            return x
+        }
+        let p = HomeProject(slug: "harbor", name: "Harbor Redesign", updatedAt: now)
+        let n = HomeFeed.sessions(
+            in: p, live: [s("a", "/Users/x/Harbor"), s("b", "harbor-redesign"), s("c", nil), s("d", "/x/Other")])
+        #expect(n == 1)  // "Harbor" matches the slug; the folder "harbor-redesign" is neither the slug nor the name
+        #expect(HomeFeed.dayKey(Date(timeIntervalSince1970: 0)).count == 10)
+    }
+}

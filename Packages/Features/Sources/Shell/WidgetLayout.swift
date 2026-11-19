@@ -1,42 +1,33 @@
 import CoreGraphics
 import Foundation
 
-/// A widget's footprint on the Home grid, counted in 16 x 12 grid units: small 2x2, wide 4x2, tall 2x4, large 4x4, extra
-/// large 8x4. One Home cell is 2x2 units, so the names read as cells: small 1x1, wide 2x1, tall 1x2, large 2x2 (home-clocks).
-/// Only the digital clock has the tall size.
+/// A widget's footprint on the Home grid, counted in 16 x 12 grid units (the 05-home mockup): small 2x2 (a glance), medium
+/// 4x2 (a list), wide 8x2 (a chart) and large 4x4 (the detail). One Home cell is 2x2 units.
 public enum WidgetSize: String, CaseIterable, Codable, Sendable {
-    case s, m, t, l, x
-    public var cols: Int { self == .s || self == .t ? 2 : self == .x ? 8 : 4 }
-    public var rows: Int { self == .s || self == .m ? 2 : 4 }
+    case s, m, w, l
+    public var cols: Int { self == .s ? 2 : self == .w ? 8 : 4 }
+    public var rows: Int { self == .l ? 4 : 2 }
     public var title: String {
         switch self {
         case .s: "Small"
-        case .m: "Wide"
-        case .t: "Tall"
+        case .m: "Medium"
+        case .w: "Wide"
         case .l: "Large"
-        case .x: "Extra Large"
         }
     }
-    /// The size choice in the gallery: one letter (S, W, T, L, X).
-    public var short: String {
-        switch self {
-        case .s: "S"
-        case .m: "W"
-        case .t: "T"
-        case .l: "L"
-        case .x: "X"
-        }
-    }
-    /// "Wide, 2 by 1": the name and its footprint in Home cells, for VoiceOver and the menus.
-    public var spoken: String { "\(title), \(cols / 2) by \(rows / 2)" }
+    /// The size choice in the gallery: one letter (S, M, W, L).
+    public var short: String { rawValue.uppercased() }
+    /// "Wide, 8 by 2": the name and its footprint in grid units, for VoiceOver and the menus.
+    public var spoken: String { "\(title), \(cols) by \(rows)" }
     var area: Int { cols * rows }
 
-    /// A size saved by an earlier build (8 x 5 grid: s 1x1, m 2x1, t 1x2, l 2x2, x 2x3) on today's grid. That tall size
-    /// becomes small (no v1 widget had today's tall), and the old extra large (two cells wide) becomes large.
-    static func migrated(_ raw: String) -> WidgetSize? {
+    /// A size saved by an earlier build on today's. v1 (8 x 5 grid): s 1x1, m 2x1, t 1x2, l 2x2, x 2x3; v2 and v3 (16 units):
+    /// s, m, t 2x4, l, x 8x4. The tall size had no widget but the digital clock and becomes small. An old extra large
+    /// becomes large on the v1 grid and wide (the same width, half the height) on the later ones.
+    static func migrated(_ raw: String, from version: Int = 4) -> WidgetSize? {
         switch raw {
         case "t": .s
-        case "x": .l
+        case "x": version == 1 ? .l : .w
         default: WidgetSize(rawValue: raw)
         }
     }
@@ -68,15 +59,13 @@ public struct WidgetLayout: Equatable, Sendable {
     public var items: [WidgetItem]
     public init(items: [WidgetItem] = []) { self.items = items }
 
-    /// The first layout: the desk of the N9 mockup (its small clock is the digital one).
+    /// The first layout: the desk of the 05-home mockup. Rows 2 and 3 across the middle are the greeting's.
     public static func standard() -> WidgetLayout {
-        // Each card fits what it holds, and the wallpaper shows under the desk (Ahmed, 2026-11-15). No Today card: it
-        // repeated Running and Machines.
-        // Rows 2 and 3 across the middle are the greeting's; the bottom rows are open to widgets.
         let d: [(WidgetKind, WidgetSize, Int, Int)] = [
-            (.running, .m, 0, 0), (.machines, .m, 4, 0), (.events, .m, 8, 0), (.digital, .s, 12, 0), (.quick, .s, 14, 0),
-            (.needs, .m, 0, 2), (.core, .m, 12, 2), (.board, .m, 0, 4), (.spend, .l, 12, 4),
-        ].filter { $0.0 != .board || WidgetKind.boardShown }
+            (.digital, .m, 0, 0), (.approvals, .m, 12, 0), (.calendar, .l, 0, 2), (.running, .l, 12, 2),
+            (.quick, .w, 4, 4), (.terminals, .m, 0, 6), (.aiusage, .w, 4, 6), (.machines, .l, 12, 6),
+            (.brain, .l, 0, 8), (.weather, .m, 4, 10), (.core, .m, 8, 10), (.todaynote, .m, 12, 10),
+        ]
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
     }
 
@@ -222,10 +211,10 @@ public struct WidgetLayout: Equatable, Sendable {
         return true
     }
 
-    // MARK: persistence (`{ v: 3, items: [{ t, s, x, y }] }`; v2 was the 16 x 8 grid, v1 the 8 x 5 grid)
+    // MARK: persistence (`{ v: 4, items: [{ t, s, x, y }] }`; v3 had the tall and extra large sizes, v2 was the 16 x 8 grid, v1 the 8 x 5 grid)
 
     private struct Stored: Codable {
-        var v = 3
+        var v = 4
         var items: [Row]
         struct Row: Codable {
             var t: String
@@ -242,8 +231,16 @@ public struct WidgetLayout: Equatable, Sendable {
 
     /// The 16 x 8 default of v2, so a desk nobody changed gets the new default instead of a shuffle around the greeting.
     private static let legacyStandard: Set<String> = [
-        "running m 0 0", "spend l 4 0", "machines m 8 0", "digital s 12 0", "quick s 14 0", "needs m 0 2", "events m 8 2",
+        "running m 0 0", "spend l 4 0", "machines m 8 0", "digital s 12 0", "quick s 14 0", "needs m 0 2",
+        "events m 8 2",
         "core m 12 2", "board m 0 4",
+    ]
+
+    /// The desk of v3 (before the 05-home mockup), so a desk nobody changed gets the new default.
+    private static let legacyStandardV3: Set<String> = [
+        "running m 0 0", "machines m 4 0", "events m 8 0", "digital s 12 0", "quick s 14 0", "needs m 0 2",
+        "core m 12 2",
+        "spend l 12 4",
     ]
 
     /// nil for anything unreadable; rows that name an unknown widget or size, or do not fit or overlap, are dropped.
@@ -251,18 +248,21 @@ public struct WidgetLayout: Equatable, Sendable {
     /// cells keep their place, and a widget now on the greeting or off the desk takes the nearest free spot. Either way a
     /// widget is dropped only when the desk has no room; a v2 desk that was still the old default becomes the new default.
     public static func decoded(_ data: Data) -> WidgetLayout? {
-        guard let s = try? JSONDecoder().decode(Stored.self, from: data), (1...3).contains(s.v) else { return nil }
+        guard let s = try? JSONDecoder().decode(Stored.self, from: data), (1...4).contains(s.v) else { return nil }
         // The board widget only exists in the sample world, so it does not count either way.
-        if s.v == 2, Set(s.items.map { "\($0.t) \($0.s) \($0.x) \($0.y)" }).subtracting(["board m 0 4"])
-            == legacyStandard.subtracting(["board m 0 4"])
+        if s.v == 2,
+            Set(s.items.map { "\($0.t) \($0.s) \($0.x) \($0.y)" }).subtracting(["board m 0 4"])
+                == legacyStandard.subtracting(["board m 0 4"])
         {
             return standard()
         }
+        let placed = Set(s.items.map { "\($0.t) \($0.s) \($0.x) \($0.y)" }).subtracting(["board m 0 4"])
+        if s.v == 3, placed == legacyStandardV3 { return standard() }
         var out: [WidgetItem] = []
         let ordered = s.v == 1 ? s.items.sorted { ($0.y, $0.x) < ($1.y, $1.x) } : s.items
         for r in ordered {
             guard let k = WidgetKind(rawValue: r.t),
-                let z = s.v == 1 ? WidgetSize.migrated(r.s) : WidgetSize(rawValue: r.s)
+                let z = WidgetSize.migrated(r.s, from: s.v)
             else { continue }
             let size = k.sizes.contains(z) ? z : k.sizes[0]
             if s.v == 1 || (s.v == 2 && k.sizes.contains(z)) {

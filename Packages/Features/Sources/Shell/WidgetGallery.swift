@@ -12,7 +12,8 @@ struct WidgetGallery: View {
 
     /// The clocks first, as the mockup; then the Core widgets.
     static let order: [WidgetKind] = [
-        .digital, .clock, .today, .machines, .spend, .quick, .running, .needs, .events, .core, .board,
+        .digital, .clock, .quick, .today, .needs, .approvals, .running, .spend, .aiusage, .machines, .board, .events,
+        .core, .terminals, .projects, .brain, .todaynote, .weather, .calendar,
     ]
     private var kinds: [WidgetKind] { Self.order.filter { $0 != .board || WidgetKind.boardShown } }
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Space.s4, alignment: .top), count: 3)
@@ -75,6 +76,7 @@ private struct GalleryCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: Space.s2) {
                     Text(kind.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                    if kind.isNew { Text("New").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.blueInk) }
                     Spacer(minLength: Space.s2)
                     if onHome {
                         Label("On Home", systemImage: "checkmark").labelStyle(OnHomeLabel())
@@ -127,6 +129,7 @@ private struct GalleryCard: View {
         let full = DeskGrid.frameSize(size)
         let k = min(226 / full.width, 116 / full.height, 0.72)
         return WidgetBody(kind: kind, size: size, shell: shell)
+            .environment(\.widgetPreview, true)
             .padding(Space.s4).frame(width: full.width, height: full.height, alignment: .topLeading)
             .coreWell(radius: Radius.pane)
             .scaleEffect(k)
