@@ -175,6 +175,8 @@ extension TerminalsModel {
     public func refreshRunnerProgress() async {
         readLocalInstall()
         await reload()
+    }
+}
 
 extension TerminalsModel {
     /// Puts what each runner reports of its AI tool install into `installs`, beside the installs this app started.
