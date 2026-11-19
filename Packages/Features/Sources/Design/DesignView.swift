@@ -265,9 +265,12 @@ struct DesignWall: View {
             CoreStateCard(
                 symbol: model.category.symbol, title: makes ? "Nothing designed yet" : "Nothing here yet",
                 line: makes
-                    ? "Start with a blank canvas. Logos, icons and fonts land in the library when AI sessions or other devices add them."
+                    ? "Start with a blank canvas, or describe what you want and AI draws three ideas to pick from."
                     : "Designs, logos, icons and fonts land here when AI sessions or other devices add them to the Core.",
-                secondary: makes ? CoreAction("New design (advanced)…") { model.openNew() } : nil,
+                secondary: makes
+                    ? (model.composeSupported
+                        ? CoreAction("Draw with AI") { Task { await model.drawWithAI() } }
+                        : CoreAction("New design (advanced)…") { model.openNew() }) : nil,
                 primary: makes ? CoreAction("New design") { Task { await model.quickNew() } } : nil
             )
             .frame(maxWidth: .infinity).padding(.top, Space.s8)
