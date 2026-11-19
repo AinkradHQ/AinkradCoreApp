@@ -60,6 +60,8 @@ protocol HomeSource: Sendable {
     func todayNote() async throws -> HomeSnapshot.NoteFact?
     /// What the Brain is doing now; nil on a Core older than API minor 95.
     func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline?
+    /// Tokens per day for the last `days` days, oldest first, from the Core's cost ledger; nil before API minor 95.
+    func usageSeries(days: Int) async throws -> [Double]?
     /// The last `lines` lines of a terminal's screen (E6's tail read); nil on a Core older than API minor 95.
     func terminalTail(_ id: String, lines: Int) async throws -> [String]?
     /// Saves a changed note (the Core merges when it moved on) and answers the note as it is now.
@@ -71,6 +73,7 @@ extension HomeSource {
     func usage() async throws -> [HomeUsage] { [] }
     func todayNote() async throws -> HomeSnapshot.NoteFact? { nil }
     func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline? { nil }
+    func usageSeries(days: Int) async throws -> [Double]? { nil }
     func terminalTail(_ id: String, lines: Int) async throws -> [String]? { nil }
     func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact? { nil }
 }
@@ -183,6 +186,14 @@ struct LiveHomeSource: HomeSource {
         return try JSONDecoder().decode(Tail.self, from: data).lines
     }
 
+    func usageSeries(days: Int) async throws -> [Double]? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        let data = try await run {
+            try await connection.signedRequest(method: "GET", target: "/api/v1/costs/series?days=\(days)", body: Data())
+        }
+        return try HomeFeed.series(data, days: days, now: Date())
+    }
+
     private var lore: LiveLoreService { LiveLoreService(connection: connection) }
 
     func todayNote() async throws -> HomeSnapshot.NoteFact? {
@@ -285,6 +296,7 @@ final class HomeFeed {
                     updatedAt: pr.updatedAt)
             }
         }
+        if let series = try? await source.usageSeries(days: 14) { home.usageSeries = series }
         if let u = try? await source.usage() {
             home.usage = u.map { .init(provider: $0.provider, share: $0.share, resetsAt: $0.resetsAt) }
         }
@@ -303,8 +315,23 @@ final class HomeFeed {
         if let b = brainService?() {
             home.brain = await Self.glance(b)
             home.brain?.pipeline = try? await source.brainPipeline()
+            home.brain?.pipeline?.progress = brainProgress(home.brain?.pipeline)
         }
         shell.home = home
+    }
+
+    private var brainPeak = 0
+
+    /// Done over done plus waiting, from the counts alone: the most work seen waiting since it last had none counts as
+    /// the whole. nil while idle (the peak resets).
+    private func brainProgress(_ p: HomeSnapshot.BrainGlance.Pipeline?) -> Double? {
+        let pending = (p?.working ?? 0) + (p?.queued ?? 0)
+        guard let p, p.now != nil else {
+            brainPeak = 0
+            return nil
+        }
+        brainPeak = max(brainPeak, pending, 1)
+        return Double(brainPeak - pending) / Double(brainPeak)
     }
 
     /// Writes a tick on today's note back (the widget shows it at once; the Core's answer replaces it).
@@ -315,6 +342,26 @@ final class HomeFeed {
             shell.home.note = saved
         } else {
             await refresh()
+        }
+    }
+
+    /// `GET /costs/series` as one token total per UTC day, the last entry being `now`'s day.
+    static func series(_ data: Data, days: Int, now: Date) throws -> [Double] {
+        struct Row: Decodable {
+            var day: String
+            var total_tokens: Int64
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let f = DateFormatter()
+        f.calendar = utc
+        f.timeZone = utc.timeZone
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let by = Dictionary(rows.map { ($0.day, Double($0.total_tokens)) }, uniquingKeysWith: +)
+        return (0..<days).reversed().map { back in
+            by[f.string(from: utc.date(byAdding: .day, value: -back, to: now) ?? now)] ?? 0
         }
     }
 

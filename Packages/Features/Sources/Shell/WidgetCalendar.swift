@@ -28,6 +28,17 @@ public final class CalendarProvider {
         }
     }
 
+    /// The next event today or later, when Calendar is already allowed.
+    public var next: Item? {
+        guard case .ready(let items) = state else { return nil }
+        return items.first { $0.start >= Date() }
+    }
+
+    /// Reads the calendar only if it is already allowed: never asks. For widgets that merely show the next event.
+    public func peek() {
+        if EKEventStore.authorizationStatus(for: .event) == .fullAccess { reload() }
+    }
+
     public func start() {
         switch EKEventStore.authorizationStatus(for: .event) {
         case .fullAccess: reload()
