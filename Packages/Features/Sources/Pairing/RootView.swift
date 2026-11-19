@@ -19,7 +19,9 @@ public struct RootView: View {
                 } else {
                     SetupWizardView(model: app.wizard) { app.useTypedCode = true }
                 }
-            case .desktop: ShellView(shell: app.shell)
+            case .desktop:
+                ShellView(shell: app.shell)
+                    .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
             case .blocked(let f): blocked(f)
             }
         }

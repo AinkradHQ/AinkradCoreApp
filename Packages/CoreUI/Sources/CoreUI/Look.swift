@@ -7,9 +7,12 @@ public struct CoreLook: Equatable, Sendable {
     public var mode: SurfaceMode
     /// 0.05 (almost clear) to 1 (solid).
     public var opacity: Double
-    public init(mode: SurfaceMode, opacity: Double) {
+    /// 0 (sharp) to 1 (the full frosted glass): how much of the blur shows. Only a Blurred look uses it.
+    public var blur: Double
+    public init(mode: SurfaceMode, opacity: Double, blur: Double = 1) {
         self.mode = mode
         self.opacity = opacity
+        self.blur = blur
     }
     public static let standard = CoreLook(mode: .blurred, opacity: 0.6)
 }
@@ -60,6 +63,8 @@ public final class LookPrefs {
     public static let shared = LookPrefs()
     public var mode: SurfaceMode { didSet { save() } }
     public var opacity: Double { didSet { save() } }
+    /// The Blur slider of setup: how much frosted glass shows through on a Blurred look.
+    public var blur: Double { didSet { save() } }
     /// Advanced: a part's own Look; a part that is missing follows the content background.
     public private(set) var custom: [LookPart: CoreLook]
     /// Posted on every change, for surfaces drawn outside SwiftUI (the terminal screen).
@@ -69,6 +74,7 @@ public final class LookPrefs {
     private init() {
         mode = SurfaceMode(rawValue: d.string(forKey: "look.mode") ?? "") ?? CoreLook.standard.mode
         opacity = d.object(forKey: "look.opacity") as? Double ?? CoreLook.standard.opacity
+        blur = d.object(forKey: "look.blur") as? Double ?? CoreLook.standard.blur
         var c: [LookPart: CoreLook] = [:]
         for part in LookPart.allCases {
             if let m = SurfaceMode(rawValue: d.string(forKey: "look.\(part.rawValue).mode") ?? "") {
@@ -81,6 +87,7 @@ public final class LookPrefs {
     private func save() {
         d.set(mode.rawValue, forKey: "look.mode")
         d.set(opacity, forKey: "look.opacity")
+        d.set(blur, forKey: "look.blur")
         for part in LookPart.allCases {
             d.set(custom[part]?.mode.rawValue, forKey: "look.\(part.rawValue).mode")
             d.set(custom[part]?.opacity, forKey: "look.\(part.rawValue).opacity")
@@ -88,7 +95,7 @@ public final class LookPrefs {
         NotificationCenter.default.post(name: Self.changed, object: nil)
     }
 
-    public var look: CoreLook { CoreLook(mode: mode, opacity: opacity) }
+    public var look: CoreLook { CoreLook(mode: mode, opacity: opacity, blur: blur) }
     /// The Look a part draws with: its own, or the content background.
     public func look(for part: LookPart) -> CoreLook { custom[part] ?? look }
     /// Give a part its own Look, or nil to follow the content background again.

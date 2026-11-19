@@ -30,6 +30,8 @@ public final class AppModel {
     /// The setup wizard is the first screen; the typed-code first run is its fallback (and a pairing left half done).
     private(set) var wizard: SetupWizardModel!
     var useTypedCode = false
+    /// What follows pairing: About you, an AI account, Look and the Mac runner (E3-1), over the desktop.
+    private(set) var tour: SetupTourModel!
     /// Makes device invites (QR). Unavailable until the Core serves them.
     var invites: any InviteService = UnavailableInviteService()
     /// Invites that were still live when their dialog went away; withdrawn from the bell.
@@ -121,14 +123,17 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        wizard = SetupWizardModel(driver: driver, profile: shell.profile, macRunner: macRunner) { [weak self] in
+        wizard = SetupWizardModel(driver: driver, profile: shell.profile) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }
+        tour = SetupTourModel(macRunner: macRunner) { [weak self] items in await self?.saveMeProfile(items) ?? false }
+        wizard.armTour = { [weak self] in self?.tour.arm() }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
+        tour.accountCount = { [weak accounts] in accounts?.accountCount ?? 0 }
         brain = BrainModel(host: AdminHostAdapter(app: self))
         projects = ProjectsModel(host: AdminHostAdapter(app: self))
         leyline = LeylineModel(host: AdminHostAdapter(app: self))
@@ -258,7 +263,22 @@ public final class AppModel {
         }
         if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop
+        tour.startIfArmed()
         await connect()
+    }
+
+    /// The setup's About you answers into the Brain's Me space (`PUT /brain/me/profile`, API minor 95). False when this Core
+    /// does not have the route yet or could not be reached: the Ready page says so.
+    private func saveMeProfile(_ items: [SetupProfile.Item]) async -> Bool {
+        guard (brain.apiMinor ?? 0) >= SetupTourModel.profileMinor, let live = service as? LiveCoreService,
+            let body = try? JSONSerialization.data(
+                withJSONObject: ["items": items.map { ["key": $0.key, "body": $0.body] }])
+        else { return false }
+        do {
+            _ = try await LiveBrainTransport(connection: live.connection).send(
+                "PUT", BrainRoutes.base + "/me/profile", body: body)
+            return true
+        } catch { return false }
     }
 
     /// Proves the Core and opens the session. Unreachable is a banner and a retry; anything else stops with its reason.
