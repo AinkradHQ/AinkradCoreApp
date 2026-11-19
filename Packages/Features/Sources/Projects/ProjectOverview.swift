@@ -10,6 +10,13 @@ struct Overview: View {
     @State private var settled = false
     @State private var runs: [RunRecord] = []
     @State private var names: [Int64: String] = [:]
+    @State private var insights: ProjectInsightsModel
+
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.model = model
+        self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
+    }
 
     private var live: ProjectLive? { project.live }
     private var settingUp: Bool { !project.repos.isEmpty && project.draft == nil && project.run == nil }
@@ -22,6 +29,10 @@ struct Overview: View {
                 VStack(spacing: Space.s2) {
                     sessions.coreRise(settled, 1)
                     brain.coreRise(settled, 2)
+                    if insights.supported {
+                        ChangesCard(insights: insights, now: model.now()).coreRise(settled, 2)
+                        notesCard.coreRise(settled, 3)
+                    }
                     if let designs = model.designsIsland {
                         designs(ProjectRef(id: String(project.id), name: project.name)).coreRise(settled, 3)
                     }
@@ -37,7 +48,12 @@ struct Overview: View {
             .frame(height: Space.s8 * 10)
         }
         .onAppear { settled = true }
-        .task(id: project.id) { await loadRuns() }
+        .task(id: project.id) {
+            await loadRuns()
+            await insights.loadUsage()
+            await insights.loadKnowledge()
+            await insights.loadDocs()
+        }
     }
 
     // MARK: Stats and activity (Core 0.10)
@@ -52,24 +68,22 @@ struct Overview: View {
 
     private var statRow: some View {
         let s = stats
+        let u = insights.usage
+        let known = insights.knowledge?.count
         return HStack(spacing: Space.s2) {
-            tile("Health", s.health, s.healthLine, CoreMeter(s.healthFraction, low: s.needsYou > 0, label: "Repos ready"))
-            tile("Runs this week", "\(s.runsThisWeek)", s.runningNow > 0 ? "\(s.runningNow) running now" : "None running", nil)
+            InsightTile(title: "Health", value: s.health, line: s.healthLine, meter: s.healthFraction)
+            InsightTile(title: "Runs this week", value: "\(s.runsThisWeek)", line: s.runningNow > 0 ? "\(s.runningNow) running now" : "None running")
+            if insights.supported {
+                InsightTile(
+                    title: "AI usage", value: u.map { CostWords.money($0.weekCost) } ?? "–",
+                    line: u.map { "This week, \(ProjectItem.count($0.sessionsWeek, "session"))" } ?? "Not available", spark: u?.byDay)
+                InsightTile(
+                    title: "Things Core knows", value: known.map(String.init) ?? "–",
+                    line: known == nil ? "Not available" : "In the \(project.name) room")
+            }
             activity
         }
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func tile(_ title: String, _ value: String, _ line: String, _ meter: CoreMeter?) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text(title).foregroundStyle(GlassInk.secondary)
-            Text(value).coreFont(size: MacTextSize.title, weight: .semibold)
-            Text(line).foregroundStyle(GlassInk.secondary)
-            if let meter { meter.frame(height: Space.s2) }
-        }
-        .padding(Space.s3).frame(width: Space.s8 * 6, alignment: .topLeading).frame(maxHeight: .infinity)
-        .coreCard(GlassInk.well, radius: Radius.cardMac)
-        .accessibilityElement(children: .combine)
     }
 
     private var activity: some View {
@@ -133,29 +147,42 @@ struct Overview: View {
     private var brain: some View {
         Island(
             title: "Brain", sub: "\(project.name) room",
-            accessory: {
-                if live?.room != nil {
-                    Button("Details") { model.section = .brain }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            accessory: { Button("Open Brain") { model.section = .brain }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
+        ) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                if let room = live?.room {
+                    Text(room.summary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(GlassInk.secondary)
+                } else if let n = insights.knowledge?.count, n > 0 {
+                    Text("Core remembers \(ProjectItem.count(n, "thing")) about this project.")
+                    ForEach(insights.knowledge?.prefix(2).map { $0 } ?? []) { KnownRow(r: $0) }
+                } else {
+                    Text(settingUp
+                        ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
+                        : "Nothing remembered yet. It fills from the repos’ instruction files, AI sessions and docs you add.")
+                        .fixedSize(horizontal: false, vertical: true).foregroundStyle(GlassInk.secondary)
                 }
             }
+        }
+    }
+
+    // MARK: Notes
+
+    private var notesCard: some View {
+        let notes = insights.notes ?? []
+        let docs = insights.docs ?? []
+        return Island(
+            title: "Notes", sub: notes.isEmpty && docs.isEmpty ? nil : "\(notes.count + docs.count)",
+            accessory: { Button("Open Notes") { model.section = .docs }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
         ) {
-            // TODO(P1-03): `room` on the project; nil until it lands, and for a project that has no room yet.
-            if let room = live?.room {
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    Text(room.summary).fixedSize(horizontal: false, vertical: true)
-                    if room.instructionsInUse {
-                        StateBadge("Instructions in use for AI sessions", tone: .done, symbol: "checkmark.circle")
+            VStack(spacing: Space.s1) {
+                if notes.isEmpty && docs.isEmpty { Text("No notes yet.").foregroundStyle(GlassInk.secondary) }
+                ForEach(notes.prefix(2)) { n in CoreRow(n.title, symbol: "doc.text") { model.openNote?(n.id) } }
+                ForEach(docs.prefix(2)) { d in
+                    CoreRow(d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" }, symbol: "sparkles") {
+                        model.openNote?(d.note)
                     }
-                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(
-                        GlassInk.secondary)
                 }
-            } else {
-                Text(
-                    settingUp
-                        ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
-                        : "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
-                )
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
