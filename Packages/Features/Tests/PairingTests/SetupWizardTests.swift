@@ -34,6 +34,8 @@ struct SetupWizardTests {
         #expect(m.stage == .install, "back returns to where the person came from")
         m.back()
         m.chooseExisting()
+        #expect(m.stage == .nearby, "a Core near you first, paste as the way on")
+        m.haveLink()
         #expect(m.stage == .connect)
         m.back()
         #expect(m.stage == .choose)

@@ -223,20 +223,24 @@ struct MacRunnerSetupTests {
             control: c, deps: deps, defaults: UserDefaults(suiteName: "macrunner-\(UUID().uuidString)")!)
     }
 
-    @Test func theEndScreenComesBeforeTheDesktopWhenTheRunnerIsInside() async {
+    @Test func theDesktopOpensAtOnceAndTheTourIsArmedFirst() async {
         var opened = 0
-        let m = SetupWizardModel(driver: paired(), macRunner: runner(bundled: true)) { opened += 1 }
+        var armed = 0
+        let m = SetupWizardModel(driver: paired()) { opened += 1 }
+        m.armTour = { armed += 1 }
         await finish(m)
-        #expect(m.stage == .ready && opened == 0)
-        m.finishSetup()
-        #expect(opened == 1)
+        #expect(opened == 1 && armed == 1)
     }
 
-    @Test func thereIsNoEndScreenWithoutARunnerInside() async {
-        var opened = 0
-        let m = SetupWizardModel(driver: paired(), macRunner: runner(bundled: false)) { opened += 1 }
-        await finish(m)
-        #expect(opened == 1)
+    @Test func theTourSkipsTheRunnerPageWithoutARunnerInside() {
+        let inside = SetupTourModel(macRunner: runner(bundled: true), save: { _ in true })
+        let outside = SetupTourModel(macRunner: runner(bundled: false), save: { _ in true })
+        for m in [inside, outside] {
+            m.begin()
+            while m.step != .look { m.next() }
+            m.next()
+        }
+        #expect(inside.step == .runner && outside.step == .ready)
     }
 
     @Test func theEndScreenSwitchOnlyRemembersTheChoice() {
