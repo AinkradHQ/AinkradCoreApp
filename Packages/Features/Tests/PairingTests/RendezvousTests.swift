@@ -20,7 +20,8 @@ private func seal(_ text: String, to s: RendezvousSession, code: Data? = nil) th
     let box = try ChaChaPoly.seal(
         Data(text.utf8), using: sym, nonce: ChaChaPoly.Nonce(data: Data(count: 12)),
         authenticating: RendezvousSession.context)
-    return (epk, box.ciphertext + box.tag)
+    // A fresh Data: the sum of two slices keeps the first one's start index, and `bad[0]` would trap.
+    return (epk, Data(box.ciphertext + box.tag))
 }
 
 private final class FakeRendezvous: RendezvousClient, @unchecked Sendable {
