@@ -24,9 +24,15 @@ protocol InviteService: Sendable {
     func withdraw(_ pairingID: String) async throws
     /// A one-time runner invite (API 1.51): lasts 15 minutes, comes with a `token` for the runner's command, no check code.
     func createRunnerInvite(name: String) async throws -> RunnerInvite
+    /// The invite for the runner bundled in this app (E6: only it can be given a real shell). A Core that cannot mark it
+    /// makes an ordinary one, and that runner then opens sandboxes only.
+    func createBundledRunnerInvite(name: String) async throws -> RunnerInvite
 }
 
 extension InviteService {
+    func createBundledRunnerInvite(name: String) async throws -> RunnerInvite {
+        try await createRunnerInvite(name: name)
+    }
     func createRunnerInvite(name: String) async throws -> RunnerInvite {
         throw CoreError.invalidInput("This Core cannot make a runner invite yet. Use a typed code instead.")
     }
@@ -43,6 +49,9 @@ struct LiveInviteService: InviteService {
     func withdraw(_ pairingID: String) async throws { _ = try await service.reject(pairingID) }
     func createRunnerInvite(name: String) async throws -> RunnerInvite {
         try await service.createRunnerInvite(name: name)
+    }
+    func createBundledRunnerInvite(name: String) async throws -> RunnerInvite {
+        try await service.createRunnerInvite(name: name, bundled: true)
     }
 }
 

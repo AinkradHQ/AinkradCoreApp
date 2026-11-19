@@ -197,9 +197,14 @@ struct LiveCoreService: CoreService {
     }
 
     /// `POST /pairings/invites` with `kind: runner`: the token comes back once and lives only in the model that shows it.
-    func createRunnerInvite(name: String) async throws -> RunnerInvite {
-        try await run {
-            switch try await client.createInvite(body: .json(.init(kind: "runner", name: name))) {
+    /// `bundled`: the invite for the runner inside this app's own bundle, which the Core records so only that runner can be
+    /// given a real shell. It is fed to the runner and never shown.
+    func createRunnerInvite(name: String, bundled: Bool = false) async throws -> RunnerInvite {
+        let bundled = bundled ? await connection.serverSupports(minor: 95) : false
+        return try await run {
+            switch try await client.createInvite(
+                body: .json(.init(bundled: bundled ? true : nil, kind: "runner", name: name)))
+            {
             case .ok(let o):
                 let b = try o.body.json
                 guard let id = b.pairingId, let token = b.token else {

@@ -57,7 +57,13 @@ import Testing
         #expect(f.sandbox == nil)
         f.session = nil
         f.projectID = nil
-        #expect(f.blockedReason == "Pick a project to share.")
+        #expect(f.blockedReason == "Pick a project.")
+        // A real shell on this Mac in a project is a cwd: `real` plus the project, never `project:<id>`.
+        f.pick("r_mac")
+        f.projectID = 7
+        #expect(f.sandbox == "real" && f.projectParam == 7)
+        f.inProject = false
+        #expect(f.projectParam == nil)
     }
 
     /// ⌘T opens on the last machine used, when it is still ready.

@@ -2,9 +2,8 @@ import CoreUI
 import SwiftUI
 
 /// One terminal in the list (E6-3, `screens/08-terminals.html`): a live look at its screen, its name, whether it is a real
-/// shell on this Mac or a sandbox, and how long ago. Hover shows Open and Close. The preview is the last lines of the
-/// screen this app is attached to; a terminal it has not attached shows its prompt. Under Reduce Motion the preview is
-/// read when the card appears and on selection, not on a timer.
+/// shell on this Mac or a sandbox, and how long ago. Hover shows Open and Close. The preview is the last lines of the screen,
+/// read by the Core; under Reduce Motion it is read once when the card appears, not on a timer.
 struct TerminalCard: View {
     let model: TerminalsModel
     let item: TerminalItem
@@ -12,6 +11,8 @@ struct TerminalCard: View {
     var index = 0
     @State private var hovering = false
     @State private var shown = false
+    /// The last rows the Core read from the screen (`GET /terminals/{id}/tail`); nil until the first answer.
+    @State private var tail: [String]?
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -64,22 +65,30 @@ struct TerminalCard: View {
         .accessibilityAction { TileAction.run(.open, item.id, model) }
     }
 
-    /// The screen: last lines, bottom-aligned, fading out toward the top; always dark, in the user's terminal theme.
+    /// The screen: last lines, bottom-aligned, fading out toward the top; always dark, in the user's terminal theme. The Core
+    /// reads them (one short call, no attach, no Touch ID) about every three seconds while the card is on screen, and once
+    /// under Reduce Motion. Before the first answer a card shows its prompt.
     private var preview: some View {
-        Group {
-            if let s = model.sessions[item.id], s.isAttached, !item.isEnded {
-                if reduce {
-                    lines(Self.last(s.surface.visibleText()))
-                } else {
-                    TimelineView(.periodic(from: .now, by: 2.5)) { _ in lines(Self.last(s.surface.visibleText())) }
-                }
-            } else {
-                lines(item.isEnded ? ["[exited]"] : ["\(model.name(of: item.runner)) ~ $"], cursor: !item.isEnded)
-            }
-        }
+        let rows = tail.flatMap { $0.isEmpty ? nil : $0 }
+        return lines(
+            item.isEnded ? ["[exited]"] : rows ?? ["\(model.name(of: item.runner)) ~ $"],
+            cursor: !item.isEnded && rows == nil
+        )
         .frame(height: Space.s8 * 3 + Space.s1, alignment: .bottom)
         .frame(maxWidth: .infinity)
         .environment(\.colorScheme, .dark)
+        .task(id: item.isEnded) { await poll() }
+    }
+
+    private func poll() async {
+        guard !item.isEnded else { return }
+        // Staggered, so a full list does not ask all at once.
+        try? await Task.sleep(for: .milliseconds(120 * min(index, 10)))
+        while !Task.isCancelled {
+            if let rows = try? await model.service.tail(item.id, lines: 5) { tail = rows }
+            if reduce { return }
+            try? await Task.sleep(for: .seconds(3))
+        }
     }
 
     private func lines(_ rows: [String], cursor: Bool = false) -> some View {
@@ -94,13 +103,6 @@ struct TerminalCard: View {
         .foregroundStyle(GlassInk.secondary)
         .padding(.horizontal, Space.s3).padding(.top, Space.s3)
         .mask(LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.3)))
-    }
-
-    /// The last five non-empty lines of the screen text.
-    static func last(_ text: String, count: Int = 5) -> [String] {
-        Array(
-            text.split(separator: "\n", omittingEmptySubsequences: true)
-                .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.suffix(count))
     }
 
     private var actions: some View {

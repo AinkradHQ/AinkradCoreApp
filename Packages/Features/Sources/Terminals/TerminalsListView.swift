@@ -24,10 +24,12 @@ struct TerminalsListView: View {
 
     private var header: some View {
         AppHeader {
-            CoreSegmented(
-                "Show",
-                segments: TerminalFilter.allCases.map { CoreSegment($0, $0.rawValue) },
-                selection: Bindable(model).filter)
+            ForEach(Array(TerminalFilter.allCases.enumerated()), id: \.element) { i, f in
+                AppFilterTile(title: f.rawValue, count: count(f), on: model.filter == f, key: "⌘\(i + 1)") {
+                    model.filter = f
+                }
+                .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
+            }
         } actions: {
             AppActionTile(title: "New terminal…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
                 model.openNew()
@@ -38,6 +40,11 @@ struct TerminalsListView: View {
             }
             .keyboardShortcut("t", modifiers: .command)
         }
+    }
+
+    private func count(_ f: TerminalFilter) -> Int {
+        let mac = model.host.thisMacRunnerID
+        return model.items.filter { f.matches($0, thisMac: mac) }.count
     }
 
     @ViewBuilder private var content: some View {

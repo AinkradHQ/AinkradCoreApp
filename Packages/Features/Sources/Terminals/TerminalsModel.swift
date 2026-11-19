@@ -632,6 +632,9 @@ final class NewTerminalModel {
     /// The chosen machine is this Mac's own runner: a real shell, the only one (D-17).
     var isThisMac: Bool { runner != nil && runner == model.host.thisMacRunnerID }
 
+    /// `NewTerminal.project`: a real shell on this Mac that starts in a project's folder (a cwd, not a mount).
+    var projectParam: Int? { isThisMac && inProject && session == nil ? projectID : nil }
+
     /// `NewTerminal.sandbox`: this Mac is `real`; an AI session's folder names itself; else the sandbox home or a project.
     var sandbox: String? {
         if isThisMac { return "real" }
@@ -653,7 +656,7 @@ final class NewTerminalModel {
         }
         if !c.online { return "That runner is offline." }
         if !c.hasPty { return "Terminals are off on that runner." }
-        if inProject, !isThisMac, session == nil, projectID == nil { return "Pick a project to share." }
+        if inProject, session == nil, projectID == nil { return "Pick a project." }
         return nil
     }
 
@@ -679,7 +682,7 @@ final class NewTerminalModel {
             ) {
                 try await self.model.service.create(
                     runner: r.id, program: program.isEmpty ? nil : program, session: self.session,
-                    sandbox: self.sandbox, rows: 30, cols: 100)
+                    sandbox: self.sandbox, project: self.projectParam, rows: 30, cols: 100)
             }
             await model.created(t)
         } catch is ElevationDeclined {
@@ -718,9 +721,11 @@ final class NewTerminalModel {
                     title: "A real shell is only for this Mac.",
                     text: "Open it from this Mac's own app, on this Mac's runner. Other machines open a sandbox.",
                     code: code, http: status)
-            case "sandbox_unsupported":
+            case "runner_update_required":
                 return Refusal(
-                    title: "\(runner) needs an update to open a sandbox.", text: message, code: code, http: status)
+                    title: "Update this runner to open terminals.",
+                    text: "\(runner) is too old to open a terminal safely. Runners update themselves; try again soon.",
+                    code: code, http: status)
             case "project_folder_unknown":
                 return Refusal(
                     title: "That project has no folder on \(runner) yet.",
