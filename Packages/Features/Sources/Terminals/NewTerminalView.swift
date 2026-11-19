@@ -33,17 +33,16 @@ struct NewTerminalView: View {
                 }
             }
             step("Open it in", index: 2) {
-                // The Core has no real shell in a project folder yet, so This Mac offers only its home folder.
                 CoreSegmented(
                     "Open it in",
-                    segments: form.isThisMac
-                        ? [CoreSegment(Where.home, "Home folder")]
-                        : [CoreSegment(Where.home, "Sandbox home"), CoreSegment(Where.project, "A project folder")],
+                    segments: [
+                        CoreSegment(Where.home, form.isThisMac ? "Home folder" : "Sandbox home"),
+                        CoreSegment(Where.project, "A project folder"),
+                    ],
                     selection: Binding(
-                        get: { form.inProject && !form.isThisMac ? .project : .home },
-                        set: { form.inProject = $0 == .project })
+                        get: { form.inProject ? .project : .home }, set: { form.inProject = $0 == .project })
                 )
-                if form.inProject, !form.isThisMac {
+                if form.inProject {
                     CoreSelect(
                         nil, selection: Binding(get: { form.projectID ?? 0 }, set: { form.projectID = $0 }),
                         options: form.projects.map { CoreSelectOption($0.id, $0.name) })

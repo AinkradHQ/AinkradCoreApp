@@ -110,7 +110,7 @@ public final class AppModel {
                 makeInvite: { [weak self] name in
                     guard let self else { throw CancellationError() }
                     return try await self.elevated("Add this Mac to the Core as a runner.", done: "added") {
-                        try await self.invites.createRunnerInvite(name: name)
+                        try await self.invites.createBundledRunnerInvite(name: name)
                     }
                 },
                 revoke: { [weak self] id in
