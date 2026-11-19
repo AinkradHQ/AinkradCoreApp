@@ -30,7 +30,9 @@ protocol AdminService: Sendable {
 }
 
 extension AdminService {
-    func revealSecret(_ name: String) async throws -> String { throw CoreError.badRequest(message: "Not available here.") }
+    func revealSecret(_ name: String) async throws -> String {
+        throw CoreError.badRequest(message: "Not available here.")
+    }
 }
 
 struct LiveAdminService: AdminService {

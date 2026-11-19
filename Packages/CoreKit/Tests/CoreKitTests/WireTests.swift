@@ -101,7 +101,9 @@ import Testing
         #expect(e(401, "pairing_failed") == .pairingFailed)
         #expect(e(403, "step_up_required") == .stepUpRequired)
         #expect(e(403, "unlock_required") == .unlockRequired)
-        #expect(CoreError.unlockRequired.needsProof && CoreError.stepUpRequired.needsProof && !CoreError.forbiddenScope.needsProof)
+        #expect(
+            CoreError.unlockRequired.needsProof && CoreError.stepUpRequired.needsProof
+                && !CoreError.forbiddenScope.needsProof)
         #expect(e(403, "forbidden_scope") == .forbiddenScope)
         #expect(e(429, "rate_limited", h: ["retry-after": "12"]) == .rateLimited(retryAfter: 12))
         #expect(e(409, "sas_mismatch") == .sasMismatch)

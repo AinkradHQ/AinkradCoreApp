@@ -134,7 +134,8 @@ public actor CoreConnection {
     public func beatUnlock() async throws -> Date {
         let res = try await sessions.perform(method: "POST", target: "/api/v1/auth/unlock/beat", body: Data("{}".utf8))
         guard
-            let until = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["unlocked_until"] as? String,
+            let until = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["unlocked_until"]
+                as? String,
             let t = Wire.parseTimestamp(until)
         else { throw CoreError.protocolViolation("an unlock beat without unlocked_until") }
         return Date(timeIntervalSince1970: TimeInterval(t))
@@ -198,7 +199,9 @@ public actor CoreConnection {
                 as? String, let t = Wire.parseTimestamp(until)
         else { throw CoreError.protocolViolation("a step-up answer without \(field)") }
         if session {
-            guard let token = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["unlock_token"] as? String
+            guard
+                let token = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["unlock_token"]
+                    as? String
             else { throw CoreError.protocolViolation("an unlock answer without unlock_token") }
             await sessions.setUnlockToken(token)
         } else {

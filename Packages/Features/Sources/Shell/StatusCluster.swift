@@ -138,4 +138,3 @@ struct StatusBarStyle: ButtonStyle {
 public enum Countdown {
     public static func text(_ seconds: Int) -> String { coreClock(seconds) }
 }
-

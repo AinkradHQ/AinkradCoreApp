@@ -128,7 +128,9 @@ struct AppModelTests {
         s.stepUpError = CoreError.keyStore("sign")
         let m = try app(s)
         await m.start()
-        await #expect(throws: StepUpDeclined.self) { try await m.elevated("test", done: "revoked") { throw CoreError.stepUpRequired } }
+        await #expect(throws: StepUpDeclined.self) {
+            try await m.elevated("test", done: "revoked") { throw CoreError.stepUpRequired }
+        }
         let n = try #require(m.stepUpNotice)
         #expect(n.title == "Touch ID didn't match. Nothing was revoked." && n.phase != .cancelled)
     }
@@ -138,7 +140,9 @@ struct AppModelTests {
         s.stepUpError = CoreError.stepUpCancelled
         let m = try app(s)
         await m.start()
-        await #expect(throws: StepUpDeclined.self) { try await m.elevated("test", done: "changed") { throw CoreError.stepUpRequired } }
+        await #expect(throws: StepUpDeclined.self) {
+            try await m.elevated("test", done: "changed") { throw CoreError.stepUpRequired }
+        }
         s.stepUpError = nil
         var ran = false
         var refused = false
