@@ -30,7 +30,7 @@ struct ProjectSpaceView: View {
         case .overview:
             Overview(model: model, project: project)
         case .run:
-            RunPage(model: model, project: project).id(project.id)
+            RunsPage(model: model, project: project).id(project.id)
         case .repos:
             ReposPage(model: model, project: project)
         case .sessions:
