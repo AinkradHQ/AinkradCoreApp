@@ -15,12 +15,15 @@ public enum ImportRetry {
     /// 1, 2, 4, 8, 16, 30, 30 ... seconds for attempt 1, 2, 3 ...
     public static func seconds(attempt: Int) -> Double { Double(min(30, 1 << min(max(attempt - 1, 0), 5))) }
 
-    public static let pause: @Sendable (Int) async -> Void = { try? await Task.sleep(for: .seconds(seconds(attempt: $0))) }
+    public static let pause: @Sendable (Int) async -> Void = {
+        try? await Task.sleep(for: .seconds(seconds(attempt: $0)))
+    }
 
     /// Runs `op` until it works or fails for good. `waiting(true)` is said at each transient failure, `waiting(false)`
     /// once the call works again (or fails for good), so the screen can show "waiting for your Core" meanwhile.
     public static func run<T>(
-        isolation: isolated (any Actor)? = #isolation, pause: (Int) async -> Void, waiting: (Bool) async -> Void, _ op: () async throws -> T
+        isolation: isolated (any Actor)? = #isolation, pause: (Int) async -> Void, waiting: (Bool) async -> Void,
+        _ op: () async throws -> T
     ) async throws -> T {
         var attempt = 0
         while true {

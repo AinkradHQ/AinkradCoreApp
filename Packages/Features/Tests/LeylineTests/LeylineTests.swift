@@ -198,7 +198,9 @@ struct LeylineTests {
 
     @Test func aKeyListShowsItsTypeAndBits() {
         let k = { (algo: String, bits: Int?) in
-            KeyItem(id: "k_1", name: "n", algo: algo, publicKey: "", fingerprint: "", imported: true, createdAt: nil, bits: bits)
+            KeyItem(
+                id: "k_1", name: "n", algo: algo, publicKey: "", fingerprint: "", imported: true, createdAt: nil,
+                bits: bits)
         }
         #expect(k("rsa", 4096).line == "RSA 4096 · imported")
         #expect(k("rsa", nil).typeWord == "RSA")

@@ -82,7 +82,8 @@ let corpus: [String] = [
         ) { t, r, _, _ in
             out.append(
                 (
-                    Block.at(s, r.location) == .code, s.attribute(.loreTable, at: r.location, effectiveRange: nil) != nil,
+                    Block.at(s, r.location) == .code,
+                    s.attribute(.loreTable, at: r.location, effectiveRange: nil) != nil,
                     t ?? ""
                 ))
         }

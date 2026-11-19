@@ -302,9 +302,13 @@ struct MacRunnerPairProcessTests {
     @Test func launchdFailureAndMissingToolAreSaidInPlainWords() {
         let launchd = "job state = spawn failed\n\tlast exit code = 78: EX_CONFIG\n"
         #expect(MacRunnerProblem.exitCode(launchd) == 78)
-        #expect(MacRunnerProblem.words(launchd: launchd, lastErrorFile: nil)?.hasPrefix("macOS could not start the runner (error 78)") == true)
+        #expect(
+            MacRunnerProblem.words(launchd: launchd, lastErrorFile: nil)?.hasPrefix(
+                "macOS could not start the runner (error 78)") == true)
         #expect(MacRunnerProblem.words(launchd: "last exit code = (never exited)", lastErrorFile: nil) == nil)
-        #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "no AI tool installed: x")?.contains("no AI tool is installed") == true)
+        #expect(
+            MacRunnerProblem.words(launchd: nil, lastErrorFile: "no AI tool installed: x")?.contains(
+                "no AI tool is installed") == true)
         #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "\n") == nil)
     }
 

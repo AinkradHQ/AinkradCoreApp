@@ -152,7 +152,8 @@ struct BrainImportFlowTests {
         t.routes["POST /modules/brain/v1/imports/r1/items"] = { _ in ["results": []] }
         await untilStep(m, .review)  // no Try again was pressed
         #expect(m.step == .review && m.failure == nil && !m.waitingForCore)
-        #expect(t.count("POST /modules/brain/v1/imports") >= 2 && t.count("POST /modules/brain/v1/imports/r1/items") >= 2)
+        #expect(
+            t.count("POST /modules/brain/v1/imports") >= 2 && t.count("POST /modules/brain/v1/imports/r1/items") >= 2)
     }
 
     @Test func aCollectedThatTimesOutIsRetriedUntilItAnswers() async {
@@ -183,8 +184,10 @@ struct BrainImportFlowTests {
     }
 
     @Test func httpStatusesDecideWhetherAnImportWaits() {
-        #expect(BrainHTTPError(status: 503, code: "x").isTransient && BrainHTTPError(status: 500, code: "x").isTransient)
-        #expect(!BrainHTTPError(status: 400, code: "x").isTransient && !BrainHTTPError(status: 409, code: "x").isTransient)
+        #expect(
+            BrainHTTPError(status: 503, code: "x").isTransient && BrainHTTPError(status: 500, code: "x").isTransient)
+        #expect(
+            !BrainHTTPError(status: 400, code: "x").isTransient && !BrainHTTPError(status: 409, code: "x").isTransient)
     }
 
     @Test func everyRoomStartsTickedButOneThatMixesTwoEmployers() async {

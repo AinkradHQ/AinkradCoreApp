@@ -277,7 +277,8 @@ public final class DesignModel {
             return why
         }
         do {
-            let d = try await service.create(kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project)
+            let d = try await service.create(
+                kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project)
             docs.append(d)
             host.shell.closeDialog()
             category = .all

@@ -51,20 +51,24 @@ enum MacRunnerProblem {
         if let launchd {
             let code = exitCode(launchd)
             if code == 78 || launchd.contains("spawn failed") {
-                return "macOS could not start the runner\(code.map { " (error \($0))" } ?? ""). Restart the app, or turn the switch off and on."
+                return
+                    "macOS could not start the runner\(code.map { " (error \($0))" } ?? ""). Restart the app, or turn the switch off and on."
             }
             if let code, code != 0 { return "The runner stopped (error \(code)). macOS starts it again by itself." }
         }
         guard let why = lastErrorFile?.trimmingCharacters(in: .whitespacesAndNewlines), !why.isEmpty else { return nil }
         if why.hasPrefix("no AI tool installed") {
-            return "The runner is on, but no AI tool is installed on this Mac. Terminals work; AI sessions wait for one."
+            return
+                "The runner is on, but no AI tool is installed on this Mac. Terminals work; AI sessions wait for one."
         }
         return "The runner is on without AI sessions: \(why)"
     }
 
     /// `last exit code = 78: EX_CONFIG` or `last exit code = (never exited)`.
     static func exitCode(_ launchd: String) -> Int? {
-        guard let line = launchd.split(separator: "\n").first(where: { $0.contains("last exit code =") }) else { return nil }
+        guard let line = launchd.split(separator: "\n").first(where: { $0.contains("last exit code =") }) else {
+            return nil
+        }
         let value = line.split(separator: "=", maxSplits: 1).last?.trimmingCharacters(in: .whitespaces) ?? ""
         return Int(value.prefix { $0.isNumber })
     }
