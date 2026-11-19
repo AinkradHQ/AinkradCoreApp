@@ -85,8 +85,11 @@ extension AccountsModel {
 
     /// Stops a sign-in that is still going (no Touch ID: stopping never changes anything).
     func cancelSignIn() async {
+        let guidedAgy = signIn?.provider == "agy-sub" && !signInEnded
         if let id = signIn?.login, let service, !signInEnded { try? await service.cancelLogin(id) }
         signIn = nil
+        // Antigravity may already have saved its login in the runner's keyring, which the Core cannot clear.
+        if guidedAgy { host.shell.showToast(AccountNotes.keyringWords) }
     }
 
     /// Any way out of an Accounts dialog (Esc, the scrim, a button) stops a sign-in that is still going.
