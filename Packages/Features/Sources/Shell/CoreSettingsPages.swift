@@ -40,7 +40,7 @@ struct CoreOverviewTab: View {
                         "Devices", subtitle: "Who can reach this Core",
                         trailing: {
                             AppActionTile(title: "Manage", symbol: "iphone", key: "", hue: GlassInk.slate) {
-                                shell.settings.selected = "devices"
+                                shell.launcher.entry("devices")?.run()
                             }
                         })
                 }
