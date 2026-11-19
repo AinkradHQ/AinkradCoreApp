@@ -20,6 +20,16 @@ final class AddAccountFlow {
     var runners: RunnerChoice?
     /// The runner the sign-in started on, for the line "Runs only on ...".
     var runnerName: String?
+    /// "I understand this may break the provider's rules": asked before a Codex or Antigravity sign-in starts. In memory
+    /// only, so every launch (and every new try) asks again.
+    var consent = false
+    private var runnerMethods: [String] = []
+
+    /// Codex and Antigravity have rules of their own: no sign-in starts before the person agrees. OpenCode needs none.
+    var needsConsent: Bool {
+        guard let id = providerID else { return false }
+        return SignInStyle.of(id, methods: runnerMethods).runnerBound && SignInStyle.showsRisk(id)
+    }
 
     var key: String {
         get { keyFlow.key }
@@ -45,6 +55,8 @@ final class AddAccountFlow {
 
     func choose(_ p: ProviderItem, _ m: AccountsModel) async {
         providerID = p.id
+        runnerMethods = p.loginMethods
+        consent = false
         error = nil
         let label = ProviderCatalog.label(
             for: ProviderCatalog.name(p.id, fallback: p.name), taken: Set(m.accounts.map(\.label)))
@@ -59,7 +71,7 @@ final class AddAccountFlow {
                 let c = RunnerChoice.make(runners: list, harness: p.harness)
                 runners = c
                 // One runner can do it: use it without asking. The sign-in says where it runs.
-                if c.only != nil { await startOnRunner(m) }
+                if c.only != nil, !needsConsent { await startOnRunner(m) }
             } else {
                 await m.startSignIn(provider: p.id, label: label)
             }
@@ -70,7 +82,7 @@ final class AddAccountFlow {
 
     /// Starts the sign-in on the chosen runner; the account will only run there.
     func startOnRunner(_ m: AccountsModel) async {
-        guard let id = providerID, let r = runners?.chosen else { return }
+        guard let id = providerID, let r = runners?.chosen, !needsConsent || consent else { return }
         runnerName = r.name
         runners = nil
         await m.startSignIn(provider: id, label: keyFlow.label, runner: r.id)
@@ -81,6 +93,7 @@ final class AddAccountFlow {
     }
 
     func back(_ m: AccountsModel) {
+        consent = false
         runners = nil
         runnerName = nil
         if stepper.step == .signIn { Task { await m.cancelSignIn() } }
@@ -91,6 +104,7 @@ final class AddAccountFlow {
 
     func again(_ m: AccountsModel) {
         m.signIn = nil
+        consent = false
         runners = nil
         runnerName = nil
         keyFlow = KeyEntryFlow()

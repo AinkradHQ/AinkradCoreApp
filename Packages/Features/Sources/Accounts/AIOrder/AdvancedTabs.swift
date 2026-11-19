@@ -42,6 +42,12 @@ struct ModelsTab: View {
                     }
                     ForEach(rows) { PriceEditRow(model: model, price: $0) }
                 }
+                if a.modelsEnforced == false {
+                    Text(AccountNotes.unenforcedWords).coreFont(size: MacTextSize.meta).foregroundStyle(
+                        GlassInk.amberInk
+                    )
+                    .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("models-unenforced")
+                }
                 Text("Prices are filled in for you. Change them only if your plan differs.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             } else {

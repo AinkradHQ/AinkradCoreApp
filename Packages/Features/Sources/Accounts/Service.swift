@@ -87,6 +87,8 @@ protocol AccountsService: Sendable {
     func sendLoginInput(_ id: String, line: String) async throws
     /// The runner each runner-bound account is pinned to, by account id (runner ids). Empty when the Core does not say.
     func boundRunners() async -> [Int64: String]
+    /// What the Core says about leftovers and model enforcement, by account id. Empty when it says nothing.
+    func accountNotes() async -> [Int64: AccountNotes]
     // E7-7 (API minor 95): remove with Undo. Wire in `AIOrder/AccountRemovalWire.swift`; the defaults say "not supported".
     /// `DELETE /accounts/{id}`: soft delete. The time the Core keeps it for an Undo (nil when it does not say).
     func removeAccount(_ id: Int64) async throws -> Date?

@@ -31,6 +31,10 @@ struct AccountDetailView: View {
                         }
                         Text(model.providerName(a.provider)).foregroundStyle(GlassInk.secondary).lineLimit(1)
                         if let b = a.runnerBinding { RunnerBoundNote(binding: b) }
+                        if let w = a.wipeNote {
+                            Text(w).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+                                .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("wipe-note")
+                        }
                     }
                     Spacer(minLength: Space.s3)
                     HStack(spacing: Space.s2) {

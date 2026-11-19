@@ -141,11 +141,16 @@ struct AddAccountDialog: View {
             let name = flow.name(model)
             if c.none {
                 NoRunnerView(
-                    provider: name, choice: c, openRunners: { close(); model.openRunners() },
+                    provider: name, choice: c,
+                    openRunners: {
+                        close()
+                        model.openRunners()
+                    },
                     back: { flow.back(model) })
             } else {
                 RunnerPickView(
                     provider: name, choice: c, pick: { flow.runners?.selected = $0 },
+                    consent: flow.needsConsent ? Binding(get: { flow.consent }, set: { flow.consent = $0 }) : nil,
                     start: { Task { await flow.startOnRunner(model) } }, back: { flow.back(model) })
             }
         } else {
@@ -164,10 +169,10 @@ struct AddAccountDialog: View {
                 style == .guided
                     ? "Follow the sign-in below. Type what it asks for."
                     : s?.deviceCode != nil
-                    ? "Open the page and type this code."
-                    : pastes
-                        ? "Sign in on the page that opens in your browser, then paste the code it shows."
-                        : "Sign in on the page that opens in your browser.")
+                        ? "Open the page and type this code."
+                        : pastes
+                            ? "Sign in on the page that opens in your browser, then paste the code it shows."
+                            : "Sign in on the page that opens in your browser.")
             if let c = s?.deviceCode { codeBlock(c) }
             if case .guided? = s?.stage {
                 GuidedTerminal(
