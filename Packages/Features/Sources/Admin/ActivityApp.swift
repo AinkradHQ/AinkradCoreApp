@@ -127,14 +127,10 @@ struct ActivityApp: View {
     var body: some View {
         let tab = Binding(get: { admin.activityTab }, set: { admin.activityTab = $0 })
         VStack(alignment: .leading, spacing: 0) {
-            // ponytail: CoreSegmented until CoreTabs lands from E2-3, then swap this one line.
             AppHeader {
-                CoreSegmented(
+                CoreTabs(
                     "Activity",
-                    segments: [
-                        CoreSegment(ActivityTab.ops, "Ops", symbol: "waveform.path.ecg"),
-                        CoreSegment(ActivityTab.audit, "Audit", symbol: "doc.text"),
-                    ],
+                    tabs: [CoreTab(ActivityTab.ops, "Ops"), CoreTab(ActivityTab.audit, "Audit")],
                     selection: tab)
             } actions: {
                 LiveBadge(readAt: admin.ops.readAt, live: admin.isConnected)
