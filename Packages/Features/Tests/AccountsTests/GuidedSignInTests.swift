@@ -35,18 +35,20 @@ struct GuidedLoginRulesTests {
             #expect(GuidedInput.check(bad, provider: agy) == .badCharacters, "\(bad)")
         }
         #expect(GuidedInput.words(.badCharacters, provider: agy)?.hasSuffix(GuidedInput.agyHint) == true)
-        // OpenCode keeps its free word, and `/` is still refused there.
-        #expect(GuidedInput.check("a/b", provider: "opencode-sub") == .badCharacters)
     }
 
     @Test func aTypedLineIsOneShortPrintableLine() {
         #expect(GuidedInput.check("  1\n") == .send("1"))
         #expect(GuidedInput.check("   \n") == .empty)
-        #expect(GuidedInput.check(String(repeating: "a", count: 129)) == .tooLong)
-        #expect(GuidedInput.check(String(repeating: "a", count: 128)) == .send(String(repeating: "a", count: 128)))
+        #expect(GuidedInput.check(String(repeating: "a", count: 257)) == .tooLong)
+        #expect(GuidedInput.check(String(repeating: "a", count: 256)) == .send(String(repeating: "a", count: 256)))
         #expect(GuidedInput.check("one\ntwo") == .badCharacters)
         #expect(GuidedInput.check("K7QM-4XZP_9") == .send("K7QM-4XZP_9"))
-        for bad in ["a b", "a;b", "a/b", "é", "a.b", "٣"] {
+        // OpenCode's menu filters by typing: any printable line goes, spaces and punctuation included.
+        for ok in ["open router", "a/b", "a;b", "é", "a.b"] {
+            #expect(GuidedInput.check(ok, provider: "opencode-sub") == .send(ok), "\(ok)")
+        }
+        for bad in ["a\u{7}b", "a\tb", "a\u{1B}[0m"] {
             #expect(GuidedInput.check(bad) == .badCharacters, "\(bad)")
         }
         #expect(GuidedInput.words(.badCharacters)?.hasSuffix(GuidedInput.hint) == true)

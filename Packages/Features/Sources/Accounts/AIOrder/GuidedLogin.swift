@@ -33,9 +33,9 @@ enum SignInStyle: Equatable, Sendable {
 
 /// One line typed into a guided sign-in. Antigravity takes only a menu number (1 or 2 digits) or a code (8 to 256 of letters,
 /// digits, `_`, `-` and `/`): the Core's own rule, checked here first so a refused line is explained and never sent.
-/// OpenCode's provider menu filters as you type, so it keeps a short word: letters, digits, `_` and `-`, up to `maxLength`.
+/// OpenCode's provider menu filters as you type, so it takes any printable line (no control characters), up to `maxLength`.
 enum GuidedInput {
-    static let maxLength = 128
+    static let maxLength = 256
     static let hint = "Type the number of a choice, or the code shown."
     enum Verdict: Equatable { case send(String), empty, tooLong, badCharacters }
 
@@ -47,7 +47,10 @@ enum GuidedInput {
         if line.isEmpty { return .empty }
         if provider == "agy-sub" { return agy(line) }
         if line.count > maxLength { return .tooLong }
-        if !line.unicodeScalars.allSatisfy(allowed) { return .badCharacters }
+        // One printable line: a newline or any other control character would be a second keystroke.
+        if line.unicodeScalars.contains(where: { $0.properties.generalCategory == .control || $0.properties.generalCategory == .format }) {
+            return .badCharacters
+        }
         return .send(line)
     }
 
@@ -71,7 +74,7 @@ enum GuidedInput {
         case .send, .empty: return nil
         case .tooLong: return "That is too long for a choice or a code. \(h)"
         case .badCharacters:
-            return provider == "agy-sub" ? "That is not a choice number or a code. \(h)" : "Only letters, numbers, dashes and underscores. \(h)"
+            return provider == "agy-sub" ? "That is not a choice number or a code. \(h)" : "One printable line only. \(h)"
         }
     }
 }
