@@ -148,6 +148,16 @@ public struct DeviceGlance: Identifiable, Sendable, Equatable {
     }
 }
 
+/// The "Update available" row of the Core dropdown.
+public struct CoreUpdateGlance: Sendable {
+    public let line: String
+    public let installNow: @MainActor @Sendable () -> Void
+    public init(line: String, installNow: @escaping @MainActor @Sendable () -> Void) {
+        self.line = line
+        self.installNow = installNow
+    }
+}
+
 /// What the Brain dropdown shows: how it is, what it does now, and a few counts.
 public struct BrainGlance: Sendable, Equatable {
     public struct Stat: Sendable, Equatable, Identifiable {
@@ -239,6 +249,10 @@ public final class ShellModel {
         get { topMenu == .core }
         set { topMenu = newValue ? .core : (topMenu == .core ? nil : topMenu) }
     }
+    /// How long the last call to the Core took, in milliseconds; the app sets it after each health read.
+    public var responseMs: Int?
+    /// An update the Core is ready to install ("0.10.0 to 0.10.1 · installs tonight, or now"); the updater (E12) sets it.
+    public var coreUpdate: CoreUpdateGlance?
     /// What the Devices block of the Core dropdown lists; the app (Pairing) supplies it.
     public var devicesGlance: (@MainActor () -> [DeviceGlance])?
     /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.
