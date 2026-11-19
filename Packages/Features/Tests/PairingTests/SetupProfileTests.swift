@@ -39,7 +39,8 @@ struct SetupProfileTests {
     @Test func splitDaysAndDaysOffReadPlainly() {
         var p = SetupProfile()
         p.setRange("Wed", at: 0, to: .init(from: 9, to: 13))
-        #expect(p.addRange("Wed"))
+        let added = p.addRange("Wed")
+        #expect(added)
         #expect(p.hours["Wed"] == [.init(from: 9, to: 13), .init(from: 14, to: 18)])
         p.toggleDay("Sat")
         p.toggleDay("Sat")
@@ -50,7 +51,8 @@ struct SetupProfileTests {
     @Test func aFullDayTakesNoMoreRanges() {
         var p = SetupProfile()
         p.hours["Mon"] = [.init(from: 8, to: 23)]
-        #expect(!p.addRange("Mon"))
+        let added = p.addRange("Mon")
+        #expect(!added)
     }
 
     @Test func variableAndOnCallHoursSayWhatTheyMean() {
