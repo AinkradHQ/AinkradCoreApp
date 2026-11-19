@@ -29,22 +29,20 @@ enum Registration {
             })
         shell.settings.section(
             SettingsSection(
-                id: "mac-runner", group: .mac, title: "This Mac as a runner",
-                sub: "Terminals and AI sessions that run on this Mac for your Core", symbol: "laptopcomputer", order: 5
+                id: "mac-runner", group: .core, title: "This Mac as a runner",
+                sub: "Terminals and AI sessions that run on this Mac for your Core", symbol: "laptopcomputer", order: 7
             ) {
                 MacRunnerSection(
                     model: app.macRunner,
                     accounts: app.macRunner.deviceID.flatMap { app.terminals?.accountsAnswer(forRunner: $0) },
                     connected: app.macRunner.deviceID.flatMap { app.terminals?.isOnline(runner: $0) })
             })
-        shell.settings.section(
-            SettingsSection(id: "forget", group: .core, title: "Forget this Core", symbol: "trash", order: 9) {
-                ForgetSection(app: app)
-            })
+        // Forget this Core is the danger row of the Core Overview, shown while Advanced is on.
+        shell.settings.overviewDanger = { AnyView(ForgetSection(app: app)) }
         shell.settings.section(
             SettingsSection(
-                id: "lockouts", group: .security, title: "Lockouts", sub: "Addresses the Core has locked out",
-                symbol: "lock", order: 0
+                id: "lockouts", group: .core, title: "Lockouts", sub: "Addresses the Core has locked out",
+                symbol: "lock", order: 6, advancedOnly: true
             ) {
                 LockoutsSection(app: app)
             })
@@ -66,7 +64,7 @@ enum Registration {
             ) { app.openAddDevice() })
         shell.launcher.register(
             LauncherEntry(
-                id: "lockouts", title: "Lockouts", sub: "Settings, Security", symbol: "lock",
+                id: "lockouts", title: "Lockouts", sub: "Settings, Core", symbol: "lock",
                 keywords: ["locked", "clear", "failed", "attempts"]
             ) { openSettings(shell, "lockouts") })
     }
