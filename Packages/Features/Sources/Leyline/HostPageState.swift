@@ -433,6 +433,19 @@ final class HostPageState {
         if !Task.isCancelled { runnerState = .expired }
     }
 
+    /// The sheet before Make Runner: what it does, and that the sudo password is typed in the terminal, not given to Ainkrad.
+    func confirmRunner() {
+        guard let h = host else { return }
+        shell.presentSheet(
+            title: "Make \(h.name) a runner?",
+            message:
+                "Ainkrad copies a one-time invite to the host and opens a terminal that installs the runner as root. You type the sudo password there; Ainkrad never sees it. The invite ends in 15 minutes.",
+            actions: [
+                ShellSheetAction("Cancel"),
+                ShellSheetAction("Make Runner", primary: true) { Task { await self.makeRunner() } },
+            ], symbol: "server.rack")
+    }
+
     // MARK: Mac-direct
 
     private(set) var direct: DirectLease?

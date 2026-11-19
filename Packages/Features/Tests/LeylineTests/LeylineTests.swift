@@ -125,6 +125,21 @@ struct LeylineTests {
         #expect(groups[2].sub == "not in a group · 1 host")
     }
 
+    @MainActor @Test func theRunnerChoicesMarkTheHostsThatAreAlreadyRunners() {
+        let (m, _, _) = model()
+        func h(_ n: String, runner: String?) -> HostItem {
+            var x = HostItem(
+                id: n, name: n, address: "10.0.0.4", port: 22, username: "ops", keyID: nil, jumpChain: [],
+                viaRunner: nil, group: nil, tags: [], aiRule: .ask, os: "Ubuntu 24.04", createdAt: nil)
+            x.runnerDevice = runner
+            return x
+        }
+        m.hosts = [h("birch", runner: nil), h("cedar", runner: "d_1")]
+        let choices = m.runnerChoices
+        #expect(choices.map(\.isRunner) == [false, true])
+        #expect(choices[0].detail == "Ubuntu 24.04 · ops@10.0.0.4")
+    }
+
     @Test func aPatchSendsNullToClearAndOmitsWhatItDoesNotOwn() throws {
         let p = HostPatch.edit(HostDraft(name: "w", address: "a", username: "u"))
         let json = try #require(
