@@ -36,7 +36,7 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
             resources: [.process("Resources")],
-            swiftSettings: [.swiftLanguageMode(.v6)]),
+            swiftSettings: [.swiftLanguageMode(.v6), .define("CORE_CLIENT_95")]),
         .target(
             name: "Terminals",
             dependencies: [
