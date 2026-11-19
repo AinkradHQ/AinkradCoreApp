@@ -38,6 +38,9 @@ final class DesignEditor {
     @ObservationIgnored private let service: (any DesignService)?
     @ObservationIgnored private weak var backend: (any DesignEditBackend)?
     @ObservationIgnored private var pending = false
+    /// What a brand-new design starts with (its page and a frame of the default canvas); written once, when the canvas is up
+    /// and the design is still empty.
+    @ObservationIgnored var starter: [[String: DJSON]]?
     @ObservationIgnored private var lastPresence = ""
 
     init(doc: String, service: (any DesignService)? = nil) {
@@ -51,6 +54,10 @@ final class DesignEditor {
     func attach(_ backend: (any DesignEditBackend)?) {
         self.backend = backend
         reload()
+        if backend != nil, let ops = starter, layers.layers.isEmpty {
+            starter = nil
+            apply(ops)
+        }
     }
 
     var attached: Bool { backend != nil }
