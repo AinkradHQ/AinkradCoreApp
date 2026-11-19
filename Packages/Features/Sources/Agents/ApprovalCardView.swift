@@ -7,6 +7,7 @@ import SwiftUI
 /// the exact command or file in a well, where and when, a live countdown with a bar, then Deny on the left and Approve on the
 /// right. ⌘Return approves and ⌘⌫ denies while `keys` is on. Decided ones fold to a sentence; expired ones dim.
 struct ApprovalCardView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
     var keys = false
@@ -38,7 +39,7 @@ struct ApprovalCardView: View {
         let busy = model.deciding.contains(request.id)
         let left = request.remaining(now: now)
         let ratio = left.map { $0 / Double(max(request.timeoutSecs ?? 1, 1)) } ?? 1
-        let hue = (left ?? 999) <= 20 ? GlassInk.red : (left ?? 999) <= 60 ? GlassInk.amber : GlassInk.blue
+        let hue = (left ?? 999) <= 20 ? GlassInk.red : (left ?? 999) <= 60 ? GlassInk.amber : GlassInk.accent(paneAccent)
         let session = model.sessions.session(request.session)
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {

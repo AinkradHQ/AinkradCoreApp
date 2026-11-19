@@ -4,6 +4,7 @@ import SwiftUI
 /// Chains: a chain is an ordered list of 1 to 4 pools, each with a model. A new session tries the first pool that has an
 /// account to give; when an account fails it moves down the list. Only admins see this page.
 struct ChainsPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
 
     var body: some View {
@@ -12,7 +13,7 @@ struct ChainsPage: View {
                 title: "Chains",
                 detail:
                     "A chain lists pools in the order a session tries them. If an account fails, the next pool takes over.",
-                symbol: "link", hue: GlassInk.blue
+                symbol: "link", hue: GlassInk.accent(paneAccent)
             ) { EmptyView() }
             if model.chains.isEmpty {
                 AccStateCard(
@@ -78,6 +79,7 @@ private struct ChainTab: View {
 }
 
 private struct ChainDetail: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let chain: ChainItem
 
@@ -96,12 +98,12 @@ private struct ChainDetail: View {
                 }
                 Spacer(minLength: Space.s2)
                 if !chain.isDefault {
-                    AppActionTile(title: "Make default", symbol: "checkmark.circle", key: "D", hue: GlassInk.blue) {
+                    AppActionTile(title: "Make default", symbol: "checkmark.circle", key: "D", hue: GlassInk.accent(paneAccent)) {
                         Task { await model.makeDefault(chain) }
                     }
                     .disabled(ro || model.busy != nil)
                 }
-                AppActionTile(title: "Edit…", symbol: "slider.horizontal.3", key: "E", hue: GlassInk.blue) {
+                AppActionTile(title: "Edit…", symbol: "slider.horizontal.3", key: "E", hue: GlassInk.accent(paneAccent)) {
                     AccountDialogs.openChain(model, editing: chain)
                 }
                 .disabled(ro)
@@ -130,7 +132,7 @@ private struct ChainDetail: View {
                     )
                     .coreFont(size: MacTextSize.body).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Space.s2)
-                    AppActionTile(title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue) {
+                    AppActionTile(title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent)) {
                         model.openChainBinding()
                     }
                     .accessibilityIdentifier("chain-bind-open")

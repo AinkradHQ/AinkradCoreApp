@@ -33,6 +33,7 @@ struct LoadNote: View {
 
 /// Settings, Devices: the list as a table, or one device's page.
 struct DevicesSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     @Environment(\.corePalette) private var palette
 
@@ -50,32 +51,19 @@ struct DevicesSection: View {
     }
 
     @ViewBuilder private func list(_ model: DevicesModel) -> some View {
-        @Bindable var model = model
-        AboutBlock(app: app)
         HStack(alignment: .center, spacing: Space.s3) {
-            Text(
-                app.service == nil
-                    ? "Every device that can reach a Core."
-                    : "\(model.active.count) can reach this Core. Revoking signs a device out at once."
-            )
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: Space.s3)
-            if app.service != nil, !model.items.isEmpty {
-                CoreSegmented(
-                    "Show",
-                    segments: DeviceFilter.allCases.map { f in
-                        CoreSegment(f, "\(f.rawValue) \(model.items.filter { f.matches($0.kind) }.count)")
-                    }, selection: $model.filter
-                )
-                .fixedSize()
+            VStack(alignment: .leading, spacing: Space.s1) {
+                Text("Devices").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
+                Text("Phones and Macs that can reach your Core.").foregroundStyle(palette.text2)
             }
+            Spacer(minLength: Space.s3)
             AppActionTile(
-                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)
             ) {
                 app.openAddDevice()
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(app.service == nil)
-            AppActionTile(title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 app.openAddWizard()
             }
             .keyboardShortcut("n", modifiers: .command)
@@ -85,10 +73,10 @@ struct DevicesSection: View {
             NotConnectedNote(what: "Devices")
         } else {
             LoadNote(state: model.load) { Task { await model.reload() } }
-            if let only = model.onlyAdmin { OnlyAdminWarning(app: app, device: only) }
+            if let only = model.onlyAdmin { OnlyAdminWarning(app: app, device: only, next: model.nextAdmin(besides: only)) }
             if model.load == .ready || !model.items.isEmpty {
                 DeviceTable(app: app, model: model)
-                Text("Where a key is kept is what each device said when it paired. Your Core can't check it.")
+                Text("Removing a device signs it out at once. You can pair it again later.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -98,12 +86,13 @@ struct DevicesSection: View {
 
 /// A device page's header, shown in the Settings title bar beside the back tile (N11).
 private struct DeviceHeader: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
     @State private var shown = false
 
     private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.blue : GlassInk.blue
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent)
     }
 
     var body: some View {
@@ -126,19 +115,25 @@ private struct DeviceHeader: View {
 }
 
 private struct OnlyAdminWarning: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
-    @Environment(\.corePalette) private var palette
+    /// The device that could become the second admin; nil when none can.
+    let next: DeviceInfo?
 
     var body: some View {
         CoreNotice(
-            symbol: "exclamationmark.triangle", title: "Only one admin device",
-            text:
-                "\(device.name) is the only device that can manage this Core. If you lose it, you would be locked out. Add a second admin device, such as your iPhone.",
-            tone: .warn
+            symbol: "shield", title: "Only one device can approve things",
+            text: "Make a second device an admin so you are never locked out.", tone: .warn
         ) {
-            AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.blue) {
-                app.openAddDevice(admin: true)
+            if let next {
+                AppActionTile(title: "Make \(next.name) an admin", symbol: "shield", key: "", hue: GlassInk.accent(paneAccent)) {
+                    Task { _ = await app.devices.setScopes(next, DeviceRole.withAdmin(next.scopes)) }
+                }
+            } else {
+                AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.accent(paneAccent)) {
+                    app.openAddDevice(admin: true)
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -146,133 +141,130 @@ private struct OnlyAdminWarning: View {
     }
 }
 
+/// The devices as one-line rows: picture, name and kind, what it may do in a sentence, when it was seen, Remove.
 private struct DeviceTable: View {
     let app: AppModel
     @Bindable var model: DevicesModel
-    @Environment(\.corePalette) private var palette
-    @State private var cursor: String?
-    @FocusState private var focus: Bool
-
-    private func keys(_ press: KeyPress) -> KeyPress.Result {
-        let ids = model.shown.map(\.id)
-        guard !ids.isEmpty else { return .ignored }
-        let i = ids.firstIndex { $0 == cursor } ?? 0
-        let step: Int? =
-            switch press.key {
-            case .rightArrow, .downArrow: 1
-            case .leftArrow, .upArrow: -1
-            default: nil
-            }
-        if let step {
-            withAnimation(.smooth(duration: 0.25)) { cursor = ids[min(max(i + step, 0), ids.count - 1)] }
-            return .handled
-        }
-        if press.key == .return, let c = cursor {
-            model.detailID = c
-            return .handled
-        }
-        return .ignored
-    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
+        VStack(alignment: .leading, spacing: Space.s2) {
             if model.shown.isEmpty {
-                Text("Nothing of that kind.").foregroundStyle(palette.text2).padding(Space.s3)
+                Text("Nothing of that kind.").foregroundStyle(GlassInk.secondary).padding(Space.s3)
             }
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 9), spacing: Space.s4, alignment: .top)],
-                spacing: Space.s3
-            ) {
-                ForEach(Array(model.shown.enumerated()), id: \.element.id) { i, d in
-                    DeviceCard(app: app, device: d, index: i, selected: cursor == d.id) { model.detailID = d.id }
-                }
+            ForEach(model.shown) { d in
+                DeviceRow(app: app, device: d) { model.detailID = d.id }
             }
         }
-        // ↑ ↓ ← → move the cursor tile, Return opens it.
-        .focusable().focused($focus).focusEffectDisabled()
-        .onKeyPress(phases: .down) { press in keys(press) }
-        .onAppear {
-            cursor = cursor ?? model.shown.first?.id
-            focus = true
-        }
-        .onChange(of: model.shown.map(\.id)) { _, ids in if !ids.contains(cursor ?? "") { cursor = ids.first } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("device-table")
     }
 }
 
-/// One device as a tile: a large device picture with a live mark for this Mac, the name, platform, where its keys live,
-/// its access as five scope icons, and when it was last seen. Lifts on hover; tiles rise in one after another.
-private struct DeviceCard: View {
+private struct DeviceRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
-    var index = 0
-    var selected = false
     let open: () -> Void
     @Environment(\.corePalette) private var palette
     @State private var hovering = false
-    @State private var shown = false
-
-    private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.blue : GlassInk.blue
-    }
 
     var body: some View {
         let me = app.devices.isMe(device)
-        Button(action: open) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                HStack(alignment: .top, spacing: Space.s3) {
-                    IconTile(DeviceWords.symbol(device.kind, device.platform), hue: hue, size: 52).coreEnterBounce(
-                        hovering
-                    )
-                    .overlay(alignment: .bottomTrailing) {
-                        if me {
-                            StatusDot(color: GlassInk.green, live: true).offset(x: 4, y: 4)
-                        }
-                    }
+        let role = DeviceRole(scopes: device.scopes)
+        HStack(spacing: Space.s3) {
+            Button(action: open) {
+                HStack(spacing: Space.s3) {
+                    IconTile(
+                        DeviceWords.symbol(device.kind, device.platform), hue: device.revoked ? GlassInk.red : GlassInk.accent(paneAccent),
+                        size: 36)
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: Space.s1) {
-                            Text(device.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-                            if me { StateBadge("This Mac", tone: .done, symbol: "desktopcomputer") }
-                            if device.revoked { StateBadge("Revoked", tone: .fail, symbol: "xmark") }
-                        }
-                        Text("\(DeviceWords.kind(device.kind)) · \(DeviceWords.platform(device.platform))")
-                            .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                        Text(device.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                        Text("\(DeviceWords.platform(device.platform)) · \(me ? "this device" : DeviceWords.kind(device.kind))")
+                            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
                     }
-                    Spacer(minLength: 0)
+                    .frame(width: 200, alignment: .leading)
+                    Label {
+                        Text("\(role.title). \(role.line)").lineLimit(2)
+                    } icon: {
+                        Image(systemName: role.symbol)
+                    }
+                    .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if device.revoked {
+                        StateBadge("Revoked", tone: .fail, symbol: "xmark")
+                    } else if !device.cutOff {
+                        LastSeenLine(lastUsed: device.lastUsed).frame(width: 130, alignment: .leading)
+                    }
                 }
-                KeyStorageLabel(storage: device.keyStorage)
-                ScopeIcons(scopes: device.scopes)
-                if !device.cutOff { LastSeenLine(lastUsed: device.lastUsed) }
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(GlassInk.primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Space.s4)
-            .background(
-                selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
-                in: coreShape(Radius.cardMac)
-            )
-            .opacity(device.revoked ? 0.6 : 1)
-            .contentShape(coreShape(Radius.cardMac))
+            .buttonStyle(.plain)
+            .help("Open \(device.name)")
+            if !device.revoked {
+                Button("Remove") { remove() }
+                    .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
+                    .help("Sign \(device.name) out at once")
+            }
         }
-        .buttonStyle(.plain)
-        .focusable(false)
-        .coreScaleEffect(hovering ? 1.02 : 1)
-        .shadow(color: GlassInk.shade(hovering ? 0.25 : 0), radius: 16, y: 8)
+        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coreWell(active: hovering)
+        .opacity(device.revoked ? 0.6 : 1)
         .onHover { hovering = $0 }
-        .animation(.smooth(duration: 0.3), value: hovering)
-        .animation(.smooth(duration: 0.3), value: selected)
-        .coreRise(shown, index)
-        .onAppear { shown = true }
-        .accessibilityLabel(
-            "\(device.name), \(me ? "This Mac, " : "")\(DeviceWords.kind(device.kind)), \(device.keyStorage ?? "storage not reported"), \(device.scopes.joined(separator: ", ")), last seen \(DeviceWords.seen(device.lastUsed))"
-        )
-        .accessibilityHint("Opens this device's page")
+        .accessibilityElement(children: .contain)
+    }
+
+    private func remove() {
+        app.devices.dialogError = nil
+        app.stepUpNotice = nil
+        let device = device
+        app.shell.present(
+            ShellDialog(id: "revoke", onClose: { app.stepUpNotice = nil }) { RevokeDialog(app: app, device: device) })
+    }
+}
+
+/// What a device may do, in one sentence (mockup 12): Admin, Member or Viewer, from the scopes it holds.
+struct DeviceRole: Equatable {
+    let title: String
+    let line: String
+    let symbol: String
+
+    init(scopes: [String]) {
+        if scopes.contains("admin") {
+            self = DeviceRole(
+                title: "Admin", line: "Can approve things, use your accounts and manage devices", symbol: "shield")
+        } else if scopes.contains(where: { ["approve", "terminal", "agent", "runner"].contains($0) }) {
+            self = DeviceRole(title: "Member", line: Self.memberLine(scopes), symbol: "person")
+        } else {
+            self = DeviceRole(title: "Viewer", line: "Can only look. It can't change anything", symbol: "eye")
+        }
+    }
+
+    private init(title: String, line: String, symbol: String) {
+        self.title = title
+        self.line = line
+        self.symbol = symbol
+    }
+
+    private static func memberLine(_ scopes: [String]) -> String {
+        var does: [String] = []
+        if scopes.contains("approve") { does.append("approve AI actions") }
+        if scopes.contains("agent") { does.append("use your accounts") }
+        if scopes.contains("terminal") { does.append("open terminals") }
+        if scopes.contains("runner") { does.append("run work") }
+        let first = does.joined(separator: ", ")
+        return "Can " + (first.isEmpty ? "chat and see projects" : first)
+    }
+
+    /// The scopes with `admin` added, in the order the app lists them.
+    static func withAdmin(_ scopes: [String]) -> [String] {
+        scopes.contains("admin") ? scopes : scopes + ["admin"]
     }
 }
 
 /// The five scopes as small icon tiles, lit when held: access at a glance instead of "all five".
 struct ScopeIcons: View {
+    @Environment(\.coreAccent) private var paneAccent
     let scopes: [String]
     var body: some View {
         HStack(spacing: Space.s1 + 2) {
@@ -282,7 +274,7 @@ struct ScopeIcons: View {
                     .opacity(on ? 1 : 0.5)
                     .help(on ? "\(s.capitalized): \(ScopeText.text(s))" : "No \(s)")
             }
-            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.blue, size: 24) }
+            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.accent(paneAccent), size: 24) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scopes.joined(separator: ", "))
@@ -401,6 +393,7 @@ private struct InlineRename: View {
 
 /// One device's page: Device, Keys, Access, Revoke. Back returns to the list.
 struct DeviceDetail: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
     @Environment(\.corePalette) private var palette
@@ -410,7 +403,7 @@ struct DeviceDetail: View {
         let me = app.devices.isMe(device)
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.blue, index: 1
+                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.accent(paneAccent), index: 1
             ) {
                 if !device.revoked && !app.devices.renaming {
                     SectionAction("Rename", symbol: "pencil") { app.devices.renaming = true }
@@ -429,7 +422,7 @@ struct DeviceDetail: View {
             }
             GlassSection(
                 "Keys", sub: "Made on the device. The Core only holds the public halves.", symbol: "key.horizontal",
-                hue: GlassInk.blue, index: 2
+                hue: GlassInk.accent(paneAccent), index: 2
             ) {
                 HStack(spacing: Space.s3) {
                     KeyFact(
@@ -449,7 +442,7 @@ struct DeviceDetail: View {
                 // N18: a runner does the work the Core sends; it does not ask for anything, so scopes do not describe it.
                 GlassSection(
                     "Access", sub: "A runner does work; it does not ask for it.", symbol: "server.rack",
-                    hue: GlassInk.blue, index: 3
+                    hue: GlassInk.accent(paneAccent), index: 3
                 ) {
                     SectionAction("Open runner page", symbol: "arrow.right") {
                         app.shell.launcher.entry("runners")?.run()
@@ -464,7 +457,7 @@ struct DeviceDetail: View {
             } else {
                 GlassSection(
                     "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
-                    symbol: "lock.shield", hue: GlassInk.blue, index: 3
+                    symbol: "lock.shield", hue: GlassInk.accent(paneAccent), index: 3
                 ) {
                     if !device.revoked {
                         SectionAction("Edit access", symbol: "slider.horizontal.3") {

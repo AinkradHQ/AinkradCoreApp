@@ -106,6 +106,7 @@ struct IssueLine: View {
 
 /// A state that replaces a section: a symbol tile, a title, the words and what to do about it.
 struct StateCard<Actions: View>: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let title: String
     let text: String
@@ -119,7 +120,7 @@ struct StateCard<Actions: View>: View {
         let c = palette.tone(tone)
         let hue: Color =
             tone == .fail
-            ? GlassInk.red : tone == .warn ? GlassInk.amber : tone == .done ? GlassInk.green : GlassInk.blue
+            ? GlassInk.red : tone == .warn ? GlassInk.amber : tone == .done ? GlassInk.green : GlassInk.accent(paneAccent)
         VStack(spacing: Space.s2) {
             IconTile(symbol, hue: hue, size: MacSize.controlLg + Space.s3)
             Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)

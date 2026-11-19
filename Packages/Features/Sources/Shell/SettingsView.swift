@@ -3,21 +3,18 @@ import Observation
 import SwiftUI
 
 public enum SettingsGroup: String, CaseIterable, Sendable {
-    case mac = "Mac"
+    /// You, Appearance, Notifications (D-11).
+    case general = "General"
     /// One page per app (Ahmed, 2026-11-05): its look and its defaults.
     case apps = "Apps"
     case core = "Core"
-    case security = "Security"
-    case notifications = "Notifications"
 
     /// Each group has its colour on the nav tiles, so the list reads at a glance.
     var hue: Color {
         switch self {
-        case .mac: GlassInk.slate
+        case .general: GlassInk.slate
         case .apps: GlassInk.blue
         case .core: GlassInk.blue
-        case .security: GlassInk.blue
-        case .notifications: GlassInk.blue
         }
     }
 }
@@ -31,10 +28,17 @@ public struct SettingsSection: Identifiable {
     public let sub: String?
     public let symbol: String
     public let order: Int
+    /// The page, when the section has no tabs.
     public let content: AnyView
+    /// Top tabs under the header. Other modules add more with `SettingsRegistry.tab(_:_:)`.
+    public let tabs: [SettingsTab]
+    /// Only in the nav while the Advanced switch is on.
+    public let advancedOnly: Bool
+    /// The header shows the one Advanced switch (the Core page).
+    public let advancedSwitch: Bool
     public init<V: View>(
         id: String, group: SettingsGroup, title: String, sub: String? = nil, symbol: String, order: Int = 0,
-        @ViewBuilder content: () -> V
+        advancedOnly: Bool = false, @ViewBuilder content: () -> V
     ) {
         self.id = id
         self.group = group
@@ -43,6 +47,25 @@ public struct SettingsSection: Identifiable {
         self.symbol = symbol
         self.order = order
         self.content = AnyView(content())
+        self.tabs = []
+        self.advancedOnly = advancedOnly
+        self.advancedSwitch = false
+    }
+    /// A section whose page is a set of tabs (the first one shows until a tab is picked).
+    public init(
+        id: String, group: SettingsGroup, title: String, sub: String? = nil, symbol: String, order: Int = 0,
+        advancedOnly: Bool = false, advancedSwitch: Bool = false, tabs: [SettingsTab]
+    ) {
+        self.id = id
+        self.group = group
+        self.sub = sub
+        self.title = title
+        self.symbol = symbol
+        self.order = order
+        self.content = AnyView(EmptyView())
+        self.tabs = tabs
+        self.advancedOnly = advancedOnly
+        self.advancedSwitch = advancedSwitch
     }
 }
 
@@ -66,6 +89,15 @@ public final class SettingsRegistry {
     public private(set) var sections: [SettingsSection] = []
     /// Sections this device may not use (no `admin` scope): out of the nav until it can.
     public var hidden: Set<String> = []
+    /// The one Advanced switch (Core page): shows the advanced tabs and sections. Kept across launches.
+    public var advanced: Bool {
+        didSet { defaults.set(advanced, forKey: Self.advancedKey) }
+    }
+    public static let advancedKey = "core.settings.advanced"
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored var extraTabs: [String: [SettingsTab]] = [:]
+    /// The tab picked in each section; a section not in here shows its first tab.
+    var tabChoice: [String: String] = [:]
     public var selected = "appearance" {
         didSet {
             let ids = grouped().flatMap { $0.1.map(\.id) }
@@ -80,7 +112,12 @@ public final class SettingsRegistry {
     public var back: SettingsBack?
     /// One-shot arguments for the page being opened (Audit's filter): the page takes them when it shows.
     public var handoff: [String: String] = [:]
-    public init() {}
+    /// The "Careful" rows on the Core Overview while Advanced is on (Forget this Core): the module that owns them sets this.
+    public var overviewDanger: (@MainActor () -> AnyView)?
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.advanced = defaults.bool(forKey: Self.advancedKey)
+    }
     /// Selects a page and leaves it arguments, for a link that lands on a filtered view.
     public func open(_ id: String, handoff: [String: String]) {
         self.handoff = handoff
@@ -91,11 +128,21 @@ public final class SettingsRegistry {
         sections.removeAll { $0.id == s.id }
         sections.append(s)
     }
+    /// The sections in the nav: not hidden for this device, and not Advanced-only while Advanced is off.
+    func visible() -> [SettingsSection] {
+        sections.filter { !hidden.contains($0.id) && (advanced || !$0.advancedOnly) }
+    }
     func grouped() -> [(SettingsGroup, [SettingsSection])] {
-        SettingsGroup.allCases.compactMap { g in
-            let list = sections.filter { $0.group == g && !hidden.contains($0.id) }.sorted { $0.order < $1.order }
+        let all = visible()
+        return SettingsGroup.allCases.compactMap { g in
+            let list = all.filter { $0.group == g }.sorted { $0.order < $1.order }
             return list.isEmpty ? nil : (g, list)
         }
+    }
+    /// The section shown: the selected one, else the first in the nav.
+    func current() -> SettingsSection? {
+        let all = visible()
+        return all.first { $0.id == selected } ?? grouped().first?.1.first
     }
 }
 
@@ -109,9 +156,8 @@ struct SettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
-        let current =
-            shell.settings.sections.first { $0.id == shell.settings.selected && !shell.settings.hidden.contains($0.id) }
-            ?? shell.settings.sections.first { !shell.settings.hidden.contains($0.id) }
+        let current = shell.settings.current()
+        let tab = current.flatMap { shell.settings.currentTab(of: $0) }
         let dir = shell.settings.direction
         HStack(alignment: .top, spacing: 0) {
             GlassScroll {
@@ -166,6 +212,13 @@ struct SettingsView: View {
                         .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 6 * dir)))
                     }
                     Spacer()
+                    if current?.advancedSwitch == true, shell.settings.back == nil {
+                        CoreSwitch(
+                            "Advanced",
+                            isOn: Binding(
+                                get: { shell.settings.advanced }, set: { shell.settings.advanced = $0 }))
+                            .help("Show network, storage, logs and the careful actions")
+                    }
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")
                             .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
@@ -178,11 +231,20 @@ struct SettingsView: View {
                         .onHover { closeHover = $0 }
                 }
                 .padding(.trailing, Space.s6)
+                if let current, shell.settings.back == nil, !shell.settings.tabs(of: current).isEmpty {
+                    CoreTabs(
+                        "\(current.title) tabs",
+                        tabs: shell.settings.tabs(of: current).map { CoreTab($0.id, $0.title) },
+                        selection: Binding(
+                            get: { tab?.id ?? "" }, set: { shell.settings.selectTab($0, in: current.id) })
+                    )
+                    .padding(.bottom, Space.s1)
+                }
                 // The scroll view runs to the panel's right edge, so its glass bar sits at the edge, not over the cards.
                 GlassScroll {
-                    current?.content.frame(maxWidth: .infinity, alignment: .leading)
+                    (tab?.content ?? current?.content)?.frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.trailing, Space.s6)
-                        .id("body-\(current?.id ?? "")")
+                        .id("body-\(current?.id ?? "")-\(tab?.id ?? "")")
                         .transition(.opacity.combined(with: .offset(y: reduce ? 0 : 10 * dir)))
                 }
             }
@@ -291,33 +353,39 @@ struct PlaceholderSection: View {
 
 extension ShellModel {
     func installBuiltInSettings() {
-        func later(_ id: String, _ g: SettingsGroup, _ title: String, _ symbol: String, _ order: Int, _ what: String) {
+        func later(
+            _ id: String, _ g: SettingsGroup, _ title: String, _ symbol: String, _ order: Int, _ what: String,
+            advancedOnly: Bool = false
+        ) {
             settings.section(
-                SettingsSection(id: id, group: g, title: title, symbol: symbol, order: order) {
+                SettingsSection(
+                    id: id, group: g, title: title, symbol: symbol, order: order, advancedOnly: advancedOnly
+                ) {
                     PlaceholderSection(what: what)
                 })
         }
-        later("core", .core, "Core settings", "gearshape", 0, "Core settings")
-        later("devices", .core, "Devices", "iphone", 1, "Devices")
-        later("lockouts", .security, "Lockouts", "lock", 0, "Lockouts")
-        later("secrets", .security, "Secrets", "key", 1, "Secrets")
-        later("audit", .security, "Audit", "doc.text", 2, "The audit log")
-        later("notifications", .notifications, "Notifications", "bell", 0, "Notification settings")
+        later("notifications", .general, "Notifications", "bell", 2, "Notification settings")
         settings.section(
             SettingsSection(
-                id: "you", group: .mac, title: "You", sub: "The name Home greets you with", symbol: "person",
-                order: 1
+                id: "core", group: .core, title: "Core", sub: "This Core, its updates and its backups",
+                symbol: "server.rack", order: 0, advancedSwitch: true, tabs: coreTabs()))
+        later("lockouts", .core, "Lockouts", "lock", 6, "Lockouts", advancedOnly: true)
+        settings.section(
+            SettingsSection(
+                id: "you", group: .general, title: "You", sub: "The name Home greets you with", symbol: "person",
+                order: 0
             ) { YouSection(profile: profile) })
         settings.section(
             SettingsSection(
-                id: "appearance", group: .mac, title: "Appearance", sub: "Night, day, or with the sun",
-                symbol: "circle.lefthalf.filled"
-            ) { AppearanceSection(shell: self) })
-        settings.section(
-            SettingsSection(
-                id: "clocks", group: .mac, title: "Clocks", sub: "The second hand and seconds on Home", symbol: "clock",
-                order: 2
-            ) { ClockSettings() })
+                id: "appearance", group: .general, title: "Appearance", sub: "Night, day, wallpaper and clocks",
+                symbol: "circle.lefthalf.filled", order: 1,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { AppearanceSection(shell: self) },
+                    SettingsTab("wallpaper", "Wallpaper", order: 1) {
+                        AppearanceSection(shell: self, part: .wallpaper)
+                    },
+                    SettingsTab("clock", "Clock", order: 2) { ClockSettings() },
+                ]))
     }
 }
 

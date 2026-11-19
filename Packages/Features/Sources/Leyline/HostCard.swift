@@ -58,8 +58,8 @@ struct HostCard: View {
         .coreWell(radius: Radius.pane, active: lit || picked)
         .contentShape(coreShape(Radius.pane))
         .onTapGesture { model.openHost(host.id) }
-        .coreScaleEffect(lit ? 1.01 : 1)
-        .coreRise(settled, index)
+        .coreScaleEffect(lit && LeylineOptions.calmOn ? 1.01 : 1)
+        .coreRise(settled || !LeylineOptions.calmOn, index)
         .animation(Motion.out(Motion.hover), value: lit)
         .onHover { hovering = $0 }
         .contextMenu {

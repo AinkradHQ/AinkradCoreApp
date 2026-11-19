@@ -15,6 +15,10 @@ final class AuditModel {
     private(set) var moreError: String?
     var filter = AuditFilter() { didSet { if filter != oldValue { scheduleSearch() } } }
     var selected: Int64?
+    /// Rows counted per hour, day and kind by the Core (API minor 95), newest day first. Empty on an older Core.
+    private(set) var stats: [AuditDayStat] = []
+    /// Which of `stats` the cards show: 0 is today.
+    var selectedDay = 0
     @ObservationIgnored private var search: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private weak var hub: AdminModel?
@@ -29,6 +33,18 @@ final class AuditModel {
         nextBefore = nil
         state = .loading
         selected = nil
+        stats = []
+        selectedDay = 0
+    }
+
+    /// Reads the Core's counts for the week, in this Mac's time zone. A Core without them leaves the cards on the loaded rows.
+    func reloadStats() async {
+        guard let hub, let service = hub.service, await service.supportsV010() else { return }
+        let offset = TimeZone.current.secondsFromGMT() / 60
+        if let days = try? await service.auditStats(days: 7, tzOffsetMins: offset), !days.isEmpty {
+            stats = days
+            selectedDay = min(selectedDay, days.count - 1)
+        }
     }
 
     /// Reads the first page again with the current filters.

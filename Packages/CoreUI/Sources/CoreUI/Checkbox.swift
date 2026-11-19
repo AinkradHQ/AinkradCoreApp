@@ -3,6 +3,7 @@ import SwiftUI
 /// A checkbox with a title and an optional plain-words detail beside it. Space toggles it; Tab reaches it.
 /// An optional `icon` (SF Symbol) sits between the box and the text. States: off, on, focus (the system checkbox ring), disabled. The title can be monospaced for names like scopes.
 public struct CoreCheckbox: View {
+    @Environment(\.coreAccent) private var accent
     let title: String
     let detail: String?
     @Binding var isOn: Bool
@@ -32,7 +33,7 @@ public struct CoreCheckbox: View {
         } label: {
             HStack(alignment: .center, spacing: Space.s2) {
                 coreShape(4)
-                    .fill(isOn ? GlassInk.blue : GlassInk.well)
+                    .fill(isOn ? GlassInk.accent(accent) : GlassInk.well)
                     .overlay { if !isOn { coreShape(4).strokeBorder(GlassInk.track, lineWidth: 1.5) } }
                     .overlay {
                         Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)

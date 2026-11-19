@@ -70,11 +70,11 @@ struct ChecksTab: View {
     }
 }
 
-private func hue(_ s: CheckState) -> Color {
+private func hue(_ s: CheckState, _ accent: CoreAccent?) -> Color {
     switch s {
     case .pass: GlassInk.green
     case .fail: GlassInk.red
-    case .due, .running: GlassInk.blue
+    case .due, .running: GlassInk.accent(accent)
     case .never, .skipped: GlassInk.slate
     }
 }
@@ -103,6 +103,7 @@ struct TrendBars: View {
 }
 
 private struct CheckRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     let item: CheckItem
     @State private var hovering = false
@@ -135,7 +136,7 @@ private struct CheckRow: View {
             } else {
                 TrendBars(history: item.history).frame(width: Space.s8 * 3, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
-                    BrainChip(st.label, hue(st))
+                    BrainChip(st.label, hue(st, paneAccent))
                     if st == .pass, item.due != "now" {
                         Text("Due \(item.due)").coreFont(size: MacTextSize.meta).foregroundStyle(
                             GlassInk.secondary)
@@ -170,6 +171,7 @@ private struct CheckRow: View {
 }
 
 private struct CheckDetail: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     let item: CheckItem
 
@@ -181,7 +183,7 @@ private struct CheckDetail: View {
                 Text(item.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: Space.s2)
-                BrainChip(st.label, hue(st))
+                BrainChip(st.label, hue(st, paneAccent))
             }
             Text(item.about).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)

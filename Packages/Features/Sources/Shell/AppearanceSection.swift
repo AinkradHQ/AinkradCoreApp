@@ -5,6 +5,7 @@ import SwiftUI
 /// Settings, Mac, Appearance (Ahmed, 2026-11-05: visual, plain words, keyboard driven): the four themes as big sky tiles,
 /// what is showing right now, and one line about motion. ← → choose a theme.
 struct AppearanceSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Bindable private var look = LookPrefs.shared
     /// Advanced: each part's own Look. Open by default once a part has one.
@@ -15,15 +16,99 @@ struct AppearanceSection: View {
     @Bindable private var textSize = TextSizePrefs.shared
     @Bindable private var accent = AccentPrefs.shared
     @Bindable private var wallpaper = WallpaperPrefs.shared
-    /// All the wallpapers, or only the first row. Open from the start when the chosen one is not in that row.
-    @State private var allWallpapers = !CoreWallpaper.presets.prefix(4).contains(WallpaperPrefs.shared.choice)
+    /// The wallpaper tab shown; it opens on the one the chosen wallpaper is in.
+    @State private var group = WallpaperPrefs.shared.choice.group
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
+    /// The Appearance page has tabs (Look, Wallpaper); Clock is its own view.
+    enum Part { case look, wallpaper }
+    var part: Part = .look
+
     var body: some View {
+        switch part {
+        case .look: lookPage
+        case .wallpaper: wallpaperPage
+        }
+    }
+
+    private var wallpaperPage: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            HStack(spacing: Space.s3) {
+                CoreSegmented(
+                    "Wallpaper kind", segments: WallpaperGroup.allCases.map { CoreSegment($0, $0.title) },
+                    selection: $group)
+                Spacer(minLength: Space.s3)
+                Text(groupNote).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+            if group == .picture {
+                picturePage
+            } else {
+                GlassSection(
+                    group.title, sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
+                    hue: GlassInk.accent(paneAccent), index: 2
+                ) {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),
+                        alignment: .leading, spacing: Space.s3
+                    ) {
+                        ForEach(CoreWallpaper.presets(in: group), id: \.self) { w in
+                            WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil) {
+                                withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = w }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .foregroundStyle(GlassInk.primary)
+    }
+
+    private var groupNote: String {
+        switch group {
+        case .photos: "\(CoreWallpaper.presets(in: .photos).count) photos"
+        case .generated: "\(CoreWallpaper.presets(in: .generated).count) made for Ainkrad"
+        case .picture: "Stays on this Mac"
+        }
+    }
+
+    /// Your picture: the one chosen (when there is one) and a place to drop another. A night and a day version are made by
+    /// the app from the one picture.
+    private var picturePage: some View {
+        GlassSection(
+            "Your picture", sub: "Drop a picture here, or choose one from your Mac.", symbol: "photo", hue: GlassInk.accent(paneAccent),
+            index: 2
+        ) {
+            AppActionTile(
+                title: wallpaper.picture == nil ? "Choose picture…" : "Change picture…", symbol: "photo", key: "",
+                hue: GlassInk.slate, prominent: wallpaper.picture == nil
+            ) { wallpaper.choosePicture() }
+        } content: {
+            HStack(spacing: Space.s4) {
+                if wallpaper.picture != nil {
+                    WallpaperTile(choice: .picture, selected: wallpaper.choice == .picture, hasPicture: true) {
+                        withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = .picture }
+                    }
+                    .frame(width: Space.s8 * 6)
+                }
+                Text("It stays on this Mac. Ainkrad dims it for night and lightens it for day.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 3, alignment: .leading)
+            .coreWell()
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first else { return false }
+                wallpaper.adoptPicture(at: url)
+                return true
+            }
+        }
+    }
+
+    private var lookPage: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
                 "Theme", sub: "Night or day for every window.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.blue
+                hue: GlassInk.accent(paneAccent)
             ) {
                 Text(now).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                     .contentTransition(.opacity)
@@ -36,12 +121,15 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Accent", sub: "Selection, the main button and switches. Status colours stay as they are.",
-                symbol: "paintbrush", hue: GlassInk.blue, index: 1
+                symbol: "paintbrush", hue: GlassInk.accent(paneAccent), index: 1
             ) {
                 Text(accent.accent.title).coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
             } content: {
-                HStack(spacing: Space.s3) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 64), spacing: Space.s3, alignment: .top)],
+                    alignment: .leading, spacing: Space.s3
+                ) {
                     ForEach(CoreAccent.allCases, id: \.self) { a in
                         AccentTile(accent: a, selected: accent.accent == a) {
                             withAnimation(Motion.out(Motion.ui)) { accent.accent = a }
@@ -50,43 +138,8 @@ struct AppearanceSection: View {
                 }
             }
             GlassSection(
-                "Wallpaper", sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
-                hue: GlassInk.blue, index: 2
-            ) {
-                HStack(spacing: Space.s2) {
-                    if wallpaper.choice == .picture {
-                        AppActionTile(title: "Change picture…", symbol: "photo", key: "", hue: GlassInk.slate) {
-                            wallpaper.choosePicture()
-                        }
-                    }
-                    AppActionTile(
-                        title: allWallpapers ? "Show less" : "See all",
-                        symbol: allWallpapers ? "chevron.up" : "chevron.down", key: "", hue: GlassInk.slate
-                    ) { withAnimation(Motion.out(Motion.ui)) { allWallpapers.toggle() } }
-                }
-            } content: {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),
-                    alignment: .leading, spacing: Space.s3
-                ) {
-                    ForEach(allWallpapers ? CoreWallpaper.allCases : Array(CoreWallpaper.presets.prefix(4)), id: \.self)
-                    {
-                        w in
-                        WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil)
-                        {
-                            if w == .picture && wallpaper.picture == nil {
-                                wallpaper.choosePicture()
-                            } else {
-                                withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = w }
-                            }
-                        }
-                        .transition(.opacity)
-                    }
-                }
-            }
-            GlassSection(
                 "Text size", sub: "How large the words are in every window. 100% is the usual size.",
-                symbol: "textformat.size", hue: GlassInk.blue, index: 3
+                symbol: "textformat.size", hue: GlassInk.accent(paneAccent), index: 3
             ) {
                 Text(textSize.scale.formatted(.percent.precision(.fractionLength(0))))
                     .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
@@ -98,11 +151,16 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",
-                symbol: "square.on.square", hue: GlassInk.blue, index: 4
+                symbol: "square.on.square", hue: GlassInk.accent(paneAccent), index: 4
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
-                GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                VStack(alignment: .leading, spacing: Space.s3) {
+                    GlassSlider(value: $look.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                    if look.mode == .blurred {
+                        GlassSlider(value: $look.blur, in: 0...1, low: "Sharp", high: "Soft")
+                    }
+                }
             }
             GlassSection(
                 "Advanced", sub: "Give one kind of surface its own background.", symbol: "slider.horizontal.3",
@@ -249,6 +307,7 @@ private struct AccentTile: View {
 
 /// One theme as a sky tile with its name and a line under it; the chosen one carries a blue edge and a check.
 private struct ThemeTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let choice: ThemeChoice
     let selected: Bool
     let action: () -> Void
@@ -266,7 +325,7 @@ private struct ThemeTile: View {
                             Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(
                                 .white
                             )
-                            .frame(width: 24, height: 24).background(GlassInk.blue, in: coreShape(Radius.chip))
+                            .frame(width: 24, height: 24).background(GlassInk.accent(paneAccent), in: coreShape(Radius.chip))
                             .padding(Space.s2).transition(.scale.combined(with: .opacity))
                         }
                     }
@@ -326,6 +385,7 @@ private struct ThemeTile: View {
 /// One part in Appearance, Advanced: its name, Same (follows the content background) or its own look, and a slider when
 /// it has its own.
 private struct LookPartRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let part: LookPart
     @Bindable var prefs: LookPrefs
 
@@ -333,7 +393,7 @@ private struct LookPartRow: View {
         let own = prefs.custom[part]
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
-                IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.blue, size: 28)
+                IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.accent(paneAccent), size: 28)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(part.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Text(part.sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

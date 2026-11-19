@@ -4,6 +4,7 @@ import SwiftUI
 /// Building blocks of the macOS-style widgets (N9): a header with a blue symbol, a darker well for a chart or list, and
 /// Swift Charts for columns and load lines. Bars and charts animate to new values; Reduce Motion cross-fades instead.
 struct WHead<Trailing: View>: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Environment(\.widgetEditing) private var editing
     @Environment(\.accessibilityReduceMotion) private var reduce
     let symbol: String
@@ -16,7 +17,7 @@ struct WHead<Trailing: View>: View {
     }
     var body: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: symbol).foregroundStyle(GlassInk.blue).accessibilityHidden(true)
+            Image(systemName: symbol).foregroundStyle(GlassInk.accent(paneAccent)).accessibilityHidden(true)
             Text(title).lineLimit(1).accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.s2)
             trailing
@@ -127,6 +128,7 @@ struct WBarRow: View {
 
 /// Columns, newest last and highlighted: a Swift Chart, so a changed value slides the column to its new height.
 struct WColumns: View {
+    @Environment(\.coreAccent) private var paneAccent
     let values: [Double]
     var labels: [String] = []
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -137,7 +139,7 @@ struct WColumns: View {
             GeometryReader { g in
                 HStack(alignment: .bottom, spacing: Space.s1) {
                     ForEach(Array(values.enumerated()), id: \.offset) { i, v in
-                        coreShape(3).fill(GlassInk.blue.opacity(i == values.count - 1 ? 1 : 0.45))
+                        coreShape(3).fill(GlassInk.accent(paneAccent).opacity(i == values.count - 1 ? 1 : 0.45))
                             .frame(height: max(2, g.size.height * v / peak))
                             .frame(maxWidth: .infinity)
                     }

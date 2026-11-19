@@ -5,6 +5,7 @@ import SwiftUI
 /// its screen. This Mac's real shells come first, then the sandboxes. ⌘T opens a terminal at once on the last machine used;
 /// "New terminal…" (⌥⌘N) opens the sheet. Keyboard: arrows move, ↩ opens, ⌫ closes, D detach, S running command, R rename.
 struct TerminalsListView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable private var prefs = TerminalPrefs.shared
     @FocusState private var listFocus: Bool
@@ -18,6 +19,7 @@ struct TerminalsListView: View {
         }
         // The pane's frame draws the background: Settings, Appearance's Look, or the app's own.
         .paneLook(prefs.look)
+        .appLookTheme(prefs.appLook)
         .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }
     }
@@ -31,7 +33,7 @@ struct TerminalsListView: View {
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
         } actions: {
-            AppActionTile(title: "New terminal…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(title: "New terminal…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)) {
                 model.openNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])

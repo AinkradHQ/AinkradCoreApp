@@ -65,6 +65,7 @@ enum AboutWords {
 
 /// Which Core this is and what this Mac may do on it: the block at the top of Settings, Devices.
 struct AboutBlock: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
 
     var body: some View {
@@ -86,9 +87,9 @@ struct AboutBlock: View {
     private func details(_ a: CoreAbout) -> some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                fact("shippingbox.fill", GlassInk.blue, "Core version", a.server, help: a.build.map { "Build \($0)" })
-                fact("number", GlassInk.blue, "API", "Minor \(a.apiMinor)", help: "API \(AboutWords.api(a))")
-                fact("laptopcomputer", GlassInk.blue, "This device", a.device, help: nil)
+                fact("shippingbox.fill", GlassInk.accent(paneAccent), "Core version", a.server, help: a.build.map { "Build \($0)" })
+                fact("number", GlassInk.accent(paneAccent), "API", "Minor \(a.apiMinor)", help: "API \(AboutWords.api(a))")
+                fact("laptopcomputer", GlassInk.accent(paneAccent), "This device", a.device, help: nil)
             }
             .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: Space.s2) {

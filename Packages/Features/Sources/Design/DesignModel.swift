@@ -284,6 +284,7 @@ public final class DesignModel {
             let d = try await service.create(
                 kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project)
             docs.append(d)
+            if kind == .design { editor(for: d.id).starter = DesignOptions.starterOps(DesignOptions.canvas) }
             host.shell.closeDialog()
             category = .all
             filter = ""
@@ -356,6 +357,18 @@ public final class DesignModel {
 
     public func install() {
         let shell = host.shell
+        // Settings, Apps, Design: Look (follows Appearance unless turned off) and Options.
+        shell.settings.section(
+            SettingsSection(
+                id: "design", group: .apps, title: "Design", sub: "Its look, grid and first canvas",
+                symbol: "paintbrush.pointed", order: 8,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Design", prefs: AppLookPrefs.shared("design"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { DesignOptionsTab() },
+                ]))
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String],
             _ run: @escaping @MainActor (DesignModel) -> Void

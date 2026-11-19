@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Settings, Core, Feature switches: the settings that gate a feature, each with the steps between its states.
 struct SwitchesSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let admin: AdminModel
     @Environment(\.corePalette) private var palette
 
@@ -22,7 +23,7 @@ struct SwitchesSection: View {
                 if let a = model.item("secrets.provider_accounts") {
                     FlagCard(
                         model: model, setting: a, index: 1, title: "Real provider keys", symbol: "key.fill",
-                        hue: GlassInk.blue,
+                        hue: GlassInk.accent(paneAccent),
                         sub: "Let accounts hold a real API key from Anthropic, OpenAI or Google.",
                         offLine: "Only test keys are accepted for accounts.",
                         onLine: "Accounts can hold real provider keys. Your AI sessions can use them.",
@@ -34,7 +35,7 @@ struct SwitchesSection: View {
                 if let c = model.item("secrets.connections") {
                     FlagCard(
                         model: model, setting: c, index: 2, title: "Real connection tokens", symbol: "link",
-                        hue: GlassInk.blue,
+                        hue: GlassInk.accent(paneAccent),
                         sub: "Let a connection to GitHub, Jira or Linear hold its own real token.",
                         offLine: "Connections accept test tokens only.",
                         onLine:
@@ -47,7 +48,7 @@ struct SwitchesSection: View {
                 if let p = model.item("auth.passkey_admin") {
                     FlagCard(
                         model: model, setting: p, index: 3, title: "Admin from a browser", symbol: "globe",
-                        hue: GlassInk.blue,
+                        hue: GlassInk.accent(paneAccent),
                         sub: "Let a device that signs in with a passkey in a web browser become an admin.",
                         offLine: "Browser devices can read and approve, but not change your Core. Safer.",
                         onLine:
@@ -62,7 +63,7 @@ struct SwitchesSection: View {
                 if let h = model.item("code_mode.hide_connection_tools") {
                     FlagCard(
                         model: model, setting: h, index: 4, title: "Hide the old connection tools",
-                        symbol: "curlybraces", hue: GlassInk.blue,
+                        symbol: "curlybraces", hue: GlassInk.accent(paneAccent),
                         sub: "Let AI sessions on Code Mode see only its two tools, not every connection tool too.",
                         offLine: "AI sessions see the old connection tools next to Code Mode. Nothing is removed.",
                         onLine: "AI sessions on Code Mode see just its two tools. Connections work through it.",
@@ -77,7 +78,7 @@ struct SwitchesSection: View {
                     GlassSection(
                         "Terminals on your runners",
                         sub: "Whether each runner can open terminals.",
-                        symbol: "terminal.fill", hue: GlassInk.blue, index: 5
+                        symbol: "terminal.fill", hue: GlassInk.accent(paneAccent), index: 5
                     ) {
                         ForEach(model.runners) { r in
                             let pty = r.drivers.contains("pty")
@@ -114,6 +115,7 @@ struct SwitchesSection: View {
 /// secrets.mode in plain words: whether the Core keeps keys and secrets at all. Off and Test keys are the choices at the
 /// top right; Real keys stays locked until the external security review. The track shows where it stands.
 private struct SecretsModeCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: RegistryModel
     let setting: SettingItem
 
@@ -125,10 +127,10 @@ private struct SecretsModeCard: View {
 
     var body: some View {
         let mode = Int(setting.value)
-        let hue = mode == 0 ? GlassInk.slate : GlassInk.blue
+        let hue = mode == 0 ? GlassInk.slate : GlassInk.accent(paneAccent)
         GlassSection(
             "Keys and secrets", sub: "Whether your Core may keep keys and secrets at all.", symbol: "lock.shield.fill",
-            hue: GlassInk.blue
+            hue: GlassInk.accent(paneAccent)
         ) {
             HStack(spacing: Space.s2) {
                 if model.busy == setting.key { ProgressView().controlSize(.small) }
@@ -173,6 +175,7 @@ private struct SecretsModeCard: View {
 /// One on/off feature in plain words: an animated switch tile at the top right (with a "Less safe" mark when turning it
 /// on weakens security), and one line saying what it means now.
 private struct FlagCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: RegistryModel
     let setting: SettingItem
     let index: Int
@@ -211,13 +214,13 @@ private struct FlagCard: View {
         } content: {
             StatePanel(
                 symbol: isOn ? onSymbol : offSymbol,
-                hue: lessSafe ? (isOn ? GlassInk.amber : GlassInk.green) : (isOn ? GlassInk.blue : GlassInk.slate),
+                hue: lessSafe ? (isOn ? GlassInk.amber : GlassInk.green) : (isOn ? GlassInk.accent(paneAccent) : GlassInk.slate),
                 title: lessSafe ? (isOn ? "On · less safe" : "Off · safer") : (isOn ? "On" : "Off"),
                 line: isOn ? onLine : offLine, trigger: isOn
             ) { EmptyView() }
             if let needs {
                 Label(needs, systemImage: "arrow.turn.right.up").coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(GlassInk.blueInk)
+                    .foregroundStyle(GlassInk.accent(paneAccent)Ink)
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }

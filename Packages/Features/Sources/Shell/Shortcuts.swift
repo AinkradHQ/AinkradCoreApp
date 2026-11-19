@@ -112,12 +112,11 @@ public struct ShellCommands: Commands {
     let paneCount: Int
     let focusMode: Bool
     let closedCount: Int
-    let chipOn: Bool
     let coreOffline: Bool
     let paneTitles: [(id: String, title: String)]
     let spaceCount: Int
     public init(
-        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true,
+        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0,
         coreOffline: Bool = false,
         paneTitles: [(id: String, title: String)] = [], spaceCount: Int = 1
     ) {
@@ -125,7 +124,6 @@ public struct ShellCommands: Commands {
         self.paneCount = paneCount
         self.focusMode = focusMode
         self.closedCount = closedCount
-        self.chipOn = chipOn
         self.coreOffline = coreOffline
         self.paneTitles = paneTitles
         self.spaceCount = spaceCount
@@ -194,7 +192,6 @@ public struct ShellCommands: Commands {
             Button("Switch Day and Night") { shell.switchDayAndNight() }
                 .keyboardShortcut("d", modifiers: [.control, .command])
             Button("Reconnect to Core") { shell.retryConnection?() }.keyboardShortcut("r").disabled(!coreOffline)
-            Toggle("Show Activity in Status Bar", isOn: Binding(get: { chipOn }, set: { shell.showActivityChip = $0 }))
             Divider()
             Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(paneCount < 2)
             Button("Previous Pane") { shell.cyclePane(-1) }.keyboardShortcut("`", modifiers: [.command, .shift])

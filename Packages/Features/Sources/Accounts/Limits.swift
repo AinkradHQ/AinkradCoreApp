@@ -108,6 +108,7 @@ extension AccountDialogs {
 /// "Limits" on an account page: every way this account can be capped, in one card and in plain words. Each row says its
 /// kind: how many sessions at once, what one session may spend, and the budgets. Usage windows are budgets now (0.10).
 struct AccountLimitsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let account: AccountItem
     let hue: Color

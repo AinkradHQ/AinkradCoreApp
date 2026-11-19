@@ -141,6 +141,7 @@ struct SourcesTab: View {
 
 /// The header's sync: when this Mac last synced, and Sync now.
 struct SyncNowTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let sync: SyncModel
 
     var body: some View {
@@ -150,7 +151,7 @@ struct SyncNowTile: View {
             }
             AppActionTile(
                 title: sync.syncing ? "Syncing…" : "Sync now", symbol: "arrow.triangle.2.circlepath", key: "⌘R",
-                hue: GlassInk.blue
+                hue: GlassInk.accent(paneAccent)
             ) {
                 Task { await sync.syncNow() }
             }

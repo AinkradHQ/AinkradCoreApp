@@ -29,7 +29,7 @@ struct AinkradCoreApp: App {
         .commands {
             ShellCommands(
                 shell: shell, paneCount: shell.panes.count, focusMode: shell.focusedPane != nil,
-                closedCount: shell.closedPanes.count, chipOn: shell.showActivityChip,
+                closedCount: shell.closedPanes.count,
                 coreOffline: shell.coreLink == .offline || shell.coreLink == .reconnecting,
                 paneTitles: shell.allPanes.map { ($0.id, $0.title) }, spaceCount: shell.spaces.count)
             QuitCommands(shell: shell)

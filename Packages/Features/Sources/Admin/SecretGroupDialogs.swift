@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 /// A file chooser and drop zone for a secret's value. It shows the file name, size and type, never the content.
 struct FileDrop: View {
+    @Environment(\.coreAccent) private var paneAccent
     let form: SecretForm
     let prompt: String
     @Binding var error: String?
@@ -16,7 +17,7 @@ struct FileDrop: View {
     var body: some View {
         Button(action: choose) {
             HStack(spacing: Space.s3) {
-                IconTile(form.fileName == nil ? "arrow.down.doc" : "doc.fill", hue: GlassInk.blue, size: 32)
+                IconTile(form.fileName == nil ? "arrow.down.doc" : "doc.fill", hue: GlassInk.accent(paneAccent), size: 32)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(form.fileName ?? prompt).fontWeight(.semibold).lineLimit(1)
                     Text(

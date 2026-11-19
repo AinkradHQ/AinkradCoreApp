@@ -181,6 +181,7 @@ extension ProjectsModel {
             return
         }
         closeProject()
+        host.shell.closePane(Self.paneID(project.id))
         await reload()
         // A Core with the unarchive route (minor 95) gives a few seconds to undo, as the mockup's delete does.
         guard let undo = insightsService else {

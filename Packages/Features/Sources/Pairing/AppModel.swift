@@ -158,6 +158,17 @@ public final class AppModel {
         agents.loreNotes = { [weak lore] session in lore?.sessionDocs.filter { $0.session == session }.map(\.note) ?? [] }
         agents.openNoteInLore = { [weak lore] id in lore?.open(note: id) }
         lore.openSession = { [weak agents] id in agents?.openSession(id) }
+        shell.devicesGlance = { [weak devices] in
+            (devices?.active ?? []).prefix(4).map { d in
+                DeviceGlance(
+                    id: d.id, name: d.name,
+                    sub: devices?.isMe(d) == true
+                        ? "\(DeviceWords.platform(d.platform)) · this device"
+                        : "Last seen \(DeviceWords.seen(d.lastUsed).lowercased())",
+                    symbol: DeviceWords.symbol(d.kind, d.platform),
+                    online: !d.cutOff && (d.lastUsed.map { Date().timeIntervalSince($0) < 300 } ?? false))
+            }
+        }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
@@ -251,9 +262,25 @@ public final class AppModel {
         shell.home.coreName = (try? keyStore.loadIdentity())??.endpoint.host() ?? "Home Core"
         if let live = service as? LiveCoreService {
             homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
+            shell.corePage.source = LiveCorePageSource(connection: live.connection)
+            shell.corePage.gate = { [weak self] reason, op in
+                guard let self else { throw CancellationError() }
+                do { try await self.elevated(reason, done: "changed") { try await op() } } catch is StepUpDeclined {
+                    throw CancellationError()
+                }
+            }
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
+            model.openRunnersApp = { [weak self] in self?.openHub(.runners) }
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let working = self.macRunner.runnerID.flatMap { self.terminals?.isWorking(runner: $0) } ?? false
+                    self.macRunner.holdAwake(working)
+                    try? await Task.sleep(for: .seconds(15))
+                }
+            }
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
@@ -327,6 +354,9 @@ public final class AppModel {
             about.use { try await service.about() }
             let me = await about.reload()
             brain.apiMinor = me?.apiMinor
+            let v010 = (me?.apiMinor ?? 0) >= 95  // the runner tool report of Core 0.10
+            shell.showsRunnerUpdates = v010
+            terminals?.showsUpdates = v010
             var admin = me?.isAdmin
             if admin == nil { admin = (try? await service.myScopes())?.contains("admin") }
             let isAdmin = admin ?? false
@@ -364,10 +394,18 @@ public final class AppModel {
     }
 
     /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
-    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts", "mac-runner"]
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts"]
+    /// The settings pages a device without `admin` does not see: Core stays (Forget lives there), its Limits tab does not.
+    static let hiddenSettings = Set(adminOnly.filter { $0 != "core" } + ["core.limits"])
+    /// Whether this device holds `admin`: the This Mac tab of Devices & Runners is hidden without it.
+    private(set) var isAdminDevice = true
+    /// The tab the Devices & Runners app shows.
+    var hubTab: HubTab = .devices
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
-        shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
+        shell.settings.hidden = admin ? [] : Self.hiddenSettings
+        isAdminDevice = admin
+        if !admin, hubTab == .thisMac { hubTab = .devices }
         if admin {
             stashed.forEach(shell.launcher.register)
             stashed = []
@@ -442,6 +480,7 @@ public final class AppModel {
             }
         case .toolInstall(let fields):
             terminals?.toolInstall(fields)
+            shell.toolInstall(fields)
             accounts.toolInstall(fields)
         case .event(let kind, let pairing, _):
             terminals?.event(kind: kind)
@@ -792,8 +831,13 @@ public final class AppModel {
     /// asks a fresh Touch ID; with the app locked (it lapsed, or the Core restarted) the unlock comes first. `done` names what did not
     /// happen if the person says no. At most two prompts, then the Core's own answer stands.
     func elevated<T>(
-        _ reason: String, done: String, keepsEdit: Bool = true, _ op: () async throws -> T
+        _ reason: String, done: String, keepsEdit: Bool = true, force: Bool = false, _ op: () async throws -> T
     ) async throws -> T {
+        if force {
+            guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true) else {
+                throw StepUpDeclined()
+            }
+        }
         var asked = 0
         while true {
             do { return try await op() } catch {
@@ -931,6 +975,7 @@ public final class AppModel {
         retry?.cancel()
         homeFeed?.stop()
         homeFeed = nil
+        shell.corePage.source = nil
         agents.detach()
         await service?.close()
         await macRunner.coreForgotten()

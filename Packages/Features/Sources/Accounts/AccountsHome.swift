@@ -302,6 +302,7 @@ private struct AdvancedRow: View {
 }
 
 private struct EmptyAccounts: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     var body: some View {
         AccStateCard(
@@ -309,7 +310,7 @@ private struct EmptyAccounts: View {
             text:
                 "Add your first account to let AI sessions work. It gets a monthly limit of $20 and a place in the order for you."
         ) {
-            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 AccountDialogs.openConnect(model, provider: nil)
             }
             .disabled(model.readOnly)

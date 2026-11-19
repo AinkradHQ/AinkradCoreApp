@@ -48,12 +48,13 @@ final class AISettings {
 }
 
 struct BrainAISection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let settings: AISettings
 
     var body: some View {
         GlassSection(
             "AI suggestions", sub: "Runs on your Core. Nothing leaves your server.", symbol: "sparkles",
-            hue: GlassInk.blue, index: 2
+            hue: GlassInk.accent(paneAccent), index: 2
         ) {
             if settings.load == .ready {
                 CoreSwitch(

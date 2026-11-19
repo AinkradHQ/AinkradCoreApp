@@ -436,6 +436,7 @@ struct LauncherView: View {
 
 /// One of the suggestions: icon, name and why, in a half-width cell.
 private struct LauncherPickCell: View {
+    @Environment(\.coreAccent) private var paneAccent
     let entry: LauncherEntry
     let reason: String
     let number: Int?
@@ -605,7 +606,7 @@ private struct LauncherItem: View {
         switch entry.tile {
         case .slate: GlassInk.slate
         case .danger: GlassInk.red
-        case .blue, .view: GlassInk.blue
+        case .blue, .view: GlassInk.accent(paneAccent)
         }
     }
 
@@ -623,13 +624,14 @@ private struct LauncherItem: View {
 
 /// ⇧⌘A's header: the pane the actions are for, its picture, title and live state, arriving with a bounce.
 private struct PaneActionsHeader: View {
+    @Environment(\.coreAccent) private var paneAccent
     let shell: ShellModel
     @State private var shown = false
     var body: some View {
         if let id = shell.activePane ?? shell.panes.first?.id, let spec = shell.panes.first(where: { $0.id == id }) {
             HStack(spacing: Space.s3) {
-                IconTile(spec.symbol, hue: GlassInk.blue, size: 44, bounce: shown)
-                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 12)
+                IconTile(spec.symbol, hue: GlassInk.accent(paneAccent), size: 44, bounce: shown)
+                    .shadow(color: GlassInk.accent(paneAccent).opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Actions").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                         GlassInk.secondary)

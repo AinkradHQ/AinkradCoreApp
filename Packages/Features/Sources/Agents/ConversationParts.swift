@@ -83,6 +83,7 @@ struct EditCard: View {
 
 /// The CLI's todo list as a checklist.
 struct TodoCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let items: [TodoItem]
 
     var body: some View {
@@ -96,7 +97,7 @@ struct TodoCard: View {
             ForEach(Array(items.enumerated()), id: \.offset) { _, t in
                 HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                     Image(systemName: symbol(t.status)).foregroundStyle(
-                        t.status == .pending ? SessionInk.text2 : GlassInk.blue
+                        t.status == .pending ? SessionInk.text2 : GlassInk.accent(paneAccent)
                     )
                     .frame(width: 16)
                     Text(t.text).strikethrough(t.status == .completed).foregroundStyle(

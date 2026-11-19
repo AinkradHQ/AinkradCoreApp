@@ -144,6 +144,74 @@ public enum AppLock: Equatable, Sendable {
     case checking
 }
 
+/// The top bar's dropdowns that hold more than a list (E2-2, D-10).
+public enum TopMenu: Hashable, Sendable { case core, runners, brain }
+
+/// One device in the Core dropdown: its name, a line under it and whether it answers now.
+public struct DeviceGlance: Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let sub: String
+    public let symbol: String
+    public let online: Bool
+    public init(id: String, name: String, sub: String, symbol: String, online: Bool) {
+        self.id = id
+        self.name = name
+        self.sub = sub
+        self.symbol = symbol
+        self.online = online
+    }
+}
+
+/// The "Update available" row of the Core dropdown.
+public struct CoreUpdateGlance: Sendable {
+    public let line: String
+    public let installNow: @MainActor @Sendable () -> Void
+    public init(line: String, installNow: @escaping @MainActor @Sendable () -> Void) {
+        self.line = line
+        self.installNow = installNow
+    }
+}
+
+/// What the Brain dropdown shows: how it is, what it does now, and a few counts.
+public struct BrainGlance: Sendable, Equatable {
+    public struct Stat: Sendable, Equatable, Identifiable {
+        public var id: String { label }
+        public let label: String
+        public let count: Int
+        /// The Brain area this count opens (`me`, `rules`, `knowledge`, `timeline`, `places`); nil for a plain count.
+        public let area: String?
+        public init(_ label: String, _ count: Int, area: String? = nil) {
+            self.label = label
+            self.count = count
+            self.area = area
+        }
+    }
+    /// "Learning quietly in the background", "Paused"...
+    public let status: String
+    public let healthy: Bool
+    /// What it is doing now ("Tidying 12 new notes"), with how far along it is (0...1), when known.
+    public let doing: String?
+    public let progress: Double?
+    public let stats: [Stat]
+    /// The step of Collect, Distill, Remember it is on now (0...2); nil draws no flow.
+    public let flowStep: Int?
+    /// Things it learned today, with an Undo in the dropdown; 0 hides the row.
+    public let learned: Int
+    public init(
+        status: String, healthy: Bool, doing: String? = nil, progress: Double? = nil, stats: [Stat] = [],
+        flowStep: Int? = nil, learned: Int = 0
+    ) {
+        self.status = status
+        self.healthy = healthy
+        self.doing = doing
+        self.progress = progress
+        self.stats = stats
+        self.flowStep = flowStep
+        self.learned = learned
+    }
+}
+
 /// The shell's one state holder. Feature modules talk to it only through `openPane`, `launcher`, `bell`, `settings`, `toast` and `sheet`.
 @MainActor @Observable
 public final class ShellModel {
@@ -221,18 +289,47 @@ public final class ShellModel {
     public var retryAttempt = 0
     public var nextRetryAt: Date?
     public var retrySpan: TimeInterval?
-    /// The panel under the connection chip.
-    public var connectionPanelOpen = false
+    /// The one top-bar dropdown that is open (Core, Runners or Brain). The bell and the launcher have their own flags.
+    public var topMenu: TopMenu?
+    /// The Core dropdown (formerly the connection panel).
+    public var connectionPanelOpen: Bool {
+        get { topMenu == .core }
+        set { topMenu = newValue ? .core : (topMenu == .core ? nil : topMenu) }
+    }
+    /// How long the last call to the Core took, in milliseconds; the app sets it after each health read.
+    public var responseMs: Int?
+    /// An update the Core is ready to install ("0.10.0 to 0.10.1 · installs tonight, or now"); the updater (E12) sets it.
+    public var coreUpdate: CoreUpdateGlance?
+    /// What the Devices block of the Core dropdown lists; the app (Pairing) supplies it.
+    public var devicesGlance: (@MainActor () -> [DeviceGlance])?
+    /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.
+    public var brainGlance: (@MainActor () -> BrainGlance?)?
+    /// Tool installs under way on runners, by runner id, from `runner.tool_install` (Core API minor 95; `RunnerUpdates`).
+    public private(set) var runnerUpdates: [String: RunnerUpdate] = [:]
+    /// True on a Core with API minor 95: the Runners dropdown then says Updating while a runner gets its tools.
+    public var showsRunnerUpdates = false
+    public func toolInstall(_ fields: [String: String]) {
+        guard showsRunnerUpdates else { return }
+        RunnerUpdates.apply(fields, to: &runnerUpdates)
+    }
+    /// Reads the Brain's fresh numbers when its dropdown opens (Core API minor 95); nil on an older Core.
+    public var brainRefresh: (@MainActor () async -> Void)?
+    /// Opens Brain at an area (`me`, `rules`, `knowledge`, `timeline`, `places`).
+    public var brainOpenArea: (@MainActor (String) -> Void)?
+    /// Takes back what the Brain learned today.
+    public var brainUndoLearned: (@MainActor () -> Void)?
     @ObservationIgnored let networkWatch = NetworkWatch()
     public var chipState: ConnectionChipState? {
         ConnectionChipState.of(link: coreLink, networkUp: networkUp, attempt: retryAttempt)
     }
     /// Starts watching the network once.
     public func watchNetwork() { networkWatch.start { [weak self] up in self?.networkUp = up } }
-    public func toggleConnectionPanel() {
+    public func toggleConnectionPanel() { toggleMenu(.core) }
+    /// Opens a top-bar dropdown, or closes it when it is the one open; any other layer closes.
+    public func toggleMenu(_ menu: TopMenu) {
         launcherOpen = false
         bellOpen = false
-        connectionPanelOpen.toggle()
+        topMenu = topMenu == menu ? nil : menu
     }
     /// When the Core was last reachable: what the "resuming" banner says the screen is current to.
     public private(set) var lastLiveAt: Date?
@@ -277,6 +374,8 @@ public final class ShellModel {
     public let launcher = LauncherRegistry()
     public let bell = BellRegistry()
     public let settings = SettingsRegistry()
+    /// The Core page of Settings: its name, crash reports, updates and storage.
+    public let corePage = CorePageModel()
     /// Day, Night or System (Settings → Appearance). Persisted; applied to the whole app.
     public var theme: ThemeChoice = ThemeChoice.stored() {
         didSet {
@@ -316,7 +415,7 @@ public final class ShellModel {
         }
         launcher.register(
             LauncherEntry(
-                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
+                id: "settings", title: "Settings", sub: "General, Apps, Core",
                 symbol: "gearshape", keywords: ["preferences", "appearance", "activity"], tile: .slate
             ) { [weak self] in self?.open(.settings) })
         launcher.register(
@@ -541,14 +640,14 @@ public final class ShellModel {
 
     public func toggleLauncher() {
         bellOpen = false
-        connectionPanelOpen = false
+        topMenu = nil
         if !launcherOpen { launcher.refreshPicks() }
         launcherOpen.toggle()
     }
 
     public func toggleBell() {
         launcherOpen = false
-        connectionPanelOpen = false
+        topMenu = nil
         bellOpen.toggle()
     }
 
@@ -567,8 +666,8 @@ public final class ShellModel {
             if top.dismissible { closeTopDialog() }
         } else if let dialog {
             if dialog.dismissible { closeDialog() }
-        } else if connectionPanelOpen {
-            connectionPanelOpen = false
+        } else if topMenu != nil {
+            topMenu = nil
         } else if launcherOpen {
             launcherOpen = false
         } else if spacesOpen {
@@ -593,7 +692,7 @@ public final class ShellModel {
 
     /// Anything the shell shows over Home or the workspace.
     public var coverOpen: Bool {
-        sheet != nil || launcherOpen || connectionPanelOpen || bellOpen || overlay != nil
+        sheet != nil || launcherOpen || topMenu != nil || bellOpen || overlay != nil
             || dialog != nil
             || topDialog != nil
     }

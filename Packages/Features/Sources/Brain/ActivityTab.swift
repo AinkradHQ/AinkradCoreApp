@@ -4,6 +4,7 @@ import SwiftUI
 /// Activity: who searched, saved or was refused, room by room, and the egress log of what a model ever received from one
 /// room. Ids and decisions only, never memory text. It starts on the viewing room; "All mounted rooms" is a choice.
 struct ActivityTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
 
     var body: some View {
@@ -67,7 +68,7 @@ struct ActivityTab: View {
             }
             if a.view == .feed {
                 HStack(spacing: Space.s1) {
-                    coreShape(2).fill(GlassInk.blue).frame(width: 6, height: 6).accessibilityHidden(true)
+                    coreShape(2).fill(GlassInk.accent(paneAccent)).frame(width: 6, height: 6).accessibilityHidden(true)
                     Text("Live").foregroundStyle(GlassInk.secondary)
                 }
                 .help("New rows arrive within seconds.")
@@ -100,7 +101,7 @@ struct ActivityTab: View {
                 note: BrainWords.activityIdsOnly)
         } else if a.view == .egress, let c = a.selectedCall {
             ActivityDetail(
-                title: c.kind.label, chip: c.sent ? ("Sent", GlassInk.blue) : ("Blocked", GlassInk.red),
+                title: c.kind.label, chip: c.sent ? ("Sent", GlassInk.accent(paneAccent)) : ("Blocked", GlassInk.red),
                 sub: "\(c.at) · \(c.actor)",
                 rule: c.block.map {
                     .init(name: $0.ruleName, code: $0.rawValue, text: $0.sentence, fix: "Nothing was sent.")
@@ -185,6 +186,7 @@ private struct FeedView: View {
 }
 
 private struct EgressView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
 
     var body: some View {
@@ -232,7 +234,7 @@ private struct EgressView: View {
                             blockedBy: c.block.map { BrainWords.blockedBy($0.ruleName) }, help: c.id,
                             chip: c.block != nil
                                 ? ("Blocked", GlassInk.red)
-                                : c.stayedHere ? ("Stayed here", GlassInk.slate) : ("Sent", GlassInk.blue),
+                                : c.stayedHere ? ("Stayed here", GlassInk.slate) : ("Sent", GlassInk.accent(paneAccent)),
                             selected: a.selectedID == c.id, fresh: false
                         ) { a.selectedID = c.id }
                     }

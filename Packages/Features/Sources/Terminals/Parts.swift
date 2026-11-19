@@ -36,6 +36,7 @@ struct TermBanner: View {
 
 /// The card over a terminal that is not showing a screen: a title, what it means, the actions.
 struct TermCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let title: String
     let text: String
     var note: String?
@@ -45,13 +46,13 @@ struct TermCard: View {
     /// The card's picture and colour, from what it says.
     private var look: (symbol: String, hue: Color) {
         let t = title.lowercased()
-        if t.contains("verify") || t.contains("touch id") { return ("touchid", GlassInk.blue) }
+        if t.contains("verify") || t.contains("touch id") { return ("touchid", GlassInk.accent(paneAccent)) }
         if t.contains("still running") || t.contains("detached") { return ("play.circle", GlassInk.green) }
         if t.contains("exited") || t.contains("ended") || t.contains("gone") { return ("stop.circle", GlassInk.slate) }
         if t.contains("lost") || t.contains("offline") || t.contains("can't") || t.contains("not") {
             return ("wifi.exclamationmark", GlassInk.amber)
         }
-        return ("terminal", GlassInk.blue)
+        return ("terminal", GlassInk.accent(paneAccent))
     }
 
     var body: some View {

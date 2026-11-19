@@ -153,6 +153,7 @@ struct StepUpBanner: View {
 /// The one Touch ID sheet. It shows only while the system prompt is up: a fingerprint that scans, a tick when it goes through, a
 /// small shake when it does not match.
 struct StepUpSheet: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: StepUpModel
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var ripple = false
@@ -160,7 +161,7 @@ struct StepUpSheet: View {
     /// Esc and Return are caught here first: the window's own Esc handler leaves this sheet alone (it is not dismissible).
     @State private var keys: Any?
 
-    private var hue: Color { done ? GlassInk.green : missed ? GlassInk.red : GlassInk.blue }
+    private var hue: Color { done ? GlassInk.green : missed ? GlassInk.red : GlassInk.accent(paneAccent) }
 
     var body: some View {
         VStack(spacing: Space.s4) {

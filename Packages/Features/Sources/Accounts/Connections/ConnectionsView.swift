@@ -3,6 +3,7 @@ import SwiftUI
 
 /// The Connections pane (CN1, CN6): page tiles and the Connect action in the header, the page, status chips at the foot.
 struct ConnectionsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     @FocusState private var paneFocus: Bool
 
@@ -16,7 +17,7 @@ struct ConnectionsView: View {
             AppHeader {
                 AppFilterTile(title: "Connections", count: model.shown.count, on: true, key: "") {}
             } actions: {
-                AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                     model.beginAdd()
                 }
                 .keyboardShortcut("n", modifiers: .command)
@@ -57,7 +58,8 @@ struct ConnectionsView: View {
             }
             .onKeyPress(characters: .letters) { model.key($0.characters.lowercased()) ? .handled : .ignored }
         }
-        .paneLook(AccountsPrefs.shared.look)
+        .paneLook(AppLookPrefs.shared("connections").look)
+        .appLookTheme(AppLookPrefs.shared("connections"))
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("connections-pane")
@@ -78,7 +80,7 @@ struct ConnectionsView: View {
                     symbol: "exclamationmark.triangle", title: "Couldn't load connections",
                     text: "Your Core didn't answer. Nothing was changed.", tone: .fail
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                         Task { await model.reload() }
                     }
                 }
@@ -89,6 +91,7 @@ struct ConnectionsView: View {
 
 /// The list (mockup 10): a row per connection, then the services not connected yet; or the empty page with the tiles.
 struct ConnListPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
 
     var body: some View {
@@ -119,7 +122,7 @@ struct ConnListPage: View {
     /// Ainkrad signs in for you, so there is nothing to set up first.
     private var empty: some View {
         VStack(spacing: Space.s2) {
-            IconTile("link", hue: GlassInk.blue, size: 72, bounce: false).connFloat().padding(.top, Space.s8)
+            IconTile("link", hue: GlassInk.accent(paneAccent), size: 72, bounce: false).connFloat().padding(.top, Space.s8)
             Text("Connect your first service").coreFont(size: MacTextSize.title, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
             Text("Let your assistant read your code, tickets and chats. It never changes anything unless you say so.")

@@ -265,7 +265,8 @@ private struct LimitEditor: View {
 /// ghost marker for the draft (red with the words when it would be refused).
 struct RangeBar: View {
     let setting: SettingItem
-    var hue: Color = GlassInk.blue
+    var hue: Color?
+    @Environment(\.coreAccent) private var paneAccent
     var ghost: Int64?
 
     var body: some View {
@@ -277,10 +278,10 @@ struct RangeBar: View {
                 let dx = w * setting.position(setting.defaultValue)
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.track.opacity(0.6)).frame(height: 6)
-                    coreShape(3).fill(hue).frame(width: max(x, 6), height: 6)
+                    coreShape(3).fill(hue ?? GlassInk.accent(paneAccent)).frame(width: max(x, 6), height: 6)
                     coreShape(1).fill(GlassInk.secondary).frame(width: 2, height: 12)
                         .offset(x: dx - 1)  // grid: ok tick
-                    coreShape(4).fill(hue).frame(width: 8, height: 18)
+                    coreShape(4).fill(hue ?? GlassInk.accent(paneAccent)).frame(width: 8, height: 18)
                         .offset(x: min(max(x - 4, 0), w - 8))  // grid: ok marker
                     if let ghost {
                         coreShape(3).fill(refused ? GlassInk.red : GlassInk.primary.opacity(0.8))

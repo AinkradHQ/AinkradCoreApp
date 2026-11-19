@@ -3,12 +3,13 @@ import SwiftUI
 
 /// Settings, Mac, You: the name Home greets you with. Kept on this Mac only; the one place to change it after setup.
 struct YouSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var profile: UserProfile
     @State private var draft = ""
 
     var body: some View {
         GlassSection(
-            "Your name", sub: "Home greets you with it. It stays on this Mac.", symbol: "person", hue: GlassInk.blue
+            "Your name", sub: "Home greets you with it. It stays on this Mac.", symbol: "person", hue: GlassInk.accent(paneAccent)
         ) {
             CoreTextField("Your name", placeholder: "Sam", text: $draft, onSubmit: save)
                 .onChange(of: draft) { _, new in profile.set(new) }

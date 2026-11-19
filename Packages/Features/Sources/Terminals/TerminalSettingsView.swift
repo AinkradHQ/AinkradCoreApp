@@ -4,97 +4,91 @@ import SwiftUI
 /// Settings, Terminal: a live preview on top, then theme, font, cursor and background. Changes apply to every open
 /// terminal at once.
 struct TerminalSettingsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var prefs = TerminalPrefs.shared
     /// Read live: the section is built once, before the runners arrive.
     weak var model: TerminalsModel?
+    var part: SettingsPart = .all
     @Namespace private var pick
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            TerminalPreview(prefs: prefs).coreRise(true, 0)
-            GlassSection(
-                "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.blue, index: 1
-            ) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
-                    ForEach(TermTheme.all) { t in
-                        ThemeTile(theme: t, on: prefs.themeID == t.id, lens: pick) { prefs.themeID = t.id }
+            if part.showsLook {
+                TerminalPreview(prefs: prefs).coreRise(true, 0)
+                GlassSection(
+                    "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.accent(paneAccent), index: 1
+                ) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
+                        ForEach(TermTheme.all) { t in
+                            ThemeTile(theme: t, on: prefs.themeID == t.id, lens: pick) { prefs.themeID = t.id }
+                        }
                     }
                 }
-            }
-            GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.blue, index: 2) {
-                HStack(spacing: Space.s3) {
-                    CoreSelect(
-                        nil, selection: $prefs.fontName,
-                        options: TerminalPrefs.families.map { CoreSelectOption($0, $0) }
-                    )
-                    .frame(maxWidth: Space.s8 * 8)
-                    .accessibilityLabel("Family")
-                    Spacer()
-                    Text("\(Int(prefs.fontSize)) pt").coreFont(size: MacTextSize.body, weight: .semibold)
-                        .monospacedDigit().contentTransition(.numericText())
-                }
-                GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) {
-                    _ in
-                    Int(prefs.fontSize.rounded())
-                }
-            }
-            GlassSection(
-                "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.blue,
-                index: 3
-            ) {
-                GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
-            } content: {
-                HStack(spacing: Space.s2) {
-                    ForEach(TerminalPrefs.CursorShape.allCases, id: \.self) { c in
-                        CursorTile(shape: c, on: prefs.cursor == c, blink: prefs.blink) { prefs.cursor = c }
+                GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.accent(paneAccent), index: 2) {
+                    HStack(spacing: Space.s3) {
+                        CoreSelect(
+                            nil, selection: $prefs.fontName,
+                            options: TerminalPrefs.families.map { CoreSelectOption($0, $0) }
+                        )
+                        .frame(maxWidth: Space.s8 * 8)
+                        .accessibilityLabel("Family")
+                        Spacer()
+                        Text("\(Int(prefs.fontSize)) pt").coreFont(size: MacTextSize.body, weight: .semibold)
+                            .monospacedDigit().contentTransition(.numericText())
+                    }
+                    GlassSlider(value: $prefs.fontSize, in: 9...24, low: "Small", high: "Large", unit: " pt", step: 1) {
+                        _ in
+                        Int(prefs.fontSize.rounded())
                     }
                 }
+                GlassSection(
+                    "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.accent(paneAccent),
+                    index: 3
+                ) {
+                    GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
+                } content: {
+                    HStack(spacing: Space.s2) {
+                        ForEach(TerminalPrefs.CursorShape.allCases, id: \.self) { c in
+                            CursorTile(shape: c, on: prefs.cursor == c, blink: prefs.blink) { prefs.cursor = c }
+                        }
+                    }
+                }
+                AppLookSection(appName: "Terminals", prefs: prefs.appLook)
             }
-            GlassSection(
-                "Look", sub: "The terminals and the Terminals app, as one.",
-                symbol: "circle.lefthalf.filled",
-                hue: GlassInk.blue, index: 4
-            ) {
-                AppLookTabs(follow: $prefs.followLook, mode: prefs.screenMode)
-            } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance. Each terminal keeps its theme's colour.")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
-                }
-            }
-            GlassSection(
-                "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
-                hue: GlassInk.blue, index: 5
-            ) {
-                SettingRow("Runner", symbol: "server.rack") {
-                    CoreSegmented(
-                        "Runner",
-                        segments: [CoreSegment("", "Best ready", symbol: "sparkles")]
-                            + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
-                        selection: $prefs.defaultRunner, fill: true)
-                }
-                SettingRow("Instant typing", symbol: "keyboard") {
-                    CoreSegmented(
-                        "Instant typing",
-                        segments: [
-                            CoreSegment("automatic", "Automatic", symbol: "bolt"),
-                            CoreSegment("off", "Off", symbol: "bolt.slash"),
-                        ],
-                        selection: Binding(
-                            get: { prefs.instantTyping.rawValue },
-                            set: { prefs.instantTyping = InstantTypingMode(rawValue: $0) ?? .off }),
-                        fill: true)
-                }
-                HStack(spacing: Space.s2) {
-                    GlassToggleTile(
-                        "Open full pane", sub: "A new terminal fills its pane.",
-                        symbol: "rectangle.split.2x1", onSymbol: "rectangle.inset.filled", isOn: $prefs.openFullPane,
-                        fill: true)
-                    GlassToggleTile(
-                        "Ask before ending", sub: "Confirm before a terminal is ended.",
-                        symbol: "bolt", onSymbol: "exclamationmark.shield", isOn: $prefs.confirmEnd, fill: true)
+            if part.showsOptions {
+                TerminalBasicsSection(prefs: prefs)
+                GlassSection(
+                    "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
+                    hue: GlassInk.accent(paneAccent), index: 5
+                ) {
+                    SettingRow("Runner", symbol: "server.rack") {
+                        CoreSegmented(
+                            "Runner",
+                            segments: [CoreSegment("", "Best ready", symbol: "sparkles")]
+                                + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
+                            selection: $prefs.defaultRunner, fill: true)
+                    }
+                    SettingRow("Instant typing", symbol: "keyboard") {
+                        CoreSegmented(
+                            "Instant typing",
+                            segments: [
+                                CoreSegment("automatic", "Automatic", symbol: "bolt"),
+                                CoreSegment("off", "Off", symbol: "bolt.slash"),
+                            ],
+                            selection: Binding(
+                                get: { prefs.instantTyping.rawValue },
+                                set: { prefs.instantTyping = InstantTypingMode(rawValue: $0) ?? .off }),
+                            fill: true)
+                    }
+                    HStack(spacing: Space.s2) {
+                        GlassToggleTile(
+                            "Open full pane", sub: "A new terminal fills its pane.",
+                            symbol: "rectangle.split.2x1", onSymbol: "rectangle.inset.filled", isOn: $prefs.openFullPane,
+                            fill: true)
+                        GlassToggleTile(
+                            "Ask before ending", sub: "Confirm before a terminal is ended.",
+                            symbol: "bolt", onSymbol: "exclamationmark.shield", isOn: $prefs.confirmEnd, fill: true)
+                    }
                 }
             }
         }
@@ -133,6 +127,7 @@ private struct TerminalPreview: View {
 }
 
 private struct ThemeTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let theme: TermTheme
     let on: Bool
     let lens: Namespace.ID
@@ -158,7 +153,7 @@ private struct ThemeTile: View {
                     Text(theme.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Spacer()
                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(on ? GlassInk.accent(paneAccent) : GlassInk.track).contentTransition(.symbolEffect(.replace))
                 }
             }
             .padding(Space.s2)
@@ -182,6 +177,7 @@ private struct ThemeTile: View {
 }
 
 private struct CursorTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let shape: TerminalPrefs.CursorShape
     let on: Bool
     let blink: Bool
@@ -190,7 +186,7 @@ private struct CursorTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
-                PreviewCursor(shape: shape, blink: blink && on, color: on ? GlassInk.blue : GlassInk.primary, size: 18)
+                PreviewCursor(shape: shape, blink: blink && on, color: on ? GlassInk.accent(paneAccent) : GlassInk.primary, size: 18)
                     .frame(height: 24)
                 Text(shape.rawValue.capitalized).coreFont(size: MacTextSize.meta, weight: .medium)
             }
