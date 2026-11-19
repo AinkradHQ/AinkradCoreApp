@@ -62,13 +62,15 @@ struct ChainBindingTests {
         #expect(!api.calls.contains { $0.hasPrefix("bind ") })
     }
 
-    @Test func unbindingAsksFirstThenFallsBackToTheDefault() async {
+    @Test func unbindingActsAtOnceAndUndoBindsItAgain() async {
         let (m, api, _) = await make()
-        m.confirmUnbind("atlas")
-        let sheet = m.shell.sheet
-        #expect(sheet?.title == "Unbind atlas?" && sheet?.message.contains("Careful") == true)
-        sheet?.actions.first { $0.destructive }?.run()
-        #expect(await until { api.calls.contains("unbind atlas") && m.bindings.isEmpty })
+        let chain = m.bindings.first { $0.agent == "atlas" }?.chain
+        await m.unbind("atlas")
+        #expect(m.shell.sheet == nil, "no question")
+        #expect(api.calls.contains("unbind atlas") && m.bindings.isEmpty)
+        #expect(m.shell.toast?.undo != nil)
+        m.shell.undoToast()
+        #expect(await until { m.bindings.first { $0.agent == "atlas" }?.chain == chain && chain != nil })
     }
 
     @Test func aRefusalForScopeMakesThePageReadOnly() async {

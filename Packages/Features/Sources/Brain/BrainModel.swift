@@ -26,6 +26,8 @@ public final class BrainModel {
     /// Where the wizard's Notes and docs look: the person's folders or a disk search. Tests and the Debug gallery replace it.
     @ObservationIgnored public var importPlaces: ImportPlaces? = ImportPlaces.shared
     /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
+    /// The top-bar dropdown's numbers from a Core with API minor 95 (`BrainGlanceSource`); nil keeps the Rooms and Records counts.
+    var glanceData: GlanceData?
     public var apiMinor: Int? {
         didSet {
             importer?.review.canSameProject = remembersSameProject
@@ -104,6 +106,7 @@ public final class BrainModel {
         clearRoomView()
         rooms = []
         overview = nil
+        glanceData = nil
         viewingID = nil
         importer = nil
         sync?.stopTimer()
@@ -456,9 +459,14 @@ public final class BrainModel {
             BrainHowItWorks.open($0.host.shell)
         }
         if service != nil { registerActions() }
-        // The top bar's Brain dropdown. "Doing now" arrives with the background learning (E9); until then it says how things are.
+        // The top bar's Brain dropdown: a Core with API minor 95 tells what it does now, the five areas and what it learned
+        // today; an older one says how things are in Rooms and Records.
+        shell.brainRefresh = { [weak self] in await self?.refreshGlance() }
+        shell.brainOpenArea = { [weak self] _ in self?.show(.overview) }  // ponytail: E9's area pages take the area at merge
+        shell.brainUndoLearned = { [weak self] in self?.undoLearned() }
         shell.brainGlance = { [weak self] in
             guard let self, self.service != nil else { return nil }
+            if self.servesGlance, let d = self.glanceData { return BrainGlanceMaker.glance(d) }
             let o = self.overview
             let status =
                 switch o?.health {

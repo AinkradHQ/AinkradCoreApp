@@ -33,7 +33,7 @@ struct RunnersView: View {
     }
 
     private var shown: [RunnerItem] {
-        RunnerFacts.ordered(model.runners.filter { model.runnerBucket == nil || RunnerBucket(of: $0) == model.runnerBucket })
+        RunnerFacts.ordered(model.runners.filter { model.runnerBucket == nil || model.bucket($0) == model.runnerBucket })
     }
 
     @ViewBuilder private var fleet: some View {
@@ -66,7 +66,7 @@ struct RunnersView: View {
         HStack(spacing: Space.s2) {
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text("Runners").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
-                Text("The computers that do your work.\(RunnerBucket.sentence(model.runners))")
+                Text("The computers that do your work.\(RunnerBucket.sentence(model.runners, updating: model.updatingIDs))")
                     .foregroundStyle(palette.text2)
             }
             Spacer(minLength: Space.s3)

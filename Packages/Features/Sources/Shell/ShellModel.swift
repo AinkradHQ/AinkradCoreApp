@@ -164,9 +164,12 @@ public struct BrainGlance: Sendable, Equatable {
         public var id: String { label }
         public let label: String
         public let count: Int
-        public init(_ label: String, _ count: Int) {
+        /// The Brain area this count opens (`me`, `rules`, `knowledge`, `timeline`, `places`); nil for a plain count.
+        public let area: String?
+        public init(_ label: String, _ count: Int, area: String? = nil) {
             self.label = label
             self.count = count
+            self.area = area
         }
     }
     /// "Learning quietly in the background", "Paused"...
@@ -176,12 +179,21 @@ public struct BrainGlance: Sendable, Equatable {
     public let doing: String?
     public let progress: Double?
     public let stats: [Stat]
-    public init(status: String, healthy: Bool, doing: String? = nil, progress: Double? = nil, stats: [Stat] = []) {
+    /// The step of Collect, Distill, Remember it is on now (0...2); nil draws no flow.
+    public let flowStep: Int?
+    /// Things it learned today, with an Undo in the dropdown; 0 hides the row.
+    public let learned: Int
+    public init(
+        status: String, healthy: Bool, doing: String? = nil, progress: Double? = nil, stats: [Stat] = [],
+        flowStep: Int? = nil, learned: Int = 0
+    ) {
         self.status = status
         self.healthy = healthy
         self.doing = doing
         self.progress = progress
         self.stats = stats
+        self.flowStep = flowStep
+        self.learned = learned
     }
 }
 
@@ -257,6 +269,20 @@ public final class ShellModel {
     public var devicesGlance: (@MainActor () -> [DeviceGlance])?
     /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.
     public var brainGlance: (@MainActor () -> BrainGlance?)?
+    /// Tool installs under way on runners, by runner id, from `runner.tool_install` (Core API minor 95; `RunnerUpdates`).
+    public private(set) var runnerUpdates: [String: RunnerUpdate] = [:]
+    /// True on a Core with API minor 95: the Runners dropdown then says Updating while a runner gets its tools.
+    public var showsRunnerUpdates = false
+    public func toolInstall(_ fields: [String: String]) {
+        guard showsRunnerUpdates else { return }
+        RunnerUpdates.apply(fields, to: &runnerUpdates)
+    }
+    /// Reads the Brain's fresh numbers when its dropdown opens (Core API minor 95); nil on an older Core.
+    public var brainRefresh: (@MainActor () async -> Void)?
+    /// Opens Brain at an area (`me`, `rules`, `knowledge`, `timeline`, `places`).
+    public var brainOpenArea: (@MainActor (String) -> Void)?
+    /// Takes back what the Brain learned today.
+    public var brainUndoLearned: (@MainActor () -> Void)?
     @ObservationIgnored let networkWatch = NetworkWatch()
     public var chipState: ConnectionChipState? {
         ConnectionChipState.of(link: coreLink, networkUp: networkUp, attempt: retryAttempt)

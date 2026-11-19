@@ -216,7 +216,7 @@ struct AgentsListView: View {
                                     waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
                                     selected: model.selected == s.id, compact: compact, showActivity: showActivity,
                                     now: now,
-                                    onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
+                                    onPin: { model.togglePin(s.id) }, onEnd: { model.end(s.id) }
                                 )
                                 .onTapGesture(count: 2) { model.openSession(s.id) }
                                 .onTapGesture {
@@ -233,7 +233,7 @@ struct AgentsListView: View {
                                 .contextMenu {
                                     Button("Open") { model.openSession(s.id) }
                                     Button(model.pinned.contains(s.id) ? "Unpin" : "Pin") { model.togglePin(s.id) }
-                                    if s.live { Button("End Session…") { model.confirmEnd(s.id) } }
+                                    if s.live { Button("End Session") { model.end(s.id) } }
                                     Button("Archive") { model.toggleArchive(s.id) }
                                     Button("Copy Title") {
                                         NSPasteboard.general.clearContents()
@@ -286,7 +286,7 @@ struct AgentsListView: View {
                     else { return .ignored }
                     switch key {
                     case "p": model.togglePin(id)
-                    case "e": model.confirmEnd(id)
+                    case "e": model.end(id)
                     case "a": model.toggleArchive(id)
                     default: return .ignored
                     }
