@@ -41,7 +41,7 @@ struct RadialMap: View {
                 let t = animating ? ctx.date.timeIntervalSinceReferenceDate : 0
                 ZStack {
                     Canvas { gc, sz in draw(&gc, sz, t) }
-                    centre(size)
+                    centre(size, t)
                     ForEach(Array(nodes.enumerated()), id: \.element.id) { i, node in
                         let p = point(node.page, size)
                         card(node)
@@ -95,12 +95,27 @@ struct RadialMap: View {
         }
     }
 
-    private func centre(_ s: CGSize) -> some View {
+    /// Two halo rings around the tile: they swell and fade on a four-second loop, half a loop apart. Static (fixed size and
+    /// strength) when nothing animates.
+    private func halo(_ t: Double, _ k: Int) -> some View {
+        let u = animating ? (t / 4 + Double(k) * 0.5).truncatingRemainder(dividingBy: 1) : 0.3 + Double(k) * 0.35
+        return coreShape(Radius.cardMac + 4)
+            .stroke(GlassInk.blue.opacity(animating ? 0.45 * (1 - u) : 0.16), lineWidth: 1.5)
+            .frame(width: Space.s8 * 2, height: Space.s8 * 2)
+            .scaleEffect(1 + 0.7 * u)
+            .accessibilityHidden(true)
+    }
+
+    private func centre(_ s: CGSize, _ t: Double) -> some View {
         let c = middle(s)
         return VStack(spacing: Space.s2) {
-            Image(systemName: "brain").font(.system(size: 28)).frame(width: Space.s8 * 2, height: Space.s8 * 2)
-                .background(GlassInk.blue.opacity(0.18), in: coreShape(Radius.cardMac))
-                .accessibilityHidden(true)
+            ZStack {
+                halo(t, 0)
+                halo(t, 1)
+                Image(systemName: "brain").font(.system(size: 28)).frame(width: Space.s8 * 2, height: Space.s8 * 2)
+                    .background(GlassInk.blue.opacity(0.18), in: coreShape(Radius.cardMac))
+                    .accessibilityHidden(true)
+            }
             HStack(spacing: Space.s1) {
                 RoundedRectangle(cornerRadius: 2).fill(working ? Color.green : Color.secondary).frame(width: 6, height: 6)
                 Text(label).coreFont(size: MacTextSize.meta, weight: .semibold)

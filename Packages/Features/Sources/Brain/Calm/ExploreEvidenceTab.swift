@@ -16,6 +16,7 @@ struct ExploreEvidenceTab: View {
     @State private var kind: String?
     @State private var picked: String?
     @State private var loaded = false
+    @State private var trace: SourceTraceWire?
 
     private var kinds: [(kind: String, count: Int)] {
         Dictionary(grouping: entries, by: \.item.sourceKind).map { ($0.key, $0.value.count) }.sorted { $0.kind < $1.kind }
@@ -49,7 +50,10 @@ struct ExploreEvidenceTab: View {
                             ) { picked = f.id }
                         }
                     }
-                    if let f = files.first(where: { $0.id == picked }) { origin(f) }
+                    if let f = files.first(where: { $0.id == picked }) {
+                        origin(f)
+                        session(f)
+                    }
                 } else {
                     Text("Pick a source to see its files and what Brain took from them.")
                         .foregroundStyle(GlassInk.secondary)
@@ -58,6 +62,7 @@ struct ExploreEvidenceTab: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .animation(Motion.out(Motion.ui), value: picked)
         }
+        .task(id: picked) { await loadTrace() }
         .task { await load() }
         .accessibilityIdentifier("brain-explore-evidence")
     }
@@ -73,6 +78,62 @@ struct ExploreEvidenceTab: View {
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
         .transition(.opacity)
+    }
+
+    /// "From the session" (the source's own words) and "How it changed" (each record's history, with Undo for a record taken out).
+    @ViewBuilder private func session(_ f: Entry) -> some View {
+        if let t = trace {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                if !t.excerpt.isEmpty {
+                    Text("From the session").coreFont(size: MacTextSize.headline, weight: .semibold)
+                    Text("“\(t.excerpt)”").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                        .textSelection(.enabled)
+                }
+                if !t.records.isEmpty {
+                    Text("How it changed").coreFont(size: MacTextSize.headline, weight: .semibold)
+                    ForEach(t.records) { r in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.body).lineLimit(2).coreFont(size: MacTextSize.meta, weight: .semibold)
+                            ForEach(Array(r.history.enumerated()), id: \.offset) { i, s in
+                                CoreRow(Self.step(s.op), subtitle: Self.when(s.at), symbol: "circle.fill") {
+                                    if r.archived, i == r.history.count - 1, s.op == "record.archived" {
+                                        Button("Undo") { Task { await restore(f.room, r.id) } }
+                                            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
+            .transition(.opacity)
+        }
+    }
+
+    private func loadTrace() async {
+        trace = nil
+        guard let id = picked, let f = entries.first(where: { $0.id == id }),
+            let routes = brain.service?.importRoutes
+        else { return }
+        trace = try? await routes.trace(room: f.room, item: f.item.itemID)
+    }
+
+    private func restore(_ room: String, _ id: String) async {
+        try? await brain.service?.importRoutes?.restoreRecord(room: room, id: id)
+        await loadTrace()
+    }
+
+    static func step(_ op: String) -> String {
+        switch op {
+        case "record.candidate": "Proposed"
+        case "record.accepted": "Learned"
+        case "record.edited": "Reworded"
+        case "record.archived": "Taken out"
+        case "record.restored": "Put back"
+        case "record.purged": "Removed for good"
+        default: op
+        }
     }
 
     private func roomName(_ id: String) -> String { brain.rooms.first { $0.id == id }?.name ?? id }
