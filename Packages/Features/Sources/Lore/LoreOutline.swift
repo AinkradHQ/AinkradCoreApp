@@ -7,16 +7,15 @@ import Foundation
 struct LoreHeading: Equatable, Identifiable {
     var level: Int
     var title: String
-    /// Which appearance of this exact title it is (0 = first), so a click lands on the right one.
-    var occurrence: Int
-    var id: String { "\(level)-\(occurrence)-\(title)" }
+    /// Its place among the headings (0 = first): the editor scrolls to the same-numbered heading, never by text.
+    var index: Int
+    var id: Int { index }
 }
 
 enum LoreOutline {
     /// `#`, `##` and `###` headings outside fenced code, in order. A heading is at most 120 characters of its line.
     static func headings(_ markdown: String) -> [LoreHeading] {
         var out: [LoreHeading] = []
-        var seen: [String: Int] = [:]
         var fenced = false
         for raw in markdown.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = raw.trimmingCharacters(in: .whitespaces)
@@ -30,9 +29,7 @@ enum LoreOutline {
             guard (1...3).contains(hashes), rest.first == " " else { continue }
             let title = String(rest.trimmingCharacters(in: .whitespaces).prefix(120))
             guard !title.isEmpty else { continue }
-            let n = seen[title, default: 0]
-            seen[title] = n + 1
-            out.append(LoreHeading(level: hashes, title: title, occurrence: n))
+            out.append(LoreHeading(level: hashes, title: title, index: out.count))
         }
         return out
     }

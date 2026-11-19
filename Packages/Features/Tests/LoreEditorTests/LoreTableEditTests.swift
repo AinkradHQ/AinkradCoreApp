@@ -30,3 +30,14 @@ struct LoreTableEditTests {
         #expect(!LoreTableEdit.hasTable("| a | b |\nplain\n"))
     }
 }
+
+@MainActor
+struct LoreHeadingScanTests {
+    @Test func theNthHeadingIsFoundByPositionEvenWhenTitlesRepeat() {
+        let (ts, _) = MarkdownReader.parse("# A\n\ntext\n\n## Steps\n\nx\n\n## Steps\n\ny\n")
+        let first = LoreHeadingScan.location(ofHeading: 1, in: ts)
+        let second = LoreHeadingScan.location(ofHeading: 2, in: ts)
+        #expect(first != nil && second != nil && first! < second!)
+        #expect(LoreHeadingScan.location(ofHeading: 3, in: ts) == nil)
+    }
+}
