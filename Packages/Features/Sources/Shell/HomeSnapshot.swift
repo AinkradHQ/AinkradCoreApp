@@ -105,7 +105,33 @@ public struct HomeSnapshot: Sendable {
         /// "Healthy", "Needs you" or "Paused".
         public var health: String
         public var question: Question?
-        public init(known: Int, rooms: Int, waiting: Int, health: String, question: Question? = nil) {
+        /// What the Brain is doing now, from `GET /activity`; nil on a Core without it.
+        public var pipeline: Pipeline?
+        public struct Pipeline: Sendable, Equatable {
+            public enum Stage: Int, Sendable { case collect, distill, remember }
+            /// The stage at work, nil when idle.
+            public let now: Stage?
+            /// Distils running, queued behind them, and overviews being written.
+            public let working: Int
+            public let queued: Int
+            public let overviews: Int
+            public let lastDoneAt: Date?
+            public init(now: Stage?, working: Int, queued: Int, overviews: Int, lastDoneAt: Date?) {
+                self.now = now
+                self.working = working
+                self.queued = queued
+                self.overviews = overviews
+                self.lastDoneAt = lastDoneAt
+            }
+            /// Distilling while any distil runs or waits, remembering while only overviews are written.
+            public static func stage(distilling: Int, queued: Int, overviews: Int) -> Stage? {
+                distilling + queued > 0 ? .distill : overviews > 0 ? .remember : nil
+            }
+        }
+        public init(
+            known: Int, rooms: Int, waiting: Int, health: String, question: Question? = nil, pipeline: Pipeline? = nil
+        ) {
+            self.pipeline = pipeline
             self.known = known
             self.rooms = rooms
             self.waiting = waiting

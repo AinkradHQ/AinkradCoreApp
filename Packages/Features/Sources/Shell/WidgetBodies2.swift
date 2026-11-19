@@ -277,13 +277,20 @@ struct TodayBody: View {
             switch size {
             case .s:
                 WHead("calendar", "Today")
-                WFigure(value: Double(h.runningAgents), caption: "AI sessions running")
+                WFigure(value: Double(waiting), caption: "need you")
                 Spacer(minLength: 0)
-                CoreMeter(rows[1].3, label: "AI session slots in use")
+                WCaption("\(h.runningAgents) running")
             case .m:
                 WHead("calendar", "Today")
-                VStack(spacing: Space.s3) {
-                    ForEach(rows, id: \.0) { r in WBarRow(label: r.0, value: r.1, fill: r.3, low: r.4) }
+                HStack(alignment: .top, spacing: Space.s5) {
+                    ForEach(rows.indices, id: \.self) { i in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(rows[i].1).coreFont(size: 22, weight: .bold)
+                                .foregroundStyle(rows[i].4 ? GlassInk.amberInk : GlassInk.primary)
+                            WCaption(["Need you", "Running", "Machines up"][i])
+                        }
+                    }
+                    Spacer(minLength: 0)
                 }
             default:
                 WHead("calendar", "Today")

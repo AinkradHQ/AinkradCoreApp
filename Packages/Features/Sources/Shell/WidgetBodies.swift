@@ -149,14 +149,22 @@ struct SpendBody: View {
                     CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                     WCaption(tightest)
                 case .m:
+                    // Medium: three figures as a list.
                     WHead("dollarsign", "AI spend")
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        VStack(alignment: .leading, spacing: Space.s2) {
-                            WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
-                            CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
+                    VStack(spacing: Space.s2) {
+                        ForEach(
+                            [
+                                ("Today", home.spendToday), ("This week", week.reduce(0, +)),
+                                ("This month", home.monthSpend),
+                            ], id: \.0
+                        ) { k in
+                            HStack {
+                                WCaption(k.0)
+                                Spacer(minLength: Space.s2)
+                                Text(money(k.1)).coreFont(size: MacTextSize.body, weight: .semibold)
+                                    .foregroundStyle(GlassInk.primary).monospacedDigit()
+                            }
                         }
-                        .frame(width: 130)
-                        if hasWeek { WColumns(values: week, labels: weekLabels) }
                     }
                 case .l:
                     WHead("dollarsign", "AI spend")
@@ -261,7 +269,14 @@ struct MachinesBody: View {
                     }
                 case .m:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
-                    rows(ms.prefix(3))
+                    VStack(spacing: Space.s2) {
+                        ForEach(ms.prefix(3)) { m in
+                            let share = m.online ? (m.load.last ?? Double(m.used) / Double(max(m.slots, 1))) : 0
+                            WBarRow(
+                                label: m.id, value: m.online ? "\(Int((share * 100).rounded()))%" : "Offline",
+                                fill: share)
+                        }
+                    }
                 case .l:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
                     rows(ms.prefix(4))
