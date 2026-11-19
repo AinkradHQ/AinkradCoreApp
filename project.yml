@@ -16,7 +16,7 @@ settings:
     CODE_SIGN_IDENTITY: "Apple Development"
     DEVELOPMENT_TEAM: RT9AA68C38
     MARKETING_VERSION: "0.9.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     # Swift string literals land in each String Catalog on build; catalogs are preferred over .strings.
     SWIFT_EMIT_LOC_STRINGS: YES
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
@@ -37,7 +37,9 @@ targets:
   AinkradCoreMac:
     type: application
     platform: macOS
-    sources: [App/Mac]
+    sources:
+      - App/Mac
+      - Icon/AppIcon.icon
     dependencies:
       - package: AinkradClient
       - package: CoreUI
@@ -90,6 +92,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.ainkrad.core
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Ainkrad
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_HARDENED_RUNTIME: YES
         # Import Apple Notes (R4-03): macOS asks the first time the person chooses it, with this sentence.
