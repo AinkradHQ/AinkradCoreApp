@@ -30,6 +30,7 @@ struct HostCard: View {
                     Text(host.os ?? host.login).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 }
                 Spacer(minLength: Space.s2)
+                if let p = host.presence { StateBadge(p.label, tone: p.tone, symbol: "circle") }
                 CoreCheckbox(
                     "", isOn: Binding(get: { picked }, set: { _ in model.toggle(host.id) }),
                     spoken: "Select \(host.name)"
@@ -40,6 +41,7 @@ struct HostCard: View {
                 Label(route, systemImage: "arrow.triangle.turn.up.right.diamond").foregroundStyle(GlassInk.secondary)
                     .lineLimit(1)
                 Spacer(minLength: Space.s2)
+                if let seen = host.seenLine { Text(seen).foregroundStyle(GlassInk.secondary).lineLimit(1) }
                 Text(host.runnerDevice == nil ? "No runner" : "Runner").foregroundStyle(GlassInk.secondary)
                 if lit {
                     Button {

@@ -96,6 +96,11 @@ struct RunnerItem: Identifiable, Equatable, Sendable {
     var tools: [String: String] = [:]
     /// What the runner offers now; nil for an old runner or one that never connected.
     var policy: RunnerPolicy?
+    /// What the runner says about itself in its heartbeats (API minor 95): the folder its work happens in, why it is not fully
+    /// working, and the AI tool install under way or the last one.
+    var home: String?
+    var lastError: String?
+    var reported: ToolInstall?
 
     var hasPty: Bool { drivers.contains { $0.name == "pty" } }
     var perCore: Double? { avg1.flatMap { a in cores.flatMap { $0 > 0 ? a / Double($0) : nil } } }
@@ -167,7 +172,20 @@ struct LiveTerminalService: TerminalService {
     }
 
     func runners() async throws -> [RunnerItem] {
-        try await run { try await client.listRunners().ok.body.json.map(Self.runner) }
+        var out = try await run { try await client.listRunners().ok.body.json.map(Self.runner) }
+        // The runners' own report (tool install, home, last error) is API minor 95; read it beside the generated list.
+        if await connection.serverSupports(minor: 95), let extra = await reported() {
+            for i in out.indices { if let e = extra[out[i].id] { e.apply(to: &out[i]) } }
+        }
+        return out
+    }
+
+    private func reported() async -> [String: RunnerReportWire]? {
+        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/runners") else { return nil }
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        guard let all = try? d.decode([RunnerReportWire].self, from: data) else { return nil }
+        return Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     }
 
     func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem {
@@ -356,5 +374,30 @@ struct LiveTerminalService: TerminalService {
                     terminalsUsed: Int($0.terminalsUsed), terminalsCapacity: $0.terminalsCapacity.map(Int.init))
             },
             tools: r.tools?.additionalProperties ?? [:], policy: r.policy.map(Self.policy))
+    }
+}
+
+/// The fields of `GET /runners` that arrived with API minor 95, read straight from the JSON.
+struct RunnerReportWire: Decodable {
+    struct Install: Decodable {
+        let tool: String
+        let state: String
+        let percent: Int
+        let step: String
+        let reason: String?
+    }
+    let id: String
+    let home: String?
+    let lastError: String?
+    let toolInstall: Install?
+
+    func apply(to r: inout RunnerItem) {
+        r.home = home
+        r.lastError = lastError
+        guard let t = toolInstall else { return }
+        let state = ToolInstall.State(rawValue: t.state) ?? .running
+        r.reported = ToolInstall(op: "report", tool: t.tool, state: state, percent: t.percent, step: t.step, reason: t.reason)
+        // Installed, but the runner has not restarted to probe it yet: it is there.
+        if state == .done, r.tools[t.tool] == nil { r.tools[t.tool] = "" }
     }
 }

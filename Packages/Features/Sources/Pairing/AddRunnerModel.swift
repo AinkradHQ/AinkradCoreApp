@@ -41,6 +41,11 @@ final class AddRunnerModel {
 
     init(app: AppModel) { self.app = app }
 
+    /// E12 HOOK: the hosted download page for "Another Mac". E12 builds the page and returns its address for this Core
+    /// here; when it is non-nil the another-Mac screen offers it as the link and QR instead of the device invite's.
+    /// Until then it is nil and the device invite (open it in Ainkrad Core on the other Mac, turn on Work for Core) is used.
+    static func hostedInstallerURL(core: String) -> URL? { nil }
+
     var coreURL: String { app?.coreURL ?? "https://<your-core>" }
     var hosts: [RunnerHostChoice] { app?.leyline.runnerChoices ?? [] }
     var picking: Bool { path == .ssh && setup == nil && step == .connect }
@@ -161,9 +166,8 @@ final class AddRunnerModel {
             progress = app?.terminals?.runnerProgress(name: s.hostName)
             connectedID = progress?.id
         case .expired:
-            fail(
-                "The invite ended",
-                "Nothing was installed and the invite is gone. Start again when you are at the terminal.")
+            fail("The invite ended", "Nothing was installed and the invite is gone. Start again.")
+        case .failed(let why): fail("The install did not finish", why)
         default: break
         }
     }
@@ -239,14 +243,18 @@ final class AddRunnerModel {
         case .idle, .starting: current = 1
         case .waiting: current = 3
         case .paired: current = 5
-        case .expired: current = 3
+        case .expired, .failed: current = 3
         }
+        var failed = false
+        if case .failed = phase { failed = true }
         let name = setup?.hostName ?? "the host"
         return [
             line(0, "Reached \(name)", "Reaching \(name)…", "Over SSH, with the key you chose", at: current),
             line(1, "Signed in", "Signing in…", "Your key was accepted", at: current),
             line(2, "Put the invite there", "Putting the invite there…", "One time, 15 minutes", at: current),
-            line(3, "Runner is installed", "Type your sudo password in the terminal…", "Ainkrad never sees it", at: current),
+            line(
+                3, "Runner is installed", "Installing the runner…",
+                "A service with passwordless sudo, else for your user only", at: current, bad: failed),
             line(4, "Connected to Core", "Connecting to Core…", "Waiting for the first hello", at: current),
         ]
     }

@@ -151,6 +151,12 @@ public final class LeylineModel {
 
     // MARK: derived
 
+    /// Whether an address answers like an SSH server from the Core, for Add Host's live check.
+    func checkHost(_ address: String, _ port: Int) async throws -> HostCheck {
+        guard let service else { throw LeylineFailure.notYet }
+        return try await service.checkHost(address: address, port: port)
+    }
+
     func hostItem(_ id: String?) -> HostItem? { id.flatMap { id in hosts.first { $0.id == id } } }
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
     var open: HostItem? { hostItem(openID) }

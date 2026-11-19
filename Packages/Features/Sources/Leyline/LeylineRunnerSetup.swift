@@ -12,8 +12,8 @@ public struct RunnerHostChoice: Identifiable, Equatable, Sendable {
     public let isRunner: Bool
 }
 
-/// "Make Runner" on one host, as the Add runner flow follows it: Touch ID, the invite copied over SSH, the installer typed into a
-/// terminal the person watches (the sudo password is theirs), then the runner pairing. One per host; reads the live host page state.
+/// "Make Runner" on one host, as the Add runner flow follows it: Touch ID, the invite copied over SSH, the installer run by the
+/// Core over SSH with nothing to type (the system service with passwordless sudo, else a runner for that user), then the pairing. One per host; reads the live host page state.
 /// What the Runner card on a host page shows of its runner.
 public struct RunnerGlance: Equatable, Sendable {
     public let online: Bool
@@ -35,6 +35,7 @@ public final class RunnerSetup {
         case waiting(until: Date?)
         case paired(device: String)
         case expired
+        case failed(String)
     }
 
     private let state: HostPageState
@@ -48,6 +49,7 @@ public final class RunnerSetup {
         case .waiting(let until): .waiting(until: until)
         case .paired(let d): .paired(device: d)
         case .expired: .expired
+        case .failed(let why): .failed(why)
         }
     }
 

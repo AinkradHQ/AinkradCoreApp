@@ -177,6 +177,15 @@ extension TerminalsModel {
         await reload()
 
 extension TerminalsModel {
+    /// Puts what each runner reports of its AI tool install into `installs`, beside the installs this app started.
+    func applyReported() {
+        for r in runners {
+            var mine = (installs[r.id] ?? [:]).filter { $0.value.op != "report" }
+            if let rep = r.reported, rep.state != .done { mine[rep.tool] = rep }
+            installs[r.id] = mine.isEmpty ? nil : mine
+        }
+    }
+
     /// Where the runner inside this app writes the AI tool install it is doing now (`<state>/ai-tools/status.json`).
     static func localToolStatusURL(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         home.appending(path: ".ainkrad-runner/core/ai-tools/status.json")

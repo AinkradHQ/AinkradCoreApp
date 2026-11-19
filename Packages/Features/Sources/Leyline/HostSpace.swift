@@ -300,7 +300,8 @@ struct AccessPage: View {
                         Array(
                             [
                                 "Create a one-time invite", "Copy it to the host over SSH",
-                                "Install the Ainkrad runner (sudo, in a terminal you watch)", "Pair with the Core",
+                                "Install the Ainkrad runner (system service with passwordless sudo, else for this user)",
+                                "Pair with the Core",
                             ].enumerated()), id: \.offset
                     ) { i, step in
                         Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
@@ -326,16 +327,17 @@ struct AccessPage: View {
         switch state.runnerState {
         case .waiting(let until):
             CoreNotice(
-                symbol: "terminal", title: "Type your sudo password in the terminal",
+                symbol: "arrow.down.circle", title: "Installing the runner",
                 text: until.map {
-                    "Waiting for the runner to pair. The invite ends \($0.formatted(date: .omitted, time: .shortened))."
+                    "Ainkrad is installing it over SSH. The invite ends \($0.formatted(date: .omitted, time: .shortened))."
                 }
-                    ?? "Waiting for the runner to pair.", tone: .queue)
+                    ?? "Ainkrad is installing it over SSH.", tone: .queue)
         case .expired:
             CoreNotice(
                 symbol: "clock.badge.exclamationmark", title: "The invite ended",
-                text: "Nothing was installed and the invite is gone. Start again when you are at the terminal.",
-                tone: .warn)
+                text: "Nothing was installed and the invite is gone. Start again.", tone: .warn)
+        case .failed(let why):
+            CoreNotice(symbol: "exclamationmark.triangle", title: "The install did not finish", text: why, tone: .fail)
         default:
             if let device = host.runnerDevice { claimer(device) }
         }
