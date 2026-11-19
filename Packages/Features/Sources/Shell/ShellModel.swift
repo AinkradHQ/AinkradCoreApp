@@ -311,6 +311,8 @@ public final class ShellModel {
     public let launcher = LauncherRegistry()
     public let bell = BellRegistry()
     public let settings = SettingsRegistry()
+    /// The Core page of Settings: its name, crash reports, updates and storage.
+    public let corePage = CorePageModel()
     /// Day, Night or System (Settings → Appearance). Persisted; applied to the whole app.
     public var theme: ThemeChoice = ThemeChoice.stored() {
         didSet {
