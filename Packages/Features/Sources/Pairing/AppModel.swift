@@ -246,6 +246,14 @@ public final class AppModel {
             model.install()
             terminals = model
             model.openRunnersApp = { [weak self] in self?.openHub(.runners) }
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let working = self.macRunner.runnerID.flatMap { self.terminals?.isWorking(runner: $0) } ?? false
+                    self.macRunner.holdAwake(working)
+                    try? await Task.sleep(for: .seconds(15))
+                }
+            }
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
