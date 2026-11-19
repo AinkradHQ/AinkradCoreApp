@@ -28,6 +28,7 @@ final class MacRunnerModel {
 
     static let useKey = "core.macRunner.on"
     static let terminalsKey = "core.macRunner.terminals"
+    static let awakeKey = "core.macRunner.awake"
     /// D2, shown beside the terminals switch.
     static let terminalsWarning = "Devices allowed to open terminals can reach this Mac's files."
     /// D3: what the runner itself reports (`accountsAnswer` is "Yes" or "No (reason)"); nil until the Core says.
@@ -49,6 +50,7 @@ final class MacRunnerModel {
     private let deps: MacRunnerDeps
     private let macName: String
     private var busy = false
+    @ObservationIgnored private var awake: NSObjectProtocol?
 
     init(control: any MacRunnerControl, deps: MacRunnerDeps, defaults: UserDefaults = .standard, macName: String? = nil)
     {
@@ -158,6 +160,35 @@ final class MacRunnerModel {
     }
 
     func openLoginItems() { control.openLoginItems() }
+
+    /// Show what it did: the runner's own folder in Finder.
+    func showLog() { control.revealLog() }
+
+    /// Starts the runner again (the system keeps it running; this registers and starts it once more).
+    func restart() async {
+        guard useThisMac, control.isBundled else { return }
+        await start()
+    }
+
+    /// Keep this Mac awake while working (on unless turned off): stays awake only while the Core has work on this runner.
+    var keepAwake: Bool { defaults.object(forKey: Self.awakeKey) as? Bool ?? true }
+    func setKeepAwake(_ on: Bool) {
+        defaults.set(on, forKey: Self.awakeKey)
+        if !on { holdAwake(false) }
+    }
+
+    /// Called as the Core's report of this runner's work changes; holds or releases the "no idle sleep" assertion.
+    func holdAwake(_ working: Bool) {
+        if working, keepAwake, useThisMac {
+            if awake == nil {
+                awake = ProcessInfo.processInfo.beginActivity(
+                    options: [.idleSystemSleepDisabled, .userInitiated], reason: "Ainkrad is working for your Core")
+            }
+        } else if let a = awake {
+            ProcessInfo.processInfo.endActivity(a)
+            awake = nil
+        }
+    }
 
     /// Looks at launchd and the runner's own note again (off the main thread: it runs `launchctl`).
     func refreshProblem(connected: Bool?) async {
