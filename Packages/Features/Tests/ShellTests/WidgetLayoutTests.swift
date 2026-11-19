@@ -119,10 +119,10 @@ struct WidgetLayoutTests {
             back.items.map { [$0.kind.rawValue, $0.size.rawValue, "\($0.x)", "\($0.y)"] }
                 == l.items.map { [$0.kind.rawValue, $0.size.rawValue, "\($0.x)", "\($0.y)"] })
         let bad =
-            #"{"v":2,"items":[{"t":"clock","s":"s","x":0,"y":0},{"t":"nope","s":"s","x":1,"y":0},{"t":"clock","s":"s","x":0,"y":0},{"t":"today","s":"x","x":15,"y":0},{"t":"quick","s":"t","x":2,"y":0}]}"#
+            #"{"v":3,"items":[{"t":"clock","s":"s","x":0,"y":0},{"t":"nope","s":"s","x":1,"y":0},{"t":"clock","s":"s","x":0,"y":0},{"t":"today","s":"x","x":15,"y":0},{"t":"quick","s":"t","x":2,"y":0}]}"#
         let d = try #require(WidgetLayout.decoded(Data(bad.utf8)))
         #expect(d.items.count == 1)  // unknown kind, overlap, off-grid and a size the widget lacks are all dropped
-        #expect(WidgetLayout.decoded(Data("{\"v\":3,\"items\":[]}".utf8)) == nil)
+        #expect(WidgetLayout.decoded(Data("{\"v\":4,\"items\":[]}".utf8)) == nil)
         #expect(WidgetLayout.decoded(Data("garbage".utf8)) == nil)
     }
 
@@ -140,6 +140,69 @@ struct WidgetLayoutTests {
         #expect(WidgetSize.migrated("t") == .s && WidgetSize.migrated("m") == .m && WidgetSize.migrated("q") == nil)
         let events = try #require(l.items.first { $0.kind == .events })
         #expect(events.size == .l && events.y + events.size.rows <= WidgetLayout.rows)
+    }
+
+    private func onGreeting(_ i: WidgetItem) -> Bool {
+        let r = WidgetLayout.reserved
+        return i.x < r.x + r.cols && r.x < i.x + i.size.cols && i.y < r.y + r.rows && r.y < i.y + i.size.rows
+    }
+
+    @Test func theGridIs16By12AndTheBottomRowTakesAWidget() {
+        #expect(WidgetLayout.cols == 16 && WidgetLayout.rows == 12)
+        var l = WidgetLayout(items: [])
+        let a = l.insert(WidgetItem(kind: .clock, size: .s, x: 0, y: 10), at: 0, 10)
+        #expect(a && l.items[0].y == 10)
+        #expect(DeskGrid.origin(0, 11).y + DeskGrid.frameSize(.s).height / 2 <= 900 - DeskGrid.bottom + 60)
+        #expect(DeskGrid.origin(0, 10).y + DeskGrid.frameSize(.s).height <= 900 - DeskGrid.bottom + 0.001)
+    }
+
+    @Test func noWidgetCanCoverTheGreeting() throws {
+        #expect(!WidgetLayout.standard().items.contains(where: onGreeting))
+        #expect(!WidgetLayout.fits(WidgetItem(kind: .clock, size: .s, x: 4, y: 2)))
+        #expect(!WidgetLayout.fits(WidgetItem(kind: .clock, size: .l, x: 6, y: 0)))
+        #expect(WidgetLayout.fits(WidgetItem(kind: .clock, size: .m, x: 4, y: 4)))
+        #expect(WidgetLayout.fits(WidgetItem(kind: .clock, size: .m, x: 4, y: 0)))
+        // Moving, nudging, resizing, adding and dropping all stay off it.
+        var l = WidgetLayout.standard()
+        let needs = try #require(l.items.first { $0.kind == .needs })
+        l.move(needs.id, to: 6, 2)
+        #expect(!l.items.contains(where: onGreeting))
+        let added = l.add(.clock, .s)
+        let c = try #require(added)
+        #expect(!onGreeting(c))
+        var edge = WidgetLayout(items: [WidgetItem(kind: .clock, size: .s, x: 3, y: 2)])
+        let nudged = edge.nudge(edge.items[0].id, dx: 1, dy: 0)
+        #expect(!nudged)
+        let ok = edge.resize(edge.items[0].id, to: .l)  // 4 x 4 at (3, 2) would cover it: it moves clear or is refused
+        #expect(!ok || !edge.items.contains(where: onGreeting))
+        var d = WidgetLayout(items: [])
+        d.insert(WidgetItem(kind: .spend, size: .l, x: 5, y: 1), at: 5, 1)
+        #expect(!d.items.contains(where: onGreeting))
+        // Undo of a removal puts it back clear of the greeting too.
+        var r = WidgetLayout.standard()
+        let removed = r.remove(r.items[0].id)
+        let gone = try #require(removed)
+        r.restore(WidgetItem(id: gone.id, kind: gone.kind, size: gone.size, x: 5, y: 2))
+        #expect(!r.items.contains(where: onGreeting))
+    }
+
+    @Test func aSavedV2LayoutMovesToTheNewGridKeepingEveryWidget() throws {
+        // A 16 x 8 desk the person arranged: one widget sits where the greeting now is, one at the old bottom.
+        let old =
+            #"{"v":2,"items":[{"t":"clock","s":"s","x":0,"y":0},{"t":"spend","s":"l","x":6,"y":1},{"t":"core","s":"m","x":0,"y":6},{"t":"quick","s":"s","x":15,"y":7}]}"#
+        let l = try #require(WidgetLayout.decoded(Data(old.utf8)))
+        #expect(l.items.count == 4, "nothing is lost")
+        #expect(noOverlap(l.items) && !l.items.contains(where: onGreeting))
+        #expect(l.items.first { $0.kind == .clock }.map { $0.x == 0 && $0.y == 0 } == true)
+        // The untouched old default becomes the new default; garbage-sized input never crashes.
+        let std = WidgetLayout.standard()
+        let stored = try #require(std.encoded())
+        #expect(WidgetLayout.decoded(stored)?.items == std.items)
+        let was =
+            #"{"v":2,"items":[{"t":"running","s":"m","x":0,"y":0},{"t":"spend","s":"l","x":4,"y":0},{"t":"machines","s":"m","x":8,"y":0},{"t":"digital","s":"s","x":12,"y":0},{"t":"quick","s":"s","x":14,"y":0},{"t":"needs","s":"m","x":0,"y":2},{"t":"events","s":"m","x":8,"y":2},{"t":"core","s":"m","x":12,"y":2},{"t":"board","s":"m","x":0,"y":4}]}"#
+        let n = try #require(WidgetLayout.decoded(Data(was.utf8)))
+        #expect(n.items.map(\.kind) == std.items.map(\.kind) && !n.items.contains(where: onGreeting))
+        #expect(WidgetLayout.decoded(Data(#"{"v":2,"items":[{"t":"clock","s":"s","x":99,"y":-5}]}"#.utf8))?.items.count == 1)
     }
 
     @Test func onlyTheDigitalClockIsTall() {

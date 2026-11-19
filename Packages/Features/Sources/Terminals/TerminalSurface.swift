@@ -160,6 +160,9 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
 
     // MARK: size
 
+    /// The pane has been given a real size (the emulator then follows it).
+    var isLaidOut: Bool { container.bounds.width > 0 && container.bounds.height > 0 }
+
     var size: (cols: Int, rows: Int) { (term.getTerminal().cols, term.getTerminal().rows) }
 
     /// Fill the pane (this window sizes the terminal) or show the terminal at `cols`×`rows` inside it, letterboxed.
