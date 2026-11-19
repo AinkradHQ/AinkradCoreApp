@@ -59,7 +59,8 @@ public final class TerminalsModel {
     var selected: String?
     /// The runner whose page is open in the Runners pane (nil: the fleet).
     var runnerDetail: String?
-    var runnerFilter: RunnerFacts.Filter = .all
+    /// The summary tile that is on (mockup 12); nil shows every runner.
+    var runnerFilter: RunnerFacts.Live?
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Terminals whose bell rang since they were last opened.
@@ -166,6 +167,7 @@ public final class TerminalsModel {
             items = terminals.sorted(by: Self.order)
             runners = fleet.sorted { $0.name < $1.name }
             for r in runners { sampleLoad(r) }
+            applyReported()
             load = .ready
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }

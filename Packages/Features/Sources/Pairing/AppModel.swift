@@ -254,6 +254,13 @@ public final class AppModel {
                 model?.recording[terminal] = paused.map { PaneRecording(paused: $0) }
             }
             model.pauseRecording = { [weak self] terminal in await self?.leyline.pauseRecording(terminal: terminal) }
+            // The host page's Runner card: how its runner is doing, and a way into the runner's page.
+            leyline.runnerGlance = { [weak self] id in
+                self?.terminals?.runnerProgress(id: id).map {
+                    RunnerGlance(online: $0.online, installing: $0.installing, percent: $0.percent)
+                }
+            }
+            leyline.openRunner = { [weak self] id in self?.terminals?.openRunners(id) }
             // Who claimed a runner invite, from the device list the Admin app keeps.
             leyline.deviceLookup = { [weak self] id in
                 self?.devices.items.first { $0.id == id }.map {
@@ -615,6 +622,26 @@ public final class AppModel {
                 }
             ) {
                 AddWizardView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
+            })
+    }
+
+    /// Add a runner (mockup 13): This Mac, another Mac, a server over SSH, or a server by command.
+    func openAddRunner() {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        stepUpNotice = nil
+        let model = AddRunnerModel(app: self)
+        shell.present(
+            ShellDialog(
+                id: "add-runner",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    Task { _ = await model?.requestClose() }
+                }
+            ) {
+                AddRunnerView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
             })
     }
 

@@ -12,6 +12,8 @@ enum RunnerTools {
     static let all: [(id: String, name: String, help: String)] = [
         ("claude", "Claude Code", "Runs AI sessions with your Claude account."),
         ("codex", "Codex", "Runs AI sessions with your OpenAI account."),
+        ("opencode", "OpenCode", "Runs AI sessions with your OpenCode login."),
+        ("agy", "Antigravity", "Runs AI sessions with your Google account."),
         ("git", "Git", "Lets AI sessions clone and push repositories."),
         ("node", "Node.js", "Needed by many tools."),
         ("python", "Python", "Needed by many tools."),
@@ -20,9 +22,14 @@ enum RunnerTools {
         ("docker", "Docker", "Runs containers."),
     ]
 
+    /// A tool's plain name from its key: "claude" is "Claude".
+    static func name(_ key: String) -> String {
+        RunnerFacts.aiTools.first { $0.key == key }?.name ?? all.first { $0.id == key }?.name ?? key
+    }
+
     /// The AI tools a runner has, for the AI sessions row: `Claude Code 2.1, Codex 0.9`; nil when it has none.
     static func aiLine(_ tools: [String: String]) -> String? {
-        let names = all.filter { ["claude", "codex"].contains($0.id) }.compactMap { t -> String? in
+        let names = all.filter { ["claude", "codex", "opencode", "agy"].contains($0.id) }.compactMap { t -> String? in
             guard let v = tools[t.id] else { return nil }
             let short = v.split(separator: ".").prefix(2).joined(separator: ".")
             return short.isEmpty ? t.name : "\(t.name) \(short)"
@@ -136,5 +143,69 @@ extension TerminalsModel {
     public func changeRunner(_ id: String, terminals: Bool? = nil, agents: Bool? = nil, capacity: Int? = nil) async {
         guard let r = runners.first(where: { $0.id == id }) else { return }
         await setPolicy(r, terminals: terminals, agents: agents, capacity: capacity)
+    }
+}
+
+/// How a runner that is being added is coming along, for Add runner's live checks.
+public struct RunnerProgress: Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let online: Bool
+    /// The AI tool being installed now ("Claude") and how far it is.
+    public let installing: String?
+    public let percent: Int
+    /// The last install that failed, in words.
+    public let failure: String?
+}
+
+extension TerminalsModel {
+    /// The runner by device id or by name; nil until the Core lists it.
+    public func runnerProgress(id: String? = nil, name: String? = nil) -> RunnerProgress? {
+        guard let r = runners.first(where: { ($0.id == id && id != nil) || ($0.name == name && name != nil) }) else {
+            return nil
+        }
+        let all = Array((installs[r.id] ?? [:]).values)
+        let now = all.first { $0.state == .running }
+        return RunnerProgress(
+            id: r.id, name: r.name, online: r.online, installing: now.map { RunnerTools.name($0.tool) },
+            percent: now?.percent ?? 0, failure: all.first { $0.state == .failed }?.reason)
+    }
+
+    /// One look at the Core and at the Mac runner's own install note, for a screen that waits on a runner.
+    public func refreshRunnerProgress() async {
+        readLocalInstall()
+        await reload()
+
+extension TerminalsModel {
+    /// Puts what each runner reports of its AI tool install into `installs`, beside the installs this app started.
+    func applyReported() {
+        for r in runners {
+            var mine = (installs[r.id] ?? [:]).filter { $0.value.op != "report" }
+            if let rep = r.reported, rep.state != .done { mine[rep.tool] = rep }
+            installs[r.id] = mine.isEmpty ? nil : mine
+        }
+    }
+
+    /// Where the runner inside this app writes the AI tool install it is doing now (`<state>/ai-tools/status.json`).
+    static func localToolStatusURL(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        home.appending(path: ".ainkrad-runner/core/ai-tools/status.json")
+    }
+
+    /// The Mac's own runner installs and updates the AI tools by itself (D-22). The Core does not see those installs, so the app
+    /// reads the runner's note: an install under way shows as "Installing Claude…", a failed one as the last problem.
+    func readLocalInstall(from url: URL = localToolStatusURL()) {
+        guard let id = host.thisMacRunnerID else { return }
+        installs[id] = installs[id]?.filter { $0.value.op != "local" }
+        guard let data = try? Data(contentsOf: url),
+            let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let tool = o["tool"] as? String
+        else { return }
+        let percent = (o["percent"] as? Int) ?? 0
+        let failed = o["failed"] as? String
+        let done = failed == nil && percent >= 100
+        guard !done else { return }
+        installs[id, default: [:]][tool] = ToolInstall(
+            op: "local", tool: tool, state: failed == nil ? .running : .failed, percent: percent,
+            step: (o["step"] as? String) ?? "", reason: failed)
     }
 }

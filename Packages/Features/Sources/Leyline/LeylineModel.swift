@@ -21,6 +21,12 @@ public final class LeylineModel {
     /// The paired device with this id (name, platform, key fingerprint), from the app's device list: who claimed a runner invite.
     public var deviceLookup: (@MainActor (String) -> RunnerClaimer?)?
 
+    /// How the runner this host was made into is doing: online, and the AI tool being installed. The app sets it from the
+    /// Runners list; nil shows the host's Runner card without live state.
+    public var runnerGlance: (@MainActor (String) -> RunnerGlance?)?
+    /// Opens a runner's page in Devices & Runners.
+    public var openRunner: (@MainActor (String) -> Void)?
+
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
     var knownHosts: [KnownHostItem] = []
@@ -144,6 +150,21 @@ public final class LeylineModel {
     }
 
     // MARK: derived
+
+    /// Whether an address answers like an SSH server from the Core, for Add Host's live check.
+    func checkHost(_ address: String, _ port: Int) async throws -> HostCheck {
+        guard let service, !checkNeedsStepUp else { throw LeylineFailure.notYet }
+        do { return try await service.checkHost(address: address, port: port) } catch let e as LeylineFailure
+            where e.code == "step_up_required"
+        {
+            // The check needs a live step-up; typing never prompts for one, so it stays quiet until the person unlocks.
+            checkNeedsStepUp = true
+            throw e
+        }
+    }
+
+    /// The Core refused a host check for want of a step-up: Add Host stops asking while it is typed into.
+    var checkNeedsStepUp = false
 
     func hostItem(_ id: String?) -> HostItem? { id.flatMap { id in hosts.first { $0.id == id } } }
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
@@ -365,6 +386,7 @@ public final class LeylineModel {
         page = .hosts
         quickText = ""
         writeError = nil
+        checkNeedsStepUp = false
         quickOpen = true
     }
 

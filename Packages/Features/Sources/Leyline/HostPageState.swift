@@ -389,13 +389,15 @@ final class HostPageState {
         /// A runner paired: the device that claimed the invite.
         case paired(device: String)
         case expired
+        /// The install on the host did not finish, and why.
+        case failed(String)
     }
 
     private(set) var runnerState = RunnerInstallState.idle
     private var runnerWatch: Task<Void, Never>?
 
-    /// One action: Touch ID, then the Core puts a one-time invite on the host, opens a terminal with the installer typed in
-    /// (the person types the sudo password there) and waits for the runner to pair.
+    /// One action: Touch ID, then the Core puts a one-time invite on the host and installs the runner there by itself over SSH
+    /// (nothing to type: the system service with passwordless sudo, else a runner for that user), and waits for it to pair.
     func makeRunner() async {
         guard let service, let h = host, model.mayWrite() else { return }
         switch runnerState {
@@ -407,7 +409,7 @@ final class HostPageState {
             let install = try await model.host.elevated(
                 "Install the Ainkrad runner on \(h.name).", done: "started", keepsEdit: false
             ) { try await service.makeRunner(host: h.id, rows: 24, cols: 80) }
-            await model.openTerminal?(install.terminal)
+            if let t = install.terminal { await model.openTerminal?(t) }  // an older Core still opens a terminal
             runnerState = .waiting(until: install.expiresAt)
             runnerWatch?.cancel()
             runnerWatch = Task { [weak self] in await self?.watchRunner(until: install.expiresAt) }
@@ -429,8 +431,25 @@ final class HostPageState {
                 runnerState = .paired(device: d)
                 return
             }
+            if let i = host?.runnerInstall, i.state == "failed" {
+                runnerState = .failed(i.reason ?? "The installer on the host failed.")
+                return
+            }
         }
         if !Task.isCancelled { runnerState = .expired }
+    }
+
+    /// The sheet before Make Runner: what it does, and that nothing is typed.
+    func confirmRunner() {
+        guard let h = host else { return }
+        shell.presentSheet(
+            title: "Make \(h.name) a runner?",
+            message:
+                "Ainkrad copies a one-time invite to the host and installs the runner there over SSH. Nothing to type. With passwordless sudo it installs the system service; without it, a runner for this user only (terminals; AI sessions need the system install). The invite ends in 15 minutes.",
+            actions: [
+                ShellSheetAction("Cancel"),
+                ShellSheetAction("Make Runner", primary: true) { Task { await self.makeRunner() } },
+            ], symbol: "server.rack")
     }
 
     // MARK: Mac-direct

@@ -30,7 +30,8 @@ struct LeylineView: View {
                 return .handled
             }
             if model.openID != nil {
-                model.closeHost()
+                // Inside a page behind Advanced, Esc goes back to the host's cards first.
+                if model.section != .overview { model.section = .overview } else { model.closeHost() }
                 return .handled
             }
             return .ignored
