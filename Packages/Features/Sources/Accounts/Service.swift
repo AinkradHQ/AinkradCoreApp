@@ -87,6 +87,11 @@ protocol AccountsService: Sendable {
     func sendLoginInput(_ id: String, line: String) async throws
     /// The runner each runner-bound account is pinned to, by account id (runner ids). Empty when the Core does not say.
     func boundRunners() async -> [Int64: String]
+    // E7-7 (API minor 95): remove with Undo. Wire in `AIOrder/AccountRemovalWire.swift`; the defaults say "not supported".
+    /// `DELETE /accounts/{id}`: soft delete. The time the Core keeps it for an Undo (nil when it does not say).
+    func removeAccount(_ id: Int64) async throws -> Date?
+    /// `POST /accounts/{id}/restore` (step-up): inside the window only.
+    func restoreAccount(_ id: Int64) async throws
 }
 
 /// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).
@@ -393,20 +398,12 @@ struct LiveAccountsService: AccountsService {
     func usage() async throws -> [UsageItem] {
         try await run { try await client.accountsUsage().ok.body.json.map(Self.usage) }
     }
+    // Core 0.10 retired `PUT /accounts/{id}/limits`: a limit is a budget now (`PUT /budgets`).
     func setLimit(account: Int64, _ d: LimitDraft) async throws {
-        try await run {
-            _ = try await client.setAccountLimit(
-                path: .init(id: String(account)),
-                body: .json(.init(cap: d.cap, unit: d.unit, warnPercent: d.warnPercent, windowSecs: d.windowSecs))
-            ).ok
-        }
+        throw CoreError.invalidInput("Usage limits are budgets now. Set one under Limits in Advanced.")
     }
     func clearLimit(account: Int64, unit: String, windowSecs: Int64) async throws {
-        try await run {
-            _ = try await client.clearAccountLimit(
-                path: .init(id: String(account), unit: unit, windowSecs: windowSecs)
-            ).ok
-        }
+        throw CoreError.invalidInput("Usage limits are budgets now. Remove one under Limits in Advanced.")
     }
     func costs(account: Int64?) async throws -> [CostItem] {
         try await run {
@@ -445,15 +442,9 @@ struct LiveAccountsService: AccountsService {
         }
         return UsageItem(
             accountID: u.accountId, fiveHours: w(u.fiveHours), sevenDays: w(u.sevenDays),
-            limitShare: Double(u.maxUtilisationBps) / 10_000, limitsExhausted: u.limits.contains { $0.exhausted },
-            hasLimits: !u.limits.isEmpty, drops: u.recentDrops,
+            limitShare: 0, limitsExhausted: false, hasLimits: false, drops: u.recentDrops,
             companies: u.byCompany.map {
                 CompanyUsage(company: $0.company, fiveHours: w($0.fiveHours), sevenDays: w($0.sevenDays))
-            },
-            limits: u.limits.map {
-                LimitItem(
-                    unit: $0.unit, windowSecs: $0.windowSecs, cap: $0.cap, used: $0.used, warnPercent: $0.warnPercent,
-                    exhausted: $0.exhausted)
             })
     }
 

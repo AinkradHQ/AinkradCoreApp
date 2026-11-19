@@ -72,6 +72,7 @@ enum BudgetWords {
         switch k {
         case "account": "Account"
         case "pool": "Pool"
+        case "provider": "Provider"
         case "agent": "AI session"
         case "company": "Company"
         case "department": "Department"
@@ -86,6 +87,7 @@ enum BudgetWords {
         switch k {
         case "account": "creditcard.fill"
         case "pool": "square.grid.2x2.fill"
+        case "provider": "server.rack"
         case "agent": "person.fill"
         case "company": "building.2.fill"
         case "department": "person.3.fill"
@@ -123,6 +125,7 @@ extension AccountsModel {
         case "account": Int64(b.subject).flatMap(account)?.label ?? "Account \(b.subject)"
         case "pool":
             Int64(b.subject).flatMap(pool).map { "\($0.name) · \(providerName($0.provider))" } ?? "Pool \(b.subject)"
+        case "provider": ProviderCatalog.name(b.subject, fallback: providerName(b.subject))
         default: b.subject
         }
     }
