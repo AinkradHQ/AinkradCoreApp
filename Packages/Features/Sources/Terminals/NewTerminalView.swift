@@ -1,46 +1,54 @@
 import CoreUI
 import SwiftUI
 
-/// New terminal (advanced): where it runs, and a live preview of what Open will do. It always starts the Ainkrad shell. The quick New terminal
-/// skips this sheet. A refusal lands inline with the Core's own code.
+/// New terminal… (`screens/08-terminals.html`): where it runs (This Mac is a real shell, every other machine a sandbox), and
+/// whether it opens in the sandbox home or a project's folder. ⌘T skips this sheet and opens on the last machine. A refusal
+/// lands inline with the Core's own code.
 struct NewTerminalView: View {
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     @Namespace private var pick
     @State private var shown = false
 
+    private enum Where: Hashable, Sendable { case home, project }
+
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
             HStack(spacing: Space.s3) {
-                IconTile("terminal", hue: GlassInk.slate, size: 52, bounce: shown)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("New terminal").coreFont(size: MacTextSize.large + 4, weight: .bold)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Pick where it runs.").foregroundStyle(GlassInk.secondary)
-                }
+                IconTile("terminal", hue: GlassInk.blue, size: 52, bounce: shown)
+                Text("New terminal").coreFont(size: MacTextSize.large + 4, weight: .bold)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
             }
             .coreRise(shown, 0)
-            step("Where", "server.rack", index: 1) {
+            step("Where should it run?", index: 1) {
                 if model.runners.isEmpty {
                     Label("No runners are paired with this Core.", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(GlassInk.secondary)
                 }
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
-                ) {
-                    ForEach(Array(model.runners.enumerated()), id: \.element.id) { i, r in
+                VStack(spacing: Space.s1) {
+                    ForEach(machines) { r in
                         RunnerTile(model: model, form: form, runner: r, lens: pick)
-                            .coreTileKey("⌘\(i + 1)", key: Character("\(min(i + 1, 9))"))
                     }
                 }
             }
-            preview.coreRise(shown, 2)
-            Label(
-                "Runs as the runner's user in a sandbox: sudo, su and ping don't work. The terminal scope counts as admin-level today.",
-                systemImage: "info.circle"
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            step("Open it in", index: 2) {
+                CoreSegmented(
+                    "Open it in",
+                    segments: [
+                        CoreSegment(Where.home, form.isThisMac ? "Home folder" : "Sandbox home"),
+                        CoreSegment(Where.project, "A project folder"),
+                    ],
+                    selection: Binding(
+                        get: { form.inProject ? .project : .home }, set: { form.inProject = $0 == .project })
+                )
+                if form.inProject {
+                    CoreSelect(
+                        nil, selection: Binding(get: { form.projectID ?? 0 }, set: { form.projectID = $0 }),
+                        options: form.projects.map { CoreSelectOption($0.id, $0.name) })
+                }
+            }
+            note
             if let n = model.host.elevationNotice { ElevationBanner(notice: n) }
             if let why = form.blockedReason, form.error == nil {
                 Label(why, systemImage: "exclamationmark.triangle").coreFont(size: MacTextSize.meta)
@@ -55,9 +63,11 @@ struct NewTerminalView: View {
                 .accessibilityIdentifier("new-terminal-error")
             }
             HStack(spacing: Space.s2) {
+                Text("⌘T opens one right away on \(form.chosen?.name ?? "the last machine").")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                Spacer(minLength: Space.s2)
                 Button("Cancel") { model.shell.closeDialog() }
                     .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-                Spacer(minLength: Space.s2)
                 Button {
                     Task { await form.submit() }
                 } label: {
@@ -73,41 +83,40 @@ struct NewTerminalView: View {
         .animation(Motion.out(Motion.ui), value: form.runner)
     }
 
-    private func step<C: View>(_ title: String, _ symbol: String, index: Int, @ViewBuilder _ content: () -> C)
-        -> some View
-    {
+    /// This Mac first, then the others as the Core lists them.
+    private var machines: [RunnerItem] {
+        let mac = model.host.thisMacRunnerID
+        return model.runners.filter { $0.id == mac } + model.runners.filter { $0.id != mac }
+    }
+
+    private func step<C: View>(_ title: String, index: Int, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Label(title, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
-                .foregroundStyle(GlassInk.secondary)
+            Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
             content()
         }
         .coreRise(shown, index)
     }
 
-    /// What Open will do, as a small terminal: the runner, the program, a blinking cursor.
-    private var preview: some View {
-        HStack(spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(form.chosen?.name ?? "no runner") $ ainkrad shell")
-                    .coreFont(size: MacTextSize.body, design: .monospaced)
-                    .contentTransition(.opacity)
-                HStack(spacing: 0) {
-                    Text("30 × 100").coreFont(size: MacTextSize.meta, design: .monospaced)
-                        .foregroundStyle(GlassInk.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-            BlinkingCursor()
-        }
-        .padding(Space.s3)
-        .background(GlassInk.sunk(0.35), in: coreShape(Radius.row))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Opens the Ainkrad shell on \(form.chosen?.name ?? "no runner")")
+    /// What this choice means for the person's files.
+    private var note: some View {
+        let mac = form.isThisMac
+        let text =
+            mac
+            ? "This is a real shell on your Mac. It can read and change your files, so be careful with commands you paste."
+            : form.inProject
+                ? "The sandbox can only see the project folder you share, nothing else."
+                : "A safe room with its own home folder. It cannot see your files unless you share a project."
+        return Label(text, systemImage: mac ? "exclamationmark.triangle" : "shield")
+            .coreFont(size: MacTextSize.meta)
+            .foregroundStyle(mac ? GlassInk.ink(GlassInk.amber) : GlassInk.primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+            .background((mac ? GlassInk.amber : GlassInk.blue).opacity(0.14), in: coreShape(Radius.row))
+            .coreRise(shown, 3)
     }
 }
 
-/// A runner to pick: its picture coloured by state, name, architecture, work slots, and why it can't be picked.
+/// A machine to pick: its picture, name and what a terminal there is, a chip (This Mac or Sandbox), and why it can't be picked.
 private struct RunnerTile: View {
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
@@ -119,66 +128,51 @@ private struct RunnerTile: View {
     var body: some View {
         let st = RunnerStatus(runner)
         let on = form.runner == runner.id
-        let hue: Color = st == .off ? GlassInk.red : st == .ok ? GlassInk.green : GlassInk.amber
+        let mac = model.host.thisMacRunnerID == runner.id
         let warn: String? =
             st == .off
-            ? "Not connected"
+            ? "Offline right now"
             : st == .busy
                 ? "Busy: new work is refused"
                 : st == .degraded ? "Slow to answer" : !runner.hasPty ? "Terminals are off" : nil
+        let about =
+            mac
+            ? "A real shell on this Mac. It can change your files."
+            : runner.builtIn ? "Sandbox. A safe room that cannot see your files." : "Sandbox on this machine."
         Button {
             form.pick(runner.id)
         } label: {
-            HStack(alignment: .top, spacing: Space.s3) {
-                IconTile("server.rack", hue: hue, size: 40, bounce: on)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    HStack {
-                        Text(runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                        Spacer()
-                        Image(systemName: on ? "checkmark.square.fill" : "square").foregroundStyle(
-                            on ? GlassInk.blue : GlassInk.track
-                        )
-                        .contentTransition(.symbolEffect(.replace))
-                    }
-                    Text([runner.arch, "\(model.onRunner(runner.id)) open"].compactMap { $0 }.joined(separator: " · "))
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    CoreSlots(used: runner.load, capacity: runner.capacity)
-                    if let warn {
-                        Label(warn, systemImage: st.symbol).coreFont(size: MacTextSize.meta, weight: .medium)
-                            .foregroundStyle(GlassInk.ink(hue))
-                    }
+            HStack(spacing: Space.s3) {
+                Image(systemName: on ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(on ? GlassInk.blue : GlassInk.track)
+                    .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
+                IconTile(
+                    mac ? "laptopcomputer" : runner.builtIn ? "diamond" : "server.rack",
+                    hue: mac ? GlassInk.amber : GlassInk.blue, size: 36, bounce: on)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(mac ? "This Mac" : runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                    Text(warn ?? about).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(warn == nil ? GlassInk.secondary : GlassInk.ink(GlassInk.red)).lineLimit(1)
                 }
+                Spacer(minLength: Space.s2)
+                MachineChip(real: mac)
             }
-            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2).frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 if on {
-                    coreShape(Radius.cardMac).fill(palette.navActive)
-                        .matchedGeometryEffect(id: "runner", in: lens)
+                    coreShape(Radius.row).fill(palette.navActive).matchedGeometryEffect(id: "runner", in: lens)
                 } else {
-                    coreShape(Radius.cardMac).fill(hovering ? GlassInk.wellHover : GlassInk.well)
+                    coreShape(Radius.row).fill(hovering ? GlassInk.wellHover : GlassInk.well)
                 }
             }
-            .contentShape(coreShape(Radius.cardMac))
-            .opacity(st == .off && !on ? 0.5 : 1)
+            .contentShape(coreShape(Radius.row))
+            .opacity(st == .off && !on ? 0.55 : 1)
         }
         .buttonStyle(.plain)
         .disabled(st == .off && !on)
-        .coreScaleEffect(hovering ? 1.015 : 1)
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.25), value: hovering)
-        .accessibilityLabel("\(runner.name), \(st.label)\(warn.map { ", \($0)" } ?? "")")
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .accessibilityLabel("\(mac ? "This Mac" : runner.name), \(mac ? "real shell" : "sandbox"), \(st.label)")
         .accessibilityAddTraits(on ? .isSelected : [])
-    }
-}
-
-/// A terminal cursor that blinks (opacity, so it stays under Reduce Motion).
-private struct BlinkingCursor: View {
-    @State private var on = true
-    var body: some View {
-        Rectangle().fill(GlassInk.blue).frame(width: 9, height: 18)
-            .opacity(on ? 1 : 0.15)
-            .coreLoop(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
-            .onAppear { on = false }
-            .accessibilityHidden(true)
     }
 }

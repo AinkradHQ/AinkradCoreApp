@@ -10,6 +10,8 @@ final class FakeHost: TerminalHost {
     var isElevated = true
     var elevationNotice: ElevationNotice?
     var declines = false
+    var macID: String?
+    var thisMacRunnerID: String? { macID }
     private(set) var reasons: [String] = []
     func clearElevationNotice() { elevationNotice = nil }
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
@@ -136,11 +138,12 @@ func item(
         exitCode: code, exitSignal: signal, createdAt: Date(timeIntervalSince1970: 1_800_000_000))
 }
 
-func runner(_ id: String = "r1", online: Bool = true, degraded: Bool = false, avg1: Double = 1, pty: Bool = true)
-    -> RunnerItem
-{
+func runner(
+    _ id: String = "r1", name: String = "mac-studio", online: Bool = true, degraded: Bool = false, avg1: Double = 1,
+    pty: Bool = true
+) -> RunnerItem {
     RunnerItem(
-        id: id, name: "mac-studio", online: online, degraded: degraded, load: 1, capacity: 4, avg1: avg1, cores: 4,
+        id: id, name: name, online: online, degraded: degraded, load: 1, capacity: 4, avg1: avg1, cores: 4,
         version: "0.24.0", arch: "aarch64", lastSeen: nil,
         drivers: pty ? [DriverItem(name: "pty", commands: ["noop"], capacity: 16)] : [], isolationTiers: nil)
 }

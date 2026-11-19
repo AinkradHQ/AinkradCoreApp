@@ -18,7 +18,11 @@ struct TerminalItem: Identifiable, Equatable, Sendable {
     var exitCode: Int32?
     var exitSignal: String?
     var createdAt: Date?
+    /// Where the shell lives (D-17): `home`, `project:<id>`, `session:<id>` or `real`; nil for a terminal opened before sandboxes.
+    var sandbox: String? = nil
 
+    /// A real shell on this Mac, not a sandbox: the only kind that can change the person's own files.
+    var isReal: Bool { sandbox == "real" }
     var isEnded: Bool { status == "exited" || status == "reaped" }
     var hostLost: Bool { exitSignal == "host_lost" }
 }
@@ -122,6 +126,15 @@ protocol TerminalService: Sendable {
     func terminal(_ id: String) async throws -> TerminalItem
     func runners() async throws -> [RunnerItem]
     func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem
+    /// `create` with where the shell lives (`sandbox`, D-17). A Core before minor 95 ignores it.
+    func create(
+        runner: String, program: String?, session: String?, sandbox: String?, project: Int?, rows: Int, cols: Int
+    ) async throws -> TerminalItem
+    /// The last rows of a terminal's screen as text, for a card's live preview (normal unlock, no Touch ID). Empty when the
+    /// Core cannot say.
+    func tail(_ id: String, lines: Int) async throws -> [String]
+    /// The projects a terminal can open in (the sandbox mounts that project's folder).
+    func projects() async throws -> [TerminalProject]
     func close(_ id: String) async throws -> TerminalItem
     func signal(_ id: String, _ name: String) async throws
     /// Milliseconds the runner took to answer an empty round trip.
@@ -135,7 +148,20 @@ protocol TerminalService: Sendable {
     func installTool(_ runner: String, tool: String) async throws -> String
 }
 
+/// A project a terminal can be opened in.
+struct TerminalProject: Identifiable, Equatable, Sendable {
+    let id: Int
+    var name: String
+}
+
 extension TerminalService {
+    func create(
+        runner: String, program: String?, session: String?, sandbox: String?, project: Int?, rows: Int, cols: Int
+    ) async throws -> TerminalItem {
+        try await create(runner: runner, program: program, session: session, rows: rows, cols: cols)
+    }
+    func tail(_ id: String, lines: Int) async throws -> [String] { [] }
+    func projects() async throws -> [TerminalProject] { [] }
     func attach(_ id: String, runner: String?, after: UInt64) async throws -> any TerminalLink {
         try await attach(id, after: after)
     }
@@ -171,12 +197,43 @@ struct LiveTerminalService: TerminalService {
     }
 
     func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws -> TerminalItem {
+        try await create(
+            runner: runner, program: program, session: session, sandbox: nil, project: nil, rows: rows, cols: cols)
+    }
+
+    func tail(_ id: String, lines: Int) async throws -> [String] {
+        guard await connection.serverSupports(minor: 95) else { return [] }
+        return try await run {
+            switch try await client.tailTerminal(path: .init(id: id), query: .init(lines: Int32(lines))) {
+            case .ok(let o): return try o.body.json.lines
+            case .notFound: return []
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    func projects() async throws -> [TerminalProject] {
+        try await run {
+            try await client.listProjects().ok.body.json.filter { $0.state != "archived" }.map {
+                TerminalProject(id: Int($0.id), name: $0.name)
+            }
+        }
+    }
+
+    func create(
+        runner: String, program: String?, session: String?, sandbox: String?, project: Int?, rows: Int, cols: Int
+    ) async throws -> TerminalItem {
+        // A Core before minor 95 ignores `sandbox` and would start a host-view shell: send nothing it cannot read.
+        let newCore = await connection.serverSupports(minor: 95)
+        let (sandbox, project) = newCore ? (sandbox, project) : (nil, nil)
         // A Core before minor 77 ignores `session` and opens in the home folder; say nothing it cannot read.
         let supported = await connection.serverSupports(minor: 77)
         let session = supported ? session : nil
         return try await run {
             let body = Components.Schemas.NewTerminal(
-                program: program, runner: runner, session: session, size: .init(cols: Int32(cols), rows: Int32(rows)))
+                program: program, project: project.map(Int64.init), runner: runner, sandbox: sandbox, session: session,
+                size: .init(cols: Int32(cols), rows: Int32(rows)))
             switch try await client.createTerminal(body: .json(body)) {
             case .created(let o): return Self.item(try o.body.json)
             case .badRequest(let r): throw Self.fail(400, try? r.body.json)
@@ -329,7 +386,7 @@ struct LiveTerminalService: TerminalService {
         return TerminalItem(
             id: t.id, runner: t.runner, status: raw, rows: Int(t.size?.rows ?? 0), cols: Int(t.size?.cols ?? 0),
             seq: UInt64(max(0, t.seq ?? 0)), attached: Int(t.attached ?? 0), orphaned: t.orphaned ?? false,
-            exitCode: t.exitCode, exitSignal: t.exitSignal, createdAt: t.createdAt)
+            exitCode: t.exitCode, exitSignal: t.exitSignal, createdAt: t.createdAt, sandbox: t.sandbox)
     }
 
     static func runner(_ r: Components.Schemas.Runner) -> RunnerItem {

@@ -24,9 +24,12 @@ protocol InviteService: Sendable {
     func withdraw(_ pairingID: String) async throws
     /// A one-time runner invite (API 1.51): lasts 15 minutes, comes with a `token` for the runner's command, no check code.
     func createRunnerInvite(name: String) async throws -> RunnerInvite
+    /// Attests `runner` as the one bundled with this Mac's app (E6: only it can be given a real shell).
+    func attestBundledRunner(_ runner: String) async throws
 }
 
 extension InviteService {
+    func attestBundledRunner(_ runner: String) async throws {}
     func createRunnerInvite(name: String) async throws -> RunnerInvite {
         throw CoreError.invalidInput("This Core cannot make a runner invite yet. Use a typed code instead.")
     }
@@ -44,6 +47,7 @@ struct LiveInviteService: InviteService {
     func createRunnerInvite(name: String) async throws -> RunnerInvite {
         try await service.createRunnerInvite(name: name)
     }
+    func attestBundledRunner(_ runner: String) async throws { try await service.attestBundledRunner(runner) }
 }
 
 /// Release default until the Core serves invites. Says so, plainly.
