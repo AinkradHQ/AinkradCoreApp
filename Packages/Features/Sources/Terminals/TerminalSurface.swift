@@ -37,6 +37,10 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
             [weak self] _ in
             MainActor.assumeIsolated { self?.applyPrefs() }
         }
+        NotificationCenter.default.addObserver(forName: AppLookPrefs.changed, object: nil, queue: .main) {
+            [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPrefs() }
+        }
         container.addSubview(term)
         container.addSubview(overlay)
         overlay.caretFrame = { [weak term] in term?.caretFrame ?? .zero }

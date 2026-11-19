@@ -45,6 +45,7 @@ struct AgentsListView: View {
         // The same light backing by day as the conversation screen, over the Look.
         .background(SessionInk.backing)
         .paneLook(AgentPrefs.shared.look)
+        .appLookTheme(AgentPrefs.shared.appLook)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .background {

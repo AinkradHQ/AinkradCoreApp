@@ -3,6 +3,7 @@ import SwiftUI
 /// Thinking and running tools: a short blue bar whose segment slides along its track, never a spinner or bouncing dots.
 /// Under Reduce Motion the segment rests in the middle. Decorative: put the words ("Thinking") beside it.
 public struct CoreWorkingBar: View {
+    @Environment(\.coreAccent) private var accent
     let width: CGFloat
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -17,7 +18,7 @@ public struct CoreWorkingBar: View {
             let p = reduce ? 0.5 : (1 - cos(t * 2 * .pi)) / 2
             coreShape(Space.s1 / 2).fill(palette.track)
                 .overlay(alignment: .leading) {
-                    coreShape(Space.s1 / 2).fill(GlassInk.blue).frame(width: seg).offset(x: (width - seg) * p)
+                    coreShape(Space.s1 / 2).fill(GlassInk.accent(accent)).frame(width: seg).offset(x: (width - seg) * p)
                 }
         }
         .frame(width: width, height: Space.s1)

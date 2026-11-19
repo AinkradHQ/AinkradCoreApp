@@ -14,6 +14,8 @@ public struct Palette: Sendable {
     private let theme: ThemeColors
     /// System Increase Contrast is on: edges and secondary ink go stronger (set by `coreTheme()`).
     public var increased = false
+    /// The app's own accent (E2-7), or nil for the global one.
+    public var accent: CoreAccent?
 
     public static let night = Palette(isDay: false, theme: Themes.night)
     public static let day = Palette(isDay: true, theme: Themes.dayLight)
@@ -29,11 +31,11 @@ public struct Palette: Sendable {
         return copy
     }
     /// The accent as text (Settings, Appearance).
-    public var primary: Color { GlassInk.blueInk }
+    public var primary: Color { GlassInk.accentInk(accent) }
     public var disabled: Color { theme["disabled"] }
-    public var btnPrimary: Color { GlassInk.blue }
-    public var btnPrimaryHover: Color { GlassInk.blue.opacity(0.9) }
-    public var btnPrimaryPress: Color { GlassInk.blue.opacity(0.8) }
+    public var btnPrimary: Color { GlassInk.accent(accent) }
+    public var btnPrimaryHover: Color { btnPrimary.opacity(0.9) }
+    public var btnPrimaryPress: Color { btnPrimary.opacity(0.8) }
     public var btnInk: Color { theme["btnInk"] }
     /// Selection, hover and dim fills are the launcher's white glass on every screen (Ahmed, 2026-11-05: one style).
     /// Day: the mockups' lit white row with dark ink.
@@ -77,7 +79,7 @@ public struct Palette: Sendable {
     private func toneColours(_ tone: Tone) -> (ink: Color, fill: Color) {
         switch tone {
         case .run: (theme["chipRun"], theme["chipRunBg"])
-        case .done: (GlassInk.blueInk, GlassInk.blueInk.opacity(0.14))
+        case .done: (GlassInk.accentInk(accent), GlassInk.accentInk(accent).opacity(0.14))
         case .fail: (theme["chipFail"], theme["chipFailBg"])
         case .queue: (theme["chipQueue"], theme["chipQueueBg"])
         case .warn:
