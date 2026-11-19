@@ -322,7 +322,7 @@ public final class AppModel {
     }
 
     /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
-    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts", "mac-runner"]
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts", "mac-runner"]
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
         shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
