@@ -212,6 +212,7 @@ public final class AccountsModel {
         switch e {
         case .forbiddenScope: "forbidden_scope"
         case .stepUpRequired: "step_up_required"
+        case .unlockRequired: "unlock_required"
         case .rateLimited: "rate_limited"
         case .offline: "offline"
         case .sessionExpired: "session_expired"

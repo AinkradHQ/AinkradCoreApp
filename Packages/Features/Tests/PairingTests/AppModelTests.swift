@@ -188,9 +188,24 @@ struct AppModelTests {
         let m = try app(s)
         m.beatEvery = .milliseconds(20)
         await m.start()
-        s.beatError = CoreError.stepUpRequired
+        s.beatError = CoreError.unlockRequired
         try await Task.sleep(for: .milliseconds(150))
         #expect(s.unlocks == 2 && m.shell.lock == .open, "a Core restart costs one Touch ID, not a lockout")
+    }
+
+    @Test func anUnlockRequiredAnswerSignsInAgainEvenWithTheCardDown() async throws {
+        let s = FakeService()
+        s.unlockSupported = true
+        let m = try app(s)
+        await m.start()
+        var refused = false
+        try await m.elevated("open", done: "opened") {
+            if !refused {
+                refused = true
+                throw CoreError.unlockRequired
+            }
+        }
+        #expect(s.unlocks == 2 && s.stepUps == 0 && m.shell.lock == .open, "the unlock, not a danger step-up")
     }
 
     @Test func aDangerActionAsksFreshEvenWhenTheAppIsUnlocked() async throws {
