@@ -125,6 +125,17 @@ struct LeylineTests {
         #expect(groups[2].sub == "not in a group · 1 host")
     }
 
+    @Test func aHostSaysOnlineOrNotAnsweringOnlyOnceTheCoreHasChecked() {
+        var h = HostItem(
+            id: "h", name: "n", address: "a", port: 22, username: "u", keyID: nil, jumpChain: [], viaRunner: nil,
+            group: nil, tags: [], aiRule: .ask, os: nil, createdAt: nil)
+        #expect(h.presence == nil && h.seenLine == nil)
+        h.reach = HostReach(up: true, latencyMS: 40, checkedAt: Date(), seenAt: Date())
+        #expect(h.presence?.label == "Online" && h.seenLine != nil)
+        h.reach = HostReach(up: false, latencyMS: nil, checkedAt: Date(), seenAt: nil)
+        #expect(h.presence?.label == "Not answering" && h.seenLine == nil)
+    }
+
     @MainActor @Test func theRunnerChoicesMarkTheHostsThatAreAlreadyRunners() {
         let (m, _, _) = model()
         func h(_ n: String, runner: String?) -> HostItem {

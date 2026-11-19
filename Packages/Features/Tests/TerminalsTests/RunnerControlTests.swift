@@ -62,4 +62,33 @@ import Testing
         #expect(m.live(r) == .gettingReady)
         #expect(m.runnerProgress(id: "nope") == nil)
     }
+
+    @Test func theRunnersOwnReportShowsAnInstallInFlightAndKeepsADoneToolReady() async throws {
+        let json = """
+            [{"id":"r1","home":"/var/lib/akrw","last_error":"no AI tool installed",
+              "tool_install":{"tool":"claude","state":"running","percent":55,"step":"Downloading Claude","reason":null}}]
+            """
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        let wire = try d.decode([RunnerReportWire].self, from: Data(json.utf8))
+        var r = runner()
+        wire[0].apply(to: &r)
+        #expect(r.home == "/var/lib/akrw" && r.lastError == "no AI tool installed")
+        #expect(r.reported?.state == .running && r.reported?.percent == 55)
+        let (m, _, _) = make()
+        await m.reload()
+        m.runners = [r]
+        m.applyReported()
+        #expect(m.installs[r.id]?["claude"]?.percent == 55)
+        // Done: nothing in flight, and the tool counts as installed before the runner restarts to probe it.
+        var done = runner()
+        RunnerReportWire(
+            id: "r1", home: nil, lastError: nil,
+            toolInstall: .init(tool: "codex", state: "done", percent: 100, step: "Installed", reason: nil)
+        ).apply(to: &done)
+        #expect(done.tools["codex"] == "")
+        m.runners = [done]
+        m.applyReported()
+        #expect(m.installs[done.id] == nil)
+    }
 }

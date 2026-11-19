@@ -21,9 +21,10 @@ struct HostHero: View {
                     HStack(spacing: Space.s3) {
                         Text(host.name).coreFont(size: MacTextSize.large + 6, weight: .semibold).lineLimit(1)
                             .accessibilityAddTraits(.isHeader)
+                        if let p = host.presence { StateBadge(p.label, tone: p.tone, symbol: "circle") }
                         if let g = host.group { CoreChip(g, minWidth: 0) }
                     }
-                    Text([host.os, host.login].compactMap { $0 }.joined(separator: " · "))
+                    Text([host.os, host.login, host.seenLine?.lowercased()].compactMap { $0 }.joined(separator: " · "))
                         .foregroundStyle(palette.text2).lineLimit(1)
                 }
                 Spacer(minLength: Space.s3)
@@ -144,7 +145,9 @@ struct HostCards: View {
                         CoreMeter(Double(g.percent) / 100, label: "Installing \(tool)").frame(width: Space.s8 * 3)
                     }
                 } else if waiting {
-                    previewLine("terminal", "Type your sudo password in the terminal")
+                    previewLine("arrow.down.circle", "Installing the runner over SSH")
+                } else if case .failed(let why) = state.runnerState {
+                    previewLine("exclamationmark.triangle", why)
                 } else if host.runnerDevice != nil {
                     previewLine("checkmark", glance?.online == false ? "Offline right now" : "Ready for work")
                 } else {

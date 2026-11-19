@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -26,6 +27,7 @@ struct RunnerPage: View {
                 VStack(spacing: Space.s3) {
                     now
                     lastProblem
+                    homeFolder
                 }
                 canDo
             }
@@ -134,18 +136,47 @@ struct RunnerPage: View {
             ]
     }
 
-    /// The last tool install that failed, or the plain "nothing".
+    /// What went wrong last: a failed tool install, else the runner's own last-error note, else nothing.
     private var lastProblem: some View {
         card("Last problem") {
             if let bad = model.installs[runner.id]?.values.first(where: { $0.state == .failed }) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Could not install \(RunnerTools.name(bad.tool))").coreFont(size: MacTextSize.body, weight: .semibold)
-                    Text(bad.reason ?? "The install did not finish.").foregroundStyle(palette.text2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                problem("Could not install \(RunnerTools.name(bad.tool))", bad.reason ?? "The install did not finish.")
+            } else if let e = runner.lastError, !e.isEmpty {
+                problem("The runner reports a problem", e)
             } else {
                 Text(off ? "Lost the connection. Nothing was lost." : "None. Everything is working.")
                     .foregroundStyle(palette.text2)
+            }
+        }
+    }
+
+    private func problem(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
+            Text(text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
+    }
+
+    /// The folder the runner's work happens in, as the runner reports it.
+    private var homeFolder: some View {
+        card("Home folder") {
+            if let h = runner.home {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "folder").foregroundStyle(palette.text2).accessibilityHidden(true)
+                    Text(h).coreFont(size: MacTextSize.meta, design: .monospaced).lineLimit(2).textSelection(.enabled)
+                    Spacer(minLength: Space.s2)
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(h, forType: .string)
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Copy the folder path")
+                }
+                .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.control))
+                Text("Work happens in this folder. The runner can’t see anything else on the \(isMac ? "Mac" : "computer").")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            } else {
+                Text("Not reported yet. A runner shows it once AI sessions are on.").foregroundStyle(palette.text2)
             }
         }
     }
@@ -194,7 +225,9 @@ struct RunnerPage: View {
         guard let key else { return "Open a terminal on this runner" }
         switch kind {
         case .installing(let p): return "Installing \(name) · \(Int(p * 100))%"
-        case .ready: return version.map { "Version \($0.split(separator: ".").prefix(2).joined(separator: "."))" } ?? "Ready"
+        case .ready:
+            guard let version, !version.isEmpty else { return "Ready" }
+            return "Version \(version.split(separator: ".").prefix(2).joined(separator: "."))"
         case .missing:
             if let bad = model.installs[runner.id]?[key], bad.state == .failed { return bad.reason ?? "The install did not finish." }
             return "Not installed yet"

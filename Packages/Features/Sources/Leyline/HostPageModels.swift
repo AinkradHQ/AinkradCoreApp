@@ -341,18 +341,19 @@ struct SessionWire: Decodable {
     }
 }
 
-/// The runner install the Core started: a terminal with the installer typed in (the person types the sudo password there),
+/// The runner install the Core started (it runs by itself; an older Core also opened a terminal with the installer typed in),
 /// and an invite that ends in 15 minutes.
 struct RunnerInstall: Equatable, Sendable {
-    let terminal: String
+    /// A terminal the Core opened with the installer in it: nil now, the install runs by itself (older Cores still send one).
+    let terminal: String?
     let expiresAt: Date?
 }
 
 struct RunnerInstallWire: Decodable {
     struct Session: Decodable { let terminal: String }
-    let session: Session
+    let session: Session?
     let expiresAt: String
-    var item: RunnerInstall { RunnerInstall(terminal: session.terminal, expiresAt: HostWire.date(expiresAt)) }
+    var item: RunnerInstall { RunnerInstall(terminal: session?.terminal, expiresAt: HostWire.date(expiresAt)) }
 }
 
 /// The machine that claimed the invite: the one check the person has that it is the machine they meant, because the invite is

@@ -35,7 +35,31 @@ protocol LeylineService: Sendable {
     /// Pauses the recording of a session (`POST /sessions/{s}/recording/pause`); no step-up needed.
     func pauseRecording(session: String) async throws
     /// Makes the host a runner (`POST /hosts/{h}/runner`, a step-up route): opens a terminal with the installer typed in.
+    func checkHost(address: String, port: Int) async throws -> HostCheck {
+        guard await connection.serverSupports(minor: 95) else { throw LeylineFailure.notYet }
+        struct Body: Encodable {
+            let address: String
+            let port: Int
+        }
+        struct Wire: Decodable {
+            let ok: Bool
+            let ms: Int?
+            let reason: String?
+        }
+        let w = try await call("POST", "/hosts/check", Body(address: address, port: port), as: Wire.self)
+        return HostCheck(ok: w.ok, ms: w.ms, reason: w.reason)
+    }
+
     func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall
+    /// Whether an address answers like an SSH server from the Core, and how fast (`POST /hosts/check`, API minor 95).
+    func checkHost(address: String, port: Int) async throws -> HostCheck
+}
+
+/// The Core's answer to "does this address answer SSH?".
+struct HostCheck: Equatable, Sendable {
+    var ok: Bool
+    var ms: Int?
+    var reason: String?
 }
 
 extension LeylineService {
@@ -56,6 +80,7 @@ extension LeylineService {
     func sessions(host: String) async throws -> [HostSession] { throw LeylineFailure.notYet }
     func pauseRecording(session: String) async throws { throw LeylineFailure.notYet }
     func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall { throw LeylineFailure.notYet }
+    func checkHost(address: String, port: Int) async throws -> HostCheck { throw LeylineFailure.notYet }
 }
 
 /// A new host, as the Add Host sheets fill it. Nothing optional is sent as null: the Core takes its defaults.
@@ -266,12 +291,31 @@ struct HostWire: Decodable {
     let os: String?
     let createdAt: String
     let runnerDevice: String?
+    struct Reach: Decodable {
+        let up: Bool
+        let latencyMs: Int?
+        let checkedAt: String
+        let seenAt: String?
+    }
+    struct Install: Decodable {
+        let state: String
+        let mode: String?
+        let reason: String?
+    }
+    let reach: Reach?
+    let runnerInstall: Install?
 
     var item: HostItem {
-        HostItem(
+        var h = HostItem(
             id: id, name: name, address: address, port: port, username: username, keyID: keyId,
             jumpChain: jumpChain, viaRunner: viaRunner, group: group, tags: tags, aiRule: AIRule(wire: aiRule),
             os: os, createdAt: Self.date(createdAt), runnerDevice: runnerDevice)
+        h.reach = reach.map {
+            HostReach(
+                up: $0.up, latencyMS: $0.latencyMs, checkedAt: Self.date($0.checkedAt), seenAt: $0.seenAt.flatMap(Self.date))
+        }
+        h.runnerInstall = runnerInstall.map { HostRunnerInstall(state: $0.state, mode: $0.mode, reason: $0.reason) }
+        return h
     }
 
     static func date(_ s: String) -> Date? {
