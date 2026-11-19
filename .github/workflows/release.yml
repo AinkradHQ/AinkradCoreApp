@@ -1,0 +1,40 @@
+# E12-4b (D-38): the app release. A tag `app-vX.Y.Z` runs on the SELF-HOSTED release runner on Ahmed's Mac, which holds the Developer ID
+# identity, the notary profile (AinkradNotary) and the Sparkle EdDSA key in its login keychain. release.sh signs, notarizes and
+# staples the dmg and writes the appcast; this job uploads the dmg first and appcast.xml last, so the feed never names a missing file.
+# Runner setup: Runbooks/2026-11-19-github-release-secrets.md, "Self-hosted release runner". No Apple secret lives in GitHub.
+name: release
+on:
+  push:
+    tags: ['app-v*']
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    # Only this repository's own tags, never a pull request or a fork: a self-hosted runner must not run foreign code.
+    if: github.repository == 'AinkradHQ/AinkradCoreApp'
+    runs-on: [self-hosted, macOS, ainkrad-release]
+    environment: release   # tags app-v* only; holds RELEASE_UPLOAD_TOKEN
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Build, sign, notarize, staple, appcast
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: scripts/release.sh --release
+      - name: Upload (dmg first, appcast last)
+        env:
+          RELEASE_UPLOAD_TOKEN: ${{ secrets.RELEASE_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          base=https://ainkrad.io/releases
+          put() { curl -fsS --proto '=https' --tlsv1.3 --retry 3 -X PUT -H "Authorization: Bearer $RELEASE_UPLOAD_TOKEN" --data-binary "@$2" -o /dev/null "$base/upload/app/$1"; echo "uploaded app/$1"; }
+          for f in build/release/*.dmg; do put "$(basename "$f")" "$f"; done
+          put appcast.xml build/release/appcast.xml
+      - name: GitHub release (the dmg, for people who download from GitHub)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" build/release/*.dmg --title "Ainkrad ${GITHUB_REF_NAME#app-v}" --notes "Signed and notarized. Updates arrive by themselves through Sparkle."
