@@ -284,7 +284,15 @@ public final class BrainModel {
         await reload()
     }
 
-    /// Opens a sealed room. Touch ID first; a cancelled one leaves the room sealed.
+    /// D-6: the app unlock opens every sealed room, once, with no prompt of its own. A room that refuses stays sealed.
+    public func openSealedRooms() async {
+        guard let service else { return }
+        let sealed = sealedRooms.map(\.id)
+        for id in sealed { try? await service.openRoom(id) }
+        if !sealed.isEmpty { await reload() }
+    }
+
+    /// Opens a sealed room. The app unlock covers it; a lapsed one asks Touch ID, and a cancelled one leaves the room sealed.
     @discardableResult
     public func open(_ id: String) async -> Bool {
         guard let service else { return false }

@@ -39,6 +39,7 @@ struct SecretsSection: View {
             await model.reload()
             focus = true
         }
+        .onDisappear { admin.secrets?.hideAll() }
         .accessibilityIdentifier("secrets")
     }
 
@@ -278,8 +279,13 @@ private struct SecretRow: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(secret.name).coreFont(size: MacTextSize.body, weight: .medium)
                         .lineLimit(1).truncationMode(.middle)
-                    Text(SecretWords.line(secret)).coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(palette.text2).lineLimit(1)
+                    if let shown = model.revealed[secret.name] {
+                        Text(shown).coreFont(size: MacTextSize.meta).monospaced().textSelection(.enabled)
+                            .lineLimit(1).truncationMode(.middle)
+                    } else {
+                        Text(SecretWords.line(secret)).coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(palette.text2).lineLimit(1)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Group {
@@ -344,6 +350,17 @@ private struct SecretRow: View {
             }
             .environment(\.coreKeycap, "↩").help("Let a runner use \(secret.name) for a short time (↩)")
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            if !SecretWords.Kind(wire: secret.kind).isFile {
+                Button(model.revealed[secret.name] == nil ? "Reveal" : "Hide") {
+                    if model.revealed[secret.name] == nil {
+                        Task { await model.reveal(secret) }
+                    } else {
+                        model.hide(secret.name)
+                    }
+                }
+                .help("Show or hide the value of \(secret.name)")
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            }
             Button("New value") { SecretDialogs.openReplace(admin, secret) }
                 .environment(\.coreKeycap, "E").help("Replace the value of \(secret.name) (E)")
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small))

@@ -170,6 +170,7 @@ public final class TerminalsModel {
     private func followElevation() {
         withObservationTracking {
             _ = shell.elevatedUntil
+            _ = shell.lock  // the app unlock stands for the elevation
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }

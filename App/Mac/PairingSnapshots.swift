@@ -87,10 +87,6 @@ enum PairingSnapshots {
         app.debugSampleLockouts()  // the throwaway Core rarely locks anything: two sample locks show the countdown rows
         await shot("lockouts")
         app.shell.overlay = nil
-        await shot("elevated-chip")
-        app.shell.elevationPanelOpen = true
-        await shot("elevated-panel", wait: 0.6)
-        app.shell.elevationPanelOpen = false
         app.shell.coreLink = .reconnecting
         await shot("banner-reconnecting")
         app.shell.coreLink = .offline
