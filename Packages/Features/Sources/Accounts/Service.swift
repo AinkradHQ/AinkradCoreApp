@@ -145,7 +145,8 @@ struct LiveAccountsService: AccountsService {
     private var client: Client { connection.client }
 
     func providers() async throws -> [ProviderItem] {
-        try await run { try await client.listProviders().ok.body.json.map(Self.provider) }
+        let list = try await run { try await client.listProviders().ok.body.json.map(Self.provider) }
+        return await withPresets(list)
     }
     func accounts() async throws -> [AccountItem] {
         try await run { try await client.listAccounts().ok.body.json.map(Self.account) }
@@ -334,9 +335,16 @@ struct LiveAccountsService: AccountsService {
     }
 
     func budgets() async throws -> [BudgetItem] {
-        try await run { try await client.listBudgets().ok.body.json.map(Self.budget) }
+        let list = try await run { try await client.listBudgets().ok.body.json.map(Self.budget) }
+        return await withMessages(list)
     }
     func setBudget(_ b: BudgetDraft) async throws {
+        // A message cap or a 5-hour period is new in 0.10: the generated body cannot say it yet.
+        if b.messageCap != nil || b.period == "hour5" {
+            let body = try JSONEncoder().encode(BudgetPut(b))
+            _ = try await connection.signedRequest(method: "PUT", target: "/api/v1/budgets", body: body)
+            return
+        }
         try await run {
             _ = try await client.setBudget(
                 body: .json(
