@@ -24,10 +24,11 @@ import SwiftUI
 }
 
 struct AccountsOptionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let options = AccountsOptions.options
 
     var body: some View {
-        GlassSection("Accounts", sub: "Keys and where you start", symbol: "creditcard", hue: GlassInk.blue) {
+        GlassSection("Accounts", sub: "Keys and where you start", symbol: "creditcard", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 OptionSwitchRow(
                     "Ask Touch ID to reveal keys", sub: "A key's last characters show only after Touch ID",

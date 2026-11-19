@@ -4,6 +4,7 @@ import SwiftUI
 /// The Spending tab (N35): this month's spend, the limits with bars, the latest calls, and a line about prices. The four
 /// older pages (Limits, Costs and usage, Ledger, Prices) stay one click away under "Advanced".
 struct SpendingPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AccountsModel
     @State private var only: Int64?
 
@@ -158,7 +159,7 @@ struct SpendingPage: View {
     private var prices: some View {
         let n = model.providers.reduce(0) { $0 + $1.models.count }
         return HStack(spacing: Space.s3) {
-            Image(systemName: "dollarsign.circle").foregroundStyle(GlassInk.blue).accessibilityHidden(true)
+            Image(systemName: "dollarsign.circle").foregroundStyle(GlassInk.accent(paneAccent)).accessibilityHidden(true)
             Text(
                 n > 0
                     ? "Prices are filled in by the Core release (\(n) models). Nothing to enter."
@@ -173,6 +174,7 @@ struct SpendingPage: View {
 
 /// The last 30 days as bars, from the calls the ledger shows (the newest 100). A bar is a day's cost; today is lit.
 private struct DayBars: View {
+    @Environment(\.coreAccent) private var paneAccent
     let costs: [CostItem]
     let now: Date
 
@@ -187,7 +189,7 @@ private struct DayBars: View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(sums.enumerated()), id: \.offset) { i, v in
-                    coreShape(2).fill(i == sums.count - 1 ? GlassInk.blue : GlassInk.blue.opacity(0.45))
+                    coreShape(2).fill(i == sums.count - 1 ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent).opacity(0.45))
                         .frame(height: max(3, 56 * CGFloat(v) / CGFloat(top)))
                         .frame(maxWidth: .infinity)
                 }

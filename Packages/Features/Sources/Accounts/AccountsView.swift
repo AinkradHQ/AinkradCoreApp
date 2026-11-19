@@ -5,6 +5,7 @@ import SwiftUI
 /// header, its own surface inside the pane's glass rim, the page under it, status chips and the keys at the foot. The
 /// keyboard drives all of it: ⌘1–⌘5 pages, arrows move the cursor tile, Return opens, and each page's letters act.
 struct AccountsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     @FocusState private var paneFocus: Bool
 
@@ -93,49 +94,49 @@ struct AccountsView: View {
     @ViewBuilder private var primary: some View {
         switch model.page {
         case .pools:
-            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)) {
                 AccountDialogs.openNewPool(model)
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
-            AppActionTile(title: "New pool", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New pool", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 Task { await model.quickPool() }
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .chains:
-            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)) {
                 AccountDialogs.openChain(model, editing: nil)
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
-            AppActionTile(title: "New chain", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New chain", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 Task { await model.quickChain() }
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .spending, .budgets:
-            AppActionTile(title: "New limit", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New limit", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 AccountDialogs.openBudget(model, editing: nil)
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .prices:
-            AppActionTile(title: "New price", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New price", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 AccountDialogs.openPrice(model, editing: nil)
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
         case .costs, .ledger:
-            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.blue) {
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "⌘R", hue: GlassInk.accent(paneAccent)) {
                 Task { await model.reloadCosts() }
             }
             .keyboardShortcut("r", modifiers: .command)
         case .connections:
-            AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 ConnDialogs.openConnect(model.connections, kind: nil)
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.connections.service == nil)
         default:
-            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+            AppActionTile(title: "Advanced…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)) {
                 AccountDialogs.openConnect(model, provider: nil, advanced: true)
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(model.readOnly)
-            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 AccountDialogs.openConnect(model, provider: nil)
             }
             .keyboardShortcut("n", modifiers: .command).disabled(model.readOnly)
@@ -194,7 +195,7 @@ struct AccountsView: View {
                     symbol: "exclamationmark.triangle", title: "Could not load this",
                     text: "The Core answered with an error. \(message) Nothing was changed.", tone: .fail, code: code
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                         Task { await model.reload() }
                     }
                 }

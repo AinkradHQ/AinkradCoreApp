@@ -244,6 +244,7 @@ private struct HeatCell: View {
 // MARK: - Audit: by kind
 
 struct AuditKindBars: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AuditModel
     @Environment(\.corePalette) private var palette
 
@@ -260,7 +261,7 @@ struct AuditKindBars: View {
                     } label: {
                         VStack(alignment: .leading, spacing: Space.s2) {
                             HStack(spacing: Space.s2) {
-                                IconTile(kind.symbol, hue: GlassInk.blue, size: 24)
+                                IconTile(kind.symbol, hue: GlassInk.accent(paneAccent), size: 24)
                                 Text(kind.title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1)
                                 Spacer(minLength: 0)
                                 Text("\(days.reduce(0) { $0 + $1.count(kind.rawValue) })")
@@ -336,6 +337,7 @@ struct LiveNow: View {
 }
 
 private struct LiveRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let event: LiveEvent
     let index: Int
     let now: Date
@@ -345,7 +347,7 @@ private struct LiveRow: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            IconTile(event.symbol, hue: GlassInk.blue, size: 30)
+            IconTile(event.symbol, hue: GlassInk.accent(paneAccent), size: 30)
                 .offset(y: up && !reduce ? -2 : 0)
             Text(event.text).coreFont(size: MacTextSize.body, weight: .medium)
             Spacer(minLength: 0)

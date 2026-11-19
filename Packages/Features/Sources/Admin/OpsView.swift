@@ -6,6 +6,7 @@ import SwiftUI
 /// certificate, disk) with how close each is to its limit, then the figures the Core reports about itself. It reads the
 /// metrics again every 15 seconds while shown; R reads now, M shows the raw metrics.
 struct OpsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let admin: AdminModel
 
     var body: some View {
@@ -33,7 +34,7 @@ struct OpsSection: View {
                 if !tiles.isEmpty {
                     GlassSection(
                         "Right now", sub: "What your Core reports about itself.", symbol: "waveform.path.ecg",
-                        hue: GlassInk.blue, index: 2
+                        hue: GlassInk.accent(paneAccent), index: 2
                     ) {
                         LazyVGrid(
                             columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 3),
@@ -102,6 +103,7 @@ enum OpsWords {
 
 /// The one answer at the top: all good, or what needs a look. Refresh and the raw metrics at the top right.
 private struct Verdict: View {
+    @Environment(\.coreAccent) private var paneAccent
     let admin: AdminModel
     @Bindable var model: OpsModel
 
@@ -124,7 +126,7 @@ private struct Verdict: View {
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
-            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                 Task { await model.reload() }
             }
             .keyboardShortcut("r", modifiers: [])

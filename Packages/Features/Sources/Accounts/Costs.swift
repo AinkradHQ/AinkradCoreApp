@@ -149,6 +149,7 @@ extension AccountsModel {
 /// A refused Spend page: an older Core (when accounts load, a `forbidden_scope` here means the route is missing), a device
 /// without `admin`, or the Core's error.
 struct SpendState: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let state: AccountsLoad
     let what: String
@@ -173,7 +174,7 @@ struct SpendState: View {
                 symbol: "exclamationmark.triangle", title: "Could not load \(what.lowercased())",
                 text: "The Core answered with an error. \(message)", tone: .fail, code: code
             ) {
-                AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                     Task { await retry() }
                 }
             }

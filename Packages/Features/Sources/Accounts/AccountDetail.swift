@@ -6,6 +6,7 @@ import SwiftUI
 /// an account needs (key saved, turned on, in a pool) with the missing one offering its fix; then three tiles: the key,
 /// how many sessions at once, and the pools it is in. What Core does not report yet is one quiet line, not a card.
 struct AccountDetailView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let account: AccountItem
     @State private var tech = false
@@ -39,7 +40,7 @@ struct AccountDetailView: View {
                             AccountDialogs.openDelete(model, a)
                         }
                         .disabled(ro)
-                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.blue) {
+                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.accent(paneAccent)) {
                             AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
                         }
                         .disabled(ro)
@@ -62,14 +63,14 @@ struct AccountDetailView: View {
                         tile("Sign-in", "person.badge.key.fill") { SignInTile(model: model, account: a) }.id("keytest")
                     } else {
                         tile("Key test", "checkmark.shield.fill") {
-                            TestTile(model: model, account: a, hue: GlassInk.blue)
+                            TestTile(model: model, account: a, hue: GlassInk.accent(paneAccent))
                         }
                         .id("keytest")
                     }
                     poolsTile(a, pools).id("pools")
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                AccountLimitsSection(model: model, account: a, hue: GlassInk.blue).id("limits")
+                AccountLimitsSection(model: model, account: a, hue: GlassInk.accent(paneAccent)).id("limits")
                 AccountSlice(model: model, account: a)
                 HStack(spacing: Space.s2) {
                     Spacer(minLength: Space.s2)
@@ -127,7 +128,7 @@ struct AccountDetailView: View {
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
-            path(on: a.phase != .disabled, inPool: !pools.isEmpty, hue: GlassInk.blue)
+            path(on: a.phase != .disabled, inPool: !pools.isEmpty, hue: GlassInk.accent(paneAccent))
             if let cause = verdict.cause, cause != .state, cause != .pools {
                 AccLink(title: "Open \(AccountsWords.causeName(cause))", symbol: "arrow.down.right") {
                     open(cause, proxy: proxy)
@@ -239,7 +240,7 @@ struct AccountDetailView: View {
                 } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(
-                            GlassInk.blueInk)
+                            GlassInk.accent(paneAccent)Ink)
                         Text(p.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.forward").foregroundStyle(GlassInk.secondary)

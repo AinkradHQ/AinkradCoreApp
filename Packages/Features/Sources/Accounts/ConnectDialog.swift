@@ -5,6 +5,7 @@ import SwiftUI
 /// Connect an account, or use a new key. An API key is pasted here and goes straight to the Core (see `KeyEntryFlow`);
 /// a subscription signs in on the provider's own page.
 struct ConnectDialog: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let replacing: AccountItem?
     let close: () -> Void
@@ -28,7 +29,7 @@ struct ConnectDialog: View {
 
     var body: some View {
         let site = ProviderSites.page(provider)
-        let hue = GlassInk.blue
+        let hue = GlassInk.accent(paneAccent)
         CoreDialogPanel((replacing ?? flow.target).map { "New key for \($0.label)" } ?? "Connect an account") {
             VStack(alignment: .leading, spacing: Space.s4) {
                 if replacing == nil && model.signIn == nil && flow.stage == .form && flow.target == nil {
@@ -124,7 +125,7 @@ struct ConnectDialog: View {
                     ForEach(flow.runners) { r in
                         AccPick(
                             title: r.name, sub: r.online ? "Online" : "Offline", symbol: "server.rack",
-                            hue: GlassInk.blue, on: flow.runner == r.id, enabled: r.online
+                            hue: GlassInk.accent(paneAccent), on: flow.runner == r.id, enabled: r.online
                         ) { flow.runner = r.id }
                     }
                 }
@@ -219,7 +220,7 @@ struct ConnectDialog: View {
             VStack(spacing: 0) {
                 Image(systemName: on ? "\(n).square.fill" : "checkmark.square.fill")
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(on ? GlassInk.blueInk : GlassInk.slate)
+                    .foregroundStyle(on ? GlassInk.accent(paneAccent)Ink : GlassInk.slate)
                 if !last {
                     coreShape(1).fill(GlassInk.track)
                         .frame(width: 2).frame(minHeight: 24).padding(.vertical, 4)

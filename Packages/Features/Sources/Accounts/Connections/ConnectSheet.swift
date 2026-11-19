@@ -59,6 +59,7 @@ enum ConnDialogs {
 
 /// CN2: pick a service, then sign in on its own site with live steps; "(advanced)…" pastes a token instead.
 struct ConnectSheet: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     let close: () -> Void
     @State var picked: String?
@@ -91,7 +92,7 @@ struct ConnectSheet: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Space.s2) {
                     ForEach(model.liveKinds) { k in
                         AccPick(
-                            title: k.name, sub: k.say, symbol: ConnLook.symbol(k.id), hue: GlassInk.blue, on: false
+                            title: k.name, sub: k.say, symbol: ConnLook.symbol(k.id), hue: GlassInk.accent(paneAccent), on: false
                         ) { picked = k.id }
                     }
                 }
@@ -244,6 +245,7 @@ struct ConnectSheet: View {
 
 /// Live steps: done ones ticked, the current one marked, the rest quiet.
 struct StepList: View {
+    @Environment(\.coreAccent) private var paneAccent
     let steps: [String]
     let at: Int
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -252,7 +254,7 @@ struct StepList: View {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
                 HStack(spacing: Space.s2) {
                     Image(systemName: i < at ? "checkmark.square.fill" : i == at ? "square.inset.filled" : "square")
-                        .foregroundStyle(i < at ? GlassInk.green : i == at ? GlassInk.blue : GlassInk.secondary)
+                        .foregroundStyle(i < at ? GlassInk.green : i == at ? GlassInk.accent(paneAccent) : GlassInk.secondary)
                         .symbolEffect(.pulse, options: .repeating, isActive: i == at && !reduce)
                         .contentTransition(.symbolEffect(.replace))
                     Text(s).foregroundStyle(i <= at ? GlassInk.primary : GlassInk.secondary)

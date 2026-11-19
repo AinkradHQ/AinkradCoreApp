@@ -135,6 +135,7 @@ extension SignInTile {
 
 /// The key test tile: the last answer, when, and Test now (resting for a minute after each test).
 struct TestTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let account: AccountItem
     let hue: Color
@@ -149,7 +150,7 @@ struct TestTile: View {
                 HStack(spacing: Space.s2) {
                     Image(systemName: running ? "arrow.triangle.2.circlepath" : w?.symbol ?? "checkmark.shield")
                         .font(.system(size: 22, weight: .semibold)).foregroundStyle(
-                            running ? GlassInk.blueInk : GlassInk.ink(w?.hue ?? GlassInk.slate)
+                            running ? GlassInk.accent(paneAccent)Ink : GlassInk.ink(w?.hue ?? GlassInk.slate)
                         )
                         .contentTransition(.symbolEffect(.replace))
                     Text(running ? "Testing…" : w?.title ?? "Never tested")
