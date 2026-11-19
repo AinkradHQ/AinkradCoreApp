@@ -48,7 +48,8 @@ public final class TerminalsModel {
     var selected: String?
     /// The runner whose page is open in the Runners pane (nil: the fleet).
     var runnerDetail: String?
-    var runnerFilter: RunnerFacts.Filter = .all
+    /// The summary tile that is on (mockup 12); nil shows every runner.
+    var runnerFilter: RunnerFacts.Live?
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Terminals whose bell rang since they were last opened.

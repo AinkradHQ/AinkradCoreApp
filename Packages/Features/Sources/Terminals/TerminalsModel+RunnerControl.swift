@@ -12,6 +12,8 @@ enum RunnerTools {
     static let all: [(id: String, name: String, help: String)] = [
         ("claude", "Claude Code", "Runs AI sessions with your Claude account."),
         ("codex", "Codex", "Runs AI sessions with your OpenAI account."),
+        ("opencode", "OpenCode", "Runs AI sessions with your OpenCode login."),
+        ("agy", "Antigravity", "Runs AI sessions with your Google account."),
         ("git", "Git", "Lets AI sessions clone and push repositories."),
         ("node", "Node.js", "Needed by many tools."),
         ("python", "Python", "Needed by many tools."),
@@ -20,9 +22,14 @@ enum RunnerTools {
         ("docker", "Docker", "Runs containers."),
     ]
 
+    /// A tool's plain name from its key: "claude" is "Claude".
+    static func name(_ key: String) -> String {
+        RunnerFacts.aiTools.first { $0.key == key }?.name ?? all.first { $0.id == key }?.name ?? key
+    }
+
     /// The AI tools a runner has, for the AI sessions row: `Claude Code 2.1, Codex 0.9`; nil when it has none.
     static func aiLine(_ tools: [String: String]) -> String? {
-        let names = all.filter { ["claude", "codex"].contains($0.id) }.compactMap { t -> String? in
+        let names = all.filter { ["claude", "codex", "opencode", "agy"].contains($0.id) }.compactMap { t -> String? in
             guard let v = tools[t.id] else { return nil }
             let short = v.split(separator: ".").prefix(2).joined(separator: ".")
             return short.isEmpty ? t.name : "\(t.name) \(short)"
@@ -168,5 +175,28 @@ extension TerminalsModel {
     public func refreshRunnerProgress() async {
         readLocalInstall()
         await reload()
+
+extension TerminalsModel {
+    /// Where the runner inside this app writes the AI tool install it is doing now (`<state>/ai-tools/status.json`).
+    static func localToolStatusURL(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        home.appending(path: ".ainkrad-runner/core/ai-tools/status.json")
+    }
+
+    /// The Mac's own runner installs and updates the AI tools by itself (D-22). The Core does not see those installs, so the app
+    /// reads the runner's note: an install under way shows as "Installing Claude…", a failed one as the last problem.
+    func readLocalInstall(from url: URL = localToolStatusURL()) {
+        guard let id = host.thisMacRunnerID else { return }
+        installs[id] = installs[id]?.filter { $0.value.op != "local" }
+        guard let data = try? Data(contentsOf: url),
+            let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let tool = o["tool"] as? String
+        else { return }
+        let percent = (o["percent"] as? Int) ?? 0
+        let failed = o["failed"] as? String
+        let done = failed == nil && percent >= 100
+        guard !done else { return }
+        installs[id, default: [:]][tool] = ToolInstall(
+            op: "local", tool: tool, state: failed == nil ? .running : .failed, percent: percent,
+            step: (o["step"] as? String) ?? "", reason: failed)
     }
 }
