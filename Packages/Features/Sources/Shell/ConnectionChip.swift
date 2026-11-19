@@ -165,6 +165,11 @@ struct ConnectionPanel: View {
                     row("Last backup", h.backup(now: now) ?? "Not reported yet")
                 }
             }
+            if shell.coreUpdate.visible {
+                CoreUpdatePanel(
+                    status: shell.coreUpdate, update: { shell.startCoreUpdate?() },
+                    news: { shell.coreUpdateNews?() }, what: { showWhatHappened() })
+            }
             if state != .online {
                 // n14: a small blue button on the left with its key, not a full-width bar.
                 Button("Reconnect now") {
@@ -182,6 +187,14 @@ struct ConnectionPanel: View {
         .corePanel(radius: Radius.pane, padding: 0, part: .popups)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Connection to \(shell.home.coreName)")
+    }
+
+    /// The run's steps with their times, as the mockup's "What happened".
+    private func showWhatHappened() {
+        let lines = shell.coreUpdate.events.map { "\($0.at.formatted(date: .omitted, time: .shortened)) · \($0.text)" }
+        shell.presentSheet(
+            title: "What happened", message: (lines + [shell.coreUpdate.errorWords]).joined(separator: "\n"),
+            actions: [ShellSheetAction("Done", primary: true)])
     }
 
     private func row(_ k: String, _ v: String) -> some View {

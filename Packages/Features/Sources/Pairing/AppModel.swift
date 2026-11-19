@@ -72,6 +72,7 @@ public final class AppModel {
     private let demo: Bool
     private var events: Task<Void, Never>?
     private var homeFeed: HomeFeed?
+    private var coreUpdateFeed: CoreUpdateFeed?
     private var retry: Task<Void, Never>?
     private var noticeIDs: [String] = []
     /// One per terminal Core has warned about: the toast it owns and the task that keeps its words fresh until `reap_at`.
@@ -232,6 +233,12 @@ public final class AppModel {
         shell.home.coreName = (try? keyStore.loadIdentity())??.endpoint.host() ?? "Home Core"
         if let live = service as? LiveCoreService {
             homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
+            let updates = CoreUpdateFeed(shell: shell, connection: live.connection) { [weak self] op in
+                guard let self else { return }
+                try await self.elevated("Update the Core", done: "The update did not start.") { try await op() }
+            }
+            updates.start()
+            coreUpdateFeed = updates
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
@@ -733,6 +740,8 @@ public final class AppModel {
         retry?.cancel()
         homeFeed?.stop()
         homeFeed = nil
+        coreUpdateFeed?.stop()
+        coreUpdateFeed = nil
         agents.detach()
         await service?.close()
         await macRunner.coreForgotten()

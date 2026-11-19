@@ -188,6 +188,12 @@ public final class ShellModel {
     public var retrySpan: TimeInterval?
     /// The panel under the connection chip.
     public var connectionPanelOpen = false
+    /// The Core's self-update (E12-3): what its pop-up shows. The app fills it from `GET /system/update`.
+    public var coreUpdate = CoreUpdateStatus()
+    /// "Update now" and "Try again now" in the pop-up; nil until the app has a Core that serves the route.
+    public var startCoreUpdate: (@MainActor () -> Void)?
+    /// "What is new" for the Core's last update, and the update's own words under "See what happened".
+    public var coreUpdateNews: (@MainActor () -> Void)?
     @ObservationIgnored let networkWatch = NetworkWatch()
     public var chipState: ConnectionChipState? {
         ConnectionChipState.of(link: coreLink, networkUp: networkUp, attempt: retryAttempt)
