@@ -85,9 +85,9 @@ struct ConnAddView: View {
     private var waitingStep: some View {
         VStack(spacing: Space.s3) {
             HStack(spacing: Space.s5) {
-                ConnLogo(kind: a.kind ?? "", size: 72)
+                ConnLogo(kind: a.kind ?? "", size: 72).connFloat()
                 ConnLink()
-                IconTile("link", hue: GlassInk.blue, size: 72, bounce: false)
+                IconTile("link", hue: GlassInk.blue, size: 72, bounce: false).connFloat(phase: ConnMotion.heroPhase)
             }
             .padding(.top, Space.s6)
             head("Finish signing in on \(name)", "We opened \(name) in your browser. Sign in there, then come back here.")
@@ -273,7 +273,8 @@ struct ConnAddView: View {
                         ForEach(rows) { r in
                             CoreCheckbox(
                                 r.name, detail: ConnAccess.line(r),
-                                isOn: Binding(get: { a.picked.contains(r.id) }, set: { _ in model.add?.toggle(pick: r.id) })
+                                isOn: Binding(get: { a.picked.contains(r.id) }, set: { _ in model.add?.toggle(pick: r.id) }),
+                                icon: a.kind == "github" ? "folder" : "doc.text"  // the mockup: folder for GitHub, doc for the rest
                             )
                             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -295,7 +296,7 @@ struct ConnAddView: View {
     private var doneStep: some View {
         let title = a.again ? "\(name) is signed in again" : a.editing ? "Saved" : "\(name) is connected"
         return VStack(spacing: Space.s2) {
-            IconTile("checkmark", hue: GlassInk.green, size: 72, bounce: a.step).padding(.top, Space.s6)
+            IconTile("checkmark", hue: GlassInk.green, size: 72, bounce: a.step).connFloat().padding(.top, Space.s6)
             Text(title).coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(.isHeader)
             Text(a.again ? "Nothing else changed." : a.doneLine(noun: kind?.resource ?? "places"))
                 .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)

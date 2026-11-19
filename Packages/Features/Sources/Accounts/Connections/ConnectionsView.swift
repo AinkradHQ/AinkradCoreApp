@@ -119,7 +119,7 @@ struct ConnListPage: View {
     /// Ainkrad signs in for you, so there is nothing to set up first.
     private var empty: some View {
         VStack(spacing: Space.s2) {
-            IconTile("link", hue: GlassInk.blue, size: 72, bounce: false).padding(.top, Space.s8)
+            IconTile("link", hue: GlassInk.blue, size: 72, bounce: false).connFloat().padding(.top, Space.s8)
             Text("Connect your first service").coreFont(size: MacTextSize.title, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
             Text("Let your assistant read your code, tickets and chats. It never changes anything unless you say so.")
