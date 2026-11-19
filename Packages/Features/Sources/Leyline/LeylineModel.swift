@@ -21,6 +21,12 @@ public final class LeylineModel {
     /// The paired device with this id (name, platform, key fingerprint), from the app's device list: who claimed a runner invite.
     public var deviceLookup: (@MainActor (String) -> RunnerClaimer?)?
 
+    /// How the runner this host was made into is doing: online, and the AI tool being installed. The app sets it from the
+    /// Runners list; nil shows the host's Runner card without live state.
+    public var runnerGlance: (@MainActor (String) -> RunnerGlance?)?
+    /// Opens a runner's page in Devices & Runners.
+    public var openRunner: (@MainActor (String) -> Void)?
+
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
     var knownHosts: [KnownHostItem] = []

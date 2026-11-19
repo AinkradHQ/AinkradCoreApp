@@ -14,6 +14,19 @@ public struct RunnerHostChoice: Identifiable, Equatable, Sendable {
 
 /// "Make Runner" on one host, as the Add runner flow follows it: Touch ID, the invite copied over SSH, the installer typed into a
 /// terminal the person watches (the sudo password is theirs), then the runner pairing. One per host; reads the live host page state.
+/// What the Runner card on a host page shows of its runner.
+public struct RunnerGlance: Equatable, Sendable {
+    public let online: Bool
+    /// The AI tool being installed now ("OpenCode") and how far it is, 0 to 100.
+    public let installing: String?
+    public let percent: Int
+    public init(online: Bool, installing: String?, percent: Int) {
+        self.online = online
+        self.installing = installing
+        self.percent = percent
+    }
+}
+
 @MainActor @Observable
 public final class RunnerSetup {
     public enum Phase: Equatable {
