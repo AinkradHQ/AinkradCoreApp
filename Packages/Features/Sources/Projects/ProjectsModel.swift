@@ -30,6 +30,10 @@ public final class ProjectsModel {
     /// ⌘N and the New Project button: the quick pop-over under the button.
     var quickOpen = false
     var quickName = ""
+    /// What a run gets unless a project says otherwise (Settings > Projects > Options); nil until read, or on a Core without it.
+    internal(set) var limits: ProjectLimits?
+    internal(set) var limitsState = LimitsState.loading
+    enum LimitsState: Equatable { case loading, ready, unsupported, failed }
     /// A refusal from the Core for the write in flight, in words.
     internal(set) var writeError: String?
     internal(set) var busy = false
@@ -64,6 +68,11 @@ public final class ProjectsModel {
     /// Opens a project's space on its Overview (from another app's link).
     public func openSpace(_ id: String) {
         guard let pid = Int64(id) else { return }
+        if ProjectsOptions.openIn == .newWorkspace, let p = project(pid) {
+            section = .overview
+            openInOwnPane(p)
+            return
+        }
         section = .overview
         show(project: pid)
     }
@@ -100,6 +109,8 @@ public final class ProjectsModel {
         lore = nil
         runService = nil
         projects = []
+        limits = nil
+        limitsState = .loading
         pollTask?.cancel()
         pollTask = nil
         load = .notConnected
@@ -118,10 +129,13 @@ public final class ProjectsModel {
     func reload() async {
         guard let service else { return }
         do {
-            let list = try await service.projects().sorted { $0.updatedAt > $1.updatedAt }
+            var all = try await service.projects()
+            // "Show archived projects" (Settings > Projects > Options): they come after the active ones in the same order.
+            if ProjectsOptions.showArchived { all += (try? await service.archivedProjects()) ?? [] }
+            let list = all.sorted { ($0.archived ? 1 : 0, $1.updatedAt) < ($1.archived ? 1 : 0, $0.updatedAt) }
             // One read of each run, in parallel: the gallery's tags and the top bar need them.
             let runs = await withTaskGroup(of: (Int64, ProjectRunState?).self) { group in
-                for p in list where !p.repos.isEmpty {
+                for p in list where !p.repos.isEmpty && !p.archived {
                     group.addTask { (p.id, try? await service.run(project: p.id)) }
                 }
                 var out: [Int64: ProjectRunState] = [:]
@@ -332,9 +346,26 @@ public final class ProjectsModel {
 
     // MARK: navigation
 
+    /// Opens a project's space where Settings, Projects, Options says: in a pane of its own beside the gallery (the default), or
+    /// in the Projects pane in place of the gallery.
     func openProject(_ id: Int64) {
         section = .overview
+        if ProjectsOptions.openIn == .newWorkspace, let p = project(id) {
+            openInOwnPane(p)
+            return
+        }
         withAnimation(Motion.out(Motion.move)) { openID = id }
+    }
+
+    static func paneID(_ id: Int64) -> String { "project-\(id)" }
+
+    private func openInOwnPane(_ p: ProjectItem) {
+        let id = p.id
+        host.shell.openPane(
+            PaneSpec(id: Self.paneID(id), title: p.name, sub: "Project", symbol: "square.grid.2x2", minWidth: 720) {
+                ProjectPaneView(model: self, id: id)
+            })
+        Task { await reload() }
     }
 
     func closeProject() {
@@ -368,14 +399,18 @@ public final class ProjectsModel {
 
     public func install() {
         let shell = host.shell
-        // Settings, Apps, Projects: its Look (follows Appearance unless turned off). No options of its own yet.
+        // Settings, Apps, Projects: its Look (follows Appearance unless turned off) and its Options.
         shell.settings.section(
             SettingsSection(
-                id: "projects", group: .apps, title: "Projects", sub: "Its look", symbol: "square.grid.2x2", order: 1
-            ) {
-                AppLookSection(appName: "Projects", prefs: AppLookPrefs.shared("projects"))
-                    .foregroundStyle(GlassInk.primary)
-            })
+                id: "projects", group: .apps, title: "Projects", sub: "Its look and what a run may use",
+                symbol: "square.grid.2x2", order: 1,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Projects", prefs: AppLookPrefs.shared("projects"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { ProjectsOptionsTab(model: self) },
+                ]))
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
             _ run: @escaping @MainActor (ProjectsModel) -> Void
