@@ -255,6 +255,15 @@ public final class AppModel {
             lore.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
             brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
+            if let feed = homeFeed {
+                feed.terminalFacts = { [weak model] in model?.homeFacts() ?? [] }
+                feed.brainService = { [weak self] in self?.brain.service }
+                shell.answerBrainQuestion = { [weak feed] id, room, keep in
+                    Task { await feed?.answer(id, room: room, keep: keep) }
+                }
+                shell.toggleNoteTodo = { [weak feed] i in Task { await feed?.toggleTodo(i) } }
+                model.changed = { [weak feed] in feed?.event(kind: "terminal.changed") }
+            }
         }
         if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop

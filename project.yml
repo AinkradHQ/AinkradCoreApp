@@ -94,6 +94,9 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         # Import Apple Notes (R4-03): macOS asks the first time the person chooses it, with this sentence.
         INFOPLIST_KEY_NSAppleEventsUsageDescription: Ainkrad reads your notes in Notes only when you choose Import Apple Notes.
+        # Weather and Calendar widgets: macOS asks only when the widget first shows on Home.
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Ainkrad uses your rough location only for the Weather widget, and sends nothing more precise than about 10 km.
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: Ainkrad reads your events only to show them in the Calendar widget.
         CODE_SIGN_ENTITLEMENTS: App/Mac/Ainkrad.entitlements
 
   AinkradCoreMacUITests:

@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// Allow and Deny on a waiting item, from the actions the item carries (the primary one is blue).
-private struct WActions: View {
+struct WActions: View {
     let item: BellItem
     var body: some View {
         HStack(spacing: Space.s2) {
@@ -39,22 +39,14 @@ struct NeedsBody: View {
                 case .m:
                     WHead("bell", "Needs you") { badge }
                     ForEach(need.prefix(2)) { n in row(n) }
-                case .l, .t:
+                case .l:
                     WHead("bell", "Needs you") { badge }
                     ForEach(need.prefix(3)) { n in card(n) }
                     Spacer(minLength: 0)
-                case .x:
+                case .w:
                     WHead("bell", "Needs you") { badge }
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        VStack(spacing: Space.s2) { ForEach(need.prefix(3)) { n in card(n) } }
-                        WSub {
-                            WCaption("What it asks")
-                            if let first = need.first {
-                                Text(first.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                                    .foregroundStyle(GlassInk.primary)
-                                if let s = first.sub { WCaption(s) }
-                            }
-                        }
+                    HStack(alignment: .top, spacing: Space.s3) {
+                        ForEach(need.prefix(3)) { n in card(n) }
                     }
                 }
             }
@@ -125,15 +117,15 @@ struct EventsBody: View {
                 case .m:
                     WHead("clock", "Recent events")
                     list(ev.prefix(3))
-                case .l, .t:
+                case .l:
                     WHead("clock", "Recent events")
                     list(ev.prefix(7))
                     Spacer(minLength: 0)
-                case .x:
+                case .w:
                     WHead("clock", "Recent events")
                     HStack(alignment: .top, spacing: Space.s5) {
-                        list(ev.prefix(5))
-                        list(ev.dropFirst(5).prefix(5))
+                        list(ev.prefix(3))
+                        list(ev.dropFirst(3).prefix(3))
                     }
                 }
             }
@@ -204,26 +196,43 @@ struct CoreBody: View {
                 }
                 Spacer(minLength: 0)
                 WCaption(h.health.map { "Core \($0.version) · up \($0.uptime)" } ?? h.coreName)
-            default:
+            case .w:
+                // Wide: the same bars as large, in a row of four.
+                WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
+                HStack(alignment: .top, spacing: Space.s5) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(s.tone == .done ? "Healthy" : s.word).coreFont(size: 28, weight: .bold)
+                            .foregroundStyle(GlassInk.primary)
+                        WCaption(h.health.map { "Version \($0.version) · up \($0.uptime)" } ?? h.coreName)
+                    }
+                    .frame(width: 170, alignment: .leading)
+                    VStack(spacing: Space.s2) { barsA(alarms: alarms, ratio: ratio, h: h) }
+                    VStack(spacing: Space.s2) { barsB(h: h) }
+                }
+            case .l:
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 VStack(alignment: .leading, spacing: 0) {
                     Text(s.tone == .done ? "Healthy" : s.word).coreFont(size: 34, weight: .bold)
                         .foregroundStyle(GlassInk.primary)
                     WCaption(h.health.map { "\(h.coreName) · version \($0.version) · up \($0.uptime)" } ?? h.coreName)
                 }
-                bars(alarms: alarms, ratio: ratio, h: h)
+                barsA(alarms: alarms, ratio: ratio, h: h)
+                barsB(h: h)
                 Spacer(minLength: 0)
             }
         }
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.coreLink)
     }
 
-    @ViewBuilder private func bars(alarms: Int, ratio: Double, h: HomeSnapshot) -> some View {
+    @ViewBuilder private func barsA(alarms: Int, ratio: Double, h: HomeSnapshot) -> some View {
         WBarRow(
             label: "Runners online", value: "\(h.machinesOnline) of \(h.machines.count)", fill: ratio)
         WBarRow(
             label: "Alarms", value: alarms == 0 ? "None" : "\(alarms)", fill: min(Double(alarms) / 5, 1),
             low: alarms > 0)
+    }
+
+    @ViewBuilder private func barsB(h: HomeSnapshot) -> some View {
         if let c = h.health?.certificate, let health = h.health {
             WBarRow(
                 label: "Certificate", value: c + (health.certDaysLeft ?? 0 > 0 ? " left" : ""),
@@ -278,14 +287,19 @@ struct TodayBody: View {
                 }
             default:
                 WHead("calendar", "Today")
-                if size == .x {
+                if size == .w {
                     HStack(alignment: .top, spacing: Space.s4) {
-                        big(rows)
+                        ForEach(rows, id: \.0) { r in
+                            VStack(alignment: .leading, spacing: Space.s1) {
+                                WCaption(r.0)
+                                RollingNumber(value: r.2, size: 28, ink: GlassInk.primary)
+                                CoreMeter(r.3, low: r.4, label: r.0)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
                         WSub {
                             WCaption("Spend this week")
                             WColumns(values: Array(h.spendByDay.suffix(7)))
-                            WCaption(
-                                "Today \(h.spendToday.formatted(.currency(code: "USD")))")
                         }
                     }
                 } else {
@@ -327,7 +341,7 @@ struct BoardBody: View {
                 WFigure(value: Double(board.doing), caption: "in progress")
                 Spacer(minLength: 0)
                 WCaption("\(board.todo) to do · \(board.done) done")
-            case .m, .l, .t:
+            case .m, .l:
                 VStack(spacing: Space.s3) {
                     ForEach(size == .m ? Array(cols.prefix(3)) : cols, id: \.0) { c in
                         // A count per column, no bar: a share of the board is not progress (Ahmed, 2026-11-15).
@@ -341,7 +355,7 @@ struct BoardBody: View {
                     }
                 }
                 Spacer(minLength: 0)
-            case .x:
+            case .w:
                 HStack(alignment: .top, spacing: Space.s3) {
                     ForEach(cols, id: \.0) { c in
                         WSub {

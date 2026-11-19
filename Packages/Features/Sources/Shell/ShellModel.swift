@@ -160,6 +160,10 @@ public final class ShellModel {
     public var toast: ToastItem?
     public var sheet: ShellSheet?
     public var home = HomeSnapshot.empty
+    /// Home widgets that act on the Core: the app sets them. The Brain question is kept (true) or dropped (false), and a
+    /// task on today's note is ticked or unticked by its place in the note.
+    public var answerBrainQuestion: (@MainActor (_ id: String, _ room: String, _ keep: Bool) -> Void)?
+    public var toggleNoteTodo: (@MainActor (_ index: Int) -> Void)?
     public private(set) var widgets: WidgetLayout
     public let profile: UserProfile
     private let defaults: UserDefaults

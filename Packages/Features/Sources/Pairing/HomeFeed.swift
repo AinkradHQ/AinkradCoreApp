@@ -1,5 +1,6 @@
 import Agents
 import AinkradClient
+import Brain
 import CoreKit
 import Foundation
 import Shell
@@ -21,6 +22,19 @@ struct HomeAudit: Equatable, Sendable {
     var actor: String
 }
 
+struct HomeProject: Equatable, Sendable {
+    var slug: String
+    var name: String
+    var updatedAt: Date
+}
+
+/// One provider's tightest plan limit.
+struct HomeUsage: Equatable, Sendable {
+    var provider: String
+    var share: Double
+    var resetsAt: Date?
+}
+
 /// What Home needs from the Core. Each read stands alone: a device without `admin` fails the costs and audit reads and the rest still show.
 protocol HomeSource: Sendable {
     func sessions() async throws -> [AgentSessionInfo]
@@ -31,6 +45,19 @@ protocol HomeSource: Sendable {
     func utilisation() async throws -> Double
     func audit() async throws -> [HomeAudit]
     func health() async throws -> CoreHealthFacts
+    func projects() async throws -> [HomeProject]
+    func usage() async throws -> [HomeUsage]
+    /// Today's Lore note, nil when none was started (reading never creates one).
+    func todayNote() async throws -> HomeSnapshot.NoteFact?
+    /// Saves a changed note (the Core merges when it moved on) and answers the note as it is now.
+    func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact?
+}
+
+extension HomeSource {
+    func projects() async throws -> [HomeProject] { [] }
+    func usage() async throws -> [HomeUsage] { [] }
+    func todayNote() async throws -> HomeSnapshot.NoteFact? { nil }
+    func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact? { nil }
 }
 
 struct LiveHomeSource: HomeSource {
@@ -86,6 +113,56 @@ struct LiveHomeSource: HomeSource {
         }
     }
 
+    func projects() async throws -> [HomeProject] {
+        try await run {
+            try await client.listProjects().ok.body.json.filter { $0.state != "archived" }.map {
+                HomeProject(slug: $0.slug, name: $0.name, updatedAt: $0.updatedAt)
+            }
+        }
+    }
+
+    /// The tightest limit of each provider across its accounts, with the soonest plan-window reset.
+    func usage() async throws -> [HomeUsage] {
+        try await run {
+            async let spend = client.accountsUsage().ok.body.json
+            async let accounts = client.listAccounts().ok.body.json
+            let (spent, list) = try await (spend, accounts)
+            return Self.usage(
+                spent: spent.map { ($0.accountId, Double($0.maxUtilisationBps) / 10_000) },
+                accounts: list.map {
+                    ($0.id, $0.provider, ($0.health?.planLimit?.windows ?? []).compactMap(\.resetsAt))
+                })
+        }
+    }
+
+    static func usage(spent: [(Int64, Double)], accounts: [(Int64, String, [Date])]) -> [HomeUsage] {
+        var by: [String: HomeUsage] = [:]
+        for (id, provider, resets) in accounts {
+            guard let share = spent.first(where: { $0.0 == id })?.1 else { continue }
+            var u = by[provider] ?? HomeUsage(provider: provider, share: 0, resetsAt: nil)
+            u.share = max(u.share, min(1, share))
+            u.resetsAt = ([u.resetsAt].compactMap { $0 } + resets).min()
+            by[provider] = u
+        }
+        return by.values.sorted { $0.provider < $1.provider }
+    }
+
+    private var lore: LiveLoreService { LiveLoreService(connection: connection) }
+
+    func todayNote() async throws -> HomeSnapshot.NoteFact? {
+        try await run {
+            guard let n = try await lore.daily(HomeFeed.dayKey(Date())) else { return nil }
+            return HomeSnapshot.NoteFact.parse(n.text, id: n.id, rev: n.rev)
+        }
+    }
+
+    func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact? {
+        try await run {
+            let r = try await lore.save(id, baseRev: rev, text: text)
+            return HomeSnapshot.NoteFact.parse(r.note.text, id: r.note.id, rev: r.note.rev)
+        }
+    }
+
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch { throw CoreFailure.of(error) ?? error }
     }
@@ -100,8 +177,13 @@ final class HomeFeed {
     private let quiet: Duration
     private var pending: Task<Void, Never>?
     private var history: [String: [Double]] = [:]
+    /// Terminals and Brain live in their own apps; the app hands Home what they hold.
+    var terminalFacts: (@MainActor () -> [HomeSnapshot.TerminalFact])?
+    var brainService: (@MainActor () -> (any BrainService)?)?
     /// The kinds that change what Home shows.
-    static let prefixes = ["agent.", "runner.", "account.", "audit", "pairing."]
+    static let prefixes = [
+        "agent.", "runner.", "account.", "audit", "pairing.", "terminal.", "project.", "lore.", "brain.",
+    ]
 
     init(
         shell: ShellModel, source: any HomeSource, quiet: Duration = .milliseconds(500),
@@ -127,8 +209,10 @@ final class HomeFeed {
     func refresh() async {
         let at = now()
         var home = shell.home
+        var live: [AgentSessionInfo] = []
         if let s = try? await source.sessions() {
-            home.running = s.filter(\.live).map {
+            live = s.filter(\.live)
+            home.running = live.map {
                 .init(
                     id: $0.id, tool: $0.harness, name: $0.model ?? $0.harness,
                     minutes: max(0, Int(at.timeIntervalSince($0.createdAt) / 60)))
@@ -158,7 +242,69 @@ final class HomeFeed {
             }
         }
         if let h = try? await source.health() { home.health = h }
+        if let p = try? await source.projects() {
+            home.projects = p.map { pr in
+                .init(
+                    id: pr.slug, name: pr.name, sessions: Self.sessions(in: pr, live: live),
+                    updatedAt: pr.updatedAt)
+            }
+        }
+        if let u = try? await source.usage() {
+            home.usage = u.map { .init(provider: $0.provider, share: $0.share, resetsAt: $0.resetsAt) }
+        }
+        if let n = try? await source.todayNote() { home.note = n } else { home.note = nil }
+        if let t = terminalFacts { home.terminals = t() }
+        if let b = brainService?() { home.brain = await Self.glance(b) }
         shell.home = home
+    }
+
+    /// Writes a tick on today's note back (the widget shows it at once; the Core's answer replaces it).
+    func toggleTodo(_ index: Int) async {
+        guard let n = shell.home.note, let text = HomeSnapshot.NoteFact.toggling(n.text, todo: index) else { return }
+        shell.home.note = HomeSnapshot.NoteFact.parse(text, id: n.id, rev: n.rev)
+        if let saved = try? await source.saveNote(n.id, rev: n.rev, text: text) {
+            shell.home.note = saved
+        } else {
+            await refresh()
+        }
+    }
+
+    /// "2026-11-19", the local day, as Lore keys its daily notes.
+    static func dayKey(_ d: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: d)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// Live sessions whose folder or repo is this project (by its name or slug, the last path part, case ignored).
+    static func sessions(in p: HomeProject, live: [AgentSessionInfo]) -> Int {
+        let names: Set<String> = [p.slug.lowercased(), p.name.lowercased()]
+        return live.filter {
+            guard let f = $0.project?.split(separator: "/").last else { return false }
+            return names.contains(f.lowercased())
+        }.count
+    }
+
+    /// What Brain shows Home. nil when the Core has no Brain (rooms cannot be read).
+    static func glance(_ s: any BrainService) async -> HomeSnapshot.BrainGlance? {
+        guard let rooms = try? await s.rooms() else { return nil }
+        let overview = try? await s.overview()
+        let candidates = try? await s.candidates()
+        let health: String
+        switch overview?.health {
+        case .needsYou: health = "Needs you"
+        case .paused: health = "Paused"
+        default: health = "Healthy"
+        }
+        return .init(
+            known: rooms.compactMap { $0.counts?.records }.reduce(0, +), rooms: rooms.count,
+            waiting: overview?.needs.map(\.n).reduce(0, +) ?? candidates?.items.count ?? 0, health: health,
+            question: candidates?.items.first.map { .init(id: $0.id, room: $0.room, text: $0.text) })
+    }
+
+    /// Keeps or drops the candidate Brain asked about.
+    func answer(_ id: String, room: String, keep: Bool) async {
+        if let s = brainService?() { try? await s.decide(id, room: room, keep ? .accept : .reject) }
+        await refresh()
     }
 
     /// `device.revoked` reads "Device revoked".

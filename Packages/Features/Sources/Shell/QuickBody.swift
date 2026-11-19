@@ -44,7 +44,7 @@ struct QuickBody: View {
                 grid(columns: 2, labels: false)
             case .m:
                 grid(columns: 4, labels: true)
-            case .l, .t:
+            case .l:
                 VStack(spacing: Space.s2) {
                     ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
                         Button {
@@ -65,7 +65,7 @@ struct QuickBody: View {
                     }
                     Spacer(minLength: 0)
                 }
-            case .x:
+            case .w:
                 grid(columns: 4, labels: true)
             }
         }
@@ -86,7 +86,7 @@ struct QuickBody: View {
                                 .multilineTextAlignment(.center)
                         }
                     }
-                    .frame(maxWidth: .infinity, minHeight: size == .s ? 52 : size == .x ? 120 : 76)
+                    .frame(maxWidth: .infinity, minHeight: size == .s ? 52 : 76)
                 }
                 .buttonStyle(QuickTileStyle(prominent: t.id == "launcher")).rise(arrived, i, reduce)
                 .environment(\.coreForcedInteraction, forcedHover(i))

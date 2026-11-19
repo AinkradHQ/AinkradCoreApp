@@ -27,6 +27,14 @@ struct WidgetBody: View {
         case .quick: QuickBody(shell: shell, size: size)
         case .clock: AnalogClockBody(size: size)
         case .digital: DigitalClockBody(size: size)
+        case .terminals: TerminalsBody(home: shell.home, size: size)
+        case .projects: ProjectsBody(home: shell.home, size: size)
+        case .brain: BrainBody(shell: shell, size: size)
+        case .todaynote: TodayNoteBody(shell: shell, size: size)
+        case .approvals: ApprovalsBody(shell: shell, size: size)
+        case .aiusage: AIUsageBody(home: shell.home, size: size)
+        case .weather: WeatherBody(size: size)
+        case .calendar: CalendarBody(size: size)
         }
     }
 }
@@ -76,16 +84,25 @@ struct RunningBody: View {
                         WFigure(value: Double(runs.count), caption: "running now").frame(width: 100)
                         list(runs.prefix(2), tool: false)
                     }
-                case .l, .t:
+                case .l:
                     WHead("text.cursor", "Running AI sessions")
                     WFigure(value: Double(runs.count), caption: "running")
                     list(runs.prefix(5), tool: true)
                     Spacer(minLength: 0)
-                case .x:
+                case .w:
+                    // Wide: how long each has been working, side by side (the mockup's bars over time).
                     WHead("text.cursor", "Running AI sessions")
                     HStack(alignment: .top, spacing: Space.s6) {
                         WFigure(value: Double(runs.count), caption: "running").frame(width: 100, alignment: .leading)
-                        list(runs.prefix(5), tool: true)
+                        let longest = Double(max(runs.map(\.minutes).max() ?? 1, 1))
+                        VStack(alignment: .leading, spacing: Space.s2) {
+                            ForEach(runs.prefix(3)) { r in
+                                WBarRow(
+                                    label: "\(r.name) · \(r.tool)", value: "\(r.minutes) min",
+                                    fill: Double(r.minutes) / longest)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
             }
@@ -141,7 +158,7 @@ struct SpendBody: View {
                         .frame(width: 130)
                         if hasWeek { WColumns(values: week, labels: weekLabels) }
                     }
-                case .l, .t:
+                case .l:
                     WHead("dollarsign", "AI spend")
                     HStack(alignment: .firstTextBaseline) {
                         WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
@@ -155,16 +172,16 @@ struct SpendBody: View {
                             WColumns(values: week, labels: weekLabels)
                         }
                     }
-                case .x:
+                case .w:
                     WHead("dollarsign", "AI spend")
                     HStack(alignment: .top, spacing: Space.s4) {
-                        VStack(alignment: .leading, spacing: Space.s3) {
+                        VStack(alignment: .leading, spacing: Space.s2) {
                             WFigure(value: home.monthSpend, format: money, caption: "this month", size: 28)
                             CoreMeter(home.monthTokensUsed, label: "Tokens used this month")
                             WCaption(tightest)
-                            WBarRow(label: "Today", value: money(home.spendToday), fill: today)
                             Spacer(minLength: 0)
                         }
+                        .frame(width: 170)
                         if busiest != nil {
                             WSub {
                                 WCaption("Last 30 days")
@@ -245,13 +262,27 @@ struct MachinesBody: View {
                 case .m:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
                     rows(ms.prefix(3))
-                case .l, .t:
+                case .l:
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
                     rows(ms.prefix(4))
                     Spacer(minLength: 0)
-                case .x:
+                case .w:
+                    // Wide: one card per machine with its recent load.
                     WHead("server.rack", "Machines") { WCaption("\(home.machinesOnline) of \(ms.count) online") }
-                    rows(ms.prefix(6))
+                    HStack(alignment: .top, spacing: Space.s3) {
+                        ForEach(ms.prefix(5)) { m in
+                            WSub {
+                                Text(m.id).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                                    .foregroundStyle(GlassInk.primary)
+                                if m.load.isEmpty {
+                                    CoreMeter(m.online ? Double(m.used) / Double(max(m.slots, 1)) : 0, label: m.id)
+                                } else {
+                                    WColumns(values: m.load)
+                                }
+                                WCaption(m.online ? "\(m.loadPercent)% busy" : "Offline")
+                            }
+                        }
+                    }
                 }
             }
         }
