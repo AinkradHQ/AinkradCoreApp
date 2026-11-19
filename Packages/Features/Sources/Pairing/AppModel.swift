@@ -275,6 +275,17 @@ public final class AppModel {
         shell.coreLink = .connecting
         do {
             try await service.connect()
+            // E12-5: a Core below the oldest this app works with is not talked to; the person is told to update it.
+            if let live = service as? LiveCoreService, let v = await live.connection.coreProof?.serverVersion,
+                CoreSkew.tooOld(v)
+            {
+                await service.close()
+                shell.coreLink = .offline
+                shell.presentSheet(
+                    title: "Update the Core", message: CoreSkew.message(core: v),
+                    actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
+                return
+            }
             shell.coreLink = .live
             shell.retryAttempt = 0
             shell.nextRetryAt = nil
