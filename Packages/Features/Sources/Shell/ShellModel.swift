@@ -223,6 +223,11 @@ public final class ShellModel {
     /// The AI session counts the status chip shows, from the same index as the AI Sessions list and its sidebar (review
     /// 2026-11-16: the chip, the sidebar and the groups disagreed). Nil until Agents is up: the home feed stands in.
     public var sessionCounts: (@MainActor () -> (running: Int, needYou: Int))?
+    /// The Brain icon's state (E9-2), supplied by Brain from the Core's status call. Nil hides the icon (an older Core, or no Brain).
+    public var brainStatus: (@MainActor () -> BrainChip?)?
+    /// Opens the Brain from the icon's panel.
+    public var openBrain: (@MainActor () -> Void)?
+    public var brainPanelOpen = false
     public var waitingOnYou: Int {
         guard let source = waitingSource else { return bell.items.filter { $0.kind == .approval }.count }
         return source() + joinRequests
@@ -653,4 +658,21 @@ public final class ShellModel {
 
     /// Layout changes animate with the move curve; Reduce Motion keeps the fade only (the views drop the travel).
     func animate(_ body: () -> Void) { withAnimation(Motion.out(Motion.move), body) }
+}
+
+/// What the top-bar Brain icon and its panel say.
+public struct BrainChip: Equatable, Sendable {
+    /// `locked`, `needs_you`, `working` or `idle`.
+    public var state: String
+    public var line: String
+    /// What Brain waits on, in words. Empty when nothing.
+    public var needs: [String]
+    /// A distil or overview failed in the last day.
+    public var attention: Bool
+    public init(state: String, line: String, needs: [String], attention: Bool) {
+        self.state = state
+        self.line = line
+        self.needs = needs
+        self.attention = attention
+    }
 }

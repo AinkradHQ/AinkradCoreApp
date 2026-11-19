@@ -155,21 +155,6 @@ public final class ReviewModel {
         }
     }
 
-    /// Groups the run again with the Core's current rules, then reads the cards. Decisions on surviving rooms are kept.
-    public func resort() async {
-        guard let run else { return }
-        await act {
-            _ = try await routes.regroup(run: run)
-            await refresh()
-            semantic = nil
-            tidyChanges = nil
-            showingChanges = false
-            sameProjectFor = nil
-            watchSemantic()
-            closeCard()
-        }
-    }
-
     /// The selected items become a new room.
     public func splitSelected(from id: String, name: String?) async {
         guard let run, !selected.isEmpty else { return }

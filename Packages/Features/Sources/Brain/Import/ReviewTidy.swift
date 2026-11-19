@@ -29,7 +29,7 @@ struct SemanticStatusLine: View {
                 } else if review.tidyDeclined {
                     words(ReviewWords.declined)
                 } else if review.tidyUndone {
-                    words("Local AI changes undone. Re-sort runs it again.")
+                    words("Local AI changes undone.")
                 } else {
                     words("Local AI found nothing to tidy.")
                 }
