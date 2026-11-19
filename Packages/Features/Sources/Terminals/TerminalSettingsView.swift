@@ -68,6 +68,7 @@ struct TerminalSettingsView: View {
                 }
             }
             if part.showsOptions {
+                TerminalBasicsSection(prefs: prefs)
                 GlassSection(
                     "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
                     hue: GlassInk.blue, index: 5
