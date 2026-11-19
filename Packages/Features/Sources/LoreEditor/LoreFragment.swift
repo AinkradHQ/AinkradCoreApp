@@ -1,6 +1,6 @@
 import AppKit
-import CoreUI
 import CoreText
+import CoreUI
 
 /// Hands TextKit 2 our own layout fragment, so list markers, checkboxes, quote bars and code wells are drawn, not stored
 /// as characters.
@@ -117,8 +117,10 @@ final class LoreFragment: NSTextLayoutFragment {
                 }
             )
         }.rows
-        let pad: CGFloat = 12, gap: CGFloat = 3
-        let avail = (textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.width) - gap * CGFloat(cols - 1)
+        let pad: CGFloat = 12
+        let gap: CGFloat = 3
+        let avail =
+            (textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.width) - gap * CGFloat(cols - 1)
         var w = (0..<cols).map { c in (cells.map { ceil($0[c].size().width) }.max() ?? 0) + pad * 2 }
         let total = w.reduce(0, +)
         // Narrower than the page: spread the spare room. Wider: shrink every column alike; long cells end in "…".
@@ -139,7 +141,8 @@ final class LoreFragment: NSTextLayoutFragment {
                 if r == 0 { Draw.fill(ctx, Draw.rect(cell, radius: 6), LoreInk.cg.head) }
                 let th = ceil(text.size().height)
                 text.draw(
-                    with: CGRect(x: cell.minX + pad, y: cell.midY - th / 2, width: max(0, cell.width - pad * 2), height: th),
+                    with: CGRect(
+                        x: cell.minX + pad, y: cell.midY - th / 2, width: max(0, cell.width - pad * 2), height: th),
                     options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
                 x += w[c] + gap
             }

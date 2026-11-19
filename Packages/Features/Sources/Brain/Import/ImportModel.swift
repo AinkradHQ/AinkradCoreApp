@@ -297,7 +297,8 @@ public final class ImportModel {
                     onProgress: { [weak self] p in await self?.apply(p) })
                 for (k, n) in report.skipped { localSkipped[k, default: 0] += n }
                 itemsFound += report.items
-                do { _ = try await retrying { try await routes.collected(run: id, source: sid) } } catch let e as BrainHTTPError
+                do { _ = try await retrying { try await routes.collected(run: id, source: sid) } } catch let e
+                    as BrainHTTPError
                     where e.status == 409
                 {}  // already reported by an earlier attempt
                 collectedSources.insert(sid)
@@ -323,7 +324,8 @@ public final class ImportModel {
         if let run { return (run, "collecting") }
         let ids = chosen.map(\.id)
         if let saved = resume?.load(), let r = saved.run, Set(saved.sources.keys).isSubset(of: ids),
-            let view = try? await retrying { try await routes.run(r) }, ["collecting", "discovering", "review"].contains(view.state)
+            let view = try? await retrying { try await routes.run(r) },
+            ["collecting", "discovering", "review"].contains(view.state)
         {
             resumeState = saved
             run = r

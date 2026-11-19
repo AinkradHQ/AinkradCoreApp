@@ -231,7 +231,8 @@ struct ImportKeySheet: View {
                 DialogHead(title: "Add a key you already have", line: "Needs Touch ID.")
                 CoreTextField("Name", placeholder: "ops-personal", text: $name, autofocus: true)
                 CoreTextArea(
-                    "Private key", placeholder: "-----BEGIN OPENSSH PRIVATE KEY----- or -----BEGIN RSA PRIVATE KEY-----", text: $pem,
+                    "Private key",
+                    placeholder: "-----BEGIN OPENSSH PRIVATE KEY----- or -----BEGIN RSA PRIVATE KEY-----", text: $pem,
                     error: model.writeError, size: MacTextSize.meta, minHeight: Space.s8 * 3, design: .monospaced
                 )
                 CoreSecureField("Passphrase", placeholder: "Only for an encrypted key", text: $passphrase)

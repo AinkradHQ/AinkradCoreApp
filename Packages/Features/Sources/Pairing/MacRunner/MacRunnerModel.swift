@@ -161,7 +161,10 @@ final class MacRunnerModel {
 
     /// Looks at launchd and the runner's own note again (off the main thread: it runs `launchctl`).
     func refreshProblem(connected: Bool?) async {
-        guard control.isBundled, useThisMac else { problem = nil; return }
+        guard control.isBundled, useThisMac else {
+            problem = nil
+            return
+        }
         let control = control
         problem = await Task.detached { control.lastProblem(connected: connected == true) }.value
     }

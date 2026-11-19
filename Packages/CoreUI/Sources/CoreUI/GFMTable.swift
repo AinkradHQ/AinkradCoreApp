@@ -36,8 +36,11 @@ public enum GFMTable {
         let t = line.trimmingCharacters(in: .whitespaces)
         guard t.contains("-") else { return false }
         let c = cells(t)
-        return c.allSatisfy { !$0.isEmpty && $0.contains("-") && $0.dropFirst($0.hasPrefix(":") ? 1 : 0)
-            .dropLast($0.hasSuffix(":") ? 1 : 0).allSatisfy { $0 == "-" } }
+        return c.allSatisfy {
+            !$0.isEmpty && $0.contains("-")
+                && $0.dropFirst($0.hasPrefix(":") ? 1 : 0)
+                    .dropLast($0.hasSuffix(":") ? 1 : 0).allSatisfy { $0 == "-" }
+        }
     }
 
     public static func alignments(_ separator: String) -> [Align] {

@@ -41,7 +41,9 @@ import Testing
         svc.attachResults = [.success(l)]
         await s.attach()
         #expect(await until { l.drawnBytes > 0 })
-        #expect(l.events.first == "resize" && l.sizes.first.map { $0 != [10, 5] } == true, "pane size first, then the replay")
+        #expect(
+            l.events.first == "resize" && l.sizes.first.map { $0 != [10, 5] } == true,
+            "pane size first, then the replay")
         s.shutDown()
     }
 

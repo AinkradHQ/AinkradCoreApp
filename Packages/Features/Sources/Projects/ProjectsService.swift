@@ -143,7 +143,6 @@ struct LiveProjectsService: ProjectsService {
     }
 }
 
-
 /// GitHub's repos as the Core lists them for the workspace's connection; nil while no connection is set up
 /// (409 `no_connection`), so the picker says "Connect GitHub".
 struct LiveRepoCatalog: RepoCatalog {

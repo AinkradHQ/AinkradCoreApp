@@ -25,7 +25,9 @@ final class FakeLink: TerminalLink, @unchecked Sendable {
     let updates: AsyncStream<TerminalUpdate>
     private let feed: AsyncStream<TerminalUpdate>.Continuation
     private let lock = NSLock()
-    private var state = (cursor: UInt64(0), detached: false, inputs: [Data](), sizes: [[Int]](), drawn: 0, events: [String]())
+    private var state = (
+        cursor: UInt64(0), detached: false, inputs: [Data](), sizes: [[Int]](), drawn: 0, events: [String]()
+    )
     init(cols: Int = 80, rows: Int = 24, seq: UInt64 = 0, state: String = "running") {
         opened = TerminalOpened(state: state, rows: rows, cols: cols, seq: seq)
         var c: AsyncStream<TerminalUpdate>.Continuation!
@@ -41,8 +43,18 @@ final class FakeLink: TerminalLink, @unchecked Sendable {
     var events: [String] { lock.withLock { state.events } }
     var drawnBytes: Int { lock.withLock { state.drawn } }
     func input(_ bytes: Data) { lock.withLock { state.inputs.append(bytes) } }
-    func resize(rows: Int, cols: Int) { lock.withLock { state.sizes.append([cols, rows]); state.events.append("resize") } }
-    func drawn(_ bytes: Int) { lock.withLock { state.drawn += bytes; state.events.append("drawn") } }
+    func resize(rows: Int, cols: Int) {
+        lock.withLock {
+            state.sizes.append([cols, rows])
+            state.events.append("resize")
+        }
+    }
+    func drawn(_ bytes: Int) {
+        lock.withLock {
+            state.drawn += bytes
+            state.events.append("drawn")
+        }
+    }
     func detach() {
         lock.withLock { state.detached = true }
         feed.yield(.closed(.detached))

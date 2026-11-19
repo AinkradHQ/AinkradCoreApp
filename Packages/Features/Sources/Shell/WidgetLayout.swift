@@ -74,7 +74,8 @@ public struct WidgetLayout: Equatable, Sendable {
         // repeated Running and Machines.
         // Rows 2 and 3 across the middle are the greeting's; the bottom rows are open to widgets.
         let d: [(WidgetKind, WidgetSize, Int, Int)] = [
-            (.running, .m, 0, 0), (.machines, .m, 4, 0), (.events, .m, 8, 0), (.digital, .s, 12, 0), (.quick, .s, 14, 0),
+            (.running, .m, 0, 0), (.machines, .m, 4, 0), (.events, .m, 8, 0), (.digital, .s, 12, 0),
+            (.quick, .s, 14, 0),
             (.needs, .m, 0, 2), (.core, .m, 12, 2), (.board, .m, 0, 4), (.spend, .l, 12, 4),
         ].filter { $0.0 != .board || WidgetKind.boardShown }
         return WidgetLayout(items: d.map { WidgetItem(kind: $0.0, size: $0.1, x: $0.2, y: $0.3) })
@@ -242,7 +243,8 @@ public struct WidgetLayout: Equatable, Sendable {
 
     /// The 16 x 8 default of v2, so a desk nobody changed gets the new default instead of a shuffle around the greeting.
     private static let legacyStandard: Set<String> = [
-        "running m 0 0", "spend l 4 0", "machines m 8 0", "digital s 12 0", "quick s 14 0", "needs m 0 2", "events m 8 2",
+        "running m 0 0", "spend l 4 0", "machines m 8 0", "digital s 12 0", "quick s 14 0", "needs m 0 2",
+        "events m 8 2",
         "core m 12 2", "board m 0 4",
     ]
 
@@ -253,8 +255,9 @@ public struct WidgetLayout: Equatable, Sendable {
     public static func decoded(_ data: Data) -> WidgetLayout? {
         guard let s = try? JSONDecoder().decode(Stored.self, from: data), (1...3).contains(s.v) else { return nil }
         // The board widget only exists in the sample world, so it does not count either way.
-        if s.v == 2, Set(s.items.map { "\($0.t) \($0.s) \($0.x) \($0.y)" }).subtracting(["board m 0 4"])
-            == legacyStandard.subtracting(["board m 0 4"])
+        if s.v == 2,
+            Set(s.items.map { "\($0.t) \($0.s) \($0.x) \($0.y)" }).subtracting(["board m 0 4"])
+                == legacyStandard.subtracting(["board m 0 4"])
         {
             return standard()
         }

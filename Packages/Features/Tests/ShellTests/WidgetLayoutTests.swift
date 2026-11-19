@@ -200,7 +200,9 @@ struct WidgetLayoutTests {
             #"{"v":2,"items":[{"t":"running","s":"m","x":0,"y":0},{"t":"spend","s":"l","x":4,"y":0},{"t":"machines","s":"m","x":8,"y":0},{"t":"digital","s":"s","x":12,"y":0},{"t":"quick","s":"s","x":14,"y":0},{"t":"needs","s":"m","x":0,"y":2},{"t":"events","s":"m","x":8,"y":2},{"t":"core","s":"m","x":12,"y":2},{"t":"board","s":"m","x":0,"y":4}]}"#
         let n = try #require(WidgetLayout.decoded(Data(was.utf8)))
         #expect(n.items.map(\.kind) == std.items.map(\.kind) && !n.items.contains(where: onGreeting))
-        #expect(WidgetLayout.decoded(Data(#"{"v":2,"items":[{"t":"clock","s":"s","x":99,"y":-5}]}"#.utf8))?.items.count == 1)
+        #expect(
+            WidgetLayout.decoded(Data(#"{"v":2,"items":[{"t":"clock","s":"s","x":99,"y":-5}]}"#.utf8))?.items.count == 1
+        )
     }
 
     @Test func onlyTheDigitalClockIsTall() {
