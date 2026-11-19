@@ -5,7 +5,7 @@ import SwiftUI
 
 struct LoreRightSidebar: View {
     let model: LoreModel
-    @State private var picked: String?
+    @State private var picked: Int?
 
     var body: some View {
         ScrollView {
