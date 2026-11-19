@@ -29,5 +29,11 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_ainkrad._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Ainkrad looks for your Core on this network. Nothing is sent until you connect.</string>
 </dict>
 </plist>
