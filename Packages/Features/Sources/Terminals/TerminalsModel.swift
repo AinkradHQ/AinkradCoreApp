@@ -48,6 +48,8 @@ public final class TerminalsModel {
     var selected: String?
     /// The runner whose page is open in the Runners pane (nil: the fleet).
     var runnerDetail: String?
+    /// Opens the Devices & Runners app on its Runners tab; set by the app that hosts that pane. Nil: the plain Runners pane.
+    @ObservationIgnored public var openRunnersApp: (@MainActor () -> Void)?
     var runnerFilter: RunnerFacts.Filter = .all
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
@@ -185,9 +187,12 @@ public final class TerminalsModel {
         followElevation()
         shell.settings.section(
             SettingsSection(
-                id: "terminal", group: .apps, title: "Terminals", sub: "Look, screen, surface and defaults",
-                symbol: "terminal", order: 10
-            ) { TerminalSettingsView(model: self) })
+                id: "terminal", group: .apps, title: "Terminal", sub: "Look, screen, surface and defaults",
+                symbol: "terminal", order: 4,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { TerminalSettingsView(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { TerminalSettingsView(model: self, part: .options) },
+                ]))
         let l = shell.launcher
         l.register(
             LauncherEntry(
@@ -277,8 +282,16 @@ public final class TerminalsModel {
         Task { await reload() }
     }
 
+    /// The Runners screen, to sit inside the Devices & Runners app.
+    public func runnersView() -> some View { RunnersView(model: self) }
+
     public func openRunners(_ id: String? = nil) {
         runnerDetail = id
+        if let openRunnersApp {
+            openRunnersApp()
+            Task { await reload() }
+            return
+        }
         shell.openPane(
             PaneSpec(id: "runners", title: "Runners", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
                 RunnersView(model: self)

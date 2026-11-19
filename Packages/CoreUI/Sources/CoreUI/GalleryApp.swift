@@ -71,6 +71,7 @@ public struct CoreUIGallery: View {
     @State var choice = "b"
     @State var checks: Set<String> = ["read", "terminal"]
     @State var segment = "all"
+    @State var tab = "look"
     @State var count = 3
     @State var switchOn = true
     @State var switchOff = false

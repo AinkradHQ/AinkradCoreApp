@@ -619,9 +619,10 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
-            ) {
-                AccountsLinkSection(model: self)
-            })
+                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 9,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { AccountsLinkSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { AccountsLinkSection(model: self, part: .options) },
+                ]))
     }
 }

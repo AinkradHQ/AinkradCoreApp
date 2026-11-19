@@ -8,17 +8,25 @@ public struct CoreHealthFacts: Equatable, Sendable {
     public var certDaysLeft: Int?
     public var lastBackupAt: Date?
     public var lastBackupBytes: Int64?
+    /// The Core process's memory in bytes, and how full its disk is (0...100). Nil from a Core that does not say.
+    public var memoryBytes: Int64?
+    public var diskUsedPct: Int?
 
     public init(
         version: String, uptimeSecs: Int64, certDaysLeft: Int? = nil, lastBackupAt: Date? = nil,
-        lastBackupBytes: Int64? = nil
+        lastBackupBytes: Int64? = nil, memoryBytes: Int64? = nil, diskUsedPct: Int? = nil
     ) {
+        self.memoryBytes = memoryBytes
+        self.diskUsedPct = diskUsedPct
         self.version = version
         self.uptimeSecs = uptimeSecs
         self.certDaysLeft = certDaysLeft
         self.lastBackupAt = lastBackupAt
         self.lastBackupBytes = lastBackupBytes
     }
+
+    /// "412 MB", nil when the Core did not say.
+    public var memory: String? { memoryBytes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .memory) } }
 
     /// "62 days", "1 day", "Expires today", "Expired".
     public var certificate: String? {

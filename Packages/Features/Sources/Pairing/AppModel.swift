@@ -244,6 +244,7 @@ public final class AppModel {
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
+            model.openRunnersApp = { [weak self] in self?.openHub(.runners) }
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
@@ -322,10 +323,18 @@ public final class AppModel {
     }
 
     /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
-    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts", "mac-runner"]
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts"]
+    /// The settings pages a device without `admin` does not see: Core stays (Forget lives there), its Limits tab does not.
+    static let hiddenSettings = Set(adminOnly.filter { $0 != "core" } + ["core.limits"])
+    /// Whether this device holds `admin`: the This Mac tab of Devices & Runners is hidden without it.
+    private(set) var isAdminDevice = true
+    /// The tab the Devices & Runners app shows.
+    var hubTab: HubTab = .devices
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
-        shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
+        shell.settings.hidden = admin ? [] : Self.hiddenSettings
+        isAdminDevice = admin
+        if !admin, hubTab == .thisMac { hubTab = .devices }
         if admin {
             stashed.forEach(shell.launcher.register)
             stashed = []

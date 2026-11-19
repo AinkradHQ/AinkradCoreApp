@@ -115,8 +115,8 @@ public final class AdminModel {
 
     // MARK: Settings sections and launcher entries
 
-    /// Core settings and Feature switches stay in Settings. Secrets and Activity (Ops, Audit) are apps of their own: each has
-    /// a launcher entry that opens its pane. Sections that the shell shipped as placeholders keep their ids.
+    /// Core settings (a tab of the Core page) and Feature switches stay in Settings. Secrets and Activity (Ops, Audit) are apps
+    /// of their own: each has a launcher entry that opens its pane. Sections that the shell shipped as placeholders keep their ids.
     public func install() {
         let shell = host.shell
         let list: [(id: String, title: String, symbol: String, order: Int, sub: String, keys: [String])] = [
@@ -130,15 +130,22 @@ public final class AdminModel {
             ),
         ]
         for e in list {
-            let content: AnyView =
-                e.id == "core" ? AnyView(CoreSettingsSection(admin: self)) : AnyView(SwitchesSection(admin: self))
-            shell.settings.section(
-                SettingsSection(id: e.id, group: .core, title: e.title, symbol: e.symbol, order: e.order) { content })
+            if e.id == "core" {
+                // The registry values are the Core page's Advanced "Limits" tab (D-11); the page itself is the shell's.
+                shell.settings.tab(
+                    "core", SettingsTab("limits", "Limits", order: 9, advanced: true) { CoreSettingsSection(admin: self) })
+            } else {
+                shell.settings.section(
+                    SettingsSection(
+                        id: e.id, group: .core, title: e.title, symbol: e.symbol, order: e.order, advancedOnly: true
+                    ) { SwitchesSection(admin: self) })
+            }
             shell.launcher.register(
                 LauncherEntry(
                     id: "admin-\(e.id)", title: e.title, sub: "Settings, Core", symbol: e.symbol, keywords: e.keys
                 ) {
                     shell.settings.selected = e.id
+                    if e.id == "core" { shell.settings.selectTab("limits", in: "core") }
                     shell.open(.settings)
                 })
         }

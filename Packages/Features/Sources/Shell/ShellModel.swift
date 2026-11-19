@@ -148,6 +148,16 @@ public struct DeviceGlance: Identifiable, Sendable, Equatable {
     }
 }
 
+/// The "Update available" row of the Core dropdown.
+public struct CoreUpdateGlance: Sendable {
+    public let line: String
+    public let installNow: @MainActor @Sendable () -> Void
+    public init(line: String, installNow: @escaping @MainActor @Sendable () -> Void) {
+        self.line = line
+        self.installNow = installNow
+    }
+}
+
 /// What the Brain dropdown shows: how it is, what it does now, and a few counts.
 public struct BrainGlance: Sendable, Equatable {
     public struct Stat: Sendable, Equatable, Identifiable {
@@ -239,6 +249,10 @@ public final class ShellModel {
         get { topMenu == .core }
         set { topMenu = newValue ? .core : (topMenu == .core ? nil : topMenu) }
     }
+    /// How long the last call to the Core took, in milliseconds; the app sets it after each health read.
+    public var responseMs: Int?
+    /// An update the Core is ready to install ("0.10.0 to 0.10.1 · installs tonight, or now"); the updater (E12) sets it.
+    public var coreUpdate: CoreUpdateGlance?
     /// What the Devices block of the Core dropdown lists; the app (Pairing) supplies it.
     public var devicesGlance: (@MainActor () -> [DeviceGlance])?
     /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.
@@ -289,11 +303,6 @@ public final class ShellModel {
     /// Alarms (backup age, an account turned off...): counted on their own, never added to the approvals.
     public var alertsOnYou: Int { bell.items.filter { $0.kind == .alarm }.count }
 
-    /// Settings → Activity: the "N running · M waiting" chip in the status cluster. The bell is always there.
-    public var showActivityChip = true {
-        didSet { defaults.set(showActivityChip, forKey: Self.activityChipKey) }
-    }
-    static let activityChipKey = "ainkrad.core.activity.statusChip"
     /// The elevation chip: asks for Touch ID.
     public var elevate: (@MainActor () -> Void)?
     public var dialog: ShellDialog?
@@ -326,7 +335,6 @@ public final class ShellModel {
         tabNames = defaults.dictionary(forKey: Self.tabNamesKey) as? [String: String] ?? [:]
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
         if !WidgetKind.boardShown { widgets.items.removeAll { $0.kind == .board } }
-        showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
         // Follow the sun changes sides at 07:00 and 18:00: look again every minute.
@@ -339,7 +347,7 @@ public final class ShellModel {
         }
         launcher.register(
             LauncherEntry(
-                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
+                id: "settings", title: "Settings", sub: "General, Apps, Core",
                 symbol: "gearshape", keywords: ["preferences", "appearance", "activity"], tile: .slate
             ) { [weak self] in self?.open(.settings) })
         launcher.register(
