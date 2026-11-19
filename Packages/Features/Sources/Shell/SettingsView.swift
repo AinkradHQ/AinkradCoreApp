@@ -369,7 +369,6 @@ extension ShellModel {
             SettingsSection(
                 id: "core", group: .core, title: "Core", sub: "This Core, its updates and its backups",
                 symbol: "server.rack", order: 0, advancedSwitch: true, tabs: coreTabs()))
-        later("devices", .core, "Devices", "iphone", 1, "Devices")
         later("lockouts", .core, "Lockouts", "lock", 6, "Lockouts", advancedOnly: true)
         later("secrets", .core, "Secrets", "key", 4, "Secrets")
         later("audit", .core, "Audit", "doc.text", 5, "The audit log")

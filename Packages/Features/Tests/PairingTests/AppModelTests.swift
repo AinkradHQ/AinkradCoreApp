@@ -396,3 +396,14 @@ struct AppModelTests {
         }
     }
 }
+
+struct HubTabTests {
+    @Test func launcherEntriesLandOnTheRightTab() {
+        #expect(HubTab.forEntry("devices") == .devices)
+        #expect(HubTab.forEntry("add-device") == .devices)
+        #expect(HubTab.forEntry("devices-runners") == .devices)
+        #expect(HubTab.forEntry("runners") == .runners)
+        #expect(HubTab.forEntry("mac-runner") == .thisMac)
+        #expect(HubTab.forEntry("lockouts") == nil)
+    }
+}
