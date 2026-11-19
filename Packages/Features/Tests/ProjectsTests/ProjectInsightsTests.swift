@@ -50,7 +50,7 @@ final class FakeInsights: ProjectInsightsService, @unchecked Sendable {
     func code(project: Int64) async throws -> [CodeInfo] { [] }
     func usage(project: Int64) async throws -> UsageInfo { UsageInfo(weekCost: 2) }
     func changes(project: Int64) async throws -> ChangesInfo { ChangesInfo() }
-    func area(_ area: String) async throws -> [KnownRecord] {
+    func area(_ area: String, room: String?) async throws -> [KnownRecord] {
         [KnownRecord(id: "1", room: "room_a", roomName: "Demo", kind: "fact", body: "a"), KnownRecord(id: "2", room: "room_b", roomName: "Else", kind: "fact", body: "b")]
     }
     func sessionDocs() async throws -> [SessionDocItem] {

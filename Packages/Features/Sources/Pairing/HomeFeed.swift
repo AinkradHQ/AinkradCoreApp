@@ -175,13 +175,13 @@ struct LiveHomeSource: HomeSource {
             working: a.distilling, queued: a.queued, overviews: a.overviews, lastDoneAt: done)
     }
 
-    /// ponytail: path and answer shape (`{ "lines": [..] }`) are a guess until E6's route lands; align them at integration.
+    /// `GET /terminals/{id}/tail` (E6): 1 to 20 lines of plain text, oldest first; empty for a terminal that is not a private sandbox.
     func terminalTail(_ id: String, lines: Int) async throws -> [String]? {
         guard await connection.serverSupports(minor: 95) else { return nil }
         struct Tail: Decodable { var lines: [String] }
         let data = try await run {
             try await connection.signedRequest(
-                method: "GET", target: "/api/v1/terminals/\(id)/tail?lines=\(lines)", body: Data())
+                method: "GET", target: "/api/v1/terminals/\(id)/tail?lines=\(min(max(lines, 1), 20))", body: Data())
         }
         return try JSONDecoder().decode(Tail.self, from: data).lines
     }

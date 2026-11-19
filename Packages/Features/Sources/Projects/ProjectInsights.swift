@@ -100,7 +100,7 @@ protocol ProjectInsightsService: Sendable {
     func usage(project: Int64) async throws -> UsageInfo
     func changes(project: Int64) async throws -> ChangesInfo
     /// The records of a Brain area (`me`, `rules`, `knowledge`, `timeline`) across the open rooms.
-    func area(_ area: String) async throws -> [KnownRecord]
+    func area(_ area: String, room: String?) async throws -> [KnownRecord]
     func sessionDocs() async throws -> [SessionDocItem]
     func tuning(project: Int64) async throws -> ProjectTuning
     func setTuning(project: Int64, fetchInterval: Int?, defaultEnvironment: String?) async throws
@@ -120,8 +120,11 @@ struct LiveProjectInsightsService: ProjectInsightsService {
     func changes(project: Int64) async throws -> ChangesInfo {
         try InsightsWire.changes(try await call("GET", "/api/v1/projects/\(project)/changes"))
     }
-    func area(_ area: String) async throws -> [KnownRecord] {
-        try InsightsWire.records(try await call("GET", "/modules/brain/v1/areas/\(LiveProjectRunService.seg(area))?limit=200"))
+    func area(_ area: String, room: String?) async throws -> [KnownRecord] {
+        // The room filter keeps the project's own records out of the Core's 200-record cap.
+        let only = room.map { "&room=\(LiveProjectRunService.seg($0))" } ?? ""
+        return try InsightsWire.records(
+            try await call("GET", "/modules/brain/v1/areas/\(LiveProjectRunService.seg(area))?limit=200\(only)"))
     }
     func sessionDocs() async throws -> [SessionDocItem] {
         try InsightsWire.docs(try await call("GET", "/modules/lore/v1/session-docs"))
@@ -265,8 +268,8 @@ final class ProjectInsightsModel {
     func loadKnowledge() async {
         guard let s = service else { return }
         let room = (try? await s.tuning(project: project.id))?.roomID
-        async let k = try? s.area("knowledge")
-        async let r = try? s.area("rules")
+        async let k = try? s.area("knowledge", room: room)
+        async let r = try? s.area("rules", room: room)
         let (kk, rr) = await (k, r)
         knowledge = kk.map { ProjectKnowledge.records($0, room: room) }
         rules = rr.map { ProjectKnowledge.records($0, room: room) }
