@@ -112,10 +112,55 @@ public actor CoreConnection {
         }
     }
 
+    /// The API minor that serves the app unlock (E1-1): `purpose: session`, the heartbeat and the end call.
+    public static let unlockMinor: Int32 = 95
+
     /// Step-up (§8): a challenge for this session, signed by the `stepup` key (the OS asks for Touch ID or the passcode, with
     /// `reason` in the prompt), then the exchange. Returns when the elevation ends.
     @discardableResult
     public func stepUp(reason: String) async throws -> Date {
+        try await prove(reason: reason, session: false)
+    }
+
+    /// The app unlock (E1-1, D-5): the same proof with `purpose: session`. The Core then keeps it open while `beatUnlock` arrives
+    /// and until `endUnlock`; there is no time cap. Returns when it would lapse without another beat.
+    @discardableResult
+    public func unlock(reason: String) async throws -> Date {
+        try await prove(reason: reason, session: true)
+    }
+
+    /// A heartbeat. Throws `.stepUpRequired` when the Core holds no unlock (it restarted, or it lapsed): sign again.
+    @discardableResult
+    public func beatUnlock() async throws -> Date {
+        let res = try await sessions.perform(method: "POST", target: "/api/v1/auth/unlock/beat", body: Data("{}".utf8))
+        guard
+            let until = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["unlocked_until"] as? String,
+            let t = Wire.parseTimestamp(until)
+        else { throw CoreError.protocolViolation("an unlock beat without unlocked_until") }
+        return Date(timeIntervalSince1970: TimeInterval(t))
+    }
+
+    /// A secret's plain value, for the app's Reveal (a danger route: a fresh step-up first). Needs a Core that serves it.
+    public func revealSecret(name: String) async throws -> String {
+        guard await serverSupports(minor: Self.unlockMinor) else {
+            throw CoreError.badRequest(message: "This Core is too old to show a secret. Update it first.")
+        }
+        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        let res = try await sessions.perform(
+            method: "POST", target: "/api/v1/secrets/\(enc)/reveal", body: Data("{}".utf8))
+        guard let v = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["value"] as? String else {
+            throw CoreError.protocolViolation("a reveal answer without a value")
+        }
+        return v
+    }
+
+    /// Ends the unlock now (the Mac locked or slept, or the app quits). Best effort: a Core that cannot be reached ends it on its own
+    /// when the beats stop.
+    public func endUnlock() async {
+        _ = try? await sessions.perform(method: "POST", target: "/api/v1/auth/unlock/end", body: Data("{}".utf8))
+    }
+
+    private func prove(reason: String, session: Bool) async throws -> Date {
         guard let key = try keyStore.key(.stepup, reason: reason) else {
             throw CoreError.stepUpUnavailable("This device has no step-up key, so it cannot elevate.")
         }
@@ -134,14 +179,17 @@ public actor CoreConnection {
         do { signature = try await offloaded { try key.sign(message) } } catch {
             throw Self.stepUpFailure(error)
         }
-        let body = try JSONEncoder().encode(["challenge": challenge, "stepup_sig": Wire.b64(signature)])
+        var fields = ["challenge": challenge, "stepup_sig": Wire.b64(signature)]
+        if session { fields["purpose"] = "session" }
+        let body = try JSONEncoder().encode(fields)
         let done = try await sessions.perform(
             method: "POST", target: "/api/v1/auth/step-up", body: body, inSession: sessionID)
+        let field = session ? "unlocked_until" : "elevated_until"
         guard
-            let until = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["elevated_until"]
+            let until = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?[field]
                 as? String, let t = Wire.parseTimestamp(until)
-        else { throw CoreError.protocolViolation("a step-up answer without elevated_until") }
-        await sessions.noteElevation(until: t, sessionID: sessionID)
+        else { throw CoreError.protocolViolation("a step-up answer without \(field)") }
+        if !session { await sessions.noteElevation(until: t, sessionID: sessionID) }
         return Date(timeIntervalSince1970: TimeInterval(t))
     }
 

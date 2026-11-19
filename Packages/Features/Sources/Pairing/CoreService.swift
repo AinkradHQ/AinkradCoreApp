@@ -79,6 +79,11 @@ protocol CoreService: Sendable {
     func about() async throws -> CoreAbout
     func elevatedUntil() async -> Date?
     func stepUp(reason: String) async throws -> Date
+    /// The app unlock (E1-1): whether this Core serves it, one proof that opens it, the heartbeat that holds it, and the end call.
+    var supportsUnlock: Bool { get async }
+    func unlock(reason: String) async throws -> Date
+    func beatUnlock() async throws
+    func endUnlock() async
     func devices() async throws -> [DeviceInfo]
     func rename(_ id: String, to name: String) async throws -> DeviceInfo
     func setScopes(_ id: String, _ scopes: [String]) async throws -> DeviceInfo
@@ -97,6 +102,10 @@ protocol CoreService: Sendable {
 }
 
 extension CoreService {
+    var supportsUnlock: Bool { get async { false } }
+    func unlock(reason: String) async throws -> Date { Date().addingTimeInterval(90) }
+    func beatUnlock() async throws {}
+    func endUnlock() async {}
     var agentsAPI: (any AgentsAPI)? { nil }
     func pendingPairings() async throws -> [PairingInfo] { [] }
 }
@@ -118,6 +127,10 @@ struct LiveCoreService: CoreService {
     }
     func elevatedUntil() async -> Date? { await connection.elevatedUntil }
     func stepUp(reason: String) async throws -> Date { try await connection.stepUp(reason: reason) }
+    var supportsUnlock: Bool { get async { await connection.serverSupports(minor: CoreConnection.unlockMinor) } }
+    func unlock(reason: String) async throws -> Date { try await connection.unlock(reason: reason) }
+    func beatUnlock() async throws { try await connection.beatUnlock() }
+    func endUnlock() async { await connection.endUnlock() }
 
     func devices() async throws -> [DeviceInfo] {
         try await run { try await client.listDevices().ok.body.json.map(Self.device) }

@@ -103,7 +103,8 @@ extension CoreError {
         case (401, "session_expired"): return .sessionExpired
         case (401, "pairing_failed"): return .pairingFailed
         case (401, _): return .authFailed
-        case (403, "step_up_required"): return .stepUpRequired
+        // `unlock_required` (the app unlock lapsed) reads the same to a caller: prove again, then retry.
+        case (403, "step_up_required"), (403, "unlock_required"): return .stepUpRequired
         case (403, "forbidden_scope"): return .forbiddenScope
         case (409, "sas_mismatch"): return .sasMismatch
         case (409, "pairing_expired"): return .pairingExpired
