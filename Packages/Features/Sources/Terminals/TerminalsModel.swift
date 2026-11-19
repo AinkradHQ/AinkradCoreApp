@@ -734,7 +734,15 @@ final class NewTerminalModel {
             case "unsupported_command":
                 return Refusal(
                     title: "\(runner) doesn’t offer that.", text: message, code: code, http: status)
-            default: return Refusal(title: message, text: "", code: code, http: status)
+            default:
+                // The runner's own words name the flag; say what to do about it.
+                if message.contains("--terminal-user") {
+                    return Refusal(
+                        title:
+                            "This runner was started with --terminal-user; restart it without it to open terminals.",
+                        text: "", code: code, http: status)
+                }
+                return Refusal(title: message, text: "", code: code, http: status)
             }
         case .forbiddenScope?:
             return Refusal(
