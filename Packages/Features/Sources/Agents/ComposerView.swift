@@ -238,7 +238,7 @@ struct ComposerView: View {
             }
             .help("Switch the model for the rest of this session (⇧⌘M)").keyHint(.model)
         } else {
-            CoreChip(labels ? label : "", symbol: "sparkles").help(label)
+            CoreChip(labels ? label : "", symbol: "sparkles", minWidth: 0).help(label)
         }
     }
 
