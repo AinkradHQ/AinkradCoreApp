@@ -172,6 +172,9 @@ struct HostsGallery: View {
                         if !model.filter.isEmpty, model.shown.isEmpty {
                             Text("No host matches “\(model.filter)”.").foregroundStyle(GlassInk.secondary)
                                 .frame(maxWidth: .infinity)
+                        } else if model.filter.isEmpty, model.shown.isEmpty {
+                            Text("No host fits “\(LeylineOptions.current.title)”. Change it in Settings, Leyline, Options.")
+                                .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity)
                         }
                     }
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s8 * 3)

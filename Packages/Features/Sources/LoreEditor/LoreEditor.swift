@@ -125,6 +125,13 @@ public enum LoreLinkPolicy {
         textView.scroll(.zero)
     }
 
+    /// Lore's own text size factor; the page is drawn again at the new size (the text and the cursor stay, undo restarts).
+    public func setTextScale(_ scale: CGFloat) {
+        guard Typeface.userScale != scale else { return }
+        Typeface.userScale = scale
+        load(markdown: markdown())
+    }
+
     /// The note as Markdown: the loaded bytes where nothing changed, fresh Markdown for edited blocks only.
     public func markdown() -> String { MarkdownWriter.markdown(textView.ts, map: map) }
 

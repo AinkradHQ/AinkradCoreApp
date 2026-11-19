@@ -458,6 +458,7 @@ public final class TerminalsModel {
 
     private func bell(_ id: String) {
         rang.insert(id)
+        TerminalOptions.ring()
         let name = name(of: items.first { $0.id == id }?.runner ?? "")
         shell.bell.add(
             BellItem(

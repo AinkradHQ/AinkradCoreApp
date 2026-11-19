@@ -23,6 +23,8 @@ final class AgentPrefs {
     var textScale: Double { didSet { save() } }
     /// The conversation's typeface: system, rounded, serif or mono. Code stays monospaced whatever is chosen.
     var font: String { didSet { save() } }
+    /// How long ended sessions stay in the list before they move to the Archive: `week`, `month` or `forever`.
+    var keep: String { didSet { save() } }
 
     private let d = UserDefaults.standard
     private init() {
@@ -37,6 +39,7 @@ final class AgentPrefs {
         model = d.string(forKey: "agents.model") ?? ""
         textScale = d.object(forKey: "agents.textScale") as? Double ?? 1
         font = d.string(forKey: "agents.font") ?? "system"
+        keep = d.string(forKey: "agents.keep") ?? "month"
     }
 
     /// A saved tool the app no longer offers (agy) falls back to Claude Code, so ⌘N never starts it.
@@ -55,10 +58,25 @@ final class AgentPrefs {
         d.set(model, forKey: "agents.model")
         d.set(textScale, forKey: "agents.textScale")
         d.set(font, forKey: "agents.font")
+        d.set(keep, forKey: "agents.keep")
     }
 }
 
 extension AgentPrefs {
+    static let keeps: [(id: String, title: String, days: Int)] = [
+        ("week", "A week", 7), ("month", "A month", 30), ("forever", "Forever", Int.max),
+    ]
+    /// The days an ended session stays in the list for a choice.
+    static func keepDays(_ id: String) -> Int { keeps.first { $0.id == id }?.days ?? 30 }
+    var keepDays: Int { Self.keepDays(keep) }
+
+    /// "Ask before running commands": on keeps the Asks first mode (or the one chosen), off starts sessions in the sandbox,
+    /// which asks for nothing because it cannot reach beyond its box.
+    var asksFirst: Bool {
+        get { mode != "sandboxed" }
+        set { mode = newValue ? (mode == "sandboxed" ? "ask" : mode) : "sandboxed" }
+    }
+
     static let textScales: [Double] = [0.9, 1, 1.1, 1.25, 1.5]
     static let fonts: [(id: String, title: String)] = [
         ("system", "System"), ("rounded", "Rounded"), ("serif", "Serif"), ("mono", "Mono"),
@@ -146,6 +164,20 @@ struct AgentSettingsView: View {
                 }
             }
             if part.showsOptions {
+                GlassSection(
+                    "Safety", sub: "What new sessions may do, and how long they stay", symbol: "hand.raised",
+                    hue: GlassInk.blue, index: 2
+                ) {
+                    VStack(spacing: Space.s2) {
+                        OptionSwitchRow(
+                            "Ask before running commands", sub: "Shows what it plans to do first. Off uses the sandbox",
+                            symbol: "hand.raised", isOn: $prefs.asksFirst)
+                        OptionSelectRow(
+                            "Keep sessions for", sub: "Older ended sessions move to the Archive", symbol: "archivebox",
+                            selection: $prefs.keep,
+                            options: AgentPrefs.keeps.map { CoreSelectOption($0.id, $0.title) })
+                    }
+                }
                 GlassSection(
                     "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.blue,
                     index: 2

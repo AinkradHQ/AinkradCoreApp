@@ -25,8 +25,31 @@ public enum CoreWallpaper: String, CaseIterable, Sendable {
     public static let presets = allCases.filter { $0 != .picture }
 
     public var title: String { self == .picture ? "Your picture" : rawValue.capitalized }
+    /// Which tab of Settings, Appearance, Wallpaper lists it (E2-4).
+    public var group: WallpaperGroup {
+        switch self {
+        case .picture: .picture
+        case .lake, .forest, .coast, .peaks, .dunes, .hills, .reef, .lavender, .glacier, .bloom, .aurora, .canyon: .photos
+        default: .generated
+        }
+    }
+    /// The wallpapers of one tab, in the order Settings shows them.
+    public static func presets(in group: WallpaperGroup) -> [CoreWallpaper] { allCases.filter { $0.group == group } }
+
     /// The two wallpapers drawn from files: every case but Sky, Plain and the picture.
     var isFile: Bool { ![.sky, .plain, .picture].contains(self) }
+}
+
+/// The tabs of the wallpaper page: photos, the ones drawn for Ainkrad (and Sky and Plain), and the person's own picture.
+public enum WallpaperGroup: String, CaseIterable, Sendable {
+    case photos, generated, picture
+    public var title: String {
+        switch self {
+        case .photos: "Photos"
+        case .generated: "Generated"
+        case .picture: "Your picture"
+        }
+    }
 }
 
 /// Decoded wallpapers, kept so a redraw never decodes again. Thumbnails are small; a full image is ~37 MB decoded, and
@@ -64,8 +87,13 @@ public final class WallpaperPrefs {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url, let image = NSImage(contentsOf: url), let dest = Self.target
-        else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        adoptPicture(at: url)
+    }
+
+    /// Keeps a copy of an image file and shows it (a chosen file, or one dropped on the page).
+    public func adoptPicture(at url: URL) {
+        guard let image = NSImage(contentsOf: url), let dest = Self.target else { return }
         try? FileManager.default.createDirectory(
             at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: dest)

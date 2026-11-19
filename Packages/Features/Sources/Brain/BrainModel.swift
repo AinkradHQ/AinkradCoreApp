@@ -336,6 +336,12 @@ public final class BrainModel {
             let made = try await service.createRoom(draft)
             host.shell.showToast("Room \(made.name) created")
             await reload()
+            // Settings, Brain, Remember for: a new room keeps its sources for that long.
+            if let days = BrainOptions.newRoomRetention(BrainOptions.options.string(BrainOptions.remember, "forever")) {
+                _ = await candidates.change(
+                    made.id, PolicyChange(retentionDays: days),
+                    reason: "Remove the text of sources older than \(days) days in \(made.name) for good.")
+            }
             return true
         } catch is AdminDeclined {
             return false

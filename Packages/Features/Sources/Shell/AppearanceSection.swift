@@ -15,8 +15,8 @@ struct AppearanceSection: View {
     @Bindable private var textSize = TextSizePrefs.shared
     @Bindable private var accent = AccentPrefs.shared
     @Bindable private var wallpaper = WallpaperPrefs.shared
-    /// All the wallpapers, or only the first row. Open from the start when the chosen one is not in that row.
-    @State private var allWallpapers = !CoreWallpaper.presets.prefix(4).contains(WallpaperPrefs.shared.choice)
+    /// The wallpaper tab shown; it opens on the one the chosen wallpaper is in.
+    @State private var group = WallpaperPrefs.shared.choice.group
     private static let scales: [Double] = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
 
     /// The Appearance page has tabs (Look, Wallpaper); Clock is its own view.
@@ -32,43 +32,75 @@ struct AppearanceSection: View {
 
     private var wallpaperPage: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            GlassSection(
-                "Wallpaper", sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
-                hue: GlassInk.blue, index: 2
-            ) {
-                HStack(spacing: Space.s2) {
-                    if wallpaper.choice == .picture {
-                        AppActionTile(title: "Change picture…", symbol: "photo", key: "", hue: GlassInk.slate) {
-                            wallpaper.choosePicture()
-                        }
-                    }
-                    AppActionTile(
-                        title: allWallpapers ? "Show less" : "See all",
-                        symbol: allWallpapers ? "chevron.up" : "chevron.down", key: "", hue: GlassInk.slate
-                    ) { withAnimation(Motion.out(Motion.ui)) { allWallpapers.toggle() } }
-                }
-            } content: {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),
-                    alignment: .leading, spacing: Space.s3
+            HStack(spacing: Space.s3) {
+                CoreSegmented(
+                    "Wallpaper kind", segments: WallpaperGroup.allCases.map { CoreSegment($0, $0.title) },
+                    selection: $group)
+                Spacer(minLength: Space.s3)
+                Text(groupNote).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+            if group == .picture {
+                picturePage
+            } else {
+                GlassSection(
+                    group.title, sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
+                    hue: GlassInk.blue, index: 2
                 ) {
-                    ForEach(allWallpapers ? CoreWallpaper.allCases : Array(CoreWallpaper.presets.prefix(4)), id: \.self)
-                    {
-                        w in
-                        WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil)
-                        {
-                            if w == .picture && wallpaper.picture == nil {
-                                wallpaper.choosePicture()
-                            } else {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),
+                        alignment: .leading, spacing: Space.s3
+                    ) {
+                        ForEach(CoreWallpaper.presets(in: group), id: \.self) { w in
+                            WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil) {
                                 withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = w }
                             }
                         }
-                        .transition(.opacity)
                     }
                 }
             }
         }
         .foregroundStyle(GlassInk.primary)
+    }
+
+    private var groupNote: String {
+        switch group {
+        case .photos: "\(CoreWallpaper.presets(in: .photos).count) photos"
+        case .generated: "\(CoreWallpaper.presets(in: .generated).count) made for Ainkrad"
+        case .picture: "Stays on this Mac"
+        }
+    }
+
+    /// Your picture: the one chosen (when there is one) and a place to drop another. A night and a day version are made by
+    /// the app from the one picture.
+    private var picturePage: some View {
+        GlassSection(
+            "Your picture", sub: "Drop a picture here, or choose one from your Mac.", symbol: "photo", hue: GlassInk.blue,
+            index: 2
+        ) {
+            AppActionTile(
+                title: wallpaper.picture == nil ? "Choose picture…" : "Change picture…", symbol: "photo", key: "",
+                hue: GlassInk.slate, prominent: wallpaper.picture == nil
+            ) { wallpaper.choosePicture() }
+        } content: {
+            HStack(spacing: Space.s4) {
+                if wallpaper.picture != nil {
+                    WallpaperTile(choice: .picture, selected: wallpaper.choice == .picture, hasPicture: true) {
+                        withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = .picture }
+                    }
+                    .frame(width: Space.s8 * 6)
+                }
+                Text("It stays on this Mac. Ainkrad dims it for night and lightens it for day.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 3, alignment: .leading)
+            .coreWell()
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first else { return false }
+                wallpaper.adoptPicture(at: url)
+                return true
+            }
+        }
     }
 
     private var lookPage: some View {

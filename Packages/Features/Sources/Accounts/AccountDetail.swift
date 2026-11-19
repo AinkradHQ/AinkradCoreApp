@@ -9,6 +9,8 @@ struct AccountDetailView: View {
     let model: AccountsModel
     let account: AccountItem
     @State private var tech = false
+    /// The account whose key ending Touch ID unlocked (Settings, Accounts, Ask Touch ID to reveal keys).
+    @State private var revealed: Int64?
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -189,14 +191,31 @@ struct AccountDetailView: View {
         .coreWell()
     }
 
+    /// The ending is held back while Touch ID is asked for it and has not been given for this account.
+    private func hidden(_ a: AccountItem) -> Bool {
+        AccountsOptions.asksTouchID && !a.maskedTail.isEmpty && revealed != a.id
+    }
+
+    private func reveal(_ a: AccountItem) async {
+        do {
+            try await model.host.elevated("Show how this key ends.", done: "shown", keepsEdit: false) {}
+            revealed = a.id
+        } catch {}
+    }
+
     private func keyTile(_ a: AccountItem) -> some View {
         tile("Key", "lock.shield.fill") {
             HStack(spacing: 6) {
                 ForEach(0..<4, id: \.self) { _ in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
                 }
-                Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(
+                Text(hidden(a) || a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(
                     size: MacTextSize.title, weight: .semibold, design: .monospaced)
+                if hidden(a) {
+                    Button("Show ending") { Task { await reveal(a) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Show how this key ends. Needs Touch ID")
+                }
             }
             Text("Kept sealed in Core. It can't be shown again.").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary)

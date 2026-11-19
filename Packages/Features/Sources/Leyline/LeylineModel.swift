@@ -152,6 +152,8 @@ public final class LeylineModel {
     /// The gallery's cards after the Filter field.
     var shown: [HostItem] {
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
+        let hosts = LeylineOptions.filter(
+            hosts, show: LeylineOptions.current, opened: LeylineOptions.opened(), mine: LeylineOptions.mine())
         return q.isEmpty
             ? hosts
             : hosts.filter {
@@ -227,6 +229,7 @@ public final class LeylineModel {
             writeError = words(error)
             return false
         }
+        LeylineOptions.markMine(made.id)
         quickOpen = false
         quickText = ""
         await reload()
@@ -352,11 +355,12 @@ public final class LeylineModel {
 
     func openHost(_ id: String) {
         section = .overview
-        withAnimation(Motion.out(Motion.move)) { openID = id }
+        LeylineOptions.markOpened(id)
+        if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = id } } else { openID = id }
     }
 
     func closeHost() {
-        withAnimation(Motion.out(Motion.move)) { openID = nil }
+        if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = nil } } else { openID = nil }
     }
 
     func newHost() {
@@ -387,15 +391,18 @@ public final class LeylineModel {
 
     public func install() {
         let shell = host.shell
-        // Settings, Apps, Leyline: its Look (follows Appearance unless turned off). No options of its own yet.
+        // Settings, Apps, Leyline: Look (follows Appearance unless turned off) and Options.
         shell.settings.section(
             SettingsSection(
-                id: "leyline", group: .apps, title: "Leyline", sub: "Its look",
-                symbol: "point.3.connected.trianglepath.dotted", order: 7
-            ) {
-                AppLookSection(appName: "Leyline", prefs: AppLookPrefs.shared("leyline"))
-                    .foregroundStyle(GlassInk.primary)
-            })
+                id: "leyline", group: .apps, title: "Leyline", sub: "Its look and what it shows",
+                symbol: "point.3.connected.trianglepath.dotted", order: 7,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Leyline", prefs: AppLookPrefs.shared("leyline"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { LeylineOptionsTab() },
+                ]))
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
             _ run: @escaping @MainActor (LeylineModel) -> Void

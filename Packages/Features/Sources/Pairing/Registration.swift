@@ -1,5 +1,6 @@
 import Accounts
 import Brain
+import CoreUI
 import Design
 import Leyline
 import Lore
@@ -28,6 +29,17 @@ enum Registration {
             ) {
                 LockoutsSection(app: app)
             })
+        shell.settings.section(
+            SettingsSection(
+                id: "runners", group: .apps, title: "Runners", sub: "Its look and how runners are kept up to date",
+                symbol: "server.rack", order: 3,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Runners", prefs: AppLookPrefs.shared("runners"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { RunnersOptionsTab(app: app) },
+                ]))
         shell.launcher.register(
             LauncherEntry(
                 id: "devices-runners", title: "Devices & Runners", sub: "Devices, runners, this Mac, about",

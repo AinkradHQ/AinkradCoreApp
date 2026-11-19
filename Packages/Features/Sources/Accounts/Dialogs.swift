@@ -316,6 +316,7 @@ struct AccountsLinkSection: View {
                 } content: {
                     EmptyView()
                 }
+                AccountsOptionsTab()
             }
         }
         .foregroundStyle(GlassInk.primary)

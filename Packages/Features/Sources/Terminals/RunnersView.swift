@@ -19,6 +19,7 @@ struct RunnersView: View {
             }
             .padding(Space.s4)
         }
+        .appLookTheme(AppLookPrefs.shared("runners"))
         .task {
             // Load and heartbeat move without events: look again while this pane is open.
             while !Task.isCancelled {

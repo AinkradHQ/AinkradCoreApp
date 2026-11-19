@@ -48,17 +48,28 @@ extension View {
 private struct AppLookModifier: ViewModifier {
     let prefs: AppLookPrefs
     func body(content: Content) -> some View {
-        Group {
-            if let palette = prefs.palette {
-                content
-                    .environment(\.corePalette, palette)
-                    .environment(\.colorScheme, palette.isDay ? .light : .dark)
-                    .foregroundStyle(palette.text)
-            } else {
-                content
-            }
+        content.appLookTheme(prefs).paneLook(nil, own: true)
+    }
+}
+
+extension View {
+    /// Only the app's own theme (when "Same as Appearance" is off), for a pane that keeps the background the shell gives it.
+    public func appLookTheme(_ prefs: AppLookPrefs) -> some View {
+        modifier(AppLookThemeModifier(prefs: prefs))
+    }
+}
+
+private struct AppLookThemeModifier: ViewModifier {
+    let prefs: AppLookPrefs
+    func body(content: Content) -> some View {
+        if let palette = prefs.palette {
+            content
+                .environment(\.corePalette, palette)
+                .environment(\.colorScheme, palette.isDay ? .light : .dark)
+                .foregroundStyle(palette.text)
+        } else {
+            content
         }
-        .paneLook(nil, own: true)
     }
 }
 
