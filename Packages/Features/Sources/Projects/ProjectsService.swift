@@ -12,6 +12,13 @@ protocol ProjectsService: Sendable {
     func setExpose(project: Int64, _ on: Bool) async throws
     func update(project: Int64, name: String, description: String) async throws
     func archive(project: Int64) async throws
+    /// The archived projects (the Options tab's "Show archived projects").
+    func archivedProjects() async throws -> [ProjectItem]
+    func unarchive(project: Int64) async throws
+    /// What a run gets unless a project says otherwise (Core 0.10); nil on a Core that has no such setting.
+    func limits() async throws -> ProjectLimits?
+    /// Saves them for every project.
+    func setLimits(_ limits: ProjectLimits) async throws
     /// The newest run; nil when the project never ran.
     func run(project: Int64) async throws -> ProjectRunState?
     func control(project: Int64, _ action: RunAction) async throws -> ProjectRunState
@@ -25,6 +32,10 @@ extension ProjectsService {
     // Stand-ins and tests that do not run projects need not answer these.
     func update(project: Int64, name: String, description: String) async throws {}
     func archive(project: Int64) async throws {}
+    func archivedProjects() async throws -> [ProjectItem] { [] }
+    func unarchive(project: Int64) async throws {}
+    func limits() async throws -> ProjectLimits? { nil }
+    func setLimits(_ limits: ProjectLimits) async throws {}
     func run(project: Int64) async throws -> ProjectRunState? { nil }
     func control(project: Int64, _ action: RunAction) async throws -> ProjectRunState {
         throw CoreError.protocolViolation("This Core cannot run projects.")
@@ -76,6 +87,34 @@ struct LiveProjectsService: ProjectsService {
 
     func archive(project: Int64) async throws {
         try await run { _ = try await client.archiveProject(path: .init(id: String(project))).ok }
+    }
+
+    func archivedProjects() async throws -> [ProjectItem] {
+        try await run {
+            try await client.listProjects(query: .init(archived: true)).ok.body.json.filter { $0.state == "archived" }
+                .map(Self.item)
+        }
+    }
+
+    // The 0.10 routes are not in the synced client until the epic's regeneration, so they go through the signed transport,
+    // and only when the Core speaks API minor 95.
+    func unarchive(project: Int64) async throws {
+        _ = try await signed("POST", "/api/v1/projects/\(project)/unarchive")
+    }
+
+    func limits() async throws -> ProjectLimits? {
+        guard await connection.serverSupports(minor: ProjectsMinor.v010) else { return nil }
+        return try ProjectLimits.decode(try await signed("GET", "/api/v1/projects/defaults"))
+    }
+
+    func setLimits(_ limits: ProjectLimits) async throws {
+        _ = try await signed("PUT", "/api/v1/projects/defaults", body: try limits.encoded())
+    }
+
+    private func signed(_ method: String, _ path: String, body: Data = Data()) async throws -> Data {
+        do { return try await connection.signedRequest(method: method, target: path, body: body) } catch {
+            throw CoreFailure.of(error) ?? error
+        }
     }
 
     // The run routes arrive with the Core's P5-03 (#318): `getProjectRun`, `startProjectRun`, `stopProjectRun`,
@@ -139,7 +178,7 @@ struct LiveProjectsService: ProjectsService {
                     head: $0.mirror?.head, state: $0.mirror?.state, reason: $0.mirror?.reason,
                     startedAt: $0.mirror?.startedAt)
             }, updatedAt: p.updatedAt, cpuLimit: p.cpuLimit, memLimitMb: p.memLimitMb,
-            idleMinutes: Int(p.idleMinutes))
+            idleMinutes: Int(p.idleMinutes), archived: p.state == "archived")
     }
 }
 

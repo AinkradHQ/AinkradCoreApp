@@ -110,14 +110,27 @@ struct SettingsPage: View {
                     GridRow {
                         label("Idle stop")
                         HStack(spacing: Space.s2) {
-                            Text("after \(project.idleMinutes) min with no visits")
+                            Text(model.limits?.idleNever == true ? "never" : "after \(project.idleMinutes) min with no visits")
                             if let idle = project.live?.idle, project.tag == .running {
                                 Text("· \(idle)").foregroundStyle(GlassInk.secondary).monospacedDigit()
                             }
                         }
                     }
                 }
-                archive
+                if project.archived { unarchive } else { archive }
+            }
+        }
+    }
+
+    private var unarchive: some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            Text("Archived").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
+            HStack(alignment: .center, spacing: Space.s4) {
+                Text("This project is set aside. Its repos, secrets and Brain room are kept.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button("Unarchive Project") { Task { await model.unarchive(project) } }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly || model.busy)
             }
         }
     }

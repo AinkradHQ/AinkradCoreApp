@@ -181,6 +181,7 @@ extension ProjectsModel {
             return
         }
         closeProject()
+        host.shell.closePane(Self.paneID(project.id))
         await reload()
         host.shell.showToast("\(project.name) archived")
     }
