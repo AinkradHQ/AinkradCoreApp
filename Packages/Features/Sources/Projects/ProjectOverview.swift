@@ -8,12 +8,15 @@ struct Overview: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var settled = false
+    @State private var runs: [RunRecord] = []
+    @State private var names: [Int64: String] = [:]
 
     private var live: ProjectLive? { project.live }
     private var settingUp: Bool { !project.repos.isEmpty && project.draft == nil && project.run == nil }
 
     var body: some View {
         VStack(spacing: Space.s2) {
+            if model.configsService != nil { statRow.coreRise(settled, 0) }
             HStack(alignment: .top, spacing: Space.s2) {
                 LiveApp(model: model, project: project).coreRise(settled, 0)
                 VStack(spacing: Space.s2) {
@@ -34,6 +37,57 @@ struct Overview: View {
             .frame(height: Space.s8 * 10)
         }
         .onAppear { settled = true }
+        .task(id: project.id) { await loadRuns() }
+    }
+
+    // MARK: Stats and activity (Core 0.10)
+
+    private func loadRuns() async {
+        guard let svc = model.configsService else { return }
+        runs = (try? await svc.history(project: project.id)) ?? []
+        names = Dictionary(uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) })
+    }
+
+    private var stats: ProjectStats { ProjectStats(repos: project.repos, runs: runs, now: model.now()) }
+
+    private var statRow: some View {
+        let s = stats
+        return HStack(spacing: Space.s2) {
+            tile("Health", s.health, s.healthLine, CoreMeter(s.healthFraction, low: s.needsYou > 0, label: "Repos ready"))
+            tile("Runs this week", "\(s.runsThisWeek)", s.runningNow > 0 ? "\(s.runningNow) running now" : "None running", nil)
+            activity
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func tile(_ title: String, _ value: String, _ line: String, _ meter: CoreMeter?) -> some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Text(title).foregroundStyle(GlassInk.secondary)
+            Text(value).coreFont(size: MacTextSize.title, weight: .semibold)
+            Text(line).foregroundStyle(GlassInk.secondary)
+            if let meter { meter.frame(height: Space.s2) }
+        }
+        .padding(Space.s3).frame(width: Space.s8 * 6, alignment: .topLeading).frame(maxHeight: .infinity)
+        .coreCard(GlassInk.well, radius: Radius.cardMac)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var activity: some View {
+        let lines = ActivityLine.timeline(repos: project.repos, runs: runs, names: names, limit: 3)
+        return VStack(alignment: .leading, spacing: Space.s1) {
+            Text("Activity").foregroundStyle(GlassInk.secondary)
+            if lines.isEmpty { Text("Nothing yet.").foregroundStyle(GlassInk.secondary) }
+            ForEach(lines) { l in
+                HStack(spacing: Space.s2) {
+                    Image(systemName: l.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                    Text(l.title).lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(runsAgo(l.at, now: model.now())).foregroundStyle(GlassInk.secondary)
+                }
+            }
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .topLeading).frame(maxHeight: .infinity)
+        .coreCard(GlassInk.well, radius: Radius.cardMac)
     }
 
     // MARK: AI Sessions

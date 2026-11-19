@@ -38,6 +38,10 @@ struct ReposPage: View {
             title: "Repos", sub: project.repos.isEmpty ? nil : "\(project.repos.count)",
             accessory: {
                 CoreIconButton(symbol: "arrow.clockwise", label: "Check the Core's copies again") { model.resync() }
+                Button("Fetch All") { for r in project.repos { model.fetchRepo(project, r) } }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .disabled(model.readOnly || project.repos.isEmpty)
+                    .help("Copy the latest changes of every repo into the Core now")
                 Button {
                     NewProjectDialogs.openAddRepos(model, project)
                 } label: {
@@ -63,7 +67,7 @@ struct ReposPage: View {
                     }
                 }
                 Text(
-                    "GitHub holds the source. The Core keeps one copy of each repo; every AI session and run gets its own clone."
+                    "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes every 15 minutes by itself; every AI session and run gets its own clone."
                 )
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
