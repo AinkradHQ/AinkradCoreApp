@@ -57,6 +57,31 @@ public final class LoreModel {
     private(set) var backlinks: [LoreBacklink] = []
     var projectNames: [String: String] = [:]
 
+    // Sidebars (E10-1). Both open by default; ⌘. hides both (focus), ⌘[ the left, ⌘] the right.
+    var showLeft = true
+    var showRight = true
+    /// Every live note without its text, newest change first (the tree, recents, project counts).
+    var sideNotes: [LoreNote] = []
+    var sideTags: [LoreTagCount] = []
+    var sessionDocs: [LoreSessionDoc] = []
+    var sideVersions: [LoreVersion] = []
+    var outline: [LoreHeading] = []
+    var wordCount = 0
+    var hasTable = false
+    var noteTags: [String] = []
+    /// The caret is inside a table (the row and column tools are live).
+    var caretInTable = false
+    var tablesAsText = false
+    /// A project, tag or search the left sidebar is filtered to; `filterHits` are its notes.
+    var sideFilter: LoreSideFilter?
+    var filterHits: [LoreNote] = []
+    @ObservationIgnored var outlineTask: Task<Void, Never>?
+    @ObservationIgnored var filterTask: Task<Void, Never>?
+    /// The Core serves `/tags` and `/session-docs` (minor 95); true until a connection says otherwise.
+    @ObservationIgnored var serves95 = true
+    /// Opens an AI session in the Agents space (wired by the app; Lore does not depend on Agents).
+    @ObservationIgnored public var openSession: (@MainActor (String) -> Void)?
+
     @ObservationIgnored let page: any LorePageText
     /// Quick capture ⇧⌘N (R6-05).
     @ObservationIgnored public private(set) lazy var capture = QuickCapture(lore: self)
@@ -88,13 +113,21 @@ public final class LoreModel {
         self.editor = editor
         self.drafts = drafts
         editor?.onChange = { [weak self] in self?.changed() }
+        editor?.onTable = { [weak self] in self?.caretInTable = $0 }
         editor?.onOpenInternal = { [weak self] in self?.openInternal($0) }
         editor?.onNotice = { [weak self] in self?.host.shell.showToast($0, kind: .info) }
     }
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveLoreService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        use(LiveLoreService(connection: connection))
+        Task { [weak self] in
+            let ok = await connection.serverSupports(minor: 95)
+            self?.serves95 = ok
+            await self?.refreshSide()
+        }
+    }
 
     func use(_ service: any LoreService) {
         self.service = service
@@ -112,6 +145,11 @@ public final class LoreModel {
         service = nil
         note = nil
         backlinks = []
+        sideNotes = []
+        sideTags = []
+        sessionDocs = []
+        sideVersions = []
+        outline = []
         day = nil
         base = 0
         synced = ""
@@ -133,6 +171,7 @@ public final class LoreModel {
 
     /// `lore.note.changed {id, rev, origin}` (ids only, T3): the open note changed on the Core.
     public func remote(_ fields: [String: String]) {
+        Task { await refreshSide() }
         guard let id = fields["id"], id == note?.id, let rev = Int(fields["rev"] ?? ""), rev > base else { return }
         Task { await pull() }
     }
@@ -257,6 +296,8 @@ public final class LoreModel {
         }
         sync = waiting ? .kept : .saved
         load = .ready
+        refreshOutline(after: .zero)
+        Task { await refreshSide() }
     }
 
     /// Before the page changes: send what was typed.
@@ -272,6 +313,7 @@ public final class LoreModel {
     func changed() {
         guard load == .ready else { return }
         schedule(debounce)
+        refreshOutline(after: .milliseconds(400))
     }
 
     private func schedule(_ wait: Duration) {
@@ -386,6 +428,8 @@ public final class LoreModel {
         page.show(n.text, fold: true)
         sync = .saved
         refreshBacklinks()
+        refreshOutline(after: .zero)
+        Task { await refreshSide() }
     }
 
     /// The note moved projects: only the project changes, so typed text and the base stay.

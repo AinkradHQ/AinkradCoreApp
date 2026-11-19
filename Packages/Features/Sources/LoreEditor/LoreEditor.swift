@@ -94,6 +94,8 @@ public enum LoreLinkPolicy {
     public var onOpenInternal: ((URL) -> Void)?
     /// One short line for the person (a toast): a link that was copied instead of opened, an upload that failed.
     public var onNotice: ((String) -> Void)?
+    /// The caret moved into (true) or out of (false) a table.
+    public var onTable: ((Bool) -> Void)?
 
     public init(titles: LoreNoteTitles = LoreStubTitles(), uploader: LoreAttachmentUploader = LoreNoUploads()) {
         self.titles = titles
