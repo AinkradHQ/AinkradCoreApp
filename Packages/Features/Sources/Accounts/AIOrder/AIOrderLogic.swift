@@ -108,9 +108,13 @@ enum OrderChips {
     static func usable(_ c: OrderChip) -> Bool { c == .ready || c == .inUse }
     /// The first usable row is the one in use now.
     static func chips(_ rows: [(AccountVerdict, String)]) -> [OrderChip] {
+        chips(rows.map { ($0.0, $0.1, false) })
+    }
+    /// As above, where the third value is the Core's own word that the row hit a limit (its meter's `limit_hit`).
+    static func chips(_ rows: [(AccountVerdict, String, Bool)]) -> [OrderChip] {
         var seen = false
-        return rows.map { v, s in
-            let c = chip(v, state: s, first: !seen)
+        return rows.map { v, s, hit in
+            let c = hit && !signing.contains(s) ? OrderChip.limitHit : chip(v, state: s, first: !seen)
             if usable(c) { seen = true }
             return c
         }
@@ -127,6 +131,10 @@ struct UsageFacts: Equatable, Sendable {
     var windowSecs: Int64?
     var monthSpendMicros: Int64?
     var monthLimitMicros: Int64?
+    /// The Core's own meter (0.10): used of limit, in `unit` (`percent`, `usd_micros`, `messages` or `tokens`).
+    var used: Double?
+    var limit: Double?
+    var unit: String?
 }
 
 enum UsageSentence {
@@ -146,7 +154,7 @@ enum UsageSentence {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = tz
-        f.dateFormat = "EEE H:mm"
+        f.dateFormat = "EEEE H:mm"
         return f.string(from: d)
     }
 
@@ -155,6 +163,14 @@ enum UsageSentence {
         if f.limitHit {
             let used = "Used all of \(window(f.windowSecs))"
             return f.resetsAt.map { "\(used). Back \(back($0, tz: tz))" } ?? "\(used). Waiting for it to reset"
+        }
+        if let u = f.unit, u != "percent", let used = f.used, let limit = f.limit, limit > 0 {
+            let w = window(f.windowSecs)
+            switch u {
+            case "usd_micros": return "\(dollars(Int64(used))) of \(dollars(Int64(limit))) \(w)"
+            case "messages": return "\(Int64(used).formatted()) of \(Int64(limit).formatted()) messages \(w)"
+            default: return "\(AccountsNumbers.tokens(Int64(used))) of \(AccountsNumbers.tokens(Int64(limit))) \(w)"
+            }
         }
         if let s = f.share { return "\(Int((s * 100).rounded()))% of \(window(f.windowSecs)) used" }
         if let spent = f.monthSpendMicros, let cap = f.monthLimitMicros, cap > 0 {

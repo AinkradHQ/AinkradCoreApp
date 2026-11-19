@@ -58,7 +58,7 @@ struct AIOrderLogicTests {
         let friday = Date(timeIntervalSince1970: 1_795_165_200)  // 2026-11-20 09:00 UTC
         #expect(
             UsageSentence.of(UsageFacts(limitHit: true, resetsAt: friday, windowSecs: 604_800), tz: utc)
-                == "Used all of this week. Back Fri 9:00")
+                == "Used all of this week. Back Friday 9:00")
         #expect(
             UsageSentence.of(UsageFacts(limitHit: true), tz: utc) == "Used all of this week. Waiting for it to reset")
         #expect(UsageSentence.meter(UsageFacts(limitHit: true)) == 1)

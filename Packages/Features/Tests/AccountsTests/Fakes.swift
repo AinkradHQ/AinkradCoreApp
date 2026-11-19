@@ -56,6 +56,9 @@ final class FakeService: AccountsService, @unchecked Sendable {
     var orderEntries: [AIOrderEntry] = []
     var overrideList: [AIOrderOverride] = []
     var modelsFound: Int?
+    /// 0.10: the usage meters, the model rows and what the switch was set to.
+    var meterList: [Int64: AccountMeterItem] = [:]
+    var modelRowList: [Int64: [ModelRowItem]] = [:]
     private var calls: [String] = []
     var log: [String] { lock.withLock { calls } }
     private func note(_ s: String) throws {
@@ -80,6 +83,16 @@ final class FakeService: AccountsService, @unchecked Sendable {
         overrideList.removeAll { $0.agent == agent }
     }
     func modelCount(account: Int64) async -> Int? { modelsFound }
+    func accountMeters() async -> [Int64: AccountMeterItem] { meterList }
+    func accountModels(account: Int64) async -> [ModelRowItem] { modelRowList[account] ?? [] }
+    func setModelAllowed(account: Int64, model: String, allowed: Bool) async throws {
+        try note("setModelAllowed \(account) \(model) \(allowed)")
+        modelRowList[account] = modelRowList[account]?.map { r in
+            var r = r
+            if r.model == model { r.allowed = allowed }
+            return r
+        }
+    }
     func providers() async throws -> [ProviderItem] { providerList }
     func accounts() async throws -> [AccountItem] { accountList }
     func pools() async throws -> [PoolItem] { poolList }
@@ -237,7 +250,7 @@ final class FakeService: AccountsService, @unchecked Sendable {
     var budgetList: [BudgetItem] = []
     func budgets() async throws -> [BudgetItem] { budgetList }
     func setBudget(_ b: BudgetDraft) async throws {
-        try note("setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)")
+        try note("setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)\(b.messageCap.map { " msgs=\($0)" } ?? "")")
     }
     func deleteBudget(_ id: Int64) async throws { try note("deleteBudget \(id)") }
     func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {

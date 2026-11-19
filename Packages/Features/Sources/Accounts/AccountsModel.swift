@@ -41,6 +41,8 @@ public final class AccountsModel {
     var advancedOpen = false
     var advancedTab: AdvancedTab = .limits
     var limitsAccount: Int64?
+    /// Each account's models with price and switch (0.10), read when the Models tab opens.
+    var modelRows: [Int64: [ModelRowItem]] = [:]
     /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
     var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
@@ -112,6 +114,7 @@ public final class AccountsModel {
         aiOrder = nil
         aiOrderOn = false
         orderIDs = []
+        modelRows = [:]
         usage = []
         limitsLoad = .loading
     }
@@ -174,6 +177,9 @@ public final class AccountsModel {
             async let a = service.accounts()
             async let o = service.pools()
             (providers, accounts, pools) = try await (p, a, o)
+            // The Core's own usage meter of each row (0.10); an older Core or a device without `admin` has none.
+            let meters = await service.accountMeters()
+            if !meters.isEmpty { accounts = accounts.map { var a = $0; a.meter = meters[a.id]; return a } }
             load = .ready
             await reloadChains(service)
             await reloadAIOrder(service)

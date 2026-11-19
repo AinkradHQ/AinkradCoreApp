@@ -415,6 +415,8 @@ public final class AccountsDemo {
         var keyFails: String?
         /// The AI order sample (`AIOrderDemo`): on, the Core speaks API minor 95.
         var order010 = false
+        /// Models the demo's person switched off, by account (0.10).
+        var deniedModels: [Int64: Set<String>] = [:]
         var orderEntries: [AIOrderEntry] = []
         var agentOrders: [AIOrderOverride] = []
         var loginProvider = "claude-sub"

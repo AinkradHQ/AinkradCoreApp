@@ -65,7 +65,7 @@ extension AccountsModel {
     var orderRows: [OrderRow] {
         let accs = orderIDs.compactMap { account($0) }
         let verdicts = accs.map {
-            (AccountVerdict.of($0, limits: limits(of: $0), budgets: budgets, inPool: true), $0.state)
+            (AccountVerdict.of($0, limits: limits(of: $0), budgets: budgets, inPool: true), $0.state, $0.meter?.limitHit ?? false)
         }
         let chips = OrderChips.chips(verdicts)
         let dup = Dictionary(grouping: accs, by: \.provider).filter { $0.value.count > 1 }.keys
@@ -88,6 +88,15 @@ extension AccountsModel {
         f.monthSpendMicros = a.monthSpendUSDMicros
         f.monthLimitMicros = a.monthLimitUSDMicros
         f.resetsAt = a.stateUntil
+        if let m = a.meter {
+            // The Core's own meter says it all: the sentence, the bar, the chip and when it is back.
+            f.limitHit = f.limitHit || m.limitHit
+            f.resetsAt = m.stateUntil ?? m.resetsAt ?? f.resetsAt
+            f.share = m.fraction
+            f.windowSecs = m.windowSecs ?? (m.window == nil ? nil : -1)
+            (f.used, f.limit, f.unit) = (m.used, m.limit, m.unit)
+            return f
+        }
         let w = a.health?.windows ?? []
         if let p = w.first(where: { $0.name == "seven_day" }) {
             (f.share, f.windowSecs, f.resetsAt) = (p.utilization, 604_800, f.resetsAt ?? p.resetsAt)
@@ -97,6 +106,32 @@ extension AccountsModel {
             (f.share, f.windowSecs) = (l.share, l.windowSecs)
         }
         return f
+    }
+
+    // MARK: models
+
+    /// Reads the models of `a` with their prices and switches (0.10); empty below that.
+    func reloadModels(_ a: AccountItem) async {
+        guard let service, aiOrderOn else { return }
+        modelRows[a.id] = await service.accountModels(account: a.id)
+    }
+
+    /// Switches a model on or off for an account. The switch moves at once and goes back when the Core refuses.
+    func setModelAllowed(_ a: AccountItem, _ model: String, _ allowed: Bool) async {
+        let before = modelRows[a.id]
+        modelRows[a.id] = before?.map { r in
+            var r = r
+            if r.model == model { r.allowed = allowed }
+            return r
+        }
+        let ok = await write(
+            "model-\(a.id)-\(model)",
+            reason: allowed
+                ? "Allow \(model) on \(a.label)." : "Switch \(model) off for \(a.label). Nothing will run it there.",
+            done: allowed ? "\(model) allowed" : "\(model) switched off", keepsEdit: true
+        ) { try await $0.setModelAllowed(account: a.id, model: model, allowed: allowed) }
+        if !ok { modelRows[a.id] = before }
+        await reloadModels(a)
     }
 
     // MARK: moves
