@@ -45,23 +45,70 @@ public struct LauncherEntry: Identifiable {
 public final class LauncherRegistry {
     public private(set) var entries: [LauncherEntry] = []
     public var recents: [String] = []
+    /// The few suggestions the empty launcher opens with, ranked by use. Computed when the launcher opens and when something is
+    /// opened from it, never while drawing.
+    private(set) var picks: [LauncherPick] = []
+    /// What usage adds to a search hit's score, by entry id (same moments as `picks`).
+    private(set) var bonus: [String: Double] = [:]
+    /// Bumps when entries come or go, so an open launcher knows to rebuild its list.
+    private(set) var version = 0
+    private(set) var usage = LauncherUsage()
+    @ObservationIgnored private var defaults: UserDefaults?
+    static let usageKey = "ainkrad.core.launcher.usage"
+    static let pickCount = 6
     public init() {}
+
+    /// Keeps the usage on this Mac across launches.
+    func attach(_ defaults: UserDefaults) {
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.usageKey), let saved = try? JSONDecoder().decode(LauncherUsage.self, from: data) {
+            usage = saved
+        }
+        refreshPicks()
+    }
 
     public func register(_ entry: LauncherEntry) {
         entries.removeAll { $0.id == entry.id }
         entries.append(entry)
+        version += 1
     }
 
-    public func unregister(_ id: String) { entries.removeAll { $0.id == id } }
+    public func unregister(_ id: String) {
+        entries.removeAll { $0.id == id }
+        version += 1
+    }
     public func entry(_ id: String) -> LauncherEntry? { entries.first { $0.id == id } }
 
-    func remember(_ id: String) { recents = Array(([id] + recents.filter { $0 != id }).prefix(3)) }
+    func remember(_ id: String, at date: Date = Date()) {
+        recents = Array(([id] + recents.filter { $0 != id }).prefix(3))
+        usage.record(id, at: date)
+        if let data = try? JSONEncoder().encode(usage) { defaults?.set(data, forKey: Self.usageKey) }
+        refreshPicks(at: date)
+    }
+
+    /// The most wanted entries now: used ones by their score, then the apps in the order they were registered until there are six.
+    func refreshPicks(at now: Date = Date()) {
+        let scored = entries.map { ($0, usage.score($0.id, at: now)) }
+        bonus = Dictionary(uniqueKeysWithValues: scored.map { ($0.0.id, min($0.1 * 1.5, 8)) })
+        var out: [LauncherPick] = scored.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }.prefix(Self.pickCount).map {
+            LauncherPick(entry: $0.0, reason: usage.reason($0.0.id, at: now) ?? $0.0.sub ?? "")
+        }
+        if out.count < Self.pickCount {
+            let have = Set(out.map(\.id))
+            let fill = entries.filter {
+                !have.contains($0.id) && LauncherSection.of($0) == .apps && $0.tile == .blue
+            }
+            out += fill.prefix(Self.pickCount - out.count).map { LauncherPick(entry: $0, reason: $0.sub ?? "") }
+        }
+        picks = out
+    }
 }
 
 struct LauncherRow: Identifiable {
     let entry: LauncherEntry
     let group: LauncherEntry.Group
     let matched: [Int]
+    var score: Double = 0
     var id: String { entry.id }
 }
 
@@ -120,7 +167,9 @@ enum Fuzzy {
     }
 
     /// Empty query: recents first, then actions, then places. Otherwise the best hit leads, the rest by group then score.
-    @MainActor static func rank(_ entries: [LauncherEntry], query: String, recents: [String]) -> [LauncherRow] {
+    @MainActor static func rank(
+        _ entries: [LauncherEntry], query: String, recents: [String], usage: [String: Double] = [:]
+    ) -> [LauncherRow] {
         let words = query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
         func group(_ e: LauncherEntry) -> LauncherEntry.Group { e.isAction ? .actions : .goTo }
         if words.isEmpty {
@@ -148,10 +197,18 @@ enum Fuzzy {
             }
             if ok {
                 hits.append(
-                    (LauncherRow(entry: e, group: group(e), matched: at), total + (recents.contains(e.id) ? 6 : 0)))
+                    (
+                        LauncherRow(entry: e, group: group(e), matched: at),
+                        total + (recents.contains(e.id) ? 6 : 0) + (usage[e.id] ?? 0)
+                    ))
             }
         }
         hits.sort { $0.score > $1.score }
+        hits = hits.map { h in
+            var row = h.row
+            row.score = h.score
+            return (row: row, score: h.score)
+        }
         guard let top = hits.first else { return [] }
         let tail = hits.dropFirst().sorted {
             $0.row.group.rawValue != $1.row.group.rawValue
