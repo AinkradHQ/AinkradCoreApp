@@ -341,7 +341,7 @@ public final class ShellModel {
         }
         launcher.register(
             LauncherEntry(
-                id: "settings", title: "Settings", sub: "Mac, Core, Security, Notifications, Appearance",
+                id: "settings", title: "Settings", sub: "General, Apps, Core",
                 symbol: "gearshape", keywords: ["preferences", "appearance", "activity"], tile: .slate
             ) { [weak self] in self?.open(.settings) })
         launcher.register(

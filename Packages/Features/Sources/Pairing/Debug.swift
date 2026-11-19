@@ -215,7 +215,7 @@ extension AppModel {
             debugOpenSettings("devices")
         case "about-read-only":
             self.about.debugSet(.ready(about(["read", "terminal"])))
-            shell.settings.hidden = Set(Self.adminOnly)
+            shell.settings.hidden = Self.hiddenSettings
             debugOpenSettings("devices")
         case "about-loading":
             self.about.debugSet(.loading)

@@ -48,7 +48,7 @@ struct AppModelTests {
         s.scopes = ["read"]
         let m = try app(s)
         await m.start()
-        #expect(m.shell.settings.hidden == Set(AppModel.adminOnly))
+        #expect(m.shell.settings.hidden == AppModel.hiddenSettings)
         #expect(m.shell.launcher.entry("lockouts") == nil && m.shell.launcher.entry("admin-ops") == nil)
         #expect(m.shell.launcher.entry("devices") != nil)
         m.showAdminPages(true)
