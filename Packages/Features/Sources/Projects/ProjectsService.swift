@@ -19,6 +19,8 @@ protocol ProjectsService: Sendable {
     func touch(project: Int64) async throws -> ProjectRunState?
     /// "Fetch now": the Core copies the repo again (a failed fetch is still an answer; the repo's state says why).
     func fetch(project: Int64, repo: Int64) async throws
+    /// Where the project prefers to run: `auto`, `this_mac` or `home_server` (Core minor 95).
+    func setRunner(project: Int64, _ runner: String) async throws
 }
 
 extension ProjectsService {
@@ -31,6 +33,7 @@ extension ProjectsService {
     }
     func touch(project: Int64) async throws -> ProjectRunState? { nil }
     func fetch(project: Int64, repo: Int64) async throws {}
+    func setRunner(project: Int64, _ runner: String) async throws {}
 }
 
 struct LiveProjectsService: ProjectsService {
@@ -58,6 +61,13 @@ struct LiveProjectsService: ProjectsService {
 
     func fetch(project: Int64, repo: Int64) async throws {
         try await run { _ = try await client.fetchProjectRepo(path: .init(id: String(project), repo: String(repo))).ok }
+    }
+
+    // `UpdateProject.runner` arrives with the Core's E11-2 (#395); it compiles at the epic's regen.
+    func setRunner(project: Int64, _ runner: String) async throws {
+        try await run {
+            _ = try await client.updateProject(path: .init(id: String(project)), body: .json(.init(runner: runner))).ok
+        }
     }
 
     func setExpose(project: Int64, _ on: Bool) async throws {

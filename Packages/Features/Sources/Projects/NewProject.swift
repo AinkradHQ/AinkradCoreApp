@@ -11,7 +11,7 @@ enum NewProjectDialogs {
         let shell = m.host.shell
         shell.present(
             ShellDialog(id: "project-new", onClose: { [weak m] in m?.clearWriteError() }) {
-                NewProjectSheet(model: m, name: name, picked: picked) { shell.closeDialog() }
+                ProjectWizard(model: m, name: name, picked: picked) { shell.closeDialog() }
             })
     }
 
@@ -94,110 +94,6 @@ struct QuickNewProject: View {
     private func create() {
         guard ready, !model.busy else { return }
         Task { await model.create(name: model.quickName, slug: slug, colour: .standard(for: slug)) }
-    }
-}
-
-/// Advanced…: name, colour, GitHub repos, the public link, where it runs, and one summary line.
-struct NewProjectSheet: View {
-    let model: ProjectsModel
-    let close: () -> Void
-    @State private var name: String
-    @State private var slug: String
-    @State private var slugTouched = false
-    @State private var colour: ProjectColour
-    @State private var colourPicked = false
-    @State private var picked: Set<String>
-    @State private var pasted: [PickRepo] = []
-    @State private var runner = "core"
-    @Environment(\.corePalette) private var palette
-
-    init(model: ProjectsModel, name: String, picked: Set<String> = [], close: @escaping () -> Void) {
-        self.model = model
-        self.close = close
-        _picked = State(initialValue: picked)
-        let s = ProjectRules.slug(from: name)
-        _name = State(initialValue: name)
-        _slug = State(initialValue: s)
-        _colour = State(initialValue: .standard(for: s))
-    }
-
-    private var nameProblem: String? { name.isEmpty ? nil : ProjectRules.nameProblem(name) }
-    private var slugProblem: String? { slug.isEmpty && name.isEmpty ? nil : ProjectRules.slugProblem(slug) }
-    private var ready: Bool { ProjectRules.nameProblem(name) == nil && ProjectRules.slugProblem(slug) == nil }
-
-    var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 22) {
-            VStack(alignment: .leading, spacing: Space.s4) {
-                DialogHead(title: "New Project", line: "Everything here can be changed later in Project Settings.")
-                HStack(alignment: .bottom, spacing: Space.s5) {
-                    CoreTextField("Name", placeholder: "Project name", text: $name, error: nameProblem, autofocus: true)
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        CoreFieldLabel("Colour")
-                        CoreSegmented(
-                            "Colour", segments: ProjectColour.allCases.map { CoreSegment($0, $0.title) },
-                            selection: $colour
-                        )
-                        .fixedSize()
-                    }
-                }
-                RepoPicker(model: model, picked: $picked, pasted: $pasted)
-                HStack(alignment: .top, spacing: Space.s5) {
-                    CoreTextField(
-                        "Public link", placeholder: "link-name", text: $slug, error: slugProblem ?? model.writeError,
-                        suffix: ".\(ProjectRules.domain)")
-                    // One machine for now: projects run on the Core itself. More runners arrive with the run engine.
-                    CoreSelect(
-                        "Runs on", selection: $runner,
-                        options: [CoreSelectOption("core", "\(model.coreName) · \(ProjectRules.defaultLimits)")])
-                }
-                summary
-                CoreDialogFooter(
-                    cancel: CoreAction("Cancel", key: .cancel, run: close),
-                    primary: CoreAction("Create Project", key: .primary, run: create), busy: model.busy,
-                    enabled: ready)
-            }
-        }
-        .onChange(of: name) { _, new in
-            // The link follows the name until it is edited by hand; a colour follows the link until one is picked.
-            if !slugTouched { slug = ProjectRules.slug(from: new) }
-            model.clearWriteError()
-        }
-        .onChange(of: slug) { _, new in
-            if new != ProjectRules.slug(from: name) { slugTouched = true }
-            if !colourPicked { colour = .standard(for: new) }
-            model.clearWriteError()
-        }
-        .onChange(of: colour) { _, new in if new != .standard(for: slug) { colourPicked = true } }
-        .accessibilityIdentifier("project-new")
-    }
-
-    /// The one summary line: what the Core will do and what the link is.
-    private var summary: some View {
-        HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: "sparkle").coreFont(size: MacTextSize.body, weight: .medium)
-                .foregroundStyle(palette.text2).accessibilityHidden(true)
-            Text(summaryText).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .coreCard(GlassInk.well, radius: Radius.cardMac)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var summaryText: String {
-        let t = name.trimmingCharacters(in: .whitespaces)
-        let room = t.isEmpty ? "a Brain room" : "the Brain room “\(t)”"
-        let lead =
-            picked.isEmpty
-            ? "The Core creates \(room) and the link. Add repos any time and it copies them and drafts how to run them."
-            : "The Core copies the repos, drafts how to run them and creates \(room)."
-        return
-            "\(lead) The link is public while it runs and stops after \(ProjectRules.idleMinutes) min with no visits."
-    }
-
-    private func create() {
-        guard ready, !model.busy else { return }
-        let repos = model.chosen(picked, pasted: pasted)
-        Task { await model.create(name: name, slug: slug, colour: colour, repos: repos) }
     }
 }
 
