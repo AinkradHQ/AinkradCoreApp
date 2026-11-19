@@ -5,6 +5,7 @@ import SwiftUI
 /// prompt with a blinking cursor), the runner in its own colour, and the facts. Hover lifts it and shows its actions as
 /// icon tiles with their keys; the selected one glows. Tiles rise in one after another.
 struct TerminalTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     let item: TerminalItem
     var index = 0
@@ -20,7 +21,7 @@ struct TerminalTile: View {
             ?? PaneView.make(item: item, runner: model.runner(item.runner), link: .none, note: nil).chip
         let selected = model.selected == item.id
         let runner = model.name(of: item.runner)
-        let accent = GlassInk.blue
+        let accent = GlassInk.accent(paneAccent)
         let state: Color =
             model.rang.contains(item.id)
             ? GlassInk.amber
@@ -97,10 +98,10 @@ struct TerminalTile: View {
     /// The tile's actions on hover: icon tiles that bounce in, each with its key.
     private var actions: some View {
         HStack(spacing: 6) {
-            mini("arrow.up.forward.app", "↩", GlassInk.blue) { TileAction.run(.open, item.id, model) }
+            mini("arrow.up.forward.app", "↩", GlassInk.accent(paneAccent)) { TileAction.run(.open, item.id, model) }
             if !item.isEnded {
                 mini("eject", "D", GlassInk.slate) { TileAction.run(.detach, item.id, model) }
-                mini("bolt", "S", GlassInk.blue) { TileAction.run(.signal, item.id, model) }
+                mini("bolt", "S", GlassInk.accent(paneAccent)) { TileAction.run(.signal, item.id, model) }
                 mini("stop.fill", "E", GlassInk.red) { TileAction.run(.end, item.id, model) }
             }
         }

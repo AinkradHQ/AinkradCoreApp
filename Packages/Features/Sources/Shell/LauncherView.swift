@@ -226,6 +226,7 @@ struct LauncherView: View {
 }
 
 private struct LauncherItem: View {
+    @Environment(\.coreAccent) private var paneAccent
     private var textScale: Double { TextSizePrefs.shared.scale }
     let row: LauncherRow
     let number: Int?
@@ -289,11 +290,11 @@ private struct LauncherItem: View {
     private var hue: Color {
         if row.entry.tile == .slate { return GlassInk.slate }
         if row.entry.tile == .danger { return GlassInk.red }
-        if row.entry.tile == .view { return GlassInk.blue }
+        if row.entry.tile == .view { return GlassInk.accent(paneAccent) }
         switch row.group {
-        case .recent, .topHit: return GlassInk.blue
-        case .actions: return GlassInk.blue
-        case .goTo: return GlassInk.blue
+        case .recent, .topHit: return GlassInk.accent(paneAccent)
+        case .actions: return GlassInk.accent(paneAccent)
+        case .goTo: return GlassInk.accent(paneAccent)
         }
     }
 
@@ -303,7 +304,7 @@ private struct LauncherItem: View {
         for i in row.matched where chars.indices.contains(i) {
             let r = chars[i]..<out.characters.index(after: chars[i])
             out[r].font = .core(size: MacTextSize.headline, weight: .bold, scale: textScale)
-            out[r].foregroundColor = hue == .white.opacity(0.35) ? GlassInk.blue : hue
+            out[r].foregroundColor = hue == .white.opacity(0.35) ? GlassInk.accent(paneAccent) : hue
         }
         return Text(out).coreFont(size: MacTextSize.headline, weight: .semibold)
     }
@@ -311,13 +312,14 @@ private struct LauncherItem: View {
 
 /// ⇧⌘A's header: the pane the actions are for, its picture, title and live state, arriving with a bounce.
 private struct PaneActionsHeader: View {
+    @Environment(\.coreAccent) private var paneAccent
     let shell: ShellModel
     @State private var shown = false
     var body: some View {
         if let id = shell.activePane ?? shell.panes.first?.id, let spec = shell.panes.first(where: { $0.id == id }) {
             HStack(spacing: Space.s3) {
-                IconTile(spec.symbol, hue: GlassInk.blue, size: 44, bounce: shown)
-                    .shadow(color: GlassInk.blue.opacity(0.45), radius: 12)
+                IconTile(spec.symbol, hue: GlassInk.accent(paneAccent), size: 44, bounce: shown)
+                    .shadow(color: GlassInk.accent(paneAccent).opacity(0.45), radius: 12)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Actions").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(
                         GlassInk.secondary)

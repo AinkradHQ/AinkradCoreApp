@@ -17,6 +17,7 @@ struct DropBadge: View {
 
 /// Tile, title, one quiet line and a state on the right.
 struct DropHead<Trailing: View>: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let title: String
     let meta: String
@@ -32,7 +33,7 @@ struct DropHead<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            IconTile(symbol, hue: GlassInk.blue, size: MacSize.controlLg + Space.s1)
+            IconTile(symbol, hue: GlassInk.accent(paneAccent), size: MacSize.controlLg + Space.s1)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 Text(meta).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(2)
@@ -108,6 +109,7 @@ private struct ActivityBars: View {
 
 /// The Runners dropdown: how many work right now, every runner with its load, and the ways on.
 struct RunnersPanel: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
 
@@ -183,7 +185,7 @@ struct RunnersPanel: View {
     private func updatingRow(_ m: HomeSnapshot.Machine, _ u: RunnerUpdate) -> some View {
         Button { go("runners") } label: {
             HStack(spacing: Space.s3) {
-                IconTile("arrow.triangle.2.circlepath", hue: GlassInk.blue, size: MacSize.controlLg)
+                IconTile("arrow.triangle.2.circlepath", hue: GlassInk.accent(paneAccent), size: MacSize.controlLg)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text("Updating \(m.id)").coreFont(size: MacTextSize.body, weight: .semibold)
                     Text("Tools update by themselves, nothing to do").coreFont(size: MacTextSize.meta)

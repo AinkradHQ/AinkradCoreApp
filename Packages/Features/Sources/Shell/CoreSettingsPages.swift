@@ -21,6 +21,7 @@ private func fact(_ title: String, _ sub: String? = nil, value: String) -> some 
 }
 
 struct CoreOverviewTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @State private var draft = ""
 
@@ -30,11 +31,11 @@ struct CoreOverviewTab: View {
             GlassSection(
                 shell.home.coreName,
                 sub: h.map { "Version \($0.version) · up for \($0.uptime)" } ?? "Not reported yet",
-                symbol: "server.rack", hue: GlassInk.blue
+                symbol: "server.rack", hue: GlassInk.accent(paneAccent)
             ) {
                 Text(shell.chipState?.popTitle ?? "Not connected").foregroundStyle(GlassInk.secondary)
             }
-            GlassSection("Basics", symbol: "slider.horizontal.3", hue: GlassInk.blue, index: 1) {
+            GlassSection("Basics", symbol: "slider.horizontal.3", hue: GlassInk.accent(paneAccent), index: 1) {
                 VStack(spacing: Space.s2) {
                     nameRow
                     CoreRow(
@@ -114,6 +115,7 @@ struct CoreOverviewTab: View {
 
 /// Update choice and hour live on the Core (Core 0.10); installing an update is E12's, so "check now" says whether a feed answered.
 struct CoreUpdatesTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
 
     /// Where an update may install: the stored hour always shows, even when it is not one of these.
@@ -128,7 +130,7 @@ struct CoreUpdatesTab: View {
         let h = shell.home.health
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Updates", sub: "Core, runners and this app", symbol: "arrow.down.circle", hue: GlassInk.blue
+                "Updates", sub: "Core, runners and this app", symbol: "arrow.down.circle", hue: GlassInk.accent(paneAccent)
             ) {
                 VStack(spacing: Space.s2) {
                     fact("Core version", value: h?.version ?? "Not reported yet")
@@ -182,12 +184,13 @@ struct CoreUpdatesTab: View {
 /// The last backup, when they run and what is kept, and "Back up now". The schedule and the backups come from the Core machine's
 /// root-owned helper (Core 0.10); the app reads them and can start one, but cannot change the timer.
 struct CoreBackupTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
 
     var body: some View {
         let h = shell.home.health
         let b = shell.corePage.backups
-        GlassSection("Backup", sub: "Kept safe on your Core", symbol: "externaldrive", hue: GlassInk.blue) {
+        GlassSection("Backup", sub: "Kept safe on your Core", symbol: "externaldrive", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 fact("Last backup", value: h?.backup(now: Date()) ?? "Not reported yet")
                 if let words = b?.scheduleWords { fact("Runs", "On the Core machine", value: words) }
@@ -235,12 +238,13 @@ struct CoreBackupTab: View {
 }
 
 struct CoreNetworkTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "How you reach your Core", symbol: "network", hue: GlassInk.blue
+                "How you reach your Core", symbol: "network", hue: GlassInk.accent(paneAccent)
             ) {
                 VStack(spacing: Space.s2) {
                     fact("Address", "Where this app connects", value: shell.home.coreName)
@@ -263,12 +267,13 @@ struct CoreNetworkTab: View {
 
 /// Disk use by kind of data, from the Core (needs Core 0.10); an older Core says so.
 struct CoreStorageTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             if let s = shell.corePage.storage {
-                GlassSection("Space used", symbol: "internaldrive", hue: GlassInk.blue) {
+                GlassSection("Space used", symbol: "internaldrive", hue: GlassInk.accent(paneAccent)) {
                     VStack(alignment: .leading, spacing: Space.s2) {
                         if let pct = s.diskUsedPct {
                             HStack(alignment: .firstTextBaseline) {
@@ -305,10 +310,11 @@ struct CoreStorageTab: View {
 
 /// The audit log is the Core's log until a plain log feed exists.
 struct CoreLogsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
 
     var body: some View {
-        GlassSection("Recent", sub: "Who did what, where and when", symbol: "doc.text", hue: GlassInk.blue) {
+        GlassSection("Recent", sub: "Who did what, where and when", symbol: "doc.text", hue: GlassInk.accent(paneAccent)) {
             HStack {
                 Text("The audit log lists what happened on your Core.").foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s3)

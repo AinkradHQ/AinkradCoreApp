@@ -100,6 +100,7 @@ struct NeedsBody: View {
 }
 
 struct EventsBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     let home: HomeSnapshot
     let size: WidgetSize
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -116,7 +117,7 @@ struct EventsBody: View {
                     WHead("clock", "Latest")
                     if let e = ev.first {
                         Spacer(minLength: 0)
-                        Image(systemName: e.symbol).coreFont(size: 22).foregroundStyle(GlassInk.blue)
+                        Image(systemName: e.symbol).coreFont(size: 22).foregroundStyle(GlassInk.accent(paneAccent))
                             .accessibilityHidden(true)
                         Text(e.text).coreFont(size: MacTextSize.body, weight: .semibold)
                             .foregroundStyle(GlassInk.primary).lineLimit(2)
@@ -146,7 +147,7 @@ struct EventsBody: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             ForEach(ev) { e in
                 HStack(spacing: Space.s2) {
-                    Image(systemName: e.symbol).foregroundStyle(GlassInk.blue).frame(width: 16)
+                    Image(systemName: e.symbol).foregroundStyle(GlassInk.accent(paneAccent)).frame(width: 16)
                         .accessibilityHidden(true)
                     Text(e.text).coreFont(size: MacTextSize.body).lineLimit(1)
                     Spacer(minLength: Space.s2)

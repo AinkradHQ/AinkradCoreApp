@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Quick actions in the four macOS sizes. Tiles use the glass well style and rise in one after another when the widget arrives.
 struct QuickBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     let size: WidgetSize
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -51,7 +52,7 @@ struct QuickBody: View {
                             go(t)
                         } label: {
                             HStack(spacing: Space.s3) {
-                                Image(systemName: t.symbol).foregroundStyle(GlassInk.blue).frame(width: 20)
+                                Image(systemName: t.symbol).foregroundStyle(GlassInk.accent(paneAccent)).frame(width: 20)
                                 Text(t.title).coreFont(size: MacTextSize.body, weight: .medium)
                                 Spacer(minLength: 0)
                                 if let k = t.key {
@@ -119,6 +120,7 @@ struct QuickTileStyle: ButtonStyle {
 }
 
 private struct QuickTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let configuration: ButtonStyleConfiguration
     let prominent: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -138,6 +140,6 @@ private struct QuickTile: View {
     }
 
     private var fill: Color {
-        prominent ? GlassInk.blue.opacity(lit ? 1 : 0.85) : lit ? GlassInk.wellEdge : GlassInk.wellHover
+        prominent ? GlassInk.accent(paneAccent).opacity(lit ? 1 : 0.85) : lit ? GlassInk.wellEdge : GlassInk.wellHover
     }
 }

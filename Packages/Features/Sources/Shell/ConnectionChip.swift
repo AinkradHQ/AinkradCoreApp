@@ -97,6 +97,7 @@ final class NetworkWatch {
 /// The Core dropdown (E2-2, mockup `kit/topbar.js` core): how the Core is, three facts, the devices, the last backup, and
 /// Reconnect (only when the link is down) beside Core settings.
 struct ConnectionPanel: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
 
@@ -125,7 +126,7 @@ struct ConnectionPanel: View {
             }
             if let u = shell.coreUpdate {
                 HStack(spacing: Space.s3) {
-                    IconTile("arrow.down.circle", hue: GlassInk.blue, size: MacSize.controlMd)
+                    IconTile("arrow.down.circle", hue: GlassInk.accent(paneAccent), size: MacSize.controlMd)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Update available").coreFont(size: MacTextSize.headline, weight: .semibold)
                         Text(u.line).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)

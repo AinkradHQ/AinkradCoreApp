@@ -33,6 +33,7 @@ struct LoadNote: View {
 
 /// Settings, Devices: the list as a table, or one device's page.
 struct DevicesSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     @Environment(\.corePalette) private var palette
 
@@ -57,12 +58,12 @@ struct DevicesSection: View {
             }
             Spacer(minLength: Space.s3)
             AppActionTile(
-                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)
             ) {
                 app.openAddDevice()
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(app.service == nil)
-            AppActionTile(title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 app.openAddWizard()
             }
             .keyboardShortcut("n", modifiers: .command)
@@ -85,12 +86,13 @@ struct DevicesSection: View {
 
 /// A device page's header, shown in the Settings title bar beside the back tile (N11).
 private struct DeviceHeader: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
     @State private var shown = false
 
     private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.blue : GlassInk.blue
+        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent)
     }
 
     var body: some View {
@@ -113,6 +115,7 @@ private struct DeviceHeader: View {
 }
 
 private struct OnlyAdminWarning: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
     /// The device that could become the second admin; nil when none can.
@@ -124,11 +127,11 @@ private struct OnlyAdminWarning: View {
             text: "Make a second device an admin so you are never locked out.", tone: .warn
         ) {
             if let next {
-                AppActionTile(title: "Make \(next.name) an admin", symbol: "shield", key: "", hue: GlassInk.blue) {
+                AppActionTile(title: "Make \(next.name) an admin", symbol: "shield", key: "", hue: GlassInk.accent(paneAccent)) {
                     Task { _ = await app.devices.setScopes(next, DeviceRole.withAdmin(next.scopes)) }
                 }
             } else {
-                AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.blue) {
+                AppActionTile(title: "Add an admin device", symbol: "plus", key: "", hue: GlassInk.accent(paneAccent)) {
                     app.openAddDevice(admin: true)
                 }
             }
@@ -158,6 +161,7 @@ private struct DeviceTable: View {
 }
 
 private struct DeviceRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
     let open: () -> Void
@@ -171,7 +175,7 @@ private struct DeviceRow: View {
             Button(action: open) {
                 HStack(spacing: Space.s3) {
                     IconTile(
-                        DeviceWords.symbol(device.kind, device.platform), hue: device.revoked ? GlassInk.red : GlassInk.blue,
+                        DeviceWords.symbol(device.kind, device.platform), hue: device.revoked ? GlassInk.red : GlassInk.accent(paneAccent),
                         size: 36)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(device.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
@@ -260,6 +264,7 @@ struct DeviceRole: Equatable {
 
 /// The five scopes as small icon tiles, lit when held: access at a glance instead of "all five".
 struct ScopeIcons: View {
+    @Environment(\.coreAccent) private var paneAccent
     let scopes: [String]
     var body: some View {
         HStack(spacing: Space.s1 + 2) {
@@ -269,7 +274,7 @@ struct ScopeIcons: View {
                     .opacity(on ? 1 : 0.5)
                     .help(on ? "\(s.capitalized): \(ScopeText.text(s))" : "No \(s)")
             }
-            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.blue, size: 24) }
+            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.accent(paneAccent), size: 24) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scopes.joined(separator: ", "))
@@ -388,6 +393,7 @@ private struct InlineRename: View {
 
 /// One device's page: Device, Keys, Access, Revoke. Back returns to the list.
 struct DeviceDetail: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     let device: DeviceInfo
     @Environment(\.corePalette) private var palette
@@ -397,7 +403,7 @@ struct DeviceDetail: View {
         let me = app.devices.isMe(device)
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.blue, index: 1
+                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.accent(paneAccent), index: 1
             ) {
                 if !device.revoked && !app.devices.renaming {
                     SectionAction("Rename", symbol: "pencil") { app.devices.renaming = true }
@@ -416,7 +422,7 @@ struct DeviceDetail: View {
             }
             GlassSection(
                 "Keys", sub: "Made on the device. The Core only holds the public halves.", symbol: "key.horizontal",
-                hue: GlassInk.blue, index: 2
+                hue: GlassInk.accent(paneAccent), index: 2
             ) {
                 HStack(spacing: Space.s3) {
                     KeyFact(
@@ -436,7 +442,7 @@ struct DeviceDetail: View {
                 // N18: a runner does the work the Core sends; it does not ask for anything, so scopes do not describe it.
                 GlassSection(
                     "Access", sub: "A runner does work; it does not ask for it.", symbol: "server.rack",
-                    hue: GlassInk.blue, index: 3
+                    hue: GlassInk.accent(paneAccent), index: 3
                 ) {
                     SectionAction("Open runner page", symbol: "arrow.right") {
                         app.shell.launcher.entry("runners")?.run()
@@ -451,7 +457,7 @@ struct DeviceDetail: View {
             } else {
                 GlassSection(
                     "Access", sub: "What it may do. You can only narrow it; to give more, pair it again.",
-                    symbol: "lock.shield", hue: GlassInk.blue, index: 3
+                    symbol: "lock.shield", hue: GlassInk.accent(paneAccent), index: 3
                 ) {
                     if !device.revoked {
                         SectionAction("Edit access", symbol: "slider.horizontal.3") {
