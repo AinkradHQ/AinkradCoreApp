@@ -137,6 +137,17 @@ struct ToolRunHeader: View {
     private var steps: [ToolStep] { entries.compactMap(ToolStep.init) }
     private var running: Bool { steps.contains { $0.ok == nil } }
     private var failed: Int { steps.filter { $0.ok == false }.count }
+    /// What the last unfinished step is doing: its command, path or pattern.
+    private var current: String? {
+        for e in entries.reversed() {
+            switch e.kind {
+            case .toolUse(_, _, let summary) where !summary.isEmpty: return summary
+            case .toolEdit(_, _, let path, _, _, let ok, _) where ok == nil: return path
+            default: continue
+            }
+        }
+        return nil
+    }
 
     var body: some View {
         Button(action: toggle) {
@@ -146,6 +157,12 @@ struct ToolRunHeader: View {
                     .frame(width: Space.s3)
                 Text(ToolStep.summary(steps)).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
                     .lineLimit(1).truncationMode(.tail)
+                // While it works, the step in flight follows the summary, so the line shows what is happening now.
+                if running, let now = current {
+                    Text(PathWords.short(now)).coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
+                        .lineLimit(1).truncationMode(.middle).id(now)
+                        .transition(.opacity)
+                }
                 Spacer(minLength: Space.s2)
                 trailing
             }

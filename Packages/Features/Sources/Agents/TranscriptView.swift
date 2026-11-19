@@ -427,9 +427,12 @@ struct ToolCard: View {
                     Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
                         .frame(width: Space.s4)
                     Text(Self.verb(name)).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+                    // The file, pattern or command sits in a small chip (the mockup's), so the verb reads apart from it.
                     Text(PathWords.short(summary.isEmpty ? name : summary))
-                        .coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
+                        .coreFont(size: 12, weight: .medium, design: .monospaced).foregroundStyle(SessionInk.text)
                         .lineLimit(1).truncationMode(.middle)
+                        .padding(.horizontal, Space.s2).padding(.vertical, 2)
+                        .background(GlassInk.wellHover, in: coreShape(Radius.chip))
                     // The working bar gives way to ✓ or ✗ with a short crossfade when the step finishes.
                     trailing.animation(Motion.out(0.2), value: statusKey)
                     Spacer(minLength: 0)
