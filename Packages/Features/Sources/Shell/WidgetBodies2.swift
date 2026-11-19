@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// Allow and Deny on a waiting item, from the actions the item carries (the primary one is blue).
-private struct WActions: View {
+struct WActions: View {
     let item: BellItem
     var body: some View {
         HStack(spacing: Space.s2) {
@@ -11,154 +11,6 @@ private struct WActions: View {
                     .buttonStyle(CoreButtonStyle(a.primary ? .prominent : .secondary, size: .small))
             }
         }
-    }
-}
-
-struct NeedsBody: View {
-    @Bindable var shell: ShellModel
-    let size: WidgetSize
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        let need = shell.bell.items.filter(\.needsPerson)
-        // The same count as the top bar's "waiting" (approvals), so the two never disagree; alarms stay rows in the list.
-        let waiting = shell.waitingOnYou
-        let badge: StateBadge? =
-            waiting == 0 ? nil : StateBadge("\(waiting) waiting", tone: .warn, symbol: "hand.raised")
-        VStack(alignment: .leading, spacing: Space.s2) {
-            if need.isEmpty {
-                WHead("bell", "Needs you")
-                WEmpty(symbol: "checkmark.circle", text: "Nothing needs you")
-            } else {
-                switch size {
-                case .s:
-                    WHead("bell", "Needs you")
-                    WFigure(value: Double(need.count), caption: "waiting for you")
-                    Spacer(minLength: 0)
-                    if let t = need.first?.time { WCaption("Oldest: \(t)") }
-                case .m:
-                    WHead("bell", "Needs you") { badge }
-                    ForEach(need.prefix(2)) { n in row(n) }
-                case .l, .t:
-                    WHead("bell", "Needs you") { badge }
-                    ForEach(need.prefix(3)) { n in card(n) }
-                    Spacer(minLength: 0)
-                case .x:
-                    WHead("bell", "Needs you") { badge }
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        VStack(spacing: Space.s2) { ForEach(need.prefix(3)) { n in card(n) } }
-                        WSub {
-                            WCaption("What it asks")
-                            if let first = need.first {
-                                Text(first.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                                    .foregroundStyle(GlassInk.primary)
-                                if let s = first.sub { WCaption(s) }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: need.map(\.id))
-    }
-
-    private func row(_ n: BellItem) -> some View {
-        Button {
-            shell.bellOpen = true
-        } label: {
-            HStack(spacing: Space.s3) {
-                Image(systemName: n.symbol).foregroundStyle(GlassInk.amber).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(n.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                    if let s = n.sub { WCaption(s) }
-                }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(GlassInk.primary)
-            .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-            .background(GlassInk.well, in: coreShape(Radius.control))
-            .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain).newRow(reduce)
-    }
-
-    private func card(_ n: BellItem) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            HStack {
-                Text(n.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                Spacer(minLength: Space.s2)
-                if let t = n.time { WCaption(t) }
-            }
-            if let s = n.sub { WCaption(s) }
-            WActions(item: n)
-        }
-        .foregroundStyle(GlassInk.primary)
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-        .background(GlassInk.well, in: coreShape(Radius.row))
-        .newRow(reduce)
-    }
-}
-
-struct EventsBody: View {
-    let home: HomeSnapshot
-    let size: WidgetSize
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        let ev = home.events
-        VStack(alignment: .leading, spacing: Space.s2) {
-            if ev.isEmpty {
-                WHead("clock", "Recent events")
-                WEmpty(symbol: "clock", text: "Nothing happened yet")
-            } else {
-                switch size {
-                case .s:
-                    WHead("clock", "Latest")
-                    if let e = ev.first {
-                        Spacer(minLength: 0)
-                        Image(systemName: e.symbol).coreFont(size: 22).foregroundStyle(GlassInk.blue)
-                            .accessibilityHidden(true)
-                        Text(e.text).coreFont(size: MacTextSize.body, weight: .semibold)
-                            .foregroundStyle(GlassInk.primary).lineLimit(2)
-                        WCaption("\(when(e)) · \(e.source)")
-                    }
-                case .m:
-                    WHead("clock", "Recent events")
-                    list(ev.prefix(3))
-                case .l, .t:
-                    WHead("clock", "Recent events")
-                    list(ev.prefix(7))
-                    Spacer(minLength: 0)
-                case .x:
-                    WHead("clock", "Recent events")
-                    HStack(alignment: .top, spacing: Space.s5) {
-                        list(ev.prefix(5))
-                        list(ev.dropFirst(5).prefix(5))
-                    }
-                }
-            }
-        }
-    }
-
-    private func when(_ e: HomeSnapshot.Event) -> String { e.minutesAgo < 1 ? "now" : "\(e.minutesAgo) min" }
-
-    private func list(_ ev: ArraySlice<HomeSnapshot.Event>) -> some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            ForEach(ev) { e in
-                HStack(spacing: Space.s2) {
-                    Image(systemName: e.symbol).foregroundStyle(GlassInk.blue).frame(width: 16)
-                        .accessibilityHidden(true)
-                    Text(e.text).coreFont(size: MacTextSize.body).lineLimit(1)
-                    Spacer(minLength: Space.s2)
-                    Text(when(e)).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                        .monospacedDigit()
-                }
-                .foregroundStyle(GlassInk.primary)
-                .accessibilityElement(children: .combine).newRow(reduce)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: ev.map(\.id))
     }
 }
 
@@ -193,7 +45,7 @@ struct CoreBody: View {
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
                 Spacer(minLength: 0)
-                WCaption(alarms == 0 ? "No alarms" : "\(alarms) alarm" + (alarms == 1 ? "" : "s"))
+                WCaption(h.health.map { "Up \($0.uptime)" } ?? (alarms == 0 ? "No alarms" : "\(alarms) alarms"))
             case .m:
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 HStack(alignment: .top, spacing: Space.s5) {
@@ -204,26 +56,43 @@ struct CoreBody: View {
                 }
                 Spacer(minLength: 0)
                 WCaption(h.health.map { "Core \($0.version) · up \($0.uptime)" } ?? h.coreName)
-            default:
+            case .w:
+                WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
+                WStats(items: [
+                    .init(id: "Runners up", value: "\(h.machinesOnline) of \(h.machines.count)", bar: ratio),
+                    .init(
+                        id: "Alarms", value: alarms == 0 ? "None" : "\(alarms)", warn: alarms > 0,
+                        bar: min(Double(alarms) / 5, 1)),
+                    .init(
+                        id: "Certificate", value: h.health?.certificate ?? "n/a",
+                        warn: h.health?.certificateLow ?? false,
+                        bar: h.health?.certificateShare),
+                    .init(id: "Backup", value: h.health?.backupAge(now: Date()) ?? "None yet"),
+                ])
+            case .l:
                 WHead("heart.text.square", "Core health") { StateBadge(s.word, tone: s.tone, symbol: s.symbol) }
                 VStack(alignment: .leading, spacing: 0) {
                     Text(s.tone == .done ? "Healthy" : s.word).coreFont(size: 34, weight: .bold)
                         .foregroundStyle(GlassInk.primary)
                     WCaption(h.health.map { "\(h.coreName) · version \($0.version) · up \($0.uptime)" } ?? h.coreName)
                 }
-                bars(alarms: alarms, ratio: ratio, h: h)
+                barsA(alarms: alarms, ratio: ratio, h: h)
+                barsB(h: h)
                 Spacer(minLength: 0)
             }
         }
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.coreLink)
     }
 
-    @ViewBuilder private func bars(alarms: Int, ratio: Double, h: HomeSnapshot) -> some View {
+    @ViewBuilder private func barsA(alarms: Int, ratio: Double, h: HomeSnapshot) -> some View {
         WBarRow(
             label: "Runners online", value: "\(h.machinesOnline) of \(h.machines.count)", fill: ratio)
         WBarRow(
             label: "Alarms", value: alarms == 0 ? "None" : "\(alarms)", fill: min(Double(alarms) / 5, 1),
             low: alarms > 0)
+    }
+
+    @ViewBuilder private func barsB(h: HomeSnapshot) -> some View {
         if let c = h.health?.certificate, let health = h.health {
             WBarRow(
                 label: "Certificate", value: c + (health.certDaysLeft ?? 0 > 0 ? " left" : ""),
@@ -240,117 +109,6 @@ struct CoreBody: View {
             WCaption(k)
             Text(v).coreFont(size: 20, weight: .bold).foregroundStyle(GlassInk.primary).lineLimit(1)
                 .minimumScaleFactor(0.6).contentTransition(.numericText())
-        }
-    }
-}
-
-/// Three bars, not three rings: what waits for you, what runs, how many machines are up.
-struct TodayBody: View {
-    @Bindable var shell: ShellModel
-    let size: WidgetSize
-
-    var body: some View {
-        let h = shell.home
-        let waiting = shell.waitingOnYou
-        // The last field is "needs you": only waiting approvals turn amber, and only while there are some.
-        let rows: [(String, String, Double, Double, Bool)] = [
-            ("Waiting for you", "\(waiting)", Double(waiting), min(Double(waiting), 5) / 5, waiting > 0),
-            (
-                "AI sessions running", "\(h.runningAgents) of \(h.totalSlots)", Double(h.runningAgents),
-                Double(h.runningAgents) / Double(max(h.totalSlots, 1)), false
-            ),
-            (
-                "Machines online", "\(h.machinesOnline) of \(h.machines.count)", Double(h.machinesOnline),
-                h.machines.isEmpty ? 0 : Double(h.machinesOnline) / Double(h.machines.count), false
-            ),
-        ]
-        VStack(alignment: .leading, spacing: Space.s2) {
-            switch size {
-            case .s:
-                WHead("calendar", "Today")
-                WFigure(value: Double(h.runningAgents), caption: "AI sessions running")
-                Spacer(minLength: 0)
-                CoreMeter(rows[1].3, label: "AI session slots in use")
-            case .m:
-                WHead("calendar", "Today")
-                VStack(spacing: Space.s3) {
-                    ForEach(rows, id: \.0) { r in WBarRow(label: r.0, value: r.1, fill: r.3, low: r.4) }
-                }
-            default:
-                WHead("calendar", "Today")
-                if size == .x {
-                    HStack(alignment: .top, spacing: Space.s4) {
-                        big(rows)
-                        WSub {
-                            WCaption("Spend this week")
-                            WColumns(values: Array(h.spendByDay.suffix(7)))
-                            WCaption(
-                                "Today \(h.spendToday.formatted(.currency(code: "USD")))")
-                        }
-                    }
-                } else {
-                    big(rows)
-                    Spacer(minLength: 0)
-                }
-            }
-        }
-    }
-
-    private func big(_ rows: [(String, String, Double, Double, Bool)]) -> some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            ForEach(rows, id: \.0) { r in
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    WCaption(r.0)
-                    RollingNumber(value: r.2, size: 28, ink: GlassInk.primary)
-                    CoreMeter(r.3, low: r.4, label: r.0)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-}
-
-struct BoardBody: View {
-    let board: HomeSnapshot.Board
-    let size: WidgetSize
-
-    var body: some View {
-        // Blocked is the one column that needs you: amber while anything is blocked.
-        let cols: [(String, Int, Bool)] = [
-            ("To do", board.todo, false), ("In progress", board.doing, false), ("In review", board.review, false),
-            ("Blocked", board.blocked, board.blocked > 0), ("Done", board.done, false),
-        ]
-        VStack(alignment: .leading, spacing: Space.s2) {
-            WHead("list.bullet.rectangle", size == .s ? "Board" : "Citadel board")
-            switch size {
-            case .s:
-                WFigure(value: Double(board.doing), caption: "in progress")
-                Spacer(minLength: 0)
-                WCaption("\(board.todo) to do · \(board.done) done")
-            case .m, .l, .t:
-                VStack(spacing: Space.s3) {
-                    ForEach(size == .m ? Array(cols.prefix(3)) : cols, id: \.0) { c in
-                        // A count per column, no bar: a share of the board is not progress (Ahmed, 2026-11-15).
-                        HStack {
-                            Text(c.0).coreFont(size: MacTextSize.body, weight: .medium)
-                            Spacer(minLength: Space.s2)
-                            Text("\(c.1)").coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
-                                .foregroundStyle(c.2 ? GlassInk.amberInk : GlassInk.primary)
-                        }
-                        .foregroundStyle(GlassInk.primary)
-                    }
-                }
-                Spacer(minLength: 0)
-            case .x:
-                HStack(alignment: .top, spacing: Space.s3) {
-                    ForEach(cols, id: \.0) { c in
-                        WSub {
-                            WCaption(c.0)
-                            RollingNumber(value: Double(c.1), size: 28, ink: GlassInk.primary)
-                        }
-                    }
-                }
-            }
         }
     }
 }

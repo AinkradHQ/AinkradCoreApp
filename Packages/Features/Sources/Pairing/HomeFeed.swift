@@ -1,5 +1,6 @@
 import Agents
 import AinkradClient
+import Brain
 import CoreKit
 import Foundation
 import Shell
@@ -21,6 +22,28 @@ struct HomeAudit: Equatable, Sendable {
     var actor: String
 }
 
+struct HomeProject: Equatable, Sendable {
+    var slug: String
+    var name: String
+    var updatedAt: Date
+}
+
+/// One provider's tightest plan limit.
+struct HomeUsage: Equatable, Sendable {
+    var provider: String
+    var share: Double
+    var resetsAt: Date?
+}
+
+extension ISO8601DateFormatter {
+    /// The Core's timestamps carry fractions of a second.
+    nonisolated(unsafe) static let withFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+}
+
 /// What Home needs from the Core. Each read stands alone: a device without `admin` fails the costs and audit reads and the rest still show.
 protocol HomeSource: Sendable {
     func sessions() async throws -> [AgentSessionInfo]
@@ -31,6 +54,28 @@ protocol HomeSource: Sendable {
     func utilisation() async throws -> Double
     func audit() async throws -> [HomeAudit]
     func health() async throws -> CoreHealthFacts
+    func projects() async throws -> [HomeProject]
+    func usage() async throws -> [HomeUsage]
+    /// Today's Lore note, nil when none was started (reading never creates one).
+    func todayNote() async throws -> HomeSnapshot.NoteFact?
+    /// What the Brain is doing now; nil on a Core older than API minor 95.
+    func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline?
+    /// Tokens per day for the last `days` days, oldest first, from the Core's cost ledger; nil before API minor 95.
+    func usageSeries(days: Int) async throws -> [Double]?
+    /// The last `lines` lines of a terminal's screen (E6's tail read); nil on a Core older than API minor 95.
+    func terminalTail(_ id: String, lines: Int) async throws -> [String]?
+    /// Saves a changed note (the Core merges when it moved on) and answers the note as it is now.
+    func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact?
+}
+
+extension HomeSource {
+    func projects() async throws -> [HomeProject] { [] }
+    func usage() async throws -> [HomeUsage] { [] }
+    func todayNote() async throws -> HomeSnapshot.NoteFact? { nil }
+    func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline? { nil }
+    func usageSeries(days: Int) async throws -> [Double]? { nil }
+    func terminalTail(_ id: String, lines: Int) async throws -> [String]? { nil }
+    func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact? { nil }
 }
 
 struct LiveHomeSource: HomeSource {
@@ -86,6 +131,85 @@ struct LiveHomeSource: HomeSource {
         }
     }
 
+    func projects() async throws -> [HomeProject] {
+        try await run {
+            try await client.listProjects().ok.body.json.filter { $0.state != "archived" }.map {
+                HomeProject(slug: $0.slug, name: $0.name, updatedAt: $0.updatedAt)
+            }
+        }
+    }
+
+    /// The tightest limit of each provider across its accounts, with the soonest plan-window reset.
+    func usage() async throws -> [HomeUsage] {
+        try await run {
+            async let spend = client.accountsUsage().ok.body.json
+            async let accounts = client.listAccounts().ok.body.json
+            let (spent, list) = try await (spend, accounts)
+            return Self.usage(
+                spent: spent.map { ($0.accountId, Double($0.maxUtilisationBps) / 10_000) },
+                accounts: list.map {
+                    ($0.id, $0.provider, ($0.health?.planLimit?.windows ?? []).compactMap(\.resetsAt))
+                })
+        }
+    }
+
+    static func usage(spent: [(Int64, Double)], accounts: [(Int64, String, [Date])]) -> [HomeUsage] {
+        var by: [String: HomeUsage] = [:]
+        for (id, provider, resets) in accounts {
+            guard let share = spent.first(where: { $0.0 == id })?.1 else { continue }
+            var u = by[provider] ?? HomeUsage(provider: provider, share: 0, resetsAt: nil)
+            u.share = max(u.share, min(1, share))
+            u.resetsAt = ([u.resetsAt].compactMap { $0 } + resets).min()
+            by[provider] = u
+        }
+        return by.values.sorted { $0.provider < $1.provider }
+    }
+
+    func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        let a = try await BrainRoutes(transport: LiveBrainTransport(connection: connection)).activity()
+        let done = a.lastDoneAt.flatMap { ISO8601DateFormatter.withFraction.date(from: $0) }
+        return .init(
+            now: HomeSnapshot.BrainGlance.Pipeline.stage(
+                distilling: a.distilling, queued: a.queued, overviews: a.overviews),
+            working: a.distilling, queued: a.queued, overviews: a.overviews, lastDoneAt: done)
+    }
+
+    /// ponytail: path and answer shape (`{ "lines": [..] }`) are a guess until E6's route lands; align them at integration.
+    func terminalTail(_ id: String, lines: Int) async throws -> [String]? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        struct Tail: Decodable { var lines: [String] }
+        let data = try await run {
+            try await connection.signedRequest(
+                method: "GET", target: "/api/v1/terminals/\(id)/tail?lines=\(lines)", body: Data())
+        }
+        return try JSONDecoder().decode(Tail.self, from: data).lines
+    }
+
+    func usageSeries(days: Int) async throws -> [Double]? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        let data = try await run {
+            try await connection.signedRequest(method: "GET", target: "/api/v1/costs/series?days=\(days)", body: Data())
+        }
+        return try HomeFeed.series(data, days: days, now: Date())
+    }
+
+    private var lore: LiveLoreService { LiveLoreService(connection: connection) }
+
+    func todayNote() async throws -> HomeSnapshot.NoteFact? {
+        try await run {
+            guard let n = try await lore.daily(HomeFeed.dayKey(Date())) else { return nil }
+            return HomeSnapshot.NoteFact.parse(n.text, id: n.id, rev: n.rev)
+        }
+    }
+
+    func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact? {
+        try await run {
+            let r = try await lore.save(id, baseRev: rev, text: text)
+            return HomeSnapshot.NoteFact.parse(r.note.text, id: r.note.id, rev: r.note.rev)
+        }
+    }
+
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch { throw CoreFailure.of(error) ?? error }
     }
@@ -100,8 +224,13 @@ final class HomeFeed {
     private let quiet: Duration
     private var pending: Task<Void, Never>?
     private var history: [String: [Double]] = [:]
+    /// Terminals and Brain live in their own apps; the app hands Home what they hold.
+    var terminalFacts: (@MainActor () -> [HomeSnapshot.TerminalFact])?
+    var brainService: (@MainActor () -> (any BrainService)?)?
     /// The kinds that change what Home shows.
-    static let prefixes = ["agent.", "runner.", "account.", "audit", "pairing."]
+    static let prefixes = [
+        "agent.", "runner.", "account.", "audit", "pairing.", "terminal.", "project.", "lore.", "brain.",
+    ]
 
     init(
         shell: ShellModel, source: any HomeSource, quiet: Duration = .milliseconds(500),
@@ -127,8 +256,10 @@ final class HomeFeed {
     func refresh() async {
         let at = now()
         var home = shell.home
+        var live: [AgentSessionInfo] = []
         if let s = try? await source.sessions() {
-            home.running = s.filter(\.live).map {
+            live = s.filter(\.live)
+            home.running = live.map {
                 .init(
                     id: $0.id, tool: $0.harness, name: $0.model ?? $0.harness,
                     minutes: max(0, Int(at.timeIntervalSince($0.createdAt) / 60)))
@@ -158,7 +289,118 @@ final class HomeFeed {
             }
         }
         if let h = try? await source.health() { home.health = h }
+        if let p = try? await source.projects() {
+            home.projects = p.map { pr in
+                .init(
+                    id: pr.slug, name: pr.name, sessions: Self.sessions(in: pr, live: live),
+                    updatedAt: pr.updatedAt)
+            }
+        }
+        if let series = try? await source.usageSeries(days: 14) { home.usageSeries = series }
+        if let u = try? await source.usage() {
+            home.usage = u.map { .init(provider: $0.provider, share: $0.share, resetsAt: $0.resetsAt) }
+        }
+        if let n = try? await source.todayNote() { home.note = n } else { home.note = nil }
+        if let t = terminalFacts {
+            var facts = t()
+            // The Core's tail serves every terminal; the attached screen (already in `lines`) is the fallback.
+            for i in facts.indices {
+                let f = facts[i]
+                if let tail = try? await source.terminalTail(f.id, lines: 3), !tail.isEmpty {
+                    facts[i] = .init(id: f.id, name: f.name, place: f.place, onThisMac: f.onThisMac, lines: tail)
+                }
+            }
+            home.terminals = facts
+        }
+        if let b = brainService?() {
+            home.brain = await Self.glance(b)
+            home.brain?.pipeline = try? await source.brainPipeline()
+            home.brain?.pipeline?.progress = brainProgress(home.brain?.pipeline)
+        }
         shell.home = home
+    }
+
+    private var brainPeak = 0
+
+    /// Done over done plus waiting, from the counts alone: the most work seen waiting since it last had none counts as
+    /// the whole. nil while idle (the peak resets).
+    private func brainProgress(_ p: HomeSnapshot.BrainGlance.Pipeline?) -> Double? {
+        let pending = (p?.working ?? 0) + (p?.queued ?? 0)
+        guard let p, p.now != nil else {
+            brainPeak = 0
+            return nil
+        }
+        brainPeak = max(brainPeak, pending, 1)
+        return Double(brainPeak - pending) / Double(brainPeak)
+    }
+
+    /// Writes a tick on today's note back (the widget shows it at once; the Core's answer replaces it).
+    func toggleTodo(_ index: Int) async {
+        guard let n = shell.home.note, let text = HomeSnapshot.NoteFact.toggling(n.text, todo: index) else { return }
+        shell.home.note = HomeSnapshot.NoteFact.parse(text, id: n.id, rev: n.rev)
+        if let saved = try? await source.saveNote(n.id, rev: n.rev, text: text) {
+            shell.home.note = saved
+        } else {
+            await refresh()
+        }
+    }
+
+    /// `GET /costs/series` as one token total per UTC day, the last entry being `now`'s day.
+    static func series(_ data: Data, days: Int, now: Date) throws -> [Double] {
+        struct Row: Decodable {
+            var day: String
+            var total_tokens: Int64
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let f = DateFormatter()
+        f.calendar = utc
+        f.timeZone = utc.timeZone
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let by = Dictionary(rows.map { ($0.day, Double($0.total_tokens)) }, uniquingKeysWith: +)
+        return (0..<days).reversed().map { back in
+            by[f.string(from: utc.date(byAdding: .day, value: -back, to: now) ?? now)] ?? 0
+        }
+    }
+
+    /// "2026-11-19", the local day, as Lore keys its daily notes.
+    static func dayKey(_ d: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: d)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// Live sessions whose folder or repo is this project (by its name or slug, the last path part, case ignored).
+    static func sessions(in p: HomeProject, live: [AgentSessionInfo]) -> Int {
+        let names: Set<String> = [p.slug.lowercased(), p.name.lowercased()]
+        return live.filter {
+            guard let f = $0.project?.split(separator: "/").last else { return false }
+            return names.contains(f.lowercased())
+        }.count
+    }
+
+    /// What Brain shows Home. nil when the Core has no Brain (rooms cannot be read).
+    static func glance(_ s: any BrainService) async -> HomeSnapshot.BrainGlance? {
+        guard let rooms = try? await s.rooms() else { return nil }
+        let overview = try? await s.overview()
+        let candidates = try? await s.candidates()
+        let health: String
+        switch overview?.health {
+        case .needsYou: health = "Needs you"
+        case .paused: health = "Paused"
+        default: health = "Healthy"
+        }
+        return .init(
+            known: rooms.compactMap { $0.counts?.records }.reduce(0, +), rooms: rooms.count,
+            waiting: overview?.needs.map(\.n).reduce(0, +) ?? candidates?.items.count ?? 0, health: health,
+            question: candidates?.items.first.map { .init(id: $0.id, room: $0.room, text: $0.text) })
+    }
+
+    /// Keeps or drops the candidate Brain asked about.
+    func answer(_ id: String, room: String, keep: Bool) async {
+        if let s = brainService?() { try? await s.decide(id, room: room, keep ? .accept : .reject) }
+        await refresh()
     }
 
     /// `device.revoked` reads "Device revoked".

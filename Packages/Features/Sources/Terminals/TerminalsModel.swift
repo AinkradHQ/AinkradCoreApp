@@ -136,6 +136,22 @@ public final class TerminalsModel {
         runners.first { $0.id == id }.map { [.ok, .busy].contains(RunnerFacts(runner: $0).status) }
     }
 
+    /// Called after every look at the Core's terminals, so Home can refresh its Terminals widget.
+    public var changed: (@MainActor () -> Void)?
+
+    /// What the Home Terminals widget shows: the live terminals, where each runs, and the last lines of the ones this
+    /// Mac has open (the Core keeps no screen, so the others show none).
+    public func homeFacts() -> [HomeSnapshot.TerminalFact] {
+        items.filter { !$0.isEnded }.map { t in
+            let mac = t.runner == host.thisMacRunnerID
+            let lines = (sessions[t.id]?.surface.visibleText() ?? "").split(whereSeparator: \.isNewline)
+                .map { String($0.trimmingCharacters(in: .whitespaces).prefix(80)) }.filter { !$0.isEmpty }.suffix(3)
+            return .init(
+                id: t.id, name: displayName(ofTerminal: t.id) ?? t.id, place: mac ? "This Mac" : name(of: t.runner),
+                onThisMac: mac, lines: Array(lines))
+        }
+    }
+
     public func displayName(ofTerminal id: String) -> String? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
         return shell.tabNames["terminal-\(id)"] ?? name(of: item.runner)
@@ -176,6 +192,7 @@ public final class TerminalsModel {
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
             syncRunners()
             syncLauncherTerminals()
+            changed?()
         } catch { load = .failed(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription) }
     }
 

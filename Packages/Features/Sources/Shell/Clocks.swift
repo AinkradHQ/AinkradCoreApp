@@ -120,43 +120,63 @@ private struct SweepHand<Content: View>: View {
     }
 }
 
-/// The analog clock widget. Small: the dial alone. Wide: the dial with the day, date and city beside it. Large: the
-/// dial with the numbers, the day and "date · city" under it.
+/// The analog clock widget (05-widgets.js). Small: the dial alone. Medium: the dial small, the time and the date. Wide: the
+/// same with the next event on the right. Large: the dial with its numbers, the time and the date under it.
 struct AnalogClockBody: View {
     let size: WidgetSize
     @Environment(\.homeLive) private var live
+    @Environment(\.widgetPreview) private var preview
 
     var body: some View {
         switch size {
         case .s:
             AnalogDial().frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .m:
+        case .m, .w:
             HStack(spacing: Space.s4) {
                 AnalogDial()
                 day { d in
                     VStack(alignment: .leading, spacing: 2) {
-                        ClockLine(d, .dateTime.weekday(.wide), strong: true)
-                        ClockLine(d, .dateTime.day().month(.wide))
-                        Text(ClockFace.city(.current)).coreFont(size: MacTextSize.body).foregroundStyle(
-                            GlassInk.secondary)
+                        Text(timeText(d)).font(.system(size: 34, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(GlassInk.primary)
+                        ClockLine(d, .dateTime.weekday(.wide).day().month(size == .m ? .abbreviated : .wide))
                     }
                 }
+                if size == .w { next }
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        default:
+        case .l:
             VStack(spacing: Space.s3) {
                 AnalogDial(numbers: true)
                 day { d in
                     VStack(spacing: 2) {
-                        ClockLine(d, .dateTime.weekday(.wide), strong: true)
-                        Text("\(d.formatted(.dateTime.day().month(.wide))) · \(ClockFace.city(.current))")
-                            .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                        Text(timeText(d)).font(.system(size: 28, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(GlassInk.primary)
+                        ClockLine(d, .dateTime.weekday(.wide).day().month(.wide))
                     }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func timeText(_ d: Date) -> String {
+        let t = ClockFace.time(d)
+        return "\(t.hours):\(t.minutes)"
+    }
+
+    /// "Next" and the coming event, when Calendar is already allowed (the clock never asks for it).
+    @ViewBuilder private var next: some View {
+        if !preview, let e = CalendarProvider.shared.next {
+            VStack(alignment: .trailing, spacing: 0) {
+                WCaption("Next")
+                Text(e.title).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.primary)
+                    .lineLimit(1)
+                WCaption("at \(e.start.formatted(.dateTime.hour().minute()))")
+            }
+            .accessibilityElement(children: .combine)
+        }
+        Color.clear.frame(width: 0, height: 0).task { if !preview { CalendarProvider.shared.peek() } }
     }
 
     private func day<V: View>(@ViewBuilder _ content: @escaping (Date) -> V) -> some View {
@@ -199,35 +219,52 @@ struct DigitalClockBody: View {
             switch size {
             case .s:
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    time(d, 38)
-                    date(d)
+                    time(d, 44)
+                    ClockLine(d, .dateTime.weekday(.wide).day().month(.abbreviated))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            case .t:
-                VStack(alignment: .leading, spacing: 0) {
-                    digits(ClockFace.time(d).hours, 62)
-                    digits(ClockFace.time(d).minutes, 62)
-                    if prefs.showsSeconds { digits(ClockFace.time(d).seconds, 28, ink: GlassInk.secondary) }
-                    VStack(alignment: .leading, spacing: 2) {
-                        ClockLine(d, .dateTime.weekday(.wide))
-                        ClockLine(d, .dateTime.day().month(.wide))
+            case .w:
+                HStack(alignment: .top, spacing: Space.s6) {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        time(d, 44)
+                        date(d)
                     }
-                    .padding(.top, Space.s3)
+                    Spacer(minLength: 0)
+                    HStack(alignment: .top, spacing: Space.s5) {
+                        ForEach(ClockFace.places(home: .current), id: \.name) { p in
+                            let t = ClockFace.time(d, calendar: ClockFace.calendar(in: p.zone))
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(p.name).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                                Text("\(t.hours):\(t.minutes)").coreFont(size: MacTextSize.title, weight: .semibold)
+                                    .monospacedDigit().foregroundStyle(GlassInk.primary)
+                            }
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            case .l, .x:
+            case .l:
                 VStack(alignment: .leading, spacing: 0) {
                     time(d, 56)
                     date(d).padding(.top, Space.s2)
-                    places(d).padding(.top, Space.s4)
+                    weekStrip(d).padding(.top, Space.s4)
+                    places(d).padding(.top, Space.s3)
                     Spacer(minLength: 0)
                 }
                 .padding(.top, Space.s1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             case .m:
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    time(d, 44)
-                    date(d)
+                HStack(alignment: .top, spacing: Space.s4) {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        time(d, 44)
+                        date(d)
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text("UTC").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        let u = ClockFace.time(d, calendar: ClockFace.calendar(in: TimeZone(identifier: "UTC") ?? .gmt))
+                        Text("\(u.hours):\(u.minutes)").coreFont(size: MacTextSize.title, weight: .semibold)
+                            .monospacedDigit().foregroundStyle(GlassInk.primary)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
@@ -264,6 +301,27 @@ struct DigitalClockBody: View {
     }
 
     /// Home and UTC, one row each: name (and "home"), the time at the right.
+    /// This week, Monday first, today marked.
+    private func weekStrip(_ d: Date) -> some View {
+        let cal = Calendar.current
+        let start = cal.dateInterval(of: .weekOfYear, for: d)?.start ?? d
+        return HStack(spacing: Space.s1) {
+            ForEach(0..<7, id: \.self) { i in
+                let day = cal.date(byAdding: .day, value: i, to: start) ?? start
+                let today = cal.isDate(day, inSameDayAs: d)
+                VStack(spacing: 0) {
+                    Text(day.formatted(.dateTime.weekday(.abbreviated))).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary)
+                    Text(day.formatted(.dateTime.day())).coreFont(size: MacTextSize.body, weight: .semibold)
+                        .foregroundStyle(today ? GlassInk.blue : GlassInk.primary)
+                }
+                .frame(maxWidth: .infinity)
+                .background(today ? GlassInk.wellEdge : .clear, in: coreShape(Radius.control))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
     private func places(_ d: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(ClockFace.places(home: .current), id: \.name) { p in

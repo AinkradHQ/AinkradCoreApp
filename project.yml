@@ -100,6 +100,9 @@ targets:
         # Dictation in the AI session composer: macOS asks the first time the person presses the mic, with these sentences.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Ainkrad listens only while you dictate a message in an AI session.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Ainkrad turns your speech into text on this Mac when you dictate a message. Nothing is sent out.
+        # Weather and Calendar widgets: macOS asks only when the widget first shows on Home.
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Ainkrad uses your rough location only for the Weather widget, and sends nothing more precise than about 10 km.
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: Ainkrad reads your events only to show them in the Calendar widget.
         CODE_SIGN_ENTITLEMENTS: App/Mac/Ainkrad.entitlements
 
   AinkradCoreMacUITests:
