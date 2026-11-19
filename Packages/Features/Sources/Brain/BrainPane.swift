@@ -5,6 +5,7 @@ import SwiftUI
 /// the tab below. Overview and Checks are global; the room picker sits inside Rooms, Inbox and Activity,
 /// the tabs that look at one room. The keyboard drives it: ⌘1 to ⌘5 tabs, ⌘N a new room, ⌥⌘N the advanced sheet, Esc back.
 struct BrainPane: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     @FocusState private var paneFocus: Bool
 
@@ -86,18 +87,18 @@ struct BrainPane: View {
             SyncNowTile(sync: sync)
         } else if model.service?.importRoutes != nil, model.load == .ready, model.setup != .ready || model.rooms.isEmpty
         {
-            AppActionTile(title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.blue) {
+            AppActionTile(title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.accent(paneAccent)) {
                 model.openImport()
             }
         }
         if model.currentTab == .rooms, model.load == .ready, model.canMakeRooms {
             AppActionTile(
-                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)
             ) {
                 BrainSheets.openNewRoom(model)
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
-            AppActionTile(title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 Task { await model.quickRoom() }
             }
             .keyboardShortcut("n", modifiers: .command)

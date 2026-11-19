@@ -109,6 +109,7 @@ struct NewTerminalView: View {
 
 /// A runner to pick: its picture coloured by state, name, architecture, work slots, and why it can't be picked.
 private struct RunnerTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     let runner: RunnerItem
@@ -136,7 +137,7 @@ private struct RunnerTile: View {
                         Text(runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         Spacer()
                         Image(systemName: on ? "checkmark.square.fill" : "square").foregroundStyle(
-                            on ? GlassInk.blue : GlassInk.track
+                            on ? GlassInk.accent(paneAccent) : GlassInk.track
                         )
                         .contentTransition(.symbolEffect(.replace))
                     }
@@ -173,9 +174,10 @@ private struct RunnerTile: View {
 
 /// A terminal cursor that blinks (opacity, so it stays under Reduce Motion).
 private struct BlinkingCursor: View {
+    @Environment(\.coreAccent) private var paneAccent
     @State private var on = true
     var body: some View {
-        Rectangle().fill(GlassInk.blue).frame(width: 9, height: 18)
+        Rectangle().fill(GlassInk.accent(paneAccent)).frame(width: 9, height: 18)
             .opacity(on ? 1 : 0.15)
             .coreLoop(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
             .onAppear { on = false }

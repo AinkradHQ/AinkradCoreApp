@@ -284,6 +284,7 @@ private struct GroupMenu: View {
 /// used and its sealed size. The selected row is lit and shows its three actions in place of the last two columns; the
 /// context menu has them too.
 private struct SecretRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let admin: AdminModel
     let model: SecretsModel
     let secret: SecretItem
@@ -298,7 +299,7 @@ private struct SecretRow: View {
         let shape = coreShape(Radius.row)
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(spacing: Space.s3) {
-                IconTile(kind.symbol, hue: names.isEmpty ? GlassInk.slate : GlassInk.blue, size: SecretColumn.tile)
+                IconTile(kind.symbol, hue: names.isEmpty ? GlassInk.slate : GlassInk.accent(paneAccent), size: SecretColumn.tile)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(secret.name).coreFont(size: MacTextSize.body, weight: .medium)
                         .lineLimit(1).truncationMode(.middle)

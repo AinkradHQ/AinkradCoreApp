@@ -462,7 +462,7 @@ public final class BrainModel {
         // The top bar's Brain dropdown: a Core with API minor 95 tells what it does now, the five areas and what it learned
         // today; an older one says how things are in Rooms and Records.
         shell.brainRefresh = { [weak self] in await self?.refreshGlance() }
-        shell.brainOpenArea = { [weak self] _ in self?.show(.overview) }  // ponytail: E9's area pages take the area at merge
+        shell.brainOpenArea = { [weak self] area in self?.show(BrainAreaLink.tab(for: area)) }
         shell.brainUndoLearned = { [weak self] in self?.undoLearned() }
         shell.brainGlance = { [weak self] in
             guard let self, self.service != nil else { return nil }

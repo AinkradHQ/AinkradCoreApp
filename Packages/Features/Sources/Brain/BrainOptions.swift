@@ -26,11 +26,12 @@ import SwiftUI
 }
 
 struct BrainLearningSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let settings: AISettings
     let options = BrainOptions.options
 
     var body: some View {
-        GlassSection("Learning", sub: "How Brain looks after your notes", symbol: "sparkles", hue: GlassInk.blue) {
+        GlassSection("Learning", sub: "How Brain looks after your notes", symbol: "sparkles", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 if settings.load == .ready {
                     OptionSwitchRow(

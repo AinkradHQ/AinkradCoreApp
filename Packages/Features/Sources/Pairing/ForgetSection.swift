@@ -4,12 +4,13 @@ import SwiftUI
 /// Settings → Core → Forget this Core: what forgetting does, as three plain facts, and the one action (it asks again before
 /// anything happens). Wipes this Mac's keys for the Core and returns to the Connect screen.
 struct ForgetSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var app: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(spacing: Space.s4) {
-                IconTile("link.badge.plus", hue: GlassInk.blue, size: 56)
+                IconTile("link.badge.plus", hue: GlassInk.accent(paneAccent), size: 56)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
                         app.service == nil
@@ -29,8 +30,8 @@ struct ForgetSection: View {
             .coreWell()
             HStack(alignment: .top, spacing: Space.s3) {
                 fact("key.slash", GlassInk.red, "This Mac's keys", "Deleted from this Mac.")
-                fact("qrcode", GlassInk.blue, "To come back", "A new pairing code from an admin device.")
-                fact("externaldrive.badge.checkmark", GlassInk.blue, "Your Core and its data", "Not touched.")
+                fact("qrcode", GlassInk.accent(paneAccent), "To come back", "A new pairing code from an admin device.")
+                fact("externaldrive.badge.checkmark", GlassInk.accent(paneAccent), "Your Core and its data", "Not touched.")
             }
             .fixedSize(horizontal: false, vertical: true)
         }

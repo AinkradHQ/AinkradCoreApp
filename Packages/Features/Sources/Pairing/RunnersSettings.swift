@@ -6,10 +6,11 @@ import SwiftUI
 /// automatically" is the Core's automatic-update setting (the one on Core, Updates), and "Use this Mac as a runner" is the
 /// This Mac switch of Devices & Runners.
 struct RunnersOptionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
 
     var body: some View {
-        GlassSection("Runners", sub: "The machines that do the work for your Core", symbol: "server.rack", hue: GlassInk.blue) {
+        GlassSection("Runners", sub: "The machines that do the work for your Core", symbol: "server.rack", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 if app.shell.corePage.supported {
                     OptionSwitchRow(

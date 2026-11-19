@@ -102,6 +102,7 @@ struct RunnerSummary: View {
 
 /// One runner on one line: name and what it is doing, the tools it has, its state, and the way into its page.
 struct RunnerRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     let runner: RunnerItem
     @Environment(\.corePalette) private var palette
@@ -118,7 +119,7 @@ struct RunnerRow: View {
         } label: {
             HStack(spacing: Space.s3) {
                 IconTile(
-                    mine ? "laptopcomputer" : "server.rack", hue: bucket == .offline ? GlassInk.slate : GlassInk.blue,
+                    mine ? "laptopcomputer" : "server.rack", hue: bucket == .offline ? GlassInk.slate : GlassInk.accent(paneAccent),
                     size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: Space.s2) {

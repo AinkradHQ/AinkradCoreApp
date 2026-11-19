@@ -4,11 +4,12 @@ import SwiftUI
 
 /// The harness as a rounded tile: blue, with its symbol. (A tile, not a circle: rounded rectangles only.)
 struct AgentMark: View {
+    @Environment(\.coreAccent) private var paneAccent
     let harness: String
     var size: CGFloat = MacSize.controlLg
     @Environment(\.corePalette) private var palette
     var body: some View {
-        IconTile(AgentsModel.harnessSymbol(harness), hue: GlassInk.blue, size: size)
+        IconTile(AgentsModel.harnessSymbol(harness), hue: GlassInk.accent(paneAccent), size: size)
             .accessibilityHidden(true)
     }
 }

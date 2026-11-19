@@ -23,12 +23,13 @@ struct AccHeader<Action: View>: View {
     let title: String
     let detail: String
     var symbol = "creditcard"
-    var hue = GlassInk.blue
+    var hue: Color?
+    @Environment(\.coreAccent) private var paneAccent
     @ViewBuilder let action: Action
     @State private var shown = false
     var body: some View {
         HStack(alignment: .center, spacing: Space.s3) {
-            IconTile(symbol, hue: hue, size: 48, bounce: shown)
+            IconTile(symbol, hue: hue ?? GlassInk.accent(paneAccent), size: 48, bounce: shown)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
                     .contentTransition(.numericText())
@@ -94,6 +95,7 @@ struct AccIssue: View {
 
 /// A state that replaces a page: a bouncing icon tile in its tone, a title, the words and what to do about it.
 struct AccStateCard<Actions: View>: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let title: String
     let text: String
@@ -102,7 +104,7 @@ struct AccStateCard<Actions: View>: View {
     @ViewBuilder let actions: Actions
     @State private var shown = false
     var body: some View {
-        let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.amber : GlassInk.blue
+        let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.amber : GlassInk.accent(paneAccent)
         VStack(spacing: Space.s3) {
             IconTile(symbol, hue: hue, size: 64, bounce: shown)
                 .coreScaleEffect(shown ? 1 : 0.6)
@@ -177,13 +179,14 @@ struct AccNotice: View {
 /// Where your Core stands on keeping account keys, in plain words and as three steps (Off, Test keys, Real keys) with
 /// the current one lit, and the way to change it. The settings' own names are in the hover help.
 struct GateBanner: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     @State private var shown = false
 
     var body: some View {
         let g = model.gate
         if g.kind != .real {
-            let hue = g.kind == .off ? GlassInk.slate : g.kind == .throwaway ? GlassInk.blue : GlassInk.slate
+            let hue = g.kind == .off ? GlassInk.slate : g.kind == .throwaway ? GlassInk.accent(paneAccent) : GlassInk.slate
             HStack(alignment: .center, spacing: Space.s4) {
                 IconTile(
                     g.kind == .off ? "lock.fill" : g.kind == .throwaway ? "testtube.2" : "questionmark", hue: hue,

@@ -109,6 +109,7 @@ extension AccountDialogs {
 /// kind: how many sessions at once, what one session may spend, the budget for a period, and the usage windows. Reading
 /// usage needs `admin` like the usage it comes from, so a device without it sees one line saying so.
 struct AccountLimitsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let account: AccountItem
     let hue: Color
@@ -194,7 +195,7 @@ struct AccountLimitsSection: View {
             switch l.standing {
             case .reached: GlassInk.red
             case .warning: GlassInk.amber
-            case .fine: GlassInk.blue
+            case .fine: GlassInk.accent(paneAccent)
             }
         let ink: Color =
             switch l.standing {

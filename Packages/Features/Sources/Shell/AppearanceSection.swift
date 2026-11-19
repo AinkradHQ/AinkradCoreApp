@@ -5,6 +5,7 @@ import SwiftUI
 /// Settings, Mac, Appearance (Ahmed, 2026-11-05: visual, plain words, keyboard driven): the four themes as big sky tiles,
 /// what is showing right now, and one line about motion. ← → choose a theme.
 struct AppearanceSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Bindable private var look = LookPrefs.shared
     /// Advanced: each part's own Look. Open by default once a part has one.
@@ -44,7 +45,7 @@ struct AppearanceSection: View {
             } else {
                 GlassSection(
                     group.title, sub: "Behind every window. Each one has a night and a day version.", symbol: "photo",
-                    hue: GlassInk.blue, index: 2
+                    hue: GlassInk.accent(paneAccent), index: 2
                 ) {
                     LazyVGrid(
                         columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),
@@ -74,7 +75,7 @@ struct AppearanceSection: View {
     /// the app from the one picture.
     private var picturePage: some View {
         GlassSection(
-            "Your picture", sub: "Drop a picture here, or choose one from your Mac.", symbol: "photo", hue: GlassInk.blue,
+            "Your picture", sub: "Drop a picture here, or choose one from your Mac.", symbol: "photo", hue: GlassInk.accent(paneAccent),
             index: 2
         ) {
             AppActionTile(
@@ -107,7 +108,7 @@ struct AppearanceSection: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
                 "Theme", sub: "Night or day for every window.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.blue
+                hue: GlassInk.accent(paneAccent)
             ) {
                 Text(now).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                     .contentTransition(.opacity)
@@ -120,7 +121,7 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Accent", sub: "Selection, the main button and switches. Status colours stay as they are.",
-                symbol: "paintbrush", hue: GlassInk.blue, index: 1
+                symbol: "paintbrush", hue: GlassInk.accent(paneAccent), index: 1
             ) {
                 Text(accent.accent.title).coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
@@ -138,7 +139,7 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Text size", sub: "How large the words are in every window. 100% is the usual size.",
-                symbol: "textformat.size", hue: GlassInk.blue, index: 3
+                symbol: "textformat.size", hue: GlassInk.accent(paneAccent), index: 3
             ) {
                 Text(textSize.scale.formatted(.percent.precision(.fractionLength(0))))
                     .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
@@ -150,7 +151,7 @@ struct AppearanceSection: View {
             }
             GlassSection(
                 "Content background", sub: "Inside every pane, dialog, pop-up and menu. An app can set its own.",
-                symbol: "square.on.square", hue: GlassInk.blue, index: 4
+                symbol: "square.on.square", hue: GlassInk.accent(paneAccent), index: 4
             ) {
                 SurfaceModeTabs(mode: $look.mode)
             } content: {
@@ -306,6 +307,7 @@ private struct AccentTile: View {
 
 /// One theme as a sky tile with its name and a line under it; the chosen one carries a blue edge and a check.
 private struct ThemeTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let choice: ThemeChoice
     let selected: Bool
     let action: () -> Void
@@ -323,7 +325,7 @@ private struct ThemeTile: View {
                             Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(
                                 .white
                             )
-                            .frame(width: 24, height: 24).background(GlassInk.blue, in: coreShape(Radius.chip))
+                            .frame(width: 24, height: 24).background(GlassInk.accent(paneAccent), in: coreShape(Radius.chip))
                             .padding(Space.s2).transition(.scale.combined(with: .opacity))
                         }
                     }
@@ -383,6 +385,7 @@ private struct ThemeTile: View {
 /// One part in Appearance, Advanced: its name, Same (follows the content background) or its own look, and a slider when
 /// it has its own.
 private struct LookPartRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let part: LookPart
     @Bindable var prefs: LookPrefs
 
@@ -390,7 +393,7 @@ private struct LookPartRow: View {
         let own = prefs.custom[part]
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s3) {
-                IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.blue, size: 28)
+                IconTile(part.symbol, hue: own == nil ? GlassInk.slate : GlassInk.accent(paneAccent), size: 28)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(part.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Text(part.sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

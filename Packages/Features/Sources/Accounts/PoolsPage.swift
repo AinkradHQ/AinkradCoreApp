@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Pools: a pool is a team of one provider's accounts. Members are tried in fallback order; the Core only appends to it.
 struct PoolsPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     @Namespace private var lens
 
@@ -12,7 +13,7 @@ struct PoolsPage: View {
                 title: "Pools",
                 detail:
                     "A pool is a team of accounts from one provider. AI sessions share it, and Core picks who works next.",
-                symbol: "square.grid.2x2.fill", hue: GlassInk.blue
+                symbol: "square.grid.2x2.fill", hue: GlassInk.accent(paneAccent)
             ) { EmptyView() }
             if model.pools.isEmpty {
                 AccStateCard(
@@ -99,6 +100,7 @@ private struct PoolTab: View {
 }
 
 private struct PoolDetail: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let pool: PoolItem
 
@@ -124,7 +126,7 @@ private struct PoolDetail: View {
                 }
                 Spacer(minLength: Space.s2)
                 if !pool.isDefault {
-                    AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.blue) {
+                    AppActionTile(title: "Make default", symbol: "star", key: "D", hue: GlassInk.accent(paneAccent)) {
                         Task { await model.makeDefault(pool) }
                     }
                     .disabled(ro || model.busy != nil)
@@ -167,6 +169,7 @@ private struct PoolDetail: View {
 /// One member in fallback order: its place as a numbered tile (glowing for the one tried first), its provider tile, its
 /// state, and a remove action. The keyboard's cursor glows.
 private struct MemberRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let pool: PoolItem
     let index: Int
@@ -188,7 +191,7 @@ private struct MemberRow: View {
                 Text(a?.label ?? "Account \(id)").coreFont(size: MacTextSize.headline, weight: .semibold)
                     .lineLimit(1)
                 Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(first ? GlassInk.blueInk : GlassInk.secondary)
+                    .foregroundStyle(first ? GlassInk.accent(paneAccent)Ink : GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let a { VerdictBadge(verdict: model.verdict(a)) }

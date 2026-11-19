@@ -4,6 +4,7 @@ import SwiftUI
 /// Costs and usage: three figures for the window (spend, tokens, messages), a note when tokens had no price, then accounts
 /// ranked by spend with a bar each, and the same by company. The window is the choice at the top right of the figures.
 struct CostsPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AccountsModel
     @State private var window = SpendWindow.sevenDays
 
@@ -35,9 +36,9 @@ struct CostsPage: View {
             .fixedSize()
         }
         HStack(spacing: Space.s3) {
-            figure("Spent", CostWords.usd(total.costMicros), "dollarsign.circle.fill", GlassInk.blue)
-            figure("Tokens", CostWords.tokens(total.tokens), "text.word.spacing", GlassInk.blue)
-            figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.blue)
+            figure("Spent", CostWords.usd(total.costMicros), "dollarsign.circle.fill", GlassInk.accent(paneAccent))
+            figure("Tokens", CostWords.tokens(total.tokens), "text.word.spacing", GlassInk.accent(paneAccent))
+            figure("Messages", total.messages.formatted(), "bubble.left.and.bubble.right.fill", GlassInk.accent(paneAccent))
         }
         if model.unpricedTokens > 0 { unpriced }
         if model.usage.isEmpty {
@@ -84,7 +85,7 @@ struct CostsPage: View {
         let top = max(1, rows.first.map { window.of($0).costMicros } ?? 1)
         return GlassSection(
             "By account", sub: "Ranked by spend, \(window.rawValue.lowercased())", symbol: "creditcard.fill",
-            hue: GlassInk.blue
+            hue: GlassInk.accent(paneAccent)
         ) {
             VStack(spacing: Space.s2) {
                 ForEach(rows, id: \.accountID) { u in
@@ -101,13 +102,13 @@ struct CostsPage: View {
         if !all.isEmpty {
             let top = max(1, all.first?.1.costMicros ?? 1)
             GlassSection(
-                "By company", sub: "Who the spend was for", symbol: "building.2.fill", hue: GlassInk.blue, index: 1
+                "By company", sub: "Who the spend was for", symbol: "building.2.fill", hue: GlassInk.accent(paneAccent), index: 1
             ) {
                 VStack(spacing: Space.s2) {
                     ForEach(all, id: \.0) { c, w in
                         SpendBarRow(
                             title: c, sub: "\(CostWords.tokens(w.tokens)) tokens", value: CostWords.usd(w.costMicros),
-                            share: Double(w.costMicros) / Double(top), hue: GlassInk.blue, symbol: "building.2")
+                            share: Double(w.costMicros) / Double(top), hue: GlassInk.accent(paneAccent), symbol: "building.2")
                     }
                 }
             }
@@ -118,6 +119,7 @@ struct CostsPage: View {
 /// An account's spend in the window as a bar against the top spender, its tokens and messages, and how close its tightest
 /// provider limit is.
 private struct AccountSpendRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let usage: UsageItem
     let window: SpendWindow
@@ -135,7 +137,7 @@ private struct AccountSpendRow: View {
             title: model.label(ofAccount: usage.accountID),
             sub: "\(CostWords.tokens(w.tokens)) tokens · \(w.messages.formatted()) messages\(limit)\(drops)",
             value: CostWords.usd(w.costMicros), share: Double(w.costMicros) / Double(top),
-            hue: GlassInk.blue, symbol: "creditcard",
+            hue: GlassInk.accent(paneAccent), symbol: "creditcard",
             warn: usage.limitsExhausted || usage.limitShare >= 0.8 || usage.drops > 0
         )
         .contentShape(coreShape(Radius.cardMac))

@@ -51,12 +51,13 @@ struct QuickCaptureView: View {
 
 /// Settings, Apps, Lore: the one Lore setting, the quick capture shortcut.
 struct LoreSettingsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var capture: QuickCapture
 
     var body: some View {
         GlassSection(
             "Quick capture", sub: "A small panel over any app. Return adds to today's note.",
-            symbol: "square.and.pencil", hue: GlassInk.blue
+            symbol: "square.and.pencil", hue: GlassInk.accent(paneAccent)
         ) {
             ShortcutField(shortcut: $capture.shortcut)
         } content: {

@@ -3,6 +3,7 @@ import SwiftUI
 
 /// The Connections pane (CN1, CN6): page tiles and the Connect action in the header, the page, status chips at the foot.
 struct ConnectionsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     @FocusState private var paneFocus: Bool
 
@@ -16,7 +17,7 @@ struct ConnectionsView: View {
             AppHeader {
                 AppFilterTile(title: "Connections", count: model.items.count, on: true, key: "") {}
             } actions: {
-                AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+                AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                     ConnDialogs.openConnect(model, kind: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
@@ -95,7 +96,7 @@ struct ConnectionsView: View {
                     symbol: "exclamationmark.triangle", title: "Couldn't load connections",
                     text: "Your Core didn't answer. Nothing was changed.", tone: .fail
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                         Task { await model.reload() }
                     }
                 }
@@ -106,6 +107,7 @@ struct ConnectionsView: View {
 
 /// CN1: one section per kind with its connections as cards, or the empty state.
 struct ConnListPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     private let columns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
 
@@ -168,7 +170,7 @@ struct ConnListPage: View {
             HStack(spacing: Space.s2) {
                 ForEach(model.liveKinds) { k in
                     AppActionTile(
-                        title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.blue,
+                        title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.accent(paneAccent),
                         prominent: true
                     ) { ConnDialogs.openConnect(model, kind: k.id) }
                 }

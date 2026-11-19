@@ -21,10 +21,11 @@ import SwiftUI
 }
 
 struct ConnectionsOptionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let options = ConnectionsOptions.options
 
     var body: some View {
-        GlassSection("Sign-ins", sub: "While Ainkrad is open", symbol: "link", hue: GlassInk.blue) {
+        GlassSection("Sign-ins", sub: "While Ainkrad is open", symbol: "link", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 OptionSwitchRow(
                     "Reconnect automatically", sub: "Try a sign-in that stopped working again at each check",

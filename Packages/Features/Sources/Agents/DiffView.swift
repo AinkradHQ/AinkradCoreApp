@@ -34,6 +34,7 @@ enum DiffLines {
 /// An edit as a diff (Ahmed, 2026-11-15: no pill per line): one block, each line a full-width band with a quiet tint, its
 /// number and a + or − sign (the meaning never rests on colour alone). Long lines wrap; long diffs fold after `fold` lines.
 struct DiffBlock: View {
+    @Environment(\.coreAccent) private var paneAccent
     let lines: [DiffLine]
     static let fold = 14
     @State private var all = false
@@ -70,7 +71,7 @@ struct DiffBlock: View {
             }
             if lines.count > Self.fold {
                 Button(all ? "Show less" : "Show \(lines.count - Self.fold) more lines") { all.toggle() }
-                    .buttonStyle(.plain).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.blueInk)
+                    .buttonStyle(.plain).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.accent(paneAccent)Ink)
                     .padding(Space.s2)
             }
         }

@@ -302,6 +302,7 @@ private struct AdvancedRow: View {
 }
 
 private struct EmptyAccounts: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     var body: some View {
         AccStateCard(
@@ -309,7 +310,7 @@ private struct EmptyAccounts: View {
             text:
                 "Add your first account to let AI sessions work. It gets a monthly limit of $20 and a place in the order for you."
         ) {
-            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 AccountDialogs.openConnect(model, provider: nil)
             }
             .disabled(model.readOnly)
@@ -320,6 +321,7 @@ private struct EmptyAccounts: View {
 
 /// The Connections tab: the same page as the Connections pane, inside Accounts.
 struct ConnectionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     var body: some View {
         Group {
@@ -336,7 +338,7 @@ struct ConnectionsTab: View {
                         symbol: "exclamationmark.triangle", title: "Couldn't load connections",
                         text: "Your Core didn't answer. Nothing was changed.", tone: .fail
                     ) {
-                        AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                        AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                             Task { await model.reload() }
                         }
                     }

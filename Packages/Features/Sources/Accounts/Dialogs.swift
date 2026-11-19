@@ -151,6 +151,7 @@ private struct CapDialog: View {
 }
 
 private struct NewPoolDialog: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let close: () -> Void
     @State private var name = ""
@@ -169,7 +170,7 @@ private struct NewPoolDialog: View {
                     ForEach(ProviderLook.ordered(model.providers)) { p in
                         AccPick(
                             title: p.name, sub: p.loginMethods.contains("browser_code") ? "Subscription" : "API key",
-                            symbol: ProviderLook.symbol(p.id), hue: GlassInk.blue, on: p.id == chosen
+                            symbol: ProviderLook.symbol(p.id), hue: GlassInk.accent(paneAccent), on: p.id == chosen
                         ) { provider = p.id }
                     }
                 }
@@ -282,6 +283,7 @@ private struct AddMemberDialog: View {
 
 /// Settings, Core: a way into the Core app.
 struct AccountsLinkSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     var part: SettingsPart = .all
     var body: some View {
@@ -292,10 +294,10 @@ struct AccountsLinkSection: View {
             if part.showsOptions {
                 GlassSection(
                     "The Core app", sub: "Accounts, pools and chains, shared by AI sessions, Citadel and every device.",
-                    symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
+                    symbol: "creditcard.fill", hue: GlassInk.accent(paneAccent), index: 1
                 ) {
                     AppActionTile(
-                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent), prominent: true
                     ) {
                         model.host.shell.overlay = nil
                         model.show(.accounts)

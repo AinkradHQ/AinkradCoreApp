@@ -5,6 +5,7 @@ import SwiftUI
 /// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S running command, R rename, ⌥⌘N new.
 /// The Core keeps no output, so a tile shows the shell, not its screen.
 struct TerminalsListView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable private var prefs = TerminalPrefs.shared
     @FocusState private var listFocus: Bool
@@ -32,7 +33,7 @@ struct TerminalsListView: View {
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
         } actions: {
-            AppActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
                 model.quickNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
@@ -125,7 +126,7 @@ struct TerminalsListView: View {
             stat("play.fill", "\(running) running", GlassInk.green)
             if ended > 0 { stat("stop.fill", "\(ended) ended", GlassInk.slate) }
             ForEach(model.runners.filter { model.onRunner($0.id) > 0 }) { r in
-                stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", GlassInk.blue)
+                stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", GlassInk.accent(paneAccent))
             }
             Spacer(minLength: 0)
             Text("↩ open · D detach · E end · S running command · R rename").coreFont(size: MacTextSize.meta)

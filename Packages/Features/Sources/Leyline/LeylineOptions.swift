@@ -61,10 +61,11 @@ import SwiftUI
 }
 
 struct LeylineOptionsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     let options = LeylineOptions.options
 
     var body: some View {
-        GlassSection("Hosts", sub: "What the gallery shows and how it moves", symbol: "server.rack", hue: GlassInk.blue) {
+        GlassSection("Hosts", sub: "What the gallery shows and how it moves", symbol: "server.rack", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 OptionSelectRow(
                     "Show on the map", sub: "Active means opened in the last 30 days; mine means added on this Mac",

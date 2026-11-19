@@ -4,6 +4,7 @@ import SwiftUI
 /// One runner's page (N18, N19): a header, then Now, What it offers, Machine, Who may use it and Actions. Plain words, no
 /// internal codes; what the Core does not report says "Not reported yet".
 struct RunnerPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: TerminalsModel
     let runner: RunnerItem
     @Environment(\.corePalette) private var palette
@@ -43,7 +44,7 @@ struct RunnerPage: View {
             BackButton("Runners") { model.runnerDetail = nil }.keyboardShortcut(.escape, modifiers: [])
             IconTile(
                 model.host.thisMacRunnerID == runner.id ? "laptopcomputer" : "server.rack",
-                hue: off ? GlassInk.slate : GlassInk.blue, size: Space.s8 - Space.s1)
+                hue: off ? GlassInk.slate : GlassInk.accent(paneAccent), size: Space.s8 - Space.s1)
             Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             if runner.builtIn { BuiltInBadge() }

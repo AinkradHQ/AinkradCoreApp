@@ -3,6 +3,7 @@ import SwiftUI
 
 /// A memory waiting for you. Keys on the focused card: ⌘↩ approve, ⌘⌫ reject, E edit, up and down move.
 struct CandidateCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     let c: Candidate
     let approve: () -> Void
@@ -13,7 +14,7 @@ struct CandidateCard: View {
     var body: some View {
         let busy = model.busy != nil
         InboxCardFrame(edge: c.flag == nil ? nil : GlassInk.red) {
-            CardHeader(chip: c.type.label, hue: GlassInk.blue, title: c.title, age: c.age)
+            CardHeader(chip: c.type.label, hue: GlassInk.accent(paneAccent), title: c.title, age: c.age)
             QuotedText(text: c.text)
             HStack(spacing: Space.s2) {
                 SourceBadge(source: c.source)
@@ -48,6 +49,7 @@ struct CandidateCard: View {
 
 /// Two memories in one room that disagree, side by side.
 struct ConflictCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     let c: Conflict
     let keep: (ConflictChoice) -> Void
@@ -55,7 +57,7 @@ struct ConflictCard: View {
     var body: some View {
         let busy = model.busy != nil
         InboxCardFrame {
-            CardHeader(chip: "Conflict", hue: GlassInk.blue, title: c.title, age: c.age)
+            CardHeader(chip: "Conflict", hue: GlassInk.accent(paneAccent), title: c.title, age: c.age)
             if model.inboxState.later.contains(c.id) {
                 InboxNote("bell", GlassInk.slate, "Asked again later. It stays here and in the bell.")
             }

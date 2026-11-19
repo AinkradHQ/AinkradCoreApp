@@ -107,6 +107,7 @@ extension AccountsModel {
 
 /// Add or change your own provider. Once accounts use it, how it speaks and its key prefix are fixed.
 struct ProviderDialog: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let editing: ProviderItem?
     let close: () -> Void
@@ -156,7 +157,7 @@ struct ProviderDialog: View {
                     ForEach(ProviderRules.wires, id: \.harness) { w in
                         AccPick(
                             title: w.title, sub: w.sub, symbol: "point.3.connected.trianglepath.dotted",
-                            hue: GlassInk.blue, on: harness == w.harness, enabled: !frozen || harness == w.harness
+                            hue: GlassInk.accent(paneAccent), on: harness == w.harness, enabled: !frozen || harness == w.harness
                         ) { harness = w.harness }
                     }
                 }
@@ -224,7 +225,7 @@ struct ProviderDialog: View {
                             ? "Already listed." : ProviderRules.modelIssue(newModel),
                     mono: true
                 ) { add() }
-                AppActionTile(title: "Add model", symbol: "plus", key: "", hue: GlassInk.blue) { add() }
+                AppActionTile(title: "Add model", symbol: "plus", key: "", hue: GlassInk.accent(paneAccent)) { add() }
                     .disabled(ProviderRules.modelIssue(newModel) != nil || models.contains { $0.id == newModel })
             }
         }

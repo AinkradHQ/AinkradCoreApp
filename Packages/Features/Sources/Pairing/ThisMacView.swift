@@ -205,6 +205,7 @@ private struct ToolPill: View {
 
 /// The About tab (mockup 12): the Core's name and version, what it runs on, and a check for updates.
 struct AboutTabView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     @State private var checking = false
     @Environment(\.corePalette) private var palette
@@ -215,7 +216,7 @@ struct AboutTabView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             VStack(spacing: Space.s2) {
-                IconTile("server.rack", hue: GlassInk.blue, size: 64)
+                IconTile("server.rack", hue: GlassInk.accent(paneAccent), size: 64)
                 Text("Ainkrad Core").coreFont(size: MacTextSize.title, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
                 Text(version.map { "Version \($0)" } ?? "Version not reported yet").foregroundStyle(palette.text2)

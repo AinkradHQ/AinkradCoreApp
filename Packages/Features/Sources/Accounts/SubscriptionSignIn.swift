@@ -5,6 +5,7 @@ import SwiftUI
 /// browser opens claude.ai, you paste the short code Claude shows, and the account appears. The app never sees a
 /// token: the runner hands it straight to Core. Every stage is keyboard driven (↩ goes on, esc stops).
 struct SubscriptionSignIn: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let provider: ProviderItem
     let close: () -> Void
@@ -17,7 +18,7 @@ struct SubscriptionSignIn: View {
     @FocusState private var codeFocus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    private var hue: Color { GlassInk.blue }
+    private var hue: Color { GlassInk.accent(paneAccent) }
     private var labelOK: Bool { label.range(of: "^[a-z][a-z0-9._-]{0,63}$", options: .regularExpression) != nil }
 
     var body: some View {
@@ -111,7 +112,7 @@ struct SubscriptionSignIn: View {
             numbered(2, "Paste the code Claude shows you", "It's a short code, not a password.") {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "doc.on.clipboard").foregroundStyle(
-                        codeFocus ? GlassInk.blueInk : GlassInk.secondary)
+                        codeFocus ? GlassInk.accent(paneAccent)Ink : GlassInk.secondary)
                     TextField("Paste the code here", text: $code).textFieldStyle(.plain)
                         .coreFont(size: MacTextSize.title, design: .monospaced).focused($codeFocus)
                         .autocorrectionDisabled().onSubmit(send)

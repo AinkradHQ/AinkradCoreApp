@@ -4,6 +4,7 @@ import SwiftUI
 /// Settings, Terminal: a live preview on top, then theme, font, cursor and background. Changes apply to every open
 /// terminal at once.
 struct TerminalSettingsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var prefs = TerminalPrefs.shared
     /// Read live: the section is built once, before the runners arrive.
     weak var model: TerminalsModel?
@@ -15,7 +16,7 @@ struct TerminalSettingsView: View {
             if part.showsLook {
                 TerminalPreview(prefs: prefs).coreRise(true, 0)
                 GlassSection(
-                    "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.blue, index: 1
+                    "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.accent(paneAccent), index: 1
                 ) {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
                         ForEach(TermTheme.all) { t in
@@ -23,7 +24,7 @@ struct TerminalSettingsView: View {
                         }
                     }
                 }
-                GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.blue, index: 2) {
+                GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.accent(paneAccent), index: 2) {
                     HStack(spacing: Space.s3) {
                         CoreSelect(
                             nil, selection: $prefs.fontName,
@@ -41,7 +42,7 @@ struct TerminalSettingsView: View {
                     }
                 }
                 GlassSection(
-                    "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.blue,
+                    "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.accent(paneAccent),
                     index: 3
                 ) {
                     GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
@@ -58,7 +59,7 @@ struct TerminalSettingsView: View {
                 TerminalBasicsSection(prefs: prefs)
                 GlassSection(
                     "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
-                    hue: GlassInk.blue, index: 5
+                    hue: GlassInk.accent(paneAccent), index: 5
                 ) {
                     SettingRow("Runner", symbol: "server.rack") {
                         CoreSegmented(
@@ -126,6 +127,7 @@ private struct TerminalPreview: View {
 }
 
 private struct ThemeTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let theme: TermTheme
     let on: Bool
     let lens: Namespace.ID
@@ -151,7 +153,7 @@ private struct ThemeTile: View {
                     Text(theme.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Spacer()
                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(on ? GlassInk.blue : GlassInk.track).contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(on ? GlassInk.accent(paneAccent) : GlassInk.track).contentTransition(.symbolEffect(.replace))
                 }
             }
             .padding(Space.s2)
@@ -175,6 +177,7 @@ private struct ThemeTile: View {
 }
 
 private struct CursorTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let shape: TerminalPrefs.CursorShape
     let on: Bool
     let blink: Bool
@@ -183,7 +186,7 @@ private struct CursorTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
-                PreviewCursor(shape: shape, blink: blink && on, color: on ? GlassInk.blue : GlassInk.primary, size: 18)
+                PreviewCursor(shape: shape, blink: blink && on, color: on ? GlassInk.accent(paneAccent) : GlassInk.primary, size: 18)
                     .frame(height: 24)
                 Text(shape.rawValue.capitalized).coreFont(size: MacTextSize.meta, weight: .medium)
             }
