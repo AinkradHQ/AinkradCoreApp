@@ -14,6 +14,8 @@ struct LoginItem: Equatable, Sendable {
     let url: String?
     let reason: String?
     let accountID: Int64?
+    /// A device code to type on the provider's page (E7-4); nil for a sign-in that has none.
+    var code: String? = nil
 }
 
 /// The sign-in sheet's stages.
@@ -31,6 +33,9 @@ struct SignInFlow: Equatable {
     var label: String
     var opened = false
     var codeError: String?
+    /// The provider the sign-in is for, and the device code the Core gave it, if any.
+    var provider = ""
+    var deviceCode: String?
 }
 
 extension AccountsModel {
@@ -38,6 +43,7 @@ extension AccountsModel {
     func startSignIn(provider: String, label: String, runner: String? = nil) async {
         guard let service, mayWrite() else { return }
         signIn = SignInFlow(stage: .starting, label: label)
+        signIn?.provider = provider
         do {
             let l = try await host.elevated(
                 "Sign in to \(providerName(provider)) as \(label).", done: "started", keepsEdit: true
@@ -92,6 +98,10 @@ extension AccountsModel {
             try? await Task.sleep(for: .seconds(1))
             guard let service, let l = try? await service.login(id) else { continue }
             apply(l)
+            // A device code is not in the generated client's answer: read it apart, for providers that have one.
+            if signIn?.deviceCode == nil, signIn?.provider != "claude-sub", !signInEnded {
+                signIn?.deviceCode = await service.loginCode(id)
+            }
         }
         if case .done = signIn?.stage { await reload() }
     }
@@ -106,6 +116,7 @@ extension AccountsModel {
     private func apply(_ l: LoginItem) {
         guard signIn != nil else { return }
         signIn?.login = l.id
+        if let c = l.code { signIn?.deviceCode = c }
         signIn?.runner = l.runner
         switch l.state {
         case "open_url":

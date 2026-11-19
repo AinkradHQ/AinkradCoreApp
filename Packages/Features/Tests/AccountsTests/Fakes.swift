@@ -51,12 +51,35 @@ final class FakeService: AccountsService, @unchecked Sendable {
     var failure: (any Error)?
     /// What listing chains throws (a device without `admin`), apart from `failure`.
     var chainsFailure: (any Error)?
+    /// The AI order (API minor 95): off until a test turns it on.
+    var orderOn = false
+    var orderEntries: [AIOrderEntry] = []
+    var overrideList: [AIOrderOverride] = []
+    var modelsFound: Int?
     private var calls: [String] = []
     var log: [String] { lock.withLock { calls } }
     private func note(_ s: String) throws {
         lock.withLock { calls.append(s) }
         if let failure { throw failure }
     }
+    func aiOrderSupported() async -> Bool { orderOn }
+    func aiOrder() async throws -> AIOrderDoc { AIOrderDoc(items: orderEntries, overrides: overrideList) }
+    func setAIOrder(agent: String?, items: [AIOrderPut.Item]) async throws -> AIOrderDoc {
+        try note("setAIOrder \(agent ?? "-") \(items.map { String($0.account) }.joined(separator: ","))")
+        let entries = items.map { AIOrderEntry(account: $0.account, provider: nil, harness: nil, model: $0.model) }
+        if let agent {
+            overrideList.removeAll { $0.agent == agent }
+            overrideList.append(AIOrderOverride(agent: agent, items: entries))
+        } else {
+            orderEntries = entries
+        }
+        return try await aiOrder()
+    }
+    func clearAIOrder(agent: String) async throws {
+        try note("clearAIOrder \(agent)")
+        overrideList.removeAll { $0.agent == agent }
+    }
+    func modelCount(account: Int64) async -> Int? { modelsFound }
     func providers() async throws -> [ProviderItem] { providerList }
     func accounts() async throws -> [AccountItem] { accountList }
     func pools() async throws -> [PoolItem] { poolList }

@@ -73,6 +73,15 @@ protocol AccountsService: Sendable {
     /// A provider definition of your own (`admin`, Touch ID); replacing makes a new version, deleting refuses one in use.
     func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws
     func deleteProvider(_ id: String) async throws
+    // E7-1 and E7-2 (API minor 95). Hand-written wire in `AIOrder/AIOrderWire.swift`; defaults say "not supported".
+    func aiOrderSupported() async -> Bool
+    func aiOrder() async throws -> AIOrderDoc
+    func setAIOrder(agent: String?, items: [AIOrderPut.Item]) async throws -> AIOrderDoc
+    func clearAIOrder(agent: String) async throws
+    /// How many models `GET /accounts/{id}/models` lists, nil when unknown.
+    func modelCount(account: Int64) async -> Int?
+    /// The device code of a runner-bound sign-in (Codex, OpenCode, Antigravity), nil when it has none.
+    func loginCode(_ id: String) async -> String?
 }
 
 /// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).

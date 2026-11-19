@@ -26,7 +26,9 @@ enum AccountDialogs {
         advanced: Bool = false
     ) {
         present(m, "account-connect") { close in
-            if replacing == nil && flow == nil {
+            if replacing == nil && flow == nil && m.aiOrderOn {
+                AddAccountDialog(model: m, provider: provider, close: close)
+            } else if replacing == nil && flow == nil {
                 ConnectWizard(model: m, provider: provider, advanced: advanced, close: close)
             } else {
                 ConnectDialog(model: m, provider: provider, replacing: replacing, flow: flow, close: close)

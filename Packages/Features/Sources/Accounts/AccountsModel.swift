@@ -32,6 +32,15 @@ public final class AccountsModel {
     var poolSelection: Int64?
     /// A subscription sign-in in the Connect sheet, while it runs (`SignIn.swift`).
     var signIn: SignInFlow?
+    /// The AI order (E7-1), read when the Core serves API minor 95; `aiOrderOn` is false below that and the old pages show.
+    var aiOrder: AIOrderDoc?
+    var aiOrderOn = false
+    /// The accounts in the order shown. It moves first on a drag and goes back when the Core refuses.
+    var orderIDs: [Int64] = []
+    /// The Advanced disclosure of the AI order surface.
+    var advancedOpen = false
+    var advancedTab: AdvancedTab = .limits
+    var limitsAccount: Int64?
     /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
     var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
@@ -100,6 +109,9 @@ public final class AccountsModel {
         readOnly = false
         detail = nil
         signIn = nil
+        aiOrder = nil
+        aiOrderOn = false
+        orderIDs = []
         usage = []
         limitsLoad = .loading
     }
@@ -164,6 +176,7 @@ public final class AccountsModel {
             (providers, accounts, pools) = try await (p, a, o)
             load = .ready
             await reloadChains(service)
+            await reloadAIOrder(service)
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
         // The verdict on every card needs the limits and budgets too; a device without `admin` just gets none.
@@ -544,6 +557,8 @@ public final class AccountsModel {
     }
 
     func show(_ page: AccountsPage, account id: Int64? = nil, pool: Int64? = nil) {
+        // From Core 0.10 pools and chains are the Core's own words, kept under the AI order.
+        let page = aiOrderOn && [.pools, .chains].contains(page) ? AccountsPage.accounts : page
         self.page = page
         detail = page == .accounts ? id : nil
         if let pool { poolSelection = pool }
