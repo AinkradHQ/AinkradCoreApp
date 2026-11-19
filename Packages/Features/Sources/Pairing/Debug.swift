@@ -233,6 +233,7 @@ extension AppModel {
     }
 
     public func debugOpenSettings(_ id: String) {
+        if let tab = HubTab.forEntry(id), id == "devices" || id == "mac-runner" { return openHub(tab) }
         shell.settings.selected = id
         shell.open(.settings)
     }
