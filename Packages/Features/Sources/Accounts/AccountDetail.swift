@@ -30,6 +30,7 @@ struct AccountDetailView: View {
                             VerdictBadge(verdict: verdict)
                         }
                         Text(model.providerName(a.provider)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                        if let b = a.runnerBinding { RunnerBoundNote(binding: b) }
                     }
                     Spacer(minLength: Space.s3)
                     HStack(spacing: Space.s2) {

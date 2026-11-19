@@ -55,6 +55,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var monthSpendUSDMicros: Int64?
     var monthLimitUSDMicros: Int64?
     var health: AccountHealthItem?
+    /// A runner-bound sign-in (Codex, OpenCode, Antigravity): the account only runs on one runner (E7-4).
+    var runnerBinding: RunnerBinding?
     /// The usage meter the Core works out (0.10); nil on an older Core or for a device without `admin`.
     var meter: AccountMeterItem?
     var phase: AccountPhase { AccountPhase(state) }
@@ -69,6 +71,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
             && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
             && l.monthSpendUSDMicros == r.monthSpendUSDMicros && l.monthLimitUSDMicros == r.monthLimitUSDMicros
+            && l.runnerBinding == r.runnerBinding
             && l.meter == r.meter
     }
 }

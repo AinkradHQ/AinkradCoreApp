@@ -82,6 +82,11 @@ protocol AccountsService: Sendable {
     func modelCount(account: Int64) async -> Int?
     /// The device code of a runner-bound sign-in (Codex, OpenCode, Antigravity), nil when it has none.
     func loginCode(_ id: String) async -> String?
+    // E7-5 (API minor 95): a guided sign-in is text on a screen and one typed line at a time. Wire in `AIOrder/GuidedLoginWire.swift`.
+    func loginScreen(_ id: String) async throws -> LoginScreen
+    func sendLoginInput(_ id: String, line: String) async throws
+    /// The runner each runner-bound account is pinned to, by account id (runner ids). Empty when the Core does not say.
+    func boundRunners() async -> [Int64: String]
 }
 
 /// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).

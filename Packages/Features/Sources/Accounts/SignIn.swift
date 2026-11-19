@@ -23,6 +23,8 @@ struct SignInFlow: Equatable {
     enum Stage: Equatable {
         case starting
         case open(URL)
+        /// A guided sign-in (OpenCode, Antigravity): the runner's screen and a line to type. The page is optional.
+        case guided(URL?)
         case working
         case done(account: Int64?)
         case failed(String)
@@ -36,6 +38,11 @@ struct SignInFlow: Equatable {
     /// The provider the sign-in is for, and the device code the Core gave it, if any.
     var provider = ""
     var deviceCode: String?
+    /// A guided sign-in's redacted screen. In memory only: never saved, logged or kept once the sign-in ends.
+    var screen: [String] = []
+    /// What went wrong with the last typed line, in words. Never the line.
+    var inputError: String?
+    var sending = false
 }
 
 extension AccountsModel {
@@ -43,6 +50,7 @@ extension AccountsModel {
     func startSignIn(provider: String, label: String, runner: String? = nil) async {
         guard let service, mayWrite() else { return }
         signIn = SignInFlow(stage: .starting, label: label)
+        pollBackoff = PollBackoff()
         signIn?.provider = provider
         do {
             let l = try await host.elevated(
@@ -93,11 +101,12 @@ extension AccountsModel {
         }
     }
 
-    private func follow(_ id: String) async {
+    func follow(_ id: String) async {
         while let s = signIn, s.login == id, !signInEnded {
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .seconds(signInTick * pollBackoff.seconds))
             guard let service, let l = try? await service.login(id) else { continue }
             apply(l)
+            await pollScreen(id)
             // A device code is not in the generated client's answer: read it apart, for providers that have one.
             if signIn?.deviceCode == nil, signIn?.provider != "claude-sub", !signInEnded {
                 signIn?.deviceCode = await service.loginCode(id)
@@ -113,12 +122,19 @@ extension AccountsModel {
         if case .done = signIn?.stage { await reload() }
     }
 
-    private func apply(_ l: LoginItem) {
+    func apply(_ l: LoginItem) {
         guard signIn != nil else { return }
         signIn?.login = l.id
         if let c = l.code { signIn?.deviceCode = c }
         signIn?.runner = l.runner
         switch l.state {
+        case "open_url" where SignInStyle.of(l.provider, methods: providerMethods(l.provider)) == .guided:
+            let u = l.url.flatMap(URL.init(string:))
+            signIn?.stage = .guided(u)
+            if let u, signIn?.opened == false {
+                signIn?.opened = true
+                opener(u)
+            }
         case "open_url":
             if let u = l.url.flatMap(URL.init(string:)) {
                 if case .open = signIn?.stage {} else { signIn?.stage = .open(u) }
@@ -128,8 +144,13 @@ extension AccountsModel {
                 }
             }
         case "waiting_code", "storing": signIn?.stage = .working
-        case "done": signIn?.stage = .done(account: l.accountID)
-        case "failed", "cancelled", "expired": signIn?.stage = .failed(Self.reasonWords(l.reason ?? l.state))
+        case "done":
+            signIn?.screen = []
+            signIn?.stage = .done(account: l.accountID)
+            if let a = l.accountID { boundSeen[a] = l.runner }
+        case "failed", "cancelled", "expired":
+            signIn?.screen = []
+            signIn?.stage = .failed(Self.reasonWords(l.reason ?? l.state))
         default: signIn?.stage = .starting
         }
     }
@@ -147,6 +168,7 @@ extension AccountsModel {
         case "secrets_disabled":
             return "Keys and secrets is Off. Set it to Test keys in Settings → Feature switches."
         case "conflict": return "An account with that name exists, or is signing in now. Pick another name."
+        case "runner_failed": return "The runner did not answer. Check that it is online, then try again."
         case "limit_reached": return "Four sign-ins are already open. Finish or stop one, then try again."
         case "login_state": return "This sign-in has moved on. Start again."
         case "rate_limited": return "Too many tries just now. Wait a minute, then try again."

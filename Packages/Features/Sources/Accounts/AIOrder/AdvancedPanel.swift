@@ -54,6 +54,7 @@ struct LimitsTab: View {
                             adding = false
                         }),
                     options: accountOptions(model))
+                if let b = a.runnerBinding { RunnerBoundNote(binding: b) }
                 HStack(spacing: Space.s3) {
                     header("Window").frame(width: Space.s8 * 5, alignment: .leading)
                     header("Stop at").frame(maxWidth: .infinity, alignment: .leading)
