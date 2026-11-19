@@ -178,7 +178,8 @@ final class SecretsModel {
         guard let hub, let service = hub.service else { return }
         if items.isEmpty { state = .loading }
         do {
-            items = try await service.secrets().sorted { $0.name < $1.name }
+            // An account's key (`acct.*`) belongs to Accounts; an older Core still lists it here.
+            items = try await service.secrets().filter { !$0.name.hasPrefix("acct.") }.sorted { $0.name < $1.name }
             groups = (try? await service.secretGroups().sorted { $0.name < $1.name }) ?? groups
             state = items.isEmpty && groups.isEmpty ? .empty : .ready
         } catch { state = hub.state(for: error) }
