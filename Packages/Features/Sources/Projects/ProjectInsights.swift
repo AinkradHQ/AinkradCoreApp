@@ -69,6 +69,8 @@ struct ChangesInfo: Equatable, Sendable {
 /// A Brain record of an area (`/areas/{area}`), cut to what a card shows.
 struct KnownRecord: Equatable, Identifiable, Sendable {
     let id: String
+    /// The Brain room (place) id the record lives in; matched against the project's linked room, never by name.
+    let room: String
     let roomName: String
     let kind: String
     let body: String
@@ -89,6 +91,8 @@ struct SessionDocItem: Equatable, Identifiable, Sendable {
 struct ProjectTuning: Equatable, Sendable {
     var fetchInterval = 15
     var defaultEnvironment: String?
+    /// The project's Brain room (`brain_project_rooms`), nil when the Brain is off or none is linked.
+    var roomID: String?
 }
 
 protocol ProjectInsightsService: Sendable {
@@ -194,7 +198,7 @@ enum InsightsWire {
         let rows = (try object(d)["records"] as? [[String: Any]]) ?? []
         return rows.compactMap {
             guard let id = $0["id"] as? String, let body = $0["body"] as? String else { return nil }
-            return KnownRecord(id: id, roomName: $0["room_name"] as? String ?? "", kind: $0["type"] as? String ?? "", body: body)
+            return KnownRecord(id: id, room: $0["room"] as? String ?? "", roomName: $0["room_name"] as? String ?? "", kind: $0["type"] as? String ?? "", body: body)
         }
     }
 
@@ -209,15 +213,17 @@ enum InsightsWire {
 
     static func tuning(_ d: Data) throws -> ProjectTuning {
         let o = try object(d)
-        return ProjectTuning(fetchInterval: (o["fetch_interval_minutes"] as? NSNumber)?.intValue ?? 15, defaultEnvironment: o["default_environment"] as? String)
+        return ProjectTuning(fetchInterval: (o["fetch_interval_minutes"] as? NSNumber)?.intValue ?? 15, defaultEnvironment: o["default_environment"] as? String,
+            roomID: (o["room"] as? [String: Any])?["room_id"] as? String)
     }
 }
 
-/// What a project's place in the Brain holds: the records of the areas whose room is named like the project.
+/// What a project's place in the Brain holds: the records of the project's linked room (`brain_project_rooms`, as the project's
+/// `room.room_id`). A project with no linked room has none.
 enum ProjectKnowledge {
-    static func records(_ all: [KnownRecord], project: String) -> [KnownRecord] {
-        let n = project.trimmingCharacters(in: .whitespaces).lowercased()
-        return all.filter { $0.roomName.lowercased() == n }
+    static func records(_ all: [KnownRecord], room: String?) -> [KnownRecord] {
+        guard let room, !room.isEmpty else { return [] }
+        return all.filter { $0.room == room }
     }
 }
 
@@ -252,11 +258,12 @@ final class ProjectInsightsModel {
 
     func loadKnowledge() async {
         guard let s = service else { return }
+        let room = (try? await s.tuning(project: project.id))?.roomID
         async let k = try? s.area("knowledge")
         async let r = try? s.area("rules")
         let (kk, rr) = await (k, r)
-        knowledge = kk.map { ProjectKnowledge.records($0, project: project.name) }
-        rules = rr.map { ProjectKnowledge.records($0, project: project.name) }
+        knowledge = kk.map { ProjectKnowledge.records($0, room: room) }
+        rules = rr.map { ProjectKnowledge.records($0, room: room) }
     }
 
     func loadDocs() async {

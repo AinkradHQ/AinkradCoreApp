@@ -87,6 +87,11 @@ final class DesignComposer {
         close()
     }
 
+    /// The picture of a direction's frame, when the canvas has it.
+    func sketch(_ d: ComposeState.Direction) -> FrameSketch? {
+        d.frame.flatMap { model?.editors[doc]?.sketch(frame: $0) }
+    }
+
     func close() {
         task?.cancel()
         model?.host.shell.closeDialog()
@@ -177,7 +182,11 @@ struct ComposerView: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 ForEach(Array((composer.state?.directions ?? []).enumerated()), id: \.offset) { i, d in
                     VStack(alignment: .leading, spacing: Space.s2) {
-                        Text(d.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                        thumb(d)
+                        HStack(spacing: Space.s2) {
+                            Text(d.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                            if i == 0 { StateBadge("Best match", tone: .run, symbol: "star") }
+                        }
                         Text(d.summary).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: Space.s2)
                         HStack(spacing: Space.s2) {
@@ -202,6 +211,17 @@ struct ComposerView: View {
                     .coreShortcut(.cancel)
             }
         }
+    }
+
+    /// The direction's frame as drawn on the canvas, or a quiet well while the canvas has not listed it.
+    @ViewBuilder private func thumb(_ d: ComposeState.Direction) -> some View {
+        Group {
+            if let sk = composer.sketch(d) { FrameSketchView(sketch: sk) } else {
+                coreShape(Radius.cardMac).fill(GlassInk.well)
+            }
+        }
+        .frame(height: Space.s8 * 5)
+        .frame(maxWidth: .infinity)
     }
 
     private func failed(_ why: String) -> some View {
