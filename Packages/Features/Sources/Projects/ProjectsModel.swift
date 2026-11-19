@@ -17,6 +17,8 @@ public final class ProjectsModel {
     var runService: (any ProjectRunService)?
     /// Run configurations and environments (Core 0.10, minor 95); nil on an older Core, so the page shows the old Run page.
     var configsService: (any RunConfigsService)?
+    /// Code facts, usage, changes, Brain records and fetch tuning (minor 95); nil on an older Core.
+    var insightsService: (any ProjectInsightsService)?
     private(set) var catalogState = RepoCatalogState.loading
     /// The Core can keep a runner preference (minor 95); older Cores are never asked.
     private(set) var runnerSupported = false
@@ -96,6 +98,7 @@ public final class ProjectsModel {
             let ok = await connection.serverSupports(minor: 95)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
+            self?.insightsService = ok ? LiveProjectInsightsService(connection: connection) : nil
         }
         use(LiveProjectsService(connection: connection))
     }
@@ -111,6 +114,7 @@ public final class ProjectsModel {
         lore = nil
         runService = nil
         configsService = nil
+        insightsService = nil
         projects = []
         pollTask?.cancel()
         pollTask = nil

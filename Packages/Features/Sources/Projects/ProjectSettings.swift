@@ -12,10 +12,12 @@ struct SettingsPage: View {
     @State private var name: String
     @State private var description: String
     @State private var settled = false
+    @State private var insights: ProjectInsightsModel
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
         self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
         _name = State(initialValue: project.name)
         _description = State(initialValue: project.description)
     }
@@ -28,9 +30,13 @@ struct SettingsPage: View {
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
             general.coreRise(settled, 0).frame(width: Space.s8 * 18)
-            limits.coreRise(settled, 1)
+            VStack(spacing: Space.s2) {
+                if insights.supported { keepFresh.coreRise(settled, 1) }
+                limits.coreRise(settled, 2)
+            }
         }
         .onAppear { settled = true }
+        .task(id: project.id) { await insights.loadTuning() }
         .onChange(of: project.name) { _, new in if !changed { name = new } }
         .accessibilityIdentifier("project-page-Project Settings")
     }
@@ -84,10 +90,28 @@ struct SettingsPage: View {
         Task { await model.saveGeneral(project, name: name, description: description) }
     }
 
+    // MARK: Keep copies fresh
+
+    /// How often the Core fetches the repos by itself (the Core's own setting, per project).
+    private var keepFresh: some View {
+        Island("Keep copies fresh") {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                CoreSelect(
+                    "Fetch new changes",
+                    selection: Binding(
+                        get: { insights.tuning.fetchInterval }, set: { v in Task { await insights.set(fetchInterval: v) } }),
+                    options: FetchInterval.options.map { CoreSelectOption($0.minutes, $0.title) })
+                    .disabled(model.readOnly || !insights.tuningLoaded)
+                Text("The Core copies each repo by itself; Fetch Now on the Code page does it at once.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     // MARK: Run limits
 
     private var limits: some View {
-        Island("Run limits") {
+        Island("Where it runs") {
             VStack(alignment: .leading, spacing: Space.s6) {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s5, verticalSpacing: Space.s3) {
                     GridRow {
@@ -97,6 +121,19 @@ struct SettingsPage: View {
                             // TODO(core): more than one machine to run on; the Core runs projects on itself today.
                             Button("Change…") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
                                 .help("Only \(model.coreName) can run projects for now")
+                        }
+                    }
+                    if insights.supported, !insights.environments.isEmpty {
+                        GridRow {
+                            label("Default environment")
+                            CoreSelect(
+                                nil,
+                                selection: Binding(
+                                    get: { insights.tuning.defaultEnvironment ?? insights.environments[0] },
+                                    set: { v in Task { await insights.set(defaultEnvironment: v) } }),
+                                options: insights.environments.map { CoreSelectOption($0, $0) }
+                            )
+                            .disabled(model.readOnly).frame(width: Space.s8 * 5)
                         }
                     }
                     GridRow {

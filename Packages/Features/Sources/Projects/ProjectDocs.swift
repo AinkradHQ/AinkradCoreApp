@@ -164,14 +164,41 @@ struct DocsPage: View {
     let project: ProjectItem
     @State private var docs: ProjectDocs
     @State private var settled = false
+    @State private var insights: ProjectInsightsModel
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
         self.project = project
         _docs = State(initialValue: ProjectDocs(model: model, project: project))
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
     }
 
     var body: some View {
+        HStack(alignment: .top, spacing: Space.s2) {
+            docsIsland
+            if insights.supported { aiDocs.frame(width: Space.s8 * 14) }
+        }
+        .task(id: project.id) { await insights.loadDocs() }
+    }
+
+    /// Notes an AI session wrote in its folder (E10): a person's edit saves back to the file.
+    private var aiDocs: some View {
+        let list = insights.docs ?? []
+        return Island(title: "AI documents", sub: "Edits save back to the file") {
+            ScrollView {
+                VStack(spacing: Space.s1) {
+                    if list.isEmpty { Text("None yet. Documents an AI session writes show up here.").foregroundStyle(GlassInk.secondary) }
+                    ForEach(list) { d in
+                        CoreRow(d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" }, symbol: "sparkles") {
+                            docs.open(d.note)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var docsIsland: some View {
         Island(
             title: "Docs", sub: docs.phase == .ready && !docs.docs.isEmpty ? "\(docs.docs.count) in this project" : nil,
             accessory: {

@@ -8,6 +8,13 @@ struct ReposPage: View {
     let project: ProjectItem
     @State private var pick: Int64?
     @State private var settled = false
+    @State private var insights: ProjectInsightsModel
+
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.model = model
+        self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
+    }
 
     /// The picked repo; before a pick, the first one that failed to fetch (it needs the person), else the first.
     private var current: RepoItem? {
@@ -19,7 +26,7 @@ struct ReposPage: View {
             list.coreRise(settled, 0).frame(width: Space.s8 * 18)
             Group {
                 if let r = current {
-                    RepoDetail(model: model, project: project, repo: r)
+                    RepoDetail(model: model, project: project, repo: r, info: insights.code?.first { $0.repo == r.name })
                 } else {
                     Island("Repos") {
                         Text("Add a repo and the Core keeps a copy of it here.").foregroundStyle(GlassInk.secondary)
@@ -30,6 +37,7 @@ struct ReposPage: View {
             .coreRise(settled, 1)
         }
         .onAppear { settled = true }
+        .task(id: project.id) { await insights.loadCode(); await insights.loadTuning() }
         .accessibilityIdentifier("project-page-Repos")
     }
 
@@ -60,14 +68,20 @@ struct ReposPage: View {
                             switch r.copy {
                             case .failed: StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
                             case .fetching: StateBadge("Copying", tone: .warn, symbol: "gearshape")
-                            case .ready: EmptyView()
+                            case .ready:
+                                if let i = insights.code?.first(where: { $0.repo == r.name }) {
+                                    HStack(spacing: Space.s1) {
+                                        if i.ahead > 0 { StateBadge("↑ \(i.ahead)", tone: .run, symbol: "arrow.up") }
+                                        if i.behind > 0 { StateBadge("↓ \(i.behind)", tone: .warn, symbol: "arrow.down") }
+                                    }
+                                }
                             }
                         }
                         .help(r.remoteURL)
                     }
                 }
                 Text(
-                    "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes every 15 minutes by itself; every AI session and run gets its own clone."
+                    "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes \(insights.supported ? FetchInterval.line(insights.tuning.fetchInterval) : "every 15 minutes") by itself; every AI session and run gets its own clone."
                 )
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -87,6 +101,7 @@ private struct RepoDetail: View {
     let model: ProjectsModel
     let project: ProjectItem
     let repo: RepoItem
+    var info: CodeInfo?
 
     private var extra: ProjectLive.RepoExtra? { project.live?.repoExtras[repo.name] }
     private var short: String { repo.head.map { String($0.prefix(7)) } ?? "–" }
@@ -142,6 +157,22 @@ private struct RepoDetail: View {
                 HStack(spacing: Space.s2) {
                     Text(short).font(.system(size: MacTextSize.body, design: .monospaced))
                     Text(copyAge).foregroundStyle(GlassInk.secondary)
+                }
+            }
+            if let info {
+                GridRow {
+                    label("Files")
+                    Text(info.files.formatted())
+                }
+                GridRow {
+                    label("Against \(repo.branch)")
+                    Text(info.ahead == 0 && info.behind == 0 ? "Up to date" : "\(info.ahead) ahead · \(info.behind) behind")
+                }
+                if let c = info.last {
+                    GridRow {
+                        label("Last commit")
+                        Text("\(c.message) · \(c.author) · \(runsAgo(c.at))").lineLimit(2)
+                    }
                 }
             }
             if let extra {
