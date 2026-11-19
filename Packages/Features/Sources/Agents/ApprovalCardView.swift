@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Shell
 import SwiftUI
@@ -43,7 +44,8 @@ struct ApprovalCardView: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 IconTile(ask.symbol, hue: GlassInk.amber, size: 44, bounce: request.id)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.title, weight: .bold)
+                    Text(ask.question).coreFont(size: MacTextSize.title, weight: .bold)
+                        .help("\(who) wants to \(ask.verb)")
                     Text(
                         "\(request.codeModeOp == nil ? "" : session?.project.map { "AI session in \($0) · " } ?? "AI session · ")On \(session.map { model.runnerName($0.runner) } ?? "a runner") · asked \(AgentWords.ago(request.requestedAt, now: now))"
                     )
@@ -69,6 +71,10 @@ struct ApprovalCardView: View {
                     Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(5)
                         .textSelection(.enabled).agentCopyMenu(request.input)
                     Spacer(minLength: 0)
+                    CoreIconButton(symbol: "doc.on.doc", label: "Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(request.input, forType: .string)
+                    }
                 }
                 .padding(Space.s3)
                 .background(GlassInk.well, in: coreShape(Radius.control))
@@ -173,6 +179,17 @@ enum ApprovalWords {
         let verb: String
         let symbol: String
         let wellSymbol: String
+        /// The card's title, as a question: "Run this command?"
+        var question: String {
+            switch verb {
+            case "run a command": "Run this command?"
+            case "change a file": "Change this file?"
+            case "read files": "Read these files?"
+            case "reach the internet": "Reach the internet?"
+            case "use a secret": "Use a secret?"
+            default: verb.prefix(1).uppercased() + verb.dropFirst() + "?"
+            }
+        }
     }
 
     static func ask(_ tool: String) -> Ask {
