@@ -93,7 +93,10 @@ struct AppearanceSection: View {
                 Text(accent.accent.title).coreFont(size: MacTextSize.meta, weight: .semibold)
                     .foregroundStyle(GlassInk.secondary).contentTransition(.opacity)
             } content: {
-                HStack(spacing: Space.s3) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 64), spacing: Space.s3, alignment: .top)],
+                    alignment: .leading, spacing: Space.s3
+                ) {
                     ForEach(CoreAccent.allCases, id: \.self) { a in
                         AccentTile(accent: a, selected: accent.accent == a) {
                             withAnimation(Motion.out(Motion.ui)) { accent.accent = a }
