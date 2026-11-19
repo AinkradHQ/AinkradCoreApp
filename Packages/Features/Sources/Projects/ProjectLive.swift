@@ -91,7 +91,7 @@ enum ProjectSection: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .overview: "Overview"
-        case .run: "Run"
+        case .run: "Runs"
         case .repos: "Repos"
         case .sessions: "AI Sessions"
         case .brain: "Brain"

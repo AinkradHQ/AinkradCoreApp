@@ -8,17 +8,31 @@ struct Overview: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var settled = false
+    @State private var runs: [RunRecord] = []
+    @State private var names: [Int64: String] = [:]
+    @State private var insights: ProjectInsightsModel
+
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.model = model
+        self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
+    }
 
     private var live: ProjectLive? { project.live }
     private var settingUp: Bool { !project.repos.isEmpty && project.draft == nil && project.run == nil }
 
     var body: some View {
         VStack(spacing: Space.s2) {
+            if model.configsService != nil { statRow.coreRise(settled, 0) }
             HStack(alignment: .top, spacing: Space.s2) {
                 LiveApp(model: model, project: project).coreRise(settled, 0)
                 VStack(spacing: Space.s2) {
                     sessions.coreRise(settled, 1)
                     brain.coreRise(settled, 2)
+                    if insights.supported {
+                        ChangesCard(insights: insights, now: model.now()).coreRise(settled, 2)
+                        notesCard.coreRise(settled, 3)
+                    }
                     if let designs = model.designsIsland {
                         designs(ProjectRef(id: String(project.id), name: project.name)).coreRise(settled, 3)
                     }
@@ -34,6 +48,60 @@ struct Overview: View {
             .frame(height: Space.s8 * 10)
         }
         .onAppear { settled = true }
+        .task(id: project.id) {
+            await loadRuns()
+            await insights.loadUsage()
+            await insights.loadKnowledge()
+            await insights.loadDocs()
+        }
+    }
+
+    // MARK: Stats and activity (Core 0.10)
+
+    private func loadRuns() async {
+        guard let svc = model.configsService else { return }
+        runs = (try? await svc.history(project: project.id)) ?? []
+        names = Dictionary(uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) })
+    }
+
+    private var stats: ProjectStats { ProjectStats(repos: project.repos, runs: runs, now: model.now()) }
+
+    private var statRow: some View {
+        let s = stats
+        let u = insights.usage
+        let known = insights.knowledge?.count
+        return HStack(spacing: Space.s2) {
+            InsightTile(title: "Health", value: s.health, line: s.healthLine, meter: s.healthFraction)
+            InsightTile(title: "Runs this week", value: "\(s.runsThisWeek)", line: s.runningNow > 0 ? "\(s.runningNow) running now" : "None running")
+            if insights.supported {
+                InsightTile(
+                    title: "AI usage", value: u.map { CostWords.money($0.weekCost) } ?? "–",
+                    line: u.map { "This week, \(ProjectItem.count($0.sessionsWeek, "session"))" } ?? "Not available", spark: u?.byDay)
+                InsightTile(
+                    title: "Things Core knows", value: known.map(String.init) ?? "–",
+                    line: known == nil ? "Not available" : "In the \(project.name) room")
+            }
+            activity
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var activity: some View {
+        let lines = ActivityLine.timeline(repos: project.repos, runs: runs, names: names, limit: 3)
+        return VStack(alignment: .leading, spacing: Space.s1) {
+            Text("Activity").foregroundStyle(GlassInk.secondary)
+            if lines.isEmpty { Text("Nothing yet.").foregroundStyle(GlassInk.secondary) }
+            ForEach(lines) { l in
+                HStack(spacing: Space.s2) {
+                    Image(systemName: l.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                    Text(l.title).lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(runsAgo(l.at, now: model.now())).foregroundStyle(GlassInk.secondary)
+                }
+            }
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .topLeading).frame(maxHeight: .infinity)
+        .coreCard(GlassInk.well, radius: Radius.cardMac)
     }
 
     // MARK: AI Sessions
@@ -79,29 +147,42 @@ struct Overview: View {
     private var brain: some View {
         Island(
             title: "Brain", sub: "\(project.name) room",
-            accessory: {
-                if live?.room != nil {
-                    Button("Details") { model.section = .brain }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            accessory: { Button("Open Brain") { model.section = .brain }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
+        ) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                if let room = live?.room {
+                    Text(room.summary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(GlassInk.secondary)
+                } else if let n = insights.knowledge?.count, n > 0 {
+                    Text("Core remembers \(ProjectItem.count(n, "thing")) about this project.")
+                    ForEach(insights.knowledge?.prefix(2).map { $0 } ?? []) { KnownRow(r: $0) }
+                } else {
+                    Text(settingUp
+                        ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
+                        : "Nothing remembered yet. It fills from the repos’ instruction files, AI sessions and docs you add.")
+                        .fixedSize(horizontal: false, vertical: true).foregroundStyle(GlassInk.secondary)
                 }
             }
+        }
+    }
+
+    // MARK: Notes
+
+    private var notesCard: some View {
+        let notes = insights.notes ?? []
+        let docs = insights.docs ?? []
+        return Island(
+            title: "Notes", sub: notes.isEmpty && docs.isEmpty ? nil : "\(notes.count + docs.count)",
+            accessory: { Button("Open Notes") { model.section = .docs }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
         ) {
-            // TODO(P1-03): `room` on the project; nil until it lands, and for a project that has no room yet.
-            if let room = live?.room {
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    Text(room.summary).fixedSize(horizontal: false, vertical: true)
-                    if room.instructionsInUse {
-                        StateBadge("Instructions in use for AI sessions", tone: .done, symbol: "checkmark.circle")
+            VStack(spacing: Space.s1) {
+                if notes.isEmpty && docs.isEmpty { Text("No notes yet.").foregroundStyle(GlassInk.secondary) }
+                ForEach(notes.prefix(2)) { n in CoreRow(n.title, symbol: "doc.text") { model.openNote?(n.id) } }
+                ForEach(docs.prefix(2)) { d in
+                    CoreRow(d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" }, symbol: "sparkles") {
+                        model.openNote?(d.note)
                     }
-                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(
-                        GlassInk.secondary)
                 }
-            } else {
-                Text(
-                    settingUp
-                        ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
-                        : "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
-                )
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

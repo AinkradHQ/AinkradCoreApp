@@ -15,7 +15,15 @@ public final class ProjectsModel {
     var catalog: any RepoCatalog
     /// The Run page's reads and writes (spec, secrets, run). Set with the connection; the Debug demo brings its own.
     var runService: (any ProjectRunService)?
+    /// Run configurations and environments (Core 0.10, minor 95); nil on an older Core, so the page shows the old Run page.
+    var configsService: (any RunConfigsService)?
+    /// Code facts, usage, changes, Brain records and fetch tuning (minor 95); nil on an older Core.
+    var insightsService: (any ProjectInsightsService)?
     private(set) var catalogState = RepoCatalogState.loading
+    /// The Core can keep a runner preference (minor 95); older Cores are never asked.
+    private(set) var runnerSupported = false
+    /// The project the New Project wizard just made: its review step shows that project's repos copying.
+    internal(set) var wizardProjectID: Int64?
 
     internal(set) var projects: [ProjectItem] = []
     var load: ProjectsLoad = .notConnected
@@ -86,6 +94,12 @@ public final class ProjectsModel {
         lore = LiveLoreService(connection: connection)
         runService = LiveProjectRunService(connection: connection)
         catalog = LiveRepoCatalog(connection: connection)
+        Task { [weak self] in
+            let ok = await connection.serverSupports(minor: 95)
+            self?.runnerSupported = ok
+            self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
+            self?.insightsService = ok ? LiveProjectInsightsService(connection: connection) : nil
+        }
         use(LiveProjectsService(connection: connection))
     }
 
@@ -99,6 +113,8 @@ public final class ProjectsModel {
         service = nil
         lore = nil
         runService = nil
+        configsService = nil
+        insightsService = nil
         projects = []
         pollTask?.cancel()
         pollTask = nil
@@ -236,12 +252,22 @@ public final class ProjectsModel {
 
     func clearWriteError() { writeError = nil }
 
+    /// The wizard's "Open project": closes it and opens the new project's space.
+    func openWizardProject() {
+        host.shell.closeDialog()
+        if let id = wizardProjectID { openProject(id) }
+        wizardProjectID = nil
+    }
+
     // MARK: writes
 
     /// Creates the project and adds the picked repos, all behind one Touch ID. The new project opens. Returns false when
     /// nothing was created (the sheet stays open with its error, or the person did not elevate).
     @discardableResult
-    func create(name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = []) async -> Bool {
+    func create(
+        name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = [], expose: Bool? = nil,
+        runner: String? = nil, wizard: Bool = false
+    ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard let service, !busy, mayWrite() else { return false }
         if let problem = ProjectRules.nameProblem(name) ?? ProjectRules.slugProblem(slug) {
@@ -269,6 +295,9 @@ public final class ProjectsModel {
                         missed.append(r.name)
                     }
                 }
+                // The wizard's choices; a failure here never undoes the project (they can be changed in Settings).
+                if let expose { try? await service.setExpose(project: p.id, expose) }
+                if let runner, runnerSupported, runner != "auto" { try? await service.setRunner(project: p.id, runner) }
             }
         } catch is AdminDeclined {
             // Nothing was written if the project is still nil; if it exists the person saw Touch ID succeed.
@@ -285,6 +314,11 @@ public final class ProjectsModel {
         quickOpen = false
         quickName = ""
         await reload()
+        if wizard {
+            // The wizard stays up and shows the copying; "Open project" there opens the space.
+            wizardProjectID = made.id
+            return true
+        }
         openID = made.id
         host.shell.closeDialog()
         if missed.isEmpty {
