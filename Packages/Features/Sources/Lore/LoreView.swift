@@ -22,7 +22,7 @@ struct LoreView: View {
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
         .animation(Motion.out(Motion.ui), value: model.notice)
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("lore"))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lore-space")
     }
