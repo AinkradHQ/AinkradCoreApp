@@ -25,7 +25,8 @@ struct SetupWizardView: View {
                 header
                 Group {
                     switch model.stage {
-                    case .choose: model.welcomed ? choose : welcome
+                    case .choose:
+                        if model.welcomed { choose } else { welcome }
                     case .install: install
                     case .waiting: waiting
                     case .found: found

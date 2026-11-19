@@ -35,21 +35,6 @@ protocol LeylineService: Sendable {
     /// Pauses the recording of a session (`POST /sessions/{s}/recording/pause`); no step-up needed.
     func pauseRecording(session: String) async throws
     /// Makes the host a runner (`POST /hosts/{h}/runner`, a step-up route): opens a terminal with the installer typed in.
-    func checkHost(address: String, port: Int) async throws -> HostCheck {
-        guard await connection.serverSupports(minor: 95) else { throw LeylineFailure.notYet }
-        struct Body: Encodable {
-            let address: String
-            let port: Int
-        }
-        struct Wire: Decodable {
-            let ok: Bool
-            let ms: Int?
-            let reason: String?
-        }
-        let w = try await call("POST", "/hosts/check", Body(address: address, port: port), as: Wire.self)
-        return HostCheck(ok: w.ok, ms: w.ms, reason: w.reason)
-    }
-
     func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall
     /// Whether an address answers like an SSH server from the Core, and how fast (`POST /hosts/check`, API minor 95).
     func checkHost(address: String, port: Int) async throws -> HostCheck
