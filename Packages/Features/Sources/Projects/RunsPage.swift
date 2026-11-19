@@ -227,7 +227,7 @@ private struct ConfigForm: View {
                             "", isOn: Binding(get: { config.restart }, set: { runs.edit(config, RunConfigPatch(restart: $0)) })
                         )
                         .accessibilityLabel("Restart if it stops")
-                        Text(config.restart ? "Saved. The Core does not restart it yet." : "Stays stopped").foregroundStyle(GlassInk.secondary)
+                        Text(config.restart ? "Comes back within seconds, up to 5 times" : "Stays stopped").foregroundStyle(GlassInk.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

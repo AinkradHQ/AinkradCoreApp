@@ -1,8 +1,8 @@
 import CoreUI
 import SwiftUI
 
-/// The Live runs tab: the project's live run with its log, Restart and Stop. A project has one live run, so starting another
-/// configuration replaces it (the Run buttons say so).
+/// The Live runs tab: one card per live run, each with its own log, port, Restart and Stop. Several configurations can run at
+/// once; "Start another" lists the ones that are not running.
 struct LiveRunsTab: View {
     let runs: RunConfigsModel
     let project: ProjectItem
@@ -10,11 +10,13 @@ struct LiveRunsTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Space.s2) {
-                if let r = runs.liveRun { live(r) } else { idle }
-                if runs.liveRun != nil, runs.configs.count > 1 { others }
+                if runs.liveRuns.isEmpty { idle } else { ForEach(runs.liveRuns) { live($0) } }
+                if !runs.liveRuns.isEmpty, !notRunning.isEmpty { others }
             }
         }
     }
+
+    private var notRunning: [RunConfigItem] { runs.configs.filter { !runs.isLive($0) } }
 
     private func live(_ r: RunRecord) -> some View {
         let c = runs.configs.first { $0.id == r.configID }
@@ -28,7 +30,7 @@ struct LiveRunsTab: View {
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .disabled(runs.busy || !runs.model.canControl(project))
                 }
-                Button { runs.model.control(.stop, project) } label: { Label("Stop", systemImage: "power") }
+                Button { Task { await runs.stop(r, project: project) } } label: { Label("Stop", systemImage: "power") }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     .disabled(runs.busy || !runs.model.canControl(project))
             }
@@ -38,7 +40,7 @@ struct LiveRunsTab: View {
                     CoreNotice(symbol: "exclamationmark.triangle", title: "It failed to start.", text: e, tone: .fail)
                 }
                 if let e = r.environment { Text("Environment: \(e)").foregroundStyle(GlassInk.secondary) }
-                LogBox(lines: runs.logLines)
+                LogBox(lines: runs.logLines[r.id] ?? [])
             }
         }
         .frame(minHeight: Space.s8 * 6)
@@ -48,32 +50,25 @@ struct LiveRunsTab: View {
         Island("Nothing is running") {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text("Start a configuration:").foregroundStyle(GlassInk.secondary)
-                HStack(spacing: Space.s2) {
-                    ForEach(runs.configs) { c in
-                        Button { Task { await runs.start(c, project: project) } } label: { Label(c.name, systemImage: "play") }
-                            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                            .disabled(runs.busy || !runs.model.canControl(project))
-                    }
-                }
+                starters
             }
         }
         .frame(height: Space.s8 * 4)
     }
 
     private var others: some View {
-        Island("Start another") {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                Text("A project has one live run, so this stops the one above first.").foregroundStyle(GlassInk.secondary)
-                HStack(spacing: Space.s2) {
-                    ForEach(runs.configs.filter { !runs.isLive($0) }) { c in
-                        Button { Task { await runs.start(c, project: project) } } label: { Label(c.name, systemImage: "play") }
-                            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                            .disabled(runs.busy || !runs.model.canControl(project))
-                    }
-                }
+        Island("Start another") { starters }
+            .frame(height: Space.s8 * 3)
+    }
+
+    private var starters: some View {
+        HStack(spacing: Space.s2) {
+            ForEach(notRunning) { c in
+                Button { Task { await runs.start(c, project: project) } } label: { Label(c.name, systemImage: "play") }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .disabled(runs.busy || !runs.model.canControl(project))
             }
         }
-        .frame(height: Space.s8 * 4)
     }
 
     private func label(_ state: String) -> String {

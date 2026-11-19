@@ -94,7 +94,12 @@ final class FakeConfigsService: RunConfigsService, @unchecked Sendable {
     }
     func importEnv(project: Int64, config: Int64, env: String, text: String) async throws -> EnvImport { EnvImport(imported: 1, skipped: 0) }
     func diff(project: Int64, config: Int64, a: String, b: String) async throws -> [EnvDiffItem] { [EnvDiffItem(key: "A", change: .different)] }
-    func history(project: Int64) async throws -> [RunRecord] { [] }
+    var runs: [RunRecord] = []
+    func history(project: Int64) async throws -> [RunRecord] { lock.withLock { runs } }
+    func logs(project: Int64, run: String, after: Int) async throws -> RunLogPage {
+        RunLogPage(lines: [ProjectLive.LogLine(service: "web", text: "from \(run)")], next: after + 1)
+    }
+    func stop(project: Int64, run: String) async throws { lock.withLock { calls.append("stop \(run)") } }
     func runners() async throws -> [RunnerOption] { [] }
 }
 
@@ -174,5 +179,26 @@ struct RunConfigsModelTests {
         let (r, _, _) = await make()
         await r.toggleCompare()
         #expect(r.comparing && r.compareWith == "Staging" && r.differences == 1)
+    }
+
+    @Test func severalLiveRunsEachKeepTheirOwnLogAndStopByID() async {
+        let (r, svc, host) = await make()
+        let live = { (id: String, cfg: Int64) in
+            RunRecord(id: id, state: "running", configID: cfg, environment: "Development", runner: "d", startedAt: nil, stoppedAt: nil, stopReason: nil, error: nil)
+        }
+        svc.runs = [live("r_b", 2), live("r_a", 1)]
+        await r.load()
+        #expect(r.liveRuns.map(\.id) == ["r_b", "r_a"])
+        #expect(r.isLive(r.configs[0]))
+        let task = Task { await r.watchLive() }
+        try? await Task.sleep(for: .milliseconds(300))
+        task.cancel()
+        #expect(r.logLines["r_a"]?.first?.text == "from r_a" && r.logLines["r_b"]?.first?.text == "from r_b")
+        let p = ProjectItem(id: 1, slug: "demo", name: "Demo", description: "", expose: false, repos: [], updatedAt: Date())
+        await r.stop(r.liveRuns[1], project: p)
+        #expect(svc.calls.contains("stop r_a") && host.reasons.last?.contains("Stop") == true)
+        // Running the config that is already live replaces only that one.
+        await r.start(r.configs[0], project: p)
+        #expect(svc.calls.contains("start 1 Development replace=true"))
     }
 }

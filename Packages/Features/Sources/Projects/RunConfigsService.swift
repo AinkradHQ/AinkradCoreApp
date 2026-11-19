@@ -97,6 +97,15 @@ protocol RunConfigsService: Sendable {
     func history(project: Int64) async throws -> [RunRecord]
     /// The Core's paired runners, for a configuration's Runner field: `(id, name)`.
     func runners() async throws -> [RunnerOption]
+    /// Log lines of one live run after `after` (a project can have several live runs).
+    func logs(project: Int64, run: String, after: Int) async throws -> RunLogPage
+    /// Stops one live run by id (admin, step-up).
+    func stop(project: Int64, run: String) async throws
+}
+
+extension RunConfigsService {
+    func logs(project: Int64, run: String, after: Int) async throws -> RunLogPage { RunLogPage(next: after) }
+    func stop(project: Int64, run: String) async throws {}
 }
 
 struct RunnerOption: Equatable, Sendable {
@@ -194,6 +203,19 @@ struct LiveRunConfigsService: RunConfigsService {
 
     func runners() async throws -> [RunnerOption] {
         try RunConfigsWire.runners(try await call("GET", "/api/v1/runners"))
+    }
+
+    func logs(project: Int64, run: String, after: Int) async throws -> RunLogPage {
+        do {
+            return try RunWire.logs(
+                try await call(
+                    "GET", "\(Self.base(project))/run/logs?run=\(LiveProjectRunService.seg(run))&after=\(after)"),
+                after: after)
+        } catch let f as RunFailure where f.status == 404 || f.status == 501 { return RunLogPage(next: after) }
+    }
+
+    func stop(project: Int64, run: String) async throws {
+        _ = try await call("POST", "\(Self.base(project))/runs/\(LiveProjectRunService.seg(run))/stop")
     }
 
     private static func base(_ id: Int64) -> String { "/api/v1/projects/\(id)" }
