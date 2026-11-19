@@ -235,4 +235,15 @@ struct FailingService: TerminalService {
         #expect(sub == "Its terminals can't be reached until it's back.")
         #expect(!sub.contains("runner_offline") && !sub.contains("runner."))
     }
+
+    /// A runner started with --terminal-user refuses private terminals; the sheet says how to fix it.
+    @Test func aTerminalUserRunnerRefusalSaysWhatToDo() {
+        let e = CoreError.http(
+            status: 400, code: "invalid_args",
+            message:
+                "private terminals need shells that run as the runner's own user: start the runner without --terminal-user"
+        )
+        let r = NewTerminalModel.refusal(e, runner: "mac-studio")
+        #expect(r.title == "This runner was started with --terminal-user; restart it without it to open terminals.")
+    }
 }
