@@ -52,6 +52,8 @@ struct ComposerView: View {
     @Environment(\.corePalette) private var palette
     @State private var pick = 0
     @State private var dropping = false
+    @State private var voice = Dictation()
+    @Environment(\.accessibilityReduceMotion) private var reduce
     private var files: [URL] { model.attachments[session.id] ?? [] }
 
     private var draft: Binding<String> {
@@ -107,14 +109,18 @@ struct ComposerView: View {
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
                         .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)").keyHint(.attach)
-                    modelPicker
-                    ModeChip(model: model, session: session)
+                    // Icon-first (the mockup's): the chips show their words only while you write.
+                    modelPicker(labels: on)
+                    ModeChip(model: model, session: session, labels: on)
                     Spacer(minLength: Space.s2)
+                    contextButton
+                    if Dictation.available, enabled { micButton }
                     if bytes > AgentsModel.messageLimit / 2 {
                         Text("\(coreDecimal(Double(bytes) / 1024, 1)) / 16 KiB")
                             .coreFont(size: MacTextSize.meta).monospacedDigit()
                             .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
                     }
+                    if enabled, model.canStopTurn(session), canSteer { steerButton }
                     if enabled || model.canStopTurn(session) { actionButton }
                 }
             }
@@ -146,7 +152,14 @@ struct ComposerView: View {
         }
         .readingColumn()
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
-        .onChange(of: text) { _, _ in pick = 0 }
+        .onChange(of: text) { _, new in
+            pick = 0
+            DraftStore.save(session.id, new)
+        }
+        .onAppear {
+            // A draft kept from last time comes back into an empty field.
+            if text.isEmpty { draft.wrappedValue = DraftStore.load(session.id) }
+        }
         .onChange(of: ui?.attach) { _, _ in if enabled { attach() } }
     }
 
@@ -200,7 +213,7 @@ struct ComposerView: View {
 
     /// The tool and its model; for Claude Code a menu that switches the model with the tool's own `/model` command. Other
     /// tools show their model as a label (they have no in-session switch the app can send).
-    @ViewBuilder private var modelPicker: some View {
+    @ViewBuilder private func modelPicker(labels: Bool) -> some View {
         let label = AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model")
         if session.harness == "claude", enabled {
             CoreDropdown(
@@ -212,17 +225,72 @@ struct ComposerView: View {
                 isPresented: Binding(get: { ui?.modelMenu ?? false }, set: { ui?.modelMenu = $0 })
             ) {
                 HStack(spacing: Space.s1) {
-                    Text(label)
-                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                    Image(systemName: "sparkles")
+                    if labels {
+                        Text(label)
+                        Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                    }
                 }
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: labels)
                 .coreFont(size: MacTextSize.meta, weight: .medium)
                 .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
                 .background(GlassInk.well, in: coreShape(Radius.chip))
             }
             .help("Switch the model for the rest of this session (⇧⌘M)").keyHint(.model)
         } else {
-            CoreChip(label)
+            CoreChip(labels ? label : "", symbol: "sparkles").help(label)
         }
+    }
+
+    /// The context meter (the mockup's): a small bar of how much of the window the conversation fills; it turns amber near
+    /// the end, and a click offers /compact. The window size is a table in `ContextWindow` (the Core exposes none).
+    @ViewBuilder private var contextButton: some View {
+        if let used = session.usage?.tokens, used > 0 {
+            let ctx = ConversationWords.context(used: used, window: ContextWindow.tokens(model: session.model))
+            Button {
+                if enabled, ctx.fill > 0.7 { draft.wrappedValue = "/compact " } else { focused.wrappedValue = true }
+            } label: {
+                CoreMeter(ctx.fill, low: ctx.fill > 0.8, label: "Context used").frame(width: 44)
+                    .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            }
+            .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.97, hoverFill: true))
+            .help("\(Int(ctx.fill * 100))% of the context is used (\(ctx.text))" + (ctx.fill > 0.7 ? ". Click to compact." : ""))
+            .accessibilityLabel("Context used: \(Int(ctx.fill * 100)) percent")
+        }
+    }
+
+    /// Dictation, on this Mac only. The first press asks for the microphone and speech recognition.
+    private var micButton: some View {
+        let listening = voice.state == .listening
+        return CoreIconButton(
+            symbol: listening ? "mic.fill" : "mic", label: listening ? "Stop dictating" : "Dictate", selected: listening
+        ) {
+            let base = text
+            Task {
+                await voice.toggle { phrase in
+                    draft.wrappedValue = base + (base.isEmpty || base.hasSuffix(" ") ? "" : " ") + phrase
+                }
+            }
+        }
+        .help(listening ? "Stop dictating" : "Dictate: speech is recognised on this Mac, nothing is sent out")
+        .onChange(of: voice.state) { _, now in
+            if case .blocked(let why) = now { model.note(session.id, InlineNotice(title: "Dictation is off", detail: why, tone: .warn)) }
+        }
+        .onDisappear { voice.stop() }
+    }
+
+    /// Steer needs the tool to take an interrupt (every tool the Core can stop a turn of).
+    private var canSteer: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.canSend(session.id)
+    }
+
+    /// Redirect now: stop the running turn and send this message as the next one.
+    private var steerButton: some View {
+        Button { Task { await model.steer(session.id) } } label: {
+            Label("Steer", systemImage: "arrow.turn.down.right")
+        }
+        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        .help("Stop the turn now and send this message instead (the queue waits)")
     }
 
     static let claudeModels: [(id: String, title: String, note: String?)] = [
