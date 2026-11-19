@@ -90,9 +90,12 @@ struct AIOrderView: View {
             }
         case .limits:
             model.limitsAccount = row.id
+            model.limitsTarget = .account(row.id)
             model.advancedTab = .limits
             withAnimation(reduce ? nil : Motion.out(Motion.ui)) { model.advancedOpen = true }
-        case .remove: AccountDialogs.openDelete(model, row.account)
+        case .remove:
+            // 0.10: gone at once with an Undo toast; below it the confirmation stays.
+            if model.aiOrderOn { Task { await model.removeWithUndo(row.account) } } else { AccountDialogs.openDelete(model, row.account) }
         }
     }
 

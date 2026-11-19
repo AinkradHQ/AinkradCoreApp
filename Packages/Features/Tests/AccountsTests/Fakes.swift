@@ -82,6 +82,25 @@ final class FakeService: AccountsService, @unchecked Sendable {
         try note("clearAIOrder \(agent)")
         overrideList.removeAll { $0.agent == agent }
     }
+    /// 0.10 remove with Undo: what the Core says the window ends at, and what it holds for a restore.
+    var undoUntil: Date?
+    private var removedStash: [Int64: (item: AccountItem, entry: AIOrderEntry?)] = [:]
+    func removeAccount(_ id: Int64) async throws -> Date? {
+        try note("removeAccount \(id)")
+        if let item = accountList.first(where: { $0.id == id }) {
+            removedStash[id] = (item, orderEntries.first { $0.account == id })
+        }
+        accountList.removeAll { $0.id == id }
+        orderEntries.removeAll { $0.account == id }
+        return undoUntil
+    }
+    func restoreAccount(_ id: Int64) async throws {
+        try note("restoreAccount \(id)")
+        guard let r = removedStash.removeValue(forKey: id) else { throw CoreError.invalidInput("not removed") }
+        accountList.append(r.item)
+        // The Core gives the seat back last; the app puts it where it stood.
+        orderEntries.append(r.entry ?? AIOrderEntry(account: id, provider: nil, harness: nil, model: nil))
+    }
     func modelCount(account: Int64) async -> Int? { modelsFound }
     func accountMeters() async -> [Int64: AccountMeterItem] { meterList }
     func accountModels(account: Int64) async -> [ModelRowItem] { modelRowList[account] ?? [] }

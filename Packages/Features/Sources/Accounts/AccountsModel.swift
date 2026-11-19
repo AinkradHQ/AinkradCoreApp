@@ -47,6 +47,10 @@ public final class AccountsModel {
     var advancedOpen = false
     var advancedTab: AdvancedTab = .limits
     var limitsAccount: Int64?
+    /// What the Limits tab speaks of: a provider, or one account when Limits… was opened from its row (0.10).
+    var limitsTarget: LimitTarget?
+    /// The account removed last and still undoable; in memory only, so a relaunch never shows an old Undo.
+    var removed: RemovedAccount?
     /// Each account's models with price and switch (0.10), read when the Models tab opens.
     var modelRows: [Int64: [ModelRowItem]] = [:]
     /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
@@ -269,7 +273,7 @@ public final class AccountsModel {
     /// `writeError[key]`; a person who did not elevate changes nothing and gets no error (the host shows its notice).
     @discardableResult
     func write(
-        _ key: String, reason: String, done: String, keepsEdit: Bool = false,
+        _ key: String, reason: String, done: String, keepsEdit: Bool = false, toast: Bool = true,
         undo: (@MainActor () async -> Void)? = nil,
         _ op: @escaping @Sendable (any AccountsService) async throws -> Void
     ) async -> Bool {
@@ -281,9 +285,9 @@ public final class AccountsModel {
         do {
             try await host.elevated(reason, done: "changed", keepsEdit: keepsEdit) { try await op(service) }
             await reload()
-            if let undo {
+            if toast, let undo {
                 host.shell.showToast(done) { Task { @MainActor in await undo() } }
-            } else {
+            } else if toast {
                 host.shell.showToast(done)
             }
             return true

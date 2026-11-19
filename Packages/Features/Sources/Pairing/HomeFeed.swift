@@ -59,8 +59,9 @@ struct LiveHomeSource: HomeSource {
     }
     func utilisation() async throws -> Double {
         try await run {
-            let all = try await client.accountsUsage().ok.body.json
-            return min(1, all.map { Double($0.maxUtilisationBps) / 10_000 }.max() ?? 0)
+            // Core 0.10 dropped `max_utilisation_bps`: the tightest token budget says how close the Core is to a stop.
+            let all = try await client.listBudgets().ok.body.json
+            return min(1, all.compactMap { $0.tokenCap > 0 ? Double($0.spent) / Double($0.tokenCap) : nil }.max() ?? 0)
         }
     }
     func audit() async throws -> [HomeAudit] {

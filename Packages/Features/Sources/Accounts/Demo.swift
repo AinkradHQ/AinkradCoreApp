@@ -459,6 +459,23 @@ public final class AccountsDemo {
                     members: $0.members.filter { $0 != id })
             }
         }
+        /// The demo's 10 s Undo window: the removed account waits here with its place in the order.
+        private var removedAccount: (item: AccountItem, entry: AIOrderEntry?, at: Int)?
+        func removeAccount(_ id: Int64) async throws -> Date? {
+            guard let item = accountList.first(where: { $0.id == id }) else { return nil }
+            let at = orderEntries.firstIndex { $0.account == id } ?? orderEntries.count
+            removedAccount = (item, orderEntries.first { $0.account == id }, at)
+            try await deleteAccount(id)
+            orderEntries.removeAll { $0.account == id }
+            return Date().addingTimeInterval(10)
+        }
+        func restoreAccount(_ id: Int64) async throws {
+            guard let r = removedAccount, r.item.id == id else { throw CoreError.invalidInput("Too late to undo.") }
+            removedAccount = nil
+            accountList.append(r.item)
+            // The seat comes back last, as the Core does; the app puts the row back where it stood.
+            orderEntries.append(r.entry ?? AIOrderEntry(account: id, provider: r.item.provider, harness: nil, model: nil))
+        }
     }
 
     public static let scenes = [
