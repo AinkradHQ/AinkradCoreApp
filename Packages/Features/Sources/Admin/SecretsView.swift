@@ -350,7 +350,7 @@ private struct SecretRow: View {
             }
             .environment(\.coreKeycap, "↩").help("Let a runner use \(secret.name) for a short time (↩)")
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            if !SecretWords.Kind(wire: secret.kind).isFile {
+            if secret.kind == "text" {
                 Button(model.revealed[secret.name] == nil ? "Reveal" : "Hide") {
                     if model.revealed[secret.name] == nil {
                         Task { await model.reveal(secret) }

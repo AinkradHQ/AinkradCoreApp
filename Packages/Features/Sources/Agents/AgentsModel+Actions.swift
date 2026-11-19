@@ -9,7 +9,7 @@ extension AgentsModel {
     func elevated<T>(_ reason: String, _ op: () async throws -> T) async throws -> T {
         if let host, let n = await host.elevate(reason: reason, force: false) { throw ElevationDeclined(notice: n) }
         do { return try await op() } catch {
-            guard case .stepUpRequired = CoreError.unwrapping(error), let host else { throw error }
+            guard CoreError.unwrapping(error)?.needsProof == true, let host else { throw error }
             if let n = await host.elevate(reason: reason, force: true) { throw ElevationDeclined(notice: n) }
             return try await op()
         }

@@ -426,7 +426,7 @@ enum ConnSay {
         case .offline: return "This Mac can't reach your Core. Check the network, then try again."
         case .forbiddenScope:
             return "This Mac can only look. Changes need a Mac you allowed to manage the Core. Nothing was changed."
-        case .stepUpRequired: return "Touch ID is needed for that. Try again and confirm it."
+        case .stepUpRequired, .unlockRequired: return "Touch ID is needed for that. Try again and confirm it."
         case .authFailed, .sessionExpired, .revoked:
             return "This Mac needs to sign in to your Core again. Reopen Ainkrad and try again."
         case .rateLimited(let s):

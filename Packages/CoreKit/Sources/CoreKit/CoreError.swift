@@ -10,6 +10,8 @@ public enum CoreError: Error, Equatable, Sendable {
     case sessionExpired
     /// 403 `step_up_required`: the UI must elevate (§8) and retry.
     case stepUpRequired
+    /// 403 `unlock_required`: the app unlock is gone (lapsed, ended, or the Core restarted): sign in again with `unlock`.
+    case unlockRequired
     /// 403 `forbidden_scope`.
     case forbiddenScope
     /// 429 `rate_limited`, with `Retry-After` in seconds.
@@ -62,6 +64,7 @@ extension CoreError: LocalizedError {
         case .clockSkew: "This Mac's clock is too far from the Core's."
         case .sessionExpired: "The session ended."
         case .stepUpRequired: "This needs Touch ID."
+        case .unlockRequired: "The app is locked. Unlock it with Touch ID."
         case .forbiddenScope: "This device is not allowed to do that."
         case .rateLimited(let s): s.map { "Too many requests. Try again in \(Int($0)) s." } ?? "Too many requests."
         case .coreIdentityMismatch: "This is not the Core this device was paired with."
@@ -104,7 +107,8 @@ extension CoreError {
         case (401, "pairing_failed"): return .pairingFailed
         case (401, _): return .authFailed
         // `unlock_required` (the app unlock lapsed) reads the same to a caller: prove again, then retry.
-        case (403, "step_up_required"), (403, "unlock_required"): return .stepUpRequired
+        case (403, "step_up_required"): return .stepUpRequired
+        case (403, "unlock_required"): return .unlockRequired
         case (403, "forbidden_scope"): return .forbiddenScope
         case (409, "sas_mismatch"): return .sasMismatch
         case (409, "pairing_expired"): return .pairingExpired
@@ -125,4 +129,9 @@ extension CoreError {
         }
         return nil
     }
+}
+
+extension CoreError {
+    /// The Core wants a proof from the person before it will do this: a fresh Touch ID (a danger action) or the app unlock.
+    public var needsProof: Bool { self == .stepUpRequired || self == .unlockRequired }
 }

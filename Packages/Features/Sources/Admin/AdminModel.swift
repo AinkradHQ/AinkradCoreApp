@@ -18,6 +18,9 @@ public final class AdminModel {
     @ObservationIgnored private(set) var audit: AuditModel!
     @ObservationIgnored private(set) var ops: OpsModel!
 
+    /// Drops every revealed secret value from the screen (the app locked).
+    public func hideRevealed() { secrets?.hideAll() }
+
     public init(host: any AdminHost) {
         self.host = host
         secrets = SecretsModel(hub: self)
@@ -95,6 +98,7 @@ public final class AdminModel {
         switch e {
         case .forbiddenScope: "forbidden_scope"
         case .stepUpRequired: "step_up_required"
+        case .unlockRequired: "unlock_required"
         case .rateLimited: "rate_limited"
         case .offline: "offline"
         case .sessionExpired: "session_expired"

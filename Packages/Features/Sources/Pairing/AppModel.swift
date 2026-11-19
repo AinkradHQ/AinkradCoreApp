@@ -723,10 +723,11 @@ public final class AppModel {
         var asked = 0
         while true {
             do { return try await op() } catch {
-                guard case .stepUpRequired = CoreError.unwrapping(error), asked < 2 else { throw error }
+                guard let why = CoreError.unwrapping(error), why.needsProof, asked < 2 else { throw error }
                 asked += 1
+                // `unlock_required` means the Core forgot the unlock: sign in again. `step_up_required` is a danger action.
                 let ok =
-                    unlockSupported && shell.lock != .open
+                    why == .unlockRequired || (unlockSupported && shell.lock != .open)
                     ? await unlockApp()
                     : await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true)
                 guard ok else { throw StepUpDeclined() }
@@ -778,7 +779,7 @@ public final class AppModel {
                 try? await Task.sleep(for: self?.beatEvery ?? .seconds(30))
                 guard !Task.isCancelled, let self, let service = self.service else { return }
                 do { try await service.beatUnlock() } catch {
-                    guard case .stepUpRequired = CoreError.unwrapping(error) else { continue }
+                    guard CoreError.unwrapping(error)?.needsProof == true else { continue }
                     self.lockApp(tellCore: false)
                     await self.unlockApp()
                     return
@@ -794,7 +795,8 @@ public final class AppModel {
         guard unlockSupported else { return }
         shell.elevatedUntil = nil
         shell.lock = .locked
-        if tellCore, let service { Task { await service.endUnlock() } }
+        admin.hideRevealed()  // a revealed value never outlives the unlock
+        if tellCore, let service { Self.endInBackground(service) }
     }
 
     private func watchMacLock() {
@@ -808,17 +810,32 @@ public final class AppModel {
             lockWatch.append((c, t))
         }
         on(ws, NSWorkspace.willSleepNotification) { $0.lockApp() }
+        // Waking: the screen may not lock at all, so no unlock notice would come. Ask once; if the screen is still locked the
+        // prompt is refused and the card waits for `screenIsUnlocked`.
+        on(ws, NSWorkspace.didWakeNotification) { m in
+            m.lockApp(tellCore: false)
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                await m.unlockApp()
+            }
+        }
         on(dc, Notification.Name("com.apple.screenIsLocked")) { $0.lockApp() }
         on(dc, Notification.Name("com.apple.screenIsUnlocked")) { m in Task { await m.unlockApp() } }
         // Quitting ends it too, so the Core does not wait out the 90 s.
         on(NotificationCenter.default, NSApplication.willTerminateNotification) { m in
             guard m.unlockSupported, let service = m.service else { return }
-            let done = DispatchSemaphore(value: 0)
-            Task.detached {
-                await service.endUnlock()
-                done.signal()
-            }
-            _ = done.wait(timeout: .now() + 0.5)
+            Self.endInBackground(service)
+        }
+    }
+
+    /// Tells the Core the unlock ended without blocking the main thread. An activity keeps the process (and a Mac going idle to sleep)
+    /// alive for the one call; if the Mac sleeps or quits first, the Core lapses the unlock itself 90 s after the last beat.
+    private static func endInBackground(_ service: any CoreService) {
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated], reason: "Ending the app unlock")
+        Task.detached {
+            await service.endUnlock()
+            ProcessInfo.processInfo.endActivity(activity)
         }
     }
 
@@ -893,6 +910,10 @@ extension AppModel: AgentsHost {
     /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
     public func elevate(reason: String, force: Bool) async -> InlineNotice? {
         if isElevated && !force { return nil }
+        if force && unlockSupported && shell.lock != .open {
+            if await unlockApp() { return nil }
+            return InlineNotice(title: "Touch ID did not run.")
+        }
         if await ensureElevated(reason, done: "done", keepsEdit: true, force: force) { return nil }
         let n = stepUpNotice
         stepUpNotice = nil

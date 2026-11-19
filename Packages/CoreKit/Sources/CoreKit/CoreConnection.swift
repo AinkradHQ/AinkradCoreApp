@@ -158,6 +158,7 @@ public actor CoreConnection {
     /// when the beats stop.
     public func endUnlock() async {
         _ = try? await sessions.perform(method: "POST", target: "/api/v1/auth/unlock/end", body: Data("{}".utf8))
+        await sessions.setUnlockToken(nil)
     }
 
     private func prove(reason: String, session: Bool) async throws -> Date {
@@ -173,8 +174,15 @@ public actor CoreConnection {
             let challenge = (try? JSONSerialization.jsonObject(with: ask.body) as? [String: Any])?["challenge"]
                 as? String, challenge.count == 43, Wire.unb64(challenge) != nil
         else { throw CoreError.protocolViolation("a step-up challenge that is not 32 bytes") }
-        let message = Wire.stepUpMessage(
-            coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID, challenge: challenge)
+        // A session proof signs its own V2 message with the purpose, so an action proof can never open the unlock.
+        let message =
+            session
+            ? Wire.stepUpMessageV2(
+                coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID,
+                challenge: challenge, purpose: "session")
+            : Wire.stepUpMessage(
+                coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID,
+                challenge: challenge)
         let signature: Data
         do { signature = try await offloaded { try key.sign(message) } } catch {
             throw Self.stepUpFailure(error)
@@ -189,7 +197,13 @@ public actor CoreConnection {
             let until = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?[field]
                 as? String, let t = Wire.parseTimestamp(until)
         else { throw CoreError.protocolViolation("a step-up answer without \(field)") }
-        if !session { await sessions.noteElevation(until: t, sessionID: sessionID) }
+        if session {
+            guard let token = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["unlock_token"] as? String
+            else { throw CoreError.protocolViolation("an unlock answer without unlock_token") }
+            await sessions.setUnlockToken(token)
+        } else {
+            await sessions.noteElevation(until: t, sessionID: sessionID)
+        }
         return Date(timeIntervalSince1970: TimeInterval(t))
     }
 
