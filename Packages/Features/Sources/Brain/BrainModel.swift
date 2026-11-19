@@ -180,7 +180,7 @@ public final class BrainModel {
 
     // MARK: loading
 
-    func reload() async {
+    public func reload() async {
         guard let service else { return }
         do {
             let st = try await service.setup()

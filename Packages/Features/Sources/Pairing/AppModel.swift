@@ -761,8 +761,8 @@ public final class AppModel {
             stepUpNotice = nil
             holdUnlock()
             Task { [brain] in
-                await brain.reload()
-                await brain.openSealedRooms()
+                await brain?.reload()
+                await brain?.openSealedRooms()
             }
             return true
         }
