@@ -130,6 +130,26 @@ struct RevealActivityTests {
         #expect(admin.ops.backups?.running == true, "read again after the start")
     }
 
+    @Test("Ops brings the recent restarts, worded, and an older Core has none")
+    func recentRestarts() async {
+        let rows = [
+            CoreRestart(id: "A", at: Date(), target: "core"),
+            CoreRestart(id: "B", at: Date(), target: "runner", worked: false),
+        ]
+        let (admin, svc, _) = await world()
+        svc.metricsText = "ainkrad_uptime_seconds 5\n"
+        svc.restartRows = rows
+        await admin.ops.reload()
+        #expect(admin.ops.restarts.map(\.id) == ["A", "B"])
+        #expect(OpsWords.restart(rows[0]) == ("Core", "restarted on request"))
+        #expect(OpsWords.restart(rows[1]) == ("Runner", "could not be restarted"))
+        let (old, oldSvc, _) = await world(v010: false)
+        oldSvc.metricsText = "ainkrad_uptime_seconds 5\n"
+        oldSvc.restartRows = rows
+        await old.ops.reload()
+        #expect(old.ops.restarts.isEmpty)
+    }
+
     @Test("An older Core shows no host figures and no backups")
     func olderCoreHasNoHost() async {
         let (admin, svc, _) = await world(v010: false)

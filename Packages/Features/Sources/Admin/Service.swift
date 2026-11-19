@@ -34,6 +34,8 @@ protocol AdminService: Sendable {
     func hostFacts() async -> CoreHostFacts?
     func backups() async throws -> CoreBackups?
     func startBackup() async throws
+    /// The restarts people asked for, newest first (Core 0.10), for the Ops card "Recent restarts".
+    func recentRestarts() async -> [CoreRestart]
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat]
 }
 

@@ -64,6 +64,7 @@ extension AdminService {
     func hostFacts() async -> CoreHostFacts? { nil }
     func backups() async throws -> CoreBackups? { nil }
     func startBackup() async throws { throw Self.unsupported }
+    func recentRestarts() async -> [CoreRestart] { [] }
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat] { [] }
 
     static var unsupported: AdminFailure {
@@ -127,6 +128,8 @@ extension LiveAdminService {
     func backups() async throws -> CoreBackups? {
         do { return try await connection.backupStatus() } catch { throw CoreFailure.of(error) ?? error }
     }
+
+    func recentRestarts() async -> [CoreRestart] { await connection.recentRestarts() }
 
     func startBackup() async throws {
         do { try await connection.startBackup() } catch { throw CoreFailure.of(error) ?? error }

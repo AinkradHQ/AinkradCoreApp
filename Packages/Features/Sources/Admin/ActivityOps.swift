@@ -41,6 +41,12 @@ enum OpsWords {
         return "Next one \(at.formatted(.dateTime.weekday(.abbreviated))) at \(time)"
     }
 
+    /// "Core restarted on request", "Runner restarted on request, it did not work".
+    static func restart(_ r: CoreRestart) -> (who: String, what: String) {
+        let who = r.target == "core" ? "Core" : "Runner"
+        return (who, r.worked ? "restarted on request" : "could not be restarted")
+    }
+
     /// The fleet in one line: "1 working, 2 idle, 1 offline", leaving out the zeros.
     static func fleet(_ f: CoreFleet) -> String {
         let parts = [(f.working, "working"), (f.idle, "idle"), (f.offline, "offline")].filter { $0.0 > 0 }
@@ -78,6 +84,7 @@ struct OpsHostCards: View {
             if let fleet = host?.fleet {
                 OpsFleetCard(fleet: fleet) { admin.host.shell.launcher.entry("runners")?.run() }
             }
+            if !ops.restarts.isEmpty { OpsRestartsCard(restarts: ops.restarts) }
         }
         .accessibilityElement(children: .contain)
     }
@@ -197,6 +204,38 @@ struct OpsBackupCard: View {
         .coreWell()
         .modifier(RiseIn(index: index))
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Recent restarts (mockup 11b): a small tile, who restarted and why, and when. The rows rise in once and sit still under Reduce
+/// Motion (`RiseIn`).
+struct OpsRestartsCard: View {
+    let restarts: [CoreRestart]
+    @Environment(\.corePalette) private var palette
+
+    var body: some View {
+        let now = Date()
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Text("Recent restarts").coreFont(size: MacTextSize.headline, weight: .semibold)
+            ForEach(Array(restarts.prefix(3).enumerated()), id: \.element.id) { i, r in
+                let w = OpsWords.restart(r)
+                HStack(spacing: Space.s2) {
+                    Image(systemName: r.target == "core" ? "arrow.triangle.2.circlepath" : "server.rack")
+                        .coreFont(size: MacTextSize.meta)
+                        .frame(width: Space.s6, height: Space.s6)
+                        .background(coreShape(Radius.chip).fill(palette.track))
+                        .accessibilityHidden(true)
+                    (Text(w.who).fontWeight(.bold) + Text(" \(w.what)")).coreFont(size: MacTextSize.body)
+                    Spacer(minLength: 0)
+                    Text(OpsWords.last(r.at, now: now)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                }
+                .modifier(RiseIn(index: i))
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coreWell()
     }
 }
 

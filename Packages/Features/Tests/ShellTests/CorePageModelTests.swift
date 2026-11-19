@@ -30,6 +30,16 @@ private actor FakeCore: CorePageSource {
         started += 1
         backupInfo.running = true
     }
+    var kept: Int? = 7
+    var keepSets: [Int] = []
+    func backupRetention() async -> CoreBackupRetention? { kept.map { CoreBackupRetention(keep: $0) } }
+    func setBackupRetention(_ keep: Int) async throws -> Int? {
+        if refuse { throw Refused() }
+        keepSets.append(keep)
+        kept = keep
+        return keep
+    }
+    func setKept(_ n: Int?) { kept = n }
     func setMinor95(_ on: Bool) { minor95 = on }
     func setRefuse(_ on: Bool) { refuse = on }
 }
@@ -108,5 +118,53 @@ struct CorePageModelTests {
         await m.backupNow()
         #expect(m.backups == nil)
         #expect(await core.started == 0)
+    }
+
+    @Test func theRetentionIsChangedBehindTheGateAndKeepsWhatTheCoreAnswers() async {
+        let core = FakeCore()
+        let m = CorePageModel()
+        m.source = core
+        await m.load()
+        await m.loadBackups()
+        #expect(m.retention?.keep == 7)
+        var asked: [String] = []
+        m.gate = { reason, op in
+            asked.append(reason)
+            try await op()
+        }
+        await m.setKeep(14)
+        #expect(asked.count == 1 && m.retention?.keep == 14 && m.backupNote == "Your Core keeps the last 14 backups.")
+        #expect(await core.keepSets == [14])
+        // Out of range, or the same number: nothing is asked.
+        await m.setKeep(0)
+        await m.setKeep(61)
+        await m.setKeep(14)
+        #expect(await core.keepSets == [14] && asked.count == 1)
+    }
+
+    @Test func aDeclinedUnlockChangesNothingAndARefusalShowsItsWords() async {
+        let core = FakeCore()
+        let m = CorePageModel()
+        m.source = core
+        await m.load()
+        await m.loadBackups()
+        m.gate = { _, _ in throw CancellationError() }
+        await m.setKeep(30)
+        #expect(m.retention?.keep == 7 && m.failure == nil && (await core.keepSets).isEmpty)
+        m.gate = nil
+        await core.setRefuse(true)
+        await m.setKeep(30)
+        #expect(m.retention?.keep == 7 && m.failure == "No.")
+    }
+
+    @Test func aCoreWithoutTheRetentionRouteHasNoRow() async {
+        let core = FakeCore()
+        await core.setKept(nil)
+        let m = CorePageModel()
+        m.source = core
+        await m.load()
+        await m.loadBackups()
+        await m.setKeep(14)
+        #expect(m.retention == nil && (await core.keepSets).isEmpty)
     }
 }

@@ -46,4 +46,32 @@ struct HostFactsTests {
         let b = try #require(CoreBackups.decode(Data(#"{"helper":"absent"}"#.utf8)))
         #expect(!b.available && b.history.isEmpty)
     }
+
+    @Test func theRetentionIsReadFromTheBackupAnswersAndItsOwnRoute() throws {
+        let b = try #require(CoreBackups.decode(Data(#"{"helper":"present","installed":true,"keep":14}"#.utf8)))
+        #expect(b.keep == 14)
+        #expect(CoreBackups.decode(Data(#"{"helper":"present"}"#.utf8))?.keep == nil)
+        let r = try #require(
+            CoreBackupRetention.decode(Data(#"{"helper":"present","keep":7,"min":1,"max":60}"#.utf8)))
+        #expect(r.keep == 7 && r.min == 1 && r.max == 60)
+        #expect(CoreBackupRetention.decode(Data(#"{"helper":"absent","min":1,"max":60}"#.utf8)) == nil)
+    }
+
+    @Test func recentRestartsJoinTheRequestWithItsOutcome() {
+        let asked = """
+            {"items":[
+              {"at":"2026-11-19T09:15:00.000Z","details":{"target":"runner","request_id":"A1"}},
+              {"at":"2026-11-18T22:10:00.000Z","details":{"target":"core","request_id":"B2"}},
+              {"at":"2026-11-17T14:02:00.000Z","details":{"target":"core"}}]}
+            """
+        let results = """
+            {"items":[{"at":"2026-11-19T09:15:01.000Z","details":{"request_id":"A1","code":"not_installed"}},
+                      {"at":"2026-11-18T22:10:01.000Z","details":{"request_id":"B2","code":"accepted"}}]}
+            """
+        let r = CoreRestart.decode(requested: Data(asked.utf8), results: Data(results.utf8))
+        #expect(r.map(\.id) == ["A1", "B2"], "a row with no request id is dropped")
+        #expect(r.map(\.worked) == [false, true])
+        #expect(CoreRestart.decode(requested: Data(asked.utf8), results: nil).map(\.worked) == [true, true])
+        #expect(CoreRestart.decode(requested: Data("nope".utf8), results: nil).isEmpty)
+    }
 }

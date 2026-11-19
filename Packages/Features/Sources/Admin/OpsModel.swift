@@ -100,6 +100,8 @@ final class OpsModel {
     /// The whole machine and the runner fleet, and the backup schedule and history (Core 0.10); nil on an older Core.
     private(set) var host: CoreHostFacts?
     private(set) var backups: CoreBackups?
+    /// The newest restarts of the Core or its runner that someone asked for (Core 0.10).
+    private(set) var restarts: [CoreRestart] = []
     /// "Back up now" was pressed and the Core has not answered yet.
     private(set) var startingBackup = false
     /// One plain line about the last "Back up now", or nil.
@@ -123,6 +125,7 @@ final class OpsModel {
         coreHistory = []
         host = nil
         backups = nil
+        restarts = []
         backupNote = nil
         state = .loading
     }
@@ -147,6 +150,7 @@ final class OpsModel {
                 if let points = try? await service.opsHistory() { coreHistory = points }
                 host = await service.hostFacts()
                 backups = (try? await service.backups()) ?? backups
+                restarts = await service.recentRestarts()
             }
         } catch { state = hub.state(for: error) }
     }

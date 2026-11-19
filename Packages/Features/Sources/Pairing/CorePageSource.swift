@@ -51,6 +51,12 @@ struct LiveCorePageSource: CorePageSource {
 
     func backupNow() async throws { try await run { try await connection.startBackup() } }
 
+    func backupRetention() async -> CoreBackupRetention? { await connection.backupRetention() }
+
+    func setBackupRetention(_ keep: Int) async throws -> Int? {
+        try await run { try await connection.setBackupRetention(keep) }
+    }
+
     private static func prefs(_ p: Components.Schemas.CorePrefs) -> CorePagePrefs {
         CorePagePrefs(
             name: p.name, crashReports: p.crashReports ?? false, autoUpdate: p.autoUpdate ?? true,

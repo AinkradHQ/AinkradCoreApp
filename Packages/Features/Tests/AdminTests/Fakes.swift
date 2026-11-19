@@ -182,6 +182,8 @@ final class FakeService: AdminService, @unchecked Sendable {
         try note("backup-now")
         backupInfo?.running = true
     }
+    var restartRows: [CoreRestart] = []
+    func recentRestarts() async -> [CoreRestart] { restartRows }
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat] { statsDays }
 }
 

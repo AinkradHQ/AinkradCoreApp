@@ -204,6 +204,19 @@ struct CoreBackupTab: View {
                 } else if let n = b?.history.count, n > 0 {
                     fact("Kept", value: "\(n) \(n == 1 ? "backup" : "backups")")
                 }
+                if let r = shell.corePage.retention, let keep = r.keep, b?.available == true {
+                    CoreRow(
+                        "Keep backups for", subtitle: "Older ones are removed after each backup",
+                        trailing: {
+                            CoreSelect(
+                                nil,
+                                selection: Binding(
+                                    get: { keep }, set: { n in Task { await shell.corePage.setKeep(n) } }),
+                                options: Self.keepOptions(now: keep, range: r.min...r.max)
+                            )
+                            .frame(width: Space.s8 * 5)
+                        })
+                }
                 if b?.available == true {
                     HStack(spacing: Space.s3) {
                         AppActionTile(
@@ -232,6 +245,12 @@ struct CoreBackupTab: View {
             await shell.corePage.loadStorage()
             await shell.corePage.loadBackups()
         }
+    }
+
+    /// "Last 7 backups" and a few more steps inside the range the Core accepts; today's value is always one of them.
+    static func keepOptions(now: Int, range: ClosedRange<Int>) -> [CoreSelectOption<Int>] {
+        let counts = Set([3, 7, 14, 30, 60].filter(range.contains) + [now]).sorted()
+        return counts.map { CoreSelectOption($0, "Last \($0) \($0 == 1 ? "backup" : "backups")") }
     }
 
     static func size(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
