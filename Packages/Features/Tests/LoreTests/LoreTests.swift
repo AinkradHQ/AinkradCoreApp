@@ -130,6 +130,13 @@ final class FakeLore: LoreService, @unchecked Sendable {
             return notes.values.filter { Self.match($0, filter) }.sorted { $0.id < $1.id }
         }
     }
+    func trash(_ id: String) async throws -> LoreNote {
+        lock.withLock {
+            calls.append("trash \(id)")
+            notes[id]!.trashed = true
+            return notes[id]!
+        }
+    }
     func restore(_ id: String) async throws -> LoreNote {
         lock.withLock {
             calls.append("restore \(id)")
@@ -196,7 +203,8 @@ struct LoreModelTests {
         #expect(model.load == .ready)
         #expect(model.note?.day == today)
         #expect(page.text == "")
-        #expect(core.log() == ["today \(today)"])
+        // The sidebars load their lists beside it, so only the first call is fixed.
+        #expect(core.log().first == "today \(today)")
     }
 
     @Test func autosavesFromTheBaseRevision() async {
@@ -204,7 +212,7 @@ struct LoreModelTests {
         page.text = "# Hello\n"
         model.changed()
         #expect(await until { core.notes["ln_aaaaaaaaaaaa"]?.text == "# Hello\n" })
-        #expect(core.log().last == "save ln_aaaaaaaaaaaa 1")
+        #expect(core.log().contains("save ln_aaaaaaaaaaaa 1"))
         #expect(await until { model.base == 2 && model.sync == .saved })
         #expect(LoreDrafts(dir: dir).read("ln_aaaaaaaaaaaa") == nil)
     }
@@ -269,7 +277,7 @@ struct LoreModelTests {
         await model.openNote("ln_cccccccccccc")
         #expect(model.projectName == "Project")  // names arrive with `use`
         await model.newNote()
-        #expect(core.log().last == "create 7")
+        #expect(core.log().contains("create 7"))
         #expect(model.note?.id == "ln_bbbbbbbbbbbb")
     }
 
