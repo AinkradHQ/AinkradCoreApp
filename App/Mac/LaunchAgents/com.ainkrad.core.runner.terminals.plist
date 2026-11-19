@@ -19,6 +19,7 @@
 		<string>ainkrad-runner</string>
 		<string>connect</string>
 		<string>--enable-agents</string>
+		<string>--bundled</string>
 		<string>--enable-pty</string>
 	</array>
 	<key>EnvironmentVariables</key>
