@@ -75,22 +75,10 @@ extension AgentsModel {
         }
     }
 
-    /// Asks first: the agent's sessions then use the default chain.
-    public func confirmUnbind(_ agent: String) {
-        shell.presentSheet(
-            title: "Unbind \(agent)?",
-            message:
-                "New sessions of \(agent) will use \(defaultChain.map { "the default chain, \($0.name)" } ?? "the default chain"). Running sessions keep the chain they started with.",
-            actions: [
-                ShellSheetAction("Keep it bound"),
-                ShellSheetAction("Unbind", primary: true, destructive: true) { [weak self] in
-                    Task { await self?.unbind(agent) }
-                },
-            ])
-    }
-
+    /// Unbinds at once; the toast says the agent falls back to the default chain and offers Undo, which binds it again.
     func unbind(_ agent: String) async {
         guard let api, bindingBusy == nil else { return }
+        let before = bindings.first { $0.agent == agent }?.chain
         bindingBusy = agent
         bindingNotices[agent] = nil
         defer { bindingBusy = nil }
@@ -99,7 +87,14 @@ extension AgentsModel {
                 try await api.unbind(agent: agent)
             }
             bindings.removeAll { $0.agent == agent }
-            shell.showToast("\(agent) is unbound")
+            shell.showToast(
+                "\(agent) is unbound and uses \(defaultChain.map { "the default chain, \($0.name)" } ?? "the default chain").",
+                undo: before == nil
+                    ? nil
+                    : { [weak self] in
+                        guard let self, let chain = self.chains.first(where: { $0.id == before }) else { return }
+                        Task { _ = await self.bind(agent, to: chain) }
+                    })
         } catch {
             bindingNotices[agent] = failure(error, doing: "Unbinding")
         }

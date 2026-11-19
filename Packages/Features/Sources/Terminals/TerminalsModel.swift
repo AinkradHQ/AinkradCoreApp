@@ -69,6 +69,8 @@ public final class TerminalsModel {
     var policyBusy: Set<String> = []
     var policyNote: [String: RunnerNote] = [:]
     var installs: [String: [String: ToolInstall]] = [:]
+    /// True on a Core with API minor 95, which reports a runner's tool installs: the Runners pane then says Updating.
+    public var showsUpdates = false
 
     let host: any TerminalHost
     let service: any TerminalService

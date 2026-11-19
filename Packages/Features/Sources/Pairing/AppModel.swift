@@ -296,6 +296,9 @@ public final class AppModel {
             about.use { try await service.about() }
             let me = await about.reload()
             brain.apiMinor = me?.apiMinor
+            let v010 = (me?.apiMinor ?? 0) >= 95  // the runner tool report of Core 0.10
+            shell.showsRunnerUpdates = v010
+            terminals?.showsUpdates = v010
             var admin = me?.isAdmin
             if admin == nil { admin = (try? await service.myScopes())?.contains("admin") }
             let isAdmin = admin ?? false
@@ -418,6 +421,7 @@ public final class AppModel {
             }
         case .toolInstall(let fields):
             terminals?.toolInstall(fields)
+            shell.toolInstall(fields)
             accounts.toolInstall(fields)
         case .event(let kind, let pairing, _):
             terminals?.event(kind: kind)

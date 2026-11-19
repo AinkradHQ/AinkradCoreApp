@@ -112,19 +112,13 @@ extension AgentsModel {
 
     // MARK: cancel, kill, resume, wake
 
-    /// Cancel and Kill ask first: what the agent already did stays, but it stops.
-    public func confirmCancel(_ id: String) {
+    /// Cancel acts at once (no question, no Undo: it cannot be taken back) and says what happens: what the agent already did
+    /// stays in the transcript, and it stops after the tool call in flight. Kill still asks.
+    public func cancel(_ id: String) {
         guard let s = sessions.session(id) else { return }
-        shell.presentSheet(
-            title: "Cancel this session?",
-            message:
-                "\(s.harness) finishes the tool call in flight, then the session ends as cancelled. What it already did stays in the transcript.",
-            actions: [
-                ShellSheetAction("Keep running"),
-                ShellSheetAction("Cancel session", primary: true, destructive: true) { [weak self] in
-                    self?.run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
-                },
-            ])
+        run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
+        shell.showToast(
+            "Cancelling the \(AgentWords.toolName(s.harness)) session. What it did stays in the transcript.", kind: .info)
     }
 
     public func confirmKill(_ id: String) {

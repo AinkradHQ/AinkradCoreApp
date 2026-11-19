@@ -305,7 +305,7 @@ struct SessionView: View {
             model.stopTurn(s.id)
         case .endSession:
             guard s.live, model.stopping[s.id] == nil else { return false }
-            model.confirmEnd(s.id)
+            model.end(s.id)
         case .terminal:
             guard s.live || s.state != .lost else { return false }
             model.host?.openTerminal(on: s.runner, session: s.id)
