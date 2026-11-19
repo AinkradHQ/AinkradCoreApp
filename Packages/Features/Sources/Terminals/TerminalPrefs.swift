@@ -39,6 +39,8 @@ final class TerminalPrefs {
 
     /// Defaults for the quick New terminal and for what opening one does.
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
+    /// The machine the last terminal opened on: ⌘T opens the next one there at once (E6-3). "" = none yet.
+    var lastRunner: String { didSet { save() } }
     var openFullPane: Bool { didSet { save() } }
     var confirmEnd: Bool { didSet { save() } }
     /// Local echo on a slow link (Settings, Terminal): Off by default (it glitched remote zsh, 2026-11-13); Automatic turns
@@ -69,6 +71,7 @@ final class TerminalPrefs {
             Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "").map { $0 == .frosted ? .clear : $0 }
             ?? .theme
         defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
+        lastRunner = defaults.string(forKey: "terminal.lastRunner") ?? ""
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
         confirmEnd = defaults.object(forKey: "terminal.confirmEnd") as? Bool ?? true
         instantTyping =
@@ -143,6 +146,7 @@ final class TerminalPrefs {
         defaults.set(followLook, forKey: "terminal.followLook")
         defaults.set(screen.rawValue, forKey: "terminal.screen")
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
+        defaults.set(lastRunner, forKey: "terminal.lastRunner")
         defaults.set(openFullPane, forKey: "terminal.openFull")
         defaults.set(confirmEnd, forKey: "terminal.confirmEnd")
         defaults.set(instantTyping.rawValue, forKey: "terminal.instantTyping")

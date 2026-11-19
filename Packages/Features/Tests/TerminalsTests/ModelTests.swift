@@ -13,15 +13,65 @@ import Testing
         return (TerminalsModel(host: host, service: svc), svc, host)
     }
 
-    @Test func reloadSortsRunningFirstAndFiltersByState() async {
+    @Test func reloadSortsRunningFirst() async {
         let (m, svc, _) = make()
         svc.terminalList = [item("t_old", status: "exited", code: 0), item("t_run")]
         await m.reload()
         #expect(m.items.map(\.id) == ["t_run", "t_old"] && m.load == .ready && m.openCount == 1)
-        m.filter = .ended
-        #expect(m.shown.map(\.id) == ["t_old"])
-        m.filter = .running
-        #expect(m.shown.map(\.id) == ["t_run"])
+        #expect(m.shown.map(\.id) == ["t_run", "t_old"])
+    }
+
+    /// E6-3: the list is grouped by machine, This Mac first; the filter splits real shells from sandboxes.
+    @Test func theListGroupsByMachineAndFiltersRealFromSandbox() async {
+        let (m, svc, host) = make()
+        host.macID = "r_mac"
+        svc.runnerList = [runner(), runner("r_mac", name: "Studio")]
+        var real = item("t_real", runner: "r_mac")
+        real.sandbox = "real"
+        var box = item("t_box")
+        box.sandbox = "home"
+        svc.terminalList = [box, real]
+        await m.reload()
+        #expect(m.groups.map(\.id) == ["r_mac", "r1"] && m.groups[0].isThisMac)
+        #expect(m.shown.map(\.id) == ["t_real", "t_box"])
+        m.filter = .sandbox
+        #expect(m.shown.map(\.id) == ["t_box"])
+        m.filter = .thisMac
+        #expect(m.shown.map(\.id) == ["t_real"])
+    }
+
+    /// D-17: This Mac's own runner asks for a real shell; every other machine asks for the sandbox home or a project.
+    @Test func theFormAsksForTheSandboxTheMachineAllows() async {
+        let (m, svc, host) = make()
+        host.macID = "r_mac"
+        svc.runnerList = [runner(), runner("r_mac", name: "Studio")]
+        await m.reload()
+        let f = NewTerminalModel(model: m, runner: "r_mac")
+        #expect(f.sandbox == "real")
+        f.pick("r1")
+        #expect(f.sandbox == "home")
+        f.inProject = true
+        f.projectID = 7
+        #expect(f.sandbox == "project:7")
+        f.session = "as_x"
+        #expect(f.sandbox == nil)
+        f.session = nil
+        f.projectID = nil
+        #expect(f.blockedReason == "Pick a project to share.")
+    }
+
+    /// ⌘T opens on the last machine used, when it is still ready.
+    @Test func quickNewUsesTheLastMachine() async {
+        let (m, svc, _) = make()
+        svc.runnerList = [runner(), runner("r2", name: "Two")]
+        await m.reload()
+        let prefs = TerminalPrefs.shared
+        let was = prefs.lastRunner
+        defer { prefs.lastRunner = was }
+        prefs.lastRunner = "r2"
+        #expect(m.quickRunner == "r2")
+        prefs.lastRunner = "gone"
+        #expect(m.quickRunner != "gone")
     }
 
     @Test func hostLoadIsSampledOnEachLookAndOnlyWhileTheRunnerIsOnline() async {
