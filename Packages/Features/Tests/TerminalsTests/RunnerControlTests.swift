@@ -48,4 +48,18 @@ import Testing
         m.toolInstall(["runner": "r1", "tool": "git", "state": "failed", "reason": "no network"])
         #expect(m.installs["r1"]?["git"]?.reason == "no network")
     }
+
+    @Test func progressNamesTheToolBeingInstalledAndTheLastFailure() async {
+        let (m, _, r) = make()
+        await m.reload()
+        #expect(m.runnerProgress(id: r.id)?.installing == nil)
+        m.installs[r.id] = [
+            "claude": ToolInstall(op: "o1", tool: "claude", state: .running, percent: 40, step: "", reason: nil),
+            "codex": ToolInstall(op: "o2", tool: "codex", state: .failed, percent: 0, step: "", reason: "No network."),
+        ]
+        let p = m.runnerProgress(name: r.name)
+        #expect(p?.installing == "Claude" && p?.percent == 40 && p?.failure == "No network.")
+        #expect(m.live(r) == .gettingReady)
+        #expect(m.runnerProgress(id: "nope") == nil)
+    }
 }

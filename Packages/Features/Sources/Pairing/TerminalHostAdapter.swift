@@ -48,7 +48,7 @@ final class TerminalHostAdapter: TerminalHost, RunnerHost {
     func startAgent(on runner: String) { app.agents.openNewSession(runner: runner) }
 
     /// Add a runner: the guided flow, at the install screen for a Linux server (the runner invite is not in Core yet).
-    func addRunner() { app.openAddWizard(kind: .linuxRunner) }
+    func addRunner() { app.openAddRunner() }
 
     func people() -> [RunnerPerson] {
         (app.devices?.active ?? []).filter { $0.kind != "runner" }.map {

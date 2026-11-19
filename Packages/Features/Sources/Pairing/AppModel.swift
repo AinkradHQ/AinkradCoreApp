@@ -593,6 +593,26 @@ public final class AppModel {
             })
     }
 
+    /// Add a runner (mockup 13): This Mac, another Mac, a server over SSH, or a server by command.
+    func openAddRunner() {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        stepUpNotice = nil
+        let model = AddRunnerModel(app: self)
+        shell.present(
+            ShellDialog(
+                id: "add-runner",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    Task { _ = await model?.requestClose() }
+                }
+            ) {
+                AddRunnerView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
+            })
+    }
+
     func watch(typed m: AddDeviceModel) { wizardPairing = m }
     func unwatch(typed m: AddDeviceModel?) { if wizardPairing === m { wizardPairing = nil } }
 

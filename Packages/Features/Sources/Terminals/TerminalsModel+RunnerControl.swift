@@ -146,6 +146,36 @@ extension TerminalsModel {
     }
 }
 
+/// How a runner that is being added is coming along, for Add runner's live checks.
+public struct RunnerProgress: Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let online: Bool
+    /// The AI tool being installed now ("Claude") and how far it is.
+    public let installing: String?
+    public let percent: Int
+    /// The last install that failed, in words.
+    public let failure: String?
+}
+
+extension TerminalsModel {
+    /// The runner by device id or by name; nil until the Core lists it.
+    public func runnerProgress(id: String? = nil, name: String? = nil) -> RunnerProgress? {
+        guard let r = runners.first(where: { ($0.id == id && id != nil) || ($0.name == name && name != nil) }) else {
+            return nil
+        }
+        let all = Array((installs[r.id] ?? [:]).values)
+        let now = all.first { $0.state == .running }
+        return RunnerProgress(
+            id: r.id, name: r.name, online: r.online, installing: now.map { RunnerTools.name($0.tool) },
+            percent: now?.percent ?? 0, failure: all.first { $0.state == .failed }?.reason)
+    }
+
+    /// One look at the Core and at the Mac runner's own install note, for a screen that waits on a runner.
+    public func refreshRunnerProgress() async {
+        readLocalInstall()
+        await reload()
+
 extension TerminalsModel {
     /// Where the runner inside this app writes the AI tool install it is doing now (`<state>/ai-tools/status.json`).
     static func localToolStatusURL(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
