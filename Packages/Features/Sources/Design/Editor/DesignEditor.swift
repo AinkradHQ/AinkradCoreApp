@@ -55,6 +55,13 @@ final class DesignEditor {
 
     var attached: Bool { backend != nil }
 
+    /// A picture of one frame (the composer's direction cards); nil until the engine lists it.
+    func sketch(frame id: String) -> FrameSketch? {
+        guard let b = backend else { return nil }
+        let list = b.tree().flatMap { try? JSONDecoder().decode([DesignLayer].self, from: $0) } ?? []
+        return FrameSketch.make(frame: id, layers: LayerTree(list)) { b.node($0).flatMap { EditorNode(json: $0) } }
+    }
+
     /// The document or selection may have changed. Reads are coalesced to one per 60 ms: a drag or a remote burst must not
     /// re-list a large document on every event.
     func changed() {

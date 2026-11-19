@@ -26,6 +26,7 @@ struct DesignDetail: View {
                 Image(systemName: item.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
                 Text(item.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
+                if case .doc(let d) = item { KindChip(kind: d.kind) }
                 Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 // The mockup's title bar: what it is, and that the canvas is saved (edits sync as they are made).
                 if editor != nil { StateBadge("Saved", tone: .done, symbol: "checkmark.circle") }
@@ -265,4 +266,30 @@ struct AboutIsland: View {
 
 extension String {
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
+
+/// The title bar's kind chip (mockup 20): what the open item is.
+struct KindChip: View {
+    let kind: DesignDoc.Kind
+    var word: String {
+        switch kind {
+        case .design: "Design"
+        case .system: "Design system"
+        case .mockup: "Mockup"
+        }
+    }
+    var symbol: String {
+        switch kind {
+        case .design: "rectangle.dashed"
+        case .system: "paintpalette"
+        case .mockup: "iphone"
+        }
+    }
+    var body: some View {
+        Label(word, systemImage: symbol).coreFont(size: MacTextSize.meta, weight: .medium)
+            .foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .coreCard(GlassInk.well, radius: Radius.control)
+            .accessibilityLabel("Kind: \(word)")
+    }
 }

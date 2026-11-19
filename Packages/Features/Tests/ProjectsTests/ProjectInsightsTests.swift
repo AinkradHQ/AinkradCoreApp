@@ -28,10 +28,10 @@ struct InsightsWireTests {
         #expect(c.byAuthor.first?.count == 14 && c.recent[0].kind == "session")
         let d = try InsightsWire.docs(Data(#"[{"note":"n1","session":"as_1","path":"plan.md","title":"Plan","session_title":"Fix login","project":"7","updated_at":"2026-11-19T10:00:00Z"}]"#.utf8))
         #expect(d[0].project == "7" && d[0].sessionTitle == "Fix login")
-        let r = try InsightsWire.records(Data(#"{"records":[{"id":"r1","room":"x","room_name":"Atlas notes","type":"fact","body":"Uses SwiftUI"}],"total":1,"locked_rooms":0}"#.utf8))
-        #expect(ProjectKnowledge.records(r, project: " atlas NOTES ").count == 1)
-        #expect(ProjectKnowledge.records(r, project: "Other").isEmpty)
-        #expect(try InsightsWire.tuning(Data(#"{"id":1,"fetch_interval_minutes":60,"default_environment":"Staging"}"#.utf8)) == ProjectTuning(fetchInterval: 60, defaultEnvironment: "Staging"))
+        let r = try InsightsWire.records(Data(#"{"records":[{"id":"r1","room":"room_a","room_name":"Atlas notes","type":"fact","body":"Uses SwiftUI"}],"total":1,"locked_rooms":0}"#.utf8))
+        #expect(ProjectKnowledge.records(r, room: "room_a").count == 1)
+        #expect(ProjectKnowledge.records(r, room: nil).isEmpty && ProjectKnowledge.records(r, room: "room_x").isEmpty)
+        #expect(try InsightsWire.tuning(Data(#"{"id":1,"fetch_interval_minutes":60,"default_environment":"Staging","room":{"room_id":"room_a","name":"Atlas"}}"#.utf8)) == ProjectTuning(fetchInterval: 60, defaultEnvironment: "Staging", roomID: "room_a"))
         // An older answer without the fields keeps the Core's real default.
         #expect(try InsightsWire.tuning(Data(#"{"id":1}"#.utf8)) == ProjectTuning(fetchInterval: 15, defaultEnvironment: nil))
     }
@@ -51,7 +51,7 @@ final class FakeInsights: ProjectInsightsService, @unchecked Sendable {
     func usage(project: Int64) async throws -> UsageInfo { UsageInfo(weekCost: 2) }
     func changes(project: Int64) async throws -> ChangesInfo { ChangesInfo() }
     func area(_ area: String) async throws -> [KnownRecord] {
-        [KnownRecord(id: "1", roomName: "Demo", kind: "fact", body: "a"), KnownRecord(id: "2", roomName: "Else", kind: "fact", body: "b")]
+        [KnownRecord(id: "1", room: "room_a", roomName: "Demo", kind: "fact", body: "a"), KnownRecord(id: "2", room: "room_b", roomName: "Else", kind: "fact", body: "b")]
     }
     func sessionDocs() async throws -> [SessionDocItem] {
         [SessionDocItem(note: "n", session: "s", path: "p.md", title: "P", sessionTitle: nil, project: "1", updatedAt: nil),
