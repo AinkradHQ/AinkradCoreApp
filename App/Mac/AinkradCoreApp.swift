@@ -6,8 +6,9 @@ import Pairing
 import Shell
 import SwiftUI
 
-@main
+// Started from `main.swift`, which also has the background collector mode (E9-6).
 struct AinkradCoreApp: App {
+    @NSApplicationDelegateAdaptor(BackgroundDelegate.self) private var delegate
     @State private var app = AinkradCoreApp.makeApp()
 
     private var shell: ShellModel { app.shell }
@@ -68,6 +69,11 @@ struct AinkradCoreApp: App {
         return app
         #endif
     }
+}
+
+/// Closing the window does not quit (E9-6): the Mac collectors and the Brain status keep running in the background. ⌘Q still quits.
+final class BackgroundDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
 /// Quit asks twice, like a browser: the first ⌘Q shows "Press ⌘Q again to quit", a second one within two seconds quits.

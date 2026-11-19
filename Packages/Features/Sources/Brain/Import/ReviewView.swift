@@ -29,9 +29,6 @@ struct ReviewStep: View {
                     Text(BrainWords.plural(r.visible.filter { !$0.isUnsorted }.count, "room", "rooms") + " found")
                         .coreFont(size: MacTextSize.headline, weight: .semibold)
                     Spacer(minLength: Space.s3)
-                    Button("Re-sort") { Task { await r.resort() } }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(r.busy)
-                        .help("Group the rooms again. Your ticks and renames stay.")
                     Text(ReviewWords.tally(checked: r.kept.count, of: r.open.filter { !$0.isUnsorted }.count))
                         .coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).monospacedDigit()

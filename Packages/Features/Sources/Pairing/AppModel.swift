@@ -209,6 +209,13 @@ public final class AppModel {
         open(url: url)
     }
 
+    /// The background collector (E9-6): once the Core is live, one sync of the Mac collectors. Does nothing offline.
+    public func collectInBackground() async {
+        for _ in 0..<60 where shell.coreLink != .live { try? await Task.sleep(for: .seconds(1)) }
+        guard shell.coreLink == .live else { return }
+        await brain.collectNow()
+    }
+
     public func start() async {
         guard phase == .starting else { return }
         defer { applyPendingURL() }

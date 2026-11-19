@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 /// Settings, Apps, Brain: the rooms the Core files as another project ("Same project as…" in an import review, API minor
-/// 72). Read from the Core each time; Remove forgets one, and the next Re-sort keeps the two rooms apart again.
+/// 72). Read from the Core each time; Remove forgets one, and the Core keeps the two rooms apart again.
 @MainActor @Observable
 final class SameProjectList {
     private let source: @MainActor () -> BrainRoutes?
@@ -42,7 +42,7 @@ struct SameProjectSection: View {
                         CoreRow(a.from, subtitle: "Filed as \(a.to)", symbol: "folder") {
                             Button("Remove") { Task { await list.remove(a) } }
                                 .buttonStyle(CoreButtonStyle(.plain, size: .small))
-                                .help("Keep \(a.from) apart from \(a.to) from the next Re-sort.")
+                                .help("Keep \(a.from) apart from \(a.to) from now on.")
                                 .accessibilityLabel("Remove \(a.from) from \(a.to)")
                         }
                     }
