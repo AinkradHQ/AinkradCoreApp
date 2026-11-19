@@ -68,6 +68,7 @@ struct BrainLookSection: View {
                 }
             }
             if part.showsOptions {
+                BrainLearningSection(settings: ai)
                 GlassSection(
                     "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain", hue: GlassInk.blue, index: 1
                 ) {
