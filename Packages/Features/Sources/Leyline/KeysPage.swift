@@ -236,7 +236,7 @@ struct ImportKeySheet: View {
                 )
                 CoreSecureField("Passphrase", placeholder: "Only for an encrypted key", text: $passphrase)
                 Text(
-                    "Works with OpenSSH, ed25519, ECDSA and RSA 2048 bits or larger. The key is sent once and sealed in the Core. It cannot be shown again."
+                    "OpenSSH or PEM keys: ed25519, ECDSA P-256/P-384, or RSA 2048 bits or larger. The key is sent once and sealed in the Core. It cannot be shown again."
                 )
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 CoreDialogFooter(
