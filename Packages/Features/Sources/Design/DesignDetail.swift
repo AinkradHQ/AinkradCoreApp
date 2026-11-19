@@ -22,11 +22,13 @@ struct DesignDetail: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             AppHeader {
-                BackButton("Design") { model.closeItem() }
+                BackButton("Designs") { model.closeItem() }
                 Image(systemName: item.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
                 Text(item.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
                 Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                // The mockup's title bar: what it is, and that the canvas is saved (edits sync as they are made).
+                if editor != nil { StateBadge("Saved", tone: .done, symbol: "checkmark.circle") }
             } actions: {
                 if let editor { PresenceStrip(peers: editor.peers) }
                 if let editor { EditorToolbar(editor: editor, aboutOpen: $aboutOpen) }
