@@ -222,11 +222,17 @@ struct SetupWizardView: View {
     private var found: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             title("Your Core is here")
-            note("It is running and ready to connect. Check this is the Core you just set up.")
+            note("It is running and ready to connect. Compare the fingerprint below with the Fingerprint line your installer printed, and press Connect only if they are the same.")
             if let link = model.link {
                 FactCard {
                     FactRow(key: "Core", value: String(link.address.prefix(80)), mono: true, oneLine: true)
-                    FactRow(key: "Fingerprint", value: link.fingerprintHint, mono: true)
+                    // The whole fingerprint, wrapped, so it can be compared and not only recognised.
+                    VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                        Text("Fingerprint").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                        Text(link.coreFingerprint).coreFont(size: MacTextSize.body, design: .monospaced)
+                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             }
             note("From now on your Core updates itself at night.")
@@ -234,8 +240,9 @@ struct SetupWizardView: View {
                 Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
                 Button("Paste a link instead") { model.haveLink() }.coreGlassButton()
+                // No Return shortcut: this link came from the network, so it is connected only by a deliberate press.
                 Button("Connect") { model.connect() }.buttonStyle(CoreButtonStyle(.prominent, size: .large))
-                    .coreShortcut(.primary).disabled(!model.canConnect)
+                    .disabled(!model.canConnect)
             }
         }
     }
