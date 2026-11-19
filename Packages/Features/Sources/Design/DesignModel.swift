@@ -335,6 +335,7 @@ public final class DesignModel {
             id: "design", title: "Design", sub: "Home Core", symbol: "paintbrush.pointed", minWidth: 760
         ) { DesignView(model: self) }
         spec.tab = "Design"
+        spec.fullScreenOnly = true
         host.shell.openPane(spec)
         Task { await reload() }
     }
