@@ -8,7 +8,26 @@ struct BrainPane: View {
     let model: BrainModel
     @FocusState private var paneFocus: Bool
 
+    /// The calm Brain fills the pane when the Core has it and the person is not in Explore.
+    private var showsCalm: Bool {
+        model.calmAvailable && !model.exploring && model.load == .ready && model.setup == .ready && !model.rooms.isEmpty
+    }
+
     var body: some View {
+        if showsCalm {
+            BrainCalmView(brain: model)
+                .coreFont(size: MacTextSize.body)
+                .foregroundStyle(GlassInk.primary)
+                .paneLook(BrainPrefs.shared.look)
+                .clipShape(coreShape(Radius.cardMac))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("brain-pane")
+        } else {
+            console
+        }
+    }
+
+    private var console: some View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
                 // No service attached: nothing to look at, so no tabs over the unavailable card.
@@ -79,6 +98,12 @@ struct BrainPane: View {
                 .accessibilityLabel(BrainWords.sampleLabel)
         }
         let ready = model.setup == .ready && model.load == .ready
+        if model.calmAvailable {
+            AppActionTile(title: "Back to Brain", symbol: "brain", key: "⌘0", hue: GlassInk.blue) {
+                model.explore(false)
+            }
+            .keyboardShortcut("0", modifiers: .command)
+        }
         if ready, !model.rooms.isEmpty, let sync = model.sync,
             model.currentTab == .rooms || model.currentTab == .sources || (model.currentTab == .inbox && servesInbox)
         {
@@ -116,7 +141,7 @@ struct BrainPane: View {
         switch model.currentTab {
         case .activity: true
         case .inbox: model.inboxState.list != .noRoom
-        case .overview, .checks, .rooms, .sources: false
+        case .overview, .checks, .rooms, .sources, .records: false
         }
     }
 
@@ -163,6 +188,7 @@ struct BrainPane: View {
                 case .overview: OverviewTab(model: model)
                 case .rooms: RoomsTab(model: model)
                 case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
+                case .records: ExploreRecordsTab(brain: model)
                 case .inbox: CandidateInboxTab(model: model)
                 case .activity:
                     if model.isSample || model.service?.servesChanges == true {
