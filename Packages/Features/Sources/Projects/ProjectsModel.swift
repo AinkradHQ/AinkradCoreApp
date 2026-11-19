@@ -15,6 +15,8 @@ public final class ProjectsModel {
     var catalog: any RepoCatalog
     /// The Run page's reads and writes (spec, secrets, run). Set with the connection; the Debug demo brings its own.
     var runService: (any ProjectRunService)?
+    /// Run configurations and environments (Core 0.10, minor 95); nil on an older Core, so the page shows the old Run page.
+    var configsService: (any RunConfigsService)?
     private(set) var catalogState = RepoCatalogState.loading
     /// The Core can keep a runner preference (minor 95); older Cores are never asked.
     private(set) var runnerSupported = false
@@ -90,7 +92,11 @@ public final class ProjectsModel {
         lore = LiveLoreService(connection: connection)
         runService = LiveProjectRunService(connection: connection)
         catalog = LiveRepoCatalog(connection: connection)
-        Task { [weak self] in self?.runnerSupported = await connection.serverSupports(minor: 95) }
+        Task { [weak self] in
+            let ok = await connection.serverSupports(minor: 95)
+            self?.runnerSupported = ok
+            self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
+        }
         use(LiveProjectsService(connection: connection))
     }
 
@@ -104,6 +110,7 @@ public final class ProjectsModel {
         service = nil
         lore = nil
         runService = nil
+        configsService = nil
         projects = []
         pollTask?.cancel()
         pollTask = nil
