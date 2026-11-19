@@ -1,6 +1,5 @@
-/// Where the top bar's Brain counts land (`me`, `rules`, `knowledge`, `timeline`, `places`). This branch has no area pages
-/// yet, so every area opens the overview; E9's calm Brain (`BrainCalmModel.Page`, same raw values) replaces `tab(for:)`
-/// with `calm.page = Page(rawValue: area)` at the epic merge, and nothing else changes.
+/// Where the top bar's Brain counts land (`me`, `rules`, `knowledge`, `timeline`, `places`). The calm Brain opens its own
+/// page (`BrainModel.open(area:)` sets `calm.page = Page(rawValue: area)`); the console, which has no area pages, opens the overview.
 enum BrainAreaLink {
     static let areas: Set<String> = ["me", "rules", "knowledge", "timeline", "places"]
 

@@ -413,6 +413,13 @@ public final class BrainModel {
     // MARK: shell
 
     /// Opens the pane on a tab.
+    /// Opens the Brain on an area the top bar counted (`me`, `rules`, `knowledge`, `timeline`, `places`): the calm Brain's page
+    /// when it is shown, else the console's overview.
+    func open(area: String) {
+        show(BrainAreaLink.tab(for: area))
+        if calmAvailable, !exploring, let page = BrainCalmModel.Page(rawValue: area) { calm.page = page }
+    }
+
     public func show(_ tab: BrainTab = .overview) {
         self.tab = tab
         var spec = PaneSpec(
@@ -507,7 +514,7 @@ public final class BrainModel {
         // The top bar's Brain dropdown: a Core with API minor 95 tells what it does now, the five areas and what it learned
         // today; an older one says how things are in Rooms and Records.
         shell.brainRefresh = { [weak self] in await self?.refreshGlance() }
-        shell.brainOpenArea = { [weak self] area in self?.show(BrainAreaLink.tab(for: area)) }
+        shell.brainOpenArea = { [weak self] area in self?.open(area: area) }
         shell.brainUndoLearned = { [weak self] in self?.undoLearned() }
         shell.brainGlance = { [weak self] in
             guard let self, self.service != nil else { return nil }
