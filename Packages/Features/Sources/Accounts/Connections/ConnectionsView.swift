@@ -73,8 +73,8 @@ struct ConnectionsView: View {
                 .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
             }
         }
+        .paneLook(AppLookPrefs.shared("connections").look)
         .appLookTheme(AppLookPrefs.shared("connections"))
-        .paneLook(AccountsPrefs.shared.look)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("connections-pane")

@@ -8,13 +8,6 @@ import SwiftUI
 final class AgentPrefs {
     static let shared = AgentPrefs()
 
-    enum Surface: String, CaseIterable { case clear, frosted, tinted, solid }
-    var surface: Surface { didSet { save() } }
-    /// How solid the surface is, 0 (see-through) to 1.
-    var opacity: Double { didSet { save() } }
-    var blur: Bool { didSet { save() } }
-    /// Use Settings, Appearance's content background (the default) instead of the app's own.
-    var followLook: Bool { didSet { save() } }
     var harness: String { didSet { save() } }
     var mode: String { didSet { save() } }
     var runner: String { didSet { save() } }  // "" = the best ready runner
@@ -28,11 +21,6 @@ final class AgentPrefs {
 
     private let d = UserDefaults.standard
     private init() {
-        surface =
-            Surface(rawValue: d.string(forKey: "agents.surface") ?? "").map { $0 == .frosted ? .clear : $0 } ?? .clear
-        opacity = d.object(forKey: "agents.opacity") as? Double ?? 0.55
-        blur = d.object(forKey: "agents.blur") as? Bool ?? true
-        followLook = d.object(forKey: "agents.followLook") as? Bool ?? true
         harness = Self.harness(d.string(forKey: "agents.harness"))
         mode = d.string(forKey: "agents.mode") ?? "ask"
         runner = d.string(forKey: "agents.runner") ?? ""
@@ -48,10 +36,6 @@ final class AgentPrefs {
     }
 
     private func save() {
-        d.set(surface.rawValue, forKey: "agents.surface")
-        d.set(opacity, forKey: "agents.opacity")
-        d.set(blur, forKey: "agents.blur")
-        d.set(followLook, forKey: "agents.followLook")
         d.set(harness, forKey: "agents.harness")
         d.set(mode, forKey: "agents.mode")
         d.set(runner, forKey: "agents.runner")
@@ -104,15 +88,10 @@ extension AgentPrefs {
         return NSFont(descriptor: d, size: size) ?? base
     }
 
-    /// The app's own Look, or nil to follow Settings, Appearance.
-    var look: CoreLook? { followLook ? nil : CoreLook(mode: modeChoice, opacity: opacity) }
-    var modeChoice: SurfaceMode {
-        get { SurfaceMode(style: AppSurfaceStyle(rawValue: surface.rawValue) ?? .tinted, blur: blur) }
-        set {
-            surface = Surface(rawValue: newValue.style.rawValue) ?? .tinted
-            blur = newValue.blur
-        }
-    }
+    /// The app's Look (E2-6): `AppLookPrefs.shared("agents")`, the same controls as every app.
+    var appLook: AppLookPrefs { AppLookPrefs.shared("agents") }
+    /// The app's own surface, or nil to follow Settings, Appearance.
+    var look: CoreLook? { appLook.look }
 }
 
 /// The Agents settings: surface and defaults. Used in Settings and in the Appearance popover.
@@ -125,19 +104,7 @@ struct AgentSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? Space.s3 : Space.s4) {
             if part.showsLook {
-                GlassSection(
-                    "Look", sub: "The AI Sessions app and its sessions, as one.", symbol: "square.on.square",
-                    hue: GlassInk.blue
-                ) {
-                    AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
-                } content: {
-                    if prefs.followLook {
-                        Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
-                            .foregroundStyle(GlassInk.secondary)
-                    } else {
-                        GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
-                    }
-                }
+                AppLookSection(appName: "AI Sessions", prefs: prefs.appLook)
                 GlassSection(
                     "Text", sub: "The conversation and the message field. Code stays monospaced.", symbol: "textformat",
                     hue: GlassInk.blue, index: 1

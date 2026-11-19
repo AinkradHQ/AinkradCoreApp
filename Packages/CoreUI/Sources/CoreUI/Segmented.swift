@@ -70,6 +70,7 @@ public struct CoreSegmented<ID: Hashable & Sendable>: View {
 }
 
 private struct Segment<ID: Hashable & Sendable>: View {
+    @Environment(\.coreAccent) private var accent
     let segment: CoreSegment<ID>
     let selected: Bool
     /// The container has keyboard focus and this is the picked segment: it shows the hover fill, a lift and a brighter edge.
@@ -104,9 +105,9 @@ private struct Segment<ID: Hashable & Sendable>: View {
             .background {
                 // The parent's animation glides the highlight between segments. Reduce Motion: it jumps and its colour fades.
                 if reduce {
-                    coreShape(Radius.control).fill(GlassInk.blue.opacity(selected ? 1 : 0))
+                    coreShape(Radius.control).fill(GlassInk.accent(accent).opacity(selected ? 1 : 0))
                 } else if selected {
-                    coreShape(Radius.control).fill(GlassInk.blue)
+                    coreShape(Radius.control).fill(GlassInk.accent(accent))
                         .matchedGeometryEffect(id: "lens", in: lens)
                 }
             }
@@ -124,6 +125,7 @@ private struct Segment<ID: Hashable & Sendable>: View {
 /// An on/off setting as a glass tile in the segment look (Ahmed, 2026-11-05): its icon swaps, a small
 /// rounded switch slides inside, and it lights blue when on. Hover steps the fill and edge; a press shrinks it a little.
 public struct GlassToggleTile: View {
+    @Environment(\.coreAccent) private var accent
     let title: String
     let sub: String?
     let symbol: String
@@ -191,7 +193,7 @@ public struct GlassToggleTile: View {
     /// A small rounded switch: the knob slides and the track fills.
     private var knob: some View {
         coreShape(Radius.chip).fill(
-            isOn ? GlassInk.blue : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
+            isOn ? GlassInk.accent(accent) : GlassInk.adaptive(.white.opacity(0.18), day: GlassInk.dayInk.opacity(0.16))
         )
         .frame(width: 30, height: 18)
         .overlay(alignment: isOn ? .trailing : .leading) {

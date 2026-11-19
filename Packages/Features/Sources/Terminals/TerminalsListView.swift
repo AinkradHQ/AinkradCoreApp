@@ -18,6 +18,7 @@ struct TerminalsListView: View {
         }
         // The pane's frame draws the background: Settings, Appearance's Look, or the app's own.
         .paneLook(prefs.look)
+        .appLookTheme(prefs.appLook)
         .clipShape(coreShape(Radius.cardMac))
         .onAppear { listFocus = true }
     }

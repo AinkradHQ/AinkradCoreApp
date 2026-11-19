@@ -15,27 +15,17 @@ final class TerminalPrefs {
     var themeID: String { didSet { save() } }
     var cursor: CursorShape { didSet { save() } }
     var blink: Bool { didSet { save() } }
-    /// How solid the terminal's background is, 0.4 (see-through glass) to 1 (opaque).
-    var opacity: Double { didSet { save() } }
-    /// Frosts what shows through a see-through terminal, so text stays readable over a busy sky.
-    var blur: Bool { didSet { save() } }
-    /// Use Settings, Appearance's content background (the default) instead of the app's own.
-    var followLook: Bool { didSet { save() } }
-
-    /// The Terminals app's own surface (the list): glass clear or frosted, the theme's colour, or a solid dark.
+    /// The Terminals app's surface is its Look (E2-6): `AppLookPrefs.shared("terminal")`, the same controls as every app.
+    var appLook: AppLookPrefs { AppLookPrefs.shared("terminal") }
+    /// The terminal screen's style: the theme's colour, or a solid dark. The app surface shares it, its blur and opacity.
     enum Surface: String, CaseIterable { case clear, frosted, theme, solid }
-    /// The terminal screen's style. The app surface shares it, its blur and its opacity: one look for both (Ahmed, 2026-11-05).
-    var screen: Surface { didSet { save() } }
     /// What is drawn: Settings, Appearance's Look, or the app's own (the terminal keeps its theme's colour either way).
-    var lookScreen: Surface {
-        followLook ? (LookPrefs.shared.look(for: .panes).mode == .solid ? .solid : .theme) : screen
-    }
-    var lookBlur: Bool { followLook ? LookPrefs.shared.look(for: .panes).mode.blur : blur }
-    var lookOpacity: Double { followLook ? LookPrefs.shared.look(for: .panes).opacity : opacity }
+    var lookScreen: Surface { lookMode == .solid ? .solid : .theme }
+    private var lookMode: SurfaceMode { appLook.look?.mode ?? LookPrefs.shared.look(for: .panes).mode }
+    var lookBlur: Bool { lookMode.blur }
+    var lookOpacity: Double { appLook.look?.opacity ?? LookPrefs.shared.look(for: .panes).opacity }
     /// The app's own Look for the list, or nil to follow Settings, Appearance.
-    var look: CoreLook? {
-        followLook ? nil : CoreLook(mode: SurfaceMode(style: Self.app(screen), blur: blur), opacity: opacity)
-    }
+    var look: CoreLook? { appLook.look }
 
     /// Defaults for the quick New terminal and for what opening one does.
     var defaultRunner: String { didSet { save() } }  // "" = the best ready runner
@@ -62,12 +52,6 @@ final class TerminalPrefs {
         themeID = defaults.string(forKey: "terminal.theme") ?? TermTheme.all[0].id
         cursor = CursorShape(rawValue: defaults.string(forKey: "terminal.cursor") ?? "") ?? .block
         blink = defaults.object(forKey: "terminal.blink") as? Bool ?? true
-        opacity = defaults.object(forKey: "terminal.opacity") as? Double ?? 0.78
-        blur = defaults.object(forKey: "terminal.blur") as? Bool ?? true
-        followLook = defaults.object(forKey: "terminal.followLook") as? Bool ?? true
-        screen =
-            Surface(rawValue: defaults.string(forKey: "terminal.screen") ?? "").map { $0 == .frosted ? .clear : $0 }
-            ?? .theme
         defaultRunner = defaults.string(forKey: "terminal.defaultRunner") ?? ""
         openFullPane = defaults.object(forKey: "terminal.openFull") as? Bool ?? false
         confirmEnd = defaults.object(forKey: "terminal.confirmEnd") as? Bool ?? true
@@ -80,22 +64,9 @@ final class TerminalPrefs {
 
     var theme: TermTheme { TermTheme.all.first { $0.id == themeID } ?? TermTheme.all[0] }
 
-    /// The three-choice look of the terminals and the app.
-    var screenMode: Binding<SurfaceMode> {
-        Binding(
-            get: { SurfaceMode(style: Self.app(self.screen), blur: self.blur) },
-            set: {
-                self.screen = Self.term($0.style)
-                self.blur = $0.blur
-            })
-    }
-
     /// The style as the shared surface type (theme ↔ tinted).
     static func app(_ s: Surface) -> AppSurfaceStyle {
         s == .theme ? .tinted : AppSurfaceStyle(rawValue: s.rawValue) ?? .frosted
-    }
-    static func term(_ s: AppSurfaceStyle) -> Surface {
-        s == .tinted ? .theme : Surface(rawValue: s.rawValue) ?? .theme
     }
 
     /// The terminal screen's background colour for its style, at its transparency.
@@ -138,10 +109,6 @@ final class TerminalPrefs {
         defaults.set(themeID, forKey: "terminal.theme")
         defaults.set(cursor.rawValue, forKey: "terminal.cursor")
         defaults.set(blink, forKey: "terminal.blink")
-        defaults.set(opacity, forKey: "terminal.opacity")
-        defaults.set(blur, forKey: "terminal.blur")
-        defaults.set(followLook, forKey: "terminal.followLook")
-        defaults.set(screen.rawValue, forKey: "terminal.screen")
         defaults.set(defaultRunner, forKey: "terminal.defaultRunner")
         defaults.set(openFullPane, forKey: "terminal.openFull")
         defaults.set(confirmEnd, forKey: "terminal.confirmEnd")

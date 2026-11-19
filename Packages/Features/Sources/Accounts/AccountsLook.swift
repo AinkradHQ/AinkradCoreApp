@@ -2,43 +2,6 @@ import CoreUI
 import Observation
 import SwiftUI
 
-/// How the Core (Accounts) app looks, like every other app's Look (Settings, Apps): one style, blur and opacity.
-@MainActor @Observable
-final class AccountsPrefs {
-    static let shared = AccountsPrefs()
-    var style: AppSurfaceStyle { didSet { save() } }
-    var blur: Bool { didSet { save() } }
-    var opacity: Double { didSet { save() } }
-    /// Use Settings, Appearance's content background (the default) instead of the app's own.
-    var followLook: Bool { didSet { save() } }
-
-    private let d = UserDefaults.standard
-    private init() {
-        style = AppSurfaceStyle(rawValue: d.string(forKey: "accounts.surface") ?? "") ?? .tinted
-        blur = d.object(forKey: "accounts.blur") as? Bool ?? true
-        opacity = d.object(forKey: "accounts.opacity") as? Double ?? 0.6
-        followLook = d.object(forKey: "accounts.followLook") as? Bool ?? true
-    }
-    private func save() {
-        d.set(style.rawValue, forKey: "accounts.surface")
-        d.set(blur, forKey: "accounts.blur")
-        d.set(opacity, forKey: "accounts.opacity")
-        d.set(followLook, forKey: "accounts.followLook")
-    }
-}
-
-extension AccountsPrefs {
-    /// The app's own Look, or nil to follow Settings, Appearance.
-    var look: CoreLook? { followLook ? nil : CoreLook(mode: modeChoice, opacity: opacity) }
-    var modeChoice: SurfaceMode {
-        get { SurfaceMode(style: style, blur: blur) }
-        set {
-            style = newValue.style
-            blur = newValue.blur
-        }
-    }
-}
-
 /// Each provider in its own colour and mark, so its accounts tell apart at a glance.
 enum ProviderLook {
     static func hue(_ provider: String) -> Color {

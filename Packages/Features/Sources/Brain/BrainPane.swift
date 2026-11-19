@@ -62,7 +62,8 @@ struct BrainPane: View {
         .focusable().focused($paneFocus).focusEffectDisabled()
         .onAppear { paneFocus = true }
         .retakeFocus(after: model.host.shell, pane: "brain") { paneFocus = true }
-        .paneLook(BrainPrefs.shared.look)
+        .paneLook(AppLookPrefs.shared("brain").look)
+        .appLookTheme(AppLookPrefs.shared("brain"))
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("brain-pane")
