@@ -230,6 +230,7 @@ extension InfoRow where Trailing == EmptyView {
 
 /// One permission as a tile: icon, name and what it allows. Lit in its hue when held or chosen, dim when not.
 public struct ScopeTile: View {
+    @Environment(\.coreAccent) private var accent
     let symbol: String
     let name: String
     let detail: String
@@ -255,7 +256,7 @@ public struct ScopeTile: View {
             Image(systemName: "checkmark").coreFont(size: 11, weight: .bold).foregroundStyle(.white)
                 .opacity(on ? 1 : 0)
                 .frame(width: 18, height: 18)
-                .background(on ? GlassInk.blue : Color.clear, in: coreShape(Radius.chip))
+                .background(on ? GlassInk.accent(accent) : Color.clear, in: coreShape(Radius.chip))
                 .overlay {
                     coreShape(Radius.chip).strokeBorder(on ? .white.opacity(0.25) : GlassInk.track, lineWidth: 1.5)
                 }

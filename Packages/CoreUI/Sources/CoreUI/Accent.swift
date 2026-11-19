@@ -51,3 +51,15 @@ public final class AccentPrefs: @unchecked Sendable {
         accent = CoreAccent(rawValue: UserDefaults.standard.string(forKey: "look.accent") ?? "") ?? .graphite
     }
 }
+
+extension EnvironmentValues {
+    /// The accent of the app pane in view (set by `.appLook`), or nil to use the global one from Settings, Appearance.
+    @Entry public var coreAccent: CoreAccent? = nil
+}
+
+extension GlassInk {
+    /// The accent fill for a view: its pane's own accent, else the global one. Components read `coreAccent` and call this.
+    public static func accent(_ own: CoreAccent?) -> Color { (own ?? AccentPrefs.shared.accent).fill }
+    /// The accent as text and small glyphs.
+    public static func accentInk(_ own: CoreAccent?) -> Color { (own ?? AccentPrefs.shared.accent).ink }
+}
