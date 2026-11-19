@@ -41,8 +41,9 @@ final class RunConfigsModel {
     private(set) var secretNames: [String] = []
     private(set) var history: [RunRecord] = []
     private(set) var runnerOptions: [RunnerOption] = []
-    private(set) var logLines: [ProjectLive.LogLine] = []
-    private var logNext = 0
+    /// The newest log lines of each live run, by run id (the last 300 each).
+    private(set) var logLines: [String: [ProjectLive.LogLine]] = [:]
+    private var logNext: [String: Int] = [:]
     private(set) var loaded = false
     private(set) var loadError: String?
     private(set) var busy = false
@@ -64,9 +65,10 @@ final class RunConfigsModel {
 
     var selectedConfig: RunConfigItem? { configs.first { $0.id == selected } ?? configs.first }
     var envConfigItem: RunConfigItem? { configs.first { $0.id == envConfig } ?? configs.first }
-    /// The newest live run, if any: a project has one live run.
-    var liveRun: RunRecord? { history.first(where: \.live) }
-    func isLive(_ config: RunConfigItem) -> Bool { liveRun?.configID == config.id }
+    /// Every live run, newest first: a project has one live run per configuration.
+    var liveRuns: [RunRecord] { history.filter(\.live) }
+    func liveRun(of config: RunConfigItem) -> RunRecord? { liveRuns.first { $0.configID == config.id } }
+    func isLive(_ config: RunConfigItem) -> Bool { liveRun(of: config) != nil }
     func name(of config: Int64?) -> String { configs.first { $0.id == config }?.name ?? "Setup" }
 
     /// "3 variables · values are hidden", for the Environment tab.
@@ -119,9 +121,11 @@ final class RunConfigsModel {
     func watchLive() async {
         while !Task.isCancelled {
             if let service, let h = try? await service.history(project: projectID) { history = h }
-            if liveRun != nil, let page = try? await model.runService?.logs(project: projectID, after: logNext) {
-                logNext = page.next
-                logLines = Array((logLines + page.lines).suffix(300))
+            for r in liveRuns {
+                guard let page = try? await service?.logs(project: projectID, run: r.id, after: logNext[r.id] ?? 0)
+                else { continue }
+                logNext[r.id] = page.next
+                logLines[r.id] = Array(((logLines[r.id] ?? []) + page.lines).suffix(300))
             }
             try? await Task.sleep(for: .seconds(3))
         }
@@ -200,14 +204,14 @@ final class RunConfigsModel {
 
     // MARK: runs
 
-    /// Starts `c` in the open environment. `replace` stops the project's live run first (a project has one).
+    /// Starts `c` in the open environment. A live run of the same configuration is replaced; the others keep running.
     func start(_ c: RunConfigItem, project: ProjectItem) async {
         await flush(c.id)
         guard let service, !busy, model.mayWrite() else { return }
         busy = true
         writeError = nil
         defer { busy = false }
-        let replace = liveRun != nil
+        let replace = isLive(c)
         do {
             _ = try await model.host.elevated(
                 "Start \(c.name) of \(project.name) in \(runEnv).", done: "started", keepsEdit: true
@@ -216,6 +220,24 @@ final class RunConfigsModel {
             }
             model.host.shell.showToast("Started \(c.name)")
             tab = .live
+            await load()
+        } catch is AdminDeclined {
+        } catch {
+            writeError = model.runWords(error)
+            model.host.shell.showToast(writeError ?? "", kind: .warn)
+        }
+    }
+
+    /// Stops one live run by id, behind Touch ID.
+    func stop(_ r: RunRecord, project: ProjectItem) async {
+        guard let service, !busy, model.mayWrite() else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await model.host.elevated(
+                "Stop \(name(of: r.configID)) of \(project.name).", done: "stopped", keepsEdit: true
+            ) { try await service.stop(project: projectID, run: r.id) }
+            model.host.shell.showToast("Stopped \(name(of: r.configID))")
             await load()
         } catch is AdminDeclined {
         } catch {
