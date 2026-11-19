@@ -132,12 +132,10 @@ struct MarkdownText: View {
         blocks = MarkdownBlock.parse(source)
     }
 
-    /// The streaming caret: a thin block glyph at the end of the last paragraph.
-    private func caret(last: Bool) -> AttributedString {
-        guard streaming, last else { return AttributedString() }
-        var c = AttributedString(" \u{258D}")
-        c.foregroundColor = GlassInk.blue
-        return c
+    /// The words of a paragraph, for finding the file a code block after it is about.
+    private static func words(_ b: MarkdownBlock) -> String? {
+        if case .paragraph(let t) = b { return t }
+        return nil
     }
 
     var body: some View {
@@ -145,8 +143,11 @@ struct MarkdownText: View {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 switch block {
                 case .paragraph(let t):
-                    Text(MarkdownBlock.inline(t) + caret(last: index == blocks.count - 1)).lineSpacing(6)
-                        .textSelection(.enabled)
+                    if streaming && index == blocks.count - 1 {
+                        CaretParagraph(text: MarkdownBlock.inline(t))
+                    } else {
+                        Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
+                    }
                 case .heading(let t):
                     // A report's headings read as headings: one step up from the body.
                     // 16 pt above a heading (8 from the stack + 8), so a section starts clearly (review 2026-11-16).
@@ -167,7 +168,7 @@ struct MarkdownText: View {
                         Text(MarkdownBlock.inline(t)).lineSpacing(6).textSelection(.enabled)
                     }
                 case .code(let lang, let t):
-                    CodeBlock(text: t, language: lang)
+                    CodeBlock(text: t, language: lang, before: index > 0 ? Self.words(blocks[index - 1]) : nil)
                 case .table(let header, let rows):
                     MarkdownTable(header: header, rows: rows)
                 case .quote(let t):
@@ -190,20 +191,43 @@ struct MarkdownText: View {
     }
 }
 
-/// A code block as a card (the mockup's): a header with the language, Wrap and Copy, then the code. Apply is not offered:
-/// an answer's snippet does not say which file it belongs to, so it would be a guess.
+/// A code block as a card (the mockup's): a header with the language, Wrap, Copy and Apply. Apply writes the block to the file
+/// named in the fence or the sentence before it; a block that names none asks which of the session's files.
 private struct CodeBlock: View {
     let text: String
+    /// The fence's whole info string (```swift Sources/A.swift).
     var language = ""
+    var before: String?
+    @Environment(\.applyCode) private var apply
     @State private var copied = false
     @State private var wrap = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Space.s1) {
-                Text(language.isEmpty ? "code" : language).coreFont(size: MacTextSize.meta, weight: .medium)
-                    .foregroundStyle(SessionInk.text2)
+                let target = CodeTarget.path(info: language, before: before)
+                Text(language.split(separator: " ").first.map { String($0).components(separatedBy: ":")[0] } ?? "code")
+                    .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(SessionInk.text2)
+                if let target {
+                    Text(target).coreFont(size: MacTextSize.meta, design: .monospaced).foregroundStyle(SessionInk.text2)
+                        .lineLimit(1).truncationMode(.middle)
+                }
                 Spacer(minLength: Space.s2)
+                if let apply {
+                    if let target {
+                        CoreIconButton(symbol: "square.and.arrow.down", label: "Apply to \(target)") {
+                            apply.write(target, text)
+                        }
+                        .help("Write this to \(target)")
+                    } else if !apply.files.isEmpty {
+                        Menu {
+                            ForEach(apply.files, id: \.self) { f in Button(f) { apply.write(f, text) } }
+                        } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
+                        .menuStyle(.borderlessButton).fixedSize().help("Apply to a file: pick which")
+                    }
+                }
                 CoreIconButton(symbol: "text.alignleft", label: wrap ? "Do not wrap lines" : "Wrap lines") {
                     wrap.toggle()
                 }
@@ -294,5 +318,30 @@ private struct MarkdownImage: View {
 
     private var fallback: some View {
         CoreChip(alt.isEmpty ? src : alt, symbol: "photo", minWidth: 0).help(src)
+    }
+}
+
+
+/// The last paragraph of an answer that is still being written: its text and a calm caret that breathes between faint and full
+/// about every 0.6 s. Reduce Motion: the caret stays, still and full.
+private struct CaretParagraph: View {
+    let text: AttributedString
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        if reduce {
+            paragraph(on: true)
+        } else {
+            TimelineView(.periodic(from: .now, by: 0.6)) { ctx in
+                paragraph(on: Int(ctx.date.timeIntervalSinceReferenceDate / 0.6) % 2 == 0)
+                    .animation(Motion.out(0.3), value: Int(ctx.date.timeIntervalSinceReferenceDate / 0.6) % 2)
+            }
+        }
+    }
+
+    private func paragraph(on: Bool) -> some View {
+        var caret = AttributedString(" \u{258D}")
+        caret.foregroundColor = GlassInk.blue.opacity(on ? 1 : 0.25)
+        return Text(text + caret).lineSpacing(6).textSelection(.enabled)
     }
 }

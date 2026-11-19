@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 /// The generated client's agent routes, mapped to this module's types. Errors come out as `CoreError`.
 public struct LiveAgentsAPI: AgentsAPI {
     let connection: CoreConnection
-    private var client: Client { connection.client }
+    var client: Client { connection.client }
     public init(connection: CoreConnection) { self.connection = connection }
 
     public func runners() async throws -> [RunnerInfo] {
@@ -345,7 +345,7 @@ public struct LiveAgentsAPI: AgentsAPI {
 
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
 
-    private func run<T>(_ body: () async throws -> T) async throws -> T {
+    func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch {
             throw CoreFailure.of(error) ?? error
         }
@@ -387,6 +387,10 @@ public struct LiveAgentsAPI: AgentsAPI {
         info.turnCostMicros = s.turnCostUsdMicros
         info.turnCostApproximate = s.turnCostApproximate ?? false
         info.canStopSubagents = s.canStopSubagents ?? false
+        #if CORE_CLIENT_95
+            info.effort = s.effort
+            info.canSetEffort = s.canSetEffort ?? false
+        #endif
         return info
     }
 

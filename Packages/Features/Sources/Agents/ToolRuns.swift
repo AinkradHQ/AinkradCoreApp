@@ -19,12 +19,18 @@ enum TranscriptItem: Identifiable, Equatable {
     static func items(_ entries: [TranscriptEntry]) -> [TranscriptItem] {
         var out: [TranscriptItem] = []
         var run: [TranscriptEntry] = []
+        // Thinking between two tool steps must not cut the run in two: it waits and shows after the run.
+        var held: [TranscriptEntry] = []
         func flush() {
             if run.count >= 2 { out.append(.run(run)) } else { out += run.map { .one($0) } }
+            out += held.map { .one($0) }
             run = []
+            held = []
         }
         for e in entries {
-            if ToolStep(e) != nil {
+            if case .thinking = e.kind, !run.isEmpty {
+                held.append(e)
+            } else if ToolStep(e) != nil {
                 run.append(e)
             } else {
                 flush()

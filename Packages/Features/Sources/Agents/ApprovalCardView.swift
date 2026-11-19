@@ -98,6 +98,11 @@ struct ApprovalCardView: View {
                         GlassInk.secondary)
                 }
                 Spacer(minLength: 0)
+                if model.sessionTools, request.codeModeOp == nil {
+                    Button("Always for this project") { Task { await model.approveAlways(request) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(busy)
+                        .help("Approve this and every request like it in this project from now on. Safe requests only.")
+                }
                 answer(approve: true, busy: busy)
             }
         }
