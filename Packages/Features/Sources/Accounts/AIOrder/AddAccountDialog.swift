@@ -136,27 +136,57 @@ struct AddAccountDialog: View {
 
     // MARK: sign-in
 
-    private var signIn: some View {
+    @ViewBuilder private var signIn: some View {
+        if let c = flow.runners, model.signIn == nil {
+            let name = flow.name(model)
+            if c.none {
+                NoRunnerView(
+                    provider: name, choice: c, openRunners: { close(); model.openRunners() },
+                    back: { flow.back(model) })
+            } else {
+                RunnerPickView(
+                    provider: name, choice: c, pick: { flow.runners?.selected = $0 },
+                    start: { Task { await flow.startOnRunner(model) } }, back: { flow.back(model) })
+            }
+        } else {
+            signInRunning
+        }
+    }
+
+    private var signInRunning: some View {
         let s = model.signIn
         let name = flow.name(model)
-        let pastes = flow.providerID == "claude-sub"
+        let style = flow.style(model)
+        let pastes = style == .paste
         return VStack(alignment: .leading, spacing: Space.s3) {
             hero(
                 "Sign in with \(name)",
-                s?.deviceCode != nil
+                style == .guided
+                    ? "Follow the sign-in below. Type what it asks for."
+                    : s?.deviceCode != nil
                     ? "Open the page and type this code."
                     : pastes
                         ? "Sign in on the page that opens in your browser, then paste the code it shows."
                         : "Sign in on the page that opens in your browser.")
             if let c = s?.deviceCode { codeBlock(c) }
+            if case .guided? = s?.stage {
+                GuidedTerminal(
+                    lines: s?.screen ?? [], error: s?.inputError, sending: s?.sending ?? false,
+                    send: { l in Task { await model.sendGuidedInput(l) } })
+            }
             if pastes, case .open? = s?.stage { pasteField(s?.codeError) }
             status(s?.stage, name: name)
-            Label(
-                "Uses your subscription at your own risk. The provider's rules may not allow it.",
-                systemImage: "exclamationmark.triangle"
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
-            .fixedSize(horizontal: false, vertical: true)
+            if let r = flow.runnerName {
+                RunnerBoundNote(binding: RunnerBinding(name: r))
+            }
+            if SignInStyle.showsRisk(flow.providerID ?? "") {
+                Label(
+                    "Uses your subscription at your own risk. The provider's rules may not allow it.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             footerSignIn(s?.stage, pastes: pastes)
         }
     }
@@ -188,7 +218,7 @@ struct AddAccountDialog: View {
     @ViewBuilder private func status(_ stage: SignInFlow.Stage?, name: String) -> some View {
         switch stage {
         case nil, .starting?: wait("Getting \(name) ready…")
-        case .open?: wait("Waiting for you to finish…")
+        case .open?, .guided?: WaitingDots(text: "Waiting for you to finish…")
         case .working?: wait("Almost there. Connecting \(name) to your Core…")
         case .failed(let why)?: AccIssue(text: why)
         case .done?: EmptyView()
@@ -216,6 +246,11 @@ struct AddAccountDialog: View {
                     confirm: "Connect", cancelTitle: "Back",
                     enabled: !code.trimmingCharacters(in: .whitespaces).isEmpty,
                     cancel: { flow.back(model) }, run: { Task { await model.sendSignInCode(code) } })
+            }
+        } else if case .guided(let url)? = stage {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                if let url { AccLink(title: "Open sign-in page", symbol: "globe") { model.opener(url) } }
+                AccDialogButtons(cancelTitle: "Cancel", cancel: { flow.back(model) })
             }
         } else if case .open(let url)? = stage {
             AccDialogButtons(

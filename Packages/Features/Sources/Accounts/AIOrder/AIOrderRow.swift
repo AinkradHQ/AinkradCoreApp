@@ -59,6 +59,7 @@ struct OrderRowView: View {
             .onTapGesture { onAction(.open) }
             .help("Open \(row.title)")
             CoreChip(row.kind == .subscription ? "Subscription" : "API key", minWidth: 0)
+            if let b = row.account.runnerBinding { CoreChip(b.words, minWidth: 0).help(b.detail) }
             StateBadge(b.label, tone: b.tone, symbol: b.symbol).frame(width: Space.s8 * 3, alignment: .leading)
             meter.frame(width: Space.s8 * 3)
             menu

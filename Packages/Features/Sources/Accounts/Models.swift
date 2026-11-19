@@ -53,6 +53,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var monthSpendUSDMicros: Int64?
     var monthLimitUSDMicros: Int64?
     var health: AccountHealthItem?
+    /// A runner-bound sign-in (Codex, OpenCode, Antigravity): the account only runs on one runner (E7-4).
+    var runnerBinding: RunnerBinding?
     var phase: AccountPhase { AccountPhase(state) }
     /// A Claude plan: a signed-in token the runner is lent, never an API key the gateway can test.
     var isPlan: Bool { provider == "claude-sub" }
@@ -65,6 +67,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
             && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
             && l.monthSpendUSDMicros == r.monthSpendUSDMicros && l.monthLimitUSDMicros == r.monthLimitUSDMicros
+            && l.runnerBinding == r.runnerBinding
     }
 }
 

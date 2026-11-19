@@ -206,10 +206,13 @@ public final class AccountsDemo {
         var codeAt: Date?
         var loginLabel = "claude-plan"
         var loginFails = false
+        /// The guided sign-in (OpenCode, Antigravity): when a line was last typed.
+        var guidedSentAt: Date?
         func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
             if loginFails { throw CoreError.http(status: 409, code: "no_runner", message: "no runner can sign in") }
             loginStart = Date()
             codeAt = nil
+            guidedSentAt = nil
             loginLabel = label
             loginProvider = provider
             return try await login("lg_demo")
@@ -221,6 +224,11 @@ public final class AccountsDemo {
             if loginProvider != "claude-sub", let s = loginStart {
                 // A runner-bound sign-in (device code): the person finishes on the provider's page.
                 state = t.timeIntervalSince(s) > 4.2 ? "done" : t.timeIntervalSince(s) > 1.2 ? "open_url" : "starting"
+                if SignInStyle.of(loginProvider) == .guided {
+                    // Waits for a typed line, then finishes a couple of seconds later.
+                    state = guidedSentAt.map { t.timeIntervalSince($0) > 2 ? "done" : "open_url" }
+                        ?? (t.timeIntervalSince(s) > 1.2 ? "open_url" : "starting")
+                }
                 if state == "done" {
                     if !accountList.contains(where: { $0.label == loginLabel }) {
                         accountList.append(a(31, loginLabel, loginProvider, "active", "dev1", 1, used: 0))
@@ -386,7 +394,12 @@ public final class AccountsDemo {
             [
                 AccountRunner(
                     id: "r_linux01", name: "linux-01", online: true,
-                    commands: noLogin ? ["gateway"] : ["gateway", "login", "subscription-env"],
+                    commands: noLogin
+                        ? ["gateway"]
+                        : [
+                            "gateway", "login", "subscription-env", "login-bound:codex", "login-bound:opencode",
+                            "login-bound:agy",
+                        ],
                     drivers: ["agent"]),
                 AccountRunner(id: "r_mac", name: "studio-mac", online: true),
                 AccountRunner(id: "r_old", name: "old-box", online: false),

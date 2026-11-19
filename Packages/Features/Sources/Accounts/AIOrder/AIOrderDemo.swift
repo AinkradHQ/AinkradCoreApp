@@ -6,10 +6,10 @@ import Foundation
 /// stand-in service. No real names, keys or machines.
 enum AIOrderDemo {
     static func providers() -> [ProviderItem] {
-        func sub(_ id: String, _ name: String, _ harness: String) -> ProviderItem {
+        func sub(_ id: String, _ name: String, _ harness: String, _ login: String = "browser_code") -> ProviderItem {
             ProviderItem(
                 id: id, name: name, harness: harness, authVar: "TOKEN", baseURL: "https://example.invalid",
-                delivery: ["env"], loginMethods: ["browser_code"], models: [], pricedAt: nil, builtin: true)
+                delivery: ["env"], loginMethods: [login], models: [], pricedAt: nil, builtin: true)
         }
         func key(_ id: String, _ name: String, _ harness: String = "claude") -> ProviderItem {
             ProviderItem(
@@ -19,8 +19,9 @@ enum AIOrderDemo {
                 pricedAt: "2026-11-19", builtin: id == "anthropic")
         }
         return [
-            sub("claude-sub", "Claude subscription", "claude"), sub("codex-sub", "Codex subscription", "codex"),
-            sub("agy-sub", "Antigravity", "agy"), sub("opencode-sub", "OpenCode", "claude"),
+            sub("claude-sub", "Claude subscription", "claude"), sub("codex-sub", "Codex subscription", "codex", "device_code"),
+            sub("agy-sub", "Antigravity", "agy", "runner_login"),
+            sub("opencode-sub", "OpenCode", "opencode", "runner_login"),
             key("anthropic", "Anthropic API"), key("openai", "OpenAI API", "codex"), key("google", "Gemini API", "agy"),
             key("openrouter", "OpenRouter"), key("aimlapi", "AIMLAPI"), key("groq", "Groq"),
             key("deepseek", "DeepSeek"),
@@ -87,6 +88,13 @@ extension AccountsDemo.Service {
     }
     func clearAIOrder(agent: String) async throws { agentOrders.removeAll { $0.agent == agent } }
     func modelCount(account: Int64) async -> Int? { order010 ? 14 : nil }
+    func loginScreen(_ id: String) async throws -> LoginScreen {
+        var lines = ["Sign in to your account", "Open the page below and approve the sign-in.", "Then type OK here."]
+        if guidedSentAt != nil { lines += ["Waiting for the page to confirm…"] }
+        return LoginScreen(lines: lines, url: nil, code: nil)
+    }
+    func sendLoginInput(_ id: String, line: String) async throws { guidedSentAt = Date() }
+    func boundRunners() async -> [Int64: String] { order010 ? [2: "r_linux01"] : [:] }
     func loginCode(_ id: String) async -> String? { loginProvider == "codex-sub" ? "K7QM-4XZP" : nil }
 }
 #endif

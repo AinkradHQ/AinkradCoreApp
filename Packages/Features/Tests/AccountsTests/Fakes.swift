@@ -189,6 +189,22 @@ final class FakeService: AccountsService, @unchecked Sendable {
         return loginItem
     }
     func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
+    /// The guided sign-in: what the runner's screen says, the lines typed (kept so a test can see none was kept elsewhere).
+    var screen = LoginScreen(lines: ["Which provider?"], url: nil, code: nil)
+    var screenFailure: (any Error)?
+    var inputFailure: (any Error)?
+    var screenReads = 0
+    var bound: [Int64: String] = [:]
+    func loginScreen(_ id: String) async throws -> LoginScreen {
+        lock.withLock { screenReads += 1 }
+        if let screenFailure { throw screenFailure }
+        return screen
+    }
+    func sendLoginInput(_ id: String, line: String) async throws {
+        if let inputFailure { throw inputFailure }
+        try note("sendLoginInput \(id) \(line.count)")
+    }
+    func boundRunners() async -> [Int64: String] { bound }
     var runnerList = [AccountRunner(id: "r_1", name: "linux-01", online: true)]
     var lastKey = ""
     func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {

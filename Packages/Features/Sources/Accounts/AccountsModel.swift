@@ -14,7 +14,7 @@ public final class AccountsModel {
     private(set) var service: (any AccountsService)?
 
     private(set) var providers: [ProviderItem] = []
-    private(set) var accounts: [AccountItem] = []
+    var accounts: [AccountItem] = []
     private(set) var pools: [PoolItem] = []
     private(set) var chains: [ChainItem] = []
     private(set) var chainBindings: [ChainBindingItem] = []
@@ -32,6 +32,12 @@ public final class AccountsModel {
     var poolSelection: Int64?
     /// A subscription sign-in in the Connect sheet, while it runs (`SignIn.swift`).
     var signIn: SignInFlow?
+    /// Seconds between looks at a sign-in (tests make it short).
+    var signInTick = 1.0
+    /// How fast a guided sign-in's screen is read: quick while it changes, slower while it is still.
+    var pollBackoff = PollBackoff()
+    /// Runner ids the app saw sign-ins finish on, for a Core that does not report where an account runs.
+    var boundSeen: [Int64: String] = [:]
     /// The AI order (E7-1), read when the Core serves API minor 95; `aiOrderOn` is false below that and the old pages show.
     var aiOrder: AIOrderDoc?
     var aiOrderOn = false
@@ -177,6 +183,7 @@ public final class AccountsModel {
             load = .ready
             await reloadChains(service)
             await reloadAIOrder(service)
+            if aiOrderOn { await reloadBindings(service) }
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
         // The verdict on every card needs the limits and budgets too; a device without `admin` just gets none.

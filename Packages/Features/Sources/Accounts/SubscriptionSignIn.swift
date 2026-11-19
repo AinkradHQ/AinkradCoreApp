@@ -28,6 +28,7 @@ struct SubscriptionSignIn: View {
                 case nil: intro
                 case .starting?: waiting("Getting Claude ready", "Starting Claude's sign-in on a runner…")
                 case .open(let url)?: signIn(url)
+                case .guided?: waiting("Waiting for you", "Finish signing in on the runner.")
                 case .working?: waiting("Almost there", "Connecting your Claude plan to your Core…")
                 case .done(let account)?: done(account)
                 case .failed(let why)?: failed(why)

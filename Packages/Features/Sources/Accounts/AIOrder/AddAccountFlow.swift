@@ -16,6 +16,10 @@ final class AddAccountFlow {
     var modelsFound: Int?
     /// The models were counted: the third line of the check is done.
     var modelsSettled = false
+    /// A runner-bound sign-in waits here for a runner: the ones that can run it, or why none can.
+    var runners: RunnerChoice?
+    /// The runner the sign-in started on, for the line "Runs only on ...".
+    var runnerName: String?
 
     var key: String {
         get { keyFlow.key }
@@ -47,13 +51,38 @@ final class AddAccountFlow {
         stepper.choose(ProviderCatalog.kind(p))
         keyFlow.label = label
         if ProviderCatalog.kind(p) == .subscription {
-            await m.startSignIn(provider: p.id, label: label)
+            runners = nil
+            runnerName = nil
+            if SignInStyle.of(p.id, methods: p.loginMethods).runnerBound,
+                let list = try? await m.service?.runners()
+            {
+                let c = RunnerChoice.make(runners: list, harness: p.harness)
+                runners = c
+                // One runner can do it: use it without asking. The sign-in says where it runs.
+                if c.only != nil { await startOnRunner(m) }
+            } else {
+                await m.startSignIn(provider: p.id, label: label)
+            }
         } else {
             await keyFlow.load(m)
         }
     }
 
+    /// Starts the sign-in on the chosen runner; the account will only run there.
+    func startOnRunner(_ m: AccountsModel) async {
+        guard let id = providerID, let r = runners?.chosen else { return }
+        runnerName = r.name
+        runners = nil
+        await m.startSignIn(provider: id, label: keyFlow.label, runner: r.id)
+    }
+
+    func style(_ m: AccountsModel) -> SignInStyle {
+        SignInStyle.of(providerID ?? "", methods: providerID.map(m.providerMethods) ?? [])
+    }
+
     func back(_ m: AccountsModel) {
+        runners = nil
+        runnerName = nil
         if stepper.step == .signIn { Task { await m.cancelSignIn() } }
         keyFlow.wipe()
         error = nil
@@ -62,6 +91,8 @@ final class AddAccountFlow {
 
     func again(_ m: AccountsModel) {
         m.signIn = nil
+        runners = nil
+        runnerName = nil
         keyFlow = KeyEntryFlow()
         providerID = nil
         addedAccount = nil
