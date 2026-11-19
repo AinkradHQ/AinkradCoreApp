@@ -177,6 +177,10 @@ actor SessionManager {
     enum Scope { case none, current }
 
     /// The `Ainkrad-*` headers for one request (§5.1). `sessionID` nil signs `-` and sends no `Ainkrad-Session`.
+    /// The unlock token (review M1): kept only here, in memory, and sent on every signed request once the app is unlocked.
+    private var unlockToken: String?
+    func setUnlockToken(_ token: String?) { unlockToken = token }
+
     func headers(method: String, target: String, body: Data, sessionID: String?) throws -> [String: String] {
         let (path, query) = Self.split(target)
         let ts = UInt64(max(0, now()))
@@ -190,7 +194,10 @@ actor SessionManager {
             "ainkrad-device": identity.deviceID, "ainkrad-alg": Wire.alg, "ainkrad-timestamp": String(ts),
             "ainkrad-nonce": nonce, "ainkrad-signature": Wire.b64(signature),
         ]
-        if let sessionID { h["ainkrad-session"] = sessionID }
+        if let sessionID {
+            h["ainkrad-session"] = sessionID
+            if let unlockToken { h["ainkrad-unlock"] = unlockToken }
+        }
         return h
     }
 

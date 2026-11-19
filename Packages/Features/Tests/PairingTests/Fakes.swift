@@ -47,6 +47,23 @@ final class FakeService: CoreService, @unchecked Sendable {
     var cleared: [String] = []
     var stepUps = 0
     var elevated: Date?
+    var unlockSupported = false
+    var unlocks = 0
+    var beats = 0
+    var ends = 0
+    var beatError: (any Error)?
+    var supportsUnlock: Bool { get async { unlockSupported } }
+    func unlock(reason: String) async throws -> Date {
+        unlocks += 1
+        if let stepUpError { throw stepUpError }
+        beatError = nil
+        return Date().addingTimeInterval(90)
+    }
+    func beatUnlock() async throws {
+        beats += 1
+        if let beatError { throw beatError }
+    }
+    func endUnlock() async { ends += 1 }
 
     func connect() async throws { if let connectError { throw connectError } }
     func close() async {}

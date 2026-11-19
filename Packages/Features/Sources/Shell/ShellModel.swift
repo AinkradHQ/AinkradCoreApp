@@ -129,6 +129,14 @@ public struct ShellDialog: Identifiable {
 }
 public enum ShellOverlay: Hashable, Sendable { case settings, shortcuts }
 
+/// Whether the app is open or covered by the Unlock card (E1-1).
+public enum AppLock: Equatable, Sendable {
+    case open
+    case locked
+    /// Touch ID is being asked for.
+    case checking
+}
+
 /// The shell's one state holder. Feature modules talk to it only through `openPane`, `launcher`, `bell`, `settings`, `toast` and `sheet`.
 @MainActor @Observable
 public final class ShellModel {
@@ -197,7 +205,6 @@ public final class ShellModel {
     public func toggleConnectionPanel() {
         launcherOpen = false
         bellOpen = false
-        elevationPanelOpen = false
         connectionPanelOpen.toggle()
     }
     /// When the Core was last reachable: what the "resuming" banner says the screen is current to.
@@ -207,16 +214,11 @@ public final class ShellModel {
     /// Retry for the connection banner and the Home Core button when the Core is unreachable.
     public var retryConnection: (@MainActor () -> Void)?
     /// When the session's Touch ID elevation ends; nil when locked.
-    public var elevatedUntil: Date? {
-        didSet {
-            // The meter shrinks over whatever the Core granted this time (it is 5 minutes today).
-            if let u = elevatedUntil, u != oldValue { elevationSpan = max(u.timeIntervalSinceNow, 1) }
-            if elevatedUntil == nil { elevationPanelOpen = false }
-        }
-    }
-    public private(set) var elevationSpan: TimeInterval = 300
-    /// The panel under the elevation chip (what is unlocked, time left, Renew with Touch ID).
-    public var elevationPanelOpen = false
+    public var elevatedUntil: Date?
+    /// The app unlock (E1-1, mockup 01): `.open` shows the app; the others cover it with the Unlock card.
+    public var lock: AppLock = .open
+    /// The Unlock card's buttons: Touch ID, and the password fallback (the system sheet offers it after Touch ID).
+    public var unlock: (@MainActor () -> Void)?
     /// The one "waiting on you" number: approvals nobody answered, supplied by Agents (`AgentsModel.waitingOnYou`). Alerts and Brain
     /// inbox items are not in it; the bell counts them on their own. Until Agents is up, the bell's approval items stand in.
     public var waitingSource: (@MainActor () -> Int)?
@@ -237,8 +239,6 @@ public final class ShellModel {
         didSet { defaults.set(showActivityChip, forKey: Self.activityChipKey) }
     }
     static let activityChipKey = "ainkrad.core.activity.statusChip"
-    /// The elevation chip: asks for Touch ID.
-    public var elevate: (@MainActor () -> Void)?
     public var dialog: ShellDialog?
     public var topDialog: ShellDialog?
 
@@ -471,14 +471,12 @@ public final class ShellModel {
 
     public func toggleLauncher() {
         bellOpen = false
-        elevationPanelOpen = false
         connectionPanelOpen = false
         launcherOpen.toggle()
     }
 
     public func toggleBell() {
         launcherOpen = false
-        elevationPanelOpen = false
         connectionPanelOpen = false
         bellOpen.toggle()
     }
@@ -500,8 +498,6 @@ public final class ShellModel {
             if dialog.dismissible { closeDialog() }
         } else if connectionPanelOpen {
             connectionPanelOpen = false
-        } else if elevationPanelOpen {
-            elevationPanelOpen = false
         } else if launcherOpen {
             launcherOpen = false
         } else if actionsOpen {
@@ -524,7 +520,7 @@ public final class ShellModel {
 
     /// Anything the shell shows over Home or the workspace.
     public var coverOpen: Bool {
-        sheet != nil || launcherOpen || elevationPanelOpen || connectionPanelOpen || bellOpen || overlay != nil
+        sheet != nil || launcherOpen || connectionPanelOpen || bellOpen || overlay != nil
             || dialog != nil
             || topDialog != nil
     }

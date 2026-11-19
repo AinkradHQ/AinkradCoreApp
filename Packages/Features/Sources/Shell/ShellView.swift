@@ -16,8 +16,11 @@ public struct ShellView: View {
     public var body: some View {
         ZStack {
             base
+            // Under the covers, so the Touch ID sheet (a dialog) rides above the card.
+            if shell.lock != .open { UnlockCard(shell: shell) }
             covers
         }
+        .coreAnimation(Motion.out(Motion.move), value: shell.lock)
         .animation(Motion.calm(Motion.out(Motion.move), reduce), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
@@ -149,14 +152,6 @@ public struct ShellView: View {
             Color.clear.contentShape(Rectangle()).onTapGesture { shell.connectionPanelOpen = false }
                 .accessibilityHidden(true)
             ConnectionPanel(shell: shell)
-                .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .transition(.opacity)
-        }
-        if shell.elevationPanelOpen {
-            Color.clear.contentShape(Rectangle()).onTapGesture { shell.elevationPanelOpen = false }
-                .accessibilityHidden(true)
-            ElevationPanel(shell: shell)
                 .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .transition(.opacity)

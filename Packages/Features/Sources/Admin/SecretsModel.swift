@@ -155,6 +155,8 @@ final class SecretsModel {
     private(set) var groups: [SecretGroupItem] = []
     var state: SectionState = .loading
     private(set) var leases: [LeaseItem] = []
+    /// Values on screen right now (E1 Reveal): by name. They are dropped with Hide, and when the page closes.
+    private(set) var revealed: [String: String] = [:]
     private(set) var runners: [RunnerChoice] = []
     private(set) var rowError: [String: String] = [:]
     @ObservationIgnored private weak var hub: AdminModel?
@@ -290,6 +292,26 @@ final class SecretsModel {
             return ""
         } catch { return hub.words(error) }
     }
+
+    /// Shows a text secret's value after a fresh Touch ID. It stays until Hide or the page closes.
+    func reveal(_ s: SecretItem) async {
+        guard let hub, let service = hub.service else { return }
+        rowError[s.name] = nil
+        do {
+            let value = try await hub.host.elevated(
+                "Reveal \(s.name). Anyone who can see your screen will be able to read it.", done: "shown",
+                keepsEdit: false
+            ) {
+                try await service.revealSecret(s.name)
+            }
+            revealed[s.name] = value
+            hub.host.shell.showToast("Secret shown. It hides when you close this window.")
+        } catch is AdminDeclined {
+        } catch { rowError[s.name] = hub.words(error) }
+    }
+
+    func hide(_ name: String) { revealed[name] = nil }
+    func hideAll() { revealed = [:] }
 
     func delete(_ s: SecretItem) async -> Bool {
         guard let hub, let service = hub.service, hub.mayWrite() else { return false }

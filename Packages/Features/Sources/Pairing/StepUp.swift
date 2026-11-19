@@ -83,6 +83,8 @@ final class StepUpModel {
     private(set) var phase: StepUpPhase?
     /// The context the embedded Touch ID view and the Secure Enclave signature share (one per ask).
     private(set) var context = LAContext()
+    /// True while the ask opens the app unlock rather than one action: the sheet's tick says how long it stays open.
+    var opensSession = false
     func set(_ p: StepUpPhase?) {
         if case .asking = p {
             context = LAContext()
@@ -208,7 +210,7 @@ struct StepUpSheet: View {
                     .accessibilityAddTraits(.isHeader)
                 Text(
                     done
-                        ? "Admin actions are open for a short while."
+                        ? (model.opensSession ? "Stays open until your Mac locks or sleeps." : "Confirmed.")
                         : missed ? "Touch it again. After a few misses macOS asks for your password." : reason
                 )
                 .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
