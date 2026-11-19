@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Settings, Security, Audit: what happened on your Core, newest first, as sentences. Filter by area, by who, or find a
+/// Activity, Audit: what happened on your Core, newest first, as sentences. Filter by area, by who, or find a
 /// name; ↑ ↓ move through the rows and the panel at the right says everything about the one picked.
 struct AuditSection: View {
     let admin: AdminModel
@@ -35,24 +35,8 @@ struct AuditSection: View {
             }
             .foregroundStyle(GlassInk.primary)
         }
-        .task {
-            takeHandoff(model)
-            await model.reload()
-        }
-        .onChange(of: admin.host.shell.settings.handoff) { takeHandoff(model) }
+        .task { await model.reload() }
         .accessibilityIdentifier("audit")
-    }
-}
-
-extension AuditSection {
-    /// A link that brought us here with a filter (a connection's History) sets it once.
-    fileprivate func takeHandoff(_ model: AuditModel) {
-        let s = admin.host.shell.settings
-        guard let kind = s.handoff["audit.kind"] else { return }
-        let target = s.handoff["audit.target"] ?? ""
-        s.handoff = [:]
-        model.open(kind: kind, target: target)
-        if model.state != .loading { Task { await model.reload() } }
     }
 }
 
@@ -343,7 +327,7 @@ private struct AuditList: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, Space.s2).padding(.top, i == 0 ? 0 : Space.s2)
                         }
-                        row(a).id(a.seq)
+                        row(a).modifier(RiseIn(index: i)).id(a.seq)
                     }
                 }
                 .onChange(of: model.selected) { _, s in

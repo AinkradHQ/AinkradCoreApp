@@ -152,7 +152,7 @@ struct CoreLogsTab: View {
                 Text("The audit log lists what happened on your Core.").foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s3)
                 AppActionTile(title: "Open the audit log", symbol: "doc.text", key: "", hue: GlassInk.slate) {
-                    shell.settings.selected = "audit"
+                    shell.launcher.entry("admin-audit")?.run()  // Audit is an Activity tab now
                 }
             }
         }

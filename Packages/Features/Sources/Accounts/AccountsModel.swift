@@ -515,8 +515,7 @@ public final class AccountsModel {
     }
 
     func openAudit() {
-        host.shell.settings.selected = "audit"
-        host.shell.open(.settings)
+        host.shell.launcher.entry("admin-audit")?.run()
     }
 
     /// "Raise budget…" from an ended session: the Raise dialog for that account's spent budget when it is known, else the

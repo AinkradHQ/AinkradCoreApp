@@ -89,8 +89,14 @@ public final class AdminDemo {
 
     private func open(_ section: String) async {
         shell.dialog = nil
-        shell.settings.selected = section
-        shell.open(.settings)
+        switch section {
+        case "secrets": admin.showSecrets()
+        case "audit": admin.showActivity(.audit)
+        case "ops": admin.showActivity(.ops)
+        default:
+            shell.settings.selected = section
+            shell.open(.settings)
+        }
         try? await Task.sleep(for: .milliseconds(700))  // the section loads itself when it appears
     }
 
@@ -156,8 +162,8 @@ public final class AdminDemo {
             admin.audit.selected = admin.audit.items.first?.seq
         case "audit-connection-history":
             // What a connection card's History does: Audit opens already filtered to that connection.
-            shell.settings.open("audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:2"])
-            shell.open(.settings)
+            shell.settings.handoff = ["audit.kind": "connection.", "audit.target": "connection:2"]
+            admin.showActivity(.audit)
             try? await Task.sleep(for: .milliseconds(1200))
         case "audit-code-mode", "audit-code-mode-nobody":
             service.auditRows = DemoData.codeModeAudit + DemoData.audit

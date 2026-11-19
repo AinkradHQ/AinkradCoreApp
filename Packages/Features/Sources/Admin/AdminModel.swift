@@ -12,6 +12,8 @@ public final class AdminModel {
     let host: any AdminHost
     /// Device names by id, when the app knows them (the audit log shows the name, not `d_…`).
     public var deviceNames: [String: String] = [:]
+    /// The tab Activity shows: Ops or Audit.
+    var activityTab: ActivityTab = .ops
     private(set) var service: (any AdminService)?
     @ObservationIgnored private(set) lazy var registry = RegistryModel(hub: self)
     @ObservationIgnored private(set) var secrets: SecretsModel!
@@ -113,62 +115,62 @@ public final class AdminModel {
 
     // MARK: Settings sections and launcher entries
 
-    /// Adds the sections to Settings (Core settings as a tab of the Core page, Feature switches, Ops, Secrets and Audit under Core)
-    /// and a launcher entry for each. Sections that the shell shipped as placeholders keep their ids.
+    /// Core settings (a tab of the Core page) and Feature switches stay in Settings. Secrets and Activity (Ops, Audit) are apps
+    /// of their own: each has a launcher entry that opens its pane. Sections that the shell shipped as placeholders keep their ids.
     public func install() {
         let shell = host.shell
-        let list:
-            [(id: String, group: SettingsGroup, title: String, symbol: String, order: Int, sub: String, keys: [String])] =
-                [
-                    (
-                        "core", .core, "Core settings", "gearshape", 0, "Registry values, their limits and history",
-                        ["registry", "limits", "out_of_bounds", "history"]
-                    ),
-                    (
-                        "switches", .core, "Feature switches", "switch.2", 2,
-                        "Secrets mode, passkey admin, terminal drivers", ["flags", "secrets mode", "passkey", "gates"]
-                    ),
-                    (
-                        "ops", .core, "Ops", "waveform.path.ecg", 3, "Alarms, health and metrics",
-                        ["health", "alarms", "metrics", "prometheus"]
-                    ),
-                    (
-                        "secrets", .core, "Secrets", "key", 4, "Write-only values the broker leases to runners",
-                        ["broker", "keys", "leases", "tokens"]
-                    ),
-                    (
-                        "audit", .core, "Audit", "doc.text", 5, "Who did what, where and when",
-                        ["log", "history", "who did what"]
-                    ),
-                ]
+        let list: [(id: String, title: String, symbol: String, order: Int, sub: String, keys: [String])] = [
+            (
+                "core", "Core settings", "gearshape", 0, "Registry values, their limits and history",
+                ["registry", "limits", "out_of_bounds", "history"]
+            ),
+            (
+                "switches", "Feature switches", "switch.2", 2, "Secrets mode, passkey admin, terminal drivers",
+                ["flags", "secrets mode", "passkey", "gates"]
+            ),
+        ]
         for e in list {
-            let content: AnyView =
-                switch e.id {
-                case "core": AnyView(CoreSettingsSection(admin: self))
-                case "switches": AnyView(SwitchesSection(admin: self))
-                case "ops": AnyView(OpsSection(admin: self))
-                case "secrets": AnyView(SecretsSection(admin: self))
-                default: AnyView(AuditSection(admin: self))
-                }
             if e.id == "core" {
                 // The registry values are the Core page's Advanced "Limits" tab (D-11); the page itself is the shell's.
                 shell.settings.tab(
-                    "core", SettingsTab("limits", "Limits", order: 9, advanced: true) { content })
+                    "core", SettingsTab("limits", "Limits", order: 9, advanced: true) { CoreSettingsSection(admin: self) })
             } else {
                 shell.settings.section(
                     SettingsSection(
-                        id: e.id, group: e.group, title: e.title, symbol: e.symbol, order: e.order,
-                        advancedOnly: e.id == "switches"
-                    ) { content })
+                        id: e.id, group: .core, title: e.title, symbol: e.symbol, order: e.order, advancedOnly: true
+                    ) { SwitchesSection(admin: self) })
             }
             shell.launcher.register(
                 LauncherEntry(
-                    id: "admin-\(e.id)", title: e.title, sub: "Settings, \(e.group.rawValue)", symbol: e.symbol,
-                    keywords: e.keys
+                    id: "admin-\(e.id)", title: e.title, sub: "Settings, Core", symbol: e.symbol, keywords: e.keys
                 ) {
                     shell.settings.selected = e.id
                     if e.id == "core" { shell.settings.selectTab("limits", in: "core") }
                     shell.open(.settings)
+                })
+        }
+        let apps: [(id: String, title: String, sub: String, symbol: String, keys: [String], run: @MainActor (AdminModel) -> Void)] = [
+            (
+                "secrets", "Secrets", "Passwords and keys you keep for yourself", "key",
+                ["broker", "keys", "leases", "tokens", "password"], { $0.showSecrets() }
+            ),
+            (
+                "activity", "Activity", "How your Core is doing and who did what", "waveform.path.ecg",
+                ["ops", "audit", "health", "alarms", "log", "history"], { $0.showActivity() }
+            ),
+            (
+                "admin-ops", "Ops", "Activity, how your Core is doing", "waveform.path.ecg",
+                ["health", "alarms", "metrics", "prometheus"], { $0.showActivity(.ops) }
+            ),
+            (
+                "admin-audit", "Audit", "Activity, who did what, where and when", "doc.text",
+                ["log", "history", "who did what"], { $0.showActivity(.audit) }
+            ),
+        ]
+        for a in apps {
+            shell.launcher.register(
+                LauncherEntry(id: a.id, title: a.title, sub: a.sub, symbol: a.symbol, keywords: a.keys) {
+                    [weak self] in if let self { a.run(self) }
                 })
         }
     }
