@@ -30,6 +30,10 @@ packages:
     path: Packages/CoreKit
   Features:
     path: Packages/Features
+  # E12-2: automatic updates (EdDSA appcast on ainkrad.io). The app is not sandboxed, so no XPC services are needed.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
   DesignCanvas:
     path: Packages/DesignCanvas
 
@@ -56,6 +60,8 @@ targets:
         product: Agents
       - package: Features
         product: Brain
+      - package: Sparkle
+        product: Sparkle
       - package: Features
         product: Projects
       - package: Features
@@ -84,6 +90,13 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.ainkrad.core.connect
             CFBundleURLSchemes: [ainkrad]
+        # Sparkle (E12-2, D-7): check by itself, download and install by itself; AppUpdater turns "install on quit" into the
+        # "restart when idle" toast. The public key is the login-keychain key's (runbook step 4).
+        SUFeedURL: https://ainkrad.io/releases/app/appcast.xml
+        SUPublicEDKey: ZfzFnEOyjj3JvJZl7UsuIy6Y29xRPxSYWdBwv3RiWL4=
+        SUEnableAutomaticChecks: true
+        SUAutomaticallyUpdate: true
+        SUScheduledCheckInterval: 14400
     settings:
       base:
         PRODUCT_NAME: Ainkrad
