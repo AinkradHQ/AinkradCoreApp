@@ -239,6 +239,8 @@ public final class ShellModel {
         get { topMenu == .core }
         set { topMenu = newValue ? .core : (topMenu == .core ? nil : topMenu) }
     }
+    /// How long the last call to the Core took, in milliseconds; the app sets it after each health read.
+    public var responseMs: Int?
     /// What the Devices block of the Core dropdown lists; the app (Pairing) supplies it.
     public var devicesGlance: (@MainActor () -> [DeviceGlance])?
     /// What the Brain dropdown shows; the Brain module supplies it. Nil means the Brain is not up yet.

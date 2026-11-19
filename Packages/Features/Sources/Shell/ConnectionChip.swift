@@ -119,9 +119,8 @@ struct ConnectionPanel: View {
             }
             if let h = health {
                 HStack(spacing: Space.s2) {
-                    DropStat(h.version, "Version")
-                    DropStat(h.uptime, "Up for")
-                    DropStat(h.backupAge(now: now) ?? "Not yet", "Last backup")
+                    // Memory, disk and response when the Core says them; a Core that does not still shows its version and uptime.
+                    ForEach(stats(h), id: \.1) { DropStat($0.0, $0.1) }
                 }
             }
             let devices = shell.devicesGlance?() ?? []
@@ -156,6 +155,14 @@ struct ConnectionPanel: View {
         .corePanel(radius: Radius.pane, padding: 0, part: .popups)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Connection to \(shell.home.coreName)")
+    }
+
+    private func stats(_ h: CoreHealthFacts) -> [(String, String)] {
+        let all: [(String?, String)] = [
+            (h.memory, "Memory"), (h.diskUsedPct.map { "\($0)%" }, "Disk"),
+            (shell.responseMs.map { "\($0) ms" }, "Response"), (h.version, "Version"), (h.uptime, "Up for"),
+        ]
+        return Array(all.compactMap { v, k in v.map { ($0, k) } }.prefix(3))
     }
 
     /// "Up for 12 days · everything is fine", or what is wrong in a few words.
