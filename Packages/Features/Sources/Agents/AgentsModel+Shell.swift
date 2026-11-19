@@ -110,7 +110,7 @@ extension AgentsModel {
     }
 
     func refreshHeads() {
-        for p in shell.panes where p.id.hasPrefix("agents.s-") {
+        for p in shell.allPanes where p.id.hasPrefix("agents.s-") {
             let id = String(p.id.dropFirst("agents.s-".count))
             if let s = sessions.session(id) {
                 let h = head(s)

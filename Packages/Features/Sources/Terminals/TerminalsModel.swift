@@ -398,7 +398,7 @@ public final class TerminalsModel {
 
     /// The pane went away (its close button, ⌘W): detach, never stop the terminal.
     func paneClosed(_ id: String) {
-        guard !shell.panes.contains(where: { $0.id == "terminal-\(id)" }) else { return }
+        guard !shell.allPanes.contains(where: { $0.id == "terminal-\(id)" }) else { return }
         sessions[id]?.shutDown()
         sessions[id] = nil
         Task { await reload() }
