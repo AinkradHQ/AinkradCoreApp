@@ -22,7 +22,10 @@ struct SecretsSection: View {
             if admin.isConnected && model.isOff {
                 CoreStateCard(
                     symbol: "lock", title: "Secrets are off", line: "Turn on test values to add one.",
-                    primary: CoreAction("Open Feature switches") { admin.host.shell.settings.selected = "switches" }
+                    primary: CoreAction("Open Feature switches") {
+                        admin.host.shell.settings.selected = "switches"
+                        admin.host.shell.open(.settings)
+                    }
                 )
                 .frame(maxWidth: .infinity).padding(.top, Space.s8)
                 .accessibilityIdentifier("secrets-mode")
@@ -79,7 +82,10 @@ struct SecretsSection: View {
                     symbol: "testtube.2", title: "Test values only",
                     text: "Anything that looks like a real key is refused."
                 ) {
-                    Button("Change…") { admin.host.shell.settings.selected = "switches" }
+                    Button("Change…") {
+                        admin.host.shell.settings.selected = "switches"
+                        admin.host.shell.open(.settings)
+                    }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .help("Keys and secrets in Feature switches")
                 }

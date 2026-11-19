@@ -47,14 +47,7 @@ struct OpsSection: View {
             }
             .foregroundStyle(GlassInk.primary)
         }
-        .task {
-            await model.reload()
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                if Task.isCancelled { break }
-                await model.reload()
-            }
-        }
+        .task { await model.reload() }  // Activity reads again every 15 seconds while it is open
         .accessibilityIdentifier("ops")
     }
 }
@@ -180,6 +173,7 @@ private struct WarningCard: View {
                     admin.registry.cursor = key
                     admin.host.shell.settings.selected = "core"
                     admin.host.shell.settings.selectTab("limits", in: "core")
+                    admin.host.shell.open(.settings)
                 }
                 .help("Change this limit in Core settings (\(key))")
             }

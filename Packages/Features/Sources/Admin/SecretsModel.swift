@@ -167,6 +167,9 @@ final class SecretsModel {
     var isOff: Bool { hub?.registry.state == .ready && mode == 0 }
     var leaseLimit: Int64 { hub?.registry.item("secrets.lease_secs")?.value ?? 120 }
 
+    /// An account's key (`acct.*`) belongs to Accounts, never to Secrets; an older Core still lists it here.
+    nonisolated static func isListed(_ name: String) -> Bool { !name.hasPrefix("acct.") }
+
     func reset() {
         items = []
         groups = []
@@ -178,8 +181,7 @@ final class SecretsModel {
         guard let hub, let service = hub.service else { return }
         if items.isEmpty { state = .loading }
         do {
-            // An account's key (`acct.*`) belongs to Accounts; an older Core still lists it here.
-            items = try await service.secrets().filter { !$0.name.hasPrefix("acct.") }.sorted { $0.name < $1.name }
+            items = try await service.secrets().filter { Self.isListed($0.name) }.sorted { $0.name < $1.name }
             groups = (try? await service.secretGroups().sorted { $0.name < $1.name }) ?? groups
             state = items.isEmpty && groups.isEmpty ? .empty : .ready
         } catch { state = hub.state(for: error) }
@@ -205,7 +207,9 @@ final class SecretsModel {
                 try await service.createSecret(draft)
             }
             form.wipe()
-            items = (items.filter { $0.name != made.name } + [made]).sorted { $0.name < $1.name }
+            if Self.isListed(made.name) {
+                items = (items.filter { $0.name != made.name } + [made]).sorted { $0.name < $1.name }
+            }
             state = .ready
             hub.host.shell.showToast("\(made.name) stored. The value is write-only.")
             return true

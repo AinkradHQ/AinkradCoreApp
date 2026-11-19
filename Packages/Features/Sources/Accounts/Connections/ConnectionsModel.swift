@@ -448,11 +448,10 @@ public final class ConnectionsModel {
 
     // MARK: pane and launcher
 
-    /// "History" on a card: Settings, Audit, showing only this connection's rows.
+    /// "History" on a card: Activity, Audit, showing only this connection's rows.
     func openHistory(_ item: ConnItem) {
-        host.shell.settings.open(
-            "audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:\(item.id)"])
-        host.shell.open(.settings)
+        host.shell.settings.handoff = ["audit.kind": "connection.", "audit.target": "connection:\(item.id)"]
+        host.shell.launcher.entry("admin-audit")?.run()
     }
 
     func show() {
