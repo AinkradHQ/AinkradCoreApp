@@ -321,7 +321,19 @@ struct AIUsageBody: View {
                             }
                         }
                         .frame(width: 190, alignment: .leading)
-                        rows(us.prefix(3))
+                        if home.spendByDay.contains(where: { $0 > 0 }) {
+                            // The chart is what the AI sessions cost each day (the Core's cost events, newest 100).
+                            VStack(alignment: .leading, spacing: Space.s1) {
+                                WColumns(values: home.spendByDay)
+                                HStack {
+                                    WCaption("30 days ago")
+                                    Spacer(minLength: 0)
+                                    WCaption("Spend per day, today")
+                                }
+                            }
+                        } else {
+                            rows(us.prefix(3))
+                        }
                     }
                 case .l:
                     WHead("chart.bar", "AI usage")

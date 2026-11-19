@@ -217,15 +217,25 @@ struct DigitalClockBody: View {
                 VStack(alignment: .leading, spacing: 0) {
                     time(d, 56)
                     date(d).padding(.top, Space.s2)
-                    places(d).padding(.top, Space.s4)
+                    weekStrip(d).padding(.top, Space.s4)
+                    places(d).padding(.top, Space.s3)
                     Spacer(minLength: 0)
                 }
                 .padding(.top, Space.s1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             case .m:
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    time(d, 44)
-                    date(d)
+                HStack(alignment: .top, spacing: Space.s4) {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        time(d, 44)
+                        date(d)
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text("UTC").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        let u = ClockFace.time(d, calendar: ClockFace.calendar(in: TimeZone(identifier: "UTC") ?? .gmt))
+                        Text("\(u.hours):\(u.minutes)").coreFont(size: MacTextSize.title, weight: .semibold)
+                            .monospacedDigit().foregroundStyle(GlassInk.primary)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
@@ -262,6 +272,27 @@ struct DigitalClockBody: View {
     }
 
     /// Home and UTC, one row each: name (and "home"), the time at the right.
+    /// This week, Monday first, today marked.
+    private func weekStrip(_ d: Date) -> some View {
+        let cal = Calendar.current
+        let start = cal.dateInterval(of: .weekOfYear, for: d)?.start ?? d
+        return HStack(spacing: Space.s1) {
+            ForEach(0..<7, id: \.self) { i in
+                let day = cal.date(byAdding: .day, value: i, to: start) ?? start
+                let today = cal.isDate(day, inSameDayAs: d)
+                VStack(spacing: 0) {
+                    Text(day.formatted(.dateTime.weekday(.abbreviated))).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary)
+                    Text(day.formatted(.dateTime.day())).coreFont(size: MacTextSize.body, weight: .semibold)
+                        .foregroundStyle(today ? GlassInk.blue : GlassInk.primary)
+                }
+                .frame(maxWidth: .infinity)
+                .background(today ? GlassInk.wellEdge : .clear, in: coreShape(Radius.control))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
     private func places(_ d: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(ClockFace.places(home: .current), id: \.name) { p in

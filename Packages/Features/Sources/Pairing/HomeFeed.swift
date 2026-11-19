@@ -35,6 +35,15 @@ struct HomeUsage: Equatable, Sendable {
     var resetsAt: Date?
 }
 
+extension ISO8601DateFormatter {
+    /// The Core's timestamps carry fractions of a second.
+    nonisolated(unsafe) static let withFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+}
+
 /// What Home needs from the Core. Each read stands alone: a device without `admin` fails the costs and audit reads and the rest still show.
 protocol HomeSource: Sendable {
     func sessions() async throws -> [AgentSessionInfo]
@@ -49,6 +58,10 @@ protocol HomeSource: Sendable {
     func usage() async throws -> [HomeUsage]
     /// Today's Lore note, nil when none was started (reading never creates one).
     func todayNote() async throws -> HomeSnapshot.NoteFact?
+    /// What the Brain is doing now; nil on a Core older than API minor 95.
+    func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline?
+    /// The last `lines` lines of a terminal's screen (E6's tail read); nil on a Core older than API minor 95.
+    func terminalTail(_ id: String, lines: Int) async throws -> [String]?
     /// Saves a changed note (the Core merges when it moved on) and answers the note as it is now.
     func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact?
 }
@@ -57,6 +70,8 @@ extension HomeSource {
     func projects() async throws -> [HomeProject] { [] }
     func usage() async throws -> [HomeUsage] { [] }
     func todayNote() async throws -> HomeSnapshot.NoteFact? { nil }
+    func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline? { nil }
+    func terminalTail(_ id: String, lines: Int) async throws -> [String]? { nil }
     func saveNote(_ id: String, rev: Int, text: String) async throws -> HomeSnapshot.NoteFact? { nil }
 }
 
@@ -145,6 +160,27 @@ struct LiveHomeSource: HomeSource {
             by[provider] = u
         }
         return by.values.sorted { $0.provider < $1.provider }
+    }
+
+    func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        let a = try await BrainRoutes(transport: LiveBrainTransport(connection: connection)).activity()
+        let done = a.lastDoneAt.flatMap { ISO8601DateFormatter.withFraction.date(from: $0) }
+        return .init(
+            now: HomeSnapshot.BrainGlance.Pipeline.stage(
+                distilling: a.distilling, queued: a.queued, overviews: a.overviews),
+            working: a.distilling, queued: a.queued, overviews: a.overviews, lastDoneAt: done)
+    }
+
+    /// ponytail: path and answer shape (`{ "lines": [..] }`) are a guess until E6's route lands; align them at integration.
+    func terminalTail(_ id: String, lines: Int) async throws -> [String]? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        struct Tail: Decodable { var lines: [String] }
+        let data = try await run {
+            try await connection.signedRequest(
+                method: "GET", target: "/api/v1/terminals/\(id)/tail?lines=\(lines)", body: Data())
+        }
+        return try JSONDecoder().decode(Tail.self, from: data).lines
     }
 
     private var lore: LiveLoreService { LiveLoreService(connection: connection) }
@@ -253,8 +289,21 @@ final class HomeFeed {
             home.usage = u.map { .init(provider: $0.provider, share: $0.share, resetsAt: $0.resetsAt) }
         }
         if let n = try? await source.todayNote() { home.note = n } else { home.note = nil }
-        if let t = terminalFacts { home.terminals = t() }
-        if let b = brainService?() { home.brain = await Self.glance(b) }
+        if let t = terminalFacts {
+            var facts = t()
+            // The Core's tail serves every terminal; the attached screen (already in `lines`) is the fallback.
+            for i in facts.indices {
+                let f = facts[i]
+                if let tail = try? await source.terminalTail(f.id, lines: 3), !tail.isEmpty {
+                    facts[i] = .init(id: f.id, name: f.name, place: f.place, onThisMac: f.onThisMac, lines: tail)
+                }
+            }
+            home.terminals = facts
+        }
+        if let b = brainService?() {
+            home.brain = await Self.glance(b)
+            home.brain?.pipeline = try? await source.brainPipeline()
+        }
         shell.home = home
     }
 
