@@ -60,9 +60,6 @@ private struct CalmSide: View {
 /// The home map: the five areas around the Brain, live counts, and on the right what it is doing and what it learned.
 private struct CalmHome: View {
     let brain: BrainModel
-    @State private var shown = false
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
     private var calm: BrainCalmModel { brain.calm }
 
     var body: some View {
@@ -82,7 +79,6 @@ private struct CalmHome: View {
                 .frame(width: Space.s8 * 12)
             }
         }
-        .onAppear { shown = true }
     }
 
     private var header: some View {
@@ -93,18 +89,10 @@ private struct CalmHome: View {
         }
     }
 
-    private struct Node: Identifiable {
-        let page: BrainCalmModel.Page
-        let count: Int
-        let line: String
-        let today: Int
-        var id: String { page.rawValue }
-    }
-
-    private var nodes: [Node] {
-        func n(_ p: BrainCalmModel.Page) -> Node {
+    private var nodes: [RadialNode] {
+        func n(_ p: BrainCalmModel.Page) -> RadialNode {
             let s = p.area.flatMap { calm.summary($0) }
-            return Node(
+            return RadialNode(
                 page: p, count: s?.count ?? (p == .places ? calm.areas?.places ?? 0 : 0),
                 line: s?.latest ?? (p == .places ? "Every place is its own room" : "Nothing yet"), today: s?.today ?? 0)
         }
@@ -112,47 +100,10 @@ private struct CalmHome: View {
     }
 
     private var map: some View {
-        let cols = [GridItem(.adaptive(minimum: Space.s8 * 8), spacing: Space.s3)]
-        return VStack(spacing: Space.s4) {
-            HStack(spacing: Space.s3) {
-                Image(systemName: "brain").font(.system(size: 22)).accessibilityHidden(true)
-                Text(brain.status.chip?.state == "needs_you" ? "Paused" : "Learning 24/7")
-                    .coreFont(size: MacTextSize.headline, weight: .semibold)
-            }
-            .padding(Space.s4).coreWell()
-            LazyVGrid(columns: cols, spacing: Space.s3) {
-                ForEach(Array(nodes.enumerated()), id: \.element.id) { i, node in
-                    Button {
-                        Task { await calm.open(node.page) }
-                    } label: {
-                        VStack(alignment: .leading, spacing: Space.s2) {
-                            HStack {
-                                Image(systemName: node.page.symbol).accessibilityHidden(true)
-                                Text(node.page == .rules ? "Rules" : node.page.title)
-                                    .coreFont(size: MacTextSize.headline, weight: .semibold)
-                                Spacer()
-                                Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
-                            }
-                            HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                                Text("\(node.count)").coreFont(size: MacTextSize.title, weight: .semibold)
-                                    .monospacedDigit().contentTransition(.numericText())
-                                if node.today > 0 {
-                                    Text("+\(node.today) today").coreFont(size: MacTextSize.meta)
-                                        .foregroundStyle(GlassInk.blue)
-                                }
-                            }
-                            Text(node.line).lineLimit(2).coreFont(size: MacTextSize.meta)
-                                .foregroundStyle(GlassInk.secondary)
-                        }
-                        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
-                    }
-                    .buttonStyle(.plain)
-                    .coreRise(shown, i)
-                    .accessibilityIdentifier("brain-node-\(node.page.rawValue)")
-                }
-            }
-            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.areas?.areas.map(\.count))
-        }
+        RadialMap(
+            nodes: nodes, working: brain.status.chip?.state == "working",
+            label: brain.status.chip?.state == "needs_you" ? "Paused" : "Learning 24/7"
+        ) { p in Task { await calm.open(p) } }
     }
 }
 
@@ -207,9 +158,12 @@ private struct Learned: View {
                 .transition(.opacity)
             }
             ForEach(calm.learned) { l in
-                CoreRow(l.line, subtitle: "\(l.roomName) · \(l.at)", symbol: "sparkles") {
-                    Button("Undo") { Task { await calm.undo(l) } }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                CoreRow(l.line, subtitle: "\(l.roomName) · \(l.at)", symbol: l.symbol) {
+                    HStack(spacing: Space.s2) {
+                        StateBadge(l.areaTitle, tone: .done, symbol: l.symbol)
+                        Button("Undo") { Task { await calm.undo(l) } }
+                            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    }
                 }
                 .transition(.opacity)
             }

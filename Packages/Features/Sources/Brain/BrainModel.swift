@@ -155,7 +155,7 @@ public final class BrainModel {
     public var visibleTabs: [BrainTab] {
         if isSample { return BrainTab.allCases }
         var tabs: [BrainTab] = service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
-        if calmAvailable { tabs.insert(.records, at: 0) }
+        if calmAvailable { tabs.insert(contentsOf: [.records, .evidence], at: 0) }
         if service?.servesChanges == true { tabs.append(.activity) }
         return tabs
     }

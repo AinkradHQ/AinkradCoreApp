@@ -39,13 +39,50 @@ public final class BrainCalmModel {
         }
     }
 
-    /// A line of "What I learned today": a change set of one room, with its Undo.
+    /// A line of "What I learned today": one record Brain accepted, in words, with its area and time.
     public struct Learned: Identifiable, Equatable {
         public let id: String
         public let room: String
         public let roomName: String
+        public let area: String
         public let line: String
         public let at: String
+        init(_ w: LearnedWire) {
+            id = w.id
+            room = w.room
+            roomName = w.roomName
+            area = w.area
+            at = SyncWords.date(w.createdAt).map { SyncWords.ago($0) } ?? ""
+            line = Self.words(w.type, w.body)
+        }
+        /// "Learned a rule: ask before deleting files".
+        static func words(_ type: String, _ body: String) -> String {
+            let b = body.prefix(1).lowercased() + body.dropFirst()
+            switch type {
+            case "rule": return "Learned a rule: \(b)"
+            case "preference": return "Noted that \(b)"
+            case "decision": return "Noted a decision: \(b)"
+            case "fact": return "Learned that \(b)"
+            case "task": return "Picked up: \(b)"
+            default: return "Noted: \(b)"
+            }
+        }
+        var symbol: String {
+            switch area {
+            case "me": "person"
+            case "rules": "checkmark.circle"
+            case "knowledge": "sparkles"
+            default: "clock"
+            }
+        }
+        var areaTitle: String {
+            switch area {
+            case "me": "Me"
+            case "rules": "Rules"
+            case "knowledge": "Knowledge"
+            default: "Timeline"
+            }
+        }
     }
 
     public var page: Page = .home
@@ -109,24 +146,17 @@ public final class BrainCalmModel {
         await loadRecords()
     }
 
-    /// The newest change sets of the open rooms that can still be undone: what Brain saved by itself.
+    /// Records accepted in the last day (the Core's `GET /learned`).
     func loadLearned() async {
-        guard let service, service.servesChanges else { return }
-        var out: [Learned] = []
-        for r in rooms() where r.mounted && r.lock == nil {
-            guard let page = try? await service.changes(room: r.id, after: nil) else { continue }
-            for c in page.changes where !c.undone && c.rows > 0 && [.distil, .checkpoint, .ai].contains(c.kind) {
-                out.append(Learned(id: c.id, room: r.id, roomName: r.name, line: c.line, at: c.at))
-                if out.count >= 6 { break }
-            }
-        }
-        learned = Array(out.prefix(6))
+        guard let routes, let l = try? await routes.learned() else { return }
+        learned = l.map(Learned.init)
     }
 
+    /// Takes the record out of memory (archived, never deleted).
     public func undo(_ l: Learned) async {
-        guard let service else { return }
+        guard let routes else { return }
         do {
-            _ = try await service.undoChange(room: l.room, change: l.id)
+            try await routes.archiveRecord(room: l.room, id: l.id)
             learned.removeAll { $0.id == l.id }
             await reload()
         } catch { notice = BrainWords.failure(error) }

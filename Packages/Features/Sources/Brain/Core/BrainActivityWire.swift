@@ -116,6 +116,25 @@ public struct LearningWire: Codable, Sendable, Equatable {
     }
 }
 
+/// One record Brain accepted in the last day (`GET /learned`).
+public struct LearnedWire: Codable, Sendable, Equatable, Identifiable {
+    public var id: String
+    public var room: String
+    public var roomName: String
+    public var type: String
+    /// `me`, `rules`, `knowledge` or `timeline`.
+    public var area: String
+    public var body: String
+    public var createdAt: String
+    enum CodingKeys: String, CodingKey {
+        case id, room, type, area, body
+        case roomName = "room_name"
+        case createdAt = "created_at"
+    }
+}
+
+struct ArchivedWire: Decodable { var archived: Bool }
+
 struct UndoneWire: Decodable {
     var rooms: Int
     var items: Int?
@@ -130,6 +149,11 @@ extension BrainRoutes {
         var q = "?limit=\(limit)"
         if let type { q += "&type=\(Self.seg(type))" }
         return try await call("GET", "/areas/\(Self.seg(area))" + q)
+    }
+    public func learned() async throws -> [LearnedWire] { try await call("GET", "/learned") }
+    /// Takes one record out of memory (archived and kept, never deleted).
+    public func archiveRecord(room: String, id: String) async throws {
+        _ = try await call("POST", "/rooms/\(Self.seg(room))/records/\(Self.seg(id))/archive", as: ArchivedWire.self)
     }
     public func autoImports() async throws -> [AutoImportWire] { try await call("GET", "/auto-imports") }
     /// Puts the sort back to one pile: archives the rooms the Core made for `run` and returns the run's items to Unsorted,
