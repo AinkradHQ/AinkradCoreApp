@@ -120,7 +120,7 @@ struct ConnectionPanel: View {
             if let h = health {
                 HStack(spacing: Space.s2) {
                     // Memory, disk and response when the Core says them; a Core that does not still shows its version and uptime.
-                    ForEach(stats(h), id: \.1) { DropStat($0.0, $0.1) }
+                    ForEach(stats(h), id: \.label) { DropStat($0.value, $0.label, share: $0.share, low: $0.low) }
                 }
             }
             if let u = shell.coreUpdate {
@@ -173,18 +173,32 @@ struct ConnectionPanel: View {
         .accessibilityLabel("Connection to \(shell.home.coreName)")
     }
 
-    private func stats(_ h: CoreHealthFacts) -> [(String, String)] {
-        let all: [(String?, String)] = [
-            (h.memory, "Memory"), (h.diskUsedPct.map { "\($0)%" }, "Disk"),
-            (shell.responseMs.map { "\($0) ms" }, "Response"), (h.version, "Version"), (h.uptime, "Up for"),
+    private struct Stat {
+        let value: String
+        let label: String
+        var share: Double?
+        var low = false
+    }
+
+    /// Memory, Disk and Response with a bar each when the Core says the share (the whole machine's memory, the disk, the
+    /// answer time against 150 ms); a Core that does not still shows what it has, then its version and uptime.
+    private func stats(_ h: CoreHealthFacts) -> [(value: String, label: String, share: Double?, low: Bool)] {
+        let ms = shell.responseMs
+        let all: [Stat?] = [
+            h.memoryPct.map { Stat(value: "\($0)%", label: "Memory", share: Double($0) / 100, low: $0 >= 90) }
+                ?? h.memory.map { Stat(value: $0, label: "Memory") },
+            h.diskUsedPct.map { Stat(value: "\($0)%", label: "Disk", share: Double($0) / 100, low: $0 >= 90) },
+            ms.map { Stat(value: "\($0) ms", label: "Response", share: min(1, Double($0) / 150), low: $0 >= 150) },
+            Stat(value: h.version, label: "Version"), Stat(value: h.uptime, label: "Up for"),
         ]
-        return Array(all.compactMap { v, k in v.map { ($0, k) } }.prefix(3))
+        return Array(all.compactMap { $0 }.prefix(3)).map { ($0.value, $0.label, $0.share, $0.low) }
     }
 
     /// "Up for 12 days · everything is fine", or what is wrong in a few words.
     private func meta(_ state: ConnectionChipState, now: Date) -> String {
         switch state {
-        case .online: return shell.home.health.map { "Up for \($0.uptime) · everything is fine" } ?? "Everything is fine"
+        case .online:
+            return shell.home.health.map { "Up for \($0.uptime) · everything is fine" } ?? "Everything is fine"
         case .reconnecting(let n): return n > 0 ? "Trying again by itself (try \(n))" : "Trying again by itself"
         case .noNetwork: return "This Mac is not online"
         case .coreNotAnswering: return "Your AI sessions keep working"

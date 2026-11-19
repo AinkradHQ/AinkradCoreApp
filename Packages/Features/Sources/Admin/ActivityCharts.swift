@@ -133,54 +133,6 @@ extension View {
     func chartReveal() -> some View { modifier(ChartReveal()) }
 }
 
-// MARK: - Ops: the Core's own last day
-
-struct OpsHistoryCards: View {
-    let points: [OpsPoint]
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        let cpu = ActivityStats.readings(points) { $0.cpuPct }
-        let mem = ActivityStats.readings(points) { $0.memoryBytes }
-        let disk = ActivityStats.readings(points) { $0.diskUsedPct }
-        if cpu.count >= 2 || mem.count >= 2 || disk.count >= 2 {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                HStack {
-                    Text("Your Core over the last day").coreFont(size: MacTextSize.headline, weight: .semibold)
-                    Spacer(minLength: 0)
-                    Text("One reading a minute").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                }
-                HStack(alignment: .top, spacing: Space.s3) {
-                    card(0, "Processor", cpu.last.map { "\(Int($0.rounded()))%" }, cpu, ceiling: max(100, cpu.max() ?? 0))
-                    card(
-                        1, "Memory", mem.last.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .memory) },
-                        mem, ceiling: nil)
-                    card(2, "Disk used", disk.last.map { "\(Int($0.rounded()))%" }, disk, ceiling: 100)
-                }
-            }
-        }
-    }
-
-    private func card(_ i: Int, _ title: String, _ value: String?, _ series: [Double], ceiling: Double?) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            Text(value ?? "–").coreFont(size: MacTextSize.large, weight: .bold, design: .rounded)
-                .contentTransition(.numericText())
-            if series.count >= 2 {
-                CoreSpark(series, ceiling: ceiling).chartReveal()
-            } else {
-                Spacer().frame(height: Space.s6 + Space.s2)
-            }
-        }
-        .padding(Space.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell()
-        .modifier(RiseIn(index: i))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title): \(value ?? "no reading")")
-    }
-}
-
 // MARK: - Audit: the week by hour
 
 struct AuditHeatmap: View {
@@ -226,7 +178,8 @@ struct AuditHeatmap: View {
                 }
                 .buttonStyle(CoreQuietPressStyle(radius: Radius.control, scale: 0.995, hoverFill: true))
                 .accessibilityLabel(
-                    "\(ActivityStats.dayLabel(day.date, index: r)), \(day.total) actions")
+                    "\(ActivityStats.dayLabel(day.date, index: r)), \(day.total) actions"
+                )
                 .accessibilityAddTraits(r == model.selectedDay ? .isSelected : [])
             }
         }
@@ -273,7 +226,11 @@ private struct HeatCell: View {
             .onAppear {
                 guard !reduce else { return }
                 withAnimation(Motion.out(Motion.ui).delay(delay)) { shown = true }
-                if now { withAnimation(.easeInOut(duration: Motion.tick).repeatForever(autoreverses: true)) { breathe = true } }
+                if now {
+                    withAnimation(.easeInOut(duration: Motion.tick).repeatForever(autoreverses: true)) {
+                        breathe = true
+                    }
+                }
             }
     }
 
@@ -322,7 +279,9 @@ struct AuditKindBars: View {
                     .disabled(kind.prefix == nil)
                     .help(kind.prefix == nil ? kind.title : "Show only \(kind.title.lowercased())")
                     .modifier(RiseIn(index: i + 3))
-                    .accessibilityLabel("\(kind.title), \(days.reduce(0) { $0 + $1.count(kind.rawValue) }) in \(days.count) days")
+                    .accessibilityLabel(
+                        "\(kind.title), \(days.reduce(0) { $0 + $1.count(kind.rawValue) }) in \(days.count) days"
+                    )
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
@@ -345,7 +304,8 @@ private struct KindBarRow: View {
                     .frame(maxWidth: .infinity).frame(height: max(3, 34 * v))
                     .scaleEffect(y: reduce || grown ? 1 : 0.05, anchor: .bottom)
                     .animation(
-                        reduce ? nil : Motion.out(Motion.reveal).delay(Double(values.count - 1 - i) * 0.055), value: grown)
+                        reduce ? nil : Motion.out(Motion.reveal).delay(Double(values.count - 1 - i) * 0.055),
+                        value: grown)
             }
         }
         .frame(height: 34, alignment: .bottom)
@@ -397,7 +357,9 @@ private struct LiveRow: View {
         .modifier(RiseIn(index: index))
         .onAppear {
             guard !reduce else { return }
-            withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true).delay(Double(index) * 1.4)) { up = true }
+            withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true).delay(Double(index) * 1.4)) {
+                up = true
+            }
         }
         .accessibilityElement(children: .combine)
     }

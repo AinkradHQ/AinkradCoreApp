@@ -30,6 +30,10 @@ protocol AdminService: Sendable {
     func revealSecret(_ name: String) async throws -> RevealedValue
     func exportSecrets() async throws -> [ExportedValue]
     func opsHistory() async throws -> [OpsPoint]
+    /// The whole machine and the runner fleet (nil before Core 0.10), the backup schedule and history, and "back up now".
+    func hostFacts() async -> CoreHostFacts?
+    func backups() async throws -> CoreBackups?
+    func startBackup() async throws
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat]
 }
 

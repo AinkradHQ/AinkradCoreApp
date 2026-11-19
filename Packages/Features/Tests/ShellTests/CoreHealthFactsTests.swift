@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Testing
 
@@ -14,6 +15,12 @@ struct CoreHealthFactsTests {
         #expect(cert(nil) == nil)
         #expect(CoreHealthFacts(version: "x", uptimeSecs: 0, certDaysLeft: 5).certificateLow)
         #expect(!CoreHealthFacts(version: "x", uptimeSecs: 0, certDaysLeft: 62).certificateLow)
+    }
+
+    @Test func memoryShareComesFromTheWholeMachineWhenTheCoreSaysIt() {
+        let host = CoreHostFacts(ramUsedBytes: 38, ramTotalBytes: 100)
+        #expect(CoreHealthFacts(version: "x", uptimeSecs: 0, host: host).memoryPct == 38)
+        #expect(CoreHealthFacts(version: "x", uptimeSecs: 0, memoryBytes: 5).memoryPct == nil)
     }
 
     @Test func backupAgeAndSize() {

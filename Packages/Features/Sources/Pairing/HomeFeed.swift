@@ -78,13 +78,14 @@ struct LiveHomeSource: HomeSource {
     }
 
     func health() async throws -> CoreHealthFacts {
-        try await run {
+        let host = await connection.hostFacts()
+        return try await run {
             let h = try await client.getCoreHealth().ok.body.json
             return CoreHealthFacts(
                 version: h.version, uptimeSecs: h.uptimeSecs, certDaysLeft: h.certDaysLeft.map(Int.init),
                 lastBackupAt: h.lastBackupAt, lastBackupBytes: h.lastBackupBytes,
                 // New in 0.10 (needs `make clients`, done by the coordinator at the epic merge).
-                memoryBytes: h.memoryBytes, diskUsedPct: h.diskUsedPct.map(Int.init))
+                memoryBytes: h.memoryBytes, diskUsedPct: h.diskUsedPct.map(Int.init), host: host)
         }
     }
 

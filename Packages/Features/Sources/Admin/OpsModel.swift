@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Observation
 
@@ -96,6 +97,13 @@ final class OpsModel {
     var showRaw = false
     /// The Core's own CPU, memory and disk for the last day, one reading a minute (API minor 95); empty on an older Core.
     private(set) var coreHistory: [OpsPoint] = []
+    /// The whole machine and the runner fleet, and the backup schedule and history (Core 0.10); nil on an older Core.
+    private(set) var host: CoreHostFacts?
+    private(set) var backups: CoreBackups?
+    /// "Back up now" was pressed and the Core has not answered yet.
+    private(set) var startingBackup = false
+    /// One plain line about the last "Back up now", or nil.
+    private(set) var backupNote: String?
     @ObservationIgnored private weak var hub: AdminModel?
 
     /// The figures worth a tile, in this order, when the Core sends them.
@@ -113,6 +121,9 @@ final class OpsModel {
         samples = []
         raw = ""
         coreHistory = []
+        host = nil
+        backups = nil
+        backupNote = nil
         state = .loading
     }
 
@@ -132,8 +143,25 @@ final class OpsModel {
                 history[name] = list
             }
             state = samples.isEmpty ? .empty : .ready
-            if await service.supportsV010(), let points = try? await service.opsHistory() { coreHistory = points }
+            if await service.supportsV010() {
+                if let points = try? await service.opsHistory() { coreHistory = points }
+                host = await service.hostFacts()
+                backups = (try? await service.backups()) ?? backups
+            }
         } catch { state = hub.state(for: error) }
+    }
+
+    /// Starts a backup on the Core machine and reads the schedule again. Needs `admin`; no Touch ID, it only starts the unit the timer
+    /// starts anyway.
+    func backUpNow() async {
+        guard let hub, let service = hub.service, !startingBackup, hub.mayWrite() else { return }
+        startingBackup = true
+        defer { startingBackup = false }
+        do {
+            try await service.startBackup()
+            backupNote = "Backup started. It finishes by itself."
+            backups = (try? await service.backups()) ?? backups
+        } catch { backupNote = hub.words(error) }
     }
 
     #if DEBUG

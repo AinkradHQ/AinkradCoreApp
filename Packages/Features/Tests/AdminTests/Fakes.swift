@@ -174,6 +174,14 @@ final class FakeService: AdminService, @unchecked Sendable {
         return exported
     }
     func opsHistory() async throws -> [OpsPoint] { history }
+    var host: CoreHostFacts?
+    var backupInfo: CoreBackups?
+    func hostFacts() async -> CoreHostFacts? { host }
+    func backups() async throws -> CoreBackups? { backupInfo }
+    func startBackup() async throws {
+        try note("backup-now")
+        backupInfo?.running = true
+    }
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat] { statsDays }
 }
 

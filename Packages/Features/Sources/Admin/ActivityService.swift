@@ -36,6 +36,12 @@ struct OpsPoint: Equatable, Sendable {
     let cpuPct: Double?
     let memoryBytes: Double?
     let diskUsedPct: Double?
+    /// The whole machine (a Linux Core): its CPU share, memory and disk.
+    var hostCpuPct: Double?
+    var ramUsedBytes: Double?
+    var ramTotalBytes: Double?
+    var diskUsedBytes: Double?
+    var diskTotalBytes: Double?
 }
 
 /// One day of the audit log: rows per hour and per kind.
@@ -55,6 +61,9 @@ extension AdminService {
     func revealSecret(_ name: String) async throws -> RevealedValue { throw Self.unsupported }
     func exportSecrets() async throws -> [ExportedValue] { throw Self.unsupported }
     func opsHistory() async throws -> [OpsPoint] { [] }
+    func hostFacts() async -> CoreHostFacts? { nil }
+    func backups() async throws -> CoreBackups? { nil }
+    func startBackup() async throws { throw Self.unsupported }
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat] { [] }
 
     static var unsupported: AdminFailure {
@@ -65,16 +74,12 @@ extension AdminService {
 extension LiveAdminService {
     func supportsV010() async -> Bool { await connection.serverSupports(minor: ActivityMinor.v010) }
 
+    /// E1's `POST /secrets/{id}/reveal`: no body, and the answer is just `{value}`. The screen keeps the name it asked for, a
+    /// text kind (a file secret is never shown, `canShow`), and its own 15 seconds.
     func revealSecret(_ name: String) async throws -> RevealedValue {
-        struct Wire: Decodable {
-            let name: String
-            let kind: String?
-            let value: String
-            let hide_after_secs: Int?
-        }
+        struct Wire: Decodable { let value: String }
         let w: Wire = try await call("POST", "/api/v1/secrets/\(name)/reveal")
-        return RevealedValue(
-            name: w.name, kind: w.kind ?? "text", value: w.value, hideAfter: TimeInterval(w.hide_after_secs ?? 15))
+        return RevealedValue(name: name, kind: "text", value: w.value, hideAfter: 15)
     }
 
     func exportSecrets() async throws -> [ExportedValue] {
@@ -88,7 +93,8 @@ extension LiveAdminService {
         struct Wire: Decodable { let items: [Item] }
         let w: Wire = try await call("POST", "/api/v1/secrets/export", limit: 16 << 20)
         return w.items.map {
-            ExportedValue(name: $0.name, kind: $0.kind ?? "text", group: $0.group, fileName: $0.file_name, value: $0.value)
+            ExportedValue(
+                name: $0.name, kind: $0.kind ?? "text", group: $0.group, fileName: $0.file_name, value: $0.value)
         }
     }
 
@@ -98,14 +104,32 @@ extension LiveAdminService {
             let cpu_pct: Double?
             let memory_bytes: Double?
             let disk_used_pct: Double?
+            let host_cpu_pct: Double?
+            let ram_used_bytes: Double?
+            let ram_total_bytes: Double?
+            let disk_used_bytes: Double?
+            let disk_total_bytes: Double?
         }
         struct Wire: Decodable { let samples: [Sample] }
         let w: Wire = try await call("GET", "/api/v1/ops/history?hours=24")
         return w.samples.compactMap { s in
             Self.date(s.at).map {
-                OpsPoint(at: $0, cpuPct: s.cpu_pct, memoryBytes: s.memory_bytes, diskUsedPct: s.disk_used_pct)
+                OpsPoint(
+                    at: $0, cpuPct: s.cpu_pct, memoryBytes: s.memory_bytes, diskUsedPct: s.disk_used_pct,
+                    hostCpuPct: s.host_cpu_pct, ramUsedBytes: s.ram_used_bytes, ramTotalBytes: s.ram_total_bytes,
+                    diskUsedBytes: s.disk_used_bytes, diskTotalBytes: s.disk_total_bytes)
             }
         }
+    }
+
+    func hostFacts() async -> CoreHostFacts? { await connection.hostFacts() }
+
+    func backups() async throws -> CoreBackups? {
+        do { return try await connection.backupStatus() } catch { throw CoreFailure.of(error) ?? error }
+    }
+
+    func startBackup() async throws {
+        do { try await connection.startBackup() } catch { throw CoreFailure.of(error) ?? error }
     }
 
     func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat] {

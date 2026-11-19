@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 
 /// What `GET /core/health` says, as plain words for the Home widget and the connection pop-up (N9, N14). Anything the Core
@@ -11,11 +12,15 @@ public struct CoreHealthFacts: Equatable, Sendable {
     /// The Core process's memory in bytes, and how full its disk is (0...100). Nil from a Core that does not say.
     public var memoryBytes: Int64?
     public var diskUsedPct: Int?
+    /// The whole machine, and the runner fleet (Core 0.10); nil from a Core that does not say.
+    public var host: CoreHostFacts?
 
     public init(
         version: String, uptimeSecs: Int64, certDaysLeft: Int? = nil, lastBackupAt: Date? = nil,
-        lastBackupBytes: Int64? = nil, memoryBytes: Int64? = nil, diskUsedPct: Int? = nil
+        lastBackupBytes: Int64? = nil, memoryBytes: Int64? = nil, diskUsedPct: Int? = nil,
+        host: CoreHostFacts? = nil
     ) {
+        self.host = host
         self.memoryBytes = memoryBytes
         self.diskUsedPct = diskUsedPct
         self.version = version
@@ -24,6 +29,9 @@ public struct CoreHealthFacts: Equatable, Sendable {
         self.lastBackupAt = lastBackupAt
         self.lastBackupBytes = lastBackupBytes
     }
+
+    /// Memory in use of the whole machine, 0...100 (the pop-up's Memory bar); nil when the host does not say.
+    public var memoryPct: Int? { host?.ramPct }
 
     /// "412 MB", nil when the Core did not say.
     public var memory: String? { memoryBytes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .memory) } }

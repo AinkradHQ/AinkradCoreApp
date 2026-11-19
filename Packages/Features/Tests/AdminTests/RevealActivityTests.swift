@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Testing
 
@@ -111,6 +112,49 @@ struct RevealActivityTests {
         oldSvc.history = svc.history
         await old.ops.reload()
         #expect(old.ops.coreHistory.isEmpty)
+    }
+
+    @Test("Ops brings the machine, the fleet and the backups, and Back up now asks the Core once")
+    func hostBackupsAndFleet() async {
+        let (admin, svc, _) = await world()
+        svc.metricsText = "ainkrad_uptime_seconds 5\n"
+        svc.host = CoreHostFacts(
+            cpuPct: 20, ramUsedBytes: 8, ramTotalBytes: 16, fleet: CoreFleet(working: 1, idle: 0, offline: 1))
+        svc.backupInfo = CoreBackups(schedule: "daily", history: [CoreBackupFile(at: Date(), bytes: 9)])
+        await admin.ops.reload()
+        #expect(admin.ops.host?.ramPct == 50 && admin.ops.host?.fleet?.offline == 1)
+        #expect(admin.ops.backups?.available == true)
+        await admin.ops.backUpNow()
+        #expect(svc.log.contains("backup-now"))
+        #expect(admin.ops.backupNote == "Backup started. It finishes by itself.")
+        #expect(admin.ops.backups?.running == true, "read again after the start")
+    }
+
+    @Test("An older Core shows no host figures and no backups")
+    func olderCoreHasNoHost() async {
+        let (admin, svc, _) = await world(v010: false)
+        svc.metricsText = "ainkrad_uptime_seconds 5\n"
+        svc.host = CoreHostFacts(cpuPct: 20)
+        svc.backupInfo = CoreBackups()
+        await admin.ops.reload()
+        #expect(admin.ops.host == nil && admin.ops.backups == nil)
+    }
+
+    @Test("The Ops words")
+    func opsWords() {
+        #expect(OpsWords.load(10) == "Quiet" && OpsWords.load(50) == "Busy" && OpsWords.load(90) == "Heavy")
+        #expect(OpsWords.room(42) == "Plenty free" && OpsWords.room(95) == "Almost full")
+        #expect(OpsWords.fleet(CoreFleet(working: 1, idle: 0, offline: 2)) == "1 working, 2 offline")
+        #expect(OpsWords.fleet(CoreFleet(working: 0, idle: 0, offline: 0)) == "No runners yet")
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let now = Date(timeIntervalSince1970: 1_795_113_600)  // 2026-11-19 18:40 UTC
+        let tonight = Date(timeIntervalSince1970: 1_795_113_600 + 4 * 3600)  // 22:40 the same day
+        #expect(OpsWords.next(tonight, now: now, calendar: cal).hasPrefix("Next one tonight at"))
+        #expect(
+            OpsWords.next(now.addingTimeInterval(86_400), now: now, calendar: cal).hasPrefix("Next one tomorrow at"))
+        #expect(OpsWords.last(now.addingTimeInterval(-3600), now: now, calendar: cal).hasPrefix("Today"))
+        #expect(OpsWords.last(now.addingTimeInterval(-86_400), now: now, calendar: cal).hasPrefix("Yesterday"))
     }
 
     @Test("The stream's news is worded, and kinds that are not news are left out")
