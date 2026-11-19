@@ -469,9 +469,12 @@ public final class BrainModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "brain-link", group: .apps, title: "Brain", sub: "Look of the memory app", symbol: "brain",
-                order: 5
-            ) { BrainLookSection(model: self) })
+                id: "brain-link", group: .apps, title: "Brain", sub: "Look and options of the memory app",
+                symbol: "brain", order: 5,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { BrainLookSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { BrainLookSection(model: self, part: .options) },
+                ]))
         // A locked Mac clears the room view from memory (security rule 7).
         lockWatch = DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main

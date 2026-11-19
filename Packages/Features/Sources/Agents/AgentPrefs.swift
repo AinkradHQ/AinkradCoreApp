@@ -102,78 +102,83 @@ struct AgentSettingsView: View {
     @Bindable var prefs = AgentPrefs.shared
     weak var model: AgentsModel?
     var compact = false
+    var part: SettingsPart = .all
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? Space.s3 : Space.s4) {
-            GlassSection(
-                "Look", sub: "The AI Sessions app and its sessions, as one.", symbol: "square.on.square",
-                hue: GlassInk.blue
-            ) {
-                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
-            } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+            if part.showsLook {
+                GlassSection(
+                    "Look", sub: "The AI Sessions app and its sessions, as one.", symbol: "square.on.square",
+                    hue: GlassInk.blue
+                ) {
+                    AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
+                } content: {
+                    if prefs.followLook {
+                        Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(GlassInk.secondary)
+                    } else {
+                        GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
+                    }
+                }
+                GlassSection(
+                    "Text", sub: "The conversation and the message field. Code stays monospaced.", symbol: "textformat",
+                    hue: GlassInk.blue, index: 1
+                ) {
+                    SettingRow("Size", symbol: "textformat.size") {
+                        CoreSegmented(
+                            "Text size",
+                            segments: AgentPrefs.textScales.map {
+                                CoreSegment($0, $0.formatted(.percent.precision(.fractionLength(0))))
+                            }, selection: $prefs.textScale, fill: true)
+                    }
+                    SettingRow("Typeface", symbol: "textformat") {
+                        CoreSegmented(
+                            "Typeface", segments: AgentPrefs.fonts.map { CoreSegment($0.id, $0.title) },
+                            selection: $prefs.font, fill: true)
+                    }
+                    // What the conversation will look like.
+                    Text("Two handlers still return 500 instead of 409 on a conflict. Fixing them.")
+                        .coreFont(size: MacTextSize.body)
+                        .environment(\.coreTextScale, prefs.textScale)
+                        .environment(\.coreFontDesign, prefs.fontDesign)
+                        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(GlassInk.well, in: coreShape(Radius.control))
                 }
             }
-            GlassSection(
-                "Text", sub: "The conversation and the message field. Code stays monospaced.", symbol: "textformat",
-                hue: GlassInk.blue, index: 1
-            ) {
-                SettingRow("Size", symbol: "textformat.size") {
-                    CoreSegmented(
-                        "Text size",
-                        segments: AgentPrefs.textScales.map {
-                            CoreSegment($0, $0.formatted(.percent.precision(.fractionLength(0))))
-                        }, selection: $prefs.textScale, fill: true)
-                }
-                SettingRow("Typeface", symbol: "textformat") {
-                    CoreSegmented(
-                        "Typeface", segments: AgentPrefs.fonts.map { CoreSegment($0.id, $0.title) },
-                        selection: $prefs.font, fill: true)
-                }
-                // What the conversation will look like.
-                Text("Two handlers still return 500 instead of 409 on a conflict. Fixing them.")
-                    .coreFont(size: MacTextSize.body)
-                    .environment(\.coreTextScale, prefs.textScale)
-                    .environment(\.coreFontDesign, prefs.fontDesign)
-                    .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GlassInk.well, in: coreShape(Radius.control))
-            }
-            GlassSection(
-                "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.blue,
-                index: 2
-            ) {
-                SettingRow("Harness", symbol: "cpu") {
-                    CoreSegmented(
-                        "Harness",
-                        segments: [
-                            CoreSegment("claude", "claude", symbol: "sparkles"),
-                            CoreSegment("codex", "codex", symbol: "chevron.left.forwardslash.chevron.right"),
-                            CoreSegment("opencode", "opencode", symbol: "curlybraces"),
-                            CoreSegment("agy", "agy", symbol: "terminal"),
-                        ], selection: $prefs.harness, fill: true)
-                }
-                SettingRow("Mode", symbol: "hand.raised") {
-                    CoreSegmented(
-                        "Mode",
-                        segments: [
-                            CoreSegment("ask", "Asks first", symbol: "questionmark.bubble"),
-                            CoreSegment("accept_edits", "Accepts edits", symbol: "pencil.and.list.clipboard"),
-                            CoreSegment("sandboxed", "Sandboxed", symbol: "shippingbox"),
-                        ], selection: $prefs.mode, fill: true)
-                }
-                SettingRow("Runner", symbol: "server.rack") {
-                    CoreSegmented(
-                        "Runner",
-                        segments: [CoreSegment("", "Best ready", symbol: "wand.and.stars")]
-                            + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
-                        selection: $prefs.runner, fill: true)
-                }
-                SettingRow("Model", symbol: "brain") {
-                    ModelField(text: $prefs.model)
+            if part.showsOptions {
+                GlassSection(
+                    "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.blue,
+                    index: 2
+                ) {
+                    SettingRow("Harness", symbol: "cpu") {
+                        CoreSegmented(
+                            "Harness",
+                            segments: [
+                                CoreSegment("claude", "claude", symbol: "sparkles"),
+                                CoreSegment("codex", "codex", symbol: "chevron.left.forwardslash.chevron.right"),
+                                CoreSegment("opencode", "opencode", symbol: "curlybraces"),
+                                CoreSegment("agy", "agy", symbol: "terminal"),
+                            ], selection: $prefs.harness, fill: true)
+                    }
+                    SettingRow("Mode", symbol: "hand.raised") {
+                        CoreSegmented(
+                            "Mode",
+                            segments: [
+                                CoreSegment("ask", "Asks first", symbol: "questionmark.bubble"),
+                                CoreSegment("accept_edits", "Accepts edits", symbol: "pencil.and.list.clipboard"),
+                                CoreSegment("sandboxed", "Sandboxed", symbol: "shippingbox"),
+                            ], selection: $prefs.mode, fill: true)
+                    }
+                    SettingRow("Runner", symbol: "server.rack") {
+                        CoreSegmented(
+                            "Runner",
+                            segments: [CoreSegment("", "Best ready", symbol: "wand.and.stars")]
+                                + (model?.runners ?? []).map { CoreSegment($0.id, $0.name, symbol: "server.rack") },
+                            selection: $prefs.runner, fill: true)
+                    }
+                    SettingRow("Model", symbol: "brain") {
+                        ModelField(text: $prefs.model)
+                    }
                 }
             }
         }

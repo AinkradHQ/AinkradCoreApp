@@ -387,6 +387,15 @@ public final class LeylineModel {
 
     public func install() {
         let shell = host.shell
+        // Settings, Apps, Leyline: its Look (follows Appearance unless turned off). No options of its own yet.
+        shell.settings.section(
+            SettingsSection(
+                id: "leyline", group: .apps, title: "Leyline", sub: "Its look",
+                symbol: "point.3.connected.trianglepath.dotted", order: 7
+            ) {
+                AppLookSection(appName: "Leyline", prefs: AppLookPrefs.shared("leyline"))
+                    .foregroundStyle(GlassInk.primary)
+            })
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
             _ run: @escaping @MainActor (LeylineModel) -> Void
