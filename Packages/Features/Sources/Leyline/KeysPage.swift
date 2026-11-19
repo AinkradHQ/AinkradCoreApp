@@ -215,7 +215,7 @@ struct GenerateKeySheet: View {
     }
 }
 
-/// Import…: an OpenSSH private key, and its passphrase when it has one. It is sent once, sealed by the Core and never shown
+/// Import…: an OpenSSH or PEM private key (ed25519, ECDSA, RSA 2048+), and its passphrase when it has one. It is sent once, sealed by the Core and never shown
 /// again; this sheet drops it the moment it closes. Touch ID first.
 struct ImportKeySheet: View {
     let model: LeylineModel
@@ -228,21 +228,24 @@ struct ImportKeySheet: View {
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 18) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                DialogHead(title: "Import Key", line: "Needs Touch ID.")
+                DialogHead(title: "Add a key you already have", line: "Needs Touch ID.")
                 CoreTextField("Name", placeholder: "ops-personal", text: $name, autofocus: true)
                 CoreTextArea(
-                    "Private key", placeholder: "-----BEGIN OPENSSH PRIVATE KEY-----", text: $pem,
+                    "Private key", placeholder: "-----BEGIN OPENSSH PRIVATE KEY----- or -----BEGIN RSA PRIVATE KEY-----", text: $pem,
                     error: model.writeError, size: MacTextSize.meta, minHeight: Space.s8 * 3, design: .monospaced
                 )
                 CoreSecureField("Passphrase", placeholder: "Only for an encrypted key", text: $passphrase)
                 Text(
-                    "The key is sent once and sealed in the Core. It cannot be shown again. RSA keys are not accepted."
+                    "Works with OpenSSH, ed25519, ECDSA and RSA 2048 bits or larger. The key is sent once and sealed in the Core. It cannot be shown again."
                 )
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),
-                    primary: CoreAction("Import", key: .primary, run: bring), busy: model.busy,
-                    enabled: !name.trimmingCharacters(in: .whitespaces).isEmpty && !pem.isEmpty)
+                    primary: model.keyTooWeak
+                        ? CoreAction("Make a new key for me", key: .primary, run: makeNew)
+                        : CoreAction("Import", key: .primary, run: bring),
+                    busy: model.busy,
+                    enabled: !name.trimmingCharacters(in: .whitespaces).isEmpty && (!pem.isEmpty || model.keyTooWeak))
             }
         }
         .onChange(of: pem) { _, _ in model.clearWriteError() }
@@ -251,6 +254,14 @@ struct ImportKeySheet: View {
             passphrase = ""
         }
         .accessibilityIdentifier("key-import")
+    }
+
+    /// The "too weak" way out: a fresh ed25519 key under the same name; the weak one was never stored.
+    private func makeNew() {
+        guard !model.busy else { return }
+        pem = ""
+        passphrase = ""
+        Task { await model.generateKey(name: name) }
     }
 
     private func bring() {
