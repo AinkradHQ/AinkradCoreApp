@@ -103,6 +103,16 @@ private struct TopBar: View {
             }
             .buttonStyle(CoreButtonStyle(.secondary))
             .help("Show the design systems")
+            if model.composeSupported && !model.readOnly {
+                Button {
+                    Task { await model.drawWithAI() }
+                } label: {
+                    Label("Draw with AI", systemImage: "sparkles")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary))
+                .help("Make a new design and let AI draw three directions on it")
+                .accessibilityIdentifier("design-draw-ai-home")
+            }
             Button {
                 model.openNew()
             } label: {

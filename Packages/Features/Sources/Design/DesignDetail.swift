@@ -30,6 +30,16 @@ struct DesignDetail: View {
             } actions: {
                 if let editor { PresenceStrip(peers: editor.peers) }
                 if let editor { EditorToolbar(editor: editor, aboutOpen: $aboutOpen) }
+                if editor != nil, model.composeSupported, !model.readOnly {
+                    Button {
+                        Task { await model.drawWithAI() }
+                    } label: {
+                        Label("Draw with AI", systemImage: "sparkles")
+                    }
+                    .buttonStyle(CoreButtonStyle(.prominent))
+                    .help("Describe it and AI draws three directions on this canvas")
+                    .accessibilityIdentifier("design-draw-ai")
+                }
                 CoreDropdown(
                     items: projectItems,
                     isPresented: Binding(get: { model.projectsMenuOpen }, set: { model.projectsMenuOpen = $0 })
