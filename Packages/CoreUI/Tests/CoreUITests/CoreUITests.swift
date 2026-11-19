@@ -182,3 +182,29 @@ struct KeyboardFocusTests {
         #expect(!AppLookPrefs(app: "design", defaults: d).own)
     }
 }
+
+@MainActor struct AppOptionsTests {
+    private func suite() -> UserDefaults {
+        let name = "appopt-test-\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
+    @Test func fallsBackThenKeepsWhatWasSet() {
+        let d = suite()
+        let o = AppOptions(app: "lore", defaults: d)
+        #expect(o.bool("openLast", true) && o.string("size", "medium") == "medium")
+        o.set("openLast", false)
+        o.set("size", "large")
+        let again = AppOptions(app: "lore", defaults: d)
+        #expect(!again.bool("openLast", true) && again.string("size", "medium") == "large")
+        #expect(AppOptions(app: "design", defaults: d).bool("openLast", true), "options are per app")
+    }
+
+    @Test func bindingsWriteThrough() {
+        let o = AppOptions(app: "leyline", defaults: suite())
+        o.flag("calm", true).wrappedValue = false
+        #expect(!o.bool("calm", true))
+    }
+}
