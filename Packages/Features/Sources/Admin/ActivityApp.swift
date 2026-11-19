@@ -106,7 +106,7 @@ struct SecretsApp: View {
                         .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 }
                 SecretsSection(admin: admin)
-                Label("Storing, replacing or handing out a secret asks for Touch ID first.", systemImage: "lock")
+                Label("Storing, replacing, showing, exporting or handing out a secret asks for Touch ID first.", systemImage: "lock")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
             .coreFont(size: MacTextSize.body)
@@ -138,10 +138,17 @@ struct ActivityApp: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     LiveStrip(items: admin.ops.strip)
+                    LiveNow(events: admin.liveEvents)
                     switch admin.activityTab {
-                    case .ops: OpsSection(admin: admin)
+                    case .ops:
+                        OpsHistoryCards(points: admin.ops.coreHistory)
+                        OpsSection(admin: admin)
                     case .audit:
                         AuditCards(model: admin.audit)
+                        if !admin.audit.stats.isEmpty {
+                            AuditHeatmap(model: admin.audit)
+                            AuditKindBars(model: admin.audit)
+                        }
                         AuditSection(admin: admin)
                     }
                 }
@@ -154,11 +161,13 @@ struct ActivityApp: View {
         }
         .task {
             admin.takeHandoff()
+            await admin.audit.reloadStats()
             // The Core reports the present value only: reading again while this app is open is what draws the charts.
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
                 if Task.isCancelled { break }
                 await admin.ops.reload()
+                await admin.audit.reloadStats()
             }
         }
         .onChange(of: admin.host.shell.settings.handoff) { admin.takeHandoff() }
@@ -230,7 +239,25 @@ private struct AuditCards: View {
 
     var body: some View {
         let items = model.items
-        if !items.isEmpty {
+        if !model.stats.isEmpty {
+            let days = model.stats
+            let day = days[min(model.selectedDay, days.count - 1)]
+            let when = model.selectedDay == 0 ? "today" : ActivityStats.dayLabel(day.date, index: model.selectedDay)
+            HStack(alignment: .top, spacing: Space.s3) {
+                StatCard(
+                    index: 0, title: "Actions \(when)", value: day.total, series: ActivityStats.series(days) { $0.total },
+                    tone: .run)
+                StatCard(
+                    index: 1, title: "AI sessions \(when)", value: day.count("sessions"),
+                    series: ActivityStats.series(days) { $0.count("sessions") }, tone: .run)
+                StatCard(
+                    index: 2, title: "Secrets \(when)", value: day.count("secrets"),
+                    series: ActivityStats.series(days) { $0.count("secrets") }, tone: .run)
+                StatCard(
+                    index: 3, title: "Needed a look \(when)", value: day.needsAttention,
+                    series: ActivityStats.series(days) { $0.needsAttention }, tone: .warn)
+            }
+        } else if !items.isEmpty {
             let s = AuditModel.summary(items, now: Date())
             HStack(alignment: .top, spacing: Space.s3) {
                 card(0, "Actions", s.total, AuditModel.trend(items) { _ in true })
@@ -262,7 +289,7 @@ private struct StatCard: View {
             Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             Text("\(value)").coreFont(size: MacTextSize.large, weight: .bold, design: .rounded)
                 .contentTransition(.numericText(value: Double(value)))
-            if series.count >= 2 { CoreSpark(series, tone: tone) } else { Spacer().frame(height: Space.s6 + Space.s2) }
+            if series.count >= 2 { CoreSpark(series, tone: tone).chartReveal() } else { Spacer().frame(height: Space.s6 + Space.s2) }
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -25,6 +25,12 @@ protocol AdminService: Sendable {
     func audit(before: Int64?, limit: Int, filter: AuditFilter) async throws -> AuditPageItem
     /// The Core's Prometheus text, as it is.
     func metrics() async throws -> String
+    /// Core 0.10 (API minor 95): show or export a value, the Core's own history, the audit counts. See `ActivityService.swift`.
+    func supportsV010() async -> Bool
+    func revealSecret(_ name: String) async throws -> RevealedValue
+    func exportSecrets() async throws -> [ExportedValue]
+    func opsHistory() async throws -> [OpsPoint]
+    func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat]
 }
 
 struct LiveAdminService: AdminService {
