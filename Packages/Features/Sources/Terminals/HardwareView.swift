@@ -48,6 +48,10 @@ struct HardwareView: View {
                 if model.load == .ready { empty } else { CoreBusyBar() }
             } else {
                 header
+                if model.pool?.decisionsOff == true {
+                    RunnerSay(text: "Smart job routing is off: add a Google account.", off: true)
+                        .help("Until then, a command no rule knows runs where you typed it.")
+                }
                 RunnerSummary(model: model)
                 VStack(spacing: Space.s2 + 2) {
                     ForEach(shown) { r in

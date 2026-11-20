@@ -43,6 +43,8 @@ struct HardwarePoolItem: Equatable, Sendable {
     var jobs: Int
     var sessions: Int
     var paused: Bool
+    /// `decisions.status` is `off_no_provider`: no Google account in the AI order, so commands no rule knows stay local.
+    var decisionsOff = false
 }
 
 /// One job of `GET /jobs`, for the "Ran on" chips.
