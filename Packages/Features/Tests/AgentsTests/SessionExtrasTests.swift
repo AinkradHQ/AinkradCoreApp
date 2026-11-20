@@ -19,7 +19,8 @@ struct SessionExtrasTests {
     }
 
     @Test func theTreeShowsOpenFoldersOnly() {
-        let root = FolderListing(dir: "", entries: [FolderEntry(name: "src", dir: true), FolderEntry(name: "a.md", dir: false)])
+        let root = FolderListing(
+            dir: "", entries: [FolderEntry(name: "src", dir: true), FolderEntry(name: "a.md", dir: false)])
         let src = FolderListing(dir: "src", entries: [FolderEntry(name: "main.rs", dir: false)])
         let folders = ["": root, "src": src]
         #expect(FilesTab.lines(folders, open: []).map(\.path) == ["src", "a.md"])

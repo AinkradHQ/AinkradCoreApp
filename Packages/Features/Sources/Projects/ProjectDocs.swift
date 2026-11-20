@@ -184,12 +184,18 @@ struct DocsPage: View {
     /// Notes an AI session wrote in its folder (E10): a person's edit saves back to the file.
     private var aiDocs: some View {
         let list = insights.docs ?? []
-        return Island(title: "AI documents", sub: "Edits save back to the file") {
+        return Island("AI documents", sub: "Edits save back to the file") {
             ScrollView {
                 VStack(spacing: Space.s1) {
-                    if list.isEmpty { Text("None yet. Documents an AI session writes show up here.").foregroundStyle(GlassInk.secondary) }
+                    if list.isEmpty {
+                        Text("None yet. Documents an AI session writes show up here.").foregroundStyle(
+                            GlassInk.secondary)
+                    }
                     ForEach(list) { d in
-                        CoreRow(d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" }, symbol: "sparkles") {
+                        CoreRow(
+                            d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" },
+                            symbol: "sparkles"
+                        ) {
                             docs.open(d.note)
                         }
                     }

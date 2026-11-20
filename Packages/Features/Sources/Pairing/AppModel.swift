@@ -143,7 +143,9 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in await self?.saveMeProfile(items) ?? false }
+        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in
+            await self?.saveMeProfile(items) ?? false
+        }
         wizard.armTour = { [weak self] in self?.tour.arm() }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
@@ -156,7 +158,8 @@ public final class AppModel {
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
-        agents.loreNotes = { [weak lore] session in lore?.sessionDocs.filter { $0.session == session }.map(\.note) ?? [] }
+        agents.loreNotes = { [weak lore] session in lore?.notes(ofSession: session) ?? []
+        }
         agents.openNoteInLore = { [weak lore] id in lore?.open(note: id) }
         lore.openSession = { [weak agents] id in agents?.openSession(id) }
         shell.devicesGlance = { [weak devices] in

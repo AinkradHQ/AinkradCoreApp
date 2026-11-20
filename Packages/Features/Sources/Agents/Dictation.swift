@@ -86,7 +86,8 @@ final class Dictation {
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
         }
         guard speech == .authorized else {
-            state = .blocked("Speech recognition is off for Ainkrad. Turn it on in System Settings, Privacy & Security.")
+            state = .blocked(
+                "Speech recognition is off for Ainkrad. Turn it on in System Settings, Privacy & Security.")
             return false
         }
         guard await AVCaptureDevice.requestAccess(for: .audio) else {

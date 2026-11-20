@@ -28,7 +28,6 @@ struct QuickCaptureTests {
 
     @Test func returnAddsToTodayFromTheHeadRev() async {
         core.put(LoreNote(id: "ln_cccccccccccc", kind: "daily", day: today, rev: 4, text: "# Day\n"))
-        capture.open()
         capture.text = "  Call the bike shop \n"
         await capture.submit()
         #expect(capture.saved?.destination == "Today", "the bar says where it went")
@@ -43,6 +42,7 @@ struct QuickCaptureTests {
         capture.text = "From the panel"
         await capture.submit()
         _ = core.append("ln_cccccccccccc", "AI line\n")
+        capture.close()  // the bar shows "Saved to …" until it closes
         capture.text = "Second"
         await capture.submit()
         let text = core.notes["ln_cccccccccccc"]?.text ?? ""
@@ -80,7 +80,6 @@ struct QuickCaptureTests {
     }
 
     @Test func escapeClearsTheText() {
-        capture.open()
         capture.text = "Never mind"
         capture.cancel()
         #expect(capture.text.isEmpty && !capture.shown)
@@ -97,7 +96,6 @@ struct QuickCaptureTests {
 
     @Test func notConnectedKeepsThePanelAndText() async {
         model.service = nil
-        capture.open()
         capture.text = "Hello"
         await capture.submit()
         #expect(capture.shown && capture.text == "Hello" && capture.error != nil)

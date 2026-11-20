@@ -85,7 +85,10 @@ struct SetupTourView: View {
     }
 
     private var ready: some View {
-        SetupPage(meta: nil, title: "You are all set", sub: "Here is what we set up. You can change any of it later in Settings.") {
+        SetupPage(
+            meta: nil, title: "You are all set",
+            sub: "Here is what we set up. You can change any of it later in Settings."
+        ) {
             VStack(spacing: Space.s2) {
                 row("person", "About you", model.aboutLine)
                 row("sparkles", "AI accounts", model.aiLine)
@@ -115,11 +118,13 @@ struct SetupLookPage: View {
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        SetupPage(meta: "Step 4 of 6", title: "Make it yours", sub: "Changes show right away, behind this window too.") {
+        SetupPage(meta: "Step 4 of 6", title: "Make it yours", sub: "Changes show right away, behind this window too.")
+        {
             CoreSegmented(
                 "Theme",
                 segments: [
-                    CoreSegment(ThemeChoice.night, "Night", symbol: "moon"), CoreSegment(.day, "Day", symbol: "sun.max"),
+                    CoreSegment(ThemeChoice.night, "Night", symbol: "moon"),
+                    CoreSegment(.day, "Day", symbol: "sun.max"),
                     CoreSegment(.sun, "Follow the sun"), CoreSegment(.system, "Follow the Mac"),
                 ], selection: $shell.theme, fill: true)
             SetupGroup(title: "Transparency") {
@@ -135,7 +140,8 @@ struct SetupLookPage: View {
                             coreShape(Radius.chip).fill(a.fill).frame(width: 36, height: 26)
                                 .overlay {
                                     if accent.accent == a {
-                                        Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                                        Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(.white)
                                     }
                                 }
                         }
@@ -146,7 +152,9 @@ struct SetupLookPage: View {
                 }
             }
             SetupGroup(title: "Wallpaper") {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s2), count: 6), spacing: Space.s2) {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Space.s2), count: 6), spacing: Space.s2
+                ) {
                     ForEach(CoreWallpaper.presets, id: \.self) { w in
                         Button {
                             wallpaper.choice = w
@@ -197,7 +205,8 @@ struct SetupRunnerPage: View {
         ) {
             GlassToggleTile(
                 "Use this Mac as a runner",
-                sub: on ? "Asks for Touch ID once. \(MacRunnerModel.terminalsWarning)" : "Turn it on any time in Settings.",
+                sub: on
+                    ? "Asks for Touch ID once. \(MacRunnerModel.terminalsWarning)" : "Turn it on any time in Settings.",
                 symbol: "laptopcomputer", isOn: $on, fill: true
             )
             .onChange(of: on) { _, v in macRunner.setPreference(v) }

@@ -34,7 +34,8 @@ final class SetupWizardModel {
     /// itself. The code is single use and is never printed again by the installer's re-run command.
     static func installCommand(rendezvous spec: String) -> String {
         installCommand.replacingOccurrences(
-            of: "AINKRAD_MIN_VERSION=\(minCoreVersion) ", with: "AINKRAD_MIN_VERSION=\(minCoreVersion) AINKRAD_RENDEZVOUS=\(spec) ")
+            of: "AINKRAD_MIN_VERSION=\(minCoreVersion) ",
+            with: "AINKRAD_MIN_VERSION=\(minCoreVersion) AINKRAD_RENDEZVOUS=\(spec) ")
     }
 
     /// Never piped into `sudo`: that stops the installer at its first question (SIGTTIN) and Ctrl-C does nothing. `sh -c` with
@@ -155,7 +156,9 @@ final class SetupWizardModel {
                 do {
                     if let m = try await rendezvousClient.fetch(id: session.id) {
                         if Task.isCancelled { return }
-                        if let text = session.open(epk: m.epk, ct: m.ct) { self?.arrived(text) } else {
+                        if let text = session.open(epk: m.epk, ct: m.ct) {
+                            self?.arrived(text)
+                        } else {
                             self?.waitEnded = "A message came, but it was not for this setup. Paste the link instead."
                         }
                         return

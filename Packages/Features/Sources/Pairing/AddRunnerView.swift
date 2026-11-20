@@ -84,7 +84,10 @@ struct AddRunnerView: View {
             case .thisMac: "Just a moment."
             case .anotherMac: "It joins as a device. Turn on “Work for Core” there and it becomes a runner."
             case .command: "Open a terminal on the server, paste the line, press Return."
-            default: model.picking ? "Pick a host from Leyline, or add a new one." : "Ainkrad is doing this over SSH. You can keep working."
+            default:
+                model.picking
+                    ? "Pick a host from Leyline, or add a new one."
+                    : "Ainkrad is doing this over SSH. You can keep working."
             }
         }
     }
@@ -151,7 +154,10 @@ struct AddRunnerView: View {
                 }
             }
             GridRow {
-                card(.ssh, "server.rack", "A server I can reach by SSH", "Pick a host you already added. Ainkrad does the rest.") {
+                card(
+                    .ssh, "server.rack", "A server I can reach by SSH",
+                    "Pick a host you already added. Ainkrad does the rest."
+                ) {
                     HStack(spacing: Space.s1 + 2) {
                         ForEach(model.hosts.prefix(2)) { CoreChip($0.name, minWidth: 0).lineLimit(1) }
                         CoreChip("+ Add", minWidth: 0)
@@ -194,7 +200,8 @@ struct AddRunnerView: View {
     private var allow: some View {
         VStack(spacing: Space.s2) {
             GlassToggleTile(
-                "Open terminals", sub: "You and your AI can run commands on it.", symbol: "terminal", isOn: $model.terminals,
+                "Open terminals", sub: "You and your AI can run commands on it.", symbol: "terminal",
+                isOn: $model.terminals,
                 fill: true)
             GlassToggleTile(
                 "Run AI sessions", sub: "Claude, Codex, OpenCode and Antigravity can work on it.", symbol: "sparkles",
@@ -202,7 +209,8 @@ struct AddRunnerView: View {
             HStack(spacing: Space.s3) {
                 IconTile("arrow.down.circle", hue: GlassInk.blue, size: Space.s8)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("AI tools are installed and kept up to date for you").coreFont(size: MacTextSize.body, weight: .medium)
+                    Text("AI tools are installed and kept up to date for you").coreFont(
+                        size: MacTextSize.body, weight: .medium)
                     Text("Ainkrad does it in the background, in versions it has tested, into the runner's own folder.")
                         .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -232,9 +240,11 @@ struct AddRunnerView: View {
                 HStack(spacing: Space.s3) {
                     IconTile(symbol(c.state), hue: hue(c.state), size: Space.s8 - Space.s2)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(c.state == .current ? c.working : c.title).coreFont(size: MacTextSize.body, weight: .medium)
+                        Text(c.state == .current ? c.working : c.title).coreFont(
+                            size: MacTextSize.body, weight: .medium)
                         if c.state != .pending {
-                            Text(c.state == .bad ? "It said no" : c.note).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                            Text(c.state == .bad ? "It said no" : c.note).coreFont(size: MacTextSize.meta)
+                                .foregroundStyle(palette.text2)
                         }
                     }
                     Spacer(minLength: Space.s2)
@@ -317,9 +327,12 @@ struct AddRunnerView: View {
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                    Label("Valid for \(RunnerInviteModel.clock(m.secondsLeft(now: ctx.date))) · works once", systemImage: "clock")
-                        .monospacedDigit().coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                        .onChange(of: m.secondsLeft(now: ctx.date)) { _, _ in m.tick(now: ctx.date) }
+                    Label(
+                        "Valid for \(RunnerInviteModel.clock(m.secondsLeft(now: ctx.date))) · works once",
+                        systemImage: "clock"
+                    )
+                    .monospacedDigit().coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    .onChange(of: m.secondsLeft(now: ctx.date)) { _, _ in m.tick(now: ctx.date) }
                 }
                 waiting("Waiting for it… this page updates by itself.")
             } else {
@@ -339,12 +352,16 @@ struct AddRunnerView: View {
                     QRImage(text: link.text).frame(width: Space.s8 * 5, height: Space.s8 * 5)
                         .accessibilityLabel("QR code for the invite")
                     VStack(alignment: .leading, spacing: Space.s2) {
-                        Text("1. On the other Mac, scan the code or open the link in Ainkrad Core.\n2. Turn on “Work for Core” in This Mac.")
-                            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                        Text(
+                            "1. On the other Mac, scan the code or open the link in Ainkrad Core.\n2. Turn on “Work for Core” in This Mac."
+                        )
+                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                         Button {
                             inv?.copyLink()
                         } label: {
-                            Label(inv?.copied == true ? "Copied" : "Copy link", systemImage: inv?.copied == true ? "checkmark" : "doc.on.doc")
+                            Label(
+                                inv?.copied == true ? "Copied" : "Copy link",
+                                systemImage: inv?.copied == true ? "checkmark" : "doc.on.doc")
                         }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     }
@@ -389,8 +406,10 @@ struct AddRunnerView: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 IconTile("exclamationmark.triangle", hue: palette.tone(.fail).ink, size: Space.s8 + Space.s2)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.failure?.title ?? "Something went wrong").coreFont(size: MacTextSize.title, weight: .semibold)
-                    Text(model.failure?.text ?? "").foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    Text(model.failure?.title ?? "Something went wrong").coreFont(
+                        size: MacTextSize.title, weight: .semibold)
+                    Text(model.failure?.text ?? "").foregroundStyle(palette.text2).fixedSize(
+                        horizontal: false, vertical: true)
                 }
             }
             .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading).coreWell()
@@ -404,15 +423,24 @@ struct AddRunnerView: View {
     private var done: some View {
         let p = model.progress
         return VStack(spacing: Space.s2) {
-            summaryRow("server.rack", model.connectedName ?? "The runner", "Connected just now", badge: StateBadge("Idle", tone: .queue, symbol: "pause"))
-            summaryRow("terminal", "Terminals and AI sessions", [model.terminals ? "terminals on" : nil, model.agents ? "AI sessions on" : nil].compactMap { $0 }.joined(separator: ", ").capitalizedFirst, badge: nil)
+            summaryRow(
+                "server.rack", model.connectedName ?? "The runner", "Connected just now",
+                badge: StateBadge("Idle", tone: .queue, symbol: "pause"))
+            summaryRow(
+                "terminal", "Terminals and AI sessions",
+                [model.terminals ? "terminals on" : nil, model.agents ? "AI sessions on" : nil].compactMap { $0 }
+                    .joined(separator: ", ").capitalizedFirst, badge: nil)
             if let tool = p?.installing {
-                summaryRow("arrow.down.circle", "Installing \(tool)…", "Keep going. It finishes in the background.", badge: nil, meter: Double(p?.percent ?? 0) / 100)
+                summaryRow(
+                    "arrow.down.circle", "Installing \(tool)…", "Keep going. It finishes in the background.",
+                    badge: nil, meter: Double(p?.percent ?? 0) / 100)
             }
         }
     }
 
-    private func summaryRow(_ symbol: String, _ title: String, _ text: String, badge: StateBadge?, meter: Double? = nil) -> some View {
+    private func summaryRow(_ symbol: String, _ title: String, _ text: String, badge: StateBadge?, meter: Double? = nil)
+        -> some View
+    {
         HStack(spacing: Space.s3) {
             IconTile(symbol, hue: GlassInk.blue, size: Space.s8)
             VStack(alignment: .leading, spacing: 0) {

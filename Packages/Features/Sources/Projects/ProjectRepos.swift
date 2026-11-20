@@ -26,7 +26,8 @@ struct ReposPage: View {
             list.coreRise(settled, 0).frame(width: Space.s8 * 18)
             Group {
                 if let r = current {
-                    RepoDetail(model: model, project: project, repo: r, info: insights.code?.first { $0.repo == r.name })
+                    RepoDetail(
+                        model: model, project: project, repo: r, info: insights.code?.first { $0.repo == r.name })
                 } else {
                     Island("Repos") {
                         Text("Add a repo and the Core keeps a copy of it here.").foregroundStyle(GlassInk.secondary)
@@ -37,7 +38,10 @@ struct ReposPage: View {
             .coreRise(settled, 1)
         }
         .onAppear { settled = true }
-        .task(id: project.id) { await insights.loadCode(); await insights.loadTuning() }
+        .task(id: project.id) {
+            await insights.loadCode()
+            await insights.loadTuning()
+        }
         .accessibilityIdentifier("project-page-Repos")
     }
 
@@ -72,7 +76,9 @@ struct ReposPage: View {
                                 if let i = insights.code?.first(where: { $0.repo == r.name }) {
                                     HStack(spacing: Space.s1) {
                                         if i.ahead > 0 { StateBadge("↑ \(i.ahead)", tone: .run, symbol: "arrow.up") }
-                                        if i.behind > 0 { StateBadge("↓ \(i.behind)", tone: .warn, symbol: "arrow.down") }
+                                        if i.behind > 0 {
+                                            StateBadge("↓ \(i.behind)", tone: .warn, symbol: "arrow.down")
+                                        }
                                     }
                                 }
                             }
@@ -166,7 +172,9 @@ private struct RepoDetail: View {
                 }
                 GridRow {
                     label("Against \(repo.branch)")
-                    Text(info.ahead == 0 && info.behind == 0 ? "Up to date" : "\(info.ahead) ahead · \(info.behind) behind")
+                    Text(
+                        info.ahead == 0 && info.behind == 0
+                            ? "Up to date" : "\(info.ahead) ahead · \(info.behind) behind")
                 }
                 if let c = info.last {
                     GridRow {

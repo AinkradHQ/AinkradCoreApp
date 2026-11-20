@@ -64,6 +64,10 @@ public final class LoreModel {
     var sideNotes: [LoreNote] = []
     var sideTags: [LoreTagCount] = []
     var sessionDocs: [LoreSessionDoc] = []
+    /// The notes an AI session wrote in its folder, for the AI Sessions screen (a note id each).
+    public func notes(ofSession session: String) -> [String] {
+        sessionDocs.filter { $0.session == session }.map(\.note)
+    }
     var sideVersions: [LoreVersion] = []
     var outline: [LoreHeading] = []
     var wordCount = 0
@@ -567,7 +571,8 @@ public final class LoreModel {
 
     /// The eight most recent notes as launcher entries (⌘K → Notes).
     func syncLauncherNotes() async {
-        guard let service, let list = try? await service.list(filter: LoreFilter(state: "active", kind: nil, project: nil, tag: nil))
+        guard let service,
+            let list = try? await service.list(filter: LoreFilter(state: "active", kind: nil, project: nil, tag: nil))
         else { return }
         let shell = host.shell
         let names = projectNames
@@ -576,7 +581,9 @@ public final class LoreModel {
         for gone in registeredNotes.subtracting(ids) { shell.launcher.unregister(gone) }
         for r in recent {
             shell.launcher.register(
-                LauncherEntry(id: "note-\(r.id)", title: r.title, sub: r.sub, symbol: r.symbol, keywords: ["note", "lore"]) {
+                LauncherEntry(
+                    id: "note-\(r.id)", title: r.title, sub: r.sub, symbol: r.symbol, keywords: ["note", "lore"]
+                ) {
                     [weak self] in self?.open(note: r.id)
                 })
         }

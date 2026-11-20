@@ -325,9 +325,12 @@ final class HomeFeed {
             home.terminals = facts
         }
         if let b = brainService?() {
-            home.brain = await Self.glance(b)
-            home.brain?.pipeline = try? await source.brainPipeline()
-            home.brain?.pipeline?.progress = brainProgress(home.brain?.pipeline)
+            var glance = await Self.glance(b)
+            var pipeline = try? await source.brainPipeline()
+            let progress = brainProgress(pipeline)
+            pipeline?.progress = progress
+            glance?.pipeline = pipeline
+            home.brain = glance
         }
         shell.home = home
     }
@@ -358,7 +361,7 @@ final class HomeFeed {
     }
 
     /// `GET /costs/series` as one token total per UTC day, the last entry being `now`'s day.
-    static func series(_ data: Data, days: Int, now: Date) throws -> [Double] {
+    nonisolated static func series(_ data: Data, days: Int, now: Date) throws -> [Double] {
         struct Row: Decodable {
             var day: String
             var total_tokens: Int64

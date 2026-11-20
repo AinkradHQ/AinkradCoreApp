@@ -47,8 +47,9 @@ extension LoreEditorController {
         let loc = textView.selectedRange().location
         guard loc < ts.length else { return nil }
         var r = NSRange(location: 0, length: 0)
-        guard ts.attribute(.loreTable, at: loc, longestEffectiveRange: &r, in: NSRange(location: 0, length: ts.length))
-            != nil
+        guard
+            ts.attribute(.loreTable, at: loc, longestEffectiveRange: &r, in: NSRange(location: 0, length: ts.length))
+                != nil
         else { return nil }
         return textView.content(r)
     }

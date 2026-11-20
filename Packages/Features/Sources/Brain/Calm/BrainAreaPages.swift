@@ -107,7 +107,10 @@ struct CalmPlaces: View {
                     ForEach(brain.rooms) { r in
                         CoreRow(
                             r.name, subtitle: brain.lastSyncLabel(r).map { "Synced \($0)" }, symbol: "folder",
-                            action: { brain.view(r.id); brain.explore(true, tab: .rooms) }
+                            action: {
+                                brain.view(r.id)
+                                brain.explore(true, tab: .rooms)
+                            }
                         ) {
                             if !r.mounted { StateBadge("Sealed", tone: .queue, symbol: "lock") }
                         }

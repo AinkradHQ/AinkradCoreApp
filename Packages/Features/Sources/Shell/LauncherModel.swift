@@ -66,7 +66,9 @@ public final class LauncherRegistry {
     /// Keeps the usage on this Mac across launches.
     func attach(_ defaults: UserDefaults) {
         self.defaults = defaults
-        if let data = defaults.data(forKey: Self.usageKey), let saved = try? JSONDecoder().decode(LauncherUsage.self, from: data) {
+        if let data = defaults.data(forKey: Self.usageKey),
+            let saved = try? JSONDecoder().decode(LauncherUsage.self, from: data)
+        {
             usage = saved
         }
         refreshPicks()

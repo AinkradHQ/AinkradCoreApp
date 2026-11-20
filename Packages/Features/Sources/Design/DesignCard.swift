@@ -151,7 +151,9 @@ struct NewDesignCard: View {
     var body: some View {
         VStack(spacing: Space.s3) {
             Image(systemName: "plus").coreFont(size: MacTextSize.title, weight: .semibold)
-                .foregroundStyle(.white).frame(width: MacSize.controlLg + Space.s2, height: MacSize.controlLg + Space.s2)
+                .foregroundStyle(.white).frame(
+                    width: MacSize.controlLg + Space.s2, height: MacSize.controlLg + Space.s2
+                )
                 .background(coreShape(Radius.cardMac).fill(Color.accentColor)).accessibilityHidden(true)
             VStack(spacing: Space.s1) {
                 Text("New design").coreFont(size: MacTextSize.headline, weight: .semibold)

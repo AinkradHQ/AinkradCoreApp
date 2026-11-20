@@ -3,6 +3,7 @@
 import CoreKit
 import CoreUI
 import Foundation
+import LoreEditor
 import SwiftUI
 
 /// Whether each sidebar is open, kept per user (UserDefaults); both open until the person hides one.
@@ -56,8 +57,9 @@ extension LoreModel {
         case .tag(let t): hits = (try? await service?.list(filter: LoreFilter(tag: t))) ?? []
         case .query(let q):
             let word = q.trimmingCharacters(in: .whitespaces)
-            if word.isEmpty { hits = [] } else if let r = try? await service?.search(word, filter: LoreFilter(), limit: 30)
-            {
+            if word.isEmpty {
+                hits = []
+            } else if let r = try? await service?.search(word, filter: LoreFilter(), limit: 30) {
                 hits = r.hits.map(\.note)
             } else {
                 hits = sideNotes.filter { $0.title.localizedCaseInsensitiveContains(word) }
@@ -209,7 +211,8 @@ struct LoreLeftSidebar: View {
 
     private var search: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
+            Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.meta + 1).foregroundStyle(
+                GlassInk.secondary)
             TextField("Search notes", text: $query).textFieldStyle(.plain).coreFont(size: MacTextSize.body)
                 .onChange(of: query) { model.setFilter(query.isEmpty ? nil : .query(query)) }
         }
@@ -292,7 +295,9 @@ struct LoreLeftSidebar: View {
             LoreSideSection(title: "Tags")
             FlowRow(spacing: Space.s2) {
                 ForEach(model.sideTags.prefix(24)) { t in
-                    Button { model.setFilter(.tag(t.tag)) } label: {
+                    Button {
+                        model.setFilter(.tag(t.tag))
+                    } label: {
                         CoreChip("#\(t.tag)", minWidth: 0)
                             .opacity(model.sideFilter == .tag(t.tag) ? 1 : 0.85)
                     }
@@ -309,7 +314,8 @@ struct LoreLeftSidebar: View {
             LoreSideSection(title: "Recents")
             ForEach(Array(recent)) { n in
                 LoreSideRow(
-                    title: n.title.isEmpty ? "Untitled note" : n.title, symbol: "clock", selected: model.note?.id == n.id
+                    title: n.title.isEmpty ? "Untitled note" : n.title, symbol: "clock",
+                    selected: model.note?.id == n.id
                 ) { Task { await model.openNote(n.id) } }
             }
         }

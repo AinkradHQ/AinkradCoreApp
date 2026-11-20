@@ -12,12 +12,25 @@ struct FrameSketchTests {
             DesignLayer(id: "h", type: "rect", parent: "f", order: "c", hidden: true),
         ])
         let nodes: [String: EditorNode] = [
-            "f": EditorNode(id: "f", type: "frame", props: ["w": .number(360), "h": .number(640), "radius": .number(24),
-                "fill": .array([.object(["type": .string("solid"), "color": .string("#F5F7FB")])])]),
-            "t": EditorNode(id: "t", type: "text", props: ["x": .number(24), "y": .number(80), "w": .number(300), "h": .number(40),
-                "type": .object(["size": .number(34), "weight": .number(700)])], text: "Hi"),
-            "b": EditorNode(id: "b", type: "rect", props: ["x": .number(24), "y": .number(540), "w": .number(312), "h": .number(52),
-                "radius": .number(14), "fill": .array([.object(["type": .string("solid"), "color": .string("#2F7BEF")])])]),
+            "f": EditorNode(
+                id: "f", type: "frame",
+                props: [
+                    "w": .number(360), "h": .number(640), "radius": .number(24),
+                    "fill": .array([.object(["type": .string("solid"), "color": .string("#F5F7FB")])]),
+                ]),
+            "t": EditorNode(
+                id: "t", type: "text",
+                props: [
+                    "x": .number(24), "y": .number(80), "w": .number(300), "h": .number(40),
+                    "type": .object(["size": .number(34), "weight": .number(700)]),
+                ], text: "Hi"),
+            "b": EditorNode(
+                id: "b", type: "rect",
+                props: [
+                    "x": .number(24), "y": .number(540), "w": .number(312), "h": .number(52),
+                    "radius": .number(14),
+                    "fill": .array([.object(["type": .string("solid"), "color": .string("#2F7BEF")])]),
+                ]),
         ]
         let s = FrameSketch.make(frame: "f", layers: layers) { nodes[$0] }
         #expect(s?.background == "#F5F7FB" && s?.w == 360)

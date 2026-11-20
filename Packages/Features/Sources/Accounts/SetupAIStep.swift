@@ -81,7 +81,8 @@ public struct SetupAIStep: View {
 
     private var add: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 4), spacing: Space.s3) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 4), spacing: Space.s3)
+            {
                 ForEach(keyProviders.prefix(8)) { p in
                     Button {
                         provider = p.id
@@ -102,7 +103,8 @@ public struct SetupAIStep: View {
             HStack {
                 if planProvider != nil {
                     CoreSegmented(
-                        "How to connect", segments: [CoreSegment(false, "API key"), CoreSegment(true, "Sign in with subscription")],
+                        "How to connect",
+                        segments: [CoreSegment(false, "API key"), CoreSegment(true, "Sign in with subscription")],
                         selection: $plan)
                 }
                 Spacer()
@@ -126,7 +128,8 @@ public struct SetupAIStep: View {
                 Button("Paste") { flow.paste() }.coreGlassButton()
                 Button("Connect") { Task { await connect() } }
                     .buttonStyle(CoreButtonStyle(.prominent, size: .large, busy: busy))
-                    .disabled(busy || flow.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || provider.isEmpty)
+                    .disabled(
+                        busy || flow.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || provider.isEmpty)
             }
             if let note {
                 Text(note).coreFont(size: MacTextSize.meta).foregroundStyle(palette.tone(.fail).ink)

@@ -42,7 +42,9 @@ enum CodeTarget {
         // `title=` style: the language is the first token, the rest may carry it.
         if let b = before {
             let words = b.split(whereSeparator: { $0.isWhitespace || "`'\"()[]:,".contains($0) })
-            if let w = words.last(where: looksLikePath) { return String(w).trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
+            if let w = words.last(where: looksLikePath) {
+                return String(w).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            }
         }
         return nil
     }
@@ -53,7 +55,8 @@ enum CodeTarget {
         if s.contains("/") { return s.first != "/" || s.count > 3 }
         guard let dot = s.lastIndex(of: "."), dot != s.startIndex else { return false }
         let ext = s[s.index(after: dot)...]
-        return (1...5).contains(ext.count) && ext.allSatisfy { $0.isLetter || $0.isNumber } && ext.contains { $0.isLetter }
+        return (1...5).contains(ext.count) && ext.allSatisfy { $0.isLetter || $0.isNumber }
+            && ext.contains { $0.isLetter }
     }
 }
 
@@ -86,7 +89,9 @@ struct MentionPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(entries.prefix(8).enumerated()), id: \.element.id) { i, e in
-                Button { choose(e) } label: {
+                Button {
+                    choose(e)
+                } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: e.dir ? "folder" : "doc").foregroundStyle(SessionInk.text2)
                             .frame(width: Space.s4)

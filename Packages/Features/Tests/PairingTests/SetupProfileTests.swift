@@ -39,7 +39,8 @@ struct SetupProfileTests {
     @Test func splitDaysAndDaysOffReadPlainly() {
         var p = SetupProfile()
         p.setRange("Wed", at: 0, to: .init(from: 9, to: 13))
-        #expect(p.addRange("Wed"))
+        let added = p.addRange("Wed")
+        #expect(added)
         #expect(p.hours["Wed"] == [.init(from: 9, to: 13), .init(from: 14, to: 18)])
         p.toggleDay("Sat")
         p.toggleDay("Sat")
@@ -50,7 +51,8 @@ struct SetupProfileTests {
     @Test func aFullDayTakesNoMoreRanges() {
         var p = SetupProfile()
         p.hours["Mon"] = [.init(from: 8, to: 23)]
-        #expect(!p.addRange("Mon"))
+        let added = p.addRange("Mon")
+        #expect(!added)
     }
 
     @Test func variableAndOnCallHoursSayWhatTheyMean() {
@@ -75,12 +77,18 @@ struct SetupProfileTests {
 struct SetupTourTests {
     @Test func theTourRunsOnlyWhenArmedAndSavesTheProfileLeavingTheLastAboutYouPage() async {
         var sent: [[SetupProfile.Item]] = []
-        let m = SetupTourModel(macRunner: nil, save: { sent.append($0); return true })
+        let m = SetupTourModel(
+            macRunner: nil,
+            save: {
+                sent.append($0)
+                return true
+            })
         m.startIfArmed()
         #expect(!m.isActive)
         m.arm()
         m.startIfArmed()
         #expect(m.step == .role)
+        m.profile.name = ""  // the tour prefills this Mac's user name; this test is about the role
         m.profile.roleSet = ["Design"]
         while m.step != .life { m.next() }
         m.next()
@@ -90,8 +98,14 @@ struct SetupTourTests {
     }
 
     @Test func skippingEverythingSendsNothingAndSaysSo() {
-        let m = SetupTourModel(macRunner: nil, save: { _ in Issue.record("nothing to send"); return true })
+        let m = SetupTourModel(
+            macRunner: nil,
+            save: { _ in
+                Issue.record("nothing to send")
+                return true
+            })
         m.begin()
+        m.profile.name = ""  // the tour prefills this Mac's user name
         while m.step != .ready { m.next() }
         #expect(m.aboutLine == "Skipped for now")
         m.finish()
@@ -103,7 +117,12 @@ struct SetupTourTests {
 struct SetupDetourTests {
     @Test func anAboutYouDetourEndsOnTheWelcomePageAndSendsNothing() {
         var sent = 0
-        let m = SetupTourModel(macRunner: nil, save: { _ in sent += 1; return true })
+        let m = SetupTourModel(
+            macRunner: nil,
+            save: { _ in
+                sent += 1
+                return true
+            })
         m.beginDetour(.you)
         m.profile.roleSet = ["Design"]
         #expect(m.step == .role && !m.isFirst)

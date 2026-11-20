@@ -416,6 +416,10 @@ struct LiveCoreService: CoreService {
         return .http(
             status: code, code: b?.code ?? "error", message: b?.message ?? "The Core could not do that (\(code)).")
     }
+    private static func fail(_ r: Components.Responses.Forbidden) -> CoreError {
+        let b = try? r.body.json
+        return .http(status: 403, code: b?.code ?? "forbidden", message: b?.message ?? "The Core refused that.")
+    }
     private static func fail(_ r: Components.Responses.NotFound) -> CoreError {
         .http(status: 404, code: "not_found", message: (try? r.body.json)?.message ?? "The Core does not know that.")
     }

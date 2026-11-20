@@ -18,7 +18,9 @@ struct ExploreRecordsTab: View {
             HStack(spacing: Space.s3) {
                 CoreSelect(
                     nil, selection: $type,
-                    options: Self.types.map { CoreSelectOption($0, $0.isEmpty ? "All types" : $0.replacingOccurrences(of: "-", with: " ")) }
+                    options: Self.types.map {
+                        CoreSelectOption($0, $0.isEmpty ? "All types" : $0.replacingOccurrences(of: "-", with: " "))
+                    }
                 )
                 .frame(width: Space.s8 * 7)
                 CoreCheckbox("Important only", isOn: $important)
@@ -29,9 +31,12 @@ struct ExploreRecordsTab: View {
             if let failure { Text(failure).foregroundStyle(GlassInk.secondary) }
             VStack(spacing: 2) {
                 ForEach(shown) { r in
-                    CoreRow(r.body, subtitle: "\(r.roomName) · \(r.type) · \(r.support) \(r.support == 1 ? "source" : "sources")",
-                        symbol: CalmArea.symbol(r.type))
-                        .transition(.opacity)
+                    CoreRow(
+                        r.body,
+                        subtitle: "\(r.roomName) · \(r.type) · \(r.support) \(r.support == 1 ? "source" : "sources")",
+                        symbol: CalmArea.symbol(r.type)
+                    )
+                    .transition(.opacity)
                 }
             }
             .animation(Motion.out(Motion.ui), value: shown.map(\.id))

@@ -62,7 +62,8 @@ struct ChangesInfo: Equatable, Sendable {
     var byAuthor: [(who: String, count: Int)] = []
     var recent: [ChangeLine] = []
     static func == (a: ChangesInfo, b: ChangesInfo) -> Bool {
-        a.recent == b.recent && a.byAuthor.map(\.who) == b.byAuthor.map(\.who) && a.byAuthor.map(\.count) == b.byAuthor.map(\.count)
+        a.recent == b.recent && a.byAuthor.map(\.who) == b.byAuthor.map(\.who)
+            && a.byAuthor.map(\.count) == b.byAuthor.map(\.count)
     }
 }
 
@@ -172,9 +173,13 @@ enum InsightsWire {
             guard let repo = $0["repo"] as? String else { throw RunWire.bad }
             let c = ($0["last_commit"] as? [String: Any]).flatMap { c -> CommitInfo? in
                 guard let sha = c["sha"] as? String else { return nil }
-                return CommitInfo(sha: sha, author: c["author"] as? String ?? "", message: c["message"] as? String ?? "", at: RunWire.date(c["at"] as? String))
+                return CommitInfo(
+                    sha: sha, author: c["author"] as? String ?? "", message: c["message"] as? String ?? "",
+                    at: RunWire.date(c["at"] as? String))
             }
-            return CodeInfo(repo: repo, files: int($0["files"]), branch: $0["branch"] as? String ?? "", ahead: int($0["ahead"]), behind: int($0["behind"]), last: c)
+            return CodeInfo(
+                repo: repo, files: int($0["files"]), branch: $0["branch"] as? String ?? "", ahead: int($0["ahead"]),
+                behind: int($0["behind"]), last: c)
         }
     }
 
@@ -182,11 +187,14 @@ enum InsightsWire {
         let o = try object(d)
         let rows = (o["sessions"] as? [[String: Any]]) ?? []
         return UsageInfo(
-            weekCost: dbl(o["week_cost"]), prevWeekCost: dbl(o["prev_week_cost"]), sessionsWeek: int(o["sessions_week"]),
+            weekCost: dbl(o["week_cost"]), prevWeekCost: dbl(o["prev_week_cost"]),
+            sessionsWeek: int(o["sessions_week"]),
             byDay: nums(o["by_day"]),
             sessions: rows.compactMap {
                 guard let id = $0["id"] as? String else { return nil }
-                return UsageSession(id: id, title: $0["title"] as? String ?? "Session", state: $0["state"] as? String ?? "", cost: dbl($0["cost"]), spark: nums($0["spark"]))
+                return UsageSession(
+                    id: id, title: $0["title"] as? String ?? "Session", state: $0["state"] as? String ?? "",
+                    cost: dbl($0["cost"]), spark: nums($0["spark"]))
             })
     }
 
@@ -198,7 +206,8 @@ enum InsightsWire {
         }
         let recent = ((o["recent"] as? [[String: Any]]) ?? []).compactMap { r -> ChangeLine? in
             guard let w = r["who"] as? String, let s = r["summary"] as? String else { return nil }
-            return ChangeLine(who: w, kind: r["kind"] as? String ?? "commit", summary: s, at: RunWire.date(r["at"] as? String))
+            return ChangeLine(
+                who: w, kind: r["kind"] as? String ?? "commit", summary: s, at: RunWire.date(r["at"] as? String))
         }
         return ChangesInfo(byAuthor: by, recent: recent)
     }
@@ -207,7 +216,9 @@ enum InsightsWire {
         let rows = (try object(d)["records"] as? [[String: Any]]) ?? []
         return rows.compactMap {
             guard let id = $0["id"] as? String, let body = $0["body"] as? String else { return nil }
-            return KnownRecord(id: id, room: $0["room"] as? String ?? "", roomName: $0["room_name"] as? String ?? "", kind: $0["type"] as? String ?? "", body: body)
+            return KnownRecord(
+                id: id, room: $0["room"] as? String ?? "", roomName: $0["room_name"] as? String ?? "",
+                kind: $0["type"] as? String ?? "", body: body)
         }
     }
 
@@ -216,13 +227,16 @@ enum InsightsWire {
             guard let note = $0["note"] as? String, let session = $0["session"] as? String else { return nil }
             return SessionDocItem(
                 note: note, session: session, path: $0["path"] as? String ?? "", title: $0["title"] as? String ?? "",
-                sessionTitle: $0["session_title"] as? String, project: $0["project"] as? String, updatedAt: RunWire.date($0["updated_at"] as? String))
+                sessionTitle: $0["session_title"] as? String, project: $0["project"] as? String,
+                updatedAt: RunWire.date($0["updated_at"] as? String))
         }
     }
 
     static func tuning(_ d: Data) throws -> ProjectTuning {
         let o = try object(d)
-        return ProjectTuning(fetchInterval: (o["fetch_interval_minutes"] as? NSNumber)?.intValue ?? 15, defaultEnvironment: o["default_environment"] as? String,
+        return ProjectTuning(
+            fetchInterval: (o["fetch_interval_minutes"] as? NSNumber)?.intValue ?? 15,
+            defaultEnvironment: o["default_environment"] as? String,
             roomID: (o["room"] as? [String: Any])?["room_id"] as? String)
     }
 }
@@ -279,7 +293,9 @@ final class ProjectInsightsModel {
         if let s = service, let all = try? await s.sessionDocs() {
             docs = all.filter { $0.project == String(project.id) }
         }
-        if let lore = model.lore, let l = try? await lore.list(filter: LoreFilter(kind: "note", project: String(project.id))) {
+        if let lore = model.lore,
+            let l = try? await lore.list(filter: LoreFilter(kind: "note", project: String(project.id)))
+        {
             notes = l.prefix(50).map { LoreNoteLine(id: $0.id, title: $0.title.isEmpty ? "Untitled" : $0.title) }
         }
     }
@@ -298,7 +314,8 @@ final class ProjectInsightsModel {
         if let fetchInterval { tuning.fetchInterval = fetchInterval }
         if let defaultEnvironment { tuning.defaultEnvironment = defaultEnvironment }
         do {
-            try await s.setTuning(project: project.id, fetchInterval: fetchInterval, defaultEnvironment: defaultEnvironment)
+            try await s.setTuning(
+                project: project.id, fetchInterval: fetchInterval, defaultEnvironment: defaultEnvironment)
         } catch {
             tuning = was
             model.host.shell.showToast("Could not save that. Try again.", kind: .warn)

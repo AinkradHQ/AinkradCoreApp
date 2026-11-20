@@ -7,7 +7,10 @@ import SwiftUI
 /// frames as one undoable canvas edit. "Draw 3 more" and "Refine" are new drawings (a refine names the direction).
 @MainActor @Observable
 final class DesignComposer {
-    enum Phase: Equatable { case prompt, drawing, directions, failed(String) }
+    enum Phase: Equatable {
+        case prompt, drawing, directions
+        case failed(String)
+    }
 
     let doc: String
     var prompt: String
@@ -70,7 +73,8 @@ final class DesignComposer {
     }
 
     func refine(_ d: ComposeState.Direction) {
-        prompt = "Refine the \(d.name) direction (\(d.summary)). Keep what works and improve it. Original request: "
+        prompt =
+            "Refine the \(d.name) direction (\(d.summary)). Keep what works and improve it. Original request: "
             + original
         phase = .prompt
     }
@@ -80,7 +84,10 @@ final class DesignComposer {
 
     /// Keeps `d`'s frame, removes the other directions' frames from the canvas (undo brings them back).
     func use(_ d: ComposeState.Direction) {
-        guard let editor = model?.editors[doc], let all = state?.directions else { close(); return }
+        guard let editor = model?.editors[doc], let all = state?.directions else {
+            close()
+            return
+        }
         let drop = all.filter { $0.frame != d.frame }.compactMap(\.frame)
         if !drop.isEmpty { editor.apply(drop.map(EditOps.delete)) }
         if let f = d.frame { editor.select(f) }
@@ -216,7 +223,9 @@ struct ComposerView: View {
     /// The direction's frame as drawn on the canvas, or a quiet well while the canvas has not listed it.
     @ViewBuilder private func thumb(_ d: ComposeState.Direction) -> some View {
         Group {
-            if let sk = composer.sketch(d) { FrameSketchView(sketch: sk) } else {
+            if let sk = composer.sketch(d) {
+                FrameSketchView(sketch: sk)
+            } else {
                 coreShape(Radius.cardMac).fill(GlassInk.well)
             }
         }

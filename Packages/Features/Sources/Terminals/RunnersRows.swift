@@ -79,7 +79,8 @@ struct RunnerTile: View {
                 coreShape(size > 40 ? Radius.cardMac : Radius.control).fill(palette.tone(.run).ink)
                     .opacity(live == .working && animate && on ? 0.16 : 0)
                     .animation(
-                        live == .working && animate ? .easeInOut(duration: 3).repeatForever(autoreverses: true) : .default,
+                        live == .working && animate
+                            ? .easeInOut(duration: 3).repeatForever(autoreverses: true) : .default,
                         value: on
                     )
                     .allowsHitTesting(false)
@@ -91,7 +92,8 @@ struct RunnerTile: View {
 /// One tool on a card: Ready is plain, missing is quiet, installing is blue with its words and a thin progress line.
 struct RunnerToolPill: View {
     enum Kind: Equatable {
-        case ready, missing, installing(Double)
+        case ready, missing
+        case installing(Double)
     }
     let symbol: String
     let name: String
@@ -110,7 +112,8 @@ struct RunnerToolPill: View {
         .overlay(alignment: .bottomLeading) {
             if case .installing(let p) = kind {
                 GeometryReader { g in
-                    Rectangle().fill(palette.primary.opacity(0.5)).frame(width: g.size.width * min(1, max(0, p)), height: 2)
+                    Rectangle().fill(palette.primary.opacity(0.5)).frame(
+                        width: g.size.width * min(1, max(0, p)), height: 2)
                 }
                 .frame(height: 2).clipShape(coreShape(Radius.chip))
             }
@@ -145,7 +148,9 @@ extension TerminalsModel {
     /// A runner's tools as pills: Terminals, then the four AI tools, each ready, installing (with progress) or missing.
     func toolPills(_ r: RunnerItem) -> [(name: String, symbol: String, kind: RunnerToolPill.Kind)] {
         let facts = RunnerFacts(runner: r)
-        var out: [(String, String, RunnerToolPill.Kind)] = [("Terminals", "terminal", facts.terminalsOn ? .ready : .missing)]
+        var out: [(String, String, RunnerToolPill.Kind)] = [
+            ("Terminals", "terminal", facts.terminalsOn ? .ready : .missing)
+        ]
         for t in RunnerFacts.aiTools {
             let inst = installs[r.id]?[t.key]
             if let inst, inst.state == .running {
@@ -223,7 +228,8 @@ struct RunnerRow: View {
             return "Working"
         case .idle: return "Idle · ready for work"
         case .gettingReady: return "Getting ready · installing tools"
-        case .offline: return ["Offline", facts.lastSeenWords].compactMap { $0 }.joined(separator: " · ").capitalizedFirst
+        case .offline:
+            return ["Offline", facts.lastSeenWords].compactMap { $0 }.joined(separator: " · ").capitalizedFirst
         }
     }
 }

@@ -179,7 +179,7 @@ struct AppModelTests {
         #expect(s.beats >= 2, "the unlock is held by heartbeat")
         // The Mac locks or sleeps: the Core is told, the card covers the app.
         m.lockApp()
-        try await Task.sleep(for: .milliseconds(50))
+        for _ in 0..<400 where s.ends == 0 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(m.shell.lock == .locked && s.ends == 1 && !m.isUnlocked)
         // Unlock again: one more Touch ID.
         #expect(await m.unlockApp())

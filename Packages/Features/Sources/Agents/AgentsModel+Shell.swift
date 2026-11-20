@@ -176,7 +176,8 @@ extension AgentsModel {
                 title: n.title, message: n.detail,
                 actions: [
                     ShellSheetAction("Close"),
-                    ShellSheetAction("Advanced…", primary: true) { [weak self] in self?.openNewSession(advanced: true) },
+                    ShellSheetAction("Advanced…", primary: true) { [weak self] in self?.openNewSession(advanced: true)
+                    },
                 ])
         }
     }

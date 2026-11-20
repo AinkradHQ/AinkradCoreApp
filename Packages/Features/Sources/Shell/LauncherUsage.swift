@@ -20,8 +20,10 @@ struct LauncherUsage: Codable, Equatable {
         s.hours[calendar.component(.hour, from: date)] += 1
         stats[id] = s
         if stats.count > Self.limit {
-            let keep = stats.keys.sorted { score($0, at: date, calendar: calendar) > score($1, at: date, calendar: calendar) }
-                .prefix(Self.limit)
+            let keep = stats.keys.sorted {
+                score($0, at: date, calendar: calendar) > score($1, at: date, calendar: calendar)
+            }
+            .prefix(Self.limit)
             stats = stats.filter { keep.contains($0.key) }
         }
     }

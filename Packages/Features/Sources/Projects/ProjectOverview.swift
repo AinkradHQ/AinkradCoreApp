@@ -61,7 +61,8 @@ struct Overview: View {
     private func loadRuns() async {
         guard let svc = model.configsService else { return }
         runs = (try? await svc.history(project: project.id)) ?? []
-        names = Dictionary(uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) })
+        names = Dictionary(
+            uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) })
     }
 
     private var stats: ProjectStats { ProjectStats(repos: project.repos, runs: runs, now: model.now()) }
@@ -72,11 +73,14 @@ struct Overview: View {
         let known = insights.knowledge?.count
         return HStack(spacing: Space.s2) {
             InsightTile(title: "Health", value: s.health, line: s.healthLine, meter: s.healthFraction)
-            InsightTile(title: "Runs this week", value: "\(s.runsThisWeek)", line: s.runningNow > 0 ? "\(s.runningNow) running now" : "None running")
+            InsightTile(
+                title: "Runs this week", value: "\(s.runsThisWeek)",
+                line: s.runningNow > 0 ? "\(s.runningNow) running now" : "None running")
             if insights.supported {
                 InsightTile(
                     title: "AI usage", value: u.map { CostWords.money($0.weekCost) } ?? "–",
-                    line: u.map { "This week, \(ProjectItem.count($0.sessionsWeek, "session"))" } ?? "Not available", spark: u?.byDay)
+                    line: u.map { "This week, \(ProjectItem.count($0.sessionsWeek, "session"))" } ?? "Not available",
+                    spark: u?.byDay)
                 InsightTile(
                     title: "Things Core knows", value: known.map(String.init) ?? "–",
                     line: known == nil ? "Not available" : "In the \(project.name) room")
@@ -147,20 +151,25 @@ struct Overview: View {
     private var brain: some View {
         Island(
             title: "Brain", sub: "\(project.name) room",
-            accessory: { Button("Open Brain") { model.section = .brain }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
+            accessory: {
+                Button("Open Brain") { model.section = .brain }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if let room = live?.room {
                     Text(room.summary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(GlassInk.secondary)
+                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(
+                        GlassInk.secondary)
                 } else if let n = insights.knowledge?.count, n > 0 {
                     Text("Core remembers \(ProjectItem.count(n, "thing")) about this project.")
                     ForEach(insights.knowledge?.prefix(2).map { $0 } ?? []) { KnownRow(r: $0) }
                 } else {
-                    Text(settingUp
-                        ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
-                        : "Nothing remembered yet. It fills from the repos’ instruction files, AI sessions and docs you add.")
-                        .fixedSize(horizontal: false, vertical: true).foregroundStyle(GlassInk.secondary)
+                    Text(
+                        settingUp
+                            ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
+                            : "Nothing remembered yet. It fills from the repos’ instruction files, AI sessions and docs you add."
+                    )
+                    .fixedSize(horizontal: false, vertical: true).foregroundStyle(GlassInk.secondary)
                 }
             }
         }
@@ -173,13 +182,18 @@ struct Overview: View {
         let docs = insights.docs ?? []
         return Island(
             title: "Notes", sub: notes.isEmpty && docs.isEmpty ? nil : "\(notes.count + docs.count)",
-            accessory: { Button("Open Notes") { model.section = .docs }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
+            accessory: {
+                Button("Open Notes") { model.section = .docs }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            }
         ) {
             VStack(spacing: Space.s1) {
                 if notes.isEmpty && docs.isEmpty { Text("No notes yet.").foregroundStyle(GlassInk.secondary) }
                 ForEach(notes.prefix(2)) { n in CoreRow(n.title, symbol: "doc.text") { model.openNote?(n.id) } }
                 ForEach(docs.prefix(2)) { d in
-                    CoreRow(d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" }, symbol: "sparkles") {
+                    CoreRow(
+                        d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" },
+                        symbol: "sparkles"
+                    ) {
                         model.openNote?(d.note)
                     }
                 }

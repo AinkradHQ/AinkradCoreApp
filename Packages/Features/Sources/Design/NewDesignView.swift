@@ -35,7 +35,9 @@ struct NewDesignView: View {
                 CoreFieldLabel("What are you making?")
                 HStack(alignment: .top, spacing: Space.s2) {
                     ForEach(Self.kinds, id: \.0.rawValue) { k, title, symbol, line in
-                        Button { kind = k.rawValue } label: {
+                        Button {
+                            kind = k.rawValue
+                        } label: {
                             VStack(alignment: .leading, spacing: Space.s1) {
                                 Image(systemName: symbol).coreFont(size: MacTextSize.title)
                                     .foregroundStyle(kind == k.rawValue ? Color.accentColor : GlassInk.secondary)
@@ -44,7 +46,9 @@ struct NewDesignView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-                            .coreCard(kind == k.rawValue ? Color.accentColor.opacity(0.16) : GlassInk.well, radius: Radius.pane)
+                            .coreCard(
+                                kind == k.rawValue ? Color.accentColor.opacity(0.16) : GlassInk.well,
+                                radius: Radius.pane)
                         }
                         .buttonStyle(.plain)
                         .accessibilityAddTraits(kind == k.rawValue ? .isSelected : [])

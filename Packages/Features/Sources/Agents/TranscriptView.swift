@@ -180,7 +180,8 @@ struct TranscriptView: View {
         } else {
             EntryRow(
                 entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
-                latest: latest, streaming: e.seq == store.entries.last(where: { $0.kind != .hidden })?.seq && latest && session.live
+                latest: latest,
+                streaming: e.seq == store.entries.last(where: { $0.kind != .hidden })?.seq && latest && session.live
                     && !session.idle,
                 openConnections: { model.shell.launcher.entry("connections")?.run() },
                 actions: EntryActions.make(model, session, ui: ui)

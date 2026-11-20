@@ -57,7 +57,8 @@ struct RunnersView: View {
                 }
                 .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shown.map(\.id))
                 if shown.isEmpty {
-                    Text("No runners are \(model.runnerFilter?.rawValue.lowercased() ?? "here").").foregroundStyle(palette.text2)
+                    Text("No runners are \(model.runnerFilter?.rawValue.lowercased() ?? "here").").foregroundStyle(
+                        palette.text2)
                 }
                 Text(
                     "Tap a runner to see what it is doing. Ainkrad installs and updates Claude, Codex, OpenCode and Antigravity on every runner for you."
@@ -71,7 +72,8 @@ struct RunnersView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Runners").coreFont(size: MacTextSize.large + 6, weight: .semibold).accessibilityAddTraits(.isHeader)
+                Text("Runners").coreFont(size: MacTextSize.large + 6, weight: .semibold).accessibilityAddTraits(
+                    .isHeader)
                 Text(summaryLine).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
             }
             Spacer(minLength: Space.s3)

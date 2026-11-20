@@ -172,12 +172,30 @@ final class RunConfigsModel {
     /// Applies a field change at once on screen and saves it 0.8 s after the last one.
     func edit(_ c: RunConfigItem, _ change: RunConfigPatch) {
         guard let i = configs.firstIndex(where: { $0.id == c.id }) else { return }
-        if let v = change.name { configs[i].name = v; pending.name = v }
-        if let v = change.command { configs[i].command = v; pending.command = v }
-        if let v = change.workdir { configs[i].workdir = v; pending.workdir = v }
-        if let v = change.runner { configs[i].runner = v; pending.runner = v }
-        if let v = change.port { configs[i].port = v == 0 ? nil : v; pending.port = v }
-        if let v = change.restart { configs[i].restart = v; pending.restart = v }
+        if let v = change.name {
+            configs[i].name = v
+            pending.name = v
+        }
+        if let v = change.command {
+            configs[i].command = v
+            pending.command = v
+        }
+        if let v = change.workdir {
+            configs[i].workdir = v
+            pending.workdir = v
+        }
+        if let v = change.runner {
+            configs[i].runner = v
+            pending.runner = v
+        }
+        if let v = change.port {
+            configs[i].port = v == 0 ? nil : v
+            pending.port = v
+        }
+        if let v = change.restart {
+            configs[i].restart = v
+            pending.restart = v
+        }
         saveTask?.cancel()
         let id = c.id
         saveTask = Task { [weak self] in

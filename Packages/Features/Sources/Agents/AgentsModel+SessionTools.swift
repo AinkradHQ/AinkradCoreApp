@@ -40,7 +40,9 @@ extension AgentsModel {
         note(id, nil)
         for path in paths {
             do {
-                let s = try await elevated("Revert a file this AI session changed.") { try await api.revert(id, path: path) }
+                let s = try await elevated("Revert a file this AI session changed.") {
+                    try await api.revert(id, path: path)
+                }
                 sessions.upsert(s)
                 ReviewStore.shared.set(id, path, .reverted)
             } catch let e as ElevationDeclined {

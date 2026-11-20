@@ -142,7 +142,8 @@ struct LiveDesignService: DesignService {
         _ = try await raw("POST", "/api/v1/agent-sessions/\(Self.seg(session))/cancel", absolute: true)
     }
 
-    private func raw(_ method: String, _ path: String, body: Data = Data(), absolute: Bool = false) async throws -> Data {
+    private func raw(_ method: String, _ path: String, body: Data = Data(), absolute: Bool = false) async throws -> Data
+    {
         do {
             return try await connection.signedRequest(
                 method: method, target: absolute ? path : Self.base + path, body: body)

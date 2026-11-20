@@ -28,7 +28,7 @@ struct NewTerminalView: View {
                 }
                 VStack(spacing: Space.s1) {
                     ForEach(machines) { r in
-                        RunnerTile(model: model, form: form, runner: r, lens: pick)
+                        NewTerminalRunnerTile(model: model, form: form, runner: r, lens: pick)
                     }
                 }
             }
@@ -117,7 +117,7 @@ struct NewTerminalView: View {
 }
 
 /// A machine to pick: its picture, name and what a terminal there is, a chip (This Mac or Sandbox), and why it can't be picked.
-private struct RunnerTile: View {
+private struct NewTerminalRunnerTile: View {
     @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel

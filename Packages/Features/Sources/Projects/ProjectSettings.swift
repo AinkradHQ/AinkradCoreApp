@@ -134,9 +134,11 @@ struct SettingsPage: View {
                 CoreSelect(
                     "Fetch new changes",
                     selection: Binding(
-                        get: { insights.tuning.fetchInterval }, set: { v in Task { await insights.set(fetchInterval: v) } }),
-                    options: FetchInterval.options.map { CoreSelectOption($0.minutes, $0.title) })
-                    .disabled(model.readOnly || !insights.tuningLoaded)
+                        get: { insights.tuning.fetchInterval },
+                        set: { v in Task { await insights.set(fetchInterval: v) } }),
+                    options: FetchInterval.options.map { CoreSelectOption($0.minutes, $0.title) }
+                )
+                .disabled(model.readOnly || !insights.tuningLoaded)
                 Text("The Core copies each repo by itself; Fetch Now on the Code page does it at once.")
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -203,7 +205,11 @@ struct SettingsPage: View {
                 Text("Removes it from Core. Your repos stay on GitHub, and you can undo for a few seconds.")
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 Button {
-                    if model.insightsService == nil { model.confirmArchive(project) } else { Task { await model.archive(project) } }
+                    if model.insightsService == nil {
+                        model.confirmArchive(project)
+                    } else {
+                        Task { await model.archive(project) }
+                    }
                 } label: {
                     Label("Delete project", systemImage: "trash")
                 }

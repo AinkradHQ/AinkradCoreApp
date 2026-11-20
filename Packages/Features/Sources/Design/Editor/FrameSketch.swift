@@ -22,7 +22,9 @@ struct FrameSketch: Equatable, Sendable {
 
     /// `nil` when the frame is not in the tree or has no size.
     @MainActor static func make(frame id: String, layers: LayerTree, node: (String) -> EditorNode?) -> FrameSketch? {
-        guard let f = node(id), let w = f.props["w"]?.double, let h = f.props["h"]?.double, w > 0, h > 0 else { return nil }
+        guard let f = node(id), let w = f.props["w"]?.double, let h = f.props["h"]?.double, w > 0, h > 0 else {
+            return nil
+        }
         let kids = layers.children(of: id).filter { !$0.hidden }.prefix(40).compactMap { l -> Shape? in
             guard let n = node(l.id), ["rect", "text", "ellipse", "frame"].contains(n.type) else { return nil }
             let kw = n.props["w"]?.double ?? 0
@@ -39,7 +41,9 @@ struct FrameSketch: Equatable, Sendable {
 
     /// The first solid fill as `#RRGGBB`, when it is a literal.
     static func hex(_ n: EditorNode) -> String? {
-        guard let c = InspectorEdits.firstSolid(n)?.string, c.hasPrefix("#"), [4, 7, 9].contains(c.count) else { return nil }
+        guard let c = InspectorEdits.firstSolid(n)?.string, c.hasPrefix("#"), [4, 7, 9].contains(c.count) else {
+            return nil
+        }
         return c
     }
 
@@ -51,7 +55,8 @@ struct FrameSketch: Equatable, Sendable {
         let a = s.count == 8 ? Double(v & 0xFF) / 255 : 1
         let rgb = s.count == 8 ? v >> 8 : v
         return Color(
-            red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255,
+            red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255,
             opacity: a)
     }
 }

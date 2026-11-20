@@ -27,7 +27,8 @@ struct SetupYouPage: View {
             CoreTextField(
                 "What should we call you?", placeholder: "Sam", text: $model.profile.name, autofocus: true,
                 onSubmit: {})
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 3), spacing: Space.s3) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 3), spacing: Space.s3)
+            {
                 ForEach(Array(SetupProfile.roles.enumerated()), id: \.offset) { i, r in
                     SetupOption(symbol: Self.roleSymbols[i], title: r, on: model.profile.roleSet.contains(r)) {
                         toggle(&model.profile.roleSet, r)
@@ -41,8 +42,13 @@ struct SetupYouPage: View {
     }
 
     private var stack: some View {
-        SetupPage(meta: "About you · 2 of 5", title: "What do you work with?", sub: "Tap anything you use. Skip what you do not.") {
-            SetupGroup(title: "Languages") { SetupChips(options: SetupProfile.languages, chosen: $model.profile.languageSet) }
+        SetupPage(
+            meta: "About you · 2 of 5", title: "What do you work with?",
+            sub: "Tap anything you use. Skip what you do not."
+        ) {
+            SetupGroup(title: "Languages") {
+                SetupChips(options: SetupProfile.languages, chosen: $model.profile.languageSet)
+            }
             SetupGroup(title: "Tools") { SetupChips(options: SetupProfile.tools, chosen: $model.profile.toolSet) }
             SetupGroup(title: "Where you run things") {
                 SetupChips(options: SetupProfile.hosting, chosen: $model.profile.hostingSet)
@@ -68,10 +74,18 @@ struct SetupYouPage: View {
     }
 
     private var life: some View {
-        SetupPage(meta: "About you · 5 of 5", title: "A little more about you", sub: "Last page. Everything here is optional.") {
-            SetupGroup(title: "Languages you speak") { SetupChips(options: SetupProfile.spoken, chosen: $model.profile.spokenSet) }
-            SetupGroup(title: "What you focus on") { SetupChips(options: SetupProfile.focus, chosen: $model.profile.focusSet) }
-            SetupGroup(title: "Routines") { SetupChips(options: SetupProfile.routines, chosen: $model.profile.routineSet) }
+        SetupPage(
+            meta: "About you · 5 of 5", title: "A little more about you", sub: "Last page. Everything here is optional."
+        ) {
+            SetupGroup(title: "Languages you speak") {
+                SetupChips(options: SetupProfile.spoken, chosen: $model.profile.spokenSet)
+            }
+            SetupGroup(title: "What you focus on") {
+                SetupChips(options: SetupProfile.focus, chosen: $model.profile.focusSet)
+            }
+            SetupGroup(title: "Routines") {
+                SetupChips(options: SetupProfile.routines, chosen: $model.profile.routineSet)
+            }
         }
     }
 
