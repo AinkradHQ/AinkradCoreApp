@@ -25,6 +25,8 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var runner: String
     /// Why the Core put it on that machine (`core`, `overflow`, `pinned`…); nil from a Core that does not say (E15).
     public var placeReason: String?
+    /// The name of the machine it runs on (`placed_on`), for "Ran on X" before the hardware list has loaded.
+    public var placedOn: String?
     public var harness: String
     public var model: String?
     public var state: SessionState
