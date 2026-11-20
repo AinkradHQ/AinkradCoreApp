@@ -211,6 +211,7 @@ private struct ClockLine: View {
 /// Clocks) follow the minutes in a smaller, secondary size. Digits change in place; Reduce Motion swaps them without
 /// the roll.
 struct DigitalClockBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     let size: WidgetSize
     @Environment(\.homeLive) private var live
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -316,7 +317,7 @@ struct DigitalClockBody: View {
                     Text(day.formatted(.dateTime.weekday(.abbreviated))).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                     Text(day.formatted(.dateTime.day())).coreFont(size: MacTextSize.body, weight: .semibold)
-                        .foregroundStyle(today ? GlassInk.blue : GlassInk.primary)
+                        .foregroundStyle(today ? GlassInk.accent(paneAccent) : GlassInk.primary)
                 }
                 .frame(maxWidth: .infinity)
                 .background(today ? GlassInk.wellEdge : .clear, in: coreShape(Radius.control))

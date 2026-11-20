@@ -3,18 +3,13 @@ import CoreKit
 import Foundation
 import Shell
 
-/// The first API minor of Core 0.10: the routes the Core page needs (`/core/prefs`, `/core/storage`, `/core/update/check`).
-enum CoreMinor {
-    static let v010: Int32 = 95
-}
-
 /// The Core page's reads and writes over the signed client. Written against the routes of Core 0.10; the generated client
 /// gains them with the epic's `make clients`.
 struct LiveCorePageSource: CorePageSource {
     let connection: CoreConnection
     private var client: Client { connection.client }
 
-    func supported() async -> Bool { await connection.serverSupports(minor: CoreMinor.v010) }
+    func supported() async -> Bool { await connection.serverSupports(minor: coreMinorV010) }
 
     func prefs() async throws -> CorePagePrefs {
         try await run { Self.prefs(try await client.getCorePrefs().ok.body.json) }

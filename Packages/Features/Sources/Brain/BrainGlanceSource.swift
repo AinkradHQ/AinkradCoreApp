@@ -1,3 +1,4 @@
+import CoreKit
 import CoreUI
 import Foundation
 import Shell
@@ -5,9 +6,6 @@ import Shell
 // What the top bar's Brain dropdown reads from a Core with API minor 95 (E2 round 2): the Brain module's `GET /activity`,
 // `/areas` and `/learned`, and `POST /rooms/{room}/records/{id}/archive` for the Undo. These wire types are private to the
 // dropdown on purpose; the Brain screens of E9 own the full ones.
-
-/// The minor that brings the three routes.
-enum BrainGlanceMinor { static let v010 = 95 }
 
 struct GlanceActivity: Decodable, Equatable {
     var state: String
@@ -105,7 +103,7 @@ enum BrainGlanceMaker {
 
 extension BrainModel {
     /// A Core with API minor 95 and real routes; the sample and an older Core keep the Rooms and Records counts.
-    var servesGlance: Bool { !isSample && (apiMinor ?? 0) >= BrainGlanceMinor.v010 && service?.importRoutes != nil }
+    var servesGlance: Bool { !isSample && (apiMinor ?? 0) >= Int(coreMinorV010) && service?.importRoutes != nil }
 
     /// Reads the dropdown's numbers; a failure keeps the last ones.
     func refreshGlance() async {

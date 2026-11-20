@@ -6,6 +6,7 @@ import SwiftUI
 /// AI may do, which repositories (or projects, teams, channels), done. The same dialog opens on step 3 or 4 from a row's
 /// More menu. All moves live in `ConnAddState`; this only draws them.
 struct ConnAddView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     let close: () -> Void
     @State private var token = false
@@ -87,7 +88,8 @@ struct ConnAddView: View {
             HStack(spacing: Space.s5) {
                 ConnLogo(kind: a.kind ?? "", size: 72).connFloat()
                 ConnLink()
-                IconTile("link", hue: GlassInk.blue, size: 72, bounce: false).connFloat(phase: ConnMotion.heroPhase)
+                IconTile("link", hue: GlassInk.accent(paneAccent), size: 72, bounce: false).connFloat(
+                    phase: ConnMotion.heroPhase)
             }
             .padding(.top, Space.s6)
             head(
@@ -163,7 +165,9 @@ struct ConnAddView: View {
                         HStack {
                             Text(s)
                             Spacer()
-                            if s == chosen { Image(systemName: "checkmark").foregroundStyle(GlassInk.blue) }
+                            if s == chosen {
+                                Image(systemName: "checkmark").foregroundStyle(GlassInk.accent(paneAccent))
+                            }
                         }
                         .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))
                         .contentShape(coreShape(Radius.cardMac))

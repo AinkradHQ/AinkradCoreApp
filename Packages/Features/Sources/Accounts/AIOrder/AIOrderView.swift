@@ -5,6 +5,7 @@ import SwiftUI
 /// session; when it hits a limit or stops working the next one takes over. Pools and chains are not shown: they are the
 /// Core's own words, kept under it. Limits, models and prices and the per-agent order sit under Advanced.
 struct AIOrderView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AccountsModel
     @State private var dragging: Int64?
     @State private var dy: CGFloat = 0
@@ -38,7 +39,9 @@ struct AIOrderView: View {
             symbol: "list.number", title: "No accounts yet",
             text: "Add an account and it becomes number 1 in your AI order. Add more to give Core somewhere to go next."
         ) {
-            AppActionTile(title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(
+                title: "Add account", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+            ) {
                 AccountDialogs.openConnect(model, provider: nil)
             }
             .disabled(model.readOnly)

@@ -111,6 +111,7 @@ struct SetupTourView: View {
 
 /// Theme, transparency, blur, accent and wallpaper, changing the app behind the card as they are touched.
 struct SetupLookPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Bindable private var look = LookPrefs.shared
     @Bindable private var accent = AccentPrefs.shared
@@ -165,7 +166,8 @@ struct SetupLookPage: View {
                                         if wallpaper.choice == w {
                                             Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
                                                 .foregroundStyle(.white).frame(width: 16, height: 16)
-                                                .background(GlassInk.blue, in: coreShape(Radius.chip / 2)).padding(4)
+                                                .background(GlassInk.accent(paneAccent), in: coreShape(Radius.chip / 2))
+                                                .padding(4)
                                         }
                                     }
                                 Text(w.title).coreFont(size: MacTextSize.meta)

@@ -459,7 +459,7 @@ private struct LauncherPickCell: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s3) {
-                IconTile(entry.symbol, hue: GlassInk.blue, size: MacSize.controlLg)
+                IconTile(entry.symbol, hue: GlassInk.accent(paneAccent), size: MacSize.controlLg)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(entry.title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                     Text(reason).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)

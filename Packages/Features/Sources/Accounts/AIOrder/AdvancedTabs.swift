@@ -171,6 +171,7 @@ private struct PriceEditRow: View {
 
 /// Per-agent order: every agent follows the AI order unless it is given another here.
 struct AgentsTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AccountsModel
     @State private var newAgent = ""
 
@@ -198,7 +199,7 @@ struct AgentsTab: View {
                     error: newAgent.isEmpty || AccountsModel.validAgent(newAgent)
                         ? nil : "1 to 64 letters, digits, . _ : -"
                 ) { add() }
-                AppActionTile(title: "Add agent", symbol: "plus", key: "", hue: GlassInk.blue) { add() }
+                AppActionTile(title: "Add agent", symbol: "plus", key: "", hue: GlassInk.accent(paneAccent)) { add() }
                     .disabled(!AccountsModel.validAgent(newAgent) || model.readOnly)
             }
         }

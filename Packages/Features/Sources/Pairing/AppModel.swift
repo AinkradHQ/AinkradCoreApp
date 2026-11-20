@@ -337,7 +337,7 @@ public final class AppModel {
     /// The setup's About you answers into the Brain's Me space (`PUT /brain/me/profile`, API minor 95). False when this Core
     /// does not have the route yet or could not be reached: the Ready page says so.
     private func saveMeProfile(_ items: [SetupProfile.Item]) async -> Bool {
-        guard (brain.apiMinor ?? 0) >= SetupTourModel.profileMinor, let live = service as? LiveCoreService,
+        guard (brain.apiMinor ?? 0) >= Int(coreMinorV010), let live = service as? LiveCoreService,
             let body = try? JSONSerialization.data(
                 withJSONObject: ["items": items.map { ["key": $0.key, "body": $0.body] }])
         else { return false }
@@ -351,7 +351,7 @@ public final class AppModel {
     /// E12-5/10: a Core that needs a newer app says so (`min_app`); the person is told to update Ainkrad (it updates by itself, or
     /// Check for Updates). Skipped on a Core that does not serve minor 95, and when the answer is not readable.
     private func checkMinApp() async {
-        guard let live = service as? LiveCoreService, await live.connection.serverSupports(minor: 95),
+        guard let live = service as? LiveCoreService, await live.connection.serverSupports(minor: coreMinorV010),
             let data = try? await live.connection.signedRequest(method: "GET", target: "/api/v1/core/health"),
             let min = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["min_app"] as? String,
             let app = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
@@ -392,7 +392,7 @@ public final class AppModel {
             about.use { try await service.about() }
             let me = await about.reload()
             brain.apiMinor = me?.apiMinor
-            let v010 = (me?.apiMinor ?? 0) >= 95  // the runner tool report of Core 0.10
+            let v010 = (me?.apiMinor ?? 0) >= Int(coreMinorV010)  // the runner tool report of Core 0.10
             shell.showsRunnerUpdates = v010
             terminals?.showsUpdates = v010
             var admin = me?.isAdmin

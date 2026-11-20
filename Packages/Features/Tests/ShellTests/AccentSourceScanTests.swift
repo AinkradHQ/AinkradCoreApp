@@ -3,47 +3,14 @@ import Testing
 
 /// Per-app accent (E2-7): views read the accent from `@Environment(\.coreAccent)`, never `GlassInk.blue` (the global one).
 struct AccentSourceScanTests {
-    /// Files that may still say `GlassInk.blue`: static lookup tables and helpers with no view or environment to read
-    /// from. They resolve to the global accent, which is the app default. Thread the colour in before adding to this list.
+    /// Deliberate exceptions: static lookup tables, enum helpers and a non-view closure with no environment to read from.
+    /// `GlassInk.blue` is the live global accent (Settings, Appearance), so they follow it; only a pane override is skipped.
     static let allowed: Set<String> = [
-        "Pairing/Controls.swift", "Pairing/AddWizardSteps.swift", "Shell/SettingsView.swift", "Admin/OpsView.swift",
-        "Admin/AuditView.swift", "Admin/SettingWords.swift", "Agents/SessionTile.swift", "Accounts/Costs.swift",
-        "Accounts/Connections/ConnModels.swift", "Accounts/AccountsLook.swift", "Brain/RoomsTab.swift",
-        "LoreEditor/LoreBlocks.swift",
-        // Views merged from the other 0.10 epics after E2-7: they move to the pane accent in a follow-up.
-        "Accounts/AIOrder/AddAccountDialog.swift",
-        "Accounts/AIOrder/AdvancedTabs.swift",
-        "Accounts/AIOrder/AIOrderRow.swift",
-        "Accounts/AIOrder/AIOrderView.swift",
-        "Accounts/AIOrder/GuidedSignInViews.swift",
-        "Accounts/Connections/ConnAddView.swift",
-        "Accounts/Connections/ConnParts.swift",
-        "Agents/MarkdownText.swift",
-        "Agents/SessionPanelTabs.swift",
-        "Brain/BrainPane.swift",
-        "Brain/Calm/RadialMap.swift",
-        "Leyline/HostCard.swift",
-        "Leyline/HostSpaceCards.swift",
-        "Lore/LoreBars.swift",
-        "Lore/QuickCaptureView.swift",
-        "Pairing/AddRunnerView.swift",
-        "Pairing/Registration.swift",
-        "Pairing/Setup/SetupTourParts.swift",
-        "Pairing/Setup/SetupTourView.swift",
-        "Pairing/SetupWizardView.swift",
-        "Shell/Clocks.swift",
-        "Shell/LauncherView.swift",
-        "Shell/UnlockCard.swift",
-        "Shell/WidgetBodiesBrain.swift",
-        "Shell/WidgetBodiesKinds.swift",
-        "Shell/WidgetBodiesNew.swift",
-        "Shell/WidgetCalendar.swift",
-        "Shell/WidgetGallery.swift",
-        "Shell/WidgetWeather.swift",
-        "Terminals/NewTerminalView.swift",
-        "Terminals/RunnersRows.swift",
-        "Terminals/TerminalCard.swift",
-        "Terminals/TerminalsListView.swift",
+        "Accounts/AccountsLook.swift", "Accounts/Connections/ConnModels.swift", "Accounts/Costs.swift",
+        "Admin/AuditView.swift", "Admin/OpsView.swift", "Admin/SettingWords.swift", "Agents/SessionTile.swift",
+        "Brain/RoomsTab.swift",
+        "LoreEditor/LoreBlocks.swift", "Pairing/Controls.swift", "Pairing/Registration.swift",
+        "Shell/SettingsView.swift", "Terminals/RunnersRows.swift",
     ]
 
     @Test func noViewReadsTheGlobalAccentDirectly() throws {

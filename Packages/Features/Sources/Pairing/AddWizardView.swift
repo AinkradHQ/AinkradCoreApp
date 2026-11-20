@@ -6,7 +6,7 @@ import SwiftUI
 /// Add a device or a runner (n17): What → Install → Connect → Access (a device) or Settings (a runner) → Done, one screen
 /// each. The step bar always shows the six names, so a person sees the whole way; the steps a kind skips stay unlit.
 struct AddWizardView: View {
-    @Environment(\.coreAccent) private var paneAccent
+    @Environment(\.coreAccent) var paneAccent
     let app: AppModel
     @Bindable var model: AddWizardModel
     let close: () -> Void

@@ -67,7 +67,7 @@ public final class DesignModel {
     public func attach(connection: CoreConnection) {
         mockups = LiveMockupSource(connection: connection)
         self.connection = connection
-        Task { composeSupported = await connection.serverSupports(minor: 95) }
+        Task { composeSupported = await connection.serverSupports(minor: coreMinorV010) }
         use(LiveDesignService(connection: connection))
     }
 

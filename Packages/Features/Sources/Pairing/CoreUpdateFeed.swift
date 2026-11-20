@@ -7,8 +7,6 @@ import Shell
 /// the status file survives it, so the first answer after the Core is back is the truth.
 @MainActor
 final class CoreUpdateFeed {
-    /// The API minor that carries the route (the coordinator renumbers it at integration).
-    static let minor: Int32 = 95
     private let shell: ShellModel
     private let connection: CoreConnection
     /// Runs the POST after Touch ID (`AppModel.elevated`): it is a danger route.
@@ -44,7 +42,7 @@ final class CoreUpdateFeed {
     }
 
     func poll() async {
-        guard await connection.serverSupports(minor: Self.minor) else { return }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return }
         guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/system/update"),
             let s = CoreUpdateStatus.decode(data)
         else { return }

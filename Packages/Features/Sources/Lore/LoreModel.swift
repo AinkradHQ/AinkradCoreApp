@@ -128,7 +128,7 @@ public final class LoreModel {
     public func attach(connection: CoreConnection) {
         use(LiveLoreService(connection: connection))
         Task { [weak self] in
-            let ok = await connection.serverSupports(minor: 95)
+            let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.serves95 = ok
             await self?.refreshSide()
         }

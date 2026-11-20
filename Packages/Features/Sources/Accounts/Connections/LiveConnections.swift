@@ -16,11 +16,10 @@ struct LiveConnectionsService: ConnectionsService {
     }
     init(connection: CoreConnection) {
         client = connection.client
-        supportsPicks = { await connection.serverSupports(minor: Self.picksMinor) }
+        supportsPicks = { await connection.serverSupports(minor: coreMinorV010) }
     }
 
     /// The API minor that added `listConnectionResources` (the coordinator renumbers it at integration).
-    static let picksMinor: Int32 = 95
 
     // MARK: reading
 

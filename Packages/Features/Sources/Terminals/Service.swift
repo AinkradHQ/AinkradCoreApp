@@ -200,7 +200,7 @@ struct LiveTerminalService: TerminalService {
     func runners() async throws -> [RunnerItem] {
         var out = try await run { try await client.listRunners().ok.body.json.map(Self.runner) }
         // The runners' own report (tool install, home, last error) is API minor 95; read it beside the generated list.
-        if await connection.serverSupports(minor: 95), let extra = await reported() {
+        if await connection.serverSupports(minor: coreMinorV010), let extra = await reported() {
             for i in out.indices { if let e = extra[out[i].id] { e.apply(to: &out[i]) } }
         }
         return out
@@ -222,7 +222,7 @@ struct LiveTerminalService: TerminalService {
     }
 
     func tail(_ id: String, lines: Int) async throws -> [String] {
-        guard await connection.serverSupports(minor: 95) else { return [] }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return [] }
         return try await run {
             switch try await client.tailTerminal(path: .init(id: id), query: .init(lines: Int32(lines))) {
             case .ok(let o): return try o.body.json.lines
@@ -245,7 +245,7 @@ struct LiveTerminalService: TerminalService {
         runner: String, program: String?, session: String?, sandbox: String?, project: Int?, rows: Int, cols: Int
     ) async throws -> TerminalItem {
         // A Core before minor 95 ignores `sandbox` and would start a host-view shell: send nothing it cannot read.
-        let newCore = await connection.serverSupports(minor: 95)
+        let newCore = await connection.serverSupports(minor: coreMinorV010)
         let (sandbox, project) = newCore ? (sandbox, project) : (nil, nil)
         // A Core before minor 77 ignores `session` and opens in the home folder; say nothing it cannot read.
         let supported = await connection.serverSupports(minor: 77)

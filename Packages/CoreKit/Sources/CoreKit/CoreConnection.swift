@@ -112,9 +112,6 @@ public actor CoreConnection {
         }
     }
 
-    /// The API minor that serves the app unlock (E1-1): `purpose: session`, the heartbeat and the end call.
-    public static let unlockMinor: Int32 = 95
-
     /// Step-up (§8): a challenge for this session, signed by the `stepup` key (the OS asks for Touch ID or the passcode, with
     /// `reason` in the prompt), then the exchange. Returns when the elevation ends.
     @discardableResult
@@ -143,7 +140,7 @@ public actor CoreConnection {
 
     /// A secret's plain value, for the app's Reveal (a danger route: a fresh step-up first). Needs a Core that serves it.
     public func revealSecret(name: String) async throws -> String {
-        guard await serverSupports(minor: Self.unlockMinor) else {
+        guard await serverSupports(minor: coreMinorV010) else {
             throw CoreError.badRequest(message: "This Core is too old to show a secret. Update it first.")
         }
         let enc = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name

@@ -6,6 +6,7 @@ import SwiftUI
 /// size by clicking it. A widget already on Home says so, and its size choice resizes it in place. Add puts it in the
 /// first free spot; dragging a preview onto Home drops it where you let go.
 struct WidgetGallery: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     let begin: (WidgetKind, WidgetSize, CGPoint) -> Void
     let move: (CGPoint) -> Void
@@ -63,7 +64,7 @@ struct WidgetGallery: View {
             chosen = shell.widgets.onlyCopy(of: k)?.size ?? k.sizes[0]
         } label: {
             HStack(spacing: Space.s2) {
-                IconTile(k.symbol, hue: GlassInk.blue, size: 24)
+                IconTile(k.symbol, hue: GlassInk.accent(paneAccent), size: 24)
                 Text(k.title).coreFont(size: MacTextSize.body, weight: on ? .semibold : .regular).lineLimit(1)
                 Spacer(minLength: 0)
                 if k.isNew { Text("New").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.blueInk) }
@@ -82,7 +83,7 @@ struct WidgetGallery: View {
     private var detail: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(alignment: .top, spacing: Space.s3) {
-                IconTile(current.symbol, hue: GlassInk.blue, size: 40)
+                IconTile(current.symbol, hue: GlassInk.accent(paneAccent), size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(current.title).coreFont(size: MacTextSize.large, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)

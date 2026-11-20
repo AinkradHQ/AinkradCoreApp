@@ -113,7 +113,7 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func limits() async throws -> ProjectLimits? {
-        guard await connection.serverSupports(minor: ProjectsMinor.v010) else { return nil }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return nil }
         return try ProjectLimits.decode(try await signed("GET", "/api/v1/projects/defaults"))
     }
 

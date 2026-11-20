@@ -180,6 +180,7 @@ private let sampleWeather = WeatherReport(
     })
 
 struct WeatherBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     let size: WidgetSize
     @Environment(\.widgetPreview) private var preview
     private let provider = WeatherProvider.shared
@@ -216,7 +217,8 @@ struct WeatherBody: View {
     private func cell(_ top: String, _ code: Int, _ t: String) -> some View {
         VStack(spacing: 2) {
             WCaption(top)
-            Image(systemName: WeatherReport.look(code).symbol).foregroundStyle(GlassInk.blue).accessibilityHidden(true)
+            Image(systemName: WeatherReport.look(code).symbol).foregroundStyle(GlassInk.accent(paneAccent))
+                .accessibilityHidden(true)
             Text(t).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.primary)
         }
         .frame(maxWidth: .infinity)
@@ -234,8 +236,10 @@ struct WeatherBody: View {
     @ViewBuilder private func report(_ r: WeatherReport) -> some View {
         switch size {
         case .s:
-            Image(systemName: WeatherReport.look(r.code).symbol).coreFont(size: 22).foregroundStyle(GlassInk.blue)
-                .accessibilityHidden(true)
+            Image(systemName: WeatherReport.look(r.code).symbol).coreFont(size: 22).foregroundStyle(
+                GlassInk.accent(paneAccent)
+            )
+            .accessibilityHidden(true)
             Spacer(minLength: 0)
             now(r, big: 38)
         case .m:
@@ -257,8 +261,10 @@ struct WeatherBody: View {
                     HStack {
                         Text(d.at.formatted(.dateTime.weekday(.wide))).coreFont(
                             size: MacTextSize.body, weight: .semibold)
-                        Image(systemName: WeatherReport.look(d.code).symbol).foregroundStyle(GlassInk.blue)
-                            .accessibilityHidden(true)
+                        Image(systemName: WeatherReport.look(d.code).symbol).foregroundStyle(
+                            GlassInk.accent(paneAccent)
+                        )
+                        .accessibilityHidden(true)
                         Spacer(minLength: 0)
                         WCaption("\(d.high)° / \(d.low)°")
                     }

@@ -3,11 +3,12 @@ import SwiftUI
 
 /// The provider's mark: one letter on a flat well, as a stand-in until the real marks are dropped in (as the mockup says).
 struct ProviderTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let name: String
     var size: CGFloat = 36
     var body: some View {
         Text(ProviderCatalog.letter(name))
-            .coreFont(size: size * 0.44, weight: .semibold).foregroundStyle(GlassInk.ink(GlassInk.blue))
+            .coreFont(size: size * 0.44, weight: .semibold).foregroundStyle(GlassInk.ink(GlassInk.accent(paneAccent)))
             .frame(width: size, height: size)
             .background(GlassInk.well, in: coreShape(size > 40 ? Radius.cardMac : Radius.control))
             .accessibilityHidden(true)

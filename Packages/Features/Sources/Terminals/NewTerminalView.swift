@@ -5,6 +5,7 @@ import SwiftUI
 /// whether it opens in the sandbox home or a project's folder. ⌘T skips this sheet and opens on the last machine. A refusal
 /// lands inline with the Core's own code.
 struct NewTerminalView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     @Namespace private var pick
@@ -15,7 +16,7 @@ struct NewTerminalView: View {
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
             HStack(spacing: Space.s3) {
-                IconTile("terminal", hue: GlassInk.blue, size: 52, bounce: shown)
+                IconTile("terminal", hue: GlassInk.accent(paneAccent), size: 52, bounce: shown)
                 Text("New terminal").coreFont(size: MacTextSize.large + 4, weight: .bold)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
@@ -111,7 +112,7 @@ struct NewTerminalView: View {
             .foregroundStyle(mac ? GlassInk.ink(GlassInk.amber) : GlassInk.primary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background((mac ? GlassInk.amber : GlassInk.blue).opacity(0.14), in: coreShape(Radius.row))
+            .background((mac ? GlassInk.amber : GlassInk.accent(paneAccent)).opacity(0.14), in: coreShape(Radius.row))
             .coreRise(shown, 3)
     }
 }
