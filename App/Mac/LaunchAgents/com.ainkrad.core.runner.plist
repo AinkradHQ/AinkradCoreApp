@@ -19,6 +19,7 @@
 		<string>ainkrad-runner</string>
 		<string>connect</string>
 		<string>--enable-agents</string>
+		<string>--bundled</string>
 	</array>
 	<key>EnvironmentVariables</key>
 	<dict>

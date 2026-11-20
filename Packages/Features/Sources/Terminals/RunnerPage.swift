@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -15,55 +16,237 @@ struct RunnerPage: View {
     private var work: [RunnerWork] { model.host.runnerHost?.agentWork(on: runner.id) ?? [] }
     private var here: [TerminalItem] { model.items.filter { $0.runner == runner.id && !$0.isEnded } }
 
+    private var live: RunnerFacts.Live { model.live(runner) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            header
-            if let say = facts.say { RunnerSay(text: say, off: off) }
+            BackButton("Runners") { model.runnerDetail = nil }.keyboardShortcut(.escape, modifiers: [])
+            hero
+            if off { whyOffline } else if let say = facts.say { RunnerSay(text: say, off: false) }
             HStack(alignment: .top, spacing: Space.s3) {
                 VStack(spacing: Space.s3) {
                     now
-                    offers
-                    tools
+                    lastProblem
+                    homeFolder
                 }
-                VStack(spacing: Space.s3) {
-                    machine
-                    who
-                    actions
-                }
-                .frame(width: Space.s8 * 11)
+                canDo
             }
+            DisclosureGroup("Advanced") {
+                HStack(alignment: .top, spacing: Space.s3) {
+                    VStack(spacing: Space.s3) {
+                        offers
+                        tools
+                    }
+                    VStack(spacing: Space.s3) {
+                        machine
+                        who
+                        actions
+                    }
+                    .frame(width: Space.s8 * 11)
+                }
+                .padding(.top, Space.s2)
+            }
+            .coreFont(size: MacTextSize.body, weight: .medium)
         }
         .coreFont(size: MacTextSize.body)
     }
 
     // MARK: header
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: Space.s3) {
-            BackButton("Runners") { model.runnerDetail = nil }.keyboardShortcut(.escape, modifiers: [])
-            IconTile(
-                model.host.thisMacRunnerID == runner.id ? "laptopcomputer" : "server.rack",
-                hue: off ? GlassInk.slate : GlassInk.blue, size: Space.s8 - Space.s1)
-            Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-                .accessibilityAddTraits(.isHeader)
-            if runner.builtIn { BuiltInBadge() }
-            if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
-            RunnerChip(facts: facts)
+    private var isMac: Bool {
+        model.host.thisMacRunnerID == runner.id || (runner.os ?? "").lowercased().contains("mac")
+    }
+
+    private var hero: some View {
+        HStack(alignment: .center, spacing: Space.s4 + 2) {
+            RunnerTile(symbol: isMac ? "laptopcomputer" : "server.rack", live: live, size: Space.s8 * 2)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: Space.s3) {
+                    Text(runner.name).coreFont(size: MacTextSize.large, weight: .semibold).lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
+                    StateBadge(live.chip, tone: liveTone(live), symbol: "circle")
+                    if runner.builtIn { BuiltInBadge() }
+                    if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
+                }
+                Text(heroLine).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2).lineLimit(1)
+            }
             Spacer(minLength: Space.s3)
+            RunnerActivity(live: live)
             Button {
-                Task { await model.runNoop(runner.id) }
+                if off { Task { await model.reload() } } else { Task { await model.runNoop(runner.id) } }
             } label: {
-                Label("Test it", systemImage: "testtube.2")
+                Label(off ? "Check again" : "Test it", systemImage: "bolt")
             }
-            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(off || model.noop[runner.id] == .running)
-            .help(off ? unavailable ?? "" : "Ask \(runner.name) to answer without starting work")
-            Button {
-                model.openNew(runner: runner.id)
-            } label: {
-                Label("Open a terminal here", systemImage: "terminal")
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.noop[runner.id] == .running)
+            .help(
+                off
+                    ? "Ask the Core whether \(runner.name) is back"
+                    : "Ask \(runner.name) to answer without starting work")
+            if !runner.builtIn {
+                Button("Remove") { model.confirmRevoke(runner) }
+                    .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
+                    .help("Stop \(runner.name) and remove it from your Core")
             }
-            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(!canTerminal)
-            .help(unavailable ?? "Open a shell on \(runner.name)")
+        }
+        .padding(.horizontal, Space.s6).padding(.vertical, Space.s5 + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coreWell()
+        .accessibilityElement(children: .contain)
+    }
+
+    private var heroLine: String {
+        let since: String =
+            off
+            ? (facts.lastSeenWords ?? "never seen")
+            : (runner.connectedSince.map {
+                "connected for "
+                    + $0.formatted(.relative(presentation: .numeric, unitsStyle: .wide)).replacingOccurrences(
+                        of: " ago", with: "")
+            } ?? "online")
+        return [facts.system ?? (isMac ? "Mac" : "Server"), runner.version.map { "Runner \($0)" }, since]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Why it is offline, and what to do, in the words of mockup 12 (the offline-reason state).
+    private var whyOffline: some View {
+        HStack(alignment: .top, spacing: Space.s4) {
+            IconTile("wifi.slash", hue: palette.tone(.fail).ink, size: Space.s8 + Space.s3)
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Text(isMac ? "\(runner.name) is asleep or closed" : "\(runner.name) is not reachable")
+                    .coreFont(size: MacTextSize.title, weight: .semibold)
+                Text(
+                    "Core has not heard from it for a while. Nothing is wrong with the runner itself. It comes back by itself when \(isMac ? "the Mac wakes up" : "the machine is on") and online."
+                )
+                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    ForEach(offlineSteps, id: \.1) { step in
+                        Label(step.1, systemImage: step.0)
+                    }
+                }
+                .padding(.top, Space.s2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Space.s6).padding(.vertical, Space.s5 + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coreWell()
+        .accessibilityElement(children: .contain)
+    }
+
+    private var offlineSteps: [(String, String)] {
+        isMac
+            ? [
+                ("power", "Open the lid or wake the Mac"), ("wifi", "Check that it is on Wi-Fi"),
+                ("server.rack", "Still offline after 5 minutes? Open Ainkrad on it and turn “Work for Core” on"),
+            ]
+            : [
+                ("power", "Check that the machine is on"), ("wifi", "Check that it is online"),
+                (
+                    "server.rack",
+                    "Still offline after 5 minutes? Check that the Ainkrad runner service is running on it"
+                ),
+            ]
+    }
+
+    /// What went wrong last: a failed tool install, else the runner's own last-error note, else nothing.
+    private var lastProblem: some View {
+        card("Last problem") {
+            if let bad = model.installs[runner.id]?.values.first(where: { $0.state == .failed }) {
+                problem("Could not install \(RunnerTools.name(bad.tool))", bad.reason ?? "The install did not finish.")
+            } else if let e = runner.lastError, !e.isEmpty {
+                problem("The runner reports a problem", e)
+            } else {
+                Text(off ? "Lost the connection. Nothing was lost." : "None. Everything is working.")
+                    .foregroundStyle(palette.text2)
+            }
+        }
+    }
+
+    private func problem(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
+            Text(text).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
+    }
+
+    /// The folder the runner's work happens in, as the runner reports it.
+    private var homeFolder: some View {
+        card("Home folder") {
+            if let h = runner.home {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "folder").foregroundStyle(palette.text2).accessibilityHidden(true)
+                    Text(h).coreFont(size: MacTextSize.meta, design: .monospaced).lineLimit(2).textSelection(.enabled)
+                    Spacer(minLength: Space.s2)
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(h, forType: .string)
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Copy the folder path")
+                }
+                .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.control))
+                Text(
+                    "Work happens in this folder. The runner can’t see anything else on the \(isMac ? "Mac" : "computer")."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            } else {
+                Text("Not reported yet. A runner shows it once AI sessions are on.").foregroundStyle(palette.text2)
+            }
+        }
+    }
+
+    /// Terminals and the four AI tools, each ready, installing with progress, or not installed (an Install button).
+    private var canDo: some View {
+        card("What it can do") {
+            ForEach(model.toolPills(runner), id: \.name) { p in
+                canRow(p.name, p.symbol, p.kind)
+            }
+            Text("Kept up to date for you").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+        }
+    }
+
+    private func canRow(_ name: String, _ symbol: String, _ kind: RunnerToolPill.Kind) -> some View {
+        let key = RunnerFacts.aiTools.first { $0.name == name }?.key
+        let version = key.flatMap { runner.tools[$0] }
+        return HStack(spacing: Space.s3) {
+            IconTile(symbol, hue: kind == .ready ? palette.tone(.run).ink : GlassInk.slate, size: Space.s8 - Space.s2)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(name).coreFont(size: MacTextSize.body, weight: .medium)
+                Text(canLine(name, kind, version, key)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: Space.s2)
+            switch kind {
+            case .ready: StateBadge("Ready", tone: .run, symbol: "checkmark")
+            case .installing(let p):
+                CoreMeter(p, label: "Installing \(name)").frame(width: Space.s8 * 3)
+            case .missing:
+                if let key, !off {
+                    Button("Install") {
+                        Task { await model.installTool(runner, key) }
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .help("Install \(name) on \(runner.name)")
+                } else {
+                    StateBadge("Not installed", tone: .queue, symbol: "minus")
+                }
+            }
+        }
+        .padding(.vertical, Space.s1)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func canLine(_ name: String, _ kind: RunnerToolPill.Kind, _ version: String?, _ key: String?) -> String {
+        guard let key else { return "Open a terminal on this runner" }
+        switch kind {
+        case .installing(let p): return "Installing \(name) · \(Int(p * 100))%"
+        case .ready:
+            guard let version, !version.isEmpty else { return "Ready" }
+            return "Version \(version.split(separator: ".").prefix(2).joined(separator: "."))"
+        case .missing:
+            if let bad = model.installs[runner.id]?[key], bad.state == .failed {
+                return bad.reason ?? "The install did not finish."
+            }
+            return "Not installed yet"
         }
     }
 
@@ -82,7 +265,7 @@ struct RunnerPage: View {
     }
 
     private var now: some View {
-        card("Now") {
+        card("Doing now") {
             if off {
                 Text("Nothing is running here.").foregroundStyle(palette.text2)
             } else {
@@ -228,7 +411,9 @@ struct RunnerPage: View {
     /// Tools found on the host, each with an Install button when missing and live progress while installing.
     private var tools: some View {
         card("Tools") {
-            ForEach(RunnerTools.all, id: \.id) { t in toolRow(t) }
+            ForEach(RunnerTools.all.filter { t in !RunnerFacts.aiTools.contains { $0.key == t.id } }, id: \.id) { t in
+                toolRow(t)
+            }
         }
     }
 
@@ -394,6 +579,8 @@ struct RunnerPage: View {
                     off
                         ? unavailable ?? ""
                         : facts.agentsOn ? "Start an AI session on \(runner.name)" : "AI sessions are off here")
+                action("Open a terminal here", "terminal", disabled: !canTerminal) { model.openNew(runner: runner.id) }
+                    .help(unavailable ?? "Open a shell on \(runner.name)")
                 action("Rename", "pencil", disabled: false) { model.confirmRename(runner) }
                     .help("Give \(runner.name) another name")
                 action("Revoke runner…", "trash", disabled: false, danger: true) { model.confirmRevoke(runner) }

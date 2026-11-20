@@ -31,6 +31,8 @@ public final class AppModel {
     /// The setup wizard is the first screen; the typed-code first run is its fallback (and a pairing left half done).
     private(set) var wizard: SetupWizardModel!
     var useTypedCode = false
+    /// What follows pairing: About you, an AI account, Look and the Mac runner (E3-1), over the desktop.
+    private(set) var tour: SetupTourModel!
     /// Makes device invites (QR). Unavailable until the Core serves them.
     var invites: any InviteService = UnavailableInviteService()
     /// Invites that were still live when their dialog went away; withdrawn from the bell.
@@ -120,6 +122,14 @@ public final class AppModel {
                         try await self.invites.createRunnerInvite(name: name)
                     }
                 },
+                attest: { [weak self] id in
+                    guard let self else { throw CancellationError() }
+                    try await self.elevated(
+                        "Mark this Mac's runner as its own, so it can open real shells.", done: "recorded"
+                    ) {
+                        try await self.invites.attestBundledRunner(id)
+                    }
+                },
                 revoke: { [weak self] id in
                     guard let self else { return "Not connected to a Core." }
                     return await TerminalHostAdapter(app: self).revokeRunner(id)
@@ -128,14 +138,19 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        wizard = SetupWizardModel(driver: driver, profile: shell.profile, macRunner: macRunner) { [weak self] in
+        wizard = SetupWizardModel(driver: driver, discovery: BonjourDiscovery()) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }
+        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in
+            await self?.saveMeProfile(items) ?? false
+        }
+        wizard.armTour = { [weak self] in self?.tour.arm() }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
+        tour.accountCount = { [weak accounts] in accounts?.accountCount ?? 0 }
         brain = BrainModel(host: AdminHostAdapter(app: self))
         projects = ProjectsModel(host: AdminHostAdapter(app: self))
         leyline = LeylineModel(host: AdminHostAdapter(app: self))
@@ -241,6 +256,13 @@ public final class AppModel {
                 model?.recording[terminal] = paused.map { PaneRecording(paused: $0) }
             }
             model.pauseRecording = { [weak self] terminal in await self?.leyline.pauseRecording(terminal: terminal) }
+            // The host page's Runner card: how its runner is doing, and a way into the runner's page.
+            leyline.runnerGlance = { [weak self] id in
+                self?.terminals?.runnerProgress(id: id).map {
+                    RunnerGlance(online: $0.online, installing: $0.installing, percent: $0.percent)
+                }
+            }
+            leyline.openRunner = { [weak self] id in self?.terminals?.openRunners(id) }
             // Who claimed a runner invite, from the device list the Admin app keeps.
             leyline.deviceLookup = { [weak self] id in
                 self?.devices.items.first { $0.id == id }.map {
@@ -254,7 +276,22 @@ public final class AppModel {
         }
         if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop
+        tour.startIfArmed()
         await connect()
+    }
+
+    /// The setup's About you answers into the Brain's Me space (`PUT /brain/me/profile`, API minor 95). False when this Core
+    /// does not have the route yet or could not be reached: the Ready page says so.
+    private func saveMeProfile(_ items: [SetupProfile.Item]) async -> Bool {
+        guard (brain.apiMinor ?? 0) >= SetupTourModel.profileMinor, let live = service as? LiveCoreService,
+            let body = try? JSONSerialization.data(
+                withJSONObject: ["items": items.map { ["key": $0.key, "body": $0.body] }])
+        else { return false }
+        do {
+            _ = try await LiveBrainTransport(connection: live.connection).send(
+                "PUT", BrainRoutes.base + "/me/profile", body: body)
+            return true
+        } catch { return false }
     }
 
     /// Proves the Core and opens the session. Unreachable is a banner and a retry; anything else stops with its reason.
@@ -587,6 +624,26 @@ public final class AppModel {
                 }
             ) {
                 AddWizardView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
+            })
+    }
+
+    /// Add a runner (mockup 13): This Mac, another Mac, a server over SSH, or a server by command.
+    func openAddRunner() {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        stepUpNotice = nil
+        let model = AddRunnerModel(app: self)
+        shell.present(
+            ShellDialog(
+                id: "add-runner",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    Task { _ = await model?.requestClose() }
+                }
+            ) {
+                AddRunnerView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
             })
     }
 

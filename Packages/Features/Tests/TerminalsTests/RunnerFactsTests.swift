@@ -63,13 +63,17 @@ struct RunnerFactsTests {
         #expect(RunnerFacts.stops(agents: 0, terminals: 0) == "nothing is running")
     }
 
-    @Test func filtersMatchTheStates() {
-        let ok = runner().self
-        let busy = runner(avg1: 20)
-        let off = runner(online: false)
-        #expect(RunnerFacts.Filter.all.matches(off) && RunnerFacts.Filter.online.matches(ok))
-        #expect(RunnerFacts.Filter.needsLook.matches(busy) && !RunnerFacts.Filter.needsLook.matches(ok))
-        #expect(RunnerFacts.Filter.offline.matches(off) && !RunnerFacts.Filter.offline.matches(busy))
+    @Test func liveStateIsOfflineThenInstallingThenWorkOrIdle() {
+        let off = RunnerFacts(runner: runner(online: false))
+        #expect(off.live(installing: true) == .offline)
+        var quiet = runner()
+        quiet.load = 0
+        let idle = RunnerFacts(runner: quiet)
+        #expect(idle.live(installing: false) == .idle)
+        #expect(idle.live(installing: true) == .gettingReady)
+        var busy = quiet
+        busy.slots = RunnerSlotFacts(agentsUsed: 1, agentsCapacity: 2, terminalsUsed: 0, terminalsCapacity: 4)
+        #expect(RunnerFacts(runner: busy).live(installing: false) == .working)
     }
 }
 

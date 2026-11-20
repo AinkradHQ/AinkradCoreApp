@@ -209,6 +209,21 @@ struct LiveCoreService: CoreService {
         }
     }
 
+    /// `POST /runners/{id}/bundled`: says this Mac's app attests `runner` as the runner inside its own bundle (it read that
+    /// runner's enrolment file on this disk). Only that runner can then be given a real shell. A Core before minor 95 has no
+    /// such route and no real-shell rule to satisfy, so nothing is sent.
+    func attestBundledRunner(_ runner: String) async throws {
+        guard await connection.serverSupports(minor: 95) else { return }
+        try await run {
+            switch try await client.attestBundledRunner(path: .init(id: runner)) {
+            case .ok: return
+            case .forbidden(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
     /// `POST /pairings/invites` with `kind: runner`: the token comes back once and lives only in the model that shows it.
     func createRunnerInvite(name: String) async throws -> RunnerInvite {
         try await run {
@@ -400,6 +415,10 @@ struct LiveCoreService: CoreService {
         let b = try? JSONDecoder().decode(Components.Schemas.ErrorBody.self, from: data)
         return .http(
             status: code, code: b?.code ?? "error", message: b?.message ?? "The Core could not do that (\(code)).")
+    }
+    private static func fail(_ r: Components.Responses.Forbidden) -> CoreError {
+        let b = try? r.body.json
+        return .http(status: 403, code: b?.code ?? "forbidden", message: b?.message ?? "The Core refused that.")
     }
     private static func fail(_ r: Components.Responses.NotFound) -> CoreError {
         .http(status: 404, code: "not_found", message: (try? r.body.json)?.message ?? "The Core does not know that.")

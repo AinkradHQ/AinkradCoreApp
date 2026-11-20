@@ -10,18 +10,29 @@ enum Load: Equatable {
     case failed(String)
 }
 
+/// The list's filter (E6-3): every terminal, only sandboxes, or only this Mac's own real shells.
 enum TerminalFilter: String, CaseIterable, Identifiable {
     case all = "All"
-    case running = "Running"
-    case ended = "Ended"
+    case sandbox = "Sandbox"
+    case thisMac = "This Mac"
     var id: String { rawValue }
-    func matches(_ t: TerminalItem) -> Bool {
-        switch self {
+    /// `thisMac`: the runner that is this Mac's own, whose terminals count as real even when the Core did not say.
+    func matches(_ t: TerminalItem, thisMac: String?) -> Bool {
+        let real = t.isReal || (t.sandbox == nil && t.runner == thisMac)
+        return switch self {
         case .all: true
-        case .running: !t.isEnded
-        case .ended: t.isEnded
+        case .sandbox: !real
+        case .thisMac: real
         }
     }
+}
+
+/// The terminals of one machine, for the list's sections: This Mac first, then the others by name.
+struct TerminalGroup: Identifiable, Equatable {
+    let id: String
+    var name: String
+    var isThisMac: Bool
+    var items: [TerminalItem]
 }
 
 /// What the runner detail shows for the no-op test.
@@ -48,7 +59,8 @@ public final class TerminalsModel {
     var selected: String?
     /// The runner whose page is open in the Runners pane (nil: the fleet).
     var runnerDetail: String?
-    var runnerFilter: RunnerFacts.Filter = .all
+    /// The summary tile that is on (mockup 12); nil shows every runner.
+    var runnerFilter: RunnerFacts.Live?
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Terminals whose bell rang since they were last opened.
@@ -85,7 +97,24 @@ public final class TerminalsModel {
 
     var shell: ShellModel { host.shell }
     var openCount: Int { items.filter { !$0.isEnded }.count }
-    var shown: [TerminalItem] { items.filter(filter.matches) }
+    /// The list as sections, one per machine (E6-3).
+    var groups: [TerminalGroup] {
+        let mac = host.thisMacRunnerID
+        let visible = items.filter { filter.matches($0, thisMac: mac) }
+        return Dictionary(grouping: visible, by: \.runner)
+            .map { TerminalGroup(id: $0.key, name: name(of: $0.key), isThisMac: $0.key == mac, items: $0.value) }
+            .sorted { ($0.isThisMac ? 0 : 1, $0.name) < ($1.isThisMac ? 0 : 1, $1.name) }
+    }
+    /// Every shown terminal in the order the sections draw them: the order the arrow keys walk.
+    var shown: [TerminalItem] { groups.flatMap(\.items) }
+    /// The machine ⌘T opens on: the last one used, else the default, else the best ready one (nil lets the form choose).
+    var quickRunner: String? {
+        let prefs = TerminalPrefs.shared
+        for id in [prefs.lastRunner, prefs.defaultRunner] where !id.isEmpty {
+            if let r = runner(id), RunnerStatus(r) != .off, r.hasPty { return id }
+        }
+        return nil
+    }
     func runner(_ id: String) -> RunnerItem? { runners.first { $0.id == id } }
     /// What a terminal is called on screen: the tab name the person gave it, else the machine it runs on.
     /// A fresh look at the runners the Core lists, by name (the Add runner wizard watches this for the new one).
@@ -138,6 +167,7 @@ public final class TerminalsModel {
             items = terminals.sorted(by: Self.order)
             runners = fleet.sorted { $0.name < $1.name }
             for r in runners { sampleLoad(r) }
+            applyReported()
             load = .ready
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
@@ -432,8 +462,7 @@ public final class TerminalsModel {
     func quickNew() {
         Task {
             if runners.isEmpty { await reload() }
-            let prefs = TerminalPrefs.shared
-            let m = NewTerminalModel(model: self, runner: prefs.defaultRunner.isEmpty ? nil : prefs.defaultRunner)
+            let m = NewTerminalModel(model: self, runner: quickRunner)
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }
@@ -454,8 +483,9 @@ public final class TerminalsModel {
     }
 
     func openNew(runner: String? = nil, form: NewTerminalModel? = nil) {
-        let m = form ?? NewTerminalModel(model: self, runner: runner)
+        let m = form ?? NewTerminalModel(model: self, runner: runner ?? quickRunner)
         newTerminal = m
+        Task { await m.loadProjects() }
         host.clearElevationNotice()
         shell.present(
             ShellDialog(
@@ -470,6 +500,7 @@ public final class TerminalsModel {
 
     func created(_ t: TerminalItem) async {
         shell.closeDialog()
+        TerminalPrefs.shared.lastRunner = t.runner
         items.insert(t, at: 0)
         openTerminal(t.id)
         await reload()
@@ -580,6 +611,10 @@ final class NewTerminalModel {
     var program = ""
     /// Start in this AI session's folder (the Core resolves the path).
     var session: String?
+    /// Open in a project's folder (the sandbox shares only that folder), not the sandbox home.
+    var inProject = false
+    var projectID: Int?
+    private(set) var projects: [TerminalProject] = []
     private(set) var busy = false
     private(set) var error: Refusal?
     private unowned let model: TerminalsModel
@@ -597,6 +632,24 @@ final class NewTerminalModel {
     }
 
     var chosen: RunnerItem? { runner.flatMap { model.runner($0) } }
+    /// The chosen machine is this Mac's own runner: a real shell, the only one (D-17).
+    var isThisMac: Bool { runner != nil && runner == model.host.thisMacRunnerID }
+
+    /// `NewTerminal.project`: a real shell on this Mac that starts in a project's folder (a cwd, not a mount).
+    var projectParam: Int? { isThisMac && inProject && session == nil ? projectID : nil }
+
+    /// `NewTerminal.sandbox`: this Mac is `real`; an AI session's folder names itself; else the sandbox home or a project.
+    var sandbox: String? {
+        if isThisMac { return "real" }
+        if session != nil { return nil }
+        if inProject, let p = projectID { return "project:\(p)" }
+        return "home"
+    }
+
+    func loadProjects() async {
+        projects = (try? await model.service.projects()) ?? []
+        if projectID == nil { projectID = projects.first?.id }
+    }
     var canOpen: Bool { !busy && blockedReason == nil }
 
     /// Why Open is off, in plain words; nil when it can go.
@@ -606,6 +659,7 @@ final class NewTerminalModel {
         }
         if !c.online { return "That runner is offline." }
         if !c.hasPty { return "Terminals are off on that runner." }
+        if inProject, session == nil, projectID == nil { return "Pick a project." }
         return nil
     }
 
@@ -630,7 +684,8 @@ final class NewTerminalModel {
                 keepsEdit: true
             ) {
                 try await self.model.service.create(
-                    runner: r.id, program: program.isEmpty ? nil : program, session: self.session, rows: 30, cols: 100)
+                    runner: r.id, program: program.isEmpty ? nil : program, session: self.session,
+                    sandbox: self.sandbox, project: self.projectParam, rows: 30, cols: 100)
             }
             await model.created(t)
         } catch is ElevationDeclined {
@@ -664,10 +719,33 @@ final class NewTerminalModel {
                     text:
                         "New work is refused while its load is over the limit. Try again in a moment or use another runner.",
                     code: code, http: status)
+            case "real_terminal_refused":
+                return Refusal(
+                    title: "A real shell is only for this Mac.",
+                    text: "Open it from this Mac's own app, on this Mac's runner. Other machines open a sandbox.",
+                    code: code, http: status)
+            case "runner_update_required":
+                return Refusal(
+                    title: "Update this runner to open terminals.",
+                    text: "\(runner) is too old to open a terminal safely. Runners update themselves; try again soon.",
+                    code: code, http: status)
+            case "project_folder_unknown":
+                return Refusal(
+                    title: "That project has no folder on \(runner) yet.",
+                    text: "Start a session in the project on this machine, or open the sandbox home.",
+                    code: code, http: status)
             case "unsupported_command":
                 return Refusal(
                     title: "\(runner) doesn’t offer that.", text: message, code: code, http: status)
-            default: return Refusal(title: message, text: "", code: code, http: status)
+            default:
+                // The runner's own words name the flag; say what to do about it.
+                if message.contains("--terminal-user") {
+                    return Refusal(
+                        title:
+                            "This runner was started with --terminal-user; restart it without it to open terminals.",
+                        text: "", code: code, http: status)
+                }
+                return Refusal(title: message, text: "", code: code, http: status)
             }
         case .forbiddenScope?:
             return Refusal(

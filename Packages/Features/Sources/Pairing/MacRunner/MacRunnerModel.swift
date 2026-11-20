@@ -7,6 +7,9 @@ struct MacRunnerDeps: Sendable {
     var coreURL: @MainActor @Sendable () -> URL?
     /// A one-time runner invite (admin, Touch ID). Throws `StepUpDeclined` when the person did not unlock.
     var makeInvite: @MainActor @Sendable (_ name: String) async throws -> RunnerInvite
+    /// Tells the Core this runner is the one bundled with this app (E6), once per enrolment. Optional: a failure only means
+    /// the runner opens sandboxes, not a real shell.
+    var attest: @MainActor @Sendable (_ runnerID: String) async throws -> Void = { _ in }
     /// Revokes the runner device; nil when it worked, else the reason in words.
     var revoke: @MainActor @Sendable (_ deviceID: String) async -> String?
 }
@@ -125,6 +128,11 @@ final class MacRunnerModel {
                 try await control.pair(core: core, token: invite.token)
             }
             deviceID = control.enrolment()?.deviceID
+            if let id = deviceID, UserDefaults.standard.string(forKey: "macRunner.attested") != id,
+                (try? await deps.attest(id)) != nil
+            {
+                UserDefaults.standard.set(id, forKey: "macRunner.attested")
+            }
             state = .working("Starting the runner")
             try control.register(terminals: terminals)
             state = control.registration(terminals: terminals) == .needsApproval ? .needsApproval : .running

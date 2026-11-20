@@ -1,9 +1,9 @@
 import CoreUI
 import SwiftUI
 
-/// The Terminals app: its own surface (Settings, Terminal, App surface), the filter, a mini-terminal tile per terminal,
-/// and the counts. Keyboard: ⌘1 ⌘2 ⌘3 filter, arrows move, ↩ open, D detach, E end, S running command, R rename, ⌥⌘N new.
-/// The Core keeps no output, so a tile shows the shell, not its screen.
+/// The Terminals app (E6-3, `screens/08-terminals.html`): the terminals grouped by machine, each a card with a live look at
+/// its screen. This Mac's real shells come first, then the sandboxes. ⌘T opens a terminal at once on the last machine used;
+/// "New terminal…" (⌥⌘N) opens the sheet. Keyboard: arrows move, ↩ opens, ⌫ closes, D detach, S running command, R rename.
 struct TerminalsListView: View {
     let model: TerminalsModel
     @Bindable private var prefs = TerminalPrefs.shared
@@ -31,19 +31,20 @@ struct TerminalsListView: View {
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
         } actions: {
-            AppActionTile(title: "New", symbol: "plus", key: "⌥⌘N", hue: GlassInk.blue, prominent: true) {
-                model.quickNew()
+            AppActionTile(title: "New terminal…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue) {
+                model.openNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
+            AppActionTile(title: "New terminal", symbol: "plus", key: "⌘T", hue: GlassInk.blue, prominent: true) {
+                model.quickNew()
+            }
+            .keyboardShortcut("t", modifiers: .command)
         }
     }
 
     private func count(_ f: TerminalFilter) -> Int {
-        switch f {
-        case .all: model.items.count
-        case .running: model.items.filter { !$0.isEnded }.count
-        case .ended: model.items.filter(\.isEnded).count
-        }
+        let mac = model.host.thisMacRunnerID
+        return model.items.filter { f.matches($0, thisMac: mac) }.count
     }
 
     @ViewBuilder private var content: some View {
@@ -56,25 +57,12 @@ struct TerminalsListView: View {
             Spacer(minLength: 0)
         default:
             if model.shown.isEmpty {
-                VStack(spacing: Space.s3) {
-                    IconTile("terminal", hue: GlassInk.slate, size: 64)
-                    Text("No terminals here").coreFont(size: MacTextSize.title, weight: .semibold)
-                    Text("Open a shell on one of your runners.").foregroundStyle(GlassInk.secondary)
-                    Button("New terminal") { model.quickNew() }.buttonStyle(CoreButtonStyle(.prominent))
-                        .coreShortcut(.primary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityElement(children: .contain)
+                empty
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: Space.s8 * 10), spacing: Space.s3, alignment: .top)],
-                            spacing: Space.s3
-                        ) {
-                            ForEach(Array(model.shown.enumerated()), id: \.element.id) { i, t in
-                                TerminalTile(model: model, item: t, index: i).id(t.id)
-                            }
+                        VStack(alignment: .leading, spacing: Space.s6) {
+                            ForEach(model.groups) { g in section(g) }
                         }
                         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
                     }
@@ -86,6 +74,7 @@ struct TerminalsListView: View {
                     .onKeyPress(.upArrow) { move(-1, proxy) }
                     .coreSideKeys { move($0, proxy) }
                     .onKeyPress(.return) { act(.open) }
+                    .onKeyPress(.delete) { act(.end) }
                     .onKeyPress(characters: .letters) { press in
                         switch press.characters.lowercased() {
                         case "d": act(.detach)
@@ -99,6 +88,69 @@ struct TerminalsListView: View {
                 }
             }
         }
+    }
+
+    /// One machine: its picture, what it is, how many, then its cards.
+    private func section(_ g: TerminalGroup) -> some View {
+        let runner = model.runner(g.id)
+        let mac = g.isThisMac
+        let title = mac ? "This Mac" : runner?.builtIn == true ? "Core sandbox" : g.name
+        let about =
+            mac
+            ? "A real shell. It can change your files."
+            : runner?.builtIn == true ? "A safe room. It cannot see your files." : "Sandbox on this machine."
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            HStack(spacing: Space.s3) {
+                IconTile(
+                    mac ? "laptopcomputer" : runner?.builtIn == true ? "diamond" : "server.rack",
+                    hue: mac ? GlassInk.amber : GlassInk.blue, size: Space.s8 - Space.s1, bounce: g.items.count)
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text(about).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                Spacer(minLength: 0)
+                Text("\(g.items.count)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    .monospacedDigit()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 10), spacing: Space.s3, alignment: .top)],
+                spacing: Space.s3
+            ) {
+                ForEach(Array(g.items.enumerated()), id: \.element.id) { i, t in
+                    TerminalCard(model: model, item: t, thisMac: mac || t.isReal, index: i).id(t.id)
+                }
+            }
+        }
+    }
+
+    private var empty: some View {
+        VStack(spacing: Space.s3) {
+            IconTile("terminal", hue: GlassInk.blue, size: 64)
+            Text("No terminals yet").coreFont(size: MacTextSize.title, weight: .semibold)
+            Text(
+                "Open a terminal in a safe sandbox, or a real one on this Mac. They show up here with a live look at what they are doing."
+            )
+            .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center).frame(maxWidth: Space.s8 * 13)
+            HStack(spacing: Space.s2) {
+                if let mac = model.host.thisMacRunnerID {
+                    Button {
+                        model.openNew(runner: mac)
+                    } label: {
+                        Label("On this Mac", systemImage: "laptopcomputer")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary))
+                }
+                Button {
+                    model.quickNew()
+                } label: {
+                    Label("In a sandbox", systemImage: "shield")
+                }
+                .buttonStyle(CoreButtonStyle(.prominent))
+            }
+            Text("Tip: press ⌘T any time.").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
     }
 
     private func move(_ step: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
@@ -118,23 +170,23 @@ struct TerminalsListView: View {
     }
 
     private var footer: some View {
-        let running = model.items.filter { !$0.isEnded }.count
-        let ended = model.items.count - running
-        return HStack(spacing: Space.s2) {
-            stat("play.fill", "\(running) running", GlassInk.green)
-            if ended > 0 { stat("stop.fill", "\(ended) ended", GlassInk.slate) }
-            ForEach(model.runners.filter { model.onRunner($0.id) > 0 }) { r in
-                stat("server.rack", "\(r.name) · \(model.onRunner(r.id))", GlassInk.blue)
-            }
+        HStack(spacing: Space.s4) {
+            hint("← → ↑ ↓", "Move")
+            hint("⏎", "Open")
+            hint("⌘T", "New terminal")
+            hint("⌫", "Close")
             Spacer(minLength: 0)
-            Text("↩ open · D detach · E end · S running command · R rename").coreFont(size: MacTextSize.meta)
-                .foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
         }
         .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
-        .help("Terminals this device opened. The Core keeps no output, so a tile shows the shell, not its screen.")
     }
 
-    private func stat(_ symbol: String, _ text: String, _ hue: Color) -> some View { AppStatChip(symbol, text, hue) }
+    private func hint(_ keys: String, _ what: String) -> some View {
+        HStack(spacing: Space.s2) {
+            CoreKeycap(keys)
+            Text(what).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 /// What a tile can do, from its hover buttons or the keyboard.

@@ -14,7 +14,7 @@ public final class UserProfile {
         name = Self.clean(defaults.string(forKey: Self.nameKey) ?? "")
     }
     /// Trimmed, one line, 40 characters at most.
-    public static func clean(_ raw: String) -> String {
+    public nonisolated static func clean(_ raw: String) -> String {
         String(
             raw.split(whereSeparator: \.isNewline).first.map { String($0) }?.trimmingCharacters(in: .whitespaces)
                 .prefix(40) ?? "")

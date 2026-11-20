@@ -3,6 +3,8 @@ import SwiftUI
 
 /// The Runners pane: the machines that do the work for your Core, as cards, or one machine's page (N19). Only what runners
 /// report: state, what they offer, work slots, load per core.
+/// E2's Devices & Runners app shows this as its Runners tab: `RunnersView(model:)`, filling the tab body. It carries its own
+/// heading and Add runner button, and opens a runner's page in place (`model.runnerDetail`), so the tab needs no navigation.
 struct RunnersView: View {
     @Bindable var model: TerminalsModel
     @Environment(\.corePalette) private var palette
@@ -22,7 +24,8 @@ struct RunnersView: View {
         .task {
             // Load and heartbeat move without events: look again while this pane is open.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
+                model.readLocalInstall()
+                try? await Task.sleep(for: .seconds(model.runners.contains(where: model.isInstalling) ? 2 : 10))
                 await model.reload()
             }
         }
@@ -31,55 +34,68 @@ struct RunnersView: View {
         }
     }
 
-    private var shown: [RunnerItem] { RunnerFacts.ordered(model.runners.filter(model.runnerFilter.matches)) }
+    private var shown: [RunnerItem] {
+        RunnerFacts.ordered(model.runners).filter { model.runnerFilter == nil || model.live($0) == model.runnerFilter }
+    }
 
     @ViewBuilder private var fleet: some View {
         switch model.load {
         case .failed(let m): ConnectionBanner(.error(m), retry: { Task { await model.reload() } })
         default:
-            toolbar
             if model.runners.isEmpty {
+                header
                 if model.load == .ready { empty } else { CoreBusyBar() }
             } else {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Space.s8 * 16), spacing: Space.s3, alignment: .top)],
-                    spacing: Space.s3
-                ) {
+                header
+                RunnerSummary(model: model)
+                VStack(spacing: Space.s2 + 2) {
                     ForEach(shown) { r in
-                        RunnerCard(model: model, runner: r).transition(
+                        RunnerRow(model: model, runner: r).transition(
                             reduce ? .opacity : .scale(scale: 0.97).combined(with: .opacity))
                     }
                 }
                 .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shown.map(\.id))
                 if shown.isEmpty {
-                    Text("No runners match this filter.").foregroundStyle(palette.text2)
+                    Text("No runners are \(model.runnerFilter?.rawValue.lowercased() ?? "here").").foregroundStyle(
+                        palette.text2)
                 }
+                Text(
+                    "Tap a runner to see what it is doing. Ainkrad installs and updates Claude, Codex, OpenCode and Antigravity on every runner for you."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
         }
     }
 
-    private var toolbar: some View {
-        HStack(spacing: Space.s2) {
-            Text("Runners").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
-            Spacer(minLength: Space.s3)
-            if !model.runners.isEmpty {
-                ForEach(RunnerFacts.Filter.allCases) { f in
-                    AppFilterTile(
-                        title: f.rawValue, count: model.runners.filter(f.matches).count, on: model.runnerFilter == f,
-                        key: ""
-                    ) { model.runnerFilter = f }
-                    .help("Show \(f == .all ? "all runners" : "runners that are \(f.rawValue.lowercased())")")
-                }
+    /// "Runners", one sentence of what is going on, and Add runner.
+    private var header: some View {
+        HStack(alignment: .center, spacing: Space.s3) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Runners").coreFont(size: MacTextSize.large + 6, weight: .semibold).accessibilityAddTraits(
+                    .isHeader)
+                Text(summaryLine).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
             }
+            Spacer(minLength: Space.s3)
             Button {
                 model.host.runnerHost?.addRunner()
             } label: {
                 Label("Add runner", systemImage: "plus")
             }
-            .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+            .buttonStyle(CoreButtonStyle(.prominent))
             .keyboardShortcut("n", modifiers: .command).environment(\.coreKeycap, "⌘N")
-            .help("Pair a new machine as a runner (⌘N)")
+            .help("Add a runner (⌘N)")
         }
+    }
+
+    /// "The computers that do your work. 2 are busy, 1 is getting ready."
+    private var summaryLine: String {
+        let live = model.runners.map(model.live)
+        let busy = live.filter { $0 == .working }.count
+        let ready = live.filter { $0 == .gettingReady }.count
+        var parts: [String] = []
+        if busy > 0 { parts.append("\(busy) \(busy == 1 ? "is" : "are") busy") }
+        if ready > 0 { parts.append("\(ready) \(ready == 1 ? "is" : "are") getting ready") }
+        return "The computers that do your work." + (parts.isEmpty ? "" : " " + parts.joined(separator: ", ") + ".")
     }
 
     private var empty: some View {
@@ -89,17 +105,6 @@ struct RunnersView: View {
             primary: CoreAction("Add runner") { model.host.runnerHost?.addRunner() }
         )
         .frame(maxWidth: .infinity).padding(.top, Space.s8 * 4)
-    }
-}
-
-/// What a runner offers, as a chip: on is blue, off is quiet. Symbol and word, so colour is never the only cue.
-struct OfferChip: View {
-    let symbol: String
-    let title: String
-    let on: Bool
-    var body: some View {
-        let label = "\(title) \(on ? "on" : "off")"
-        if on { StateBadge(label, tone: .done, symbol: symbol) } else { CoreChip(label, symbol: symbol, minWidth: 0) }
     }
 }
 
@@ -184,66 +189,9 @@ struct RunnerBar: View {
     }
 }
 
-private struct RunnerCard: View {
+/// The Runners tab for E2's Devices & Runners app shell: the heading, summary tiles, runner cards and the runner's own page.
+public struct RunnersTab: View {
     let model: TerminalsModel
-    let runner: RunnerItem
-    @Environment(\.corePalette) private var palette
-    @State private var hovering = false
-
-    var body: some View {
-        let facts = RunnerFacts(runner: runner)
-        let terminals = model.onRunner(runner.id)
-        Button {
-            model.runnerDetail = runner.id
-        } label: {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                HStack(spacing: Space.s3) {
-                    IconTile(
-                        model.host.thisMacRunnerID == runner.id ? "laptopcomputer" : "server.rack",
-                        hue: facts.status == .off ? GlassInk.slate : GlassInk.blue, size: Space.s8 + Space.s2)
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: Space.s2) {
-                            Text(runner.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-                            if runner.builtIn { BuiltInBadge() }
-                            if model.host.thisMacRunnerID == runner.id { ThisMacBadge() }
-                        }
-                        Text(facts.system ?? "System not reported yet").coreFont(size: MacTextSize.meta)
-                            .foregroundStyle(palette.text2)
-                    }
-                    Spacer(minLength: Space.s2)
-                    RunnerChip(facts: facts)
-                }
-                if let say = facts.say, facts.status != .off { RunnerSay(text: say, off: false) }
-                HStack(spacing: Space.s2) {
-                    OfferChip(symbol: "terminal", title: "Terminals", on: facts.terminalsOn)
-                    OfferChip(symbol: "bubble.left", title: "AI sessions", on: facts.agentsOn)
-                }
-                RunnerBars(facts: facts, terminalsHere: terminals)
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Load, last 10 minutes").coreFont(size: MacTextSize.meta).foregroundStyle(
-                            palette.text2)
-                        if let s = model.loadSamples[runner.id], s.count >= 2 {
-                            CoreSpark(s, ceiling: max(0.5, s.max() ?? 0.5)).frame(height: Space.s8 + Space.s2)
-                        } else {
-                            Text("Not reported yet").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Label("Open", systemImage: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).opacity(hovering ? 1 : 0)
-                }
-            }
-            .padding(Space.s4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .coreWell(active: hovering)
-            .contentShape(coreShape(Radius.cardMac))
-        }
-        .buttonStyle(.coreQuietPress)
-        .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
-        .help("Open \(runner.name)")
-        .accessibilityLabel(
-            "\(runner.name), \(facts.chip), \(runner.load) of \(runner.capacity) work slots in use")
-    }
+    public init(model: TerminalsModel) { self.model = model }
+    public var body: some View { RunnersView(model: model) }
 }

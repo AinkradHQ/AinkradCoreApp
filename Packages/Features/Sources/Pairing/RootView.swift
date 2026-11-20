@@ -17,9 +17,15 @@ public struct RootView: View {
                 if app.useTypedCode {
                     FirstRunView(model: app.firstRun) { app.useTypedCode = false }
                 } else {
-                    SetupWizardView(model: app.wizard) { app.useTypedCode = true }
+                    SetupWizardView(
+                        model: app.wizard, useCode: { app.useTypedCode = true },
+                        startTour: { app.tour.beginDetour($0) }
+                    )
+                    .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
                 }
-            case .desktop: ShellView(shell: app.shell)
+            case .desktop:
+                ShellView(shell: app.shell)
+                    .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
             case .blocked(let f): blocked(f)
             }
         }

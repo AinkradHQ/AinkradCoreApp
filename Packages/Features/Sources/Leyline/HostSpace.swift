@@ -18,15 +18,19 @@ struct HostSpaceView: View {
     }
 
     var body: some View {
-        VStack(spacing: Space.s2) {
-            HostTopBar(model: model, host: host, state: state)
-            if let lease = state.direct { DirectBanner(state: state, lease: lease) }
-            HStack(alignment: .top, spacing: Space.s2) {
-                HostRail(model: model)
+        VStack(alignment: .leading, spacing: Space.s3) {
+            if model.section == .overview {
+                HostHero(model: model, host: host, state: state)
+                if let lease = state.direct { DirectBanner(state: state, lease: lease) }
+                HostCards(model: model, host: host, state: state)
+            } else {
+                HostSubpageBar(model: model, host: host)
+                if let lease = state.direct { DirectBanner(state: state, lease: lease) }
                 page
             }
         }
-        .padding(Space.s2)
+        .padding(Space.s4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
         // What the Overview and History pages both show, read once when the space opens.
@@ -96,77 +100,6 @@ struct RouteChips: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Reached through \(hops.joined(separator: ", then "))")
-    }
-}
-
-private struct HostTopBar: View {
-    let model: LeylineModel
-    let host: HostItem
-    let state: HostPageState
-
-    /// Relayed is the default; Mac-direct needs a lease, so choosing it asks Touch ID and choosing Relayed revokes.
-    private var mode: Binding<String> {
-        Binding(
-            get: { state.direct == nil ? "relayed" : "direct" },
-            set: { new in
-                Task { if new == "direct" { await state.startDirect() } else { await state.stopDirect() } }
-            })
-    }
-
-    var body: some View {
-        AppHeader {
-            BackButton("Leyline") { model.closeHost() }
-            Text(host.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-            if let g = host.group { CoreChip(g, minWidth: 0) }
-        } actions: {
-            RouteChips(hops: ["This Mac"] + model.route(host) + [host.name])
-            CoreSegmented(
-                "Route",
-                segments: [CoreSegment("relayed", "Relayed"), CoreSegment("direct", "Mac-direct")],
-                selection: mode
-            )
-            .fixedSize().disabled(state.directBusy || model.readOnly)
-            .help(
-                "Relayed: the key never leaves the Core. Mac-direct: this Mac’s ssh borrows the key for a few minutes.")
-            Button {
-                Task { await state.connect() }
-            } label: {
-                Label("Connect", systemImage: "terminal")
-            }
-            .buttonStyle(CoreButtonStyle(.prominent, busy: state.opening))
-            .disabled(state.opening || model.readOnly).help("Open a terminal on this host")
-            Button {
-                model.section = .commands
-            } label: {
-                Label("Run…", systemImage: "chevron.right.2")
-            }
-            .buttonStyle(CoreButtonStyle(.secondary)).help("Pick a pre-set command to run on this host")
-        }
-        .frame(maxWidth: .infinity)
-        .coreWell(radius: Radius.pane)
-        .accessibilityElement(children: .contain)
-    }
-}
-
-/// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘7 from anywhere in the space.
-private struct HostRail: View {
-    let model: LeylineModel
-    var body: some View {
-        VStack(spacing: Space.s1) {
-            ForEach(HostSection.allCases) { tile($0) }
-            Spacer(minLength: 0)
-        }
-        .padding(Space.s1)
-        .frame(maxHeight: .infinity)
-        .coreWell(radius: Radius.pane)
-        .accessibilityElement(children: .contain)
-    }
-    private func tile(_ s: HostSection) -> some View {
-        CoreIconButton(symbol: s.symbol, label: "\(s.title)  ⌘\(s.key)", selected: model.section == s) {
-            model.section = s
-        }
-        .keyboardShortcut(KeyEquivalent(s.key), modifiers: .command)
-        .accessibilityIdentifier("host-rail-\(s.title)")
     }
 }
 
@@ -367,7 +300,8 @@ struct AccessPage: View {
                         Array(
                             [
                                 "Create a one-time invite", "Copy it to the host over SSH",
-                                "Install the Ainkrad runner (sudo, in a terminal you watch)", "Pair with the Core",
+                                "Install the Ainkrad runner (system service with passwordless sudo, else for this user)",
+                                "Pair with the Core",
                             ].enumerated()), id: \.offset
                     ) { i, step in
                         Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
@@ -385,16 +319,7 @@ struct AccessPage: View {
         }
     }
 
-    private func confirmRunner() {
-        model.host.shell.presentSheet(
-            title: "Make \(host.name) a runner?",
-            message:
-                "Ainkrad copies a one-time invite to the host and opens a terminal that installs the runner as root. You type the sudo password there; Ainkrad never sees it. The invite ends in 15 minutes.",
-            actions: [
-                ShellSheetAction("Cancel"),
-                ShellSheetAction("Make Runner", primary: true) { Task { await state.makeRunner() } },
-            ], symbol: "server.rack")
-    }
+    private func confirmRunner() { state.confirmRunner() }
 
     /// What the install is doing, and, once it paired, which machine claimed the invite: the invite is its own approval, so this
     /// is the person's one check that it is the machine they meant.
@@ -402,16 +327,17 @@ struct AccessPage: View {
         switch state.runnerState {
         case .waiting(let until):
             CoreNotice(
-                symbol: "terminal", title: "Type your sudo password in the terminal",
+                symbol: "arrow.down.circle", title: "Installing the runner",
                 text: until.map {
-                    "Waiting for the runner to pair. The invite ends \($0.formatted(date: .omitted, time: .shortened))."
+                    "Ainkrad is installing it over SSH. The invite ends \($0.formatted(date: .omitted, time: .shortened))."
                 }
-                    ?? "Waiting for the runner to pair.", tone: .queue)
+                    ?? "Ainkrad is installing it over SSH.", tone: .queue)
         case .expired:
             CoreNotice(
                 symbol: "clock.badge.exclamationmark", title: "The invite ended",
-                text: "Nothing was installed and the invite is gone. Start again when you are at the terminal.",
-                tone: .warn)
+                text: "Nothing was installed and the invite is gone. Start again.", tone: .warn)
+        case .failed(let why):
+            CoreNotice(symbol: "exclamationmark.triangle", title: "The install did not finish", text: why, tone: .fail)
         default:
             if let device = host.runnerDevice { claimer(device) }
         }

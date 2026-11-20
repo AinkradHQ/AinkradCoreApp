@@ -6,7 +6,7 @@ import Shell
 /// Debug only: the wizard and Add device by QR in a named state for the snapshot runner. Nothing leaves the app.
 extension AppModel {
     public static let wizardScenes = [
-        "choose", "install", "connect", "connect-filled", "connecting", "mismatch", "badinvite", "offline",
+        "welcome", "choose", "install", "connect", "connect-filled", "connecting", "mismatch", "badinvite", "offline",
     ]
 
     public func debugWizard(_ scene: String) {
@@ -15,7 +15,10 @@ extension AppModel {
         let fp = Wire.b64(Data(repeating: 7, count: 32))
         let link = "ainkrad://connect?host=core.example.com&fp=\(fp)&secret=\(Wire.b64(Data(repeating: 9, count: 16)))"
         switch scene {
-        case "choose": wizard.debugSet(.choose)
+        case "welcome": wizard.debugSet(.choose)
+        case "choose":
+            wizard.getStarted()
+            wizard.debugSet(.choose)
         case "install": wizard.debugSet(.install)
         case "connect": wizard.debugSet(.connect)
         case "connect-filled": wizard.debugSet(.connect, link: link)
