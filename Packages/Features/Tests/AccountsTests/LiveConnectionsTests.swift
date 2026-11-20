@@ -147,7 +147,7 @@ struct LiveConnectionsTests {
     @Test func thePickerListsWhatTheCoreSaysWithItsSecondLine() async throws {
         let core = StubCore([
             "listConnectionResources":
-                ##"{"key":"repos","truncated":true,"resources":[{"id":"maple/harbor-web","name":"maple/harbor-web","updated_at":"2026-11-18T10:00:00.000Z"},{"id":"C1","name":"#build","detail":"14 people"}]}""##
+                ##"{"key":"repos","truncated":true,"resources":[{"id":"maple/harbor-web","name":"maple/harbor-web","updated_at":"2026-11-18T10:00:00.000Z"},{"id":"C1","name":"#build","detail":"14 people"}]}"##
         ])
         let p = try await live(core).picks(1)
         #expect(p.truncated)
