@@ -24,7 +24,7 @@ public protocol AdminHost: AnyObject {
 
 extension AdminHost {
     /// A host that cannot force (a test double) elevates as usual.
-    func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
+    public func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
         async throws -> T
     {
         try await elevated(reason, done: done, keepsEdit: keepsEdit, op)

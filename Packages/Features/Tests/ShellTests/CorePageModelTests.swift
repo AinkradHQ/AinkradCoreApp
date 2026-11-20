@@ -134,12 +134,14 @@ struct CorePageModelTests {
         }
         await m.setKeep(14)
         #expect(asked.count == 1 && m.retention?.keep == 14 && m.backupNote == "Your Core keeps the last 14 backups.")
-        #expect(await core.keepSets == [14])
+        let sets = await core.keepSets
+        #expect(sets == [14])
         // Out of range, or the same number: nothing is asked.
         await m.setKeep(0)
         await m.setKeep(61)
         await m.setKeep(14)
-        #expect(await core.keepSets == [14] && asked.count == 1)
+        let sets2 = await core.keepSets
+        #expect(sets2 == [14] && asked.count == 1)
     }
 
     @Test func aDeclinedUnlockChangesNothingAndARefusalShowsItsWords() async {
@@ -150,7 +152,8 @@ struct CorePageModelTests {
         await m.loadBackups()
         m.gate = { _, _ in throw CancellationError() }
         await m.setKeep(30)
-        #expect(m.retention?.keep == 7 && m.failure == nil && (await core.keepSets).isEmpty)
+        let sets = await core.keepSets
+        #expect(m.retention?.keep == 7 && m.failure == nil && sets.isEmpty)
         m.gate = nil
         await core.setRefuse(true)
         await m.setKeep(30)
@@ -165,6 +168,7 @@ struct CorePageModelTests {
         await m.load()
         await m.loadBackups()
         await m.setKeep(14)
-        #expect(m.retention == nil && (await core.keepSets).isEmpty)
+        let sets = await core.keepSets
+        #expect(m.retention == nil && sets.isEmpty)
     }
 }

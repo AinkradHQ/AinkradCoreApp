@@ -238,7 +238,10 @@ struct GuidedSignInModelTests {
         svc.orderOn = true
         let m = await ready(svc)
         await m.reload()
-        guard let id = m.accounts.first?.id else { return Issue.record("no account") }
+        guard let id = m.accounts.first?.id else {
+            Issue.record("no account")
+            return
+        }
         svc.notes = [id: AccountNotes(wipeNote: AccountNotes.keyringWords, modelsEnforced: false)]
         await m.reloadBindings(svc)
         #expect(m.account(id)?.wipeNote == AccountNotes.keyringWords && m.account(id)?.modelsEnforced == false)
