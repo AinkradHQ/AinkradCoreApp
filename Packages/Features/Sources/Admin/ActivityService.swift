@@ -58,7 +58,7 @@ struct AuditDayStat: Equatable, Sendable, Identifiable {
 
 extension AdminService {
     func supportsV010() async -> Bool { false }
-    func revealSecret(_ name: String) async throws -> RevealedValue { throw Self.unsupported }
+    func revealValue(_ name: String) async throws -> RevealedValue { throw Self.unsupported }
     func exportSecrets() async throws -> [ExportedValue] { throw Self.unsupported }
     func opsHistory() async throws -> [OpsPoint] { [] }
     func hostFacts() async -> CoreHostFacts? { nil }
@@ -77,7 +77,7 @@ extension LiveAdminService {
 
     /// E1's `POST /secrets/{id}/reveal`: no body, and the answer is just `{value}`. The screen keeps the name it asked for, a
     /// text kind (a file secret is never shown, `canShow`), and its own 15 seconds.
-    func revealSecret(_ name: String) async throws -> RevealedValue {
+    func revealValue(_ name: String) async throws -> RevealedValue {
         struct Wire: Decodable { let value: String }
         let w: Wire = try await call("POST", "/api/v1/secrets/\(name)/reveal")
         return RevealedValue(name: name, kind: "text", value: w.value, hideAfter: 15)

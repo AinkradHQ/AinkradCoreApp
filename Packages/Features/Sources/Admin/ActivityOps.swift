@@ -67,7 +67,7 @@ struct OpsHostCards: View {
             guard let u = p.ramUsedBytes, let t = p.ramTotalBytes, t > 0 else { return p.memoryBytes }
             return u / t * 100
         }
-        let disk = ActivityStats.readings(points) { $0.diskUsedPct }
+        let diskSeries = ActivityStats.readings(points) { $0.diskUsedPct }
         let host = ops.host
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
@@ -78,7 +78,7 @@ struct OpsHostCards: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 processor(cpu, host: host)
                 memory(ram, host: host)
-                disk(disk, host: host, last: points.last)
+                disk(diskSeries, host: host, last: points.last)
                 OpsBackupCard(ops: ops, index: 3)
             }
             if let fleet = host?.fleet {
@@ -160,8 +160,8 @@ struct OpsBackupCard: View {
             Text(b?.history.first.map { ActivityWords.last($0.at, now: now) } ?? "None yet")
                 .coreFont(size: MacTextSize.headline, weight: .bold)
             if let b {
+                let days = b.days(7, now: now)
                 HStack(spacing: Space.s1) {
-                    let days = b.days(7, now: now)
                     ForEach(days.indices, id: \.self) { i in
                         coreShape(Radius.chip / 2).fill(days[i] ? palette.primary : palette.track)
                             .frame(width: Space.s4, height: Space.s4)

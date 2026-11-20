@@ -19,7 +19,7 @@ struct BrainPane: View {
             BrainCalmView(brain: model)
                 .coreFont(size: MacTextSize.body)
                 .foregroundStyle(GlassInk.primary)
-                .paneLook(BrainPrefs.shared.look)
+                .paneLook(AppLookPrefs.shared("brain").look)
                 .clipShape(coreShape(Radius.cardMac))
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("brain-pane")

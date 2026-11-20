@@ -1,5 +1,6 @@
 import CoreUI
 import Observation
+import Shell
 import SwiftUI
 
 /// Settings, Apps, Brain: the Look and a way in.

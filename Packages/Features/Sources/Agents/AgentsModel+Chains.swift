@@ -88,13 +88,13 @@ extension AgentsModel {
             }
             bindings.removeAll { $0.agent == agent }
             let chainName = defaultChain.map { "the default chain, \($0.name)" } ?? "the default chain"
-            let undo: (@Sendable @MainActor () -> Void)? =
-                before == nil
-                ? nil
-                : { [weak self] in
+            var undo: (@Sendable @MainActor () -> Void)?
+            if before != nil {
+                undo = { [weak self] in
                     guard let self, let chain = self.chains.first(where: { $0.id == before }) else { return }
                     Task { _ = await self.bind(agent, to: chain) }
                 }
+            }
             shell.showToast("\(agent) is unbound and uses \(chainName).", undo: undo)
         } catch {
             bindingNotices[agent] = failure(error, doing: "Unbinding")

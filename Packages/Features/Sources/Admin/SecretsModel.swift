@@ -218,7 +218,7 @@ final class SecretsModel {
         do {
             let got = try await hub.host.elevated(
                 "Show \(s.name). It hides itself after 15 seconds.", done: "shown", keepsEdit: false
-            ) { try await service.revealSecret(s.name) }
+            ) { try await service.revealValue(s.name) }
             hide()
             let until = Date().addingTimeInterval(got.hideAfter)
             shown = ShownSecret(name: got.name, value: got.value, until: until)

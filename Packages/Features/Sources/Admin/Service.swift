@@ -29,7 +29,7 @@ protocol AdminService: Sendable {
     func metrics() async throws -> String
     /// Core 0.10 (API minor 95): show or export a value, the Core's own history, the audit counts. See `ActivityService.swift`.
     func supportsV010() async -> Bool
-    func revealSecret(_ name: String) async throws -> RevealedValue
+    func revealValue(_ name: String) async throws -> RevealedValue
     func exportSecrets() async throws -> [ExportedValue]
     func opsHistory() async throws -> [OpsPoint]
     /// The whole machine and the runner fleet (nil before Core 0.10), the backup schedule and history, and "back up now".
