@@ -175,7 +175,8 @@ struct AppModelTests {
         m.beatEvery = .milliseconds(20)
         await m.start()
         #expect(m.shell.lock == .open && s.unlocks == 1 && m.isUnlocked)
-        try await Task.sleep(for: .milliseconds(150))
+        // Polled, not one fixed sleep: under the parallel run the main actor is shared and a beat can come late.
+        for _ in 0..<1000 where s.beats < 2 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(s.beats >= 2, "the unlock is held by heartbeat")
         // The Mac locks or sleeps: the Core is told, the card covers the app.
         m.lockApp()

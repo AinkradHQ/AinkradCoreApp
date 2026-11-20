@@ -52,7 +52,8 @@ public final class ConnectionsModel {
     @ObservationIgnored var undoTasks: [Int64: Task<Void, Never>] = [:]
     /// How long "Disconnect" can be undone before the Core really deletes the connection.
     @ObservationIgnored var undoWindow: Duration = .seconds(6)
-    @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// Opens a sign-in page, through the host (a test host only records it).
+    @ObservationIgnored var opener: (URL) -> Void = { _ in }
     /// A macOS notification (id, title, body); the app routes it through the Agents notifier.
     @ObservationIgnored public var notify: ((String, String, String) -> Void)?
     @ObservationIgnored var pollEvery: Duration = .seconds(1)
@@ -61,7 +62,10 @@ public final class ConnectionsModel {
     @ObservationIgnored private var checker: Task<Void, Never>?
     @ObservationIgnored private var catcher: LoopbackCatcher?
 
-    public init(host: any AdminHost) { self.host = host }
+    public init(host: any AdminHost) {
+        self.host = host
+        opener = { [weak host] in host?.open($0) }
+    }
 
     // MARK: connection
 

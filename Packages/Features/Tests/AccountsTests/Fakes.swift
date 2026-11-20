@@ -7,6 +7,9 @@ import Shell
 
 @MainActor
 final class FakeHost: AdminHost {
+    /// Never a real browser: the links a test opened, in order.
+    private(set) var opened: [URL] = []
+    func open(_ url: URL) { opened.append(url) }
     let shell = ShellModel()
     var pausedReason: String?
     var elevationNotice: AdminNotice?

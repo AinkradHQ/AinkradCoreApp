@@ -89,6 +89,11 @@ protocol AccountsService: Sendable {
     func boundRunners() async -> [Int64: String]
     /// What the Core says about leftovers and model enforcement, by account id. Empty when it says nothing.
     func accountNotes() async -> [Int64: AccountNotes]
+    // 0.10 usage meters and model switches. Wire in `AIOrder/UsageWire.swift`; the defaults say "not supported".
+    // Requirements, not extension-only, so a conformer's own answer is the one `any AccountsService` calls.
+    func accountMeters() async -> [Int64: AccountMeterItem]
+    func accountModels(account: Int64) async -> [ModelRowItem]
+    func setModelAllowed(account: Int64, model: String, allowed: Bool) async throws
     // E7-7 (API minor 95): remove with Undo. Wire in `AIOrder/AccountRemovalWire.swift`; the defaults say "not supported".
     /// `DELETE /accounts/{id}`: soft delete. The time the Core keeps it for an Undo (nil when it does not say).
     func removeAccount(_ id: Int64) async throws -> Date?

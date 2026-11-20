@@ -81,8 +81,8 @@ public final class AccountsModel {
     /// The usage limits on an account page, read when it opens.
     var limitsLoad: AccountsLoad = .loading
     var pricesLoad: AccountsLoad = .loading
-    /// Opens a provider's own page. Tests and the demo replace it: they must never open a browser.
-    @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// Opens a provider's own page, through the host (a test host only records it). The demo replaces it.
+    @ObservationIgnored var opener: (URL) -> Void = { _ in }
     @ObservationIgnored var now: () -> Date = { Date() }
 
     /// Connections (GitHub, Jira…): its own pane, driven alongside the accounts.
@@ -91,6 +91,7 @@ public final class AccountsModel {
     public init(host: any AdminHost) {
         self.host = host
         connections = ConnectionsModel(host: host)
+        opener = { [weak host] in host?.open($0) }
     }
 
     // MARK: connection
