@@ -52,7 +52,9 @@ struct AppearanceSection: View {
                         alignment: .leading, spacing: Space.s3
                     ) {
                         ForEach(CoreWallpaper.presets(in: group), id: \.self) { w in
-                            WallpaperTile(choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil) {
+                            WallpaperTile(
+                                choice: w, selected: wallpaper.choice == w, hasPicture: wallpaper.picture != nil
+                            ) {
                                 withAnimation(Motion.out(Motion.ui)) { wallpaper.choice = w }
                             }
                         }
@@ -75,7 +77,8 @@ struct AppearanceSection: View {
     /// the app from the one picture.
     private var picturePage: some View {
         GlassSection(
-            "Your picture", sub: "Drop a picture here, or choose one from your Mac.", symbol: "photo", hue: GlassInk.accent(paneAccent),
+            "Your picture", sub: "Drop a picture here, or choose one from your Mac.", symbol: "photo",
+            hue: GlassInk.accent(paneAccent),
             index: 2
         ) {
             AppActionTile(
@@ -325,7 +328,9 @@ private struct ThemeTile: View {
                             Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(
                                 .white
                             )
-                            .frame(width: 24, height: 24).background(GlassInk.accent(paneAccent), in: coreShape(Radius.chip))
+                            .frame(width: 24, height: 24).background(
+                                GlassInk.accent(paneAccent), in: coreShape(Radius.chip)
+                            )
                             .padding(Space.s2).transition(.scale.combined(with: .opacity))
                         }
                     }

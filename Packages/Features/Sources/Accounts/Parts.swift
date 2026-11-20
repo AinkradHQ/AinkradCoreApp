@@ -186,7 +186,8 @@ struct GateBanner: View {
     var body: some View {
         let g = model.gate
         if g.kind != .real {
-            let hue = g.kind == .off ? GlassInk.slate : g.kind == .throwaway ? GlassInk.accent(paneAccent) : GlassInk.slate
+            let hue =
+                g.kind == .off ? GlassInk.slate : g.kind == .throwaway ? GlassInk.accent(paneAccent) : GlassInk.slate
             HStack(alignment: .center, spacing: Space.s4) {
                 IconTile(
                     g.kind == .off ? "lock.fill" : g.kind == .throwaway ? "testtube.2" : "questionmark", hue: hue,

@@ -27,11 +27,13 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         #else
         let start = true
         #endif
-        controller = SPUStandardUpdaterController(startingUpdater: start, updaterDelegate: self, userDriverDelegate: nil)
+        controller = SPUStandardUpdaterController(
+            startingUpdater: start, updaterDelegate: self, userDriverDelegate: nil)
         showInstalledNews()
         shell.settings.section(
             SettingsSection(
-                id: "updates", group: .mac, title: "Updates", sub: "Ainkrad updates itself", symbol: "arrow.down.circle",
+                id: "updates", group: .mac, title: "Updates", sub: "Ainkrad updates itself",
+                symbol: "arrow.down.circle",
                 order: 6
             ) { UpdatesSection(version: Self.version) { [weak self] in self?.check() } })
     }

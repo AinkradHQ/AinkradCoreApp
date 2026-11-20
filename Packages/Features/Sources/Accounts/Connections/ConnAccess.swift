@@ -28,7 +28,8 @@ enum ConnAccess {
 
     /// The second line of a pick row for something that changed `then`: "Updated today", "3 days ago", "Last month".
     static func updated(_ then: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: then), to: calendar.startOfDay(for: now))
+        let days =
+            calendar.dateComponents([.day], from: calendar.startOfDay(for: then), to: calendar.startOfDay(for: now))
             .day ?? 0
         switch days {
         case ..<1: return "Updated today"

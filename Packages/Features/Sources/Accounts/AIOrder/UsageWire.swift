@@ -190,7 +190,9 @@ extension LiveAccountsService {
         else { return list }
         return list.map { b in
             var b = b
-            if let r = rows.first(where: { $0.id == b.id }) { (b.messageCap, b.messages) = (r.messageCap, r.messages ?? 0) }
+            if let r = rows.first(where: { $0.id == b.id }) {
+                (b.messageCap, b.messages) = (r.messageCap, r.messages ?? 0)
+            }
             return b
         }
     }

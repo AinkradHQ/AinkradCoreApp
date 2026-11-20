@@ -17,7 +17,7 @@ struct UsageWireTests {
         let m = AccountUsageProbe.meters(Data(json.utf8))
         #expect(m.keys.sorted() == [1, 3], "an account with no usage object has no meter")
         #expect(m[1]?.limitHit == true)
-        #expect(m[1]?.stateUntil == Date(timeIntervalSince1970: 1795165200))
+        #expect(m[1]?.stateUntil == Date(timeIntervalSince1970: 1_795_165_200))
         #expect(m[1]?.windowSecs == 604_800)
         #expect(m[3]?.unit == "usd_micros" && m[3]?.windowSecs == 2_592_000)
     }
@@ -29,10 +29,11 @@ struct UsageWireTests {
               {"model": "b"}]}
             """
         let rows = ModelRowsProbe.rows(Data(json.utf8))
-        #expect(rows == [
-            ModelRowItem(model: "a", allowed: false, inputMicro: 3_000_000, outputMicro: 15_000_000),
-            ModelRowItem(model: "b", allowed: true, inputMicro: nil, outputMicro: nil),
-        ])
+        #expect(
+            rows == [
+                ModelRowItem(model: "a", allowed: false, inputMicro: 3_000_000, outputMicro: 15_000_000),
+                ModelRowItem(model: "b", allowed: true, inputMicro: nil, outputMicro: nil),
+            ])
         #expect(ModelRowsProbe.rows(Data(#"{"models": ["a"]}"#.utf8)).isEmpty, "an older Core has no items")
     }
 
@@ -60,7 +61,8 @@ struct UsageSentenceMeterTests {
             UsageSentence.of(UsageFacts(windowSecs: 18_000, used: 60, limit: 900, unit: "messages"), tz: utc)
                 == "60 of 900 messages these 5 hours")
         #expect(
-            UsageSentence.of(UsageFacts(share: 0.38, windowSecs: 604_800, used: 38, limit: 100, unit: "percent"), tz: utc)
+            UsageSentence.of(
+                UsageFacts(share: 0.38, windowSecs: 604_800, used: 38, limit: 100, unit: "percent"), tz: utc)
                 == "38% of this week used")
     }
 }
@@ -79,7 +81,7 @@ struct MeterModelTests {
     }
 
     @Test func theCoresMeterDrivesTheSentenceTheBarAndTheLimitHitChip() async throws {
-        let back = Date(timeIntervalSince1970: 1795165200)
+        let back = Date(timeIntervalSince1970: 1_795_165_200)
         let (m, _) = await make {
             $0.meterList = [
                 1: AccountMeterItem(
@@ -161,7 +163,10 @@ struct LimitBudgetTests {
                 usdCap: nil, spent: 0, usdSpent: 0, held: 0, raised: 0, raisedUSD: 0, warnAt: 80, hardStop: true,
                 exhausted: false, messageCap: cap, messages: 30)
         }
-        let all = [b(1, "7", "week", cap: 900), b(2, "7", "hour5", cap: 60), b(3, "8", "day", cap: 5), b(4, "7", "month", cap: nil)]
+        let all = [
+            b(1, "7", "week", cap: 900), b(2, "7", "hour5", cap: 60), b(3, "8", "day", cap: 5),
+            b(4, "7", "month", cap: nil),
+        ]
         #expect(AccountLimitRules.rows(all, account: 7).map(\.id) == [2, 1])
         #expect(all[1].messageShare == 0.5)
         #expect(all[1].share == 0.5)

@@ -226,7 +226,8 @@ public final class AccountsDemo {
                 state = t.timeIntervalSince(s) > 4.2 ? "done" : t.timeIntervalSince(s) > 1.2 ? "open_url" : "starting"
                 if SignInStyle.of(loginProvider) == .guided {
                     // Waits for a typed line, then finishes a couple of seconds later.
-                    state = guidedSentAt.map { t.timeIntervalSince($0) > 2 ? "done" : "open_url" }
+                    state =
+                        guidedSentAt.map { t.timeIntervalSince($0) > 2 ? "done" : "open_url" }
                         ?? (t.timeIntervalSince(s) > 1.2 ? "open_url" : "starting")
                 }
                 if state == "done" {
@@ -474,7 +475,8 @@ public final class AccountsDemo {
             removedAccount = nil
             accountList.append(r.item)
             // The seat comes back last, as the Core does; the app puts the row back where it stood.
-            orderEntries.append(r.entry ?? AIOrderEntry(account: id, provider: r.item.provider, harness: nil, model: nil))
+            orderEntries.append(
+                r.entry ?? AIOrderEntry(account: id, provider: r.item.provider, harness: nil, model: nil))
         }
     }
 

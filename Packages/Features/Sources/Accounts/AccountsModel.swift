@@ -189,7 +189,13 @@ public final class AccountsModel {
             (providers, accounts, pools) = try await (p, a, o)
             // The Core's own usage meter of each row (0.10); an older Core or a device without `admin` has none.
             let meters = await service.accountMeters()
-            if !meters.isEmpty { accounts = accounts.map { var a = $0; a.meter = meters[a.id]; return a } }
+            if !meters.isEmpty {
+                accounts = accounts.map {
+                    var a = $0
+                    a.meter = meters[a.id]
+                    return a
+                }
+            }
             load = .ready
             await reloadChains(service)
             await reloadAIOrder(service)

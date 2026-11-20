@@ -162,7 +162,9 @@ private struct RoomPane: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: Space.s3) {
-            IconTile(room.lock == nil ? "folder" : "lock", hue: room.lock == nil ? GlassInk.accent(paneAccent) : GlassInk.slate)
+            IconTile(
+                room.lock == nil ? "folder" : "lock",
+                hue: room.lock == nil ? GlassInk.accent(paneAccent) : GlassInk.slate)
             VStack(alignment: .leading, spacing: 2) {
                 Text(room.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 Text(line).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)

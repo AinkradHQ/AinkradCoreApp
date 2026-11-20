@@ -11,7 +11,8 @@ import Testing
     }
 
     @Test func theAppIsOldOnlyWhenTheCoreSaysSo() {
-        #expect(CoreSkew.appTooOld(app: "0.10.0", minApp: "0.10.1") && !CoreSkew.appTooOld(app: "0.10.1", minApp: "0.10.1"))
+        #expect(
+            CoreSkew.appTooOld(app: "0.10.0", minApp: "0.10.1") && !CoreSkew.appTooOld(app: "0.10.1", minApp: "0.10.1"))
         #expect(!CoreSkew.appTooOld(app: "0.10.0", minApp: nil) && !CoreSkew.appTooOld(app: "dev", minApp: "0.10.1"))
     }
 

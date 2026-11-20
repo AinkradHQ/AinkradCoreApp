@@ -24,7 +24,8 @@ struct ProjectLimits: Equatable, Sendable {
 
     static func decode(_ data: Data) throws -> ProjectLimits {
         let w = try JSONDecoder().decode(Wire.self, from: data)
-        return ProjectLimits(cpus: w.cpu_limit, memoryMb: w.mem_limit_mb, idleMinutes: w.idle_minutes, idleNever: w.idle_never)
+        return ProjectLimits(
+            cpus: w.cpu_limit, memoryMb: w.mem_limit_mb, idleMinutes: w.idle_minutes, idleNever: w.idle_never)
     }
 
     func encoded() throws -> Data {
@@ -41,7 +42,9 @@ struct ProjectLimits: Equatable, Sendable {
     static let openInKey = "openIn"
 
     static var showArchived: Bool { options.bool(showArchivedKey, false) }
-    static var openIn: OpenIn { OpenIn(rawValue: options.string(openInKey, OpenIn.newWorkspace.rawValue)) ?? .newWorkspace }
+    static var openIn: OpenIn {
+        OpenIn(rawValue: options.string(openInKey, OpenIn.newWorkspace.rawValue)) ?? .newWorkspace
+    }
 
     enum OpenIn: String, CaseIterable {
         case newWorkspace = "new", thisWorkspace = "this"
@@ -89,7 +92,9 @@ struct ProjectsOptionsTab: View {
                             selection: Binding(
                                 get: { ProjectsOptions.coreChoice(l) },
                                 set: { n in model.saveLimits { $0.cpus = Double(n) } }),
-                            options: ProjectsOptions.cores.map { CoreSelectOption($0, $0 == 1 ? "1 core" : "\($0) cores") })
+                            options: ProjectsOptions.cores.map {
+                                CoreSelectOption($0, $0 == 1 ? "1 core" : "\($0) cores")
+                            })
                         OptionSelectRow(
                             "Memory", sub: "The most a project can use", symbol: "memorychip",
                             selection: Binding(
@@ -120,7 +125,8 @@ struct ProjectsOptionsTab: View {
                             }))
                     OptionSelectRow(
                         "Open projects in", symbol: "rectangle.on.rectangle",
-                        selection: options.text(ProjectsOptions.openInKey, ProjectsOptions.OpenIn.newWorkspace.rawValue),
+                        selection: options.text(
+                            ProjectsOptions.openInKey, ProjectsOptions.OpenIn.newWorkspace.rawValue),
                         options: ProjectsOptions.OpenIn.allCases.map { CoreSelectOption($0.rawValue, $0.title) })
                 }
             }

@@ -61,8 +61,10 @@ struct DesignOptionsTab: View {
     let options = DesignOptions.options
 
     var body: some View {
-        GlassSection("Canvas", sub: "How a design is laid out and where it starts", symbol: "square.dashed", hue: GlassInk.accent(paneAccent))
-        {
+        GlassSection(
+            "Canvas", sub: "How a design is laid out and where it starts", symbol: "square.dashed",
+            hue: GlassInk.accent(paneAccent)
+        ) {
             VStack(spacing: Space.s2) {
                 OptionSwitchRow(
                     "Snap to grid", sub: "Positions and sizes typed in the inspector land on an 8 pt grid",

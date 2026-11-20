@@ -130,7 +130,8 @@ struct CoreUpdatesTab: View {
         let h = shell.home.health
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Updates", sub: "Core, runners and this app", symbol: "arrow.down.circle", hue: GlassInk.accent(paneAccent)
+                "Updates", sub: "Core, runners and this app", symbol: "arrow.down.circle",
+                hue: GlassInk.accent(paneAccent)
             ) {
                 VStack(spacing: Space.s2) {
                     fact("Core version", value: h?.version ?? "Not reported yet")
@@ -190,7 +191,8 @@ struct CoreBackupTab: View {
     var body: some View {
         let h = shell.home.health
         let b = shell.corePage.backups
-        GlassSection("Backup", sub: "Kept safe on your Core", symbol: "externaldrive", hue: GlassInk.accent(paneAccent)) {
+        GlassSection("Backup", sub: "Kept safe on your Core", symbol: "externaldrive", hue: GlassInk.accent(paneAccent))
+        {
             VStack(spacing: Space.s2) {
                 fact("Last backup", value: h?.backup(now: Date()) ?? "Not reported yet")
                 if let words = b?.scheduleWords { fact("Runs", "On the Core machine", value: words) }
@@ -333,7 +335,9 @@ struct CoreLogsTab: View {
     @Bindable var shell: ShellModel
 
     var body: some View {
-        GlassSection("Recent", sub: "Who did what, where and when", symbol: "doc.text", hue: GlassInk.accent(paneAccent)) {
+        GlassSection(
+            "Recent", sub: "Who did what, where and when", symbol: "doc.text", hue: GlassInk.accent(paneAccent)
+        ) {
             HStack {
                 Text("The audit log lists what happened on your Core.").foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s3)

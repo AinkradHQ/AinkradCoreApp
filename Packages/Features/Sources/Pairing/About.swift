@@ -87,8 +87,12 @@ struct AboutBlock: View {
     private func details(_ a: CoreAbout) -> some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                fact("shippingbox.fill", GlassInk.accent(paneAccent), "Core version", a.server, help: a.build.map { "Build \($0)" })
-                fact("number", GlassInk.accent(paneAccent), "API", "Minor \(a.apiMinor)", help: "API \(AboutWords.api(a))")
+                fact(
+                    "shippingbox.fill", GlassInk.accent(paneAccent), "Core version", a.server,
+                    help: a.build.map { "Build \($0)" })
+                fact(
+                    "number", GlassInk.accent(paneAccent), "API", "Minor \(a.apiMinor)",
+                    help: "API \(AboutWords.api(a))")
                 fact("laptopcomputer", GlassInk.accent(paneAccent), "This device", a.device, help: nil)
             }
             .fixedSize(horizontal: false, vertical: true)

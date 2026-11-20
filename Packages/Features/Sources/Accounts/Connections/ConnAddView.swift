@@ -90,7 +90,9 @@ struct ConnAddView: View {
                 IconTile("link", hue: GlassInk.blue, size: 72, bounce: false).connFloat(phase: ConnMotion.heroPhase)
             }
             .padding(.top, Space.s6)
-            head("Finish signing in on \(name)", "We opened \(name) in your browser. Sign in there, then come back here.")
+            head(
+                "Finish signing in on \(name)", "We opened \(name) in your browser. Sign in there, then come back here."
+            )
             if let code = model.flow?.userCode { codeBox(code) }
             HStack(spacing: Space.s3) {
                 CoreWorkingBar(width: Space.s8 * 4 + Space.s3)
@@ -128,9 +130,12 @@ struct ConnAddView: View {
             IconTile("exclamationmark.triangle", hue: GlassInk.red, size: 72, bounce: false).padding(.top, Space.s6)
             Text("Sign-in didn't finish").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
-            Text(title == ConnSay.expiredTitle ? "We didn't hear back from \(name). Nothing was connected." : "\(title) \(fix)")
-                .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                title == ConnSay.expiredTitle
+                    ? "We didn't hear back from \(name). Nothing was connected." : "\(title) \(fix)"
+            )
+            .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
             if gated { TurnOnConnections(model: model) { model.retrySignIn() } }
             HStack(spacing: Space.s2) {
                 if notSet, let k = kind {
@@ -152,7 +157,9 @@ struct ConnAddView: View {
             head("Which \(name) site?", "You have more than one. Connect the other later if you need it.")
             VStack(spacing: Space.s1) {
                 ForEach(sites, id: \.self) { s in
-                    Button { site = s } label: {
+                    Button {
+                        site = s
+                    } label: {
                         HStack {
                             Text(s)
                             Spacer()
@@ -204,7 +211,9 @@ struct ConnAddView: View {
         let on = Binding(get: { a.isOn(c) }, set: { _ in model.add?.toggle(c.id) })
         let dim = c.writes && a.mode == .read
         return HStack(spacing: Space.s3) {
-            IconTile(c.writes ? "bolt" : "eye", hue: c.writes ? GlassInk.amber : GlassInk.green, size: 32, bounce: on.wrappedValue)
+            IconTile(
+                c.writes ? "bolt" : "eye", hue: c.writes ? GlassInk.amber : GlassInk.green, size: 32,
+                bounce: on.wrappedValue)
             VStack(alignment: .leading, spacing: 0) {
                 Text(c.title).coreFont(size: MacTextSize.body, weight: .semibold)
                 Text(c.say).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
@@ -255,11 +264,14 @@ struct ConnAddView: View {
         switch model.picks {
         case .idle, .loading:
             VStack(spacing: Space.s1 + 2) {
-                ForEach(0..<3, id: \.self) { _ in CoreSkeleton(coreShape(Radius.control)).frame(height: Space.s8 + Space.s2) }
+                ForEach(0..<3, id: \.self) { _ in
+                    CoreSkeleton(coreShape(Radius.control)).frame(height: Space.s8 + Space.s2)
+                }
             }
             .accessibilityLabel("Loading \(noun)")
         case .failed(let why):
-            CoreNotice(symbol: "exclamationmark.triangle", title: "Couldn't read your \(noun)", text: why, tone: .fail) {
+            CoreNotice(symbol: "exclamationmark.triangle", title: "Couldn't read your \(noun)", text: why, tone: .fail)
+            {
                 Button("Try again") { Task { await model.loadPicks() } }.buttonStyle(CoreButtonStyle(.secondary))
             }
         case .ready(let p):
@@ -273,7 +285,8 @@ struct ConnAddView: View {
                         ForEach(rows) { r in
                             CoreCheckbox(
                                 r.name, detail: ConnAccess.line(r),
-                                isOn: Binding(get: { a.picked.contains(r.id) }, set: { _ in model.add?.toggle(pick: r.id) }),
+                                isOn: Binding(
+                                    get: { a.picked.contains(r.id) }, set: { _ in model.add?.toggle(pick: r.id) }),
                                 icon: a.kind == "github" ? "folder" : "doc.text"  // the mockup: folder for GitHub, doc for the rest
                             )
                             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)

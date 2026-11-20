@@ -234,7 +234,8 @@ private struct EgressView: View {
                             blockedBy: c.block.map { BrainWords.blockedBy($0.ruleName) }, help: c.id,
                             chip: c.block != nil
                                 ? ("Blocked", GlassInk.red)
-                                : c.stayedHere ? ("Stayed here", GlassInk.slate) : ("Sent", GlassInk.accent(paneAccent)),
+                                : c.stayedHere
+                                    ? ("Stayed here", GlassInk.slate) : ("Sent", GlassInk.accent(paneAccent)),
                             selected: a.selectedID == c.id, fresh: false
                         ) { a.selectedID = c.id }
                     }

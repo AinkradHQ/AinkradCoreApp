@@ -16,7 +16,9 @@ struct RunnerBucketTests {
     }
 
     @Test func theHeaderSentenceCountsWhatIsBusyOrDown() {
-        #expect(RunnerBucket.sentence([runner(), runner("r2"), runner("r3", online: false)]) == " 2 are busy, 1 is offline.")
+        #expect(
+            RunnerBucket.sentence([runner(), runner("r2"), runner("r3", online: false)]) == " 2 are busy, 1 is offline."
+        )
         #expect(RunnerBucket.sentence([]) == "")
     }
 
@@ -32,10 +34,12 @@ struct RunnerBucketTests {
         #expect(RunnerBucket.of(runner(online: false), updating: true) == .offline)
         #expect(RunnerBucket.of(runner(), updating: false) == .working)
         #expect(RunnerBucket.updating.chip == "Updating")
-        #expect(RunnerBucket.sentence([runner("r1"), runner("r2")], updating: ["r2"]) == " 1 is busy, 1 is getting ready.")
+        #expect(
+            RunnerBucket.sentence([runner("r1"), runner("r2")], updating: ["r2"]) == " 1 is busy, 1 is getting ready.")
         #expect(RunnerRow.line(runner(), .updating, terminals: 0) == "Getting ready · installing tools")
         let i = ToolInstall(op: "o", tool: "node", state: .running, percent: 64, step: "")
-        #expect(RunnerRow.line(runner(), .updating, terminals: 0, install: i) == "Getting ready · installing Node.js · 64%")
+        #expect(
+            RunnerRow.line(runner(), .updating, terminals: 0, install: i) == "Getting ready · installing Node.js · 64%")
     }
 
     @MainActor @Test func theCoreReportsInstallsOnlyFromMinor95() {

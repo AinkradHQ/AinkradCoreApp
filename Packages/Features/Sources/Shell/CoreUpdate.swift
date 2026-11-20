@@ -4,7 +4,11 @@ import SwiftUI
 
 /// Where the Core's self-update stands (`GET /system/update`, E12-3): the words and step states of the mockup's Core pop-up.
 public struct CoreUpdateStatus: Equatable, Sendable {
-    public enum Phase: String, Sendable { case idle, snapshot, install, health, done, rolledBack = "rolled_back", failed }
+    public enum Phase: String, Sendable {
+        case idle, snapshot, install, health, done
+        case rolledBack = "rolled_back"
+        case failed
+    }
     public enum StepState: Sendable { case wait, now, done, fail }
     public struct Event: Equatable, Sendable {
         public var at: Date
@@ -63,7 +67,11 @@ public struct CoreUpdateStatus: Equatable, Sendable {
     /// The decoded answer; nil when it is not the contract's.
     public static func decode(_ data: Data) -> CoreUpdateStatus? {
         struct Wire: Decodable {
-            struct E: Decodable { var at: Int64?; var step: String?; var text: String? }
+            struct E: Decodable {
+                var at: Int64?
+                var step: String?
+                var text: String?
+            }
             var current: String?
             var state: String?
             var available: String?

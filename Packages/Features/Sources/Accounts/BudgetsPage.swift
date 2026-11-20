@@ -62,7 +62,9 @@ struct BudgetsPage: View {
                     symbol: "exclamationmark.triangle", title: "Could not load budgets",
                     text: "The Core answered with an error. \(message)", tone: .fail, code: code
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
+                    AppActionTile(
+                        title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)
+                    ) {
                         Task { await model.reloadBudgets() }
                     }
                 }
@@ -70,9 +72,12 @@ struct BudgetsPage: View {
                 verdict
                 let mine = model.budgets.filter { ["account", "pool"].contains($0.kind) }
                 let theirs = model.budgets.filter { !["account", "pool"].contains($0.kind) }
-                if !mine.isEmpty { section("Accounts and pools", "creditcard.fill", GlassInk.accent(paneAccent), mine, 0) }
+                if !mine.isEmpty {
+                    section("Accounts and pools", "creditcard.fill", GlassInk.accent(paneAccent), mine, 0)
+                }
                 if !theirs.isEmpty {
-                    section("AI sessions, companies and projects", "person.3.fill", GlassInk.accent(paneAccent), theirs, 1)
+                    section(
+                        "AI sessions, companies and projects", "person.3.fill", GlassInk.accent(paneAccent), theirs, 1)
                 }
             }
         }
@@ -198,7 +203,8 @@ private struct BudgetCard: View {
                         }
                     }
                     AppActionTile(
-                        title: "Edit", symbol: "slider.horizontal.3", key: selected ? "E" : "", hue: GlassInk.accent(paneAccent)
+                        title: "Edit", symbol: "slider.horizontal.3", key: selected ? "E" : "",
+                        hue: GlassInk.accent(paneAccent)
                     ) { AccountDialogs.openBudget(model, editing: b) }
                     AppActionTile(title: "Remove", symbol: "trash", key: selected ? "⌫" : "", hue: GlassInk.slate) {
                         AccountDialogs.openDeleteBudget(model, b)
@@ -221,7 +227,8 @@ private struct BudgetCard: View {
     }
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {
-        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.amber : GlassInk.accent(paneAccent)
+        let hue =
+            share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.amber : GlassInk.accent(paneAccent)
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)

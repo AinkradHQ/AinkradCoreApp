@@ -7,7 +7,8 @@ import Testing
 struct BrainGlanceTests {
     private func data(_ activity: String, learned: String = "[]") throws -> GlanceData {
         let d = JSONDecoder()
-        let areas = #"{"areas":[{"area":"rules","count":38,"today":1,"latest":null},{"area":"me","count":14,"today":0,"latest":null}],"places":21,"evidence":4,"locked_rooms":0}"#
+        let areas =
+            #"{"areas":[{"area":"rules","count":38,"today":1,"latest":null},{"area":"me","count":14,"today":0,"latest":null}],"places":21,"evidence":4,"locked_rooms":0}"#
         return GlanceData(
             activity: try d.decode(GlanceActivity.self, from: Data(activity.utf8)),
             areas: try d.decode(GlanceAreas.self, from: Data(areas.utf8)),
@@ -28,7 +29,9 @@ struct BrainGlanceTests {
 
     @Test func idleHasNoFlowAndANeedIsSaidInWords() throws {
         let idle = BrainGlanceMaker.glance(
-            try data(#"{"state":"idle","health":"ok","rooms":3,"distilling":0,"queued":0,"overviews":0,"failed":0,"needs":[]}"#))
+            try data(
+                #"{"state":"idle","health":"ok","rooms":3,"distilling":0,"queued":0,"overviews":0,"failed":0,"needs":[]}"#
+            ))
         #expect(idle.flowStep == nil && idle.doing == nil && idle.learned == 0)
         let needy = BrainGlanceMaker.glance(
             try data(

@@ -98,12 +98,15 @@ private struct ChainDetail: View {
                 }
                 Spacer(minLength: Space.s2)
                 if !chain.isDefault {
-                    AppActionTile(title: "Make default", symbol: "checkmark.circle", key: "D", hue: GlassInk.accent(paneAccent)) {
+                    AppActionTile(
+                        title: "Make default", symbol: "checkmark.circle", key: "D", hue: GlassInk.accent(paneAccent)
+                    ) {
                         Task { await model.makeDefault(chain) }
                     }
                     .disabled(ro || model.busy != nil)
                 }
-                AppActionTile(title: "Edit…", symbol: "slider.horizontal.3", key: "E", hue: GlassInk.accent(paneAccent)) {
+                AppActionTile(title: "Edit…", symbol: "slider.horizontal.3", key: "E", hue: GlassInk.accent(paneAccent))
+                {
                     AccountDialogs.openChain(model, editing: chain)
                 }
                 .disabled(ro)
@@ -132,7 +135,9 @@ private struct ChainDetail: View {
                     )
                     .coreFont(size: MacTextSize.body).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Space.s2)
-                    AppActionTile(title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent)) {
+                    AppActionTile(
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent)
+                    ) {
                         model.openChainBinding()
                     }
                     .accessibilityIdentifier("chain-bind-open")

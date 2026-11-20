@@ -3,7 +3,8 @@ import Foundation
 /// The five steps of the guided Add (D-21): pick a service, sign in on its own website, what AI may do, which
 /// repositories (or projects, teams, channels), done.
 enum ConnStep: Int, CaseIterable, Sendable {
-    case service = 1, signIn, allow, choose, done
+    case service = 1
+    case signIn, allow, choose, done
 }
 
 /// Read only, or read and change.

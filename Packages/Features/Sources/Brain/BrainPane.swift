@@ -112,18 +112,23 @@ struct BrainPane: View {
             SyncNowTile(sync: sync)
         } else if model.service?.importRoutes != nil, model.load == .ready, model.setup != .ready || model.rooms.isEmpty
         {
-            AppActionTile(title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.accent(paneAccent)) {
+            AppActionTile(
+                title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.accent(paneAccent)
+            ) {
                 model.openImport()
             }
         }
         if model.currentTab == .rooms, model.load == .ready, model.canMakeRooms {
             AppActionTile(
-                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)
+                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N",
+                hue: GlassInk.accent(paneAccent)
             ) {
                 BrainSheets.openNewRoom(model)
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
-            AppActionTile(title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
+            AppActionTile(
+                title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+            ) {
                 Task { await model.quickRoom() }
             }
             .keyboardShortcut("n", modifiers: .command)

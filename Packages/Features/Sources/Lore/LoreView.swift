@@ -37,7 +37,9 @@ struct LoreView: View {
         .coreFont(size: MacTextSize.body)
         .animation(Motion.out(Motion.ui), value: model.notice)
         .appLook(AppLookPrefs.shared("lore"))
-        .onAppear { model.editor?.setTextScale(LoreOptions.scale(LoreOptions.options.string(LoreOptions.textSize, "medium"))) }
+        .onAppear {
+            model.editor?.setTextScale(LoreOptions.scale(LoreOptions.options.string(LoreOptions.textSize, "medium")))
+        }
         .onChange(of: LoreOptions.options.string(LoreOptions.textSize, "medium")) { _, id in
             model.editor?.setTextScale(LoreOptions.scale(id))
         }

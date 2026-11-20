@@ -12,6 +12,7 @@ struct ConnMotionTests {
             let y = ConnMotion.floatOffset(at: t, reduce: false)
             #expect(y <= 0 && y >= -ConnMotion.floatLift - 0.0001)
         }
-        #expect(abs(ConnMotion.floatOffset(at: ConnMotion.floatPeriod / 2, reduce: false) + ConnMotion.floatLift) < 0.0001)
+        #expect(
+            abs(ConnMotion.floatOffset(at: ConnMotion.floatPeriod / 2, reduce: false) + ConnMotion.floatLift) < 0.0001)
     }
 }

@@ -22,7 +22,8 @@ struct ProviderLimitsTests {
     @Test func thePickerListsEachProviderOfTheOrderOnceInOrder() async {
         let (m, _) = await make()
         #expect(m.limitProviders == ["claude-sub", "anthropic", "openrouter"])
-        #expect(m.limitOptions.map(\.value) == [.provider("claude-sub"), .provider("anthropic"), .provider("openrouter")])
+        #expect(
+            m.limitOptions.map(\.value) == [.provider("claude-sub"), .provider("anthropic"), .provider("openrouter")])
         #expect(m.limitTarget == .provider("claude-sub"), "the first provider until one is picked")
         #expect(AccountLimitRules.providers(of: []).isEmpty)
     }
@@ -52,8 +53,10 @@ struct ProviderLimitsTests {
                 usdCap: nil, spent: 0, usdSpent: 0, held: 0, raised: 0, raisedUSD: 0, warnAt: 80, hardStop: true,
                 exhausted: false, messageCap: 50, messages: 1)
         }
-        let all = [b(1, "provider", "anthropic", "week"), b(2, "provider", "anthropic", "hour5"),
-                   b(3, "account", "2", "day"), b(4, "provider", "openrouter", "day")]
+        let all = [
+            b(1, "provider", "anthropic", "week"), b(2, "provider", "anthropic", "hour5"),
+            b(3, "account", "2", "day"), b(4, "provider", "openrouter", "day"),
+        ]
         #expect(AccountLimitRules.rows(all, target: .provider("anthropic")).map(\.id) == [2, 1])
         #expect(AccountLimitRules.rows(all, target: .account(2)).map(\.id) == [3])
         #expect(AccountLimitRules.rows(all, account: 2).map(\.id) == [3])

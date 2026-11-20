@@ -9,7 +9,8 @@ extension ProjectsModel {
     var limitsNote: String {
         switch limitsState {
         case .loading: "Reading the Core…"
-        case .unsupported: "This Core is older than the one that sets what a project may use. Update it to set them here."
+        case .unsupported:
+            "This Core is older than the one that sets what a project may use. Update it to set them here."
         case .failed: "The Core did not answer. Open this page again to retry."
         case .ready: ""
         }
@@ -41,7 +42,8 @@ extension ProjectsModel {
         Task {
             do {
                 try await host.elevated(
-                    "Change what a running project may use. It applies to every project.", done: "saved", keepsEdit: false
+                    "Change what a running project may use. It applies to every project.", done: "saved",
+                    keepsEdit: false
                 ) { try await service.setLimits(next) }
                 await reload()
             } catch is AdminDeclined {

@@ -10,11 +10,15 @@ struct RunnersOptionsTab: View {
     let app: AppModel
 
     var body: some View {
-        GlassSection("Runners", sub: "The machines that do the work for your Core", symbol: "server.rack", hue: GlassInk.accent(paneAccent)) {
+        GlassSection(
+            "Runners", sub: "The machines that do the work for your Core", symbol: "server.rack",
+            hue: GlassInk.accent(paneAccent)
+        ) {
             VStack(spacing: Space.s2) {
                 if app.shell.corePage.supported {
                     OptionSwitchRow(
-                        "Update runners automatically", sub: "At night, one at a time. The same switch as Core, Updates",
+                        "Update runners automatically",
+                        sub: "At night, one at a time. The same switch as Core, Updates",
                         symbol: "arrow.down.circle",
                         isOn: Binding(
                             get: { app.shell.corePage.prefs.autoUpdate },
@@ -29,7 +33,8 @@ struct RunnersOptionsTab: View {
                         "Use this Mac as a runner", sub: "Only while you are signed in", symbol: "desktopcomputer",
                         isOn: Binding(
                             get: { app.macRunner.useThisMac },
-                            set: { on in Task { await app.macRunner.setUseThisMac(on) } }))
+                            set: { on in Task { await app.macRunner.setUseThisMac(on) } })
+                    )
                     .disabled(app.macRunner.isBusy)
                 }
             }

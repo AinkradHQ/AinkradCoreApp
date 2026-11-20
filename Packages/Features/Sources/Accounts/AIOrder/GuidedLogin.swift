@@ -48,7 +48,9 @@ enum GuidedInput {
         if provider == "agy-sub" { return agy(line) }
         if line.count > maxLength { return .tooLong }
         // One printable line: a newline or any other control character would be a second keystroke.
-        if line.unicodeScalars.contains(where: { $0.properties.generalCategory == .control || $0.properties.generalCategory == .format }) {
+        if line.unicodeScalars.contains(where: {
+            $0.properties.generalCategory == .control || $0.properties.generalCategory == .format
+        }) {
             return .badCharacters
         }
         return .send(line)
@@ -59,7 +61,9 @@ enum GuidedInput {
         let n = line.utf8.count
         if n > 256 { return .tooLong }
         let ascii = line.unicodeScalars.allSatisfy { $0.isASCII }
-        if (1...2).contains(n) { return ascii && line.unicodeScalars.allSatisfy { ("0"..."9").contains($0) } ? .send(line) : .badCharacters }
+        if (1...2).contains(n) {
+            return ascii && line.unicodeScalars.allSatisfy { ("0"..."9").contains($0) } ? .send(line) : .badCharacters
+        }
         if n < 8 { return .badCharacters }
         return ascii && line.unicodeScalars.allSatisfy { allowed($0) || $0 == "/" } ? .send(line) : .badCharacters
     }
@@ -74,7 +78,8 @@ enum GuidedInput {
         case .send, .empty: return nil
         case .tooLong: return "That is too long for a choice or a code. \(h)"
         case .badCharacters:
-            return provider == "agy-sub" ? "That is not a choice number or a code. \(h)" : "One printable line only. \(h)"
+            return provider == "agy-sub"
+                ? "That is not a choice number or a code. \(h)" : "One printable line only. \(h)"
         }
     }
 }

@@ -147,7 +147,8 @@ struct AgentSettingsView: View {
                     }
                 }
                 GlassSection(
-                    "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape", hue: GlassInk.accent(paneAccent),
+                    "Defaults", sub: "What New session (⌘N) starts with.", symbol: "gearshape",
+                    hue: GlassInk.accent(paneAccent),
                     index: 2
                 ) {
                     SettingRow("Harness", symbol: "cpu") {

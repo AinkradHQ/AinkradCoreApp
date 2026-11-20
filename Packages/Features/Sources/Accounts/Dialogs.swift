@@ -299,7 +299,8 @@ struct AccountsLinkSection: View {
                     symbol: "creditcard.fill", hue: GlassInk.accent(paneAccent), index: 1
                 ) {
                     AppActionTile(
-                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent), prominent: true
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent),
+                        prominent: true
                     ) {
                         model.host.shell.overlay = nil
                         model.show(.accounts)

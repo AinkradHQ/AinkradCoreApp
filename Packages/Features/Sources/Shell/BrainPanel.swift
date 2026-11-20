@@ -55,8 +55,11 @@ struct BrainPanel: View {
         HStack(spacing: Space.s2) {
             ForEach(Array(Self.steps.enumerated()), id: \.offset) { i, s in
                 HStack(spacing: Space.s1) {
-                    Image(systemName: i < now ? "checkmark" : s.1).font(.system(size: MacTextSize.meta, weight: .semibold))
-                        .foregroundStyle(i == now ? palette.tone(.run).ink : i < now ? palette.tone(.done).ink : palette.text2)
+                    Image(systemName: i < now ? "checkmark" : s.1).font(
+                        .system(size: MacTextSize.meta, weight: .semibold)
+                    )
+                    .foregroundStyle(
+                        i == now ? palette.tone(.run).ink : i < now ? palette.tone(.done).ink : palette.text2)
                     Text(s.0).coreFont(size: MacTextSize.meta, weight: i == now ? .semibold : .regular)
                         .foregroundStyle(i > now ? palette.text2 : palette.text)
                 }
@@ -71,9 +74,13 @@ struct BrainPanel: View {
     }
 
     private func stat(_ s: BrainGlance.Stat) -> some View {
-        Button { open(s.area) } label: { DropStat("\(s.count)", s.label) }
-            .buttonStyle(.plain)
-            .accessibilityHint(s.area == nil ? "" : "Opens \(s.label) in Brain")
+        Button {
+            open(s.area)
+        } label: {
+            DropStat("\(s.count)", s.label)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(s.area == nil ? "" : "Opens \(s.label) in Brain")
     }
 
     private func learned(_ n: Int) -> some View {

@@ -70,7 +70,10 @@ extension AccountsModel {
     func limitTargetName(_ t: LimitTarget) -> String {
         switch t {
         case .provider(let p): ProviderCatalog.name(p, fallback: providerName(p))
-        case .account(let id): account(id).map { "\(ProviderCatalog.name($0.provider, fallback: providerName($0.provider))) · \($0.label)" }
+        case .account(let id):
+            account(id).map {
+                "\(ProviderCatalog.name($0.provider, fallback: providerName($0.provider))) · \($0.label)"
+            }
                 ?? "Account \(id)"
         }
     }
@@ -78,7 +81,9 @@ extension AccountsModel {
     /// The picker: every provider, and the one account when Limits… was opened from its row.
     var limitOptions: [CoreSelectOption<LimitTarget>] {
         var all = limitProviders.map { CoreSelectOption(LimitTarget.provider($0), limitTargetName(.provider($0))) }
-        if case .account? = limitTarget, let t = limitTarget { all.insert(CoreSelectOption(t, limitTargetName(t)), at: 0) }
+        if case .account? = limitTarget, let t = limitTarget {
+            all.insert(CoreSelectOption(t, limitTargetName(t)), at: 0)
+        }
         return all
     }
 }
@@ -99,8 +104,9 @@ struct BudgetLimitRows: View {
                 Text(
                     target.kind == "provider"
                         ? "No limit. Add one to cap the messages all accounts of this provider may use in a window."
-                        : "No limit. Add one to cap the messages this account may use in a window.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        : "No limit. Add one to cap the messages this account may use in a window."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
             if adding { BudgetLimitRow(model: model, target: target, existing: nil) { adding = false } }
             if let e = model.writeError["budget"] { AccIssue(text: e) }

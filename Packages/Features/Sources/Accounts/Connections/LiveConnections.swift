@@ -81,7 +81,9 @@ struct LiveConnectionsService: ConnectionsService {
         return try await run {
             let r = try await client.listConnectionResources(path: .init(id: String(id)), query: .init()).ok.body.json
             return ConnPicks(
-                items: r.resources.map { ConnPick(id: $0.id, name: $0.name, detail: $0.detail, updatedAt: $0.updatedAt) },
+                items: r.resources.map {
+                    ConnPick(id: $0.id, name: $0.name, detail: $0.detail, updatedAt: $0.updatedAt)
+                },
                 truncated: r.truncated)
         }
     }
@@ -274,7 +276,8 @@ struct LiveConnectionsService: ConnectionsService {
         let token = k.authMethods.first { $0.id == "token" && $0.available }
         let limit = k.limits.first
         return ConnKind(
-            id: k.kind, name: k.title, say: k.summary, signIn: k.kind == "github" || k.kind == "teams" ? .deviceCode : .browser,
+            id: k.kind, name: k.title, say: k.summary,
+            signIn: k.kind == "github" || k.kind == "teams" ? .deviceCode : .browser,
             resource: limit?.title.lowercased() ?? "places",
             capabilities: k.capabilities.map {
                 ConnCapability(
@@ -335,7 +338,9 @@ struct LiveConnectionsService: ConnectionsService {
         let step: ConnFlow.Step =
             switch f.step {
             case "connected":
-                if let c = f.connection { .connected(c) } else {
+                if let c = f.connection {
+                    .connected(c)
+                } else {
                     failed(f, service)
                 }
             case "choose_site": .pickSite(f.sites.map(\.name))

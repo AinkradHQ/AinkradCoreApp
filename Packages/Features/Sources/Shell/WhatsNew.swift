@@ -34,7 +34,9 @@ public enum WhatsNewStore {
         defaults.set(["version": version, "notes": lines.joined(separator: "\n")], forKey: key)
     }
 
-    public static func take(installed current: String, defaults: UserDefaults = .standard) -> (version: String, items: [WhatsNewItem])? {
+    public static func take(installed current: String, defaults: UserDefaults = .standard) -> (
+        version: String, items: [WhatsNewItem]
+    )? {
         guard let d = defaults.dictionary(forKey: key) as? [String: String], d["version"] == current else { return nil }
         defaults.removeObject(forKey: key)
         return (current, WhatsNew.parse(d["notes"] ?? ""))

@@ -29,7 +29,8 @@ public enum CoreWallpaper: String, CaseIterable, Sendable {
     public var group: WallpaperGroup {
         switch self {
         case .picture: .picture
-        case .lake, .forest, .coast, .peaks, .dunes, .hills, .reef, .lavender, .glacier, .bloom, .aurora, .canyon: .photos
+        case .lake, .forest, .coast, .peaks, .dunes, .hills, .reef, .lavender, .glacier, .bloom, .aurora, .canyon:
+            .photos
         default: .generated
         }
     }

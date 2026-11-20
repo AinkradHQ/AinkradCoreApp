@@ -159,7 +159,8 @@ struct SpendingPage: View {
     private var prices: some View {
         let n = model.providers.reduce(0) { $0 + $1.models.count }
         return HStack(spacing: Space.s3) {
-            Image(systemName: "dollarsign.circle").foregroundStyle(GlassInk.accent(paneAccent)).accessibilityHidden(true)
+            Image(systemName: "dollarsign.circle").foregroundStyle(GlassInk.accent(paneAccent)).accessibilityHidden(
+                true)
             Text(
                 n > 0
                     ? "Prices are filled in by the Core release (\(n) models). Nothing to enter."
@@ -189,9 +190,11 @@ private struct DayBars: View {
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(sums.enumerated()), id: \.offset) { i, v in
-                    coreShape(2).fill(i == sums.count - 1 ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent).opacity(0.45))
-                        .frame(height: max(3, 56 * CGFloat(v) / CGFloat(top)))
-                        .frame(maxWidth: .infinity)
+                    coreShape(2).fill(
+                        i == sums.count - 1 ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent).opacity(0.45)
+                    )
+                    .frame(height: max(3, 56 * CGFloat(v) / CGFloat(top)))
+                    .frame(maxWidth: .infinity)
                 }
             }
             .frame(height: 56, alignment: .bottom)

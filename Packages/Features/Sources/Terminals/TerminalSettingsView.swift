@@ -16,7 +16,8 @@ struct TerminalSettingsView: View {
             if part.showsLook {
                 TerminalPreview(prefs: prefs).coreRise(true, 0)
                 GlassSection(
-                    "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.accent(paneAccent), index: 1
+                    "Theme", sub: "The terminal's colours.", symbol: "paintpalette", hue: GlassInk.accent(paneAccent),
+                    index: 1
                 ) {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
                         ForEach(TermTheme.all) { t in
@@ -24,7 +25,9 @@ struct TerminalSettingsView: View {
                         }
                     }
                 }
-                GlassSection("Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.accent(paneAccent), index: 2) {
+                GlassSection(
+                    "Font", sub: "Family and size.", symbol: "textformat", hue: GlassInk.accent(paneAccent), index: 2
+                ) {
                     HStack(spacing: Space.s3) {
                         CoreSelect(
                             nil, selection: $prefs.fontName,
@@ -42,7 +45,8 @@ struct TerminalSettingsView: View {
                     }
                 }
                 GlassSection(
-                    "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays", hue: GlassInk.accent(paneAccent),
+                    "Cursor", sub: "Its shape, and whether it blinks.", symbol: "cursorarrow.rays",
+                    hue: GlassInk.accent(paneAccent),
                     index: 3
                 ) {
                     GlassToggleTile("Blink", symbol: "cursorarrow", onSymbol: "cursorarrow.rays", isOn: $prefs.blink)
@@ -58,7 +62,8 @@ struct TerminalSettingsView: View {
             if part.showsOptions {
                 TerminalBasicsSection(prefs: prefs)
                 GlassSection(
-                    "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.", symbol: "gearshape",
+                    "Defaults", sub: "What New terminal (⌘T) uses, and what opening and ending do.",
+                    symbol: "gearshape",
                     hue: GlassInk.accent(paneAccent), index: 5
                 ) {
                     SettingRow("Runner", symbol: "server.rack") {
@@ -83,7 +88,8 @@ struct TerminalSettingsView: View {
                     HStack(spacing: Space.s2) {
                         GlassToggleTile(
                             "Open full pane", sub: "A new terminal fills its pane.",
-                            symbol: "rectangle.split.2x1", onSymbol: "rectangle.inset.filled", isOn: $prefs.openFullPane,
+                            symbol: "rectangle.split.2x1", onSymbol: "rectangle.inset.filled",
+                            isOn: $prefs.openFullPane,
                             fill: true)
                         GlassToggleTile(
                             "Ask before ending", sub: "Confirm before a terminal is ended.",
@@ -153,7 +159,8 @@ private struct ThemeTile: View {
                     Text(theme.title).coreFont(size: MacTextSize.body, weight: .semibold)
                     Spacer()
                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(on ? GlassInk.accent(paneAccent) : GlassInk.track).contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(on ? GlassInk.accent(paneAccent) : GlassInk.track).contentTransition(
+                            .symbolEffect(.replace))
                 }
             }
             .padding(Space.s2)
@@ -186,8 +193,11 @@ private struct CursorTile: View {
     var body: some View {
         Button(action: pick) {
             VStack(spacing: Space.s2) {
-                PreviewCursor(shape: shape, blink: blink && on, color: on ? GlassInk.accent(paneAccent) : GlassInk.primary, size: 18)
-                    .frame(height: 24)
+                PreviewCursor(
+                    shape: shape, blink: blink && on, color: on ? GlassInk.accent(paneAccent) : GlassInk.primary,
+                    size: 18
+                )
+                .frame(height: 24)
                 Text(shape.rawValue.capitalized).coreFont(size: MacTextSize.meta, weight: .medium)
             }
             .frame(maxWidth: .infinity, minHeight: 64)

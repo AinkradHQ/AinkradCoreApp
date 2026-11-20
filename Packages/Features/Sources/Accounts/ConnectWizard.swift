@@ -248,7 +248,9 @@ struct ConnectWizard: View {
                             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: Space.s2)
-                    AppActionTile(title: "Open", symbol: "arrow.up.right.square", key: "⌘O", hue: GlassInk.accent(paneAccent)) {
+                    AppActionTile(
+                        title: "Open", symbol: "arrow.up.right.square", key: "⌘O", hue: GlassInk.accent(paneAccent)
+                    ) {
                         model.opener(site.url)
                     }
                     .keyboardShortcut("o", modifiers: .command)

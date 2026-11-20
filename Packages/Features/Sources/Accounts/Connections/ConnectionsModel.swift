@@ -84,7 +84,8 @@ public final class ConnectionsModel {
         checker = Task { [weak self] in
             while !Task.isCancelled {
                 let o = ConnectionsOptions.options
-                try? await Task.sleep(for: .seconds(ConnectionsOptions.seconds(o.string(ConnectionsOptions.every, "5m"))))
+                try? await Task.sleep(
+                    for: .seconds(ConnectionsOptions.seconds(o.string(ConnectionsOptions.every, "5m"))))
                 guard let self, !Task.isCancelled, let service = self.service, self.load == .ready else { continue }
                 let due = ConnectionsOptions.due(self.items, reconnect: o.bool(ConnectionsOptions.reconnect, true))
                 for c in due { _ = try? await service.test(c.id) }
@@ -475,7 +476,8 @@ public final class ConnectionsModel {
             ) { [weak self] in self?.show() })
         shell.launcher.register(
             LauncherEntry(
-                id: "connections-connect", title: "Connect a service", sub: "Sign in to GitHub, Jira, Linear, Slack or Teams", symbol: "plus",
+                id: "connections-connect", title: "Connect a service",
+                sub: "Sign in to GitHub, Jira, Linear, Slack or Teams", symbol: "plus",
                 keywords: ["github", "jira", "linear", "slack", "teams", "connect"], isAction: true
             ) { [weak self] in
                 guard let self else { return }

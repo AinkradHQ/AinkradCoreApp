@@ -17,7 +17,9 @@ struct ConnectionsView: View {
             AppHeader {
                 AppFilterTile(title: "Connections", count: model.shown.count, on: true, key: "") {}
             } actions: {
-                AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
+                AppActionTile(
+                    title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+                ) {
                     model.beginAdd()
                 }
                 .keyboardShortcut("n", modifiers: .command)
@@ -80,7 +82,9 @@ struct ConnectionsView: View {
                     symbol: "exclamationmark.triangle", title: "Couldn't load connections",
                     text: "Your Core didn't answer. Nothing was changed.", tone: .fail
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
+                    AppActionTile(
+                        title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)
+                    ) {
                         Task { await model.reload() }
                     }
                 }
@@ -122,7 +126,8 @@ struct ConnListPage: View {
     /// Ainkrad signs in for you, so there is nothing to set up first.
     private var empty: some View {
         VStack(spacing: Space.s2) {
-            IconTile("link", hue: GlassInk.accent(paneAccent), size: 72, bounce: false).connFloat().padding(.top, Space.s8)
+            IconTile("link", hue: GlassInk.accent(paneAccent), size: 72, bounce: false).connFloat().padding(
+                .top, Space.s8)
             Text("Connect your first service").coreFont(size: MacTextSize.title, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
             Text("Let your assistant read your code, tickets and chats. It never changes anything unless you say so.")
@@ -188,11 +193,14 @@ struct ConnRow: View {
                 ? CoreDropdownItem("Clear default", symbol: "star.slash") { Task { await model.clearDefault(item) } }
                 : CoreDropdownItem("Use by default", symbol: "star") { Task { await model.makeDefault(item) } },
         ]
-        if !oauth { out.append(CoreDropdownItem("Replace token…", symbol: "key") { ConnDialogs.openReplace(model, item) }) }
+        if !oauth {
+            out.append(CoreDropdownItem("Replace token…", symbol: "key") { ConnDialogs.openReplace(model, item) })
+        }
         if !model.host.shell.settings.hidden.contains("audit") {
             out.append(CoreDropdownItem("History", symbol: "clock.arrow.circlepath") { model.openHistory(item) })
         }
-        out.append(CoreDropdownItem("Disconnect", symbol: "trash", destructive: true) { model.disconnectWithUndo(item) })
+        out.append(
+            CoreDropdownItem("Disconnect", symbol: "trash", destructive: true) { model.disconnectWithUndo(item) })
         return out
     }
 
@@ -207,7 +215,8 @@ struct ConnRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .leading, spacing: 0) {
-                Text(ConnAccess.lead(kind, allowed: item.allowed)).coreFont(size: MacTextSize.meta + 1, weight: .semibold)
+                Text(ConnAccess.lead(kind, allowed: item.allowed)).coreFont(
+                    size: MacTextSize.meta + 1, weight: .semibold)
                 Text(ConnAccess.scope(kind, only: item.only)).coreFont(size: MacTextSize.meta + 1)
                     .foregroundStyle(GlassInk.secondary)
             }

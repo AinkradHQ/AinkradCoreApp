@@ -168,8 +168,10 @@ struct ComposerView: View {
             }
             .overlay {
                 if dropping {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.accent(paneAccent), style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                        .allowsHitTesting(false)
+                    coreShape(Radius.cardMac).strokeBorder(
+                        GlassInk.accent(paneAccent), style: StrokeStyle(lineWidth: 1.5, dash: [5])
+                    )
+                    .allowsHitTesting(false)
                 }
             }
             .coreDimWhenDisabled(enabled || session.over)

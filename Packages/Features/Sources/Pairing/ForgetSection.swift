@@ -31,7 +31,9 @@ struct ForgetSection: View {
             HStack(alignment: .top, spacing: Space.s3) {
                 fact("key.slash", GlassInk.red, "This Mac's keys", "Deleted from this Mac.")
                 fact("qrcode", GlassInk.accent(paneAccent), "To come back", "A new pairing code from an admin device.")
-                fact("externaldrive.badge.checkmark", GlassInk.accent(paneAccent), "Your Core and its data", "Not touched.")
+                fact(
+                    "externaldrive.badge.checkmark", GlassInk.accent(paneAccent), "Your Core and its data",
+                    "Not touched.")
             }
             .fixedSize(horizontal: false, vertical: true)
         }

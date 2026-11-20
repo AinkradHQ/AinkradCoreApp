@@ -33,7 +33,9 @@ struct TerminalsListView: View {
                 .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
         } actions: {
-            AppActionTile(title: "New terminal…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)) {
+            AppActionTile(
+                title: "New terminal…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)
+            ) {
                 model.openNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])

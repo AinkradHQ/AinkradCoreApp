@@ -9,7 +9,8 @@ struct YouSection: View {
 
     var body: some View {
         GlassSection(
-            "Your name", sub: "Home greets you with it. It stays on this Mac.", symbol: "person", hue: GlassInk.accent(paneAccent)
+            "Your name", sub: "Home greets you with it. It stays on this Mac.", symbol: "person",
+            hue: GlassInk.accent(paneAccent)
         ) {
             CoreTextField("Your name", placeholder: "Sam", text: $draft, onSubmit: save)
                 .onChange(of: draft) { _, new in profile.set(new) }

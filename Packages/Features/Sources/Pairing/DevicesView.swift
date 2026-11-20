@@ -58,12 +58,15 @@ struct DevicesSection: View {
             }
             Spacer(minLength: Space.s3)
             AppActionTile(
-                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.accent(paneAccent)
+                title: "Add device (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N",
+                hue: GlassInk.accent(paneAccent)
             ) {
                 app.openAddDevice()
             }
             .keyboardShortcut("n", modifiers: [.command, .option]).disabled(app.service == nil)
-            AppActionTile(title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true) {
+            AppActionTile(
+                title: "Add device", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+            ) {
                 app.openAddWizard()
             }
             .keyboardShortcut("n", modifiers: .command)
@@ -73,7 +76,9 @@ struct DevicesSection: View {
             NotConnectedNote(what: "Devices")
         } else {
             LoadNote(state: model.load) { Task { await model.reload() } }
-            if let only = model.onlyAdmin { OnlyAdminWarning(app: app, device: only, next: model.nextAdmin(besides: only)) }
+            if let only = model.onlyAdmin {
+                OnlyAdminWarning(app: app, device: only, next: model.nextAdmin(besides: only))
+            }
             if model.load == .ready || !model.items.isEmpty {
                 DeviceTable(app: app, model: model)
                 Text("Removing a device signs it out at once. You can pair it again later.")
@@ -92,7 +97,8 @@ private struct DeviceHeader: View {
     @State private var shown = false
 
     private var hue: Color {
-        device.revoked ? GlassInk.red : device.kind == "runner" ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent)
+        device.revoked
+            ? GlassInk.red : device.kind == "runner" ? GlassInk.accent(paneAccent) : GlassInk.accent(paneAccent)
     }
 
     var body: some View {
@@ -127,7 +133,9 @@ private struct OnlyAdminWarning: View {
             text: "Make a second device an admin so you are never locked out.", tone: .warn
         ) {
             if let next {
-                AppActionTile(title: "Make \(next.name) an admin", symbol: "shield", key: "", hue: GlassInk.accent(paneAccent)) {
+                AppActionTile(
+                    title: "Make \(next.name) an admin", symbol: "shield", key: "", hue: GlassInk.accent(paneAccent)
+                ) {
                     Task { _ = await app.devices.setScopes(next, DeviceRole.withAdmin(next.scopes)) }
                 }
             } else {
@@ -175,12 +183,15 @@ private struct DeviceRow: View {
             Button(action: open) {
                 HStack(spacing: Space.s3) {
                     IconTile(
-                        DeviceWords.symbol(device.kind, device.platform), hue: device.revoked ? GlassInk.red : GlassInk.accent(paneAccent),
+                        DeviceWords.symbol(device.kind, device.platform),
+                        hue: device.revoked ? GlassInk.red : GlassInk.accent(paneAccent),
                         size: 36)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(device.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                        Text("\(DeviceWords.platform(device.platform)) · \(me ? "this device" : DeviceWords.kind(device.kind))")
-                            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+                        Text(
+                            "\(DeviceWords.platform(device.platform)) · \(me ? "this device" : DeviceWords.kind(device.kind))"
+                        )
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
                     }
                     .frame(width: 200, alignment: .leading)
                     Label {
@@ -274,7 +285,9 @@ struct ScopeIcons: View {
                     .opacity(on ? 1 : 0.5)
                     .help(on ? "\(s.capitalized): \(ScopeText.text(s))" : "No \(s)")
             }
-            if scopes.contains("runner") { IconTile(ScopeText.symbol("runner"), hue: GlassInk.accent(paneAccent), size: 24) }
+            if scopes.contains("runner") {
+                IconTile(ScopeText.symbol("runner"), hue: GlassInk.accent(paneAccent), size: 24)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scopes.joined(separator: ", "))
@@ -403,7 +416,8 @@ struct DeviceDetail: View {
         let me = app.devices.isMe(device)
         VStack(alignment: .leading, spacing: Space.s4) {
             GlassSection(
-                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle", hue: GlassInk.accent(paneAccent), index: 1
+                "Device", sub: "Who it is, as it told the Core.", symbol: "info.circle",
+                hue: GlassInk.accent(paneAccent), index: 1
             ) {
                 if !device.revoked && !app.devices.renaming {
                     SectionAction("Rename", symbol: "pencil") { app.devices.renaming = true }

@@ -162,7 +162,9 @@ struct ProjectPaneView: View {
     var body: some View {
         ZStack {
             if let project = model.project(id) {
-                ProjectSpaceView(model: model, project: project) { model.host.shell.closePane(ProjectsModel.paneID(id)) }
+                ProjectSpaceView(model: model, project: project) {
+                    model.host.shell.closePane(ProjectsModel.paneID(id))
+                }
             } else {
                 Text("This project is not in the list any more.").foregroundStyle(GlassInk.secondary)
             }

@@ -15,15 +15,45 @@ public final class AppLookPrefs {
     }
 
     /// Own theme: false is Night, true is Day.
-    public var day: Bool { didSet { d.set(day, forKey: key("day")); Self.notify() } }
-    public var accent: CoreAccent { didSet { d.set(accent.rawValue, forKey: key("accent")); Self.notify() } }
+    public var day: Bool {
+        didSet {
+            d.set(day, forKey: key("day"))
+            Self.notify()
+        }
+    }
+    public var accent: CoreAccent {
+        didSet {
+            d.set(accent.rawValue, forKey: key("accent"))
+            Self.notify()
+        }
+    }
     /// True while the app uses its own theme and accent instead of Appearance's (the default is false: it follows).
-    public var own: Bool { didSet { d.set(own, forKey: key("own")); Self.notify() } }
+    public var own: Bool {
+        didSet {
+            d.set(own, forKey: key("own"))
+            Self.notify()
+        }
+    }
     /// Own surface (E2-6): Blurred, Clear or Solid, how solid it is (0.05 to 1) and how soft the glass is (0 to 1).
     /// They start at Appearance's values. Used while `own` is on.
-    public var mode: SurfaceMode { didSet { d.set(mode.rawValue, forKey: key("mode")); Self.notify() } }
-    public var opacity: Double { didSet { d.set(opacity, forKey: key("opacity")); Self.notify() } }
-    public var blur: Double { didSet { d.set(blur, forKey: key("blur")); Self.notify() } }
+    public var mode: SurfaceMode {
+        didSet {
+            d.set(mode.rawValue, forKey: key("mode"))
+            Self.notify()
+        }
+    }
+    public var opacity: Double {
+        didSet {
+            d.set(opacity, forKey: key("opacity"))
+            Self.notify()
+        }
+    }
+    public var blur: Double {
+        didSet {
+            d.set(blur, forKey: key("blur"))
+            Self.notify()
+        }
+    }
 
     /// Posted on every change, for surfaces drawn outside SwiftUI (the terminal screen).
     public static let changed = Notification.Name("ainkrad.applook")
@@ -145,7 +175,8 @@ public struct AppLookSection: View {
         GlassSection("Look", symbol: "circle.lefthalf.filled", hue: GlassInk.blue) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreRow(
-                    "Same as Appearance", subtitle: "\(appName) uses your theme, accent and wallpaper", symbol: "sparkles"
+                    "Same as Appearance", subtitle: "\(appName) uses your theme, accent and wallpaper",
+                    symbol: "sparkles"
                 ) {
                     CoreSwitch(isOn: Binding(get: { !prefs.own }, set: { prefs.own = !$0 }))
                 }

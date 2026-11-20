@@ -22,9 +22,12 @@ public struct CrashReport: Codable, Equatable, Sendable {
     /// `Module+0xhex`: a module name of `A-Za-z0-9_.-` (at most 64) and a lower-case hex offset (at most 16 digits).
     static func isFrame(_ f: String) -> Bool {
         guard let plus = f.range(of: "+0x") else { return false }
-        let module = f[..<plus.lowerBound], off = f[plus.upperBound...]
-        return (1...64).contains(module.count) && module.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "_.-".contains($0)) }
-            && (1...16).contains(off.count) && off.allSatisfy { $0.isASCII && ($0.isNumber || ("a"..."f").contains($0)) }
+        let module = f[..<plus.lowerBound]
+        let off = f[plus.upperBound...]
+        return (1...64).contains(module.count)
+            && module.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "_.-".contains($0)) }
+            && (1...16).contains(off.count)
+            && off.allSatisfy { $0.isASCII && ($0.isNumber || ("a"..."f").contains($0)) }
     }
 
     public init(version: String, os: String, arch: String, kind: String, frames: [String]) {
@@ -61,7 +64,8 @@ public struct CrashReport: Codable, Equatable, Sendable {
 /// Reports waiting to be sent (a crash is written down at once; the next launch sends it when the person allows it).
 public enum CrashSpool {
     public static func directory() -> URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let base =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("Ainkrad/crash-reports", isDirectory: true)
     }

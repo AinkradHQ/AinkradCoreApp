@@ -41,6 +41,7 @@ extension LiveAccountsService {
     }
 
     func restoreAccount(_ id: Int64) async throws {
-        _ = try await connection.signedRequest(method: "POST", target: "/api/v1/accounts/\(id)/restore", body: Data("{}".utf8))
+        _ = try await connection.signedRequest(
+            method: "POST", target: "/api/v1/accounts/\(id)/restore", body: Data("{}".utf8))
     }
 }

@@ -46,7 +46,9 @@ struct TerminalBasicsSection: View {
     let options = TerminalOptions.options
 
     var body: some View {
-        GlassSection("Basics", sub: "Size, cursor and sound", symbol: "terminal", hue: GlassInk.accent(paneAccent), index: 4) {
+        GlassSection(
+            "Basics", sub: "Size, cursor and sound", symbol: "terminal", hue: GlassInk.accent(paneAccent), index: 4
+        ) {
             VStack(spacing: Space.s2) {
                 OptionSelectRow(
                     "Text size", symbol: "textformat.size",

@@ -358,7 +358,9 @@ public final class AppModel {
             CoreSkew.appTooOld(app: app, minApp: min)
         else { return }
         shell.presentSheet(
-            title: "Update Ainkrad", message: "Your Core needs Ainkrad \(min) or newer, and this Mac has \(app). Ainkrad updates itself; to do it now, choose Ainkrad, then Check for Updates.",
+            title: "Update Ainkrad",
+            message:
+                "Your Core needs Ainkrad \(min) or newer, and this Mac has \(app). Ainkrad updates itself; to do it now, choose Ainkrad, then Check for Updates.",
             actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
     }
 

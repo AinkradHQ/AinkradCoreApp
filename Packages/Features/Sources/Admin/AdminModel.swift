@@ -144,7 +144,8 @@ public final class AdminModel {
             if e.id == "core" {
                 // The registry values are the Core page's Advanced "Limits" tab (D-11); the page itself is the shell's.
                 shell.settings.tab(
-                    "core", SettingsTab("limits", "Limits", order: 9, advanced: true) { CoreSettingsSection(admin: self) })
+                    "core",
+                    SettingsTab("limits", "Limits", order: 9, advanced: true) { CoreSettingsSection(admin: self) })
             } else {
                 shell.settings.section(
                     SettingsSection(
@@ -160,24 +161,28 @@ public final class AdminModel {
                     shell.open(.settings)
                 })
         }
-        let apps: [(id: String, title: String, sub: String, symbol: String, keys: [String], run: @MainActor (AdminModel) -> Void)] = [
-            (
-                "secrets", "Secrets", "Passwords and keys you keep for yourself", "key",
-                ["broker", "keys", "leases", "tokens", "password"], { $0.showSecrets() }
-            ),
-            (
-                "activity", "Activity", "How your Core is doing and who did what", "waveform.path.ecg",
-                ["ops", "audit", "health", "alarms", "log", "history"], { $0.showActivity() }
-            ),
-            (
-                "admin-ops", "Ops", "Activity, how your Core is doing", "waveform.path.ecg",
-                ["health", "alarms", "metrics", "prometheus"], { $0.showActivity(.ops) }
-            ),
-            (
-                "admin-audit", "Audit", "Activity, who did what, where and when", "doc.text",
-                ["log", "history", "who did what"], { $0.showActivity(.audit) }
-            ),
-        ]
+        let apps:
+            [(
+                id: String, title: String, sub: String, symbol: String, keys: [String],
+                run: @MainActor (AdminModel) -> Void
+            )] = [
+                (
+                    "secrets", "Secrets", "Passwords and keys you keep for yourself", "key",
+                    ["broker", "keys", "leases", "tokens", "password"], { $0.showSecrets() }
+                ),
+                (
+                    "activity", "Activity", "How your Core is doing and who did what", "waveform.path.ecg",
+                    ["ops", "audit", "health", "alarms", "log", "history"], { $0.showActivity() }
+                ),
+                (
+                    "admin-ops", "Ops", "Activity, how your Core is doing", "waveform.path.ecg",
+                    ["health", "alarms", "metrics", "prometheus"], { $0.showActivity(.ops) }
+                ),
+                (
+                    "admin-audit", "Audit", "Activity, who did what, where and when", "doc.text",
+                    ["log", "history", "who did what"], { $0.showActivity(.audit) }
+                ),
+            ]
         for a in apps {
             shell.launcher.register(
                 LauncherEntry(id: a.id, title: a.title, sub: a.sub, symbol: a.symbol, keywords: a.keys) {

@@ -16,7 +16,9 @@ import SwiftUI
     static func days(_ id: String) -> Int { remembers.first { $0.id == id }?.days ?? 0 }
 
     /// How often Brain asks, as the Core's suggestion strength: fewer, normal, more.
-    static let asks: [CoreSegment<Int>] = [CoreSegment(0, "Rarely"), CoreSegment(1, "Sometimes"), CoreSegment(2, "Often")]
+    static let asks: [CoreSegment<Int>] = [
+        CoreSegment(0, "Rarely"), CoreSegment(1, "Sometimes"), CoreSegment(2, "Often"),
+    ]
 
     /// Retention for a new room, or nil when it keeps everything (nothing to set).
     static func newRoomRetention(_ id: String) -> Int? {
@@ -31,7 +33,9 @@ struct BrainLearningSection: View {
     let options = BrainOptions.options
 
     var body: some View {
-        GlassSection("Learning", sub: "How Brain looks after your notes", symbol: "sparkles", hue: GlassInk.accent(paneAccent)) {
+        GlassSection(
+            "Learning", sub: "How Brain looks after your notes", symbol: "sparkles", hue: GlassInk.accent(paneAccent)
+        ) {
             VStack(spacing: Space.s2) {
                 if settings.load == .ready {
                     OptionSwitchRow(
@@ -55,7 +59,8 @@ struct BrainLearningSection: View {
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 OptionSelectRow(
-                    "Remember for", sub: "How long a new room keeps its sources. Older ones lose their text", symbol: "clock.arrow.circlepath",
+                    "Remember for", sub: "How long a new room keeps its sources. Older ones lose their text",
+                    symbol: "clock.arrow.circlepath",
                     selection: options.text(BrainOptions.remember, "forever"),
                     options: BrainOptions.remembers.map { CoreSelectOption($0.id, $0.title) })
             }

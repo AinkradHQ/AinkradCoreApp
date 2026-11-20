@@ -99,7 +99,10 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         kind(
             "github", "GitHub", "Code, pull requests and issues", .deviceCode, "repositories", "repos",
             [
-                ("read_repo", "Read code, pull requests and issues", "See what is in your projects. Nothing changes.", false),
+                (
+                    "read_repo", "Read code, pull requests and issues",
+                    "See what is in your projects. Nothing changes.", false
+                ),
                 ("pr_write", "Comment on pull requests", "Leave notes for you and your team.", true),
                 ("push", "Open pull requests and push branches", "Make changes in your repositories.", true),
             ]),
@@ -119,13 +122,19 @@ final class SampleConnections: ConnectionsService, @unchecked Sendable {
         kind(
             "slack", "Slack", "Messages and channels", .browser, "channels", "channels",
             [
-                ("read_messages", "Read messages in channels you pick", "See the conversation. Nothing is sent.", false),
+                (
+                    "read_messages", "Read messages in channels you pick", "See the conversation. Nothing is sent.",
+                    false
+                ),
                 ("post_messages", "Post new messages", "Write in the channels you pick.", true),
             ]),
         kind(
             "teams", "Microsoft Teams", "Chats and channels", .deviceCode, "channels", "channels",
             [
-                ("read_messages", "Read messages in channels you pick", "See the conversation. Nothing is sent.", false),
+                (
+                    "read_messages", "Read messages in channels you pick", "See the conversation. Nothing is sent.",
+                    false
+                ),
                 ("post_messages", "Post new messages", "Write in the channels you pick.", true),
             ]),
     ]

@@ -357,7 +357,9 @@ public struct StepTrack: View {
     public var body: some View {
         HStack(spacing: 6) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, name in
-                if i > 0 { coreShape(1).fill(i <= at ? GlassInk.accent(accent) : GlassInk.track).frame(width: 14, height: 2) }
+                if i > 0 {
+                    coreShape(1).fill(i <= at ? GlassInk.accent(accent) : GlassInk.track).frame(width: 14, height: 2)
+                }
                 HStack(spacing: 4) {
                     if locked.contains(i) { Image(systemName: "lock.fill").coreFont(size: 9) }
                     Text(name)

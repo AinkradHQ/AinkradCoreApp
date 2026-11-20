@@ -174,16 +174,21 @@ struct RunnersPanel: View {
         shell.showsRunnerUpdates && m.online ? shell.runnerUpdates[m.runnerID] : nil
     }
     private func state(_ m: HomeSnapshot.Machine) -> (String, Tone) {
-        !m.online ? ("Offline", .fail) : update(m) != nil ? ("Updating", .done) : m.used > 0 ? ("Running", .run) : ("Idle", .queue)
+        !m.online
+            ? ("Offline", .fail)
+            : update(m) != nil ? ("Updating", .done) : m.used > 0 ? ("Running", .run) : ("Idle", .queue)
     }
     private func footnote(_ ms: [HomeSnapshot.Machine]) -> String {
         let names = ms.filter { update($0) != nil }.map(\.id)
         return names.isEmpty
-            ? "All runners are on the latest tools." : "All runners are on the latest tools except \(names.joined(separator: ", "))."
+            ? "All runners are on the latest tools."
+            : "All runners are on the latest tools except \(names.joined(separator: ", "))."
     }
     /// "Updating Dune": the tools update by themselves, so the row only shows how far it is.
     private func updatingRow(_ m: HomeSnapshot.Machine, _ u: RunnerUpdate) -> some View {
-        Button { go("runners") } label: {
+        Button {
+            go("runners")
+        } label: {
             HStack(spacing: Space.s3) {
                 IconTile("arrow.triangle.2.circlepath", hue: GlassInk.accent(paneAccent), size: MacSize.controlLg)
                 VStack(alignment: .leading, spacing: Space.s1) {

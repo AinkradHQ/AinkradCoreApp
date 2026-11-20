@@ -25,14 +25,18 @@ struct StatusCluster: View {
                 .runners, label: counts.running == 0 ? "Runners" : "Runners, \(counts.running) running",
                 symbol: "server.rack", on: shell.topMenu == .runners, badge: counts.running
             ) { shell.toggleMenu(.runners) }
-            TopBarIcon(.brain, label: "Brain", symbol: "brain", on: shell.topMenu == .brain) { shell.toggleMenu(.brain) }
+            TopBarIcon(.brain, label: "Brain", symbol: "brain", on: shell.topMenu == .brain) {
+                shell.toggleMenu(.brain)
+            }
             Spacer().frame(width: Space.s2)
             TopBarIcon(
                 .bell, label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
                 symbol: "bell", on: shell.bellOpen, mark: needsYou
             ) { shell.toggleBell() }
             Spacer().frame(width: Space.s2)
-            TopBarIcon(.launcher, label: "Launcher (⌘K)", symbol: nil, on: shell.launcherOpen) { shell.toggleLauncher() }
+            TopBarIcon(.launcher, label: "Launcher (⌘K)", symbol: nil, on: shell.launcherOpen) {
+                shell.toggleLauncher()
+            }
         }
         .padding(.horizontal, Space.s4)
         .frame(height: ShellMetrics.topBar, alignment: .center)
@@ -159,7 +163,8 @@ private struct TopBarLoop: ViewModifier {
         }
     }
 
-    private var spec: (period: Double, opacity: Double, scale: Double, scaleX: Double, lift: CGFloat, anchor: UnitPoint) {
+    private var spec: (period: Double, opacity: Double, scale: Double, scaleX: Double, lift: CGFloat, anchor: UnitPoint)
+    {
         switch kind {
         case .home: (3, 0.6, 1, 1, 0, .center)
         case .workspace: (4, 0.65, 1, 1, 0, .center)

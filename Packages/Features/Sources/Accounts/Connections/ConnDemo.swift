@@ -43,7 +43,9 @@ extension AccountsDemo {
         /// The dialog on step `at` for a connection that is there.
         func edit(_ id: Int64, at step: ConnStep, write: Bool = false) async {
             guard let c = m.item(id) else { return }
-            if write { try? await svc.setAccess(id, allowed: ["read_repo", "pr_write", "push"], only: ["maple/harbor-web"]) }
+            if write {
+                try? await svc.setAccess(id, allowed: ["read_repo", "pr_write", "push"], only: ["maple/harbor-web"])
+            }
             await m.reload()
             m.beginEdit(m.item(id) ?? c, at: step)
         }

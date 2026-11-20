@@ -157,7 +157,8 @@ struct ProviderDialog: View {
                     ForEach(ProviderRules.wires, id: \.harness) { w in
                         AccPick(
                             title: w.title, sub: w.sub, symbol: "point.3.connected.trianglepath.dotted",
-                            hue: GlassInk.accent(paneAccent), on: harness == w.harness, enabled: !frozen || harness == w.harness
+                            hue: GlassInk.accent(paneAccent), on: harness == w.harness,
+                            enabled: !frozen || harness == w.harness
                         ) { harness = w.harness }
                     }
                 }

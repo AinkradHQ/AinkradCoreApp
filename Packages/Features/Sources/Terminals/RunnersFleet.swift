@@ -54,7 +54,8 @@ enum RunnerBucket: String, CaseIterable, Identifiable, Sendable {
 
     /// "2 are busy, 1 is not answering."; empty when there is nothing to say.
     static func sentence(_ runners: [RunnerItem], updating: Set<String> = []) -> String {
-        let counts = Dictionary(grouping: runners, by: { of($0, updating: updating.contains($0.id)) }).mapValues(\.count)
+        let counts = Dictionary(grouping: runners, by: { of($0, updating: updating.contains($0.id)) }).mapValues(
+            \.count)
         var parts: [String] = []
         if let n = counts[.working] { parts.append("\(n) \(n == 1 ? "is" : "are") busy") }
         if let n = counts[.updating] { parts.append("\(n) \(n == 1 ? "is" : "are") getting ready") }

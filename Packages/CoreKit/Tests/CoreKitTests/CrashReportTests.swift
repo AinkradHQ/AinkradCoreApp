@@ -10,9 +10,12 @@ import Testing
             frames: ["Ainkrad+0x1a2", "x\ny"])
         #expect(r.kind == "NSRangeException", "only the first word of a kind survives, never a path")
         #expect(r.frames == ["Ainkrad+0x1a2"], "a frame that is not Module+0xOffset is dropped")
-        let leak = CrashReport(version: "1", os: "macOS", arch: "arm64", kind: "crash", frames: ["/Users/sam/Ainkrad+0x1", "sam's Mac+0x1", "Ok+0xZZ", "Ok+0x1f"])
+        let leak = CrashReport(
+            version: "1", os: "macOS", arch: "arm64", kind: "crash",
+            frames: ["/Users/sam/Ainkrad+0x1", "sam's Mac+0x1", "Ok+0xZZ", "Ok+0x1f"])
         #expect(leak.frames == ["Ok+0x1f"], "paths, spaces and non-hex offsets never pass")
-        let keys = Set(try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as? [String: Any]).keys)
+        let keys = Set(
+            try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as? [String: Any]).keys)
         #expect(keys == ["app", "version", "os", "arch", "kind", "frames"], "no message, no id, no path")
     }
 
@@ -37,7 +40,12 @@ import Testing
         await CrashSpool.flush(enabled: true, in: dir, send: { _ in 204 })
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
         CrashSpool.write(r, in: dir)
-        await CrashSpool.flush(enabled: false, in: dir, send: { _ in Issue.record("sent while off"); return 204 })
+        await CrashSpool.flush(
+            enabled: false, in: dir,
+            send: { _ in
+                Issue.record("sent while off")
+                return 204
+            })
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty, "off discards what was waiting")
     }
 }

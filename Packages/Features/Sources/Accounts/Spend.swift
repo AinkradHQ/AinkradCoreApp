@@ -54,7 +54,8 @@ struct BudgetDraft: Equatable, Sendable {
 
 enum BudgetWords {
     static let periods: [(id: String, title: String)] = [
-        ("hour5", "Every 5 hours"), ("day", "Each day"), ("week", "Each week"), ("month", "Each month"), ("total", "In total"),
+        ("hour5", "Every 5 hours"), ("day", "Each day"), ("week", "Each week"), ("month", "Each month"),
+        ("total", "In total"),
     ]
 
     static func period(_ p: String) -> String {

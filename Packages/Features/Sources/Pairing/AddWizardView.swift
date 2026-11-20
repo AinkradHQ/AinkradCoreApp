@@ -81,7 +81,8 @@ struct AddWizardView: View {
                             model.choose(k)
                         } label: {
                             VStack(alignment: .leading, spacing: Space.s2) {
-                                IconTile(k.symbol, hue: k.isRunner ? GlassInk.slate : GlassInk.accent(paneAccent), size: 48)
+                                IconTile(
+                                    k.symbol, hue: k.isRunner ? GlassInk.slate : GlassInk.accent(paneAccent), size: 48)
                                 Text(k.title).coreFont(size: MacTextSize.body, weight: .semibold).padding(
                                     .top, Space.s1)
                                 Text(k.blurb).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)

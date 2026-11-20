@@ -174,7 +174,8 @@ struct SpendState: View {
                 symbol: "exclamationmark.triangle", title: "Could not load \(what.lowercased())",
                 text: "The Core answered with an error. \(message)", tone: .fail, code: code
             ) {
-                AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
+                AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent))
+                {
                     Task { await retry() }
                 }
             }

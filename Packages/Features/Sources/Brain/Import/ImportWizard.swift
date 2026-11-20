@@ -72,8 +72,11 @@ struct ImportWizard: View {
                     Text("Import into the Brain").coreFont(size: MacTextSize.title + 2, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: Space.s3)
-                    StepTrack(model.autoSort ? Self.autoSteps : Self.steps, at: model.step.rawValue, hue: GlassInk.accent(paneAccent))
-                        .accessibilityIdentifier("brain-import-step")
+                    StepTrack(
+                        model.autoSort ? Self.autoSteps : Self.steps, at: model.step.rawValue,
+                        hue: GlassInk.accent(paneAccent)
+                    )
+                    .accessibilityIdentifier("brain-import-step")
                 }
                 Group {
                     switch model.step {

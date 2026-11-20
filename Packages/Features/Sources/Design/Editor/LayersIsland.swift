@@ -72,7 +72,9 @@ private struct LayerRowView: View {
         .accessibilityAction(named: "Move Backward") { editor.step(layer.id, up: false) }
     }
 
-    private var bar: some View { coreShape(1).fill(GlassInk.accent(paneAccent)).frame(height: 2).padding(.horizontal, Space.s2) }
+    private var bar: some View {
+        coreShape(1).fill(GlassInk.accent(paneAccent)).frame(height: 2).padding(.horizontal, Space.s2)
+    }
 
     @ViewBuilder private var chevron: some View {
         if row.hasChildren {

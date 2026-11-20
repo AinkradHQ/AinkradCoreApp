@@ -118,7 +118,8 @@ private struct ConnFloat: ViewModifier {
             content
         } else {
             TimelineView(.animation) { ctx in
-                content.offset(y: ConnMotion.floatOffset(at: ctx.date.timeIntervalSinceReferenceDate, phase: phase, reduce: false))
+                content.offset(
+                    y: ConnMotion.floatOffset(at: ctx.date.timeIntervalSinceReferenceDate, phase: phase, reduce: false))
             }
         }
     }
@@ -135,7 +136,8 @@ private struct ConnRise: ViewModifier {
             .offset(y: reduce || shown ? 0 : ConnMotion.riseDistance)
             .onAppear {
                 guard !reduce else { return }
-                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.5).delay(Double(index) * ConnMotion.riseStep)) {
+                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.5).delay(Double(index) * ConnMotion.riseStep))
+                {
                     shown = true
                 }
             }

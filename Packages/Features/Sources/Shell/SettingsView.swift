@@ -216,8 +216,9 @@ struct SettingsView: View {
                         CoreSwitch(
                             "Advanced",
                             isOn: Binding(
-                                get: { shell.settings.advanced }, set: { shell.settings.advanced = $0 }))
-                            .help("Show network, storage, logs and the careful actions")
+                                get: { shell.settings.advanced }, set: { shell.settings.advanced = $0 })
+                        )
+                        .help("Show network, storage, logs and the careful actions")
                     }
                     if showSaved, let at = shell.settings.savedAt {
                         Text("Saved \(at.formatted(date: .omitted, time: .shortened))")

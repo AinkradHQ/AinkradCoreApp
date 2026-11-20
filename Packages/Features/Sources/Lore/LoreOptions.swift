@@ -32,7 +32,8 @@ struct LoreWritingSection: View {
         GlassSection("Writing", symbol: "text.alignleft", hue: GlassInk.accent(paneAccent)) {
             VStack(spacing: Space.s2) {
                 OptionSwitchRow(
-                    "Open last note at start", sub: "Otherwise Lore opens today's note", symbol: "clock.arrow.circlepath",
+                    "Open last note at start", sub: "Otherwise Lore opens today's note",
+                    symbol: "clock.arrow.circlepath",
                     isOn: options.flag(LoreOptions.openLast, true))
                 OptionSelectRow(
                     "Text size", symbol: "textformat.size", selection: options.text(LoreOptions.textSize, "medium"),

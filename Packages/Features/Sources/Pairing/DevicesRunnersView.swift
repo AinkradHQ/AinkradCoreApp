@@ -43,7 +43,7 @@ struct DevicesRunnersView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             CoreTabs("Devices and runners", tabs: tabs.map { CoreTab($0, $0.rawValue) }, selection: $app.hubTab)
-            .fixedSize().padding(.horizontal, Space.s4).padding(.top, Space.s4)
+                .fixedSize().padding(.horizontal, Space.s4).padding(.top, Space.s4)
             switch app.hubTab {
             case .devices: page { DevicesSection(app: app) }
             case .runners:

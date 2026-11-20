@@ -120,7 +120,8 @@ struct StateCard<Actions: View>: View {
         let c = palette.tone(tone)
         let hue: Color =
             tone == .fail
-            ? GlassInk.red : tone == .warn ? GlassInk.amber : tone == .done ? GlassInk.green : GlassInk.accent(paneAccent)
+            ? GlassInk.red
+            : tone == .warn ? GlassInk.amber : tone == .done ? GlassInk.green : GlassInk.accent(paneAccent)
         VStack(spacing: Space.s2) {
             IconTile(symbol, hue: hue, size: MacSize.controlLg + Space.s3)
             Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)

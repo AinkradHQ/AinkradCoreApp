@@ -48,7 +48,10 @@ struct ProjectsOptionsTests {
         #expect(!l.idleNever && l.idleMinutes == 120)
         // A value set from elsewhere shows as the nearest choice at or above it.
         l = ProjectLimits(cpus: 3, memoryMb: 3000, idleMinutes: 45, idleNever: false)
-        #expect((ProjectsOptions.coreChoice(l), ProjectsOptions.memoryChoice(l), ProjectsOptions.idleChoice(l)) == (4, 4, 120))
+        #expect(
+            (ProjectsOptions.coreChoice(l), ProjectsOptions.memoryChoice(l), ProjectsOptions.idleChoice(l)) == (
+                4, 4, 120
+            ))
     }
 
     @Test func limitsRoundTripTheCoresJSON() throws {
@@ -101,7 +104,8 @@ struct ProjectsOptionsTests {
     @Test func unarchiveAsksTheCoreAndReloads() async {
         let (m, s, host) = await make()
         let old = ProjectItem(
-            id: 2, slug: "old", name: "old", description: "", expose: true, repos: [], updatedAt: Date(), archived: true)
+            id: 2, slug: "old", name: "old", description: "", expose: true, repos: [], updatedAt: Date(), archived: true
+        )
         await m.unarchive(old)
         #expect(s.unarchived == [2])
         #expect(host.reasons.last?.contains("old") == true)

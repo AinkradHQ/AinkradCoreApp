@@ -23,10 +23,12 @@ struct BrainLookSection: View {
             if part.showsOptions {
                 BrainLearningSection(settings: ai)
                 GlassSection(
-                    "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain", hue: GlassInk.accent(paneAccent), index: 1
+                    "The Brain", sub: "Rooms of memory, kept sealed apart.", symbol: "brain",
+                    hue: GlassInk.accent(paneAccent), index: 1
                 ) {
                     AppActionTile(
-                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent), prominent: true
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent),
+                        prominent: true
                     ) {
                         model.host.shell.overlay = nil
                         model.show(.overview)

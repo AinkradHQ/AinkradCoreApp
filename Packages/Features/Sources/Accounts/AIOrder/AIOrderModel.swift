@@ -65,7 +65,10 @@ extension AccountsModel {
     var orderRows: [OrderRow] {
         let accs = orderIDs.compactMap { account($0) }
         let verdicts = accs.map {
-            (AccountVerdict.of($0, limits: limits(of: $0), budgets: budgets, inPool: true), $0.state, $0.meter?.limitHit ?? false)
+            (
+                AccountVerdict.of($0, limits: limits(of: $0), budgets: budgets, inPool: true), $0.state,
+                $0.meter?.limitHit ?? false
+            )
         }
         let chips = OrderChips.chips(verdicts)
         let dup = Dictionary(grouping: accs, by: \.provider).filter { $0.value.count > 1 }.keys

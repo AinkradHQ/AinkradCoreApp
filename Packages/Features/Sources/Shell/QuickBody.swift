@@ -55,7 +55,8 @@ struct QuickBody: View {
                             go(t)
                         } label: {
                             HStack(spacing: Space.s3) {
-                                Image(systemName: t.symbol).foregroundStyle(GlassInk.accent(paneAccent)).frame(width: 20)
+                                Image(systemName: t.symbol).foregroundStyle(GlassInk.accent(paneAccent)).frame(
+                                    width: 20)
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text(t.title).coreFont(size: MacTextSize.body, weight: .medium)
                                     Text(t.sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

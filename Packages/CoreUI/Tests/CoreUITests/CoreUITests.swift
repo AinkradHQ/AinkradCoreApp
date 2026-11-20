@@ -181,7 +181,8 @@ struct LookAssetTests {
     }
 
     @Test func wallpaperTabsPartitionThePresets() {
-        let photos = CoreWallpaper.presets(in: .photos), generated = CoreWallpaper.presets(in: .generated)
+        let photos = CoreWallpaper.presets(in: .photos)
+        let generated = CoreWallpaper.presets(in: .generated)
         #expect(photos.count == 12 && generated.count == 14)
         #expect(Set(photos + generated) == Set(CoreWallpaper.presets) && Set(photos).isDisjoint(with: generated))
         #expect(CoreWallpaper.picture.group == .picture && CoreWallpaper.presets(in: .picture) == [.picture])

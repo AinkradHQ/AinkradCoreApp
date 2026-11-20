@@ -17,7 +17,8 @@ struct FileDrop: View {
     var body: some View {
         Button(action: choose) {
             HStack(spacing: Space.s3) {
-                IconTile(form.fileName == nil ? "arrow.down.doc" : "doc.fill", hue: GlassInk.accent(paneAccent), size: 32)
+                IconTile(
+                    form.fileName == nil ? "arrow.down.doc" : "doc.fill", hue: GlassInk.accent(paneAccent), size: 32)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(form.fileName ?? prompt).fontWeight(.semibold).lineLimit(1)
                     Text(

@@ -63,14 +63,16 @@ final class CoreUpdateFeed {
         } catch is StepUpDeclined {
             return
         } catch {
-            shell.showToast(CoreError.unwrapping(error)?.localizedDescription ?? "The update did not start.", kind: .warn)
+            shell.showToast(
+                CoreError.unwrapping(error)?.localizedDescription ?? "The update did not start.", kind: .warn)
         }
     }
 
     private func showNews() {
         let to = shell.coreUpdate.to ?? shell.coreUpdate.current
         shell.presentSheet(
-            title: "Core is on \(to)", message: "Updates install by themselves at night: the app, the Core and the runners.",
+            title: "Core is on \(to)",
+            message: "Updates install by themselves at night: the app, the Core and the runners.",
             actions: [ShellSheetAction("Done", primary: true)])
     }
 }

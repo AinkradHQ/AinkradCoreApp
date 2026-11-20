@@ -176,7 +176,8 @@ struct AddAccountDialog: View {
             if let c = s?.deviceCode { codeBlock(c) }
             if case .guided? = s?.stage {
                 GuidedTerminal(
-                    lines: s?.screen ?? [], error: s?.inputError, provider: s?.provider ?? "", sending: s?.sending ?? false,
+                    lines: s?.screen ?? [], error: s?.inputError, provider: s?.provider ?? "",
+                    sending: s?.sending ?? false,
                     send: { l in Task { await model.sendGuidedInput(l) } })
             }
             if pastes, case .open? = s?.stage { pasteField(s?.codeError) }

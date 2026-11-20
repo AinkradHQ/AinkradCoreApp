@@ -126,7 +126,9 @@ public struct CoreDropdown<Label: View>: View {
             HStack(spacing: Space.s2) {
                 if checks {
                     Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold)
-                        .foregroundStyle(GlassInk.accentInk(accent)).frame(width: Space.s3).opacity(item.checked ? 1 : 0)
+                        .foregroundStyle(GlassInk.accentInk(accent)).frame(width: Space.s3).opacity(
+                            item.checked ? 1 : 0
+                        )
                         .accessibilityHidden(true)
                 }
                 if let symbol = item.symbol {

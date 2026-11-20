@@ -91,12 +91,15 @@ struct ThisMacView: View {
         if !model.isAvailable { return "This build has no runner inside." }
         if !model.useThisMac { return "Off. Core will not send work to this Mac." }
         return connected == true
-            ? "\(model.runnerName) is online and ready." : "\(model.runnerName) is starting. Core has not heard from it yet."
+            ? "\(model.runnerName) is online and ready."
+            : "\(model.runnerName) is starting. Core has not heard from it yet."
     }
 
     private var big: some View {
         HStack(spacing: Space.s4) {
-            IconTile("laptopcomputer", hue: model.useThisMac && connected == true ? GlassInk.green : GlassInk.slate, size: 56)
+            IconTile(
+                "laptopcomputer", hue: model.useThisMac && connected == true ? GlassInk.green : GlassInk.slate, size: 56
+            )
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text("Work for Core").coreFont(size: MacTextSize.large, weight: .semibold)
                 Text(statusLine).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
@@ -122,7 +125,9 @@ struct ThisMacView: View {
         let update = runnerID.flatMap { app.terminals?.updateAvailable(ofRunner: $0) }
         return HStack(spacing: Space.s3) {
             stat("Connection", connected == true ? "Online" : model.useThisMac ? "Not connected" : "Off", nil, nil)
-            stat("Version", version ?? "Not reported", update == nil ? nil : update == true ? "Update available" : "Up to date", nil)
+            stat(
+                "Version", version ?? "Not reported",
+                update == nil ? nil : update == true ? "Update available" : "Up to date", nil)
             stat("Memory", vitals.memory.map(Self.percent) ?? "Not reported", nil, vitals.memory)
             stat("Disk", vitals.disk.map(Self.percent) ?? "Not reported", nil, vitals.disk)
         }
@@ -224,7 +229,11 @@ struct AboutTabView: View {
             .frame(maxWidth: .infinity).padding(.top, Space.s4)
             VStack(alignment: .leading, spacing: Space.s3) {
                 row("Core address", app.shell.home.coreName)
-                row("This Mac", mine.flatMap { id in app.terminals?.version(ofRunner: id).map { "\(app.macRunner.runnerName) · runner \($0)" } } ?? "Not a runner")
+                row(
+                    "This Mac",
+                    mine.flatMap { id in
+                        app.terminals?.version(ofRunner: id).map { "\(app.macRunner.runnerName) · runner \($0)" }
+                    } ?? "Not a runner")
                 row("Running for", app.shell.home.health?.uptime ?? "Not reported yet")
                 row("Tools it keeps current", toolLine)
             }
@@ -250,7 +259,8 @@ struct AboutTabView: View {
 
     private func row(_ title: String, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-            Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).frame(width: 160, alignment: .leading)
+            Text(title).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).frame(
+                width: 160, alignment: .leading)
             Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
@@ -265,7 +275,9 @@ struct AboutTabView: View {
         await app.terminals?.recheck()
         let waiting = app.terminals?.runnersWithUpdate ?? 0
         let core = me.map { "Core \($0.server) is running." } ?? "The Core did not answer."
-        let runners = waiting == 0 ? "Every runner is up to date." : "\(waiting) \(waiting == 1 ? "runner has" : "runners have") an update."
+        let runners =
+            waiting == 0
+            ? "Every runner is up to date." : "\(waiting) \(waiting == 1 ? "runner has" : "runners have") an update."
         app.shell.showToast("\(core) \(runners)", kind: me == nil ? .error : .ok)
     }
 }
