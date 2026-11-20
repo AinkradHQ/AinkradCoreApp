@@ -388,6 +388,8 @@ public struct LiveAgentsAPI: AgentsAPI {
         info.turnCostApproximate = s.turnCostApproximate ?? false
         info.canStopSubagents = s.canStopSubagents ?? false
         #if CORE_CLIENT_95
+        // ponytail: a plain string on the wire; if the regenerated client types it as an enum, read `.rawValue`.
+        info.placeReason = s.placeReason
         info.effort = s.effort
         info.canSetEffort = s.canSetEffort ?? false
         #endif

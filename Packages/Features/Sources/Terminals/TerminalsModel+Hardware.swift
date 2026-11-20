@@ -49,6 +49,7 @@ extension TerminalsModel {
             deck.jobByTerminal = [:]
             deck.jobBySession = [:]
             deck.jobByProject = [:]
+            deck.runsBySession = [:]
             deck.offCore = [:]
             return
         }
@@ -64,7 +65,11 @@ extension TerminalsModel {
         var term: [String: JobPlace] = [:]
         var sess: [String: JobPlace] = [:]
         var proj: [Int: JobPlace] = [:]
+        var runs: [String: [HardwareDeck.JobRun]] = [:]
         for j in jobs {
+            if let s = j.session, let at = j.startedAt {
+                runs[s, default: []].append(.init(startedAt: at, place: j.place))
+            }
             if let t = j.terminal, term[t] == nil { term[t] = j.place }
             if let s = j.session, sess[s] == nil { sess[s] = j.place }
             if let p = j.project, proj[p] == nil { proj[p] = j.place }
@@ -72,6 +77,7 @@ extension TerminalsModel {
         deck.jobByTerminal = term
         deck.jobBySession = sess
         deck.jobByProject = proj
+        deck.runsBySession = runs
     }
 
     /// Pauses one machine, or all but the Core, for a span; `.resume` lifts it. Admin: Touch ID once.

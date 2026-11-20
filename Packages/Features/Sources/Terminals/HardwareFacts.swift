@@ -55,6 +55,7 @@ struct JobItem: Identifiable, Equatable, Sendable, Decodable {
     var placeReason: String
     var missing: String?
     var state: String
+    var startedAt: Date?
 
     var place: JobPlace {
         JobPlace(

@@ -76,7 +76,9 @@ struct SessionHero: View {
                 Color.clear.frame(width: 0, height: 0)
             }
             // Where it ran when that was not the Core (E15): an overflowed or pinned session, or one with heavy jobs.
-            RanOnChip(model.shell.hardwareDeck.place(session: session.id, runner: session.runner))
+            RanOnChip(
+                model.shell.hardwareDeck.place(
+                    session: session.id, runner: session.runner, placeReason: session.placeReason))
         }
         .help(model.title(session) + "\n" + subtitle)
         .accessibilityElement(children: .combine)

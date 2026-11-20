@@ -22,8 +22,9 @@ public struct AgentUsageInfo: Equatable, Sendable {
 /// One agent session as the API has it. There is no title yet (KAN-455): a session is its harness, runner and id.
 public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public let id: String
-    /// nil lets the Core place it (E15: no runner to choose).
-    public var runner: String?
+    public var runner: String
+    /// Why the Core put it on that machine (`core`, `overflow`, `pinned`…); nil from a Core that does not say (E15).
+    public var placeReason: String?
     public var harness: String
     public var model: String?
     public var state: SessionState
@@ -167,7 +168,8 @@ public struct ChainOption: Identifiable, Equatable, Sendable {
 }
 
 public struct NewAgentSession: Equatable, Sendable {
-    public var runner: String
+    /// nil lets the Core place it (E15: no runner to choose).
+    public var runner: String?
     public var harness: String
     public var model: String?
     /// Empty opens a live session that waits for the first message, like typing `claude` in a terminal.

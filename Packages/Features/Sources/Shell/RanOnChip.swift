@@ -5,7 +5,10 @@ import SwiftUI
 /// Where a job (or an AI session) ran, as the Core placed it (E15 §5, `Job.place_reason`).
 public struct JobPlace: Equatable, Sendable {
     public enum Reason: String, Sendable {
-        case core, overflow, runner, thisMac = "this_mac", coreNoFit = "core_no_fit", pinned
+        case core, overflow, runner
+        case thisMac = "this_mac"
+        case coreNoFit = "core_no_fit"
+        case pinned
     }
     public var deviceName: String
     public var reason: Reason
@@ -27,6 +30,9 @@ public struct JobPlace: Equatable, Sendable {
     public var words: String? {
         if reason == .core { return nil }
         let name = reason == .coreNoFit ? "Core" : deviceName
+        if reason == .overflow {
+            return "Overflow · " + (state == "lost" ? "lost on" : live ? "running on" : "ran on") + " \(name)"
+        }
         let verb = state == "lost" ? "Lost on" : live ? "Running on" : "Ran on"
         return "\(verb) \(name)"
     }
@@ -119,7 +125,18 @@ public final class HardwareDeck {
         }
     }
 
+    /// A job that ran in a session, with when it started: a tool step shows it when it started inside the step's run.
+    public struct JobRun: Equatable, Sendable {
+        public var startedAt: Date
+        public var place: JobPlace
+        public init(startedAt: Date, place: JobPlace) {
+            self.startedAt = startedAt
+            self.place = place
+        }
+    }
+
     public var bar: Bar?
+    public var runsBySession: [String: [JobRun]] = [:]
     public var jobByTerminal: [String: JobPlace] = [:]
     public var jobBySession: [String: JobPlace] = [:]
     public var jobByProject: [Int: JobPlace] = [:]
@@ -133,9 +150,24 @@ public final class HardwareDeck {
     public init() {}
     public var on: Bool { bar != nil }
 
-    /// A session's place: its newest job's, else "ran on X" when its runner is not the Core.
-    public func place(session id: String, runner: String) -> JobPlace? {
+    /// A session's place: how the Core placed it (`place_reason`: overflow, pinned…) when it is not on the Core, else its
+    /// newest job's, else "ran on X" when its runner is not the Core.
+    public func place(session id: String, runner: String, placeReason: String? = nil) -> JobPlace? {
+        if let name = offCore[runner] {
+            let why = placeReason.flatMap(JobPlace.Reason.init(rawValue:))
+            if let why, why != .core { return JobPlace(deviceName: name, reason: why) }
+        }
         if let p = jobBySession[id] { return p }
         return offCore[runner].map { JobPlace(deviceName: $0, reason: .runner) }
+    }
+
+    /// The job of `session` that started while a tool step ran (from `start` to `end`, or until now when it has not ended),
+    /// within `slack` seconds either way: the step's "ran on X" chip.
+    public func place(
+        session id: String, from start: Date, until end: Date?, slack: TimeInterval = 2
+    ) -> JobPlace? {
+        let stop = (end ?? .distantFuture).addingTimeInterval(slack)
+        return runsBySession[id]?.first { $0.startedAt >= start.addingTimeInterval(-slack) && $0.startedAt <= stop }?
+            .place
     }
 }

@@ -54,7 +54,8 @@ import Testing
     @Test func ranOnSaysNothingForTheCoreAndNamesAnyOtherMachine() {
         #expect(JobPlace(deviceName: "Core", reason: .core).words == nil)
         #expect(JobPlace(deviceName: "Studio", reason: .thisMac).words == "Ran on Studio")
-        #expect(JobPlace(deviceName: "Box", reason: .overflow, state: "running").words == "Running on Box")
+        #expect(JobPlace(deviceName: "Box", reason: .overflow, state: "running").words == "Overflow · running on Box")
+        #expect(JobPlace(deviceName: "Box", reason: .runner, state: "running").words == "Running on Box")
         #expect(JobPlace(deviceName: "Box", reason: .runner, state: "lost").words == "Lost on Box")
         let none = JobPlace(deviceName: "Core", reason: .coreNoFit, missing: "xcode")
         #expect(none.words == "Ran on Core")
@@ -72,7 +73,8 @@ import Testing
         svc.jobList = [
             JobItem(
                 id: "j_1", project: 3, session: "as_1", terminal: "t_1", label: "cargo build", deviceName: "Studio",
-                placeReason: "this_mac", missing: nil, state: "ended")
+                placeReason: "this_mac", missing: nil, state: "ended",
+                startedAt: Date(timeIntervalSince1970: 1_800_000_010))
         ]
         await m.refreshHardware()
         let deck = m.shell.hardwareDeck
@@ -118,5 +120,27 @@ import Testing
         let m = TerminalsModel(host: host, service: svc)
         await m.pause("d_mac", .indefinite)
         #expect(svc.pauses.isEmpty)
+    }
+
+    @Test func aSessionsPlaceReasonSaysOverflowAndAJobMatchesTheStepItStartedIn() async {
+        let svc = FakeService()
+        let m = TerminalsModel(host: FakeHost(), service: svc)
+        svc.hardwareList = [hw("d_core", kind: "core"), hw("d_box", kind: "runner")]
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        svc.jobList = [
+            JobItem(
+                id: "j_1", project: nil, session: "as_1", terminal: nil, label: "cargo build", deviceName: "box",
+                placeReason: "runner", missing: nil, state: "ended", startedAt: t0.addingTimeInterval(5))
+        ]
+        await m.refreshHardware()
+        let deck = m.shell.hardwareDeck
+        #expect(
+            deck.place(session: "as_2", runner: "d_box", placeReason: "overflow")?.words == "Overflow · ran on d_box")
+        #expect(deck.place(session: "as_2", runner: "d_core", placeReason: "overflow") == nil)
+        // A step that ran t0 to t0 + 20 s owns the job that started at t0 + 5 s; one that ended before does not.
+        #expect(deck.place(session: "as_1", from: t0, until: t0.addingTimeInterval(20))?.words == "Ran on box")
+        #expect(deck.place(session: "as_1", from: t0.addingTimeInterval(-30), until: t0.addingTimeInterval(-10)) == nil)
+        #expect(deck.place(session: "as_9", from: t0, until: nil) == nil, "another session's job is never matched")
+        #expect(deck.place(session: "as_1", from: t0, until: nil)?.deviceName == "box", "a running step has no end yet")
     }
 }
