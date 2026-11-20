@@ -216,7 +216,9 @@ struct LiveTerminalService: TerminalService {
 
     func hardwarePool() async -> HardwarePoolItem? {
         guard case .ok(let o)? = try? await client.getHardwarePool(), let p = try? o.body.json else { return nil }
-        return HardwarePoolItem(loadPct: Int(p.loadPct), jobs: Int(p.jobs), sessions: Int(p.sessions), paused: p.paused)
+        return HardwarePoolItem(
+            loadPct: Int(p.loadPct), jobs: Int(p.jobs), sessions: Int(p.sessions), paused: p.paused,
+            decisionsOff: p.decisions?.status == "off_no_provider")
     }
 
     func jobs() async -> [JobItem] {
