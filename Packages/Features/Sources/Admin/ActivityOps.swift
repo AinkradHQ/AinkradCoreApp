@@ -8,7 +8,7 @@ import SwiftUI
 // still under Reduce Motion; nothing follows the pointer.
 
 /// The words of the Ops cards, as pure functions.
-enum OpsWords {
+enum ActivityWords {
     /// "Quiet", "Busy", "Heavy" for a CPU share.
     static func load(_ pct: Double) -> String { pct < 40 ? "Quiet" : pct < 75 ? "Busy" : "Heavy" }
     /// "Plenty free", "Getting full", "Almost full" for a share in use.
@@ -94,19 +94,21 @@ struct OpsHostCards: View {
         return card(
             0, "Processor", big: now.map { "\(Int($0.rounded()))%" } ?? "–", small: nil,
             share: now.map { min($0, 100) / 100 },
-            series: series, ceiling: max(100, series.max() ?? 0), note: now.map(OpsWords.load))
+            series: series, ceiling: max(100, series.max() ?? 0), note: now.map(ActivityWords.load))
     }
 
     private func memory(_ series: [Double], host: CoreHostFacts?) -> some View {
         if let u = host?.ramUsedBytes, let t = host?.ramTotalBytes, t > 0 {
             let pct = Double(u) / Double(t) * 100
             return card(
-                1, "Memory", big: OpsWords.size(Double(u)), small: " of \(OpsWords.size(Double(t)))", share: pct / 100,
-                series: series, ceiling: 100, note: OpsWords.room(pct))
+                1, "Memory", big: ActivityWords.size(Double(u)), small: " of \(ActivityWords.size(Double(t)))",
+                share: pct / 100,
+                series: series, ceiling: 100, note: ActivityWords.room(pct))
         }
         let own = ops.coreHistory.last?.memoryBytes
         return card(
-            1, "Memory", big: own.map(OpsWords.size) ?? "–", small: own == nil ? nil : " used by the Core", share: nil,
+            1, "Memory", big: own.map(ActivityWords.size) ?? "–", small: own == nil ? nil : " used by the Core",
+            share: nil,
             series: series, ceiling: nil, note: nil)
     }
 
@@ -114,10 +116,10 @@ struct OpsHostCards: View {
         let used = host?.diskUsedBytes.map(Double.init) ?? last?.diskUsedBytes
         let total = last?.diskTotalBytes
         let pct = last?.diskUsedPct ?? (used.flatMap { u in total.map { u / $0 * 100 } })
-        let big = used.map(OpsWords.size) ?? pct.map { "\(Int($0.rounded()))%" } ?? "–"
+        let big = used.map(ActivityWords.size) ?? pct.map { "\(Int($0.rounded()))%" } ?? "–"
         return card(
-            2, "Disk", big: big, small: total.map { " of \(OpsWords.size($0))" }, share: pct.map { $0 / 100 },
-            series: series, ceiling: 100, note: pct.map(OpsWords.room))
+            2, "Disk", big: big, small: total.map { " of \(ActivityWords.size($0))" }, share: pct.map { $0 / 100 },
+            series: series, ceiling: 100, note: pct.map(ActivityWords.room))
     }
 
     private func card(
@@ -155,7 +157,7 @@ struct OpsBackupCard: View {
         let b = ops.backups
         VStack(alignment: .leading, spacing: Space.s2) {
             Text("Backups").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            Text(b?.history.first.map { OpsWords.last($0.at, now: now) } ?? "None yet")
+            Text(b?.history.first.map { ActivityWords.last($0.at, now: now) } ?? "None yet")
                 .coreFont(size: MacTextSize.headline, weight: .bold)
             if let b {
                 HStack(spacing: Space.s1) {
@@ -171,7 +173,8 @@ struct OpsBackupCard: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(days.filter { $0 }.count) of the last 7 days have a backup")
                 if let next = b.nextAt, b.available {
-                    Text(OpsWords.next(next, now: now)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    Text(ActivityWords.next(next, now: now)).coreFont(size: MacTextSize.meta).foregroundStyle(
+                        palette.text2)
                 } else if let words = b.scheduleWords {
                     Text(words).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 }
@@ -218,7 +221,7 @@ struct OpsRestartsCard: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Text("Recent restarts").coreFont(size: MacTextSize.headline, weight: .semibold)
             ForEach(Array(restarts.prefix(3).enumerated()), id: \.element.id) { i, r in
-                let w = OpsWords.restart(r)
+                let w = ActivityWords.restart(r)
                 HStack(spacing: Space.s2) {
                     Image(systemName: r.target == "core" ? "arrow.triangle.2.circlepath" : "server.rack")
                         .coreFont(size: MacTextSize.meta)
@@ -227,7 +230,8 @@ struct OpsRestartsCard: View {
                         .accessibilityHidden(true)
                     (Text(w.who).fontWeight(.bold) + Text(" \(w.what)")).coreFont(size: MacTextSize.body)
                     Spacer(minLength: 0)
-                    Text(OpsWords.last(r.at, now: now)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    Text(ActivityWords.last(r.at, now: now)).coreFont(size: MacTextSize.meta).foregroundStyle(
+                        palette.text2)
                 }
                 .modifier(RiseIn(index: i))
                 .accessibilityElement(children: .combine)
@@ -249,7 +253,7 @@ struct OpsFleetCard: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
                 Text("Runners").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text(OpsWords.fleet(fleet)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                Text(ActivityWords.fleet(fleet)).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 Spacer(minLength: 0)
                 Button("Open Runners", action: open).buttonStyle(CoreButtonStyle(.plain))
             }

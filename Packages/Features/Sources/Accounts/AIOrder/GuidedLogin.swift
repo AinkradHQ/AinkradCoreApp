@@ -37,7 +37,10 @@ enum SignInStyle: Equatable, Sendable {
 enum GuidedInput {
     static let maxLength = 256
     static let hint = "Type the number of a choice, or the code shown."
-    enum Verdict: Equatable { case send(String), empty, tooLong, badCharacters }
+    enum Verdict: Equatable {
+        case send(String)
+        case empty, tooLong, badCharacters
+    }
 
     static let agyHint = "Type the number of a choice, or paste the code shown (8 to 256 characters)."
 

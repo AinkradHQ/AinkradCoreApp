@@ -47,7 +47,8 @@ struct ProjectLimits: Equatable, Sendable {
     }
 
     enum OpenIn: String, CaseIterable {
-        case newWorkspace = "new", thisWorkspace = "this"
+        case newWorkspace = "new"
+        case thisWorkspace = "this"
         var title: String { self == .newWorkspace ? "A new workspace" : "This workspace" }
     }
 

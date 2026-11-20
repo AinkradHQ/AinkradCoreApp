@@ -165,8 +165,8 @@ struct RevealActivityTests {
         svc.restartRows = rows
         await admin.ops.reload()
         #expect(admin.ops.restarts.map(\.id) == ["A", "B"])
-        #expect(OpsWords.restart(rows[0]) == ("Core", "restarted on request"))
-        #expect(OpsWords.restart(rows[1]) == ("Runner", "could not be restarted"))
+        #expect(ActivityWords.restart(rows[0]) == ("Core", "restarted on request"))
+        #expect(ActivityWords.restart(rows[1]) == ("Runner", "could not be restarted"))
         let (old, oldSvc, _) = await world(v010: false)
         oldSvc.metricsText = "ainkrad_uptime_seconds 5\n"
         oldSvc.restartRows = rows
@@ -186,19 +186,21 @@ struct RevealActivityTests {
 
     @Test("The Ops words")
     func opsWords() {
-        #expect(OpsWords.load(10) == "Quiet" && OpsWords.load(50) == "Busy" && OpsWords.load(90) == "Heavy")
-        #expect(OpsWords.room(42) == "Plenty free" && OpsWords.room(95) == "Almost full")
-        #expect(OpsWords.fleet(CoreFleet(working: 1, idle: 0, offline: 2)) == "1 working, 2 offline")
-        #expect(OpsWords.fleet(CoreFleet(working: 0, idle: 0, offline: 0)) == "No runners yet")
+        #expect(
+            ActivityWords.load(10) == "Quiet" && ActivityWords.load(50) == "Busy" && ActivityWords.load(90) == "Heavy")
+        #expect(ActivityWords.room(42) == "Plenty free" && ActivityWords.room(95) == "Almost full")
+        #expect(ActivityWords.fleet(CoreFleet(working: 1, idle: 0, offline: 2)) == "1 working, 2 offline")
+        #expect(ActivityWords.fleet(CoreFleet(working: 0, idle: 0, offline: 0)) == "No runners yet")
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let now = Date(timeIntervalSince1970: 1_795_113_600)  // 2026-11-19 18:40 UTC
         let tonight = Date(timeIntervalSince1970: 1_795_113_600 + 4 * 3600)  // 22:40 the same day
-        #expect(OpsWords.next(tonight, now: now, calendar: cal).hasPrefix("Next one tonight at"))
+        #expect(ActivityWords.next(tonight, now: now, calendar: cal).hasPrefix("Next one tonight at"))
         #expect(
-            OpsWords.next(now.addingTimeInterval(86_400), now: now, calendar: cal).hasPrefix("Next one tomorrow at"))
-        #expect(OpsWords.last(now.addingTimeInterval(-3600), now: now, calendar: cal).hasPrefix("Today"))
-        #expect(OpsWords.last(now.addingTimeInterval(-86_400), now: now, calendar: cal).hasPrefix("Yesterday"))
+            ActivityWords.next(now.addingTimeInterval(86_400), now: now, calendar: cal).hasPrefix(
+                "Next one tomorrow at"))
+        #expect(ActivityWords.last(now.addingTimeInterval(-3600), now: now, calendar: cal).hasPrefix("Today"))
+        #expect(ActivityWords.last(now.addingTimeInterval(-86_400), now: now, calendar: cal).hasPrefix("Yesterday"))
     }
 
     @Test("The stream's news is worded, and kinds that are not news are left out")

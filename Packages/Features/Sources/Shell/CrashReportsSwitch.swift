@@ -8,7 +8,7 @@ import SwiftUI
 @MainActor @Observable
 public final class CrashReportPrefs {
     public static let shared = CrashReportPrefs()
-    private static let key = "ainkrad.crashReports"
+    private nonisolated static let key = "ainkrad.crashReports"
     public var enabled: Bool { didSet { UserDefaults.standard.set(enabled, forKey: Self.key) } }
     private init() { enabled = Self.isEnabled }
     /// Readable from anywhere (a crash handler runs off the main actor). Unset means on.

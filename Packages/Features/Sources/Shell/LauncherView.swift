@@ -544,6 +544,7 @@ private struct LauncherGroupRow: View {
 }
 
 private struct LauncherItem: View {
+    @Environment(\.coreAccent) private var paneAccent
     private var textScale: Double { TextSizePrefs.shared.scale }
     let entry: LauncherEntry
     let matched: [Int]

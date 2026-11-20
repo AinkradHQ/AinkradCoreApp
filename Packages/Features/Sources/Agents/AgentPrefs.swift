@@ -1,6 +1,7 @@
 import AppKit
 import CoreUI
 import Observation
+import Shell
 import SwiftUI
 
 /// How the Agents app looks and what the quick New session (⌘N) uses (Settings, Agents; the Appearance popover).

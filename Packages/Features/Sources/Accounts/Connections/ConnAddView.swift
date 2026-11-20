@@ -287,7 +287,8 @@ struct ConnAddView: View {
                                 r.name, detail: ConnAccess.line(r),
                                 isOn: Binding(
                                     get: { a.picked.contains(r.id) }, set: { _ in model.add?.toggle(pick: r.id) }),
-                                icon: a.kind == "github" ? "folder" : "doc.text"  // the mockup: folder for GitHub, doc for the rest
+                                // the mockup: folder for GitHub, doc for the rest
+                                icon: a.kind == "github" ? "folder" : "doc.text"
                             )
                             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                             .frame(maxWidth: .infinity, alignment: .leading)

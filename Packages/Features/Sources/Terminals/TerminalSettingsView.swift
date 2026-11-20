@@ -1,4 +1,5 @@
 import CoreUI
+import Shell
 import SwiftUI
 
 /// Settings, Terminal: a live preview on top, then theme, font, cursor and background. Changes apply to every open
