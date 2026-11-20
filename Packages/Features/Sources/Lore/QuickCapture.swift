@@ -124,11 +124,12 @@ public final class QuickCapture {
 
     /// Esc, a click elsewhere, or a send. What was typed stays for the next open until it is sent.
     func close() {
-        guard shown else { return }
-        shown = false
+        // A save's "Saved to …" line ends with the bar, shown or not: the next capture starts clean.
         saved = nil
         undoSave = nil
         closing?.cancel()
+        guard shown else { return }
+        shown = false
         if let escape { CoreEscape.shared.remove(escape) }
         escape = nil
         present(false)
@@ -161,6 +162,7 @@ public final class QuickCapture {
         guard !body.isEmpty, saved == nil else { return }
         guard let service = lore.service else {
             error = "Not connected to your Core. Your text stays here."
+            open()  // the bar stays up with the text, as after a failed save
             return
         }
         error = nil
