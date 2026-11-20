@@ -397,7 +397,7 @@ public final class TerminalsModel {
     }
 
     /// The Runners screen, to sit inside the Devices & Runners app.
-    public func runnersView() -> some View { RunnersView(model: self) }
+    public func runnersView() -> some View { HardwareView(model: self) }
 
     public func openRunners(_ id: String? = nil) {
         runnerDetail = id

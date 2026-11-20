@@ -130,7 +130,8 @@ public final class FakeAgentsAPI: AgentsAPI, @unchecked Sendable {
             return "as_new\(counter)"
         }
         let s = AgentSessionInfo(
-            id: id, runner: new.runner ?? "core", harness: new.chain == nil && new.agent == nil ? new.harness : "claude",
+            id: id, runner: new.runner ?? "core",
+            harness: new.chain == nil && new.agent == nil ? new.harness : "claude",
             state: new.prompt.isEmpty ? .waiting : .starting, createdAt: Date(), updatedAt: Date(),
             index: Int64(counter), project: new.project, branch: new.branch, policy: new.mode, plan: new.plan)
         add(

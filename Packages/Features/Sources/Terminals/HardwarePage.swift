@@ -285,7 +285,9 @@ struct HardwarePage: View {
                         }
                         .transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity))
                     }
-                    ForEach(jobs) { j in jobRow(j).transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity)) }
+                    ForEach(jobs) { j in
+                        jobRow(j).transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    }
                     ForEach(shownTerminals) { t in
                         workRow(
                             "terminal", "Terminal \(t.id)", t.attached == 0 ? "Not attached" : "\(t.attached) attached"
@@ -301,7 +303,8 @@ struct HardwarePage: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + jobs.map(\.id) + here.map(\.id))
+                .animation(
+                    Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + jobs.map(\.id) + here.map(\.id))
                 loadChart
             }
             if let n = model.noop[runner.id] { noopLine(n) }
