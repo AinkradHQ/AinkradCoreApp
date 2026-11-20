@@ -31,7 +31,9 @@ struct NewSessionSheet: View {
         case .repo: !repo.trimmingCharacters(in: .whitespaces).isEmpty
         }
     }
-    private var ready: Bool { runner != nil && placeOK && !busy }
+    /// With hardware (E15) the Core picks where a session runs: there is no runner to choose.
+    private var coreChooses: Bool { model.shell.hardwareDeck.on }
+    private var ready: Bool { (runner != nil || coreChooses) && placeOK && !busy }
 
     /// The tools the sheet offers (approved mockup): Claude Code, Codex, OpenCode, plus Antigravity (agy), the Gemini harness.
     static let tools = ["claude", "codex", "opencode", "agy"]
@@ -71,13 +73,15 @@ struct NewSessionSheet: View {
                         }
                     }
                     HStack(alignment: .top, spacing: Space.s3) {
-                        VStack(alignment: .leading, spacing: Space.s1) {
-                            CoreSelect(
-                                "Runner", selection: Binding(get: { runnerID ?? "" }, set: { runnerID = $0 }),
-                                options: model.runners.map {
-                                    CoreSelectOption($0.id, $0.name, note: $0.online ? nil : "offline")
-                                })
-                            hint(runnerLine)
+                        if !coreChooses {
+                            VStack(alignment: .leading, spacing: Space.s1) {
+                                CoreSelect(
+                                    "Runner", selection: Binding(get: { runnerID ?? "" }, set: { runnerID = $0 }),
+                                    options: model.runners.map {
+                                        CoreSelectOption($0.id, $0.name, note: $0.online ? nil : "offline")
+                                    })
+                                hint(runnerLine)
+                            }
                         }
                         VStack(alignment: .leading, spacing: Space.s1) {
                             CoreTextField(
@@ -206,7 +210,7 @@ struct NewSessionSheet: View {
     }
 
     private func start() {
-        guard let runner else { return }
+        guard runner != nil || coreChooses else { return }
         busy = true
         notice = nil
         let project: String? =
@@ -216,7 +220,8 @@ struct NewSessionSheet: View {
             case .repo: repo.trimmingCharacters(in: .whitespaces)
             }
         let new = NewAgentSession(
-            runner: runner.id, harness: harness, model: llm.isEmpty ? nil : llm, prompt: "", mode: mode,
+            runner: coreChooses ? model.newSessionRunner : runner?.id, harness: harness, model: llm.isEmpty ? nil : llm,
+            prompt: "", mode: mode,
             chain: chain?.id, project: project, branch: place == .repo && !branch.isEmpty ? branch : nil,
             base: Self.base(place, base))
         Task {

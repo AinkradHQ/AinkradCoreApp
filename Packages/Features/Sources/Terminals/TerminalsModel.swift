@@ -75,6 +75,14 @@ public final class TerminalsModel {
     /// only the current value, so the chart is what was sampled while the app watched.
     private(set) var loadSamples: [String: [Double]] = [:]
     var newTerminal: NewTerminalModel?
+    /// E15 hardware, by runner id: empty and off until the Core answers `/hardware` (minor 95).
+    var hardware: [String: HardwareItem] = [:]
+    var pool: HardwarePoolItem?
+    var jobs: [JobItem] = []
+    var hardwareOn = false
+    /// CPU use of each machine, one sample per `hardware.changed` look, oldest first.
+    var cpuSamples: [String: [Double]] = [:]
+    @ObservationIgnored var hardwareBusy = false
     /// Host terminals the Core is recording (Leyline), by terminal id: the pane says so and offers Pause. Leyline sets it.
     public var recording: [String: PaneRecording] = [:]
     /// Pauses the Core's recording of a terminal. Leyline owns the Core call, so the app sets this.
@@ -120,7 +128,7 @@ public final class TerminalsModel {
     var quickRunner: String? {
         let prefs = TerminalPrefs.shared
         for id in [prefs.lastRunner, prefs.defaultRunner] where !id.isEmpty {
-            if let r = runner(id), RunnerStatus(r) != .off, r.hasPty { return id }
+            if let r = runner(id), RunnerStatus(r) != .off, r.hasPty, !hidesTerminals(r) { return id }
         }
         return nil
     }
@@ -213,6 +221,7 @@ public final class TerminalsModel {
     /// The event stream said something: terminal and runner events mean "look again".
     public func event(kind: String) {
         if kind.hasPrefix("terminal.") || kind.hasPrefix("runner.") { resync() }
+        hardwareEvent(kind: kind)
     }
 
     func reload() async {
@@ -226,6 +235,7 @@ public final class TerminalsModel {
             for r in runners { sampleLoad(r) }
             applyReported()
             load = .ready
+            await refreshHardware()
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
             syncRunners()
@@ -310,8 +320,8 @@ public final class TerminalsModel {
             ) { [weak self] in self?.openNew() })
         l.register(
             LauncherEntry(
-                id: "runners", title: "Runners", sub: "Load, drivers and isolation of each runner",
-                symbol: "server.rack", keywords: ["runner", "machine", "load"]
+                id: "runners", title: "Hardware", sub: "Load, capacity and pause for each machine",
+                symbol: "server.rack", keywords: ["hardware", "runner", "machine", "load", "pause"]
             ) { [weak self] in self?.openRunners() })
     }
 
@@ -387,7 +397,7 @@ public final class TerminalsModel {
     }
 
     /// The Runners screen, to sit inside the Devices & Runners app.
-    public func runnersView() -> some View { RunnersView(model: self) }
+    public func runnersView() -> some View { HardwareView(model: self) }
 
     public func openRunners(_ id: String? = nil) {
         runnerDetail = id
@@ -397,8 +407,8 @@ public final class TerminalsModel {
             return
         }
         shell.openPane(
-            PaneSpec(id: "runners", title: "Runners", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
-                RunnersView(model: self)
+            PaneSpec(id: "runners", title: "Hardware", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
+                HardwareView(model: self)
             })
         Task { await reload() }
     }
@@ -746,7 +756,9 @@ final class NewTerminalModel {
 
     init(model: TerminalsModel, runner: String?) {
         self.model = model
-        self.runner = runner ?? model.runners.first(where: { RunnerStatus($0) != .off && $0.hasPty })?.id
+        self.runner =
+            runner
+            ?? model.runners.first(where: { RunnerStatus($0) != .off && $0.hasPty && !model.hidesTerminals($0) })?.id
     }
 
     var chosen: RunnerItem? { runner.flatMap { model.runner($0) } }

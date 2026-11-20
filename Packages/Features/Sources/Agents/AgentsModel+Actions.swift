@@ -273,7 +273,7 @@ extension AgentsModel {
     public func create(_ new: NewAgentSession) async -> InlineNotice? {
         guard let api else { return InlineNotice(title: "Connect to a Core first.") }
         do {
-            let s = try await elevated("Start \(new.harness) on \(runnerName(new.runner)).") {
+            let s = try await elevated("Start \(new.harness) on \(new.runner.map(runnerName) ?? "the Core").") {
                 try await api.create(new)
             }
             sessions.upsert(s)

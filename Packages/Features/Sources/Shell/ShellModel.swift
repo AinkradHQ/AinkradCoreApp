@@ -366,6 +366,8 @@ public final class ShellModel {
     public var topDialog: ShellDialog?
 
     public let launcher = LauncherRegistry()
+    /// What the Core says about its hardware (E15): the top bar's load, and where jobs and sessions ran.
+    public let hardwareDeck = HardwareDeck()
     public let bell = BellRegistry()
     public let settings = SettingsRegistry()
     /// The Core page of Settings: its name, crash reports, updates and storage.

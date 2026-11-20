@@ -84,6 +84,11 @@ final class FakeService: TerminalService, @unchecked Sendable {
     var policyResult: Result<(policy: RunnerPolicy, restarting: Bool), CoreError>?
     private(set) var policies: [RunnerPolicy] = []
     private(set) var installed: [String] = []
+    /// nil: the Core has no hardware API. Otherwise `/hardware`, `/hardware/pool` and `/jobs` answer these.
+    var hardwareList: [HardwareItem]?
+    var poolItem: HardwarePoolItem?
+    var jobList: [JobItem] = []
+    private(set) var pauses: [(id: String?, until: Date?)] = []
 
     func terminals() async throws -> [TerminalItem] { lock.withLock { terminalList } }
     func terminal(_ id: String) async throws -> TerminalItem {
@@ -108,6 +113,10 @@ final class FakeService: TerminalService, @unchecked Sendable {
     }
     func signal(_ id: String, _ name: String) async throws { lock.withLock { signals.append(name) } }
     func noop(_ runner: String) async throws -> Int { 31 }
+    func hardware() async -> [HardwareItem]? { lock.withLock { hardwareList } }
+    func hardwarePool() async -> HardwarePoolItem? { lock.withLock { poolItem } }
+    func jobs() async -> [JobItem] { lock.withLock { jobList } }
+    func pauseHardware(_ id: String?, until: Date?) async throws { lock.withLock { pauses.append((id, until)) } }
     func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {
         lock.withLock { policies.append(policy) }
         return try lock.withLock { policyResult }?.get() ?? (policy, true)
