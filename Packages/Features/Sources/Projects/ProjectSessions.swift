@@ -44,8 +44,10 @@ struct SessionsPage: View {
         VStack(spacing: Space.s2) {
             if let u = usage {
                 HStack(spacing: Space.s2) {
-                    InsightTile(title: "Running now", value: "\(u.running)", line: "Working on your code", spark: u.byDay)
-                    InsightTile(title: "Sessions this week", value: "\(u.sessionsWeek)", line: "Started in the last 7 days")
+                    InsightTile(
+                        title: "Running now", value: "\(u.running)", line: "Working on your code", spark: u.byDay)
+                    InsightTile(
+                        title: "Sessions this week", value: "\(u.sessionsWeek)", line: "Started in the last 7 days")
                     InsightTile(title: "Cost this week", value: CostWords.money(u.weekCost), line: u.trend)
                 }
                 .fixedSize(horizontal: false, vertical: true).coreRise(settled, 0)
@@ -73,8 +75,11 @@ struct SessionsPage: View {
                 if all.isEmpty, let rows = usage?.sessions, !rows.isEmpty {
                     VStack(spacing: Space.s1) {
                         ForEach(rows) { r in
-                            CoreRow(r.title, subtitle: r.running ? "Working now" : r.state.capitalized, symbol: "sparkles") {
-                                CoreSpark(r.spark, tone: r.running ? .run : .queue).frame(width: Space.s8 * 2, height: Space.s4)
+                            CoreRow(
+                                r.title, subtitle: r.running ? "Working now" : r.state.capitalized, symbol: "sparkles"
+                            ) {
+                                CoreSpark(r.spark, tone: r.running ? .run : .queue).frame(
+                                    width: Space.s8 * 2, height: Space.s4)
                                 StateBadge(CostWords.money(r.cost), tone: .queue, symbol: "circle")
                             }
                         }

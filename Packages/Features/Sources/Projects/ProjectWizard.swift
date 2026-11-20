@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The four steps of the New Project wizard (D-30): name, code (GitHub first), where it runs, review.
 enum WizardStep: Int, CaseIterable {
-    case name = 1, code, runs, review
+    case name = 1
+    case code, runs, review
 
     var title: String {
         switch self {
@@ -150,7 +151,8 @@ struct ProjectWizard: View {
 
     private var nameStep: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            DialogHead(title: "Name your project", line: "A project keeps your code, notes and AI sessions in one place.")
+            DialogHead(
+                title: "Name your project", line: "A project keeps your code, notes and AI sessions in one place.")
             CoreTextField(
                 "Name", placeholder: "Atlas notes", text: $name, error: problem ?? model.writeError, autofocus: true,
                 onSubmit: { if nameReady { step = .code } })
@@ -245,8 +247,10 @@ struct ProjectWizard: View {
                 }
             }
             if made != nil, progress.failed > 0, progress.settled {
-                Text("\(ProjectItem.count(progress.failed, "repo")) needs you. The others are ready, so you can open the project now.")
-                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "\(ProjectItem.count(progress.failed, "repo")) needs you. The others are ready, so you can open the project now."
+                )
+                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
             if let e = model.writeError { CoreFieldError(e) }
         }
@@ -290,7 +294,11 @@ struct ProjectWizard: View {
             CoreDialogFooter(
                 cancel: CoreAction("Back") { step = .name },
                 primary: CoreAction("Next", key: .primary) { step = .runs },
-                alternate: needsGithub ? CoreAction("Start with no code") { noCode = true; step = .runs } : nil,
+                alternate: needsGithub
+                    ? CoreAction("Start with no code") {
+                        noCode = true
+                        step = .runs
+                    } : nil,
                 enabled: !needsGithub)
         case .runs:
             CoreDialogFooter(

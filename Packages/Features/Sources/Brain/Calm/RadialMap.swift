@@ -117,7 +117,8 @@ struct RadialMap: View {
                     .accessibilityHidden(true)
             }
             HStack(spacing: Space.s1) {
-                RoundedRectangle(cornerRadius: 2).fill(working ? Color.green : Color.secondary).frame(width: 6, height: 6)
+                RoundedRectangle(cornerRadius: 2).fill(working ? Color.green : Color.secondary).frame(
+                    width: 6, height: 6)
                 Text(label).coreFont(size: MacTextSize.meta, weight: .semibold)
             }
         }

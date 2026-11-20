@@ -35,7 +35,8 @@ struct BrainPage: View {
                             )
                             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                             if let r = insights.rules, !r.isEmpty {
-                                Text("Rules").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
+                                Text("Rules").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(
+                                    GlassInk.secondary)
                                 ForEach(r.prefix(8)) { KnownRow(r: $0) }
                             }
                         }
@@ -54,7 +55,10 @@ struct BrainPage: View {
         let items = insights.knowledge ?? []
         return Island(
             title: "What Core remembers", sub: insights.knowledge == nil ? nil : "\(items.count) shown",
-            accessory: { Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }.buttonStyle(CoreButtonStyle(.secondary, size: .small)) }
+            accessory: {
+                Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }.buttonStyle(
+                    CoreButtonStyle(.secondary, size: .small))
+            }
         ) {
             if insights.knowledge == nil {
                 Text("Loading…").foregroundStyle(GlassInk.secondary)

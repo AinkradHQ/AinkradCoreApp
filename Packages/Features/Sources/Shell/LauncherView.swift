@@ -61,7 +61,9 @@ struct LauncherView: View {
                         ForEach(Array(lines.enumerated()), id: \.element.id) { i, line in
                             if let h = line.heading, i == 0 || lines[i - 1].heading != h { sectionTitle(h) }
                             if i == 0, case .pick = line { sectionTitle(suggestionTitle) }
-                            if case .group = line, i == 0 || !lines[i - 1].isGroup, !isNested(i - 1) { sectionTitle("Browse") }
+                            if case .group = line, i == 0 || !lines[i - 1].isGroup, !isNested(i - 1) {
+                                sectionTitle("Browse")
+                            }
                             if noMatch, i == 0 { empty }
                             if case .pick = line {
                                 // Two to a row (07-launcher `.n7-picks`); the second of each pair is drawn with the first.
@@ -177,8 +179,10 @@ struct LauncherView: View {
         case .item(let r, _, let nested):
             LauncherItem(
                 entry: r.entry, matched: r.matched, sub: r.entry.sub,
-                number: !nested && (actionsOnly || !query.isEmpty) && i < 9 ? i + 1 : nil, nested: nested, selected: i == selection,
-                glide: glide, hover: { hoverOver(i) }, copy: { copyName(r.entry) }, beside: { activate(at: i, beside: true) }
+                number: !nested && (actionsOnly || !query.isEmpty) && i < 9 ? i + 1 : nil, nested: nested,
+                selected: i == selection,
+                glide: glide, hover: { hoverOver(i) }, copy: { copyName(r.entry) },
+                beside: { activate(at: i, beside: true) }
             ) { activate(at: i) }
             if menuFor == line.id { actionsMenu(r.entry, at: i) }
         case .group(let s, let count, let isOpen):
@@ -331,7 +335,8 @@ struct LauncherView: View {
                 if let entry = lines.indices.contains(selection) ? lines[selection].entry : nil { copyName(entry) }
             case 48:  // ⇥ and ⇧⇥ between groups
                 if let to = LauncherLines.nextGroup(lines, from: selection, step: shift ? -1 : 1) { jump(to) }
-            case 124 where !query.isEmpty && caretAtEnd() && lines.indices.contains(selection)
+            case 124
+            where !query.isEmpty && caretAtEnd() && lines.indices.contains(selection)
                 && lines[selection].entry != nil:  // → opens the actions
                 menuFor = lines[selection].id
             case 125 where count > 0 && command: _ = jump(count - 1)  // ⌘↓
@@ -341,7 +346,11 @@ struct LauncherView: View {
             case 123 where count > 0 && selectedIsPick(): go(.left)  // ← across the suggestions
             case 124 where count > 0 && selectedIsPick(): go(.right)  // → across the suggestions
             case 35 where command && shift:  // ⌘⇧P show in Projects
-                if lines.indices.contains(selection), let e = lines[selection].entry, isProject(e) { activate(at: selection) } else { return e }
+                if lines.indices.contains(selection), let e = lines[selection].entry, isProject(e) {
+                    activate(at: selection)
+                } else {
+                    return e
+                }
             case 51 where command && menuFor != nil:  // ⌘⌫ close it, while the menu is open
                 if lines.indices.contains(selection), let en = lines[selection].entry, isOpen(en) { closeIt(en) }
             case 121 where count > 0: _ = jump(min(selection + 8, count - 1))  // page down
@@ -591,7 +600,9 @@ private struct LauncherItem: View {
             Button("Open", action: action)
             if let beside { Button("Open Beside", action: beside) }
             Button("Copy Name") {
-                if let copy { copy() } else {
+                if let copy {
+                    copy()
+                } else {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(entry.title, forType: .string)
                 }

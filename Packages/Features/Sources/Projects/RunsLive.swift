@@ -26,13 +26,21 @@ struct LiveRunsTab: View {
             accessory: {
                 if let p = c?.port { StateBadge("localhost:\(p)", tone: .queue, symbol: "globe") }
                 if let c {
-                    Button { Task { await runs.start(c, project: project) } } label: { Label("Restart", systemImage: "arrow.clockwise") }
-                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                        .disabled(runs.busy || !runs.model.canControl(project))
-                }
-                Button { Task { await runs.stop(r, project: project) } } label: { Label("Stop", systemImage: "power") }
+                    Button {
+                        Task { await runs.start(c, project: project) }
+                    } label: {
+                        Label("Restart", systemImage: "arrow.clockwise")
+                    }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     .disabled(runs.busy || !runs.model.canControl(project))
+                }
+                Button {
+                    Task { await runs.stop(r, project: project) }
+                } label: {
+                    Label("Stop", systemImage: "power")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .disabled(runs.busy || !runs.model.canControl(project))
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s2) {
@@ -64,9 +72,13 @@ struct LiveRunsTab: View {
     private var starters: some View {
         HStack(spacing: Space.s2) {
             ForEach(notRunning) { c in
-                Button { Task { await runs.start(c, project: project) } } label: { Label(c.name, systemImage: "play") }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                    .disabled(runs.busy || !runs.model.canControl(project))
+                Button {
+                    Task { await runs.start(c, project: project) }
+                } label: {
+                    Label(c.name, systemImage: "play")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .disabled(runs.busy || !runs.model.canControl(project))
             }
         }
     }
@@ -128,7 +140,9 @@ struct HistoryTab: View {
                         ) {
                             StateBadge(badge(r).0, tone: badge(r).1, symbol: "circle")
                             if let c = runs.configs.first(where: { $0.id == r.configID }) {
-                                Button { Task { await runs.start(c, project: project) } } label: {
+                                Button {
+                                    Task { await runs.start(c, project: project) }
+                                } label: {
                                     Label("Run again", systemImage: "arrow.clockwise")
                                 }
                                 .buttonStyle(CoreButtonStyle(.plain, size: .small))

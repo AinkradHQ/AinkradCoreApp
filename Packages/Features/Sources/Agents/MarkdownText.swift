@@ -232,7 +232,8 @@ private struct CodeBlock: View {
                     wrap.toggle()
                 }
                 .help(wrap ? "Scroll long lines" : "Wrap long lines")
-                CoreIconButton(symbol: copied ? "checkmark" : "doc.on.doc", label: copied ? "Copied" : "Copy the code") {
+                CoreIconButton(symbol: copied ? "checkmark" : "doc.on.doc", label: copied ? "Copied" : "Copy the code")
+                {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                     copied = true
@@ -320,7 +321,6 @@ private struct MarkdownImage: View {
         CoreChip(alt.isEmpty ? src : alt, symbol: "photo", minWidth: 0).help(src)
     }
 }
-
 
 /// The last paragraph of an answer that is still being written: its text and a calm caret that breathes between faint and full
 /// about every 0.6 s. Reduce Motion: the caret stays, still and full.

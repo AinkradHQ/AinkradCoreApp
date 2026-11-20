@@ -176,8 +176,11 @@ struct SpaceNoteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(note.fullScreen ? "\(note.app) opened in its own workspace" : "\(note.app) did not fit, so it has a workspace")
-                .coreFont(size: MacTextSize.body, weight: .semibold)
+            Text(
+                note.fullScreen
+                    ? "\(note.app) opened in its own workspace" : "\(note.app) did not fit, so it has a workspace"
+            )
+            .coreFont(size: MacTextSize.body, weight: .semibold)
             Text(
                 (note.fullScreen
                     ? "\(note.app) needs the whole screen, so it did not squeeze in beside your other apps."

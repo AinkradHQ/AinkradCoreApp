@@ -188,8 +188,8 @@ struct ReviewPane: View {
                 Button("Accept") { store.set(id, f.path, .accepted) }
                     .buttonStyle(CoreButtonStyle(.prominent, size: .small)).help("Mark this file as reviewed")
                 Button("Revert") { Task { await model.revert(id, paths: [f.path]) } }
-                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(!writable)
-                .help("Put this file back as it was before this session's edits")
+                    .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(!writable)
+                    .help("Put this file back as it was before this session's edits")
             }
             CoreTextArea(
                 nil, placeholder: "Comment on this file", text: $comment, minHeight: Space.s8, maxHeight: Space.s8 * 3)

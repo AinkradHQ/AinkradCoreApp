@@ -23,7 +23,9 @@ struct ProjectStats: Equatable {
     /// "Good", or what needs the person.
     var health: String { needsYou > 0 ? "Needs you" : total == 0 ? "No code yet" : "Good" }
     var healthLine: String {
-        needsYou > 0 ? "\(ProjectItem.count(needsYou, "repo")) could not be copied" : total == 0 ? "Add a repo" : "Everything is ready"
+        needsYou > 0
+            ? "\(ProjectItem.count(needsYou, "repo")) could not be copied"
+            : total == 0 ? "Add a repo" : "Everything is ready"
     }
     var healthFraction: Double { total == 0 ? 0 : Double(ready) / Double(total) }
 }
@@ -36,12 +38,16 @@ struct ActivityLine: Equatable, Identifiable {
     var id: String { "\(title)\(at.timeIntervalSince1970)" }
 
     /// Runs and repo copies, newest first, at most `limit`.
-    static func timeline(repos: [RepoItem], runs: [RunRecord], names: [Int64: String], limit: Int = 6) -> [ActivityLine] {
+    static func timeline(repos: [RepoItem], runs: [RunRecord], names: [Int64: String], limit: Int = 6) -> [ActivityLine]
+    {
         var out: [ActivityLine] = []
         for r in runs {
             guard let at = r.startedAt else { continue }
             let n = r.configID.flatMap { names[$0] } ?? "The project"
-            out.append(ActivityLine(title: r.state == "failed" ? "\(n) failed to start" : "\(n) started", symbol: r.state == "failed" ? "exclamationmark.triangle" : "bolt", at: at))
+            out.append(
+                ActivityLine(
+                    title: r.state == "failed" ? "\(n) failed to start" : "\(n) started",
+                    symbol: r.state == "failed" ? "exclamationmark.triangle" : "bolt", at: at))
         }
         for r in repos {
             if let at = r.fetchedAt { out.append(ActivityLine(title: "\(r.name) copied", symbol: "checkmark", at: at)) }

@@ -388,8 +388,8 @@ public struct LiveAgentsAPI: AgentsAPI {
         info.turnCostApproximate = s.turnCostApproximate ?? false
         info.canStopSubagents = s.canStopSubagents ?? false
         #if CORE_CLIENT_95
-            info.effort = s.effort
-            info.canSetEffort = s.canSetEffort ?? false
+        info.effort = s.effort
+        info.canSetEffort = s.canSetEffort ?? false
         #endif
         return info
     }

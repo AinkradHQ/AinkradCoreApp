@@ -131,7 +131,8 @@ struct LauncherGridTests {
     @Test func fallbacksAreOfferedByModulesAndTakeTheWords() {
         let reg = LauncherRegistry()
         var got = ""
-        reg.registerFallback(LauncherFallback(id: "ask", symbol: "sparkles", title: { "Ask AI about “\($0)”" }) { got = $0 })
+        reg.registerFallback(
+            LauncherFallback(id: "ask", symbol: "sparkles", title: { "Ask AI about “\($0)”" }) { got = $0 })
         reg.registerFallback(LauncherFallback(id: "ask", symbol: "sparkles", title: { "Ask \($0)" }) { got = $0 })
         #expect(reg.fallbacks.count == 1 && reg.fallbacks[0].title("x") == "Ask x")
         reg.fallbacks[0].run("hello")
@@ -140,7 +141,9 @@ struct LauncherGridTests {
 
     @Test func notesBelongToTheirOwnGroup() {
         let e = LauncherEntry(id: "note-n_1", title: "Weekly plan") {}
-        #expect(LauncherSection.of(e) == .notes && LauncherSection.of(LauncherEntry(id: "project-3", title: "x") {}) == .projects)
+        #expect(
+            LauncherSection.of(e) == .notes
+                && LauncherSection.of(LauncherEntry(id: "project-3", title: "x") {}) == .projects)
         #expect(LauncherSection.of(LauncherEntry(id: "terminal-t", title: "x") {}) == .terminals)
     }
 }

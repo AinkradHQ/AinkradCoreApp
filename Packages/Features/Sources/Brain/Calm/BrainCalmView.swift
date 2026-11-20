@@ -170,7 +170,9 @@ private struct Learned: View {
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
         // Reduce Motion: the list changes at once, no fade.
-        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.learned.map(\.id) + calm.autoImports.map(\.run))
+        .animation(
+            Motion.calm(Motion.out(Motion.ui), reduce), value: calm.learned.map(\.id) + calm.autoImports.map(\.run)
+        )
         .accessibilityIdentifier("brain-learned")
     }
 }

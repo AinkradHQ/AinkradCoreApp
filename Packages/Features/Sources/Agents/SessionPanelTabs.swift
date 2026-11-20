@@ -49,7 +49,9 @@ struct TodoStrip: View {
 
     /// The newest list, or nil when there is none or every item is done (a finished list is history, not a strip).
     static func items(_ entries: [TranscriptEntry]) -> [TodoItem]? {
-        guard let list = TasksCard.latest(entries), list.contains(where: { $0.status != .completed }) else { return nil }
+        guard let list = TasksCard.latest(entries), list.contains(where: { $0.status != .completed }) else {
+            return nil
+        }
         return list
     }
 
@@ -143,7 +145,8 @@ struct FilesTab: View {
     }
 
     /// The tree flattened: a folder's children follow it while it is open.
-    static func lines(_ folders: [String: FolderListing], open: Set<String>, dir: String = "", depth: Int = 0) -> [Line] {
+    static func lines(_ folders: [String: FolderListing], open: Set<String>, dir: String = "", depth: Int = 0) -> [Line]
+    {
         var out: [Line] = []
         for e in folders[dir]?.entries ?? [] {
             let path = dir.isEmpty ? e.name : dir + "/" + e.name
@@ -158,7 +161,8 @@ struct FilesTab: View {
         let changed = Set(touched.map { ($0.path as NSString).lastPathComponent })
         VStack(alignment: .leading, spacing: Space.s1) {
             HStack {
-                Text(session.project ?? "Fresh folder").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
+                Text(session.project ?? "Fresh folder").coreFont(size: MacTextSize.meta).foregroundStyle(
+                    SessionInk.text2)
                 Spacer(minLength: 0)
                 if model.sessionTools {
                     CoreIconButton(symbol: "arrow.clockwise", label: "Reload the folder") {

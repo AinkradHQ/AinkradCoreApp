@@ -103,7 +103,9 @@ enum LauncherLines {
     static let maxResults = 40
 
     /// Empty query: the suggestions, then a collapsed header per group, with the open group's entries under it.
-    @MainActor static func browse(entries: [LauncherEntry], picks: [LauncherPick], open: LauncherSection?) -> [LauncherLine] {
+    @MainActor static func browse(entries: [LauncherEntry], picks: [LauncherPick], open: LauncherSection?)
+        -> [LauncherLine]
+    {
         var out = picks.map { LauncherLine.pick($0) }
         let by = Dictionary(grouping: entries, by: LauncherSection.of)
         for s in LauncherSection.allCases {

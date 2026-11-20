@@ -283,7 +283,8 @@ public final class TerminalsModel {
             shell.launcher.register(
                 LauncherEntry(
                     id: "terminal-\(t.id)", title: displayName(ofTerminal: t.id) ?? "Terminal",
-                    sub: "On \(name(of: t.runner))", symbol: "terminal", keywords: ["terminal", "shell", name(of: t.runner)]
+                    sub: "On \(name(of: t.runner))", symbol: "terminal",
+                    keywords: ["terminal", "shell", name(of: t.runner)]
                 ) { [weak self] in self?.openTerminal(t.id) })
         }
         registeredTerminals = ids

@@ -102,7 +102,9 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
-            if !mentionEntries.isEmpty { MentionPicker(entries: mentionEntries, pick: min(pick, mentionEntries.count - 1), choose: take) }
+            if !mentionEntries.isEmpty {
+                MentionPicker(entries: mentionEntries, pick: min(pick, mentionEntries.count - 1), choose: take)
+            }
             // The agent's own steps, one line above the composer (opens upward).
             if let todos = TodoStrip.items(model.transcripts[session.id]?.entries ?? []) { TodoStrip(items: todos) }
             // What went wrong with the last send (or resume, wake...), right where you typed it.
@@ -278,7 +280,10 @@ struct ComposerView: View {
                     .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
             }
             .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.97, hoverFill: true))
-            .help("\(Int(ctx.fill * 100))% of the context is used (\(ctx.text))" + (ctx.fill > 0.7 ? ". Click to compact." : ""))
+            .help(
+                "\(Int(ctx.fill * 100))% of the context is used (\(ctx.text))"
+                    + (ctx.fill > 0.7 ? ". Click to compact." : "")
+            )
             .accessibilityLabel("Context used: \(Int(ctx.fill * 100)) percent")
         }
     }
@@ -298,7 +303,9 @@ struct ComposerView: View {
         }
         .help(listening ? "Stop dictating" : "Dictate: speech is recognised on this Mac, nothing is sent out")
         .onChange(of: voice.state) { _, now in
-            if case .blocked(let why) = now { model.note(session.id, InlineNotice(title: "Dictation is off", detail: why, tone: .warn)) }
+            if case .blocked(let why) = now {
+                model.note(session.id, InlineNotice(title: "Dictation is off", detail: why, tone: .warn))
+            }
         }
         .onDisappear { voice.stop() }
     }
@@ -334,7 +341,9 @@ struct ComposerView: View {
 
     /// Redirect now: stop the running turn and send this message as the next one.
     private var steerButton: some View {
-        Button { Task { await model.steer(session.id) } } label: {
+        Button {
+            Task { await model.steer(session.id) }
+        } label: {
             Label("Steer", systemImage: "arrow.turn.down.right")
         }
         .buttonStyle(CoreButtonStyle(.secondary, size: .small))

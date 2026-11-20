@@ -46,7 +46,10 @@ public final class AutoFlow {
                 }
                 quiet += 1
                 // About two minutes with nothing: the person sorts it (the Core leaves Unsorted and mixed rooms alone).
-                if quiet > 60 { sort = .nothing; return }
+                if quiet > 60 {
+                    sort = .nothing
+                    return
+                }
                 try? await Task.sleep(for: poll)
             }
         }

@@ -50,7 +50,11 @@ struct RunVarItem: Equatable, Identifiable, Sendable {
 }
 
 struct EnvDiffItem: Equatable, Identifiable, Sendable {
-    enum Change: String, Sendable { case same, different, onlyA = "only_a", onlyB = "only_b" }
+    enum Change: String, Sendable {
+        case same, different
+        case onlyA = "only_a"
+        case onlyB = "only_b"
+    }
     let key: String
     let change: Change
     var id: String { key }
@@ -164,8 +168,7 @@ struct LiveRunConfigsService: RunConfigsService {
         try RunConfigsWire.vars(try await call("GET", Self.envPath(project, config, env)))
     }
 
-    func setVar(project: Int64, config: Int64, env: String, key: String, value: String?, secret: String?) async throws
-    {
+    func setVar(project: Int64, config: Int64, env: String, key: String, value: String?, secret: String?) async throws {
         var o: [String: Any] = [:]
         if let value { o["value"] = value }
         if let secret { o["secret"] = secret }

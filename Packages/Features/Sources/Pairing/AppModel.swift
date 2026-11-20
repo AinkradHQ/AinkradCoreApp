@@ -157,7 +157,8 @@ public final class AppModel {
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
-        agents.loreNotes = { [weak lore] session in lore?.sessionDocs.filter { $0.session == session }.map(\.note) ?? [] }
+        agents.loreNotes = { [weak lore] session in lore?.sessionDocs.filter { $0.session == session }.map(\.note) ?? []
+        }
         agents.openNoteInLore = { [weak lore] id in lore?.open(note: id) }
         lore.openSession = { [weak agents] id in agents?.openSession(id) }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }

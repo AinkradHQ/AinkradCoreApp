@@ -268,7 +268,6 @@ extension String {
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
-
 /// The title bar's kind chip (mockup 20): what the open item is.
 struct KindChip: View {
     let kind: DesignDoc.Kind

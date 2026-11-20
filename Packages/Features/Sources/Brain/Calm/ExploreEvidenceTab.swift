@@ -19,7 +19,9 @@ struct ExploreEvidenceTab: View {
     @State private var trace: SourceTraceWire?
 
     private var kinds: [(kind: String, count: Int)] {
-        Dictionary(grouping: entries, by: \.item.sourceKind).map { ($0.key, $0.value.count) }.sorted { $0.kind < $1.kind }
+        Dictionary(grouping: entries, by: \.item.sourceKind).map { ($0.key, $0.value.count) }.sorted {
+            $0.kind < $1.kind
+        }
     }
     private var files: [Entry] { entries.filter { $0.item.sourceKind == kind } }
 
@@ -31,10 +33,14 @@ struct ExploreEvidenceTab: View {
                         .padding(Space.s3)
                 }
                 ForEach(kinds, id: \.kind) { k in
-                    CoreRow(Self.title(k.kind), subtitle: BrainWords.plural(k.count, "item", "items"),
+                    CoreRow(
+                        Self.title(k.kind), subtitle: BrainWords.plural(k.count, "item", "items"),
                         symbol: Self.symbol(k.kind), selected: kind == k.kind
                     ) {
-                        withAnimation(Motion.out(Motion.ui)) { kind = k.kind; picked = nil }
+                        withAnimation(Motion.out(Motion.ui)) {
+                            kind = k.kind
+                            picked = nil
+                        }
                     }
                 }
             }
@@ -44,7 +50,8 @@ struct ExploreEvidenceTab: View {
                     Text(Self.title(kind)).coreFont(size: MacTextSize.headline, weight: .semibold)
                     VStack(spacing: 2) {
                         ForEach(files) { f in
-                            CoreRow(f.item.title.isEmpty ? "Untitled" : f.item.title,
+                            CoreRow(
+                                f.item.title.isEmpty ? "Untitled" : f.item.title,
                                 subtitle: "\(Self.when(f.item.startedAt)) · \(roomName(f.room))", symbol: "doc",
                                 selected: picked == f.id
                             ) { picked = f.id }
@@ -71,7 +78,9 @@ struct ExploreEvidenceTab: View {
     private func origin(_ f: Entry) -> some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Text("Where it came from").coreFont(size: MacTextSize.headline, weight: .semibold)
-            CoreRow(Self.title(f.item.sourceKind), subtitle: Self.when(f.item.startedAt), symbol: Self.symbol(f.item.sourceKind))
+            CoreRow(
+                Self.title(f.item.sourceKind), subtitle: Self.when(f.item.startedAt),
+                symbol: Self.symbol(f.item.sourceKind))
             CoreRow(roomName(f.room), subtitle: "The place Brain filed it in", symbol: "folder")
             Text("Brain read this and wrote down what mattered. What it learned is under Records.")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

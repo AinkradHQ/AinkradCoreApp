@@ -23,8 +23,12 @@ struct EnvironmentTab: View {
             CoreSegmented(
                 "Environment", segments: runs.envs.map { CoreSegment($0, $0) },
                 selection: Binding(get: { runs.env }, set: { e in Task { await runs.pickEnv(e) } }))
-            Button { Task { await runs.addEnvironment() } } label: { Label("Environment", systemImage: "plus") }
-                .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
+            Button {
+                Task { await runs.addEnvironment() }
+            } label: {
+                Label("Environment", systemImage: "plus")
+            }
+            .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
             Spacer(minLength: 0)
             if runs.configs.count > 1 {
                 CoreSelect(
@@ -35,12 +39,20 @@ struct EnvironmentTab: View {
                 )
                 .frame(width: Space.s8 * 4)
             }
-            Button { RunsDialogs.openImport(runs) } label: { Label("Import .env", systemImage: "square.and.arrow.down") }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                .disabled(runs.model.readOnly || runs.envConfigItem == nil)
-            Button { Task { await runs.toggleCompare() } } label: { Label("Compare", systemImage: "arrow.left.arrow.right") }
-                .buttonStyle(CoreButtonStyle(runs.comparing ? .prominent : .secondary, size: .small))
-                .disabled(runs.envs.count < 2)
+            Button {
+                RunsDialogs.openImport(runs)
+            } label: {
+                Label("Import .env", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            .disabled(runs.model.readOnly || runs.envConfigItem == nil)
+            Button {
+                Task { await runs.toggleCompare() }
+            } label: {
+                Label("Compare", systemImage: "arrow.left.arrow.right")
+            }
+            .buttonStyle(CoreButtonStyle(runs.comparing ? .prominent : .secondary, size: .small))
+            .disabled(runs.envs.count < 2)
         }
     }
 
@@ -79,7 +91,12 @@ struct EnvironmentTab: View {
 
     private func add() {
         let (k, v) = (newKey, newValue)
-        Task { if await runs.addVar(key: k, value: v) { newKey = ""; newValue = "" } }
+        Task {
+            if await runs.addVar(key: k, value: v) {
+                newKey = ""
+                newValue = ""
+            }
+        }
     }
 
     private var compare: some View {
@@ -87,7 +104,8 @@ struct EnvironmentTab: View {
             title: "\(runs.env) compared with",
             accessory: {
                 CoreSelect(
-                    nil, selection: Binding(get: { runs.compareWith }, set: { e in Task { await runs.pickCompare(e) } }),
+                    nil,
+                    selection: Binding(get: { runs.compareWith }, set: { e in Task { await runs.pickCompare(e) } }),
                     options: runs.envs.filter { $0 != runs.env }.map { CoreSelectOption($0, $0) }
                 )
                 .frame(width: Space.s8 * 4)
@@ -99,9 +117,13 @@ struct EnvironmentTab: View {
                     if runs.diff.isEmpty { Text("Nothing to compare.").foregroundStyle(GlassInk.secondary) }
                     ForEach(runs.diff) { d in
                         CoreRow(
-                            d.key, symbol: d.change == .same ? "checkmark" : d.change == .different ? "arrow.triangle.2.circlepath" : "plus"
+                            d.key,
+                            symbol: d.change == .same
+                                ? "checkmark" : d.change == .different ? "arrow.triangle.2.circlepath" : "plus"
                         ) {
-                            StateBadge(label(d.change), tone: d.change == .same ? .queue : d.change == .onlyA ? .run : .warn, symbol: "circle")
+                            StateBadge(
+                                label(d.change), tone: d.change == .same ? .queue : d.change == .onlyA ? .run : .warn,
+                                symbol: "circle")
                         }
                     }
                 }
@@ -137,14 +159,19 @@ private struct VarRow: View {
                 .frame(width: MacSize.controlMd).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(v.key).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
-                Text(line).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(GlassInk.secondary)
-                    .lineLimit(1).textSelection(.enabled)
+                Text(line).font(.system(size: MacTextSize.meta, design: .monospaced)).foregroundStyle(
+                    GlassInk.secondary
+                )
+                .lineLimit(1).textSelection(.enabled)
             }
             Spacer(minLength: 0)
             Text(v.secret.map { "From Secrets: \($0)" } ?? "Plain value").foregroundStyle(GlassInk.secondary)
                 .coreFont(size: MacTextSize.meta)
             if v.secret == nil {
-                CoreIconButton(symbol: shown == nil ? "eye" : "eye.slash", label: shown == nil ? "Show the value" : "Hide the value") {
+                CoreIconButton(
+                    symbol: shown == nil ? "eye" : "eye.slash",
+                    label: shown == nil ? "Show the value" : "Hide the value"
+                ) {
                     Task { await runs.toggleReveal(v) }
                 }
             }
@@ -217,11 +244,14 @@ struct ImportEnvSheet: View {
                 DialogHead(
                     title: "Import a .env file",
                     line: "Paste the file. Values stay hidden once imported, and go into \(runs.env).")
-                CoreTextArea(nil, placeholder: "API_URL=http://localhost:8080", text: $text, autofocus: true, design: .monospaced)
+                CoreTextArea(
+                    nil, placeholder: "API_URL=http://localhost:8080", text: $text, autofocus: true, design: .monospaced
+                )
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),
                     primary: CoreAction(
-                        Self.count(text) == 0 ? "Import" : "Import \(ProjectItem.count(Self.count(text), "variable"))", key: .primary
+                        Self.count(text) == 0 ? "Import" : "Import \(ProjectItem.count(Self.count(text), "variable"))",
+                        key: .primary
                     ) {
                         let t = text
                         Task { if await runs.importEnv(t) { close() } }

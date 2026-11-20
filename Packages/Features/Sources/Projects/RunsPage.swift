@@ -21,7 +21,10 @@ struct RunsPage: View {
         if model.configsService == nil || setup {
             VStack(alignment: .leading, spacing: Space.s2) {
                 if setup {
-                    HStack { BackButton("Runs") { setup = false }; Spacer(minLength: 0) }
+                    HStack {
+                        BackButton("Runs") { setup = false }
+                        Spacer(minLength: 0)
+                    }
                 }
                 RunPage(model: model, project: project)
             }
@@ -107,17 +110,24 @@ struct ConfigurationsTab: View {
         Island(
             title: "Configurations",
             accessory: {
-                Button { Task { await runs.create() } } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(runs.model.readOnly || runs.busy)
+                Button {
+                    Task { await runs.create() }
+                } label: {
+                    Label("New", systemImage: "plus")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(runs.model.readOnly || runs.busy)
             }
         ) {
             if let e = runs.loadError {
                 CoreNotice(symbol: "exclamationmark.triangle", title: "Unable to load", text: e, tone: .fail) {
-                    Button("Try Again") { Task { await runs.load() } }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    Button("Try Again") { Task { await runs.load() } }.buttonStyle(
+                        CoreButtonStyle(.secondary, size: .small))
                 }
             } else if runs.configs.isEmpty && runs.loaded {
-                Text("No configurations yet. Add one to start this project's code with its own command and environment.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "No configurations yet. Add one to start this project's code with its own command and environment."
+                )
+                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 ScrollView {
                     VStack(spacing: Space.s1) {
@@ -140,14 +150,26 @@ struct ConfigurationsTab: View {
             Island(
                 title: c.name,
                 accessory: {
-                    Button { Task { await runs.duplicate(c) } } label: { Label("Duplicate", systemImage: "doc.on.doc") }
-                        .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
-                    Button { deleting = true } label: { Label("Delete", systemImage: "trash") }
-                        .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
-                    Button { Task { await runs.start(c, project: project) } } label: { Label("Run", systemImage: "play") }
-                        .buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: runs.busy))
-                        .disabled(runs.model.readOnly || runs.busy || !runs.model.canControl(project))
-                        .help("Run \(c.name) in \(runs.runEnv)")
+                    Button {
+                        Task { await runs.duplicate(c) }
+                    } label: {
+                        Label("Duplicate", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
+                    Button {
+                        deleting = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
+                    Button {
+                        Task { await runs.start(c, project: project) }
+                    } label: {
+                        Label("Run", systemImage: "play")
+                    }
+                    .buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: runs.busy))
+                    .disabled(runs.model.readOnly || runs.busy || !runs.model.canControl(project))
+                    .help("Run \(c.name) in \(runs.runEnv)")
                 }
             ) {
                 ScrollView {
@@ -224,10 +246,13 @@ private struct ConfigForm: View {
                     CoreFieldLabel("Restart if it stops")
                     HStack(spacing: Space.s2) {
                         CoreSwitch(
-                            "", isOn: Binding(get: { config.restart }, set: { runs.edit(config, RunConfigPatch(restart: $0)) })
+                            "",
+                            isOn: Binding(
+                                get: { config.restart }, set: { runs.edit(config, RunConfigPatch(restart: $0)) })
                         )
                         .accessibilityLabel("Restart if it stops")
-                        Text(config.restart ? "Comes back within seconds, up to 5 times" : "Stays stopped").foregroundStyle(GlassInk.secondary)
+                        Text(config.restart ? "Comes back within seconds, up to 5 times" : "Stays stopped")
+                            .foregroundStyle(GlassInk.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

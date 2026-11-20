@@ -547,7 +547,8 @@ public final class LoreModel {
 
     /// The eight most recent notes as launcher entries (⌘K → Notes).
     func syncLauncherNotes() async {
-        guard let service, let list = try? await service.list(filter: LoreFilter(state: "active", kind: nil, project: nil, tag: nil))
+        guard let service,
+            let list = try? await service.list(filter: LoreFilter(state: "active", kind: nil, project: nil, tag: nil))
         else { return }
         let shell = host.shell
         let names = projectNames
@@ -556,7 +557,9 @@ public final class LoreModel {
         for gone in registeredNotes.subtracting(ids) { shell.launcher.unregister(gone) }
         for r in recent {
             shell.launcher.register(
-                LauncherEntry(id: "note-\(r.id)", title: r.title, sub: r.sub, symbol: r.symbol, keywords: ["note", "lore"]) {
+                LauncherEntry(
+                    id: "note-\(r.id)", title: r.title, sub: r.sub, symbol: r.symbol, keywords: ["note", "lore"]
+                ) {
                     [weak self] in self?.open(note: r.id)
                 })
         }

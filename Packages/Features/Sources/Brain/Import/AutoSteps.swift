@@ -55,7 +55,8 @@ struct SortStep: View {
         let items = model.counts.stored.formatted()
         switch model.auto.sort {
         case .waiting: return "Sorting into places"
-        case .sorted(let n): return "Sorted \(items) items into \(BrainWords.plural(n, "place", "places")), all accepted"
+        case .sorted(let n):
+            return "Sorted \(items) items into \(BrainWords.plural(n, "place", "places")), all accepted"
         case .undone(let n): return "Undone. \(n.formatted()) items are back in one pile for now."
         case .nothing: return "Nothing was sorted by itself. Sort it yourself, or keep going."
         }
@@ -77,8 +78,10 @@ struct LearnStep: View {
                         .accessibilityIdentifier("brain-import-cost")
                 }
             }
-            Text("Brain reads every place and writes down what matters: who you are, your rules, what you know and what happened.")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(
+                "Brain reads every place and writes down what matters: who you are, your rules, what you know and what happened."
+            )
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             if l == nil { CoreBusyBar().accessibilityHidden(true) }
             VStack(spacing: 2) {
                 ForEach(l?.places ?? []) { p in
@@ -91,7 +94,8 @@ struct LearnStep: View {
             if l?.places.contains(where: { $0.state == "waiting" }) == true {
                 CoreNotice(
                     symbol: "key", title: "Brain needs an AI account",
-                    text: "It cannot learn new things without one. Your Claude subscription works, and costs nothing extra."
+                    text:
+                        "It cannot learn new things without one. Your Claude subscription works, and costs nothing extra."
                 ) { EmptyView() }
             }
             Text("Closing this does not stop it.").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

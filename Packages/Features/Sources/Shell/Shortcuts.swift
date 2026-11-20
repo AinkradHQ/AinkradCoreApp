@@ -18,7 +18,8 @@ enum ShortcutCatalog {
             "View",
             [
                 ("Home or last workspace", "⌘0"), ("Workspace", "⇧⌘0"),
-                ("Next / Previous Workspace", "⌃→ / ⌃←"), ("Jump to Workspace", "⌃1–9"), ("All Workspaces", "⌃↑"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘B"),
+                ("Next / Previous Workspace", "⌃→ / ⌃←"), ("Jump to Workspace", "⌃1–9"), ("All Workspaces", "⌃↑"),
+                ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘B"),
                 ("Reconnect to Core", "⌘R"),
                 ("Switch Day and Night", "⌃⌘D"), ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"),
                 ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
