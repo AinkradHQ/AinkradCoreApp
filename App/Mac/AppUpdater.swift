@@ -32,7 +32,7 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         showInstalledNews()
         shell.settings.section(
             SettingsSection(
-                id: "updates", group: .mac, title: "Updates", sub: "Ainkrad updates itself",
+                id: "updates", group: .general, title: "Updates", sub: "Ainkrad updates itself",
                 symbol: "arrow.down.circle",
                 order: 6
             ) { UpdatesSection(version: Self.version) { [weak self] in self?.check() } })

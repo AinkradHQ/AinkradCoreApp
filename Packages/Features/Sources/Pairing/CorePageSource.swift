@@ -23,7 +23,7 @@ struct LiveCorePageSource: CorePageSource {
     func set(name: String?, crashReports: Bool?, autoUpdate: Bool?, updateHour: Int?) async throws -> CorePagePrefs {
         try await run {
             let body = Components.Schemas.SetCorePrefs(
-                name: name, crashReports: crashReports, autoUpdate: autoUpdate, updateHour: updateHour.map { Int64($0) }
+                autoUpdate: autoUpdate, crashReports: crashReports, name: name, updateHour: updateHour.map { Int64($0) }
             )
             return Self.prefs(try await client.setCorePrefs(body: .json(body)).ok.body.json)
         }

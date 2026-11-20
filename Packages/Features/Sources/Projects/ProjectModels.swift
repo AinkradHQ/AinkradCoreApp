@@ -131,13 +131,13 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The state as the design system's badge says it.
     var badge: (label: String, tone: Tone, symbol: String) {
         if archived { return ("Archived", .queue, "archivebox") }
-        switch tag {
-        case .running: ("Running", .run, "play.circle")
-        case .starting: ("Starting", .warn, "gearshape")
-        case .stopped: ("Stopped", .queue, "stop.circle")
-        case .failed: ("Failed", .fail, "exclamationmark.triangle")
-        case .settingUp: ("Setting up", .warn, "gearshape")
-        case .new: ("New", .queue, "sparkle")
+        return switch tag {
+        case .running: ("Running", Tone.run, "play.circle")
+        case .starting: ("Starting", Tone.warn, "gearshape")
+        case .stopped: ("Stopped", Tone.queue, "stop.circle")
+        case .failed: ("Failed", Tone.fail, "exclamationmark.triangle")
+        case .settingUp: ("Setting up", Tone.warn, "gearshape")
+        case .new: ("New", Tone.queue, "sparkle")
         }
     }
 

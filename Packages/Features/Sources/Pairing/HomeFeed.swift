@@ -145,14 +145,15 @@ struct LiveHomeSource: HomeSource {
         }
     }
 
-    /// The tightest limit of each provider across its accounts, with the soonest plan-window reset.
+    /// The tightest plan window of each provider across its accounts (a fraction of the window's limit), with the soonest
+    /// reset. E7 removed the per-account limits, so the subscription's own plan windows are the measure.
     func usage() async throws -> [HomeUsage] {
         try await run {
-            async let spend = client.accountsUsage().ok.body.json
-            async let accounts = client.listAccounts().ok.body.json
-            let (spent, list) = try await (spend, accounts)
+            let list = try await client.listAccounts().ok.body.json
             return Self.usage(
-                spent: spent.map { ($0.accountId, Double($0.maxUtilisationBps) / 10_000) },
+                spent: list.compactMap { a in
+                    a.health?.planLimit?.windows.map(\.utilization).max().map { (a.id, $0) }
+                },
                 accounts: list.map {
                     ($0.id, $0.provider, ($0.health?.planLimit?.windows ?? []).compactMap(\.resetsAt))
                 })
