@@ -226,16 +226,27 @@ struct GuidedSignInModelTests {
         #expect(!flow.consent, "consent is not kept across tries")
     }
 
-    @Test func openCodeNeedsNoConsent() async {
+    @Test(.timeLimit(.minutes(1))) func openCodeNeedsNoConsent() async {
         let flow = AddAccountFlow()
-        let m = await ready(FakeService())
-        await flow.choose(provider("opencode-sub", harness: "opencode"), m)
+        let svc = FakeService()
+        let m = await ready(svc)
+        m.signInTick = 0.002
+        // With one runner and no consent to ask, choosing starts the sign-in and follows it until it ends.
+        let choosing = Task { await flow.choose(provider("opencode-sub", harness: "opencode"), m) }
+        for _ in 0..<400 where !svc.log.contains(where: { $0.hasPrefix("startLogin opencode-sub") }) {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
         #expect(!flow.needsConsent)
+        #expect(svc.log.contains { $0.hasPrefix("startLogin opencode-sub") }, "it started without asking")
+        await m.cancelSignIn()  // closing the dialog ends the follow
+        await choosing.value
+        #expect((m.host as? FakeHost)?.opened.isEmpty == false, "the sign-in page went to the host, not a browser")
     }
 
     @Test func theNotesLandOnTheAccountAndTheRemovalToast() async {
         let svc = FakeService()
         svc.orderOn = true
+        svc.accountList = [account(1, "agy-main")]
         let m = await ready(svc)
         await m.reload()
         guard let id = m.accounts.first?.id else {

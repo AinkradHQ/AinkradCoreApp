@@ -20,6 +20,8 @@ public protocol AdminHost: AnyObject {
         async throws -> T
     /// The Core answered 429: the shell shows its banner with the wait.
     func rateLimited(retryAfter: TimeInterval?)
+    /// Opens a link in the person's browser. No default: a test host records it, so no test ever opens a real browser.
+    func open(_ url: URL)
 }
 
 extension AdminHost {

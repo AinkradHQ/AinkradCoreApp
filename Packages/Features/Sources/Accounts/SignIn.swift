@@ -105,7 +105,8 @@ extension AccountsModel {
     }
 
     func follow(_ id: String) async {
-        while let s = signIn, s.login == id, !signInEnded {
+        // Cancellation ends it too: the sleep below swallows it, and the loop must not spin on.
+        while let s = signIn, s.login == id, !signInEnded, !Task.isCancelled {
             try? await Task.sleep(for: .seconds(signInTick * pollBackoff.seconds))
             guard let service, let l = try? await service.login(id) else { continue }
             apply(l)
