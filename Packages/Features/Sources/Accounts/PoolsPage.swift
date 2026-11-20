@@ -191,7 +191,7 @@ private struct MemberRow: View {
                 Text(a?.label ?? "Account \(id)").coreFont(size: MacTextSize.headline, weight: .semibold)
                     .lineLimit(1)
                 Text(first ? "Tried first" : AccountsWords.capWords(a?.cap ?? 0)).coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(first ? GlassInk.accent(paneAccent)Ink : GlassInk.secondary)
+                    .foregroundStyle(first ? GlassInk.accentInk(paneAccent) : GlassInk.secondary)
             }
             Spacer(minLength: Space.s2)
             if let a { VerdictBadge(verdict: model.verdict(a)) }

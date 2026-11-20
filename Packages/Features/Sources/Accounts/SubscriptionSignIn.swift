@@ -118,7 +118,7 @@ struct SubscriptionSignIn: View {
             numbered(2, "Paste the code Claude shows you", "It's a short code, not a password.") {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "doc.on.clipboard").foregroundStyle(
-                        codeFocus ? GlassInk.accent(paneAccent)Ink : GlassInk.secondary)
+                        codeFocus ? GlassInk.accentInk(paneAccent) : GlassInk.secondary)
                     TextField("Paste the code here", text: $code).textFieldStyle(.plain)
                         .coreFont(size: MacTextSize.title, design: .monospaced).focused($codeFocus)
                         .autocorrectionDisabled().onSubmit(send)

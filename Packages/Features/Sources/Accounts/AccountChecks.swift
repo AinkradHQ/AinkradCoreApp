@@ -150,7 +150,7 @@ struct TestTile: View {
                 HStack(spacing: Space.s2) {
                     Image(systemName: running ? "arrow.triangle.2.circlepath" : w?.symbol ?? "checkmark.shield")
                         .font(.system(size: 22, weight: .semibold)).foregroundStyle(
-                            running ? GlassInk.accent(paneAccent)Ink : GlassInk.ink(w?.hue ?? GlassInk.slate)
+                            running ? GlassInk.accentInk(paneAccent) : GlassInk.ink(w?.hue ?? GlassInk.slate)
                         )
                         .contentTransition(.symbolEffect(.replace))
                     Text(running ? "Testing…" : w?.title ?? "Never tested")

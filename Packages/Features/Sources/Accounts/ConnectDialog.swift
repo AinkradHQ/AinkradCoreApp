@@ -220,7 +220,7 @@ struct ConnectDialog: View {
             VStack(spacing: 0) {
                 Image(systemName: on ? "\(n).square.fill" : "checkmark.square.fill")
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(on ? GlassInk.accent(paneAccent)Ink : GlassInk.slate)
+                    .foregroundStyle(on ? GlassInk.accentInk(paneAccent) : GlassInk.slate)
                 if !last {
                     coreShape(1).fill(GlassInk.track)
                         .frame(width: 2).frame(minHeight: 24).padding(.vertical, 4)

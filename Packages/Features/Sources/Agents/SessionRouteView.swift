@@ -81,7 +81,7 @@ private struct AttemptList: View {
                 } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: a.id == current ? "circle.inset.filled" : "square.stack")
-                            .foregroundStyle(a.id == current ? GlassInk.accent(paneAccent)Ink : GlassInk.secondary)
+                            .foregroundStyle(a.id == current ? GlassInk.accentInk(paneAccent) : GlassInk.secondary)
                         Text(SessionCues.attempt(a))
                         if let acc = a.route?.account, let n = model.accountNames[acc] {
                             Text("on \(n)").foregroundStyle(GlassInk.secondary)

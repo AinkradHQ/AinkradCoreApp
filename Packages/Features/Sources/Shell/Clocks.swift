@@ -27,10 +27,12 @@ struct AnalogDial: View {
                     TimelineView(homeTicks(1, live: live)) { ctx in
                         let a = ClockFace.angles(ctx.date, hand: hand)
                         ZStack {
-                            HandLine(tail: 0.08, length: 0.42, width: 0.06 * r, ink: GlassInk.accent(paneAccent)).rotationEffect(
-                                .degrees(a.hour))
-                            HandLine(tail: 0.08, length: 0.70, width: 0.04 * r, ink: GlassInk.accent(paneAccent)).rotationEffect(
-                                .degrees(a.minute))
+                            HandLine(tail: 0.08, length: 0.42, width: 0.06 * r, ink: GlassInk.accent(paneAccent))
+                                .rotationEffect(
+                                    .degrees(a.hour))
+                            HandLine(tail: 0.08, length: 0.70, width: 0.04 * r, ink: GlassInk.accent(paneAccent))
+                                .rotationEffect(
+                                    .degrees(a.minute))
                             if hand == .ticking {
                                 secondHand(r).rotationEffect(.degrees(a.second))
                             }
@@ -52,7 +54,7 @@ struct AnalogDial: View {
     }
 
     private func secondHand(_ r: CGFloat) -> some View {
-        HandLine(tail: 0.20, length: 0.80, width: 0.018 * r, ink: GlassInk.accent(paneAccent)Ink)
+        HandLine(tail: 0.20, length: 0.80, width: 0.018 * r, ink: GlassInk.accentInk(paneAccent))
     }
 
     /// Face, ticks and (Large) the four numbers. Drawn once; only the hands move.

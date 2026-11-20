@@ -245,10 +245,11 @@ private struct SourceRows: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(c.sources) { s in
                     HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-                        Image(systemName: "link").foregroundStyle(GlassInk.accent(paneAccent)Ink).accessibilityHidden(true)
+                        Image(systemName: "link").foregroundStyle(GlassInk.accentInk(paneAccent)).accessibilityHidden(
+                            true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(s.title).coreFont(size: MacTextSize.body, weight: .medium).foregroundStyle(
-                                GlassInk.accent(paneAccent)Ink)
+                                GlassInk.accentInk(paneAccent))
                             if !s.quote.isEmpty {
                                 Text(s.quote).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
                                     .fixedSize(horizontal: false, vertical: true)

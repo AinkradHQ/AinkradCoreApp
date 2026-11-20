@@ -71,7 +71,9 @@ struct DiffBlock: View {
             }
             if lines.count > Self.fold {
                 Button(all ? "Show less" : "Show \(lines.count - Self.fold) more lines") { all.toggle() }
-                    .buttonStyle(.plain).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.accent(paneAccent)Ink)
+                    .buttonStyle(.plain).coreFont(size: MacTextSize.meta).foregroundStyle(
+                        GlassInk.accentInk(paneAccent)
+                    )
                     .padding(Space.s2)
             }
         }

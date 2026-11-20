@@ -58,7 +58,7 @@ struct ConnCue: View {
             .lineLimit(2)
             if refused, let openConnections {
                 Button("Allow in Connections", action: openConnections).buttonStyle(.plain)
-                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.accent(paneAccent)Ink)
+                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.accentInk(paneAccent))
             }
         }
         .padding(.horizontal, Space.s2).padding(.vertical, Space.s1)

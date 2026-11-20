@@ -214,13 +214,14 @@ private struct FlagCard: View {
         } content: {
             StatePanel(
                 symbol: isOn ? onSymbol : offSymbol,
-                hue: lessSafe ? (isOn ? GlassInk.amber : GlassInk.green) : (isOn ? GlassInk.accent(paneAccent) : GlassInk.slate),
+                hue: lessSafe
+                    ? (isOn ? GlassInk.amber : GlassInk.green) : (isOn ? GlassInk.accent(paneAccent) : GlassInk.slate),
                 title: lessSafe ? (isOn ? "On · less safe" : "Off · safer") : (isOn ? "On" : "Off"),
                 line: isOn ? onLine : offLine, trigger: isOn
             ) { EmptyView() }
             if let needs {
                 Label(needs, systemImage: "arrow.turn.right.up").coreFont(size: MacTextSize.meta, weight: .semibold)
-                    .foregroundStyle(GlassInk.accent(paneAccent)Ink)
+                    .foregroundStyle(GlassInk.accentInk(paneAccent))
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }

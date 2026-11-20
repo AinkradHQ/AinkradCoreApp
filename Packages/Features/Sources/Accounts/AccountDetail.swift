@@ -45,7 +45,8 @@ struct AccountDetailView: View {
                             AccountDialogs.openDelete(model, a)
                         }
                         .disabled(ro)
-                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.accent(paneAccent)) {
+                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.accent(paneAccent))
+                        {
                             AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
                         }
                         .disabled(ro)
@@ -245,7 +246,7 @@ struct AccountDetailView: View {
                 } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(
-                            GlassInk.accent(paneAccent)Ink)
+                            GlassInk.accentInk(paneAccent))
                         Text(p.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.forward").foregroundStyle(GlassInk.secondary)
