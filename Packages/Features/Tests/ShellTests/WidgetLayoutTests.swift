@@ -53,10 +53,10 @@ struct WidgetLayoutTests {
         #expect(l.items[0].x == 1)
     }
 
-    @Test func resizeOnlyToSizesTheWidgetHas() throws {
+    @Test func resizeToTheSameSizeIsRefusedAndAnotherSizeTheWidgetHasWorks() throws {
         var l = WidgetLayout(items: [WidgetItem(kind: .clock, size: .m, x: 0, y: 0)])
         let id = l.items[0].id
-        let ok6350 = l.resize(id, to: .x)
+        let ok6350 = l.resize(id, to: .m)
         #expect(!ok6350)
         let ok1198 = l.resize(id, to: .l)
         #expect(ok1198)

@@ -53,7 +53,7 @@ struct RunConfigsWireTests {
         #expect(RunConfigPatch().json.isEmpty)
     }
 
-    @Test func namesAndImportCounts() {
+    @Test @MainActor func namesAndImportCounts() {
         #expect(RunConfigsModel.varName(" api url ") == "API_URL")
         #expect(ImportEnvSheet.count("# c\nA=1\n\nB=2\nnope\n") == 2)
     }

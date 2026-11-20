@@ -3,6 +3,7 @@ import Testing
 
 @testable import Brain
 
+@MainActor
 struct BrainStatusTests {
     @Test func theCoreAnswerIsReadAndWorded() throws {
         let json = """
@@ -28,6 +29,7 @@ struct BrainStatusTests {
     }
 }
 
+@MainActor
 struct AutoImportTests {
     @Test func theLearningStepIsReadWithItsCost() throws {
         let json = """
