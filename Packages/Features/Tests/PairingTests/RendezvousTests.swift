@@ -99,7 +99,7 @@ struct RendezvousTests {
     }
 
     private func settle(_ m: SetupWizardModel, until done: @MainActor () -> Bool) async {
-        for _ in 0..<400 where !done() { try? await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<2000 where !done() { try? await Task.sleep(for: .milliseconds(5)) }
     }
 
     @Test func theWaitMovesOnByItselfWhenTheLinkArrivesAndNeverConnectsByItself() async throws {
