@@ -109,6 +109,7 @@ final class ConnectWizardState {
 }
 
 struct ConnectWizard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let close: () -> Void
     @State private var w: ConnectWizardState
@@ -119,7 +120,10 @@ struct ConnectWizard: View {
         self.model = model
         self.close = close
         let first =
-            provider ?? ProviderLook.ordered(model.providers).first { ProviderSites.page($0.id) != nil }?.id
+            provider
+            ?? AccountsOptions.startProvider(
+                AccountsOptions.options.string(AccountsOptions.provider, "claude"), among: model.providers.map(\.id))
+            ?? ProviderLook.ordered(model.providers).first { ProviderSites.page($0.id) != nil }?.id
             ?? model.providers.first?.id ?? ""
         let state = ConnectWizardState(provider: first, advanced: advanced)
         #if DEBUG
@@ -244,7 +248,9 @@ struct ConnectWizard: View {
                             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: Space.s2)
-                    AppActionTile(title: "Open", symbol: "arrow.up.right.square", key: "⌘O", hue: GlassInk.blue) {
+                    AppActionTile(
+                        title: "Open", symbol: "arrow.up.right.square", key: "⌘O", hue: GlassInk.accent(paneAccent)
+                    ) {
                         model.opener(site.url)
                     }
                     .keyboardShortcut("o", modifiers: .command)

@@ -61,6 +61,10 @@ public final class TerminalsModel {
     var runnerDetail: String?
     /// The summary tile that is on (mockup 12); nil shows every runner.
     var runnerFilter: RunnerFacts.Live?
+    /// The summary tile picked on the Runners screen of the Devices & Runners app; nil shows every runner.
+    var runnerBucket: RunnerBucket?
+    /// Opens the Devices & Runners app on its Runners tab; set by the app that hosts that pane. Nil: the plain Runners pane.
+    @ObservationIgnored public var openRunnersApp: (@MainActor () -> Void)?
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Why the last embedded terminal did not open.
@@ -79,6 +83,8 @@ public final class TerminalsModel {
     var policyBusy: Set<String> = []
     var policyNote: [String: RunnerNote] = [:]
     var installs: [String: [String: ToolInstall]] = [:]
+    /// True on a Core with API minor 95, which reports a runner's tool installs: the Runners pane then says Updating.
+    public var showsUpdates = false
 
     let host: any TerminalHost
     let service: any TerminalService
@@ -150,6 +156,38 @@ public final class TerminalsModel {
                 id: t.id, name: displayName(ofTerminal: t.id) ?? t.id, place: mac ? "This Mac" : name(of: t.runner),
                 onThisMac: mac, lines: Array(lines))
         }
+    }
+
+    /// Whether the Core says this runner has work on it now; nil when it is not in the list yet.
+    public func isWorking(runner id: String) -> Bool? {
+        runners.first { $0.id == id }.map { RunnerBucket(of: $0) == .working }
+    }
+
+    /// The runner's own version, as the Core lists it.
+    public func version(ofRunner id: String) -> String? { runners.first { $0.id == id }?.version }
+
+    /// Whether the Core says a newer runner is ready for this one; nil when it did not say.
+    public func updateAvailable(ofRunner id: String) -> Bool? { runners.first { $0.id == id }?.updateAvailable }
+
+    /// How many runners the Core says have an update waiting.
+    public var runnersWithUpdate: Int { runners.filter { $0.updateAvailable == true }.count }
+
+    /// The runner's load samples (last ten minutes), for a small chart.
+    public func loadSamples(ofRunner id: String) -> [Double] { loadSamples[id] ?? [] }
+
+    /// "Claude 2.1 · Codex 0.9": the tools a runner has, with versions; empty when it reports none.
+    public func toolLine(ofRunner id: String) -> String {
+        guard let r = runners.first(where: { $0.id == id }) else { return "" }
+        return r.tools.filter { $0.key != RunnerFacts.shellKey }.sorted { $0.key < $1.key }
+            .map { "\($0.key.prefix(1).uppercased())\($0.key.dropFirst()) \($0.value)" }.joined(separator: " · ")
+    }
+
+    /// Looks at the runners again (the About tab's "Check for updates").
+    public func recheck() async { await reload() }
+
+    /// The tool names a runner has ready, e.g. "claude", for the This Mac tab.
+    public func tools(ofRunner id: String) -> Set<String> {
+        Set((runners.first { $0.id == id }?.tools.keys.map { $0.lowercased() }) ?? [])
     }
 
     public func displayName(ofTerminal id: String) -> String? {
@@ -237,9 +275,12 @@ public final class TerminalsModel {
         followElevation()
         shell.settings.section(
             SettingsSection(
-                id: "terminal", group: .apps, title: "Terminals", sub: "Look, screen, surface and defaults",
-                symbol: "terminal", order: 10
-            ) { TerminalSettingsView(model: self) })
+                id: "terminal", group: .apps, title: "Terminal", sub: "Look, screen, surface and defaults",
+                symbol: "terminal", order: 4,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { TerminalSettingsView(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { TerminalSettingsView(model: self, part: .options) },
+                ]))
         let l = shell.launcher
         l.register(
             LauncherEntry(
@@ -345,8 +386,16 @@ public final class TerminalsModel {
         Task { await reload() }
     }
 
+    /// The Runners screen, to sit inside the Devices & Runners app.
+    public func runnersView() -> some View { RunnersView(model: self) }
+
     public func openRunners(_ id: String? = nil) {
         runnerDetail = id
+        if let openRunnersApp {
+            openRunnersApp()
+            Task { await reload() }
+            return
+        }
         shell.openPane(
             PaneSpec(id: "runners", title: "Runners", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
                 RunnersView(model: self)
@@ -479,6 +528,7 @@ public final class TerminalsModel {
 
     private func bell(_ id: String) {
         rang.insert(id)
+        TerminalOptions.ring()
         let name = name(of: items.first { $0.id == id }?.runner ?? "")
         shell.bell.add(
             BellItem(

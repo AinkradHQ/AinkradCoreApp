@@ -201,7 +201,14 @@ public final class LoreModel {
         spec.fullScreenOnly = true
         spec.onNew = { [weak self] in Task { await self?.newNote() } }
         shell.openPane(spec)
-        if today, load != .ready { Task { await openDay(todayKey) } }
+        if today, load != .ready {
+            let o = LoreOptions.options
+            let last = LoreOptions.noteAtStart(
+                openLast: o.bool(LoreOptions.openLast, true), last: o.string(LoreOptions.lastNote, ""))
+            Task {
+                if let last { await openNote(last) } else { await openDay(todayKey) }
+            }
+        }
     }
 
     /// The page is on screen and takes typing (L1). Ends the open signpost.
@@ -224,6 +231,7 @@ public final class LoreModel {
 
     func openDay(_ key: String) async {
         opened = true
+        LoreOptions.options.set(LoreOptions.lastNote, "")
         await leave()
         day = key
         note = nil
@@ -233,6 +241,7 @@ public final class LoreModel {
     func openNote(_ id: String) async {
         guard LoreLink.isNoteID(id) else { return }
         opened = true
+        LoreOptions.options.set(LoreOptions.lastNote, id)
         await leave()
         day = nil
         note = LoreNote(id: id)
@@ -532,9 +541,20 @@ public final class LoreModel {
             ) { [weak self] in self?.capture.toggle() })
         shell.settings.section(
             SettingsSection(
-                id: "lore", group: .apps, title: "Lore", sub: "The quick capture shortcut", symbol: "text.book.closed",
-                order: 40
-            ) { [capture] in LoreSettingsSection(capture: capture) })
+                id: "lore", group: .apps, title: "Lore", sub: "Look and the quick capture shortcut",
+                symbol: "text.book.closed", order: 6,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Lore", prefs: AppLookPrefs.shared("lore"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { [capture] in
+                        VStack(alignment: .leading, spacing: Space.s4) {
+                            LoreWritingSection()
+                            LoreSettingsSection(capture: capture)
+                        }
+                    },
+                ]))
         shell.launcher.registerFallback(
             LauncherFallback(id: "lore-search", symbol: "magnifyingglass", title: { "Search notes for “\($0)”" }) {
                 [weak self] q in if let self { LoreOpenSheet.open(self, query: q) }

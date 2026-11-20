@@ -3,6 +3,7 @@ import SwiftUI
 
 /// One opened card: rename, kind, merge, split, refuse, the room's settings, and its items with Needed and Refused marks.
 struct ReviewDetail: View {
+    @Environment(\.coreAccent) private var paneAccent
     let review: ReviewModel
     @State private var name = ""
     @State private var mergeInto = ""
@@ -46,7 +47,7 @@ struct ReviewDetail: View {
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             Text(c.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-            if let s = ReviewWords.state(c) { BrainChip(s, GlassInk.blue) }
+            if let s = ReviewWords.state(c) { BrainChip(s, GlassInk.accent(paneAccent)) }
             ForEach(c.warnings, id: \.self) { BrainChip(ReviewWords.warning($0), GlassInk.red) }
             Spacer()
             if c.state != "committed" { RoomBox(card: c, review: review) }

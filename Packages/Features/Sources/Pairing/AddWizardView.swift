@@ -6,6 +6,7 @@ import SwiftUI
 /// Add a device or a runner (n17): What → Install → Connect → Access (a device) or Settings (a runner) → Done, one screen
 /// each. The step bar always shows the six names, so a person sees the whole way; the steps a kind skips stay unlit.
 struct AddWizardView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     @Bindable var model: AddWizardModel
     let close: () -> Void
@@ -80,7 +81,8 @@ struct AddWizardView: View {
                             model.choose(k)
                         } label: {
                             VStack(alignment: .leading, spacing: Space.s2) {
-                                IconTile(k.symbol, hue: k.isRunner ? GlassInk.slate : GlassInk.blue, size: 48)
+                                IconTile(
+                                    k.symbol, hue: k.isRunner ? GlassInk.slate : GlassInk.accent(paneAccent), size: 48)
                                 Text(k.title).coreFont(size: MacTextSize.body, weight: .semibold).padding(
                                     .top, Space.s1)
                                 Text(k.blurb).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
@@ -154,7 +156,7 @@ struct AddWizardView: View {
         let d = model.connected
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                IconTile(model.kind?.symbol ?? "checkmark", hue: GlassInk.blue, size: 36)
+                IconTile(model.kind?.symbol ?? "checkmark", hue: GlassInk.accent(paneAccent), size: 36)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(d?.name ?? model.name).coreFont(size: MacTextSize.body, weight: .semibold)
                     Text(AddWizardWords.summary(model, d)).coreFont(size: MacTextSize.meta)

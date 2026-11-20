@@ -4,6 +4,7 @@ import SwiftUI
 /// A small tag on the CoreUI state tones (no hand-mixed tint): blue informs, green and red are real status, amber is
 /// "needs you", slate is quiet. Same height, radius and type as `StateBadge`, without the symbol a tag does not need.
 struct BrainChip: View {
+    @Environment(\.coreAccent) private var paneAccent
     let text: String
     let hue: Color
     var help: String?
@@ -20,7 +21,7 @@ struct BrainChip: View {
                 ? .fail
                 : hue == GlassInk.amber
                     ? .warn
-                    : hue == GlassInk.blue ? .done : .queue
+                    : hue == GlassInk.accent(paneAccent) ? .done : .queue
     }
     var body: some View {
         let c = palette.tone(tone)
@@ -39,15 +40,16 @@ struct BrainChip: View {
 
 /// The chips every Brain screen shows for a room: its mode, provider policy and, for employer and client rooms, who it is for.
 struct RoomChips: View {
+    @Environment(\.coreAccent) private var paneAccent
     let room: RoomSummary
     var body: some View {
         ChipFlow(spacing: Space.s2) {
             BrainChip(room.mode.label, GlassInk.slate, help: room.mode.story)
             BrainChip(
-                room.provider.label, room.provider == .approvedCloud ? GlassInk.blue : GlassInk.slate,
+                room.provider.label, room.provider == .approvedCloud ? GlassInk.accent(paneAccent) : GlassInk.slate,
                 help: room.provider.help)
             if let k = room.kind.chipLabel {
-                BrainChip(k, GlassInk.blue, help: "\(k) room: kept apart from every other.")
+                BrainChip(k, GlassInk.accent(paneAccent), help: "\(k) room: kept apart from every other.")
             }
         }
     }
@@ -83,7 +85,7 @@ struct BrainCard<Content: View>: View {
 /// A bar that fills to a fraction: the CoreUI meter, amber when the hue says it is running out.
 struct BrainBar: View {
     let fraction: Double
-    var hue: Color = GlassInk.blue
+    var hue: Color?
     var height: CGFloat = 6
     var body: some View {
         CoreMeter(fraction, low: hue == GlassInk.amber || hue == GlassInk.red, height: height, label: "")

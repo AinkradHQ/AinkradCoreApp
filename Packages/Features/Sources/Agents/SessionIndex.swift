@@ -68,6 +68,8 @@ struct SessionIndex {
         var archived: Set<String>
         var now: Date = Date()
         var calendar: Calendar = .current
+        /// Ended sessions older than this many days go to the Archive (Settings, AI Sessions, Keep sessions for).
+        var archiveDays: Int = SessionIndex.archiveDays
         var title: (AgentSessionInfo) -> String
         var runnerName: (String) -> String
         var project: (AgentSessionInfo) -> String?
@@ -138,7 +140,7 @@ struct SessionIndex {
         let last = s.updatedAt
         let cal = i.calendar
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: last), to: cal.startOfDay(for: i.now)).day ?? 0
-        if !s.live && days > archiveDays { return .archive }
+        if !s.live && days > i.archiveDays { return .archive }
         switch days {
         case ...0: return .today
         case 1: return .yesterday

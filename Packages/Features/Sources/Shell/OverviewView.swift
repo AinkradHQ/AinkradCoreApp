@@ -5,6 +5,7 @@ import SwiftUI
 /// Overview (⇧⌘O): every open app as a card, like Mission Control. Pick one with the arrows and Return, its number, or a
 /// click; it comes to the front (out of the stack if it was there). Esc closes.
 struct OverviewView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @State private var selected = 0
     @State private var shown = false
@@ -15,7 +16,7 @@ struct OverviewView: View {
         let panes = shell.panes
         VStack(alignment: .leading, spacing: Space.s4) {
             HStack(spacing: Space.s3) {
-                IconTile("square.grid.2x2", hue: GlassInk.blue, size: 40, bounce: shown)
+                IconTile("square.grid.2x2", hue: GlassInk.accent(paneAccent), size: 40, bounce: shown)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Overview").coreFont(size: MacTextSize.large + 2, weight: .bold)
                     Text("\(panes.count) apps open · \(coreArrowKeys()) ↑ ↓ choose · ↩ or 1–9 open · esc close")
@@ -58,7 +59,7 @@ struct OverviewView: View {
         }
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack {
-                IconTile(p.symbol, hue: on ? GlassInk.blue : GlassInk.slate, size: 44, bounce: on)
+                IconTile(p.symbol, hue: on ? GlassInk.accent(paneAccent) : GlassInk.slate, size: 44, bounce: on)
                 Spacer()
                 if index < 9 {
                     Text("\(index + 1)").coreFont(size: MacTextSize.meta, weight: .bold, design: .rounded)
@@ -78,7 +79,7 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
         .background {
             if on {
-                coreShape(Radius.cardMac).fill(GlassInk.blue.opacity(0.22))
+                coreShape(Radius.cardMac).fill(GlassInk.accent(paneAccent).opacity(0.22))
                     .matchedGeometryEffect(id: "pick", in: lens)
             } else {
                 coreShape(Radius.cardMac).fill(GlassInk.well)

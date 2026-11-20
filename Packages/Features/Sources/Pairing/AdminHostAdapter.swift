@@ -30,7 +30,15 @@ final class AdminHostAdapter: AdminHost {
     func clearElevationNotice() { app.stepUpNotice = nil }
 
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
-        do { return try await app.elevated(reason, done: done, keepsEdit: keepsEdit, op) } catch is StepUpDeclined {
+        try await elevated(reason, done: done, keepsEdit: keepsEdit, force: false, op)
+    }
+
+    func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
+        async throws -> T
+    {
+        do {
+            return try await app.elevated(reason, done: done, keepsEdit: keepsEdit, force: force, op)
+        } catch is StepUpDeclined {
             throw AdminDeclined()
         }
     }

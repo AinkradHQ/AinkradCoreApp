@@ -114,6 +114,7 @@ private struct AccountTile {
 /// Settings, Notifications: whether macOS lets Ainkrad show banners, what it tells you about, and where activity shows
 /// inside Ainkrad. Saved on this Mac.
 struct NotificationsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
 
     var body: some View {
@@ -145,44 +146,8 @@ struct NotificationsSection: View {
                             .disabled(!allowed)
                         }
                     }
-                    ForEach(
-                        [
-                            ("A session fails", "xmark.octagon"), ("A session finishes", "checkmark.circle"),
-                            ("A session stalls", "pause.circle"),
-                        ],
-                        id: \.0
-                    ) { title, symbol in
-                        GlassToggleTile(
-                            title, sub: "Coming: your Core can't send this yet.", symbol: symbol,
-                            isOn: .constant(false), fill: true
-                        )
-                        .disabled(true).opacity(0.55)
-                    }
                 }
                 BannerPreview()
-            }
-            GlassSection(
-                "Inside Ainkrad", sub: "What is running and what needs you.", symbol: "waveform.path.ecg",
-                hue: GlassInk.blue, index: 2
-            ) {
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: Space.s3), GridItem(.flexible())], spacing: Space.s3
-                ) {
-                    GlassToggleTile(
-                        "The bell", sub: "Always on: what waits on you, runners and recent events.", symbol: "bell",
-                        onSymbol: "bell.fill", isOn: .constant(true), fill: true
-                    )
-                    .disabled(true)
-                    GlassToggleTile(
-                        "Status bar chip", sub: "“2 running · 1 waiting” next to the bell.", symbol: "capsule",
-                        onSymbol: "capsule.fill",
-                        isOn: Binding(
-                            get: { model.shell.showActivityChip },
-                            set: {
-                                model.shell.showActivityChip = $0
-                                model.shell.settings.saved()
-                            }), fill: true)
-                }
             }
         }
         .foregroundStyle(GlassInk.primary)
@@ -191,7 +156,7 @@ struct NotificationsSection: View {
 
     private var permission: some View {
         let p = model.notifierPermission
-        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.blue : GlassInk.amber
+        let hue = p == .allowed ? GlassInk.green : p == .notAsked ? GlassInk.accent(paneAccent) : GlassInk.amber
         return HStack(spacing: Space.s4) {
             IconTile(p == .allowed ? "bell.fill" : "bell.slash.fill", hue: hue, size: 56, bounce: p == .allowed)
                 .shadow(color: hue.opacity(0.5), radius: 14)
@@ -212,7 +177,9 @@ struct NotificationsSection: View {
             }
             Spacer(minLength: Space.s3)
             if p == .notAsked {
-                AppActionTile(title: "Turn on", symbol: "bell.badge", key: "↩", hue: GlassInk.blue, prominent: true) {
+                AppActionTile(
+                    title: "Turn on", symbol: "bell.badge", key: "↩", hue: GlassInk.accent(paneAccent), prominent: true
+                ) {
                     Task { await model.turnOnNotifications() }
                 }
                 .keyboardShortcut(.defaultAction)

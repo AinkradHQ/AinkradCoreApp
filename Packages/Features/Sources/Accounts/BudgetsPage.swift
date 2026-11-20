@@ -3,13 +3,14 @@ import SwiftUI
 
 /// The Spend pages' shared head: the page's own title, and Budgets · Costs · Ledger · Prices at the top right.
 struct SpendHeader: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AccountsModel
     let title: String
     let detail: String
     let symbol: String
 
     var body: some View {
-        AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.blue) {
+        AccHeader(title: title, detail: detail, symbol: symbol, hue: GlassInk.accent(paneAccent)) {
             CoreSegmented(
                 "Spend",
                 segments: [AccountsPage.spending, .budgets, .costs, .ledger, .prices].map {
@@ -32,6 +33,7 @@ struct SpendHeader: View {
 /// Budgets (Ahmed's prototype, `accounts-3.js`): one verdict first (all have room, or which one stopped), then a card per
 /// budget with tokens and dollars used against its cap, grouped by what it caps. ↑↓ move, E edit, R raise, ⌫ remove.
 struct BudgetsPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
 
     var body: some View {
@@ -60,7 +62,9 @@ struct BudgetsPage: View {
                     symbol: "exclamationmark.triangle", title: "Could not load budgets",
                     text: "The Core answered with an error. \(message)", tone: .fail, code: code
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                    AppActionTile(
+                        title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)
+                    ) {
                         Task { await model.reloadBudgets() }
                     }
                 }
@@ -68,9 +72,12 @@ struct BudgetsPage: View {
                 verdict
                 let mine = model.budgets.filter { ["account", "pool"].contains($0.kind) }
                 let theirs = model.budgets.filter { !["account", "pool"].contains($0.kind) }
-                if !mine.isEmpty { section("Accounts and pools", "creditcard.fill", GlassInk.blue, mine, 0) }
+                if !mine.isEmpty {
+                    section("Accounts and pools", "creditcard.fill", GlassInk.accent(paneAccent), mine, 0)
+                }
                 if !theirs.isEmpty {
-                    section("AI sessions, companies and projects", "person.3.fill", GlassInk.blue, theirs, 1)
+                    section(
+                        "AI sessions, companies and projects", "person.3.fill", GlassInk.accent(paneAccent), theirs, 1)
                 }
             }
         }
@@ -147,6 +154,7 @@ struct BudgetsPage: View {
 /// One budget: what it caps, its standing, tokens and dollars used as bars, and its actions at the top right (they fade
 /// in on hover or with the cursor, in place).
 private struct BudgetCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let budget: BudgetItem
     let selected: Bool
@@ -195,7 +203,8 @@ private struct BudgetCard: View {
                         }
                     }
                     AppActionTile(
-                        title: "Edit", symbol: "slider.horizontal.3", key: selected ? "E" : "", hue: GlassInk.blue
+                        title: "Edit", symbol: "slider.horizontal.3", key: selected ? "E" : "",
+                        hue: GlassInk.accent(paneAccent)
                     ) { AccountDialogs.openBudget(model, editing: b) }
                     AppActionTile(title: "Remove", symbol: "trash", key: selected ? "⌫" : "", hue: GlassInk.slate) {
                         AccountDialogs.openDeleteBudget(model, b)
@@ -218,7 +227,8 @@ private struct BudgetCard: View {
     }
 
     private func bar(_ what: String, _ words: String, _ share: Double, _ b: BudgetItem) -> some View {
-        let hue = share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.amber : GlassInk.blue
+        let hue =
+            share >= 1 ? GlassInk.red : share * 100 >= Double(b.warnAt) ? GlassInk.amber : GlassInk.accent(paneAccent)
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(what).foregroundStyle(GlassInk.secondary)

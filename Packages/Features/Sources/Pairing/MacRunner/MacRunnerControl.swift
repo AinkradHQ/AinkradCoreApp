@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ServiceManagement
 
@@ -37,10 +38,13 @@ protocol MacRunnerControl: Sendable {
     func openLoginItems()
     /// Why the runner is not doing its job, in plain words; nil when nothing is wrong (see `MacRunnerProblem`).
     func lastProblem(connected: Bool) -> String?
+    /// Shows the runner's own folder (its log and last error) in Finder.
+    func revealLog()
 }
 
 extension MacRunnerControl {
     func lastProblem(connected: Bool) -> String? { nil }
+    func revealLog() {}
 }
 
 /// The runner's problems in plain words, from the two places they show: launchd (`launchctl print`, when it could not start
@@ -182,6 +186,15 @@ struct LiveMacRunnerControl: MacRunnerControl {
     }
 
     func openLoginItems() { SMAppService.openSystemSettingsLoginItems() }
+
+    func revealLog() {
+        let log = state.appending(path: "runner.log")
+        if FileManager.default.fileExists(atPath: log.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([log])
+        } else {
+            NSWorkspace.shared.open(state)
+        }
+    }
 
     func lastProblem(connected: Bool) -> String? {
         let launchd = connected ? nil : Self.launchctlPrint()

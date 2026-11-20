@@ -26,7 +26,9 @@ enum AccountDialogs {
         advanced: Bool = false
     ) {
         present(m, "account-connect") { close in
-            if replacing == nil && flow == nil {
+            if replacing == nil && flow == nil && m.aiOrderOn {
+                AddAccountDialog(model: m, provider: provider, close: close)
+            } else if replacing == nil && flow == nil {
                 ConnectWizard(model: m, provider: provider, advanced: advanced, close: close)
             } else {
                 ConnectDialog(model: m, provider: provider, replacing: replacing, flow: flow, close: close)
@@ -151,6 +153,7 @@ private struct CapDialog: View {
 }
 
 private struct NewPoolDialog: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let close: () -> Void
     @State private var name = ""
@@ -169,7 +172,7 @@ private struct NewPoolDialog: View {
                     ForEach(ProviderLook.ordered(model.providers)) { p in
                         AccPick(
                             title: p.name, sub: p.loginMethods.contains("browser_code") ? "Subscription" : "API key",
-                            symbol: ProviderLook.symbol(p.id), hue: GlassInk.blue, on: p.id == chosen
+                            symbol: ProviderLook.symbol(p.id), hue: GlassInk.accent(paneAccent), on: p.id == chosen
                         ) { provider = p.id }
                     }
                 }
@@ -282,35 +285,30 @@ private struct AddMemberDialog: View {
 
 /// Settings, Core: a way into the Core app.
 struct AccountsLinkSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
-    @Bindable private var prefs = AccountsPrefs.shared
+    var part: SettingsPart = .all
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s4) {
-            GlassSection(
-                "Look", sub: "The Core app's content background.", symbol: "circle.lefthalf.filled",
-                hue: GlassInk.blue
-            ) {
-                AppLookTabs(follow: $prefs.followLook, mode: $prefs.modeChoice)
-            } content: {
-                if prefs.followLook {
-                    Text("Same as Settings, Appearance.").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
-                } else {
-                    GlassSlider(value: $prefs.opacity, in: 0.05...1, low: "See-through", high: "Solid")
-                }
+            if part.showsLook {
+                AppLookSection(appName: "Accounts", prefs: AppLookPrefs.shared("accounts"))
             }
-            GlassSection(
-                "The Core app", sub: "Accounts, pools and chains, shared by AI sessions, Citadel and every device.",
-                symbol: "creditcard.fill", hue: GlassInk.blue, index: 1
-            ) {
-                AppActionTile(
-                    title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.blue, prominent: true
+            if part.showsOptions {
+                GlassSection(
+                    "The Core app", sub: "Accounts, pools and chains, shared by AI sessions, Citadel and every device.",
+                    symbol: "creditcard.fill", hue: GlassInk.accent(paneAccent), index: 1
                 ) {
-                    model.host.shell.overlay = nil
-                    model.show(.accounts)
+                    AppActionTile(
+                        title: "Open", symbol: "arrow.up.forward.app", key: "", hue: GlassInk.accent(paneAccent),
+                        prominent: true
+                    ) {
+                        model.host.shell.overlay = nil
+                        model.show(.accounts)
+                    }
+                } content: {
+                    EmptyView()
                 }
-            } content: {
-                EmptyView()
+                AccountsOptionsTab()
             }
         }
         .foregroundStyle(GlassInk.primary)

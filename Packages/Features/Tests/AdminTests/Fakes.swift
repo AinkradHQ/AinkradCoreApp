@@ -13,8 +13,15 @@ final class FakeHost: AdminHost {
     private(set) var reasons: [String] = []
     private(set) var rateLimits: [TimeInterval?] = []
     func clearElevationNotice() { elevationNotice = nil }
+    private(set) var forces: [Bool] = []
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
+        try await elevated(reason, done: done, keepsEdit: keepsEdit, force: false, op)
+    }
+    func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
+        async throws -> T
+    {
         reasons.append(reason)
+        forces.append(force)
         if declines { throw AdminDeclined() }
         return try await op()
     }
@@ -160,6 +167,31 @@ final class FakeService: AdminService, @unchecked Sendable {
         try note("metrics")
         return metricsText
     }
+    var v010 = false
+    var history: [OpsPoint] = []
+    var statsDays: [AuditDayStat] = []
+    var exported: [ExportedValue] = []
+    func supportsV010() async -> Bool { v010 }
+    func revealValue(_ name: String) async throws -> RevealedValue {
+        try note("reveal \(name)")
+        return RevealedValue(name: name, kind: "text", value: "dummy-shown-1", hideAfter: 0.15)
+    }
+    func exportSecrets() async throws -> [ExportedValue] {
+        try note("export")
+        return exported
+    }
+    func opsHistory() async throws -> [OpsPoint] { history }
+    var host: CoreHostFacts?
+    var backupInfo: CoreBackups?
+    func hostFacts() async -> CoreHostFacts? { host }
+    func backups() async throws -> CoreBackups? { backupInfo }
+    func startBackup() async throws {
+        try note("backup-now")
+        backupInfo?.running = true
+    }
+    var restartRows: [CoreRestart] = []
+    func recentRestarts() async -> [CoreRestart] { restartRows }
+    func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat] { statsDays }
 }
 
 @MainActor

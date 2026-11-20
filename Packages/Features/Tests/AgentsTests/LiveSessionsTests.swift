@@ -62,6 +62,19 @@ struct LiveSessionsTests {
         #expect(!i.flat(scope: .earlier, filters: .init()).contains { $0.id == "a15" })
     }
 
+    /// Settings, AI Sessions, Keep sessions for: "a week" archives an ended session after seven days.
+    @MainActor @Test func keepSessionsForMovesTheArchiveLine() {
+        let items = [session("e5", .ended, ageDays: 5), session("e9", .ended, ageDays: 9)]
+        let week = SessionIndex(
+            .init(
+                items: items, needsYou: [], pinned: [], archived: [], now: now, calendar: cal, archiveDays: 7,
+                title: { $0.id }, runnerName: { $0 }, project: { $0.project }))
+        #expect(week.counts[.archive] == 1)
+        #expect(AgentPrefs.keepDays("week") == 7 && AgentPrefs.keepDays("month") == 30)
+        #expect(AgentPrefs.keepDays("forever") == Int.max)
+        #expect(index(items).counts[.archive] == nil, "the default stays 14 days")
+    }
+
     @Test func archivingByHandAndSearchReachingTheArchive() {
         let items = [session("keep", .ended), session("gone", .ended)]
         let i = index(items, archived: ["gone"])

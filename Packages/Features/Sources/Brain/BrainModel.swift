@@ -26,6 +26,8 @@ public final class BrainModel {
     /// Where the wizard's Notes and docs look: the person's folders or a disk search. Tests and the Debug gallery replace it.
     @ObservationIgnored public var importPlaces: ImportPlaces? = ImportPlaces.shared
     /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
+    /// The top-bar dropdown's numbers from a Core with API minor 95 (`BrainGlanceSource`); nil keeps the Rooms and Records counts.
+    var glanceData: GlanceData?
     public var apiMinor: Int? {
         didSet {
             updateStatusPolling()
@@ -137,6 +139,7 @@ public final class BrainModel {
         clearRoomView()
         rooms = []
         overview = nil
+        glanceData = nil
         viewingID = nil
         importer = nil
         sync?.stopTimer()
@@ -381,6 +384,12 @@ public final class BrainModel {
             let made = try await service.createRoom(draft)
             host.shell.showToast("Room \(made.name) created")
             await reload()
+            // Settings, Brain, Remember for: a new room keeps its sources for that long.
+            if let days = BrainOptions.newRoomRetention(BrainOptions.options.string(BrainOptions.remember, "forever")) {
+                _ = await candidates.change(
+                    made.id, PolicyChange(retentionDays: days),
+                    reason: "Remove the text of sources older than \(days) days in \(made.name) for good.")
+            }
             return true
         } catch is AdminDeclined {
             return false
@@ -404,6 +413,13 @@ public final class BrainModel {
     // MARK: shell
 
     /// Opens the pane on a tab.
+    /// Opens the Brain on an area the top bar counted (`me`, `rules`, `knowledge`, `timeline`, `places`): the calm Brain's page
+    /// when it is shown, else the console's overview.
+    func open(area: String) {
+        show(BrainAreaLink.tab(for: area))
+        if calmAvailable, !exploring, let page = BrainCalmModel.Page(rawValue: area) { calm.page = page }
+    }
+
     public func show(_ tab: BrainTab = .overview) {
         self.tab = tab
         var spec = PaneSpec(
@@ -495,11 +511,36 @@ public final class BrainModel {
             BrainHowItWorks.open($0.host.shell)
         }
         if service != nil { registerActions() }
+        // The top bar's Brain dropdown: a Core with API minor 95 tells what it does now, the five areas and what it learned
+        // today; an older one says how things are in Rooms and Records.
+        shell.brainRefresh = { [weak self] in await self?.refreshGlance() }
+        shell.brainOpenArea = { [weak self] area in self?.open(area: area) }
+        shell.brainUndoLearned = { [weak self] in self?.undoLearned() }
+        shell.brainGlance = { [weak self] in
+            guard let self, self.service != nil else { return nil }
+            if self.servesGlance, let d = self.glanceData { return BrainGlanceMaker.glance(d) }
+            let o = self.overview
+            let status =
+                switch o?.health {
+                case .paused?: "Paused"
+                case .needsYou?: "Something needs a look"
+                default: "Learning quietly in the background"
+                }
+            let records = self.rooms.reduce(0) { $0 + ($1.counts?.records ?? 0) }
+            return BrainGlance(
+                status: status, healthy: (o?.health ?? .healthy) == .healthy,
+                stats: [
+                    .init("Rooms", self.rooms.count), .init("Records", records), .init("To check", o?.needs.count ?? 0),
+                ])
+        }
         shell.settings.section(
             SettingsSection(
-                id: "brain-link", group: .apps, title: "Brain", sub: "Look of the memory app", symbol: "brain",
-                order: 5
-            ) { BrainLookSection(model: self) })
+                id: "brain-link", group: .apps, title: "Brain", sub: "Look and options of the memory app",
+                symbol: "brain", order: 5,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { BrainLookSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { BrainLookSection(model: self, part: .options) },
+                ]))
         // A locked Mac clears the room view from memory (security rule 7).
         lockWatch = DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main

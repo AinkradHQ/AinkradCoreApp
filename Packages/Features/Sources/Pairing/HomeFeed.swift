@@ -6,6 +6,8 @@ import Foundation
 import Shell
 
 struct HomeRunner: Equatable, Sendable {
+    /// The runner's device id, the key of its `runner.tool_install` events; empty when the source has none.
+    var id: String = ""
     var name: String
     var arch: String?
     var online: Bool
@@ -89,7 +91,7 @@ struct LiveHomeSource: HomeSource {
         try await run {
             try await client.listRunners().ok.body.json.map { r in
                 HomeRunner(
-                    name: r.name, arch: r.arch, online: r.online ?? false, capacity: Int(r.capacity ?? 0),
+                    id: r.id, name: r.name, arch: r.arch, online: r.online ?? false, capacity: Int(r.capacity ?? 0),
                     load: Int(r.load ?? 0),
                     perCore: r.hostLoad.flatMap { $0.cores > 0 ? $0.avg1 / Double($0.cores) : nil })
             }
@@ -104,8 +106,9 @@ struct LiveHomeSource: HomeSource {
     }
     func utilisation() async throws -> Double {
         try await run {
-            let all = try await client.accountsUsage().ok.body.json
-            return min(1, all.map { Double($0.maxUtilisationBps) / 10_000 }.max() ?? 0)
+            // Core 0.10 dropped `max_utilisation_bps`: the tightest token budget says how close the Core is to a stop.
+            let all = try await client.listBudgets().ok.body.json
+            return min(1, all.compactMap { $0.tokenCap > 0 ? Double($0.spent) / Double($0.tokenCap) : nil }.max() ?? 0)
         }
     }
     func audit() async throws -> [HomeAudit] {
@@ -123,11 +126,14 @@ struct LiveHomeSource: HomeSource {
     }
 
     func health() async throws -> CoreHealthFacts {
-        try await run {
+        let host = await connection.hostFacts()
+        return try await run {
             let h = try await client.getCoreHealth().ok.body.json
             return CoreHealthFacts(
                 version: h.version, uptimeSecs: h.uptimeSecs, certDaysLeft: h.certDaysLeft.map(Int.init),
-                lastBackupAt: h.lastBackupAt, lastBackupBytes: h.lastBackupBytes)
+                lastBackupAt: h.lastBackupAt, lastBackupBytes: h.lastBackupBytes,
+                // New in 0.10 (needs `make clients`, done by the coordinator at the epic merge).
+                memoryBytes: h.memoryBytes, diskUsedPct: h.diskUsedPct.map(Int.init), host: host)
         }
     }
 
@@ -139,14 +145,15 @@ struct LiveHomeSource: HomeSource {
         }
     }
 
-    /// The tightest limit of each provider across its accounts, with the soonest plan-window reset.
+    /// The tightest plan window of each provider across its accounts (a fraction of the window's limit), with the soonest
+    /// reset. E7 removed the per-account limits, so the subscription's own plan windows are the measure.
     func usage() async throws -> [HomeUsage] {
         try await run {
-            async let spend = client.accountsUsage().ok.body.json
-            async let accounts = client.listAccounts().ok.body.json
-            let (spent, list) = try await (spend, accounts)
+            let list = try await client.listAccounts().ok.body.json
             return Self.usage(
-                spent: spent.map { ($0.accountId, Double($0.maxUtilisationBps) / 10_000) },
+                spent: list.compactMap { a in
+                    a.health?.planLimit?.windows.map(\.utilization).max().map { (a.id, $0) }
+                },
                 accounts: list.map {
                     ($0.id, $0.provider, ($0.health?.planLimit?.windows ?? []).compactMap(\.resetsAt))
                 })
@@ -271,7 +278,8 @@ final class HomeFeed {
                 if let p = m.perCore { h = Array((h + [min(1, p)]).suffix(12)) }
                 history[m.name] = h
                 return .init(
-                    id: m.name, os: m.arch ?? "runner", online: m.online, slots: m.capacity, used: m.load, load: h)
+                    id: m.name, os: m.arch ?? "runner", online: m.online, slots: m.capacity, used: m.load, load: h,
+                    runnerID: m.id)
             }
         }
         if let c = try? await source.costs() {
@@ -288,7 +296,12 @@ final class HomeFeed {
                     minutesAgo: max(0, Int(at.timeIntervalSince($0.at) / 60)), symbol: "list.bullet")
             }
         }
-        if let h = try? await source.health() { home.health = h }
+        let began = ContinuousClock.now
+        if let h = try? await source.health() {
+            home.health = h
+            let d = ContinuousClock.now - began
+            shell.responseMs = Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
+        }
         if let p = try? await source.projects() {
             home.projects = p.map { pr in
                 .init(

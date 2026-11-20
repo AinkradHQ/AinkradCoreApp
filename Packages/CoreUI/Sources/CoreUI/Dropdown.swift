@@ -34,6 +34,7 @@ public struct CoreDropdownItem: Identifiable {
 /// the one frame, with a row per item. Hover tints a row; ↑ ↓ move the highlight, Return runs it, Esc or a click outside
 /// closes. The panel fades in and rises a few points. Right-click menus stay native.
 public struct CoreDropdown<Label: View>: View {
+    @Environment(\.coreAccent) private var accent
     let items: [CoreDropdownItem]
     let label: Label
     let isPresented: Binding<Bool>?
@@ -125,7 +126,9 @@ public struct CoreDropdown<Label: View>: View {
             HStack(spacing: Space.s2) {
                 if checks {
                     Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold)
-                        .foregroundStyle(GlassInk.blueInk).frame(width: Space.s3).opacity(item.checked ? 1 : 0)
+                        .foregroundStyle(GlassInk.accentInk(accent)).frame(width: Space.s3).opacity(
+                            item.checked ? 1 : 0
+                        )
                         .accessibilityHidden(true)
                 }
                 if let symbol = item.symbol {
@@ -144,7 +147,7 @@ public struct CoreDropdown<Label: View>: View {
             .frame(height: MacSize.controlMd + Space.s1)
             .background(
                 on || hovered == item.id
-                    ? GlassInk.wellHover : item.checked ? GlassInk.blue.opacity(0.22) : .clear,
+                    ? GlassInk.wellHover : item.checked ? GlassInk.accent(accent).opacity(0.22) : .clear,
                 in: coreShape(Radius.control)
             )
             .contentShape(coreShape(Radius.control))

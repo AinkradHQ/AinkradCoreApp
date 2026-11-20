@@ -219,6 +219,10 @@ extension CoreUIGallery {
                 GVariant("SurfaceModeTabs") { SurfaceModeTabs(mode: $mode) }
             }
         }
+        GSpec("CoreTabs", "The tabs of a pane, under its title. The selection glides; Reduce Motion jumps.") {
+            let tabs = [CoreTab("look", "Look"), CoreTab("wall", "Wallpaper"), CoreTab("clock", "Clock")]
+            GVariant("Plain") { CoreTabs("Appearance", tabs: tabs, selection: $tab) }
+        }
         GSpec("AppFilterTile", "A pane header's filter with its count. The key shows in the tooltip.") {
             HStack(spacing: Space.s2) {
                 AppFilterTile(title: "Overview", count: -1, on: false, key: "⌘1") {}

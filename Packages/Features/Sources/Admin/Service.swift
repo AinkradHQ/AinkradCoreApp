@@ -27,6 +27,18 @@ protocol AdminService: Sendable {
     func audit(before: Int64?, limit: Int, filter: AuditFilter) async throws -> AuditPageItem
     /// The Core's Prometheus text, as it is.
     func metrics() async throws -> String
+    /// Core 0.10 (API minor 95): show or export a value, the Core's own history, the audit counts. See `ActivityService.swift`.
+    func supportsV010() async -> Bool
+    func revealValue(_ name: String) async throws -> RevealedValue
+    func exportSecrets() async throws -> [ExportedValue]
+    func opsHistory() async throws -> [OpsPoint]
+    /// The whole machine and the runner fleet (nil before Core 0.10), the backup schedule and history, and "back up now".
+    func hostFacts() async -> CoreHostFacts?
+    func backups() async throws -> CoreBackups?
+    func startBackup() async throws
+    /// The restarts people asked for, newest first (Core 0.10), for the Ops card "Recent restarts".
+    func recentRestarts() async -> [CoreRestart]
+    func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat]
 }
 
 extension AdminService {

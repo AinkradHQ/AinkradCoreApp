@@ -118,6 +118,7 @@ struct NewTerminalView: View {
 
 /// A machine to pick: its picture, name and what a terminal there is, a chip (This Mac or Sandbox), and why it can't be picked.
 private struct NewTerminalRunnerTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     let runner: RunnerItem
@@ -144,11 +145,11 @@ private struct NewTerminalRunnerTile: View {
         } label: {
             HStack(spacing: Space.s3) {
                 Image(systemName: on ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(on ? GlassInk.blue : GlassInk.track)
+                    .foregroundStyle(on ? GlassInk.accent(paneAccent) : GlassInk.track)
                     .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
                 IconTile(
                     mac ? "laptopcomputer" : runner.builtIn ? "diamond" : "server.rack",
-                    hue: mac ? GlassInk.amber : GlassInk.blue, size: 36, bounce: on)
+                    hue: mac ? GlassInk.amber : GlassInk.accent(paneAccent), size: 36, bounce: on)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(mac ? "This Mac" : runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(warn ?? about).coreFont(size: MacTextSize.meta)
