@@ -151,6 +151,13 @@ protocol TerminalService: Sendable {
     func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool)
     /// `POST /runners/{id}/tools` (admin, step-up): the id of the install operation.
     func installTool(_ runner: String, tool: String) async throws -> String
+    /// `GET /hardware` (E15): nil before API minor 95 or when it does not answer 200.
+    func hardware() async -> [HardwareItem]?
+    func hardwarePool() async -> HardwarePoolItem?
+    /// The newest jobs (`GET /jobs`), for the "Ran on" chips; empty when there are none to read.
+    func jobs() async -> [JobItem]
+    /// `PUT /hardware/{id}/pause`, or `/hardware/pause` for `nil` (admin, step-up). A nil `until` lifts the pause.
+    func pauseHardware(_ id: String?, until: Date?) async throws
 }
 
 /// A project a terminal can be opened in.
@@ -174,6 +181,10 @@ extension TerminalService {
         (policy, false)
     }
     func installTool(_ runner: String, tool: String) async throws -> String { "op" }
+    func hardware() async -> [HardwareItem]? { nil }
+    func hardwarePool() async -> HardwarePoolItem? { nil }
+    func jobs() async -> [JobItem] { [] }
+    func pauseHardware(_ id: String?, until: Date?) async throws {}
 }
 
 struct LiveTerminalService: TerminalService {
@@ -204,6 +215,35 @@ struct LiveTerminalService: TerminalService {
             for i in out.indices { if let e = extra[out[i].id] { e.apply(to: &out[i]) } }
         }
         return out
+    }
+
+    func hardware() async -> [HardwareItem]? {
+        guard await connection.serverSupports(minor: 95) else { return nil }
+        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/hardware") else {
+            return nil
+        }
+        return try? HardwareWire.decoder.decode([HardwareItem].self, from: data)
+    }
+
+    func hardwarePool() async -> HardwarePoolItem? {
+        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/hardware/pool") else {
+            return nil
+        }
+        return try? HardwareWire.decoder.decode(HardwarePoolItem.self, from: data)
+    }
+
+    func jobs() async -> [JobItem] {
+        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/jobs?limit=50") else {
+            return []
+        }
+        return (try? HardwareWire.decoder.decode([JobItem].self, from: data)) ?? []
+    }
+
+    func pauseHardware(_ id: String?, until: Date?) async throws {
+        let target = id.map { "/api/v1/hardware/\($0)/pause" } ?? "/api/v1/hardware/pause"
+        _ = try await run {
+            try await connection.signedRequest(method: "PUT", target: target, body: HardwareWire.pauseBody(until))
+        }
     }
 
     private func reported() async -> [String: RunnerReportWire]? {

@@ -23,7 +23,7 @@ struct NewTerminalView: View {
             .coreRise(shown, 0)
             step("Where should it run?", index: 1) {
                 if model.runners.isEmpty {
-                    Label("No runners are paired with this Core.", systemImage: "exclamationmark.triangle")
+                    Label("No hardware is paired with this Core.", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(GlassInk.secondary)
                 }
                 VStack(spacing: Space.s1) {
@@ -86,7 +86,9 @@ struct NewTerminalView: View {
     /// This Mac first, then the others as the Core lists them.
     private var machines: [RunnerItem] {
         let mac = model.host.thisMacRunnerID
-        return model.runners.filter { $0.id == mac } + model.runners.filter { $0.id != mac }
+        // With hardware (E15) a terminal opens on the Core or This Mac; the other machines take jobs, not shells.
+        let all = model.runners.filter { !model.hidesTerminals($0) }
+        return all.filter { $0.id == mac } + all.filter { $0.id != mac }
     }
 
     private func step<C: View>(_ title: String, index: Int, @ViewBuilder _ content: () -> C) -> some View {

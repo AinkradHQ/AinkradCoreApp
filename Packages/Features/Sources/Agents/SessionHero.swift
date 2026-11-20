@@ -1,4 +1,5 @@
 import CoreUI
+import Shell
 import SwiftUI
 
 /// The top of a conversation: one slim line with the session's title, tool and runner on the left and the actions on the
@@ -74,6 +75,8 @@ struct SessionHero: View {
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1).fixedSize()
                 Color.clear.frame(width: 0, height: 0)
             }
+            // Where it ran when that was not the Core (E15): an overflowed or pinned session, or one with heavy jobs.
+            RanOnChip(model.shell.hardwareDeck.place(session: session.id, runner: session.runner))
         }
         .help(model.title(session) + "\n" + subtitle)
         .accessibilityElement(children: .combine)

@@ -1,5 +1,6 @@
 import AppKit
 import CoreUI
+import Shell
 import SwiftUI
 
 /// The Run page: the services table, the public link, the secrets and the logs, as in the approved mockup
@@ -86,11 +87,15 @@ private struct ServicesIsland: View {
         Island(
             title: "Services", sub: rows.isEmpty ? model.coreName : sub,
             accessory: {
-                Button("Edit Setup…") { RunDialogs.openSetup(run, project: project) }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                    .disabled(model.readOnly || !run.loaded || run.loadError != nil)
-                    .help("Change what this project runs")
-                    .accessibilityIdentifier("project-edit-setup")
+                HStack(spacing: Space.s2) {
+                    // Where the project's latest heavy job ran (E15); nothing for a Core run or before hardware.
+                    RanOnChip(model.host.shell.hardwareDeck.jobByProject[Int(project.id)])
+                    Button("Edit Setup…") { RunDialogs.openSetup(run, project: project) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .disabled(model.readOnly || !run.loaded || run.loadError != nil)
+                        .help("Change what this project runs")
+                        .accessibilityIdentifier("project-edit-setup")
+                }
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {

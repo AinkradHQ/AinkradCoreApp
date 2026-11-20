@@ -4,14 +4,14 @@ import SwiftUI
 
 /// One runner's page (N18, N19): a header, then Now, What it offers, Machine, Who may use it and Actions. Plain words, no
 /// internal codes; what the Core does not report says "Not reported yet".
-struct RunnerPage: View {
+struct HardwarePage: View {
     @Bindable var model: TerminalsModel
     let runner: RunnerItem
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.corePalette) var palette
+    @Environment(\.accessibilityReduceMotion) var reduce
 
     private var facts: RunnerFacts { RunnerFacts(runner: runner) }
-    private var off: Bool { facts.status == .off }
+    var off: Bool { facts.status == .off }
     private var busy: Bool { facts.status == .busy }
     private var work: [RunnerWork] { model.host.runnerHost?.agentWork(on: runner.id) ?? [] }
     private var here: [TerminalItem] { model.items.filter { $0.runner == runner.id && !$0.isEnded } }
@@ -20,12 +20,14 @@ struct RunnerPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            BackButton("Runners") { model.runnerDetail = nil }.keyboardShortcut(.escape, modifiers: [])
+            BackButton("Hardware") { model.runnerDetail = nil }.keyboardShortcut(.escape, modifiers: [])
             hero
             if off { whyOffline } else if let say = facts.say { RunnerSay(text: say, off: false) }
             HStack(alignment: .top, spacing: Space.s3) {
                 VStack(spacing: Space.s3) {
+                    capacity
                     now
+                    toolchains
                     lastProblem
                     homeFolder
                 }
@@ -250,11 +252,15 @@ struct RunnerPage: View {
         }
     }
 
+    private var shownTerminals: [TerminalItem] { hidesTerminals ? [] : Array(here.prefix(5)) }
+    var hidesTerminals: Bool { model.hidesTerminals(runner) }
+    var jobs: [HardwareItem.Job] { model.hardware[runner.id]?.jobs ?? [] }
+
     private var canTerminal: Bool { !off && !busy && facts.terminalsOn }
 
     // MARK: sections
 
-    private func card<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    func card<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
             content()
@@ -270,7 +276,7 @@ struct RunnerPage: View {
                 Text("Nothing is running here.").foregroundStyle(palette.text2)
             } else {
                 let terminals = here.count
-                RunnerBars(facts: facts, terminalsHere: terminals)
+                RunnerBars(facts: facts, terminalsHere: terminals, showTerminals: !hidesTerminals)
                 VStack(spacing: Space.s2) {
                     ForEach(work) { w in
                         workRow("bubble.left", w.title, w.detail) {
@@ -278,22 +284,23 @@ struct RunnerPage: View {
                         }
                         .transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity))
                     }
-                    ForEach(here.prefix(5)) { t in
+                    ForEach(jobs) { j in jobRow(j).transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity)) }
+                    ForEach(shownTerminals) { t in
                         workRow(
                             "terminal", "Terminal \(t.id)", t.attached == 0 ? "Not attached" : "\(t.attached) attached"
                         ) { model.openTerminal(t.id, attach: false) }
                         .transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity))
                     }
-                    if here.count > 5 {
+                    if !hidesTerminals && here.count > 5 {
                         Text("and \(here.count - 5) more terminals").foregroundStyle(palette.text2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if work.isEmpty && here.isEmpty {
+                    if work.isEmpty && jobs.isEmpty && (hidesTerminals || here.isEmpty) {
                         Text("Nothing is running here.").foregroundStyle(palette.text2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + here.map(\.id))
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + jobs.map(\.id) + here.map(\.id))
                 loadChart
             }
             if let n = model.noop[runner.id] { noopLine(n) }
@@ -370,14 +377,17 @@ struct RunnerPage: View {
     private func controls(_ known: RunnerPolicy?) -> some View {
         let p = known ?? RunnerPolicy(terminals: facts.terminalsOn, agents: facts.agentsOn, capacity: 2)
         return VStack(alignment: .leading, spacing: Space.s3) {
-            offer("terminal", "Terminals", "Open a shell on this runner") {
-                CoreSwitch(
-                    "",
-                    isOn: Binding(
-                        get: { p.terminals }, set: { v in Task { await model.setPolicy(runner, terminals: v) } })
-                )
-                .accessibilityLabel("Terminals")
-                .disabled(busyPolicy || off)
+            // Remote hardware no longer opens terminals (E15): the switch goes, the Core and This Mac keep theirs.
+            if !hidesTerminals {
+                offer("terminal", "Terminals", "Open a shell on this runner") {
+                    CoreSwitch(
+                        "",
+                        isOn: Binding(
+                            get: { p.terminals }, set: { v in Task { await model.setPolicy(runner, terminals: v) } })
+                    )
+                    .accessibilityLabel("Terminals")
+                    .disabled(busyPolicy || off)
+                }
             }
             offer("bubble.left", "AI sessions", aiLine) {
                 CoreSwitch(
@@ -579,8 +589,12 @@ struct RunnerPage: View {
                     off
                         ? unavailable ?? ""
                         : facts.agentsOn ? "Start an AI session on \(runner.name)" : "AI sessions are off here")
-                action("Open a terminal here", "terminal", disabled: !canTerminal) { model.openNew(runner: runner.id) }
+                if !hidesTerminals {
+                    action("Open a terminal here", "terminal", disabled: !canTerminal) {
+                        model.openNew(runner: runner.id)
+                    }
                     .help(unavailable ?? "Open a shell on \(runner.name)")
+                }
                 action("Rename", "pencil", disabled: false) { model.confirmRename(runner) }
                     .help("Give \(runner.name) another name")
                 action("Revoke runner…", "trash", disabled: false, danger: true) { model.confirmRevoke(runner) }
