@@ -343,7 +343,7 @@ public struct LiveAgentsAPI: AgentsAPI {
 
     // MARK: mapping
 
-    private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
+    static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
 
     func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch {
@@ -419,7 +419,7 @@ public struct LiveAgentsAPI: AgentsAPI {
     }
 
     /// A status the contract does not list (502 `runner_failed`, 503 `runner_busy`): its error body, when it has one.
-    private static func status(_ code: Int, _ payload: UndocumentedPayload) async -> CoreError {
+    static func status(_ code: Int, _ payload: UndocumentedPayload) async -> CoreError {
         var code_ = "error"
         var message = "The Core could not do that (\(code))."
         if let body = payload.body, let data = try? await Data(collecting: body, upTo: 16 * 1024),
@@ -430,14 +430,14 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
         return .http(status: code, code: code_, message: message)
     }
-    private static func fail(_ r: Components.Responses.Conflict) -> CoreError {
+    static func fail(_ r: Components.Responses.Conflict) -> CoreError {
         let b = try? r.body.json
         return .http(status: 409, code: b?.code ?? "conflict", message: b?.message ?? "The Core refused that.")
     }
-    private static func fail(_ r: Components.Responses.BadRequest) -> CoreError {
+    static func fail(_ r: Components.Responses.BadRequest) -> CoreError {
         .badRequest(message: (try? r.body.json)?.message ?? "The Core refused that.")
     }
-    private static func fail(_ r: Components.Responses.NotFound) -> CoreError {
+    static func fail(_ r: Components.Responses.NotFound) -> CoreError {
         .http(status: 404, code: "not_found", message: (try? r.body.json)?.message ?? "The Core does not know that.")
     }
 }

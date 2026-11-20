@@ -198,7 +198,7 @@ private struct VarRow: View {
                     note: runs.secretNames.isEmpty ? "none yet" : nil
                 ) {})
             out += runs.secretNames.map { s in
-                CoreDropdownItem("Use \(s)", indented: true, enabled: !runs.model.readOnly) {
+                CoreDropdownItem("Use \(s)", enabled: !runs.model.readOnly, indented: true) {
                     Task { await runs.link(v, to: s) }
                 }
             }

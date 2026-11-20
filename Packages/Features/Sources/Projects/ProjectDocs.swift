@@ -184,7 +184,7 @@ struct DocsPage: View {
     /// Notes an AI session wrote in its folder (E10): a person's edit saves back to the file.
     private var aiDocs: some View {
         let list = insights.docs ?? []
-        return Island(title: "AI documents", sub: "Edits save back to the file") {
+        return Island("AI documents", sub: "Edits save back to the file") {
             ScrollView {
                 VStack(spacing: Space.s1) {
                     if list.isEmpty {

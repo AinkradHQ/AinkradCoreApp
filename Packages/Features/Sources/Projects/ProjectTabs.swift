@@ -30,7 +30,7 @@ struct ChangesCard: View {
     let now: Date
 
     var body: some View {
-        Island(title: "Who changed what", sub: "This week") {
+        Island("Who changed what", sub: "This week") {
             if let c = insights.changes {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     if c.byAuthor.isEmpty && c.recent.isEmpty {

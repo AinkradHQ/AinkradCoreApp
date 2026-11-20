@@ -29,9 +29,9 @@ public final class BrainStatusModel {
     }
 
     /// The chip the shell draws; nil until the Core has answered.
-    public var chip: BrainChip? {
+    public var chip: Shell.BrainChip? {
         guard let a = activity else { return nil }
-        return BrainChip(
+        return Shell.BrainChip(
             state: a.state, line: Self.line(a), needs: a.needs.map { Self.need($0) }, attention: a.health != "ok")
     }
 

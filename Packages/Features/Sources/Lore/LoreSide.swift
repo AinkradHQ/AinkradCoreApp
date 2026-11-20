@@ -3,6 +3,7 @@
 import CoreKit
 import CoreUI
 import Foundation
+import LoreEditor
 import SwiftUI
 
 /// Whether each sidebar is open, kept per user (UserDefaults); both open until the person hides one.

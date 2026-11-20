@@ -264,8 +264,8 @@ public final class LoreDemo {
         model.use(service)
         let c = model.capture
         c.text = "Ask Mira whether the seed swap moves to Saturday"
-        c.advanced = scene == "advanced"
-        c.project = scene == "advanced" ? "7" : ""
+        // The destination chip (E10-3): the advanced scene shows a project, the quick one Today.
+        c.destination = scene == "advanced" ? .project(id: "7", name: "Garden") : .today
         c.error =
             scene == "error" ? "Unable to save: The Core did not answer. Your text is still here." : nil
         c.open()

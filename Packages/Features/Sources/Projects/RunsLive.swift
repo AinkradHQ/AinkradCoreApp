@@ -126,7 +126,7 @@ struct HistoryTab: View {
     @State private var open: String?
 
     var body: some View {
-        Island(title: "History", accessory: { Text("Latest 30").foregroundStyle(GlassInk.secondary) }) {
+        Island("History", accessory: { Text("Latest 30").foregroundStyle(GlassInk.secondary) }) {
             ScrollView {
                 VStack(spacing: Space.s1) {
                     if runs.history.isEmpty {
